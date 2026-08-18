@@ -1,0 +1,28 @@
+<Project>
+  <!--
+    ランタイム・言語は Pleasanter 本体に揃える。
+    参照元は _reference/Implem.Pleasanter（Pleasanter_1.5.7.0）の global.json / 各 csproj。
+      - SDK: 10.0.100 / TargetFramework: net10.0
+    Pleasanter 側は Nullable=disable だが、本アプリは新規実装のため enable とする
+    （本体コードを取り込まないので揃える必要が無く、enable の方が安全なため）。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>PMC Co.,Ltd.</Company>
+    <Product>VehicleVision.PleasanterTools.Questionnaire</Product>
+    <Copyright>Copyright (C) PMC Co.,Ltd.</Copyright>
+  </PropertyGroup>
+
+  <!--
+    Pleasanter 本体（GNU AGPL v3）はコピー・流用・リンク・プロジェクト参照しない。
+    本アプリは Pleasanter の「標準 API を叩く別アプリ」であり、本体の派生著作物にしない。
+    _reference/ は事実確認のための参照専用。詳細は _reference/README.md。
+  -->
+</Project>

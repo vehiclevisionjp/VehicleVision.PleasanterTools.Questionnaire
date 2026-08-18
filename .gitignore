@@ -1,0 +1,36 @@
+## build
+bin/
+obj/
+artifacts/
+*.user
+_dist/
+
+## rider / visual studio
+.vs/
+.idea/
+
+## node（フロントエンド: TypeScript + Vite + Svelte）
+node_modules/
+.vite/
+
+## secrets / local config（接続文字列・APIキーはコミットしない）
+appsettings.*.local.json
+*.env
+.env.local
+
+## logs
+logs/
+*.log
+
+## test results
+TestResults/
+_testresults/
+
+## 一時成果物（調査メモ・検証スクリプト）: temp/{yyyyMMdd}_{内容}/
+temp/
+
+## Claude Code の並列 worktree（Agent isolation:"worktree"）の作業コピー
+.claude/
+
+## Parameters のローカル上書き（実値。コミットしない）
+App_Data/Parameters/*.local.json
