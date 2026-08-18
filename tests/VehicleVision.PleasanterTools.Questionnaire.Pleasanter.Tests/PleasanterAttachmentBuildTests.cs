@@ -29,9 +29,10 @@ public class PleasanterAttachmentBuildTests
     {
         var record = Builder.Build(
             NoColumns,
-            attachments: new Dictionary<string, IReadOnlyList<PleasanterAttachment>>
+            attachments: new Dictionary<string, PleasanterAttachmentColumn>
             {
-                ["AttachmentsA"] = [new PleasanterAttachment("a.png", "aGVsbG8=")],
+                ["AttachmentsA"] = PleasanterAttachmentColumn.Of(
+                    new PleasanterAttachment("a.png", "aGVsbG8=")),
             });
 
         Assert.Empty(record.Problems);
@@ -47,13 +48,11 @@ public class PleasanterAttachmentBuildTests
     {
         var record = Builder.Build(
             NoColumns,
-            attachments: new Dictionary<string, IReadOnlyList<PleasanterAttachment>>
+            attachments: new Dictionary<string, PleasanterAttachmentColumn>
             {
-                ["AttachmentsA"] =
-                [
+                ["AttachmentsA"] = PleasanterAttachmentColumn.Of(
                     new PleasanterAttachment("a.png", "aGVsbG8="),
-                    new PleasanterAttachment("b.png", "d29ybGQ="),
-                ],
+                    new PleasanterAttachment("b.png", "d29ybGQ=")),
             });
 
         var files = AttachmentsOf(record, "AttachmentsA");
@@ -63,17 +62,54 @@ public class PleasanterAttachmentBuildTests
     }
 
     [Fact]
-    public void 添付が無くても列は載せる()
+    public void 足すものも消すものも無ければ列ごと送らない()
     {
         var record = Builder.Build(
             NoColumns,
-            attachments: new Dictionary<string, IReadOnlyList<PleasanterAttachment>>
+            attachments: new Dictionary<string, PleasanterAttachmentColumn>
             {
-                ["AttachmentsA"] = [],
+                ["AttachmentsA"] = new([], []),
             });
 
-        // **入れないと「添付を外した」編集が伝わらず、前の添付が残る**
-        Assert.Empty(AttachmentsOf(record, "AttachmentsA"));
+        // **空配列を送っても何も起きない**（_documents/実機検証結果.md 8 章）。
+        // 送るだけ無駄なので入れない
+        Assert.False(record.Body.ContainsKey("AttachmentsHash"));
+    }
+
+    [Fact]
+    public void 消す指示はGuidとDeletedで送る()
+    {
+        var record = Builder.Build(
+            NoColumns,
+            attachments: new Dictionary<string, PleasanterAttachmentColumn>
+            {
+                ["AttachmentsA"] = new([], ["7ab84732aaaa4bbbccc"]),
+            });
+
+        var file = Assert.Single(AttachmentsOf(record, "AttachmentsA"));
+
+        // **削除時の Guid は必ず大文字**（Pleasanter のマニュアル）
+        Assert.Equal("7AB84732AAAA4BBBCCC", file["Guid"]);
+        Assert.Equal(true, file["Deleted"]);
+    }
+
+    [Fact]
+    public void 消してから足す()
+    {
+        var record = Builder.Build(
+            NoColumns,
+            attachments: new Dictionary<string, PleasanterAttachmentColumn>
+            {
+                ["AttachmentsA"] = new(
+                    [new PleasanterAttachment("new.png", "aGVsbG8=")],
+                    ["7AB84732"]),
+            });
+
+        var files = AttachmentsOf(record, "AttachmentsA");
+
+        Assert.Equal(2, files.Count);
+        Assert.Equal(true, files[0]["Deleted"]);
+        Assert.Equal("new.png", files[1]["Name"]);
     }
 
     [Fact]
@@ -81,9 +117,10 @@ public class PleasanterAttachmentBuildTests
     {
         var record = Builder.Build(
             NoColumns,
-            attachments: new Dictionary<string, IReadOnlyList<PleasanterAttachment>>
+            attachments: new Dictionary<string, PleasanterAttachmentColumn>
             {
-                ["ClassA"] = [new PleasanterAttachment("a.png", "aGVsbG8=")],
+                ["ClassA"] = PleasanterAttachmentColumn.Of(
+                    new PleasanterAttachment("a.png", "aGVsbG8=")),
             });
 
         Assert.Contains(record.Problems, problem => problem.ColumnName == "ClassA");
@@ -106,9 +143,10 @@ public class PleasanterAttachmentBuildTests
     {
         var record = Builder.Build(
             new Dictionary<string, ImmutableArray<string>> { ["ClassA"] = ["満足"] },
-            attachments: new Dictionary<string, IReadOnlyList<PleasanterAttachment>>
+            attachments: new Dictionary<string, PleasanterAttachmentColumn>
             {
-                ["AttachmentsA"] = [new PleasanterAttachment("a.png", "aGVsbG8=")],
+                ["AttachmentsA"] = PleasanterAttachmentColumn.Of(
+                    new PleasanterAttachment("a.png", "aGVsbG8=")),
             });
 
         Assert.Empty(record.Problems);

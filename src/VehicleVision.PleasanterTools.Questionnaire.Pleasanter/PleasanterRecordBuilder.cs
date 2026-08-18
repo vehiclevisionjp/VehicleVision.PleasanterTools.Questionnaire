@@ -18,6 +18,27 @@ public sealed record ColumnConversionProblem(string ColumnName, string Reason);
 /// </remarks>
 public sealed record PleasanterAttachment(string Name, string Base64);
 
+/// <summary>添付列 1 本に対する指示。</summary>
+/// <param name="Added">足す添付。</param>
+/// <param name="DeletedGuids">消す添付の <c>Guid</c>。</param>
+/// <remarks>
+/// <para>
+/// **足すだけでは前の添付が残る。** 空配列を送っても消えない（実機で確認。
+/// <c>_documents/実機検証結果.md</c> 8 章）。
+/// </para>
+/// <para>
+/// **消すには <c>Guid</c> と <c>Deleted</c> を送る。**
+/// <c>Guid</c> は <c>Get</c> でしか得られない。
+/// </para>
+/// </remarks>
+public sealed record PleasanterAttachmentColumn(
+    IReadOnlyList<PleasanterAttachment> Added,
+    IReadOnlyList<string> DeletedGuids)
+{
+    public static PleasanterAttachmentColumn Of(params PleasanterAttachment[] added) =>
+        new(added, []);
+}
+
 /// <summary>Pleasanter へ送るレコードの中身。</summary>
 /// <param name="Body">リクエストボディへ載せる内容。</param>
 /// <param name="Problems">写せなかった列。</param>
@@ -47,7 +68,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
         IReadOnlyDictionary<string, ImmutableArray<string>> columns,
         string? responseJsonColumn = null,
         string? responseJson = null,
-        IReadOnlyDictionary<string, IReadOnlyList<PleasanterAttachment>>? attachments = null)
+        IReadOnlyDictionary<string, PleasanterAttachmentColumn>? attachments = null)
     {
         ArgumentNullException.ThrowIfNull(columns);
 
@@ -119,7 +140,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
     }
 
     private static void AddAttachments(
-        IReadOnlyDictionary<string, IReadOnlyList<PleasanterAttachment>>? attachments,
+        IReadOnlyDictionary<string, PleasanterAttachmentColumn>? attachments,
         Dictionary<PleasanterColumnKind, Dictionary<string, object?>> hashes,
         ImmutableArray<ColumnConversionProblem>.Builder problems)
     {
@@ -128,7 +149,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
             return;
         }
 
-        foreach (var (columnName, files) in attachments)
+        foreach (var (columnName, column) in attachments)
         {
             if (PleasanterColumn.KindOf(columnName) is not PleasanterColumnKind.Attachments)
             {
@@ -137,22 +158,44 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                 continue;
             }
 
+            // **消す指示を先に置く。** 同じ列で消してから足す
+            var entries = new List<Dictionary<string, object?>>();
+
+            foreach (var guid in column.DeletedGuids)
+            {
+                entries.Add(new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    // **削除時の Guid は必ず大文字**（Pleasanter のマニュアル。2026-08-18 参照）
+                    ["Guid"] = guid.ToUpperInvariant(),
+                    ["Deleted"] = true,
+                });
+            }
+
+            foreach (var file in column.Added)
+            {
+                entries.Add(new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["Name"] = file.Name,
+                    ["Base64"] = file.Base64,
+                    ["Added"] = true,
+                });
+            }
+
+            if (entries.Count == 0)
+            {
+                // **空配列を送っても何も起きない。** 送るだけ無駄なので入れない
+                continue;
+            }
+
+            // **入れるものが決まってから入れ物を作る。** 先に作ると空の
+            // AttachmentsHash が本体に残る
             if (!hashes.TryGetValue(PleasanterColumnKind.Attachments, out var hash))
             {
                 hash = new Dictionary<string, object?>(StringComparer.Ordinal);
                 hashes[PleasanterColumnKind.Attachments] = hash;
             }
 
-            // 空でも入れる。**ただしこれで前の添付が消えるわけではない**
-            // （実機で確認。_documents/実機検証結果.md 8 章。削除は #9 で扱う）
-            hash[columnName] = files
-                .Select(file => new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["Name"] = file.Name,
-                    ["Base64"] = file.Base64,
-                    ["Added"] = true,
-                })
-                .ToArray();
+            hash[columnName] = entries.ToArray();
         }
     }
 

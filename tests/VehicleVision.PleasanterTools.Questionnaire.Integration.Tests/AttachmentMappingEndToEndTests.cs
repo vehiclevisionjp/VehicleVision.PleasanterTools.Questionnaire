@@ -212,20 +212,14 @@ public class AttachmentMappingEndToEndTests
             StringComparison.Ordinal);
     }
 
-    /// <summary>添付を外して送り直しても、前の添付は Pleasanter に残る。</summary>
+    /// <summary>添付を外して送り直すと、前の添付が消える。</summary>
     /// <remarks>
-    /// <para>
-    /// **これは望ましい振る舞いではない。** 回答者が取り消しても消えない。
-    /// **今そうなっている**ことを固定して、直したときに気付けるようにしている
-    /// （<c>_documents/実機検証結果.md</c> 8 章、Issue #9）。
-    /// </para>
-    /// <para>
-    /// 消すには <c>Guid</c> を添えた削除の指定が要り、そのためには
-    /// 送信前に既存の添付を読み直す往復が増える。**その判断は #9 で行う。**
-    /// </para>
+    /// **足すだけでは消えない。** 空配列を送っても何も起きないので、
+    /// <c>Guid</c> を添えた削除の指定を送っている
+    /// （<c>_documents/実機検証結果.md</c> 8 章）。
     /// </remarks>
     [Fact]
-    public async Task 添付を外して送り直しても前の添付が残る_既知の未対応()
+    public async Task 添付を外して送り直すと前の添付が消える()
     {
         if (!Enabled)
         {
@@ -288,9 +282,78 @@ public class AttachmentMappingEndToEndTests
         // 値の側はちゃんと更新される
         Assert.Equal("ふつう", row["ClassHash"]?["ClassA"]?.GetValue<string>());
 
-        // **添付は残る。** 空配列は「これが全部」ではなく、何もしない指定として扱われる
+        // **前の添付は消えている**
         var files = row["AttachmentsHash"]?["AttachmentsA"]?.AsArray();
-        var remaining = Assert.Single(files!);
-        Assert.Equal("old.txt", remaining!["Name"]?.GetValue<string>());
+        Assert.Empty(files ?? []);
+    }
+
+    [Fact]
+    public async Task 添付を差し替えると新しいものだけが残る()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        var siteId = await CreateSiteAsync(http, $"添付差替 {Guid.NewGuid():N}");
+
+        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
+        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+
+        var surveys = new SurveyRepository(factory);
+        var snapshots = new SurveySnapshotStore(factory);
+        var outbox = new ResponseOutbox(factory);
+        var tokens = new ResponseTokenStore(factory);
+
+        var surveyId = Guid.NewGuid();
+        var publicId = $"pub-{Guid.NewGuid():N}";
+        await surveys.SaveAsync(new SurveyRecord(
+            surveyId, publicId, "添付差替", siteId, "DescriptionA",
+            (int)SurveyStatus.Published, null));
+        await surveys.PublishAsync(surveyId, 1, Definition(), Mapping(), null);
+
+        var intake = new ResponseIntake(surveys, snapshots, outbox, tokens, Inspector());
+        var pleasanter = new PleasanterApiClient(http, new PleasanterOptions
+        {
+            BaseUrl = PleasanterBaseUrl,
+            ApiKey = ApiKey,
+            ApiKeyUserTimeZoneId = "Asia/Tokyo",
+        });
+
+        var sender = new ResponseSender(
+            outbox,
+            tokens,
+            snapshots,
+            pleasanter,
+            new PleasanterRecordBuilder(new PleasanterDateTime("Asia/Tokyo")),
+            new MappingEvaluator(),
+            new ResponseSenderOptions(),
+            NullLogger<ResponseSender>.Instance);
+
+        var token = $"tok-{Guid.NewGuid():N}";
+
+        await intake.SubmitAsync(
+            publicId,
+            token,
+            [Answer.Of("q1", "満足"), new Answer("qf", []) { FileNames = ["old.txt"] }],
+            [File("old.txt", "古い資料")]);
+        Assert.Equal(SendOutcome.Sent, await sender.SendOnceAsync());
+
+        // --- 別のファイルへ差し替える ---
+        await intake.SubmitAsync(
+            publicId,
+            token,
+            [Answer.Of("q1", "満足"), new Answer("qf", []) { FileNames = ["new.txt"] }],
+            [File("new.txt", "新しい資料")]);
+        Assert.Equal(SendOutcome.Sent, await sender.SendOnceAsync());
+
+        var after = await pleasanter.FindByResponseTokenAsync(siteId, "DescriptionA", token);
+        var row = after.Body?["Response"]?["Data"]?.AsArray()?.SingleOrDefault();
+        Assert.NotNull(row);
+
+        // **古いものは残さない。** 送り直しは「足す」ではなく「置き換える」
+        var file = Assert.Single(row["AttachmentsHash"]?["AttachmentsA"]?.AsArray()!);
+        Assert.Equal("new.txt", file!["Name"]?.GetValue<string>());
     }
 }
