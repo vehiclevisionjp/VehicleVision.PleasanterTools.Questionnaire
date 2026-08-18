@@ -125,12 +125,14 @@ var secretKey = builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
         "QUESTIONNAIRE_SECRET_KEY が設定されていない（Base64 の 32 バイト）");
 
 builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
+builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton(new SecretProtector(secretKey));
 builder.Services.AddSingleton(new AdminAuthOptions());
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
+builder.Services.AddSingleton<AdminUserService>();
 
 // **既定は厳しく。** 緩めるのは検証環境だけにすること。
 // 端から端まで通す試験は 1 つの IP から大量に叩くので、既定のままだと自分で枠を使い切る
@@ -146,12 +148,33 @@ var requestPermitLimit = int.TryParse(
 
 builder.Services
     .AddAuthentication(AdminAuthSchemes.Session)
-    .AddCookie(AdminAuthSchemes.Session, options => AdminAuthSchemes.Configure(
-        options, "q.admin", AdminAuthSchemes.SessionLifetime))
-    .AddCookie(AdminAuthSchemes.Pending, options => AdminAuthSchemes.Configure(
-        options, "q.admin.pending", AdminAuthSchemes.PendingLifetime));
+    .AddCookie(AdminAuthSchemes.Session, options =>
+    {
+        AdminAuthSchemes.Configure(options, "q.admin", AdminAuthSchemes.SessionLifetime);
 
-builder.Services.AddAuthorization();
+        // **止めた管理者を、その場で追い出す。** cookie は 8 時間有効なので、
+        // これが無いと止めたのに最大 8 時間は操作できてしまう
+        options.Events.OnValidatePrincipal = AdminSessionGuard.ValidateAsync;
+    })
+    .AddCookie(AdminAuthSchemes.Pending, options => AdminAuthSchemes.Configure(
+        options, "q.admin.pending", AdminAuthSchemes.PendingLifetime))
+    .AddCookie(AdminAuthSchemes.Reenroll, options => AdminAuthSchemes.Configure(
+        options, "q.admin.reenroll", AdminAuthSchemes.ReenrollLifetime));
+
+builder.Services.AddAuthorization(options =>
+{
+    // **ログイン済み（2 要素まで通った状態）だけを通す。**
+    // 途中状態の cookie では何も操作させない
+    options.AddPolicy(AdminAuthSchemes.SessionPolicy, policy => policy
+        .AddAuthenticationSchemes(AdminAuthSchemes.Session)
+        .RequireAuthenticatedUser());
+
+    // **他人に触れるのは Administrator だけ**（_documents/非機能設計.md 1 章）
+    options.AddPolicy(AdminAuthSchemes.AdministratorPolicy, policy => policy
+        .AddAuthenticationSchemes(AdminAuthSchemes.Session)
+        .RequireAuthenticatedUser()
+        .RequireRole(nameof(AdminRole.Administrator)));
+});
 
 // **送信ワーカーは .Web に同居させる**（_documents/アプリケーション設計.md 8 章）。
 // Azure App Service では別プロセス常駐の手段が限られるため。**Always On を有効にすること**
@@ -239,6 +262,7 @@ app.UseStaticFiles();
 
 app.MapFormEndpoints();
 app.MapAdminAuthEndpoints();
+app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
