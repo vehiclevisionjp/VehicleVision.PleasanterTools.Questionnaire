@@ -22,6 +22,36 @@
 | `Service.json` | アプリ名・既定タイムゾーン |
 | `Pleasanter.json` | 接続先 Pleasanter の URL・API キー・タイムアウト |
 
+## 環境変数
+
+| 変数 | 内容 |
+|---|---|
+| `QUESTIONNAIRE_DB_PROVIDER` | `SqlServer` / `PostgreSql` / `MySql` |
+| `QUESTIONNAIRE_DB_CONNECTIONSTRING` | 本アプリの DB への接続文字列 |
+| `QUESTIONNAIRE_PLEASANTER_BASEURL` | 接続先 Pleasanter の URL |
+| `QUESTIONNAIRE_PLEASANTER_APIKEY` | Pleasanter の API キー |
+| `QUESTIONNAIRE_PLEASANTER_TIMEZONE` | API キーに紐づくユーザのタイムゾーン |
+| `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト） |
+
+### `QUESTIONNAIRE_SECRET_KEY` について
+
+**失うと、登録済みの 2 要素が全て使えなくなる。**
+管理者は復旧コードで入り、2 要素を登録し直すことになる。
+
+- **Key Vault に置き、控えを取っておくこと**
+- 値は次で作れる
+
+```
+dotnet run --project src/VehicleVision.PleasanterTools.Questionnaire.Web -- --generate-secret-key
+```
+
+または任意の手段で 32 バイトの乱数を Base64 にする。
+
+**Data Protection の鍵束は使っていない。**
+App Service では鍵の保存先が既定で一時領域になり、
+**再起動で鍵を失うと 2 要素が全部使えなくなる**ため、
+運用者が持つ 1 本の鍵を設定から受け取る形にしている。
+
 ## タイムゾーンに注意
 
 **3 つのタイムゾーンが別々に存在し得る。** 詳細は

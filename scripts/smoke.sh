@@ -23,6 +23,20 @@ check_status() {
     fi
 }
 
+check_post_status() {
+    local path="$1" expected="$2" label="$3"
+    local actual
+    actual=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${BASE}${path}")
+    if [ "$actual" = "$expected" ]; then
+        printf 'OK   %-46s %s
+' "$label" "$actual"
+    else
+        printf 'NG   %-46s 期待 %s / 実際 %s
+' "$label" "$expected" "$actual" >&2
+        failed=1
+    fi
+}
+
 check_header() {
     local path="$1" header="$2" label="$3"
     if curl -s -D - -o /dev/null "${BASE}${path}" | grep -qi "^${header}:"; then
@@ -51,6 +65,15 @@ check_header "/" "content-security-policy" "Content-Security-Policy"
 check_header "/" "x-content-type-options" "X-Content-Type-Options"
 check_header "/" "referrer-policy" "Referrer-Policy"
 check_header "/" "permissions-policy" "Permissions-Policy"
+
+echo
+echo "== 管理画面の認証 =="
+check_status "/api/admin/session" 200 "状態は誰でも見られる"
+# **合言葉を通していない相手に、登録の入口を開けない**
+check_post_status "/api/admin/enroll/begin" 401 "途中状態でなければ登録できない"
+
+# **管理画面の応答を途中の経路に残さない**
+check_header "/api/admin/session" "cache-control" "Cache-Control（保存させない）"
 
 echo
 if [ "$failed" -eq 0 ]; then

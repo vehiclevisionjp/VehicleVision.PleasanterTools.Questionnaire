@@ -108,6 +108,10 @@ services:
       QUESTIONNAIRE_PLEASANTER_BASEURL: http://pleasanter:8080
       # **実値をここへ書かない。** 検証環境用の固定値のみ
       QUESTIONNAIRE_PLEASANTER_APIKEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
+      # **管理者の 2 要素の共有鍵を守る鍵。** これを失うと登録済みの 2 要素が全て使えなくなる。
+      # 本番では App Service の設定か Key Vault に置き、**控えを取っておくこと**。
+      # ここにあるのは検証環境用の固定値
+      QUESTIONNAIRE_SECRET_KEY: ${DEV_SECRET_KEY:-4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=}
       # ウイルススキャンは既定で無効。clamav profile と併せて有効にする
       QUESTIONNAIRE_VIRUSSCAN_ENABLED: ${DEV_VIRUSSCAN_ENABLED:-false}
       QUESTIONNAIRE_VIRUSSCAN_HOST: clamav

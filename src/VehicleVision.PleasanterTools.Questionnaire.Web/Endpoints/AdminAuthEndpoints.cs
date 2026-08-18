@@ -1,0 +1,380 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
+
+namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
+
+/// <summary>管理画面の認証の入口。</summary>
+/// <remarks>
+/// <para>
+/// **2 段階で通す。** 合言葉が通った時点では
+/// <see cref="AdminAuthSchemes.Pending"/> の途中状態にしかならず、
+/// 使い捨てパスワードか復旧コードが通って初めて
+/// <see cref="AdminAuthSchemes.Session"/> になる。
+/// </para>
+/// <para>
+/// **外へ返す文言で段階を区別しない。** 「その利用者は居ない」と
+/// 「合言葉が違う」を区別すると、利用者名の総当たりに使える。
+/// </para>
+/// </remarks>
+public static class AdminAuthEndpoints
+{
+    /// <summary>途中状態に入れておく共有鍵の claim。</summary>
+    private const string EnrollmentSecretClaim = "questionnaire:totp_enrollment_secret";
+
+    /// <summary>段階を問わず同じ文言を返す。</summary>
+    private const string InvalidMessage = "ログイン ID または入力内容が正しくありません。";
+
+    public static IEndpointRouteBuilder MapAdminAuthEndpoints(this IEndpointRouteBuilder builder)
+    {
+        var group = builder.MapGroup("/api/admin");
+
+        // **管理画面の応答を途中の経路に残さない**
+        group.AddEndpointFilter(async (context, next) =>
+        {
+            var headers = context.HttpContext.Response.Headers;
+            headers.CacheControl = "no-store, no-cache, must-revalidate";
+            headers.Pragma = "no-cache";
+            return await next(context);
+        });
+
+        // ---- 今の状態 --------------------------------------------------------
+        group.MapGet("/session", async (
+            HttpContext context,
+            IAdminUserStore store,
+            CancellationToken cancellationToken) =>
+        {
+            var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
+
+            var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
+            if (session.Succeeded)
+            {
+                return Results.Ok(new
+                {
+                    authenticated = true,
+                    setupRequired,
+                    loginId = session.Principal?.Identity?.Name,
+                    role = session.Principal?.FindFirstValue(ClaimTypes.Role),
+                });
+            }
+
+            var pending = await context.AuthenticateAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+            return Results.Ok(new
+            {
+                authenticated = false,
+                setupRequired,
+                // **途中状態かどうかは画面の出し分けに要る**
+                pending = pending.Succeeded,
+                pendingLoginId = pending.Succeeded ? pending.Principal?.Identity?.Name : null,
+            });
+        });
+
+        // ---- 最初の管理者 ----------------------------------------------------
+        group.MapPost("/setup", async (
+            AdminCredentialRequest request,
+            HttpContext context,
+            AdminAuthenticator authenticator,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
+            {
+                return Results.BadRequest(new { message = "ログイン ID と合言葉を入力してください。" });
+            }
+
+            // **短すぎる合言葉を通さない。** 最初の 1 人こそ全権を持つ
+            if (request.Password.Length < 12)
+            {
+                return Results.BadRequest(new { message = "合言葉は 12 文字以上にしてください。" });
+            }
+
+            var created = await authenticator
+                .TryCreateFirstAdministratorAsync(request.LoginId.Trim(), request.Password, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (created is null)
+            {
+                // **既に居るなら、ここは二度と使えない**
+                return Results.Conflict(new { message = "管理者は既に登録されています。" });
+            }
+
+            await SignInPendingAsync(context, created, secret: null).ConfigureAwait(false);
+            return Results.Ok(new { next = "enroll" });
+        }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
+        // ---- 合言葉 ----------------------------------------------------------
+        group.MapPost("/login", async (
+            AdminCredentialRequest request,
+            HttpContext context,
+            AdminAuthenticator authenticator,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
+            {
+                return Results.Json(new { message = InvalidMessage }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            var result = await authenticator
+                .CheckPasswordAsync(request.LoginId.Trim(), request.Password, cancellationToken)
+                .ConfigureAwait(false);
+
+            switch (result.Outcome)
+            {
+                case PasswordOutcome.NeedsSecondFactor:
+                    await SignInPendingAsync(context, result.User!, secret: null).ConfigureAwait(false);
+                    return Results.Ok(new { next = "totp" });
+
+                case PasswordOutcome.NeedsTotpEnrollment:
+                    await SignInPendingAsync(context, result.User!, secret: null).ConfigureAwait(false);
+                    return Results.Ok(new { next = "enroll" });
+
+                case PasswordOutcome.LockedOut:
+                    return Results.Json(
+                        new { message = "試行が続いたため、しばらくログインできません。時間を置いてお試しください。" },
+                        statusCode: StatusCodes.Status423Locked);
+
+                default:
+                    // **止められている利用者も同じ文言にする**
+                    return Results.Json(
+                        new { message = InvalidMessage }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+        }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
+        // ---- 2 要素の登録 ----------------------------------------------------
+        group.MapPost("/enroll/begin", async (
+            HttpContext context,
+            AdminAuthenticator authenticator) =>
+        {
+            var pending = await context.AuthenticateAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+            if (!pending.Succeeded || pending.Principal?.Identity?.Name is not { } loginId)
+            {
+                return Results.Unauthorized();
+            }
+
+            var enrollment = authenticator.BeginTotpEnrollment(loginId);
+
+            // **共有鍵は途中状態の側に持たせる。** 画面から送り返させると差し替えられる
+            await SignInPendingAsync(context, ReadPending(pending.Principal), enrollment.SecretBase32)
+                .ConfigureAwait(false);
+
+            return Results.Ok(new { secret = enrollment.SecretBase32, uri = enrollment.OtpAuthUri });
+        });
+
+        group.MapPost("/enroll/complete", async (
+            AdminCodeRequest request,
+            HttpContext context,
+            AdminAuthenticator authenticator,
+            CancellationToken cancellationToken) =>
+        {
+            var pending = await context.AuthenticateAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+            if (!pending.Succeeded || pending.Principal is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            var secret = pending.Principal.FindFirstValue(EnrollmentSecretClaim);
+            if (string.IsNullOrEmpty(secret))
+            {
+                return Results.BadRequest(new { message = "登録をやり直してください。" });
+            }
+
+            var user = ReadPending(pending.Principal);
+            var codes = await authenticator
+                .CompleteTotpEnrollmentAsync(user.AdminUserId, secret, request.Code ?? string.Empty, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (codes is null)
+            {
+                return Results.Json(
+                    new { message = "数字が合いません。認証アプリの表示をご確認ください。" },
+                    statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            await SignInSessionAsync(context, user).ConfigureAwait(false);
+
+            // **復旧コードを返せるのはここだけ。** 保存しているのはハッシュのみ
+            return Results.Ok(new { recoveryCodes = codes });
+        }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
+        // ---- 2 要素 ----------------------------------------------------------
+        group.MapPost("/login/totp", (
+            AdminCodeRequest request,
+            HttpContext context,
+            AdminAuthenticator authenticator,
+            CancellationToken cancellationToken) =>
+            CompleteSecondFactorAsync(
+                context,
+                cancellationToken,
+                (user, token) => authenticator.VerifyTotpAsync(user.AdminUserId, request.Code ?? string.Empty, token)))
+            .RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
+        group.MapPost("/login/recovery", (
+            AdminCodeRequest request,
+            HttpContext context,
+            AdminAuthenticator authenticator,
+            CancellationToken cancellationToken) =>
+            CompleteSecondFactorAsync(
+                context,
+                cancellationToken,
+                (user, token) => authenticator.VerifyRecoveryCodeAsync(
+                    user.AdminUserId, request.Code ?? string.Empty, token)))
+            .RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
+        // ---- ログアウト ------------------------------------------------------
+        group.MapPost("/logout", async (HttpContext context) =>
+        {
+            // **途中状態も一緒に消す。** 残しておくと 2 要素から再開できてしまう
+            await context.SignOutAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
+            await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+            return Results.Ok(new { signedOut = true });
+        });
+
+        return builder;
+    }
+
+    private static async Task<IResult> CompleteSecondFactorAsync(
+        HttpContext context,
+        CancellationToken cancellationToken,
+        Func<AdminUser, CancellationToken, Task<SecondFactorOutcome>> verify)
+    {
+        var pending = await context.AuthenticateAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+        if (!pending.Succeeded || pending.Principal is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var user = ReadPending(pending.Principal);
+        var outcome = await verify(user, cancellationToken).ConfigureAwait(false);
+
+        switch (outcome)
+        {
+            case SecondFactorOutcome.Succeeded:
+                await SignInSessionAsync(context, user).ConfigureAwait(false);
+                return Results.Ok(new { authenticated = true });
+
+            case SecondFactorOutcome.LockedOut:
+                await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+                return Results.Json(
+                    new { message = "試行が続いたため、しばらくログインできません。時間を置いてお試しください。" },
+                    statusCode: StatusCodes.Status423Locked);
+
+            case SecondFactorOutcome.NotEnrolled:
+                return Results.Ok(new { next = "enroll" });
+
+            default:
+                return Results.Json(
+                    new { message = InvalidMessage }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+    }
+
+    /// <summary>途中状態の claim から利用者を組み立てる。</summary>
+    /// <remarks>
+    /// **照合に要る値だけを持つ。** 合言葉のハッシュなどは cookie に入れない。
+    /// </remarks>
+    private static AdminUser ReadPending(ClaimsPrincipal principal) => new()
+    {
+        AdminUserId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!),
+        LoginId = principal.Identity?.Name ?? string.Empty,
+        PasswordHash = string.Empty,
+        Role = Enum.TryParse<AdminRole>(principal.FindFirstValue(ClaimTypes.Role), out var role)
+            ? role
+            : AdminRole.Editor,
+    };
+
+    private static Task SignInPendingAsync(HttpContext context, AdminUser user, string? secret)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.AdminUserId.ToString()),
+            new(ClaimTypes.Name, user.LoginId),
+            new(ClaimTypes.Role, user.Role.ToString()),
+        };
+
+        if (secret is not null)
+        {
+            claims.Add(new Claim(EnrollmentSecretClaim, secret));
+        }
+
+        var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Pending);
+        return context.SignInAsync(AdminAuthSchemes.Pending, new ClaimsPrincipal(identity));
+    }
+
+    private static async Task SignInSessionAsync(HttpContext context, AdminUser user)
+    {
+        // **途中状態は必ず消す。** 共有鍵の claim を残さない
+        await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, user.AdminUserId.ToString()),
+                new Claim(ClaimTypes.Name, user.LoginId),
+                new Claim(ClaimTypes.Role, user.Role.ToString()),
+            ],
+            AdminAuthSchemes.Session);
+
+        await context.SignInAsync(
+            AdminAuthSchemes.Session,
+            new ClaimsPrincipal(identity),
+            new AuthenticationProperties { IsPersistent = false }).ConfigureAwait(false);
+    }
+
+    /// <summary>ログイン ID と合言葉。</summary>
+    public sealed record AdminCredentialRequest(string? LoginId, string? Password);
+
+    /// <summary>使い捨てパスワードか復旧コード。</summary>
+    public sealed record AdminCodeRequest(string? Code);
+}
+
+/// <summary>管理画面の認証で使う名前。</summary>
+public static class AdminAuthSchemes
+{
+    /// <summary>2 要素まで通った状態。</summary>
+    public const string Session = "Admin.Session";
+
+    /// <summary>合言葉だけ通った途中の状態。**ここでは何も操作させない。**</summary>
+    public const string Pending = "Admin.Pending";
+
+    /// <summary>ログインの試行に掛けるレート制限の名前。</summary>
+    public const string LoginRateLimitPolicy = "admin-login";
+
+    /// <summary>途中状態を保つ長さ。**短くする。**</summary>
+    public static readonly TimeSpan PendingLifetime = TimeSpan.FromMinutes(5);
+
+    /// <summary>ログインを保つ長さ。</summary>
+    public static readonly TimeSpan SessionLifetime = TimeSpan.FromHours(8);
+
+    /// <summary>cookie の共通の設定を当てる。</summary>
+    /// <remarks>
+    /// <para>
+    /// **画面側の JavaScript から読ませない**（<c>HttpOnly</c>）。
+    /// **他所のサイトからの遷移で送らせない**（<c>SameSite=Strict</c>）。
+    /// これで、別サイトに置かれた form からの操作が届かなくなる。
+    /// </para>
+    /// <para>
+    /// **cookie の名前から中身を推させない。** 既定の名前は素性が知られている。
+    /// </para>
+    /// </remarks>
+    public static void Configure(CookieAuthenticationOptions options, string name, TimeSpan lifetime)
+    {
+        options.Cookie.Name = name;
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.IsEssential = true;
+        options.ExpireTimeSpan = lifetime;
+        options.SlidingExpiration = false;
+
+        // **画面へ飛ばさない。** これは API なので、状態だけを返す
+        options.Events.OnRedirectToLogin = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        };
+    }
+}

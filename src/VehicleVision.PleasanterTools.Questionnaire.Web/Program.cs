@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -7,6 +8,13 @@ using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 using VehicleVision.PleasanterTools.Questionnaire.Worker;
+
+// **設定に書く鍵を作るための道。** 手で乱数を用意させると、短い値や使い回しが混ざる
+if (args.Contains("--generate-secret-key"))
+{
+    Console.WriteLine(SecretProtector.GenerateKey());
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +53,30 @@ builder.Services.AddHttpClient<PleasanterApiClient>(client =>
 
 builder.Services.AddSingleton<ResponseIntake>();
 
+// ---- 管理者の認証 ----------------------------------------------------------
+// **共有鍵を復号するための鍵。** 失うと登録済みの 2 要素が全て使えなくなるので、
+// **App Service の設定か Key Vault に置き、控えを取っておくこと**
+var secretKey = builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
+    ?? throw new InvalidOperationException(
+        "QUESTIONNAIRE_SECRET_KEY が設定されていない（Base64 の 32 バイト）");
+
+builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
+builder.Services.AddSingleton<PasswordHasher>();
+builder.Services.AddSingleton<TotpService>();
+builder.Services.AddSingleton(new SecretProtector(secretKey));
+builder.Services.AddSingleton(new AdminAuthOptions());
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<AdminAuthenticator>();
+
+builder.Services
+    .AddAuthentication(AdminAuthSchemes.Session)
+    .AddCookie(AdminAuthSchemes.Session, options => AdminAuthSchemes.Configure(
+        options, "q.admin", AdminAuthSchemes.SessionLifetime))
+    .AddCookie(AdminAuthSchemes.Pending, options => AdminAuthSchemes.Configure(
+        options, "q.admin.pending", AdminAuthSchemes.PendingLifetime));
+
+builder.Services.AddAuthorization();
+
 // **送信ワーカーは .Web に同居させる**（_documents/アプリケーション設計.md 8 章）。
 // Azure App Service では別プロセス常駐の手段が限られるため。**Always On を有効にすること**
 builder.Services.AddSingleton(new ResponseSenderOptions());
@@ -76,6 +108,17 @@ builder.Services.AddRateLimiter(options =>
                     PermitLimit = 600,
                     Window = TimeSpan.FromMinutes(1),
                 })));
+
+    // **ログインの試行だけは別枠で厳しくする。**
+    // 全体の枠に紛れさせると、1 分に 60 回の総当たりが通ってしまう
+    options.AddPolicy(AdminAuthSchemes.LoginRateLimitPolicy, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(5),
+            }));
 });
 
 var app = builder.Build();
@@ -106,11 +149,15 @@ app.Use(async (context, next) =>
 
 app.UseRateLimiter();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 // 回答画面（TypeScript + Vite + Svelte のビルド成果物）
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapFormEndpoints();
+app.MapAdminAuthEndpoints();
 
 // **`/f/{publicId}` は画面側で解釈する。** サーバは同じ入口を返すだけ。
 // 存在しない公開 ID でも同じ応答にして、総当たりで実在が分からないようにする
