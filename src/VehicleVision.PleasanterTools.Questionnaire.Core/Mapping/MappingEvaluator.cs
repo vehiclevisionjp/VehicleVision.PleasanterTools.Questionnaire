@@ -69,9 +69,18 @@ public sealed record MappingRuntimeProblem(string TargetColumn, string Reason);
 /// 値が無い場合は空配列で、これは「消す」を意味する。
 /// </param>
 /// <param name="Problems">実行時に見つかった不備。</param>
+/// <param name="AttachmentColumns">
+/// 添付列 → 添付を持つ設問。**中身はここへ載せない。**
+/// Base64 を値の流れに乗せると、他の列と同じ変換の対象になってしまう。
+/// 実際の中身は送信側が回答から取り出す。
+/// </param>
 public sealed record MappingResult(
     ImmutableDictionary<string, ImmutableArray<string>> Columns,
-    ImmutableArray<MappingRuntimeProblem> Problems);
+    ImmutableArray<MappingRuntimeProblem> Problems)
+{
+    public ImmutableDictionary<string, string> AttachmentColumns { get; init; } =
+        ImmutableDictionary<string, string>.Empty;
+}
 
 /// <summary>マッピングを適用して、列名と値の対応を作る。</summary>
 /// <remarks>
@@ -94,6 +103,8 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
 
         var columns = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
             StringComparer.OrdinalIgnoreCase);
+        var attachmentColumns = ImmutableDictionary.CreateBuilder<string, string>(
+            StringComparer.OrdinalIgnoreCase);
         var problems = ImmutableArray.CreateBuilder<MappingRuntimeProblem>();
 
         foreach (var assignment in mapping.Assignments)
@@ -106,11 +117,27 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
                 continue;
             }
 
-            if (columns.ContainsKey(assignment.TargetColumn))
+            if (columns.ContainsKey(assignment.TargetColumn)
+                || attachmentColumns.ContainsKey(assignment.TargetColumn))
             {
                 // 同じ列への割り当てが 2 つ。保存時にも弾いているはず
                 problems.Add(new MappingRuntimeProblem(
                     assignment.TargetColumn, "同じ列への割り当てが重複している"));
+                continue;
+            }
+
+            // **添付は値の流れに乗せない。** どの列がどの設問の添付を受けるかだけを返す
+            if (assignment.Sources.Any(source => source.Port is QuestionPort.Files))
+            {
+                if (assignment.Sources.Length != 1 || assignment.Converter is not null)
+                {
+                    problems.Add(new MappingRuntimeProblem(
+                        assignment.TargetColumn,
+                        "添付の割り当ては入力 1 つ・変換なしに限る"));
+                    continue;
+                }
+
+                attachmentColumns[assignment.TargetColumn] = assignment.Sources[0].QuestionId;
                 continue;
             }
 
@@ -135,7 +162,10 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
             }
         }
 
-        return new MappingResult(columns.ToImmutable(), problems.ToImmutable());
+        return new MappingResult(columns.ToImmutable(), problems.ToImmutable())
+        {
+            AttachmentColumns = attachmentColumns.ToImmutable(),
+        };
     }
 
     private static ImmutableArray<string> Read(Answer? answer, QuestionPort port)

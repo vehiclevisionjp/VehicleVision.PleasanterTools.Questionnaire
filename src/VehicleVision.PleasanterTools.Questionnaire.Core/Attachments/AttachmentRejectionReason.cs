@@ -15,6 +15,12 @@ public enum AttachmentRejectionReason
     /// <summary>個数の上限を超えた。</summary>
     TooMany,
 
+    /// <summary>
+    /// 1 回の送信の合計サイズが上限を超えた。
+    /// **1 件あたりの上限だけでは DB が溢れる**（設問の数だけ並べられる）。
+    /// </summary>
+    TotalTooLarge,
+
     /// <summary>ファイル名が不正（空、パス区切りを含む等）。</summary>
     InvalidFileName,
 
