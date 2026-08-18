@@ -68,6 +68,12 @@ builder.Services.AddSingleton(new AdminAuthOptions());
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
 
+// **既定は厳しく。** 緩めるのは検証環境だけにすること
+var loginPermitLimit = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"], out var configured)
+    ? configured
+    : 10;
+
 builder.Services
     .AddAuthentication(AdminAuthSchemes.Session)
     .AddCookie(AdminAuthSchemes.Session, options => AdminAuthSchemes.Configure(
@@ -110,13 +116,16 @@ builder.Services.AddRateLimiter(options =>
                 })));
 
     // **ログインの試行だけは別枠で厳しくする。**
-    // 全体の枠に紛れさせると、1 分に 60 回の総当たりが通ってしまう
+    // 全体の枠に紛れさせると、1 分に 60 回の総当たりが通ってしまう。
+    //
+    // **回数を設定で変えられるようにしてある。** 検証環境では端から端まで通す試験が
+    // 既定の枠を使い切ってしまうため。**本番では既定のまま使うこと**
     options.AddPolicy(AdminAuthSchemes.LoginRateLimitPolicy, context =>
         RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                PermitLimit = loginPermitLimit,
                 Window = TimeSpan.FromMinutes(5),
             }));
 });

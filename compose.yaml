@@ -112,6 +112,9 @@ services:
       # 本番では App Service の設定か Key Vault に置き、**控えを取っておくこと**。
       # ここにあるのは検証環境用の固定値
       QUESTIONNAIRE_SECRET_KEY: ${DEV_SECRET_KEY:-4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=}
+      # **検証環境だけ緩める。** 端から端まで通す試験が既定の枠（10 回）を使い切るため。
+      # **本番では設定しないこと**
+      QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN: ${DEV_LOGIN_ATTEMPTS:-200}
       # ウイルススキャンは既定で無効。clamav profile と併せて有効にする
       QUESTIONNAIRE_VIRUSSCAN_ENABLED: ${DEV_VIRUSSCAN_ENABLED:-false}
       QUESTIONNAIRE_VIRUSSCAN_HOST: clamav
