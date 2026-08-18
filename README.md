@@ -79,6 +79,18 @@ dotnet test
 ./scripts/license-check.sh
 ```
 
+#### 結合テスト（実機の Pleasanter に当てる）
+
+**環境変数を設定したときだけ実行される。**
+
+```bash
+docker compose --profile postgres up -d --wait
+QUESTIONNAIRE_INTEGRATION=1 dotnet test tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests
+```
+
+> **設定していないと、結合テストは何も検証せずに緑になる。**
+> **その緑を「通った」と読まないこと。** CI では必ず設定する。
+
 ### 設定
 
 設定は `App_Data/Parameters/*.json` に置く（Pleasanter 本体と同じ方式）。
