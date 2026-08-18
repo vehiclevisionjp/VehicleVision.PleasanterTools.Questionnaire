@@ -79,6 +79,20 @@ if (attachmentOptions.VirusScan.Enabled)
                     serviceProvider.GetRequiredService<ILogger<ClamAvVirusScanner>>()));
             break;
 
+        case VirusScanProvider.DefenderForStorage:
+            // **判定は非同期で届く。** Event Grid の受け口が要る
+            builder.Services.AddSingleton<MalwareScanVerdicts>();
+            builder.Services.AddSingleton<IDmzBlobStore>(
+                new AzureDmzBlobStore(attachmentOptions.VirusScan));
+            builder.Services.AddSingleton<IVirusScanner>(serviceProvider =>
+                new DefenderForStorageVirusScanner(
+                    attachmentOptions.VirusScan,
+                    serviceProvider.GetRequiredService<IDmzBlobStore>(),
+                    serviceProvider.GetRequiredService<MalwareScanVerdicts>(),
+                    serviceProvider
+                        .GetRequiredService<ILogger<DefenderForStorageVirusScanner>>()));
+            break;
+
         default:
             throw new InvalidOperationException(
                 $"未対応のウイルススキャン方式: {attachmentOptions.VirusScan.Provider}");
@@ -204,6 +218,17 @@ app.UseStaticFiles();
 
 app.MapFormEndpoints();
 app.MapAdminAuthEndpoints();
+
+// **Defender for Storage を使うときだけ受け口を生やす。**
+// 使わない構成で認証の外の口を開けたままにしない
+if (attachmentOptions.VirusScan is
+    { Enabled: true, Provider: VirusScanProvider.DefenderForStorage } defenderOptions)
+{
+    app.MapMalwareScanEndpoints(defenderOptions.EventGridKey
+        ?? throw new InvalidOperationException(
+            "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_EVENTGRIDKEY が設定されていない"
+            + "（判定の受け口を守る合言葉。無いと誰でも『検出なし』を送り込める）"));
+}
 
 // **`/f/{publicId}` は画面側で解釈する。** サーバは同じ入口を返すだけ。
 // 存在しない公開 ID でも同じ応答にして、総当たりで実在が分からないようにする
