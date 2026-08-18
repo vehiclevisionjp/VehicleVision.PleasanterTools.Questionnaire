@@ -10,6 +10,7 @@
 #   SQL Server で動かす:  docker compose --profile sqlserver up -d --wait
 #   PostgreSQL で動かす:  docker compose --profile postgres  up -d --wait
 #   MySQL で動かす:       docker compose --profile mysql     up -d --wait
+#   ウイルススキャンも:   docker compose --profile postgres --profile clamav up -d --wait
 #   後片付け:             docker compose --profile "*" down -v
 #
 # Pleasanter（db / codedefiner / pleasanter）は profile を持たないので常に起動する。
@@ -70,6 +71,26 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
 
+  # ---- ウイルススキャン（オプション） ---------------------------------------
+  # **既定は無効。** profile を付けたときだけ起動する。
+  # Azure App Service では**サイドカーコンテナ**として同じ形で動かす
+  # （_documents/添付ファイル検査-運用手順書.md）。
+  # **ClamAV は GPL-2.0。本アプリのイメージへ同梱しない**（別プロセスとして接続する）
+  clamav:
+    image: clamav/clamav:1.5-debian13-slim
+    profiles: ["clamav"]
+    environment:
+      TZ: Asia/Tokyo
+    ports:
+      - "${DEV_CLAMD_PORT:-13310}:3310"
+    healthcheck:
+      # 定義データベースの取得が終わるまで ready にならない。起動に数分かかる
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 180s
+
   # ---- 本アプリ ------------------------------------------------------------
   app:
     build:
@@ -87,6 +108,10 @@ services:
       QUESTIONNAIRE_PLEASANTER_BASEURL: http://pleasanter:8080
       # **実値をここへ書かない。** 検証環境用の固定値のみ
       QUESTIONNAIRE_PLEASANTER_APIKEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
+      # ウイルススキャンは既定で無効。clamav profile と併せて有効にする
+      QUESTIONNAIRE_VIRUSSCAN_ENABLED: ${DEV_VIRUSSCAN_ENABLED:-false}
+      QUESTIONNAIRE_VIRUSSCAN_HOST: clamav
+      QUESTIONNAIRE_VIRUSSCAN_PORT: "3310"
     ports:
       - "${DEV_APP_PORT:-8081}:8080"
 
