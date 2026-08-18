@@ -14,7 +14,27 @@ Copyright (C) PMC Co.,Ltd.
 
 依存を追加したら、このファイルへ「名称 / バージョン / ライセンス / 入手元」を追記すること。
 
-（未記入。依存パッケージの追加に合わせて維持する）
+名称 / バージョン / ライセンス / 入手元
+
+  Dapper 2.1.79 / Apache-2.0 / https://www.nuget.org/packages/Dapper
+  FluentMigrator 8.0.1 / Apache-2.0 / https://www.nuget.org/packages/FluentMigrator
+  FluentMigrator.Runner 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.SqlServer 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.Postgres 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.MySql 8.0.1 / Apache-2.0
+  Microsoft.Data.SqlClient 7.0.2 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
+  Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
+  MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
+  Microsoft.Extensions.DependencyInjection 10.0.11 / MIT
+
+テスト時のみ使用するもの
+
+  xunit 2.9.3 / Apache-2.0
+  xunit.runner.visualstudio 3.1.4 / Apache-2.0
+  Microsoft.NET.Test.Sdk 17.14.1 / MIT
+  coverlet.collector 6.0.4 / MIT
+
+**依存を追加したら、ここへ追記してからコミットすること。**
 
 --------------------------------------------------------------------------------
 Pleasanter について
