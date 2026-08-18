@@ -1,0 +1,95 @@
+# 開発環境ひとそろい。
+#
+# **ホストに .NET SDK も node も DB クライアントも要求しない**ことが目的。
+# Pleasanter と 3 種類の RDBMS、本アプリをまとめて起動する。
+#
+# Pleasanter 側の定義は tools/pleasanter-testenv/docker-compose.yml を include して
+# 再利用する（二重管理しないため）。そちらの service 名は db / codedefiner /
+# pleasanter / verify。`db` は SQL Server。
+#
+#   SQL Server で動かす:  docker compose --profile sqlserver up -d --wait
+#   PostgreSQL で動かす:  docker compose --profile postgres  up -d --wait
+#   MySQL で動かす:       docker compose --profile mysql     up -d --wait
+#   後片付け:             docker compose --profile "*" down -v
+#
+# Pleasanter（db / codedefiner / pleasanter）は profile を持たないので常に起動する。
+# **tools/pleasanter-testenv を同時に起動しないこと。** ポートが衝突する。
+#
+# **Windows の Git Bash からは MSYS_NO_PATHCONV=1 を付けること。**
+
+name: questionnaire-dev
+
+include:
+  - path: tools/pleasanter-testenv/docker-compose.yml
+
+services:
+  # ---- 3 RDBMS -------------------------------------------------------------
+  # SQL Server は include 先の `db` を使う（profile: sqlserver で起動する）
+
+  db-postgres:
+    # タグはレジストリで確認して固定する（2026-08-18 時点の最新メジャー）
+    image: postgres:18-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_PASSWORD: ${TESTENV_SA_PASSWORD:-Questionnaire#Test1}
+      POSTGRES_DB: questionnaire
+      TZ: Asia/Tokyo
+    ports:
+      - "${DEV_POSTGRES_PORT:-15432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    volumes:
+      # **PostgreSQL 18 以降はマウント位置が /var/lib/postgresql。**
+      # 従来の /var/lib/postgresql/data へ当てると起動時に弾かれる
+      # （pg_upgrade をマウント境界越しに行えないため）
+      - postgres-data:/var/lib/postgresql
+
+  db-mysql:
+    image: mysql:26
+    profiles: ["mysql"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TESTENV_SA_PASSWORD:-Questionnaire#Test1}
+      MYSQL_DATABASE: questionnaire
+      TZ: Asia/Tokyo
+    # **utf8mb4 を明示する。** 既定が 3 バイトの utf8 だと絵文字が入らない
+    # （_documents/データモデル設計.md 4 章）
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_as_cs
+    ports:
+      - "${DEV_MYSQL_PORT:-13306}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  # ---- 本アプリ ------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["sqlserver", "postgres", "mysql", "app"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      # **Azure の実行環境は既定 UTC。** 明示しないと回答日時が 9 時間ずれる
+      # （_documents/実機検証結果.md 4 章）
+      TZ: Asia/Tokyo
+      # 接続先はプロファイルに応じて .env か環境変数で差し替える
+      QUESTIONNAIRE_DB_PROVIDER: ${DEV_DB_PROVIDER:-SqlServer}
+      QUESTIONNAIRE_DB_CONNECTIONSTRING: ${DEV_DB_CONNECTIONSTRING:-Server=db;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True}
+      QUESTIONNAIRE_PLEASANTER_BASEURL: http://pleasanter:8080
+      # **実値をここへ書かない。** 検証環境用の固定値のみ
+      QUESTIONNAIRE_PLEASANTER_APIKEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
+    ports:
+      - "${DEV_APP_PORT:-8081}:8080"
+
+volumes:
+  postgres-data:
+  mysql-data:

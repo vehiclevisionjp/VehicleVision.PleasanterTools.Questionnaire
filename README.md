@@ -47,6 +47,40 @@ cd VehicleVision.PleasanterTools.Questionnaire
 git submodule update --init --recursive
 ```
 
+### 開発環境は Docker で完結する
+
+**ホストに .NET SDK も node も DB クライアントも要らない。**
+Pleasanter・3 種類の RDBMS・本アプリをまとめて起動する。
+
+```bash
+docker compose --profile sqlserver up -d --wait   # SQL Server で動かす
+docker compose --profile postgres  up -d --wait   # PostgreSQL で動かす
+docker compose --profile mysql     up -d --wait   # MySQL で動かす
+docker compose --profile "*" down -v              # 後片付け
+```
+
+| 到達先 | URL |
+|---|---|
+| 本アプリ | <http://localhost:8081> |
+| Pleasanter | <http://localhost:8080>（`Administrator` / `pleasanter`） |
+
+- **Pleasanter は profile を持たないので常に起動する**
+- **[`tools/pleasanter-testenv/`](tools/pleasanter-testenv/README.md) を同時に起動しないこと。**
+  ポートが衝突する。あちらは Pleasanter 単体の検証専用
+- **Windows の Git Bash からは `MSYS_NO_PATHCONV=1` を付ける**
+
+### ホストで直接ビルドする場合
+
+.NET 10 SDK が要る（`global.json` で固定）。
+
+```bash
+dotnet build
+dotnet test
+./scripts/license-check.sh
+```
+
+### 設定
+
 設定は `App_Data/Parameters/*.json` に置く（Pleasanter 本体と同じ方式）。
 **API キーの実値はコミットしない。** 詳細は
 [`App_Data/Parameters/README.md`](App_Data/Parameters/README.md)。
