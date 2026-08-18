@@ -58,6 +58,10 @@ git submodule update --init --recursive
 | [`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) | 構成方針・決定事項・未確定事項 |
 | [`_documents/機能一覧.md`](_documents/機能一覧.md) | Forms 相当のどこまで作るか |
 | [`_documents/実機検証結果.md`](_documents/実機検証結果.md) | 実機で確定した Pleasanter の挙動 |
+| [`_documents/データモデル設計.md`](_documents/データモデル設計.md) | DB スキーマ・版管理・3 RDBMS の型対応 |
+| [`_documents/アプリケーション設計.md`](_documents/アプリケーション設計.md) | プロジェクト構成・API・送信ワーカー |
+| [`_documents/画面設計.md`](_documents/画面設計.md) | 回答画面・管理アプリ |
+| [`_documents/非機能設計.md`](_documents/非機能設計.md) | セキュリティ・障害時・テスト・運用 |
 | [`tools/pleasanter-testenv/`](tools/pleasanter-testenv/README.md) | 検証環境（Docker） |
 | `_reference/Implem.Pleasanter` | Pleasanter 本体（**AGPL v3 / 参照専用**）。[README](_reference/README.md) |
 | `App_Data/Parameters/` | 設定ファイル |
