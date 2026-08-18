@@ -1,0 +1,61 @@
+namespace VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+
+/// <summary>設問の形式ごとの固有設定。</summary>
+/// <remarks>
+/// 形式によって使う項目が違う。使わない項目は <c>null</c> のままにする。
+/// </remarks>
+public sealed record QuestionSettings
+{
+    /// <summary>文字数の上限。<see cref="QuestionType.Text"/> / <see cref="QuestionType.Paragraph"/>。</summary>
+    public int? MaxLength { get; init; }
+
+    /// <summary>入力欄のプレースホルダ。</summary>
+    public LocalizedText? Placeholder { get; init; }
+
+    /// <summary>既定値。</summary>
+    public string? DefaultValue { get; init; }
+
+    /// <summary>尺度の下限。<see cref="QuestionType.Scale"/> / <see cref="QuestionType.Rating"/>。</summary>
+    public int? ScaleMinimum { get; init; }
+
+    /// <summary>尺度の上限。</summary>
+    public int? ScaleMaximum { get; init; }
+
+    /// <summary>尺度の下限に添えるラベル。</summary>
+    public LocalizedText? ScaleMinimumLabel { get; init; }
+
+    /// <summary>尺度の上限に添えるラベル。</summary>
+    public LocalizedText? ScaleMaximumLabel { get; init; }
+
+    /// <summary>数値の下限。</summary>
+    public decimal? NumberMinimum { get; init; }
+
+    /// <summary>数値の上限。</summary>
+    public decimal? NumberMaximum { get; init; }
+
+    /// <summary>入力の形式検証。</summary>
+    public TextFormat? Format { get; init; }
+
+    /// <summary>添付できる個数の上限。<see cref="QuestionType.File"/>。</summary>
+    public int? MaxFileCount { get; init; }
+
+    /// <summary>添付 1 件あたりのサイズ上限（バイト）。</summary>
+    /// <remarks>
+    /// 添付は送信待ちの <c>PayloadJson</c> へ Base64 で載る。
+    /// **上限が無いと DB が溢れる**（<c>_documents/非機能設計.md</c> 1 章）。
+    /// </remarks>
+    public long? MaxFileSizeBytes { get; init; }
+}
+
+/// <summary>文字列入力の形式検証。</summary>
+public enum TextFormat
+{
+    /// <summary>検証しない。</summary>
+    None,
+
+    /// <summary>メールアドレスとして妥当か。</summary>
+    Email,
+
+    /// <summary>URL として妥当か。</summary>
+    Url,
+}
