@@ -299,7 +299,8 @@ public static class AdminUserEndpoints
         AdminUserOutcome.LastAdministrator =>
             Results.Conflict(new
             {
-                message = "最後の管理者です。先に別の管理者を用意してください。",
+                message = "他にログインできる管理者が居ません。"
+                    + "先に別の管理者を追加し、その管理者がログインできることを確かめてください。",
             }),
 
         AdminUserOutcome.LockedOut =>

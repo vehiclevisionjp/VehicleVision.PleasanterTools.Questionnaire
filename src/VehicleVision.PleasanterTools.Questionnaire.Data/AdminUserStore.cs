@@ -81,12 +81,15 @@ public interface IAdminUserStore
 
     Task SetDisabledAsync(Guid adminUserId, bool isDisabled, CancellationToken cancellationToken = default);
 
-    /// <summary>止める。**最後の有効な <see cref="AdminRole.Administrator"/> は止めさせない。**</summary>
-    /// <returns>止められたかどうか。<c>false</c> なら**最後の 1 人だった**。</returns>
+    /// <summary>止める。**最後の <see cref="AdminRole.Administrator"/> は止めさせない。**</summary>
+    /// <returns>
+    /// 止められたかどうか。<c>false</c> なら**他に入れる管理者が居なかった**。
+    /// 「入れる」は、有効かつ**一度でもログインしたことがある**こと。
+    /// </returns>
     Task<bool> TryDisableAsync(Guid adminUserId, CancellationToken cancellationToken = default);
 
-    /// <summary>役割を変える。**最後の有効な <see cref="AdminRole.Administrator"/> は降格させない。**</summary>
-    /// <returns>変えられたかどうか。<c>false</c> なら**最後の 1 人だった**。</returns>
+    /// <summary>役割を変える。**最後の <see cref="AdminRole.Administrator"/> は降格させない。**</summary>
+    /// <returns>変えられたかどうか。<c>false</c> なら**他に入れる管理者が居なかった**。</returns>
     Task<bool> TrySetRoleAsync(
         Guid adminUserId,
         AdminRole role,
@@ -259,8 +262,18 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
             new { AdminUserId = adminUserId, Role = (int)role },
             cancellationToken);
 
-    /// <summary>他に有効な <see cref="AdminRole.Administrator"/> が居るかを見る条件。</summary>
+    /// <summary>他に**実際に入れる** <see cref="AdminRole.Administrator"/> が居るかを見る条件。</summary>
     /// <remarks>
+    /// <para>
+    /// **一度もログインしていない管理者を当てにしない**（<c>LastLoginAt IS NULL</c> は数えない）。
+    /// 招待しただけの管理者は**誰も知らない合言葉**しか持たないので、
+    /// 頭数に入れると「招いたが受け取っていない相手」を頼りに
+    /// 最後の 1 人を止められてしまう。**それは締め出しそのもの。**
+    /// </para>
+    /// <para>
+    /// この条件は**厳しい側に外れる**。まだ一度も入っていない相手が居る間は、
+    /// 止める操作が断られる。**断るのは安全側**なので、そちらへ寄せた。
+    /// </para>
     /// <para>
     /// **副問い合わせを派生表で包んでいるのは MySQL のため。**
     /// 「更新する表を副問い合わせで直接読む」ことができない（ERROR 1093）。
@@ -275,11 +288,12 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
     /// </para>
     /// </remarks>
     private string OtherAdministratorExists() =>
-        $"EXISTS (SELECT 1 FROM (SELECT {Q("AdminUserId")}, {Q("Role")}, {Q("IsDisabled")} "
-        + $"FROM {Q("AdminUsers")}) AS {Q("other")} "
+        $"EXISTS (SELECT 1 FROM (SELECT {Q("AdminUserId")}, {Q("Role")}, {Q("IsDisabled")}, "
+        + $"{Q("LastLoginAt")} FROM {Q("AdminUsers")}) AS {Q("other")} "
         + $"WHERE {Q("other")}.{Q("AdminUserId")} <> @AdminUserId "
         + $"AND {Q("other")}.{Q("Role")} = @Administrator "
-        + $"AND {Q("other")}.{Q("IsDisabled")} = @Enabled)";
+        + $"AND {Q("other")}.{Q("IsDisabled")} = @Enabled "
+        + $"AND {Q("other")}.{Q("LastLoginAt")} IS NOT NULL)";
 
     /// <summary>誰も入れなくならないことを確かめてから更新する。</summary>
     private async Task<bool> GuardedUpdateAsync(

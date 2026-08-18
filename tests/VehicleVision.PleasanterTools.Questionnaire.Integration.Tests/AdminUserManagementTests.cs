@@ -80,20 +80,32 @@ public class AdminUserManagementTests
         return new Harness(users, invitations, service, authenticator, options, time);
     }
 
-    private static async Task<AdminUser> FirstAdministratorAsync(Harness harness) =>
-        (await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", Password))!;
+    /// <summary>最初の管理者を作り、**一度ログインしたことにする。**</summary>
+    /// <remarks>一度も入っていない管理者は頭数に数えない決まりのため。</remarks>
+    private static async Task<AdminUser> FirstAdministratorAsync(Harness harness)
+    {
+        var user = (await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", Password))!;
+        await harness.Users.RecordSuccessAsync(user.AdminUserId);
+        return user;
+    }
 
     private static async Task<Guid> InviteAndAcceptAsync(
         Harness harness,
         Guid actorId,
         string loginId,
-        AdminRole role)
+        AdminRole role,
+        bool signedIn = true)
     {
         var (outcome, invitation) = await harness.Service.InviteAsync(actorId, loginId, role);
         Assert.Equal(AdminUserOutcome.Succeeded, outcome);
 
         var accepted = await harness.Service.AcceptInvitationAsync(invitation!.Token, Password);
         Assert.Equal(AdminUserOutcome.Succeeded, accepted.Outcome);
+
+        if (signedIn)
+        {
+            await harness.Users.RecordSuccessAsync(invitation.AdminUserId);
+        }
 
         return invitation.AdminUserId;
     }
@@ -137,6 +149,31 @@ public class AdminUserManagementTests
 
         // **残った 1 人は止められない**
         Assert.False(await harness.Users.TryDisableAsync(secondId));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 一度もログインしていない管理者は頭数に入らない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var harness = Create(provider, connectionString);
+        var admin = await FirstAdministratorAsync(harness);
+
+        // 招待を受け取っただけで、まだ一度も入っていない管理者
+        var secondId = await InviteAndAcceptAsync(
+            harness, admin.AdminUserId, "admin2", AdminRole.Administrator, signedIn: false);
+
+        // **当てにしない。** 本当に入れるかが分からないうちに最後の 1 人を止めさせない
+        Assert.False(await harness.Users.TryDisableAsync(admin.AdminUserId));
+
+        await harness.Users.RecordSuccessAsync(secondId);
+        Assert.True(await harness.Users.TryDisableAsync(admin.AdminUserId));
     }
 
     [Theory]

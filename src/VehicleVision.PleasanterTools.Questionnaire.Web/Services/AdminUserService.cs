@@ -23,7 +23,10 @@ public enum AdminUserOutcome
     /// <summary>自分自身には行えない操作。</summary>
     SelfNotAllowed,
 
-    /// <summary>**最後の <see cref="AdminRole.Administrator"/> なので行えない。**</summary>
+    /// <summary>
+    /// **他に入れる <see cref="AdminRole.Administrator"/> が居ないので行えない。**
+    /// 「入れる」は、有効かつ一度でもログインしたことがあること。
+    /// </summary>
     LastAdministrator,
 
     /// <summary>招待が無い・期限切れ・使用済み。**理由は区別して返さない。**</summary>
@@ -66,7 +69,10 @@ public sealed record IssuedInvitation(Guid AdminUserId, string Token, DateTime E
 /// （<c>_documents/非機能設計.md</c> 1 章）。守っているのは 3 つ。
 /// </para>
 /// <list type="bullet">
-///   <item>**最後の <see cref="AdminRole.Administrator"/> を止めない・降格させない。** 誰も入れなくなる</item>
+///   <item>
+///     **最後の <see cref="AdminRole.Administrator"/> を止めない・降格させない。** 誰も入れなくなる。
+///     **一度もログインしていない管理者は頭数に入れない**（招待しただけの相手を当てにしない）
+///   </item>
 ///   <item>**自分自身を止めさせない・自分の役割を変えさせない。** 手が滑ったときに戻せない</item>
 ///   <item>**既定の合言葉を配らない。** 期限付きで 1 回しか使えない招待を渡す</item>
 /// </list>

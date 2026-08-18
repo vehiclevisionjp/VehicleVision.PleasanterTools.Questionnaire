@@ -52,23 +52,38 @@ public class AdminUserServiceTests
         return new Harness(users, invitations, service, authenticator, options, time);
     }
 
-    /// <summary>最初の管理者を作る。</summary>
-    private static async Task<AdminUser> FirstAdministratorAsync(Harness harness, string loginId = "admin") =>
-        (await harness.Authenticator.TryCreateFirstAdministratorAsync(loginId, Password))!;
+    /// <summary>最初の管理者を作り、**一度ログインしたことにする。**</summary>
+    /// <remarks>
+    /// 一度も入っていない管理者は頭数に数えない決まりなので、
+    /// **普通に運用されている状態**を作るには、ここでログインを済ませておく必要がある。
+    /// </remarks>
+    private static async Task<AdminUser> FirstAdministratorAsync(Harness harness, string loginId = "admin")
+    {
+        var user = (await harness.Authenticator.TryCreateFirstAdministratorAsync(loginId, Password))!;
+        await harness.Users.RecordSuccessAsync(user.AdminUserId);
+        return user;
+    }
 
     /// <summary>招待して、受け取らせるところまで進める。</summary>
+    /// <param name="signedIn">**一度ログインしたことにするか。**</param>
     private static async Task<Guid> InviteAndAcceptAsync(
         Harness harness,
         Guid actorId,
         string loginId,
         AdminRole role,
-        string password = Password)
+        string password = Password,
+        bool signedIn = true)
     {
         var (outcome, invitation) = await harness.Service.InviteAsync(actorId, loginId, role);
         Assert.Equal(AdminUserOutcome.Succeeded, outcome);
 
         var accepted = await harness.Service.AcceptInvitationAsync(invitation!.Token, password);
         Assert.Equal(AdminUserOutcome.Succeeded, accepted.Outcome);
+
+        if (signedIn)
+        {
+            await harness.Users.RecordSuccessAsync(invitation.AdminUserId);
+        }
 
         return invitation.AdminUserId;
     }
@@ -255,6 +270,28 @@ public class AdminUserServiceTests
         // **止まっている 2 人目は当てにならない。** 1 人目は止められない
         Assert.Equal(
             AdminUserOutcome.LastAdministrator,
+            await harness.Service.SetDisabledAsync(secondId, admin.AdminUserId, isDisabled: true));
+    }
+
+    [Fact]
+    public async Task 一度もログインしていない管理者は頭数に入らない()
+    {
+        var harness = Create();
+        var admin = await FirstAdministratorAsync(harness);
+
+        // 招待を受け取っただけで、まだ一度も入っていない管理者
+        var secondId = await InviteAndAcceptAsync(
+            harness, admin.AdminUserId, "admin2", AdminRole.Administrator, signedIn: false);
+
+        // **当てにしない。** 本当に入れるかが分からないうちに最後の 1 人を止めさせない
+        Assert.Equal(
+            AdminUserOutcome.LastAdministrator,
+            await harness.Service.SetDisabledAsync(secondId, admin.AdminUserId, isDisabled: true));
+
+        // 一度でも入れたなら、頼りにしてよい
+        await harness.Users.RecordSuccessAsync(secondId);
+        Assert.Equal(
+            AdminUserOutcome.Succeeded,
             await harness.Service.SetDisabledAsync(secondId, admin.AdminUserId, isDisabled: true));
     }
 

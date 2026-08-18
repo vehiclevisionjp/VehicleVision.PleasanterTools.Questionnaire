@@ -287,6 +287,11 @@ public sealed class AdminAuthenticator(
         await store.TryConsumeTotpTimeStepAsync(adminUserId, timeStep, cancellationToken)
             .ConfigureAwait(false);
 
+        // **ここまで来たらログインが 1 回通ったのと同じ。**
+        // 合言葉と使い捨てパスワードの両方が揃っており、この後 `Admin.Session` になる。
+        // 記録しないと、**入れているのに「一度も入っていない」ように見える**
+        await store.RecordSuccessAsync(adminUserId, cancellationToken).ConfigureAwait(false);
+
         var codes = RecoveryCode.Generate();
         await store.ReplaceRecoveryCodesAsync(
             adminUserId,

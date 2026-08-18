@@ -186,10 +186,16 @@ internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUser
         return Task.FromResult(true);
     }
 
+    /// <summary>他に**実際に入れる**管理者が居るか。</summary>
+    /// <remarks>
+    /// **一度もログインしていない管理者は当てにしない。**
+    /// 招待しただけの相手を頭数に入れると、それを頼りに最後の 1 人を止められてしまう。
+    /// </remarks>
     private bool OtherAdministratorExists(Guid exceptId) => users.Values.Any(
         other => other.AdminUserId != exceptId
             && other.Role is AdminRole.Administrator
-            && !other.IsDisabled);
+            && !other.IsDisabled
+            && other.LastLoginAt is not null);
 
     private Task UpdateAsync(Guid adminUserId, Func<AdminUser, AdminUser> change)
     {

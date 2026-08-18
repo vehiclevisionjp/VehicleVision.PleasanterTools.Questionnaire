@@ -231,8 +231,17 @@ public class AdminUserEndToEndTests
         change.EnsureSuccessStatusCode();
     }
 
+    /// <summary>自分自身は止められないし、降格もできない。</summary>
+    /// <remarks>
+    /// **HTTP からは、この 2 つが「最後の管理者を残す」条件も兼ねている。**
+    /// 操作できるのは有効な Administrator だけなので、
+    /// 自分以外を止めても**操作した本人が必ず残る**。
+    /// SQL 側の条件（<c>TryDisableAsync</c> / <c>TrySetRoleAsync</c>）は、
+    /// 画面以外から呼ばれたときと同時実行のための備えであり、
+    /// そちらは <c>AdminUserManagementTests</c> で見る。
+    /// </remarks>
     [Fact]
-    public async Task 最後の管理者は止められない()
+    public async Task 自分自身は止められないし降格もできない()
     {
         if (!Enabled)
         {
@@ -245,13 +254,12 @@ public class AdminUserEndToEndTests
 
         var me = await MyIdAsync(admin);
 
-        // 自分自身なので、まずここで止まる
         using (var self = await PostAsync(admin, $"/api/admin/users/{me}/disable"))
         {
             Assert.Equal(HttpStatusCode.Conflict, self.StatusCode);
         }
 
-        // 降格も通さない。**Editor しか残らなければ誰も足せなくなる**
+        // **Editor しか残らなければ、誰も管理者を足せなくなる**
         using var demote = await PostAsync(
             admin, $"/api/admin/users/{me}/role", new { role = "Editor" });
         Assert.Equal(HttpStatusCode.Conflict, demote.StatusCode);
