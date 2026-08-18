@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Worker.Tests;

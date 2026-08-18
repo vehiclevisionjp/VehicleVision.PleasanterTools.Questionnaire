@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;

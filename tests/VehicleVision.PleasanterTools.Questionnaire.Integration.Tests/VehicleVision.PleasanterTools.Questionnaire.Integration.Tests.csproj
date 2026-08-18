@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Data\VehicleVision.PleasanterTools.Questionnaire.Data.csproj" />
     <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Pleasanter\VehicleVision.PleasanterTools.Questionnaire.Pleasanter.csproj" />
+    <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Core\VehicleVision.PleasanterTools.Questionnaire.Core.csproj" />
   </ItemGroup>
 
 </Project>
