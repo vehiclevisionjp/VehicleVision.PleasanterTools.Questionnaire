@@ -53,6 +53,19 @@ builder.Services.AddHttpClient<PleasanterApiClient>(client =>
 
 builder.Services.AddSingleton<ResponseIntake>();
 
+// **HTTP でやり取りする JSON も定義と同じ設定にする。**
+// 既定のままだと LocalizedText が言語コードのオブジェクトにならず、
+// **画面に文言が出ないし、管理画面から送られた定義も読めない**
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Encoder = SurveyJson.Options.Encoder;
+    options.SerializerOptions.DefaultIgnoreCondition = SurveyJson.Options.DefaultIgnoreCondition;
+    foreach (var converter in SurveyJson.Options.Converters)
+    {
+        options.SerializerOptions.Converters.Add(converter);
+    }
+});
+
 // ---- 管理者の認証 ----------------------------------------------------------
 // **共有鍵を復号するための鍵。** 失うと登録済みの 2 要素が全て使えなくなるので、
 // **App Service の設定か Key Vault に置き、控えを取っておくこと**
