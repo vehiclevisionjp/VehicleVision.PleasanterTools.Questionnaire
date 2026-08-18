@@ -88,7 +88,7 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
                 SurveyVersion = surveyVersion,
                 PayloadJson = payloadJson,
                 PendingStatus = (int)ResponseStatus.Pending,
-                Now = UtcNowTruncated(),
+                Now = DbTime.UtcNowTruncated(),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -98,7 +98,7 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         TimeSpan lockDuration,
         CancellationToken cancellationToken = default)
     {
-        var now = UtcNowTruncated();
+        var now = DbTime.UtcNowTruncated();
 
         // **確保ごとに一意な値を入れる。** MySQL は RETURNING が無く、確保した行を
         // 読み直す必要がある。呼び出し元の名前だけだと**過去の確保とも一致してしまい、
@@ -169,9 +169,9 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
             {
                 ResponseToken = responseToken,
                 PendingStatus = (int)ResponseStatus.Pending,
-                NextAttemptAt = nextAttemptAtUtc,
+                NextAttemptAt = DbTime.ForDb(nextAttemptAtUtc),
                 Error = Truncate(error),
-                Now = UtcNowTruncated(),
+                Now = DbTime.UtcNowTruncated(),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -194,7 +194,7 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
                 ResponseToken = responseToken,
                 DeadLetterStatus = (int)ResponseStatus.DeadLetter,
                 Error = Truncate(error),
-                Now = UtcNowTruncated(),
+                Now = DbTime.UtcNowTruncated(),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -213,7 +213,7 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
             {
                 PendingStatus = (int)ResponseStatus.Pending,
                 SendingStatus = (int)ResponseStatus.Sending,
-                Now = UtcNowTruncated(),
+                Now = DbTime.UtcNowTruncated(),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -245,19 +245,6 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
 
     private string Q(string identifier) => SqlDialect.Quote(Provider, identifier);
 
-    /// <summary>秒未満を切り捨てた現在時刻（UTC）。</summary>
-    /// <remarks>
-    /// **MySQL の <c>datetime</c> は秒未満を保持せず、四捨五入して格納する**
-    /// （<c>_documents/データモデル設計.md</c> 4 章）。
-    /// 切り捨てずに渡すと、保存直後の <c>NextAttemptAt</c> が**現在より未来に丸められ**、
-    /// その回答が次の秒まで確保できなくなる（実際に MySQL で踏んだ）。
-    /// **3 者で同じ振る舞いにするため、アプリ側で切り捨ててから渡す。**
-    /// </remarks>
-    private static DateTime UtcNowTruncated()
-    {
-        var now = DateTime.UtcNow;
-        return new DateTime(now.Ticks - (now.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
-    }
 
     /// <summary>失敗の理由は列の桁に収める。**回答本文は入れないこと。**</summary>
     private static string? Truncate(string? error) =>

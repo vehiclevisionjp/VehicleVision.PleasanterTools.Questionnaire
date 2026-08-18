@@ -64,7 +64,7 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(
             SqlDialect.EnsureResponseToken(connectionFactory.Provider),
-            new { ResponseToken = responseToken, SurveyId = surveyId, Now = DateTime.UtcNow },
+            new { ResponseToken = responseToken, SurveyId = surveyId, Now = DbTime.UtcNowTruncated() },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
@@ -82,7 +82,7 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
                 ResponseToken = responseToken,
                 SurveyId = surveyId,
                 ReferenceId = referenceId,
-                Now = DateTime.UtcNow,
+                Now = DbTime.UtcNowTruncated(),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }

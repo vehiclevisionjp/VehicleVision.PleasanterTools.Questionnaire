@@ -105,7 +105,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
     public async Task SaveAsync(SurveyRecord survey, CancellationToken cancellationToken = default)
     {
         var q = (string name) => SqlDialect.Quote(connectionFactory.Provider, name);
-        var now = DateTime.UtcNow;
+        var now = DbTime.UtcNowTruncated();
 
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
@@ -202,7 +202,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 Version = version,
                 DefinitionJson = SurveyJson.Serialize(definition),
                 MappingJson = SurveyJson.Serialize(mapping),
-                Now = DateTime.UtcNow,
+                Now = DbTime.UtcNowTruncated(),
                 PublishedBy = publishedBy,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -210,7 +210,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         await connection.ExecuteAsync(new CommandDefinition(
             $"UPDATE {q("Surveys")} SET {q("PublishedVersion")} = @Version, {q("UpdatedAt")} = @Now "
             + $"WHERE {q("SurveyId")} = @SurveyId",
-            new { SurveyId = surveyId, Version = version, Now = DateTime.UtcNow },
+            new { SurveyId = surveyId, Version = version, Now = DbTime.UtcNowTruncated() },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
