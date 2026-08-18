@@ -55,7 +55,8 @@ git submodule update --init --recursive
 
 | パス | 内容 |
 |---|---|
-| `_documents/` | 仕様書・方針・調査結果 |
+| [`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) | 構成方針・決定事項・未確定事項 |
+| [`_documents/機能一覧.md`](_documents/機能一覧.md) | Forms 相当のどこまで作るか |
 | `_reference/Implem.Pleasanter` | Pleasanter 本体（**AGPL v3 / 参照専用**）。[README](_reference/README.md) |
 | `App_Data/Parameters/` | 設定ファイル |
 | `scripts/` | 開発補助スクリプト |
