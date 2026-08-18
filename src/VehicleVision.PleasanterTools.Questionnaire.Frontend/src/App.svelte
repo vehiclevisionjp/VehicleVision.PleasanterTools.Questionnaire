@@ -1,27 +1,35 @@
 <script lang="ts">
   import QuestionField from './components/QuestionField.svelte';
   import {
-    getOrCreateResponseToken,
+    forgetSubmission,
+    hasSubmitted,
     loadForm,
     loadPendingAnswers,
+    requestTicket,
     submitAnswers,
   } from './lib/api';
   import type { AnswerState, PayloadAnswer, RejectionReason, SurveyDefinition } from './lib/types';
   import { isDisplayOnly, text } from './lib/types';
   import { validatePage } from './lib/validation';
 
-  type Screen = 'loading' | 'answering' | 'completed' | 'rejected' | 'error';
+  type Screen = 'loading' | 'answering' | 'answered' | 'completed' | 'rejected' | 'error';
 
   let screen = $state<Screen>('loading');
   let rejection = $state<RejectionReason>();
   let definition = $state<SurveyDefinition>();
   let publicId = $state('');
   let responseToken = $state('');
+  /** 送信チケット。**画面を開いたときにサーバから受け取る。** */
+  let ticket = $state('');
+  /** ハニーポット項目。**人が触らない場所に置いてあるので、空のままのはず。** */
+  let trap = $state('');
   let pageIndex = $state(0);
   let answers = $state<Record<string, AnswerState>>({});
   let errors = $state<Record<string, string>>({});
   let submitting = $state(false);
-  let submitFailed = $state(false);
+  let submitError = $state('');
+  /** 前に送った回答を読めたか。**読めなければ編集を出せない。** */
+  let canEdit = $state(false);
 
   const pages = $derived(definition?.pages ?? []);
   const currentPage = $derived(pages[pageIndex]);
@@ -57,7 +65,17 @@
     }
 
     definition = result.form.definition;
-    responseToken = getOrCreateResponseToken(publicId);
+
+    // **回答トークンと送信チケットをサーバから受け取る。**
+    // チケットが無いと送信できないので、ここで失敗したら回答させない
+    const issued = await requestTicket(publicId);
+    if (!issued) {
+      screen = 'error';
+      return;
+    }
+
+    responseToken = issued.responseToken;
+    ticket = issued.ticket;
 
     for (const page of definition.pages) {
       for (const question of page.questions) {
@@ -68,6 +86,7 @@
     // **送信待ちを先に見る。** 未送信の回答は Pleasanter にまだ無い
     const pending = await loadPendingAnswers(publicId, responseToken);
     if (pending) {
+      canEdit = true;
       for (const answer of pending) {
         answers[answer.questionId] = {
           values: answer.values ?? [],
@@ -76,7 +95,10 @@
       }
     }
 
-    screen = 'answering';
+    // **この端末から回答済みなら、いきなり空のフォームを出さない**
+    // （`_documents/画面設計.md` 1 章「既に回答済み」）。
+    // **消されたら分からない。** これは防止ではなく抑止
+    screen = hasSubmitted(publicId) ? 'answered' : 'answering';
   }
 
   /** ページ遷移時に、そのページ分だけ見る。 */
@@ -116,12 +138,30 @@
     if (!checkCurrentPage()) return;
 
     submitting = true;
-    submitFailed = false;
+    submitError = '';
 
     try {
-      const result = await submitAnswers(publicId, responseToken, toPayload());
+      const result = await submitAnswers(publicId, responseToken, toPayload(), { ticket, trap });
       if (result.accepted) {
+        canEdit = true;
         screen = 'completed';
+        return;
+      }
+
+      // **受付そのものを断られた場合だけ画面を切り替える。**
+      // それ以外は入力内容を残したまま、その場でやり直させる
+      if (result.rejection === 'rejected' || result.rejection === 'tooManyRequests') {
+        submitError =
+          result.rejection === 'tooManyRequests'
+            ? '送信が混み合っています。少し時間を置いてもう一度お試しください。'
+            : '送信を受け付けられませんでした。もう一度「送信する」を押してください。';
+
+        // **チケットが切れていただけのことがある。** 取り直して次の操作で通るようにする
+        const reissued = await requestTicket(publicId);
+        if (reissued) {
+          responseToken = reissued.responseToken;
+          ticket = reissued.ticket;
+        }
         return;
       }
 
@@ -132,7 +172,7 @@
       }
 
       // **入力内容は消さない。** 失われたら再入力してもらう以外に手が無い
-      submitFailed = true;
+      submitError = '送信できませんでした。入力内容はそのままです。少し時間を置いてもう一度お試しください。';
       if (result.errors) {
         const mapped: Record<string, string> = {};
         for (const [questionId, codes] of Object.entries(result.errors)) {
@@ -141,14 +181,15 @@
         errors = mapped;
       }
     } catch {
-      submitFailed = true;
+      submitError = '送信できませんでした。入力内容はそのままです。少し時間を置いてもう一度お試しください。';
     } finally {
       submitting = false;
     }
   }
 
+  /** 別の回答として新しく登録する。**この端末の記録は捨てる。** */
   function answerAgain() {
-    localStorage.removeItem(`questionnaire.token.${publicId}`);
+    forgetSubmission(publicId);
     location.reload();
   }
 
@@ -157,6 +198,8 @@
     closed: 'このアンケートの受付は終了しました。',
     suspended: 'このアンケートは現在受付を停止しています。',
     notFound: 'このアンケートは見つかりませんでした。URL をご確認ください。',
+    rejected: '送信を受け付けられませんでした。ページを開き直してお試しください。',
+    tooManyRequests: '送信が混み合っています。少し時間を置いてお試しください。',
   };
 </script>
 
@@ -170,6 +213,26 @@
   {:else if screen === 'error'}
     <h1>URL が正しくありません</h1>
     <p class="status">アンケートの URL をご確認ください。</p>
+  {:else if screen === 'answered' && definition}
+    <!-- **同じ端末からの再訪**（`_documents/画面設計.md` 1 章）。
+         編集するか、新しく回答するかを選ばせる -->
+    <h1>この端末では回答済みです</h1>
+    {#if definition.allowEditingAfterSubmit && canEdit}
+      <p class="status">前回の回答を編集できます。</p>
+      <button type="button" onclick={() => (screen = 'answering')}>回答を編集する</button>
+    {:else if definition.allowEditingAfterSubmit}
+      <!-- **前の回答が読めない。** 送信済みで Pleasanter へ渡った後や、
+           トークンだけ消えた後はこちらになる -->
+      <p class="status">前回の回答内容は読み出せませんでした。</p>
+    {:else}
+      <p class="status">このアンケートは回答の編集を受け付けていません。</p>
+    {/if}
+    <button type="button" class="secondary" onclick={answerAgain}>
+      新しい回答として送信する
+    </button>
+    <p class="note">
+      「新しい回答として送信する」を選ぶと、前回とは別の回答として登録されます。
+    </p>
   {:else if screen === 'completed' && definition}
     <h1>{text(definition.confirmationMessage) || '回答を受け付けました'}</h1>
     <p class="status">ご協力ありがとうございました。</p>
@@ -209,10 +272,23 @@
         />
       {/each}
 
-      {#if submitFailed}
-        <p class="error" role="alert">
-          送信できませんでした。入力内容はそのままです。少し時間を置いてもう一度お試しください。
-        </p>
+      <!-- **ハニーポット。** 画面にも読み上げにも出さず、キーボードでも辿れない場所に置く。
+           人には触れないので、埋まっていたら bot（`Services/SubmissionGuard.cs`）。
+           **自動入力に拾われない名前にすること。** 拾われると正規の回答者を弾く -->
+      <div class="trap" aria-hidden="true">
+        <label for="q-extra">この欄は入力しないでください</label>
+        <input
+          id="q-extra"
+          name="q-extra"
+          type="text"
+          tabindex="-1"
+          autocomplete="off"
+          bind:value={trap}
+        />
+      </div>
+
+      {#if submitError}
+        <p class="error" role="alert">{submitError}</p>
       {/if}
 
       <nav class="actions">
@@ -322,5 +398,21 @@
 
   .error {
     color: var(--error);
+  }
+
+  .note {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+  }
+
+  /* **ハニーポットを画面から外す。** `display: none` にしないのは、
+     それだけを見て無視する bot が居るため */
+  .trap {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
   }
 </style>
