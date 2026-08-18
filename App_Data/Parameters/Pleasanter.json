@@ -1,0 +1,19 @@
+{
+    "//": "接続先 Pleasanter の設定。実値は Pleasanter.local.json（git 管理外）か環境変数で上書きする",
+
+    "//BaseUrl": "Pleasanter のベース URL。末尾のスラッシュは付けない。例 https://pleasanter.example.jp",
+    "BaseUrl": "https://localhost:5001",
+
+    "//ApiKey": "Pleasanter の API キー。**このファイルへ実値を書かないこと。** 環境変数 QUESTIONNAIRE_PLEASANTER_APIKEY か Azure Key Vault から読む。Pleasanter はリクエストボディの JSON に ApiKey を載せる方式のため、ブラウザへ配布できない（_documents/アーキテクチャ方針.md 3 章）",
+    "ApiKey": null,
+    "ApiKeyEnvVar": "QUESTIONNAIRE_PLEASANTER_APIKEY",
+
+    "//ApiVersion": "Pleasanter の API バージョン。リクエストボディの ApiVersion に載せる",
+    "ApiVersion": 1.1,
+
+    "//TimeoutSeconds": "Pleasanter API 呼び出しのタイムアウト",
+    "TimeoutSeconds": 30,
+
+    "//ApiKeyUserTimeZoneId": "API キーに紐づく Pleasanter ユーザの TimeZone。Pleasanter は API キー認証時、そのユーザの TimeZone で日時を解釈する（Context.cs の TimeZoneInfo）。本アプリの実行環境（Azure は既定 UTC）とも、回答者のタイムゾーンとも別物であることに注意する。null なら Service.json の TimeZoneDefault と同じとみなす",
+    "ApiKeyUserTimeZoneId": null
+}

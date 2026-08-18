@@ -1,0 +1,7 @@
+{
+    "Name": "VehicleVisionQuestionnaire",
+    "Description": "Pleasanter をバックエンドにした Web アンケート・Web フォームアプリ",
+
+    "//TimeZoneDefault": "本アプリが日時を表示・解釈するときの既定タイムゾーン。Pleasanter 本体の App_Data/Parameters/Service.json の TimeZoneDefault に相当する（本体の既定は 'UTC'）。Azure App Service の実行環境は既定 UTC のため、明示しないと回答日時が 9 時間ずれる。IANA 形式（Asia/Tokyo）と Windows 形式（Tokyo Standard Time）のどちらでもよい",
+    "TimeZoneDefault": "Asia/Tokyo"
+}
