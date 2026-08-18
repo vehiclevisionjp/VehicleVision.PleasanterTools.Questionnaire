@@ -66,6 +66,25 @@ builder.Services.AddSingleton(attachmentOptions);
 builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = attachmentOptions.MaxRequestBodyBytes);
 
+// **ウイルススキャンは設定で有効にしたときだけ組み込む**（既定は無効）。
+// **ClamAV 本体は GPL-2.0 なので別プロセスとして呼ぶだけ**（LICENSING.md）
+if (attachmentOptions.VirusScan.Enabled)
+{
+    switch (attachmentOptions.VirusScan.Provider)
+    {
+        case VirusScanProvider.ClamAv:
+            builder.Services.AddSingleton<IVirusScanner>(serviceProvider =>
+                new ClamAvVirusScanner(
+                    attachmentOptions.VirusScan,
+                    serviceProvider.GetRequiredService<ILogger<ClamAvVirusScanner>>()));
+            break;
+
+        default:
+            throw new InvalidOperationException(
+                $"未対応のウイルススキャン方式: {attachmentOptions.VirusScan.Provider}");
+    }
+}
+
 // **スキャナが登録されていなければ 3 層目は無効。**
 // 「有効なのにスキャナが無い」場合は検査側が添付を拒否する（素通しにしない）
 builder.Services.AddSingleton(serviceProvider => new AttachmentInspector(
