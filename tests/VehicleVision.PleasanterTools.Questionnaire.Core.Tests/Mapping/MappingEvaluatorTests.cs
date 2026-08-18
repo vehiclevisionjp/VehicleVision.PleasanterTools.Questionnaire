@@ -6,252 +6,251 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Mapping;
 
 public class MappingEvaluatorTests
 {
-    private static MappingNode Input(string nodeId, string questionId) => new()
-    {
-        NodeId = nodeId,
-        Type = MappingNodeType.QuestionInput,
-        QuestionId = questionId,
-    };
+    private static MappingDefinition Mapping(params ColumnAssignment[] assignments) =>
+        new() { Assignments = [.. assignments] };
 
-    private static MappingNode Transform(
-        string nodeId,
-        string operation,
-        params (string Key, string Value)[] config) => new()
-        {
-            NodeId = nodeId,
-            Type = MappingNodeType.Transform,
-            Operation = operation,
-            Config = config.ToImmutableDictionary(
-                pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
-        };
-
-    private static MappingNode Condition(
-        string nodeId,
-        string operation,
-        params (string Key, string Value)[] config) => new()
-        {
-            NodeId = nodeId,
-            Type = MappingNodeType.Condition,
-            Operation = operation,
-            Config = config.ToImmutableDictionary(
-                pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
-        };
-
-    private static MappingNode Output(string nodeId, string columnName) => new()
-    {
-        NodeId = nodeId,
-        Type = MappingNodeType.ColumnOutput,
-        ColumnName = columnName,
-    };
+    private static MappingResult Evaluate(
+        MappingDefinition mapping,
+        IReadOnlyCollection<Answer> answers,
+        IScriptConverter? script = null) =>
+        new MappingEvaluator(script).Evaluate(mapping, answers);
 
     [Fact]
-    public void 設問の値をそのまま列へ写す()
+    public void 入力をそのまま列へ写す()
     {
-        var graph = new MappingGraph
-        {
-            Nodes = [Input("n1", "q1"), Output("n2", "ClassA")],
-            Edges = [MappingEdge.Simple("n1", "n2")],
-        };
+        var mapping = Mapping(ColumnAssignment.Direct("ClassA", new MappingSource("q1")));
 
-        var result = MappingEvaluator.Evaluate(graph, [Answer.Of("q1", "満足")]);
+        var result = Evaluate(mapping, [Answer.Of("q1", "満足")]);
 
-        Assert.Equal(["満足"], result["ClassA"].ToArray());
+        Assert.Equal(["満足"], result.Columns["ClassA"].ToArray());
+        Assert.Empty(result.Problems);
     }
 
     [Fact]
-    public void 流れてこなかった列は結果に含めない()
+    public void 管理している列は値が無くても結果へ含める()
     {
-        // **未接続の出力列を空文字で上書きしない**
-        var graph = new MappingGraph
-        {
-            Nodes = [Input("n1", "q1"), Output("n2", "ClassA"), Output("n3", "ClassB")],
-            Edges = [MappingEdge.Simple("n1", "n2")],
-        };
+        // **空配列は「消す」を意味する。** 編集で回答を消したときに古い値を残さない
+        var mapping = Mapping(ColumnAssignment.Direct("ClassA", new MappingSource("q1")));
 
-        var result = MappingEvaluator.Evaluate(graph, [Answer.Of("q1", "満足")]);
+        var result = Evaluate(mapping, []);
 
-        Assert.True(result.ContainsKey("ClassA"));
-        Assert.False(result.ContainsKey("ClassB"));
+        Assert.True(result.Columns.ContainsKey("ClassA"));
+        Assert.Empty(result.Columns["ClassA"]);
     }
 
     [Fact]
-    public void 未回答なら列に値を出さない()
+    public void 割り当てが無い列は結果に含めない()
     {
-        var graph = new MappingGraph
-        {
-            Nodes = [Input("n1", "q1"), Output("n2", "ClassA")],
-            Edges = [MappingEdge.Simple("n1", "n2")],
-        };
+        var mapping = Mapping(ColumnAssignment.Direct("ClassA", new MappingSource("q1")));
 
-        Assert.Empty(MappingEvaluator.Evaluate(graph, []));
+        var result = Evaluate(mapping, [Answer.Of("q1", "満足")]);
+
+        Assert.False(result.Columns.ContainsKey("ClassB"));
     }
 
     [Fact]
     public void 選択肢をコードへ置き換える()
     {
-        var graph = new MappingGraph
-        {
-            Nodes =
-            [
-                Input("n1", "q1"),
-                Transform("n2", TransformOperations.Map, ("map.とても満足", "5"), ("map.満足", "4")),
-                Output("n3", "NumA"),
-            ],
-            Edges = [MappingEdge.Simple("n1", "n2"), MappingEdge.Simple("n2", "n3")],
-        };
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(ConverterOperations.Map, ("map.とても満足", "5"), ("map.満足", "4")),
+            new MappingSource("q1")));
 
-        var result = MappingEvaluator.Evaluate(graph, [Answer.Of("q1", "とても満足")]);
+        var result = Evaluate(mapping, [Answer.Of("q1", "とても満足")]);
 
-        Assert.Equal(["5"], result["NumA"].ToArray());
+        Assert.Equal(["5"], result.Columns["NumA"].ToArray());
     }
 
     [Fact]
-    public void 複数選択を連結して一つの列へ入れる()
+    public void 複数の設問を連結して一つの列へ入れる()
     {
-        var graph = new MappingGraph
-        {
-            Nodes =
-            [
-                Input("n1", "q1"),
-                Transform("n2", TransformOperations.Join, ("separator", ",")),
-                Output("n3", "ClassA"),
-            ],
-            Edges = [MappingEdge.Simple("n1", "n2"), MappingEdge.Simple("n2", "n3")],
-        };
+        // **N : 1 : 1。** 入力の順序は宣言順で決まる
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(ConverterOperations.Join, ("separator", " ")),
+            new MappingSource("姓"),
+            new MappingSource("名")));
 
-        var result = MappingEvaluator.Evaluate(graph, [Answer.Of("q1", "A", "C")]);
+        var result = Evaluate(mapping, [Answer.Of("名", "太郎"), Answer.Of("姓", "山田")]);
 
-        Assert.Equal(["A,C"], result["ClassA"].ToArray());
+        Assert.Equal(["山田 太郎"], result.Columns["ClassA"].ToArray());
     }
 
     [Fact]
-    public void 複数選択から複数のチェック列をONOFFする()
+    public void 入力の順序は宣言順で決まり回答の順序に依存しない()
     {
-        // **1 設問 = 1 列を前提にしない。** 1 入力から複数の列へ分岐する
-        var graph = new MappingGraph
-        {
-            Nodes =
-            [
-                Input("n1", "q1"),
-                Transform("n2", TransformOperations.ToCheck, ("value", "A")),
-                Transform("n3", TransformOperations.ToCheck, ("value", "B")),
-                Transform("n4", TransformOperations.ToCheck, ("value", "C")),
-                Output("o1", "CheckA"),
-                Output("o2", "CheckB"),
-                Output("o3", "CheckC"),
-            ],
-            Edges =
-            [
-                MappingEdge.Simple("n1", "n2"),
-                MappingEdge.Simple("n1", "n3"),
-                MappingEdge.Simple("n1", "n4"),
-                MappingEdge.Simple("n2", "o1"),
-                MappingEdge.Simple("n3", "o2"),
-                MappingEdge.Simple("n4", "o3"),
-            ],
-        };
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(ConverterOperations.Join, ("separator", "/")),
+            new MappingSource("a"),
+            new MappingSource("b")));
 
-        var result = MappingEvaluator.Evaluate(graph, [Answer.Of("q1", "A", "C")]);
+        var one = Evaluate(mapping, [Answer.Of("a", "1"), Answer.Of("b", "2")]);
+        var other = Evaluate(mapping, [Answer.Of("b", "2"), Answer.Of("a", "1")]);
 
-        Assert.Equal(["true"], result["CheckA"].ToArray());
-        Assert.Equal(["false"], result["CheckB"].ToArray());
-        Assert.Equal(["true"], result["CheckC"].ToArray());
+        Assert.Equal(["1/2"], one.Columns["ClassA"].ToArray());
+        Assert.Equal(one.Columns["ClassA"].ToArray(), other.Columns["ClassA"].ToArray());
+    }
+
+    [Fact]
+    public void 一つの設問を複数のチェック列へ展開する()
+    {
+        // **同じ設問を入力にした割り当てを、列の数だけ並べる**
+        var mapping = Mapping(
+            ColumnAssignment.Converted(
+                "CheckA", MappingConverter.Of(ConverterOperations.ToCheck, ("value", "A")),
+                new MappingSource("q1")),
+            ColumnAssignment.Converted(
+                "CheckB", MappingConverter.Of(ConverterOperations.ToCheck, ("value", "B")),
+                new MappingSource("q1")),
+            ColumnAssignment.Converted(
+                "CheckC", MappingConverter.Of(ConverterOperations.ToCheck, ("value", "C")),
+                new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", "A", "C")]);
+
+        Assert.Equal(["true"], result.Columns["CheckA"].ToArray());
+        Assert.Equal(["false"], result.Columns["CheckB"].ToArray());
+        Assert.Equal(["true"], result.Columns["CheckC"].ToArray());
     }
 
     [Fact]
     public void 文字列の内容を判定してフラグを立てる()
     {
-        var graph = new MappingGraph
-        {
-            Nodes =
-            [
-                Input("n1", "q1"),
-                Transform("n2", TransformOperations.Contains, ("keyword", "至急")),
-                Output("n3", "CheckD"),
-            ],
-            Edges = [MappingEdge.Simple("n1", "n2"), MappingEdge.Simple("n2", "n3")],
-        };
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "CheckD",
+            MappingConverter.Of(ConverterOperations.Contains, ("keyword", "至急")),
+            new MappingSource("q1")));
 
-        var hit = MappingEvaluator.Evaluate(graph, [Answer.Of("q1", "至急対応してほしい")]);
-        var miss = MappingEvaluator.Evaluate(graph, [Answer.Of("q1", "特にありません")]);
-
-        Assert.Equal(["true"], hit["CheckD"].ToArray());
-        Assert.Equal(["false"], miss["CheckD"].ToArray());
+        Assert.Equal(
+            ["true"],
+            Evaluate(mapping, [Answer.Of("q1", "至急対応してほしい")]).Columns["CheckD"].ToArray());
+        Assert.Equal(
+            ["false"],
+            Evaluate(mapping, [Answer.Of("q1", "特にありません")]).Columns["CheckD"].ToArray());
     }
 
     [Fact]
-    public void 条件で流す先を分ける()
+    public void 条件で出す値を変える()
     {
-        var graph = new MappingGraph
-        {
-            Nodes =
-            [
-                Input("n1", "q1"),
-                Condition("c1", ConditionOperations.EqualsValue, ("value", "はい")),
-                Output("o1", "ClassYes"),
-                Output("o2", "ClassNo"),
-            ],
-            Edges =
-            [
-                MappingEdge.Simple("n1", "c1"),
-                new MappingEdge("c1", ConditionPorts.True, "o1", "in"),
-                new MappingEdge("c1", ConditionPorts.False, "o2", "in"),
-            ],
-        };
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(ConverterOperations.When, ("when", "はい"), ("then", "要対応"), ("else", "不要")),
+            new MappingSource("q1")));
 
-        var yes = MappingEvaluator.Evaluate(graph, [Answer.Of("q1", "はい")]);
-        var no = MappingEvaluator.Evaluate(graph, [Answer.Of("q1", "いいえ")]);
-
-        Assert.Equal(["はい"], yes["ClassYes"].ToArray());
-        Assert.False(yes.ContainsKey("ClassNo"));
-
-        Assert.Equal(["いいえ"], no["ClassNo"].ToArray());
-        Assert.False(no.ContainsKey("ClassYes"));
+        Assert.Equal(["要対応"], Evaluate(mapping, [Answer.Of("q1", "はい")]).Columns["ClassA"].ToArray());
+        Assert.Equal(["不要"], Evaluate(mapping, [Answer.Of("q1", "いいえ")]).Columns["ClassA"].ToArray());
     }
 
     [Fact]
-    public void 循環参照があっても止まる()
+    public void その他の自由記述を別の列へ写す()
     {
-        // 保存時に弾いているが、**実行時に踏んでも無限ループさせない**
-        var graph = new MappingGraph
-        {
-            Nodes =
-            [
-                Transform("n1", TransformOperations.Identity),
-                Transform("n2", TransformOperations.Identity),
-                Output("o1", "ClassA"),
-            ],
-            Edges =
-            [
-                MappingEdge.Simple("n1", "n2"),
-                MappingEdge.Simple("n2", "n1"),
-                MappingEdge.Simple("n2", "o1"),
-            ],
-        };
+        // **OtherText をグラフの外に置かない**
+        var mapping = Mapping(ColumnAssignment.Direct(
+            "ClassB", new MappingSource("q1", QuestionPort.OtherText)));
+        var answer = new Answer("q1", ["other"]) { OtherText = "自由記述の内容" };
 
-        var result = MappingEvaluator.Evaluate(graph, []);
+        var result = Evaluate(mapping, [answer]);
 
-        Assert.Empty(result);
+        Assert.Equal(["自由記述の内容"], result.Columns["ClassB"].ToArray());
     }
 
     [Fact]
-    public void 同じ回答からは常に同じ結果が出る()
+    public void 添付の名前を列へ写す()
     {
-        var graph = new MappingGraph
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassC",
+            MappingConverter.Of(ConverterOperations.Join, ("separator", ",")),
+            new MappingSource("q1", QuestionPort.FileNames)));
+        var answer = new Answer("q1", []) { FileNames = ["a.png", "b.pdf"] };
+
+        var result = Evaluate(mapping, [answer]);
+
+        Assert.Equal(["a.png,b.pdf"], result.Columns["ClassC"].ToArray());
+    }
+
+    [Fact]
+    public void 入力が複数なのに変換が無ければ不備として扱う()
+    {
+        var mapping = Mapping(new ColumnAssignment
         {
-            Nodes =
-            [
-                Input("n1", "q1"),
-                Transform("n2", TransformOperations.Join, ("separator", "/")),
-                Output("n3", "ClassA"),
-            ],
-            Edges = [MappingEdge.Simple("n1", "n2"), MappingEdge.Simple("n2", "n3")],
-        };
-        var answers = new[] { Answer.Of("q1", "A", "B") };
+            TargetColumn = "ClassA",
+            Sources = [new MappingSource("q1"), new MappingSource("q2")],
+            Converter = null,
+        });
 
-        var first = MappingEvaluator.Evaluate(graph, answers);
-        var second = MappingEvaluator.Evaluate(graph, answers);
+        var result = Evaluate(mapping, [Answer.Of("q1", "A"), Answer.Of("q2", "B")]);
 
-        Assert.Equal(first["ClassA"].ToArray(), second["ClassA"].ToArray());
+        Assert.False(result.Columns.ContainsKey("ClassA"));
+        Assert.Single(result.Problems);
+    }
+
+    [Fact]
+    public void 同じ列への割り当てが重複していたら不備として扱う()
+    {
+        var mapping = Mapping(
+            ColumnAssignment.Direct("ClassA", new MappingSource("q1")),
+            ColumnAssignment.Direct("ClassA", new MappingSource("q2")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", "A"), Answer.Of("q2", "B")]);
+
+        // 先勝ちで 1 件だけ入り、重複は不備として報告される
+        Assert.Equal(["A"], result.Columns["ClassA"].ToArray());
+        Assert.Single(result.Problems);
+    }
+
+    private sealed class FailingScript : IScriptConverter
+    {
+        public ImmutableArray<string> Convert(string script, ImmutableArray<string> input) =>
+            throw new ScriptConverterException("実行時エラー");
+    }
+
+    private sealed class UpperCaseScript : IScriptConverter
+    {
+        public ImmutableArray<string> Convert(string script, ImmutableArray<string> input) =>
+            [.. input.Select(value => value.ToUpperInvariant())];
+    }
+
+    [Fact]
+    public void スクリプト変換を適用できる()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(ConverterOperations.Script, ("script", "…")),
+            new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", "abc")], new UpperCaseScript());
+
+        Assert.Equal(["ABC"], result.Columns["ClassA"].ToArray());
+    }
+
+    [Fact]
+    public void スクリプトが失敗しても他の列の評価は続く()
+    {
+        // **回答そのものは捨てない。** 不備として報告し、人が対処する
+        var mapping = Mapping(
+            ColumnAssignment.Converted(
+                "ClassA", MappingConverter.Of(ConverterOperations.Script, ("script", "…")),
+                new MappingSource("q1")),
+            ColumnAssignment.Direct("ClassB", new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", "abc")], new FailingScript());
+
+        Assert.False(result.Columns.ContainsKey("ClassA"));
+        Assert.Equal(["abc"], result.Columns["ClassB"].ToArray());
+        Assert.Single(result.Problems);
+    }
+
+    [Fact]
+    public void スクリプト実行環境が無ければ不備として扱う()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(ConverterOperations.Script, ("script", "…")),
+            new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", "abc")], script: null);
+
+        Assert.Single(result.Problems);
     }
 }

@@ -1,16 +1,15 @@
 using System.Collections.Immutable;
-using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
-/// <summary>変換ノードの種別。</summary>
-public static class TransformOperations
+/// <summary>変換の種別。</summary>
+public static class ConverterOperations
 {
-    /// <summary>そのまま通す。</summary>
+    /// <summary>入力をそのまま出す。</summary>
     public const string Identity = "identity";
 
-    /// <summary>複数の値を連結して 1 つにする。設定 <c>separator</c>。</summary>
+    /// <summary>入力を連結して 1 つにする。設定 <c>separator</c>。</summary>
     public const string Join = "join";
 
     /// <summary>値を別の値へ置き換える。設定 <c>map.{元の値}</c> = 置き換え後。</summary>
@@ -19,213 +18,206 @@ public static class TransformOperations
     /// <summary>設定 <c>value</c> が含まれていれば <c>true</c>。チェック列向け。</summary>
     public const string ToCheck = "toCheck";
 
-    /// <summary>設定 <c>keyword</c> を含む文字列があれば <c>true</c>。</summary>
+    /// <summary>設定 <c>keyword</c> を含む値があれば <c>true</c>。</summary>
     public const string Contains = "contains";
 
     /// <summary>入力によらず設定 <c>value</c> を出す。</summary>
     public const string Constant = "constant";
+
+    /// <summary>空でない最初の値を出す。</summary>
+    public const string Coalesce = "coalesce";
+
+    /// <summary>
+    /// 設定 <c>when</c> と一致する入力があれば設定 <c>then</c>、無ければ設定 <c>else</c>。
+    /// </summary>
+    public const string When = "when";
+
+    /// <summary>スクリプトで変換する。設定 <c>script</c>。</summary>
+    /// <remarks>
+    /// **固定の変換だけでは必ず足りなくなるための逃げ道**
+    /// （<c>_documents/アーキテクチャ方針.md</c> 8 章）。
+    /// 実行は <c>.Core</c> の外（スクリプトエンジン）が担う。
+    /// **決定性を壊さないこと。** 時刻・乱数・外部 I/O を封じる。
+    /// </remarks>
+    public const string Script = "script";
 }
 
-/// <summary>条件ノードの種別。</summary>
-public static class ConditionOperations
+/// <summary>スクリプト変換を実行する。</summary>
+/// <remarks>
+/// <c>.Core</c> は外部依存を持たないので、実装は外に置く。
+/// 既定は Jint（JavaScript）。CLR アクセスを閉じ、実行時間・ステップ数・メモリの上限を掛ける。
+/// </remarks>
+public interface IScriptConverter
 {
-    /// <summary>設定 <c>value</c> と一致するか。</summary>
-    public const string EqualsValue = "equals";
+    /// <summary>スクリプトを適用する。</summary>
+    /// <exception cref="ScriptConverterException">実行に失敗した場合。</exception>
+    ImmutableArray<string> Convert(string script, ImmutableArray<string> input);
 }
 
-/// <summary>条件ノードの出力ポート。</summary>
-public static class ConditionPorts
-{
-    public const string True = "true";
-    public const string False = "false";
-}
+/// <summary>スクリプト変換の失敗。</summary>
+public sealed class ScriptConverterException(string message, Exception? innerException = null)
+    : Exception(message, innerException);
+
+/// <summary>マッピングの不備（実行時）。</summary>
+/// <param name="TargetColumn">対象の列。</param>
+/// <param name="Reason">理由。</param>
+public sealed record MappingRuntimeProblem(string TargetColumn, string Reason);
+
+/// <summary>マッピングを適用した結果。</summary>
+/// <param name="Columns">
+/// 列名 → 値。**マッピングが管理している列はすべて含む。**
+/// 値が無い場合は空配列で、これは「消す」を意味する。
+/// </param>
+/// <param name="Problems">実行時に見つかった不備。</param>
+public sealed record MappingResult(
+    ImmutableDictionary<string, ImmutableArray<string>> Columns,
+    ImmutableArray<MappingRuntimeProblem> Problems);
 
 /// <summary>マッピングを適用して、列名と値の対応を作る。</summary>
 /// <remarks>
-/// **評価は決定的にする。** 同じ回答からは常に同じ列の値が出ること
+/// **評価は決定的。** 割り当てごとに入力を宣言順で集め、変換を 1 回だけ適用する
 /// （<c>_documents/アプリケーション設計.md</c> 7 章）。
-/// 値は文字列のまま返す。Pleasanter の型（Class / Num / Date …）への変換は
-/// <c>.Pleasanter</c> 側の責務。
+/// 値は文字列のまま返す。Pleasanter の型への変換は <c>.Pleasanter</c> 側の責務。
 /// </remarks>
-public static class MappingEvaluator
+public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
 {
-    /// <summary>マッピングを適用する。</summary>
-    /// <returns>
-    /// 列名 → 値。**流れてこなかった列は含めない。**
-    /// 未接続の出力列を空文字で上書きしないため。
-    /// </returns>
-    public static ImmutableDictionary<string, ImmutableArray<string>> Evaluate(
-        MappingGraph graph,
+    public MappingResult Evaluate(
+        MappingDefinition mapping,
         IReadOnlyCollection<Answer> answers)
     {
-        ArgumentNullException.ThrowIfNull(graph);
+        ArgumentNullException.ThrowIfNull(mapping);
         ArgumentNullException.ThrowIfNull(answers);
 
         var answerByQuestion = answers
             .GroupBy(answer => answer.QuestionId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
-        // ノード ID → ポート名 → 値
-        var outputs = new Dictionary<string, Dictionary<string, ImmutableArray<string>>>(
-            StringComparer.Ordinal);
-        var evaluating = new HashSet<string>(StringComparer.Ordinal);
-
-        var results = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
+        var columns = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
             StringComparer.OrdinalIgnoreCase);
+        var problems = ImmutableArray.CreateBuilder<MappingRuntimeProblem>();
 
-        foreach (var output in graph.Nodes.Where(node => node.Type is MappingNodeType.ColumnOutput))
+        foreach (var assignment in mapping.Assignments)
         {
-            if (string.IsNullOrEmpty(output.ColumnName))
+            if (!assignment.HasValidShape)
             {
+                problems.Add(new MappingRuntimeProblem(
+                    assignment.TargetColumn,
+                    "入力が複数あるのに変換が無い、または入力が 1 つも無い"));
                 continue;
             }
 
-            var values = Incoming(output.NodeId);
-            if (!values.IsDefaultOrEmpty)
+            if (columns.ContainsKey(assignment.TargetColumn))
             {
-                results[output.ColumnName] = values;
-            }
-        }
-
-        return results.ToImmutable();
-
-        // 指定したノードへ流れ込む値を集める
-        ImmutableArray<string> Incoming(string nodeId)
-        {
-            var collected = ImmutableArray.CreateBuilder<string>();
-
-            foreach (var edge in graph.Edges.Where(edge => edge.ToNodeId == nodeId))
-            {
-                var fromValues = EvaluateNode(edge.FromNodeId, edge.FromPort);
-                if (!fromValues.IsDefaultOrEmpty)
-                {
-                    collected.AddRange(fromValues);
-                }
+                // 同じ列への割り当てが 2 つ。保存時にも弾いているはず
+                problems.Add(new MappingRuntimeProblem(
+                    assignment.TargetColumn, "同じ列への割り当てが重複している"));
+                continue;
             }
 
-            return collected.ToImmutable();
-        }
-
-        // 指定したノードの、指定したポートの出力を返す
-        ImmutableArray<string> EvaluateNode(string nodeId, string port)
-        {
-            if (outputs.TryGetValue(nodeId, out var cached)
-                && cached.TryGetValue(port, out var cachedValues))
+            // **宣言順に集める。** 並び順に依存した非決定性を作らない
+            var input = ImmutableArray.CreateBuilder<string>();
+            foreach (var source in assignment.Sources)
             {
-                return cachedValues;
-            }
-
-            // 循環参照は保存時に弾いている。**実行時に踏んだら空を返して止める**
-            if (!evaluating.Add(nodeId))
-            {
-                return [];
+                answerByQuestion.TryGetValue(source.QuestionId, out var answer);
+                input.AddRange(Read(answer, source.Port));
             }
 
             try
             {
-                var node = graph.FindNode(nodeId);
-                if (node is null)
-                {
-                    return [];
-                }
-
-                var byPort = ComputeNode(node);
-                outputs[nodeId] = byPort;
-                return byPort.TryGetValue(port, out var values) ? values : [];
+                // **管理している列は、値が無くても結果へ含める。** 空配列＝消す
+                columns[assignment.TargetColumn] =
+                    Apply(assignment.Converter, input.ToImmutable());
             }
-            finally
+            catch (ScriptConverterException exception)
             {
-                evaluating.Remove(nodeId);
+                problems.Add(new MappingRuntimeProblem(
+                    assignment.TargetColumn, $"スクリプトの実行に失敗した: {exception.Message}"));
             }
         }
 
-        Dictionary<string, ImmutableArray<string>> ComputeNode(MappingNode node)
-        {
-            switch (node.Type)
-            {
-                case MappingNodeType.QuestionInput:
-                    var answer = node.QuestionId is not null
-                        && answerByQuestion.TryGetValue(node.QuestionId, out var found)
-                            ? found
-                            : null;
-                    return Single(answer is null ? [] : answer.Values);
-
-                case MappingNodeType.Transform:
-                    return Single(ApplyTransform(node, Incoming(node.NodeId)));
-
-                case MappingNodeType.Condition:
-                    return ApplyCondition(node, Incoming(node.NodeId));
-
-                default:
-                    return Single(Incoming(node.NodeId));
-            }
-        }
-
-        static Dictionary<string, ImmutableArray<string>> Single(ImmutableArray<string> values) =>
-            new(StringComparer.Ordinal) { [MappingEdge.DefaultPort] = values };
+        return new MappingResult(columns.ToImmutable(), problems.ToImmutable());
     }
 
-    private static ImmutableArray<string> ApplyTransform(
-        MappingNode node,
+    private static ImmutableArray<string> Read(Answer? answer, QuestionPort port)
+    {
+        if (answer is null)
+        {
+            return [];
+        }
+
+        return port switch
+        {
+            QuestionPort.OtherText =>
+                string.IsNullOrWhiteSpace(answer.OtherText) ? [] : [answer.OtherText],
+            QuestionPort.FileNames => answer.FileNames.IsDefault ? [] : answer.FileNames,
+            _ => answer.Values.IsDefault ? [] : answer.Values,
+        };
+    }
+
+    private ImmutableArray<string> Apply(
+        MappingConverter? converter,
         ImmutableArray<string> input)
     {
-        switch (node.Operation)
+        if (converter is null)
         {
-            case TransformOperations.Join:
-                if (input.IsDefaultOrEmpty)
-                {
-                    return [];
-                }
+            return input;
+        }
 
-                var separator = node.Config.GetValueOrDefault("separator", ",");
-                return [string.Join(separator, input)];
+        switch (converter.Operation)
+        {
+            case ConverterOperations.Join:
+                return input.IsEmpty
+                    ? []
+                    : [string.Join(converter.Config.GetValueOrDefault("separator", ","), input)];
 
-            case TransformOperations.Map:
+            case ConverterOperations.Map:
                 return
                 [
                     .. input.Select(value =>
-                        node.Config.TryGetValue($"map.{value}", out var mapped) ? mapped : value),
+                        converter.Config.TryGetValue($"map.{value}", out var mapped) ? mapped : value),
                 ];
 
-            case TransformOperations.ToCheck:
-                var target = node.Config.GetValueOrDefault("value", string.Empty);
+            case ConverterOperations.ToCheck:
+                var target = converter.Config.GetValueOrDefault("value", string.Empty);
                 return [Bool(input.Contains(target, StringComparer.Ordinal))];
 
-            case TransformOperations.Contains:
-                var keyword = node.Config.GetValueOrDefault("keyword", string.Empty);
+            case ConverterOperations.Contains:
+                var keyword = converter.Config.GetValueOrDefault("keyword", string.Empty);
                 return
                 [
                     Bool(!string.IsNullOrEmpty(keyword)
                         && input.Any(value => value.Contains(keyword, StringComparison.Ordinal))),
                 ];
 
-            case TransformOperations.Constant:
-                return [node.Config.GetValueOrDefault("value", string.Empty)];
+            case ConverterOperations.Constant:
+                return [converter.Config.GetValueOrDefault("value", string.Empty)];
 
-            case TransformOperations.Identity:
+            case ConverterOperations.Coalesce:
+                var first = input.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+                return first is null ? [] : [first];
+
+            case ConverterOperations.When:
+                var when = converter.Config.GetValueOrDefault("when", string.Empty);
+                var matched = input.Contains(when, StringComparer.Ordinal);
+                var result = matched
+                    ? converter.Config.GetValueOrDefault("then", string.Empty)
+                    : converter.Config.GetValueOrDefault("else", string.Empty);
+                return string.IsNullOrEmpty(result) ? [] : [result];
+
+            case ConverterOperations.Script:
+                var script = converter.Config.GetValueOrDefault("script", string.Empty);
+                if (scriptConverter is null)
+                {
+                    throw new ScriptConverterException("スクリプト変換の実行環境が設定されていない");
+                }
+
+                return scriptConverter.Convert(script, input);
+
+            case ConverterOperations.Identity:
             default:
                 return input;
         }
     }
 
-    private static Dictionary<string, ImmutableArray<string>> ApplyCondition(
-        MappingNode node,
-        ImmutableArray<string> input)
-    {
-        var matched = node.Operation switch
-        {
-            ConditionOperations.EqualsValue =>
-                input.Contains(node.Config.GetValueOrDefault("value", string.Empty), StringComparer.Ordinal),
-            _ => false,
-        };
-
-        return new Dictionary<string, ImmutableArray<string>>(StringComparer.Ordinal)
-        {
-            [ConditionPorts.True] = matched ? input : [],
-            [ConditionPorts.False] = matched ? [] : input,
-        };
-    }
-
-    private static string Bool(bool value) =>
-        value.ToString(CultureInfo.InvariantCulture).ToLowerInvariant();
+    private static string Bool(bool value) => value ? "true" : "false";
 }
