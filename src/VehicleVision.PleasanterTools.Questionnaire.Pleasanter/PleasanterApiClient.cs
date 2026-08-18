@@ -86,6 +86,16 @@ public sealed class PleasanterApiClient(HttpClient httpClient, PleasanterOptions
             view is null ? new Dictionary<string, object?>() : new Dictionary<string, object?> { ["View"] = view },
             cancellationToken);
 
+    /// <summary>レコードを 1 件取り出す。</summary>
+    /// <remarks>
+    /// **添付を消すために使う。** 消すには <c>Guid</c> が要り、
+    /// <c>Guid</c> は取り出さないと分からない（<c>_documents/実機検証結果.md</c> 8 章）。
+    /// </remarks>
+    public Task<PleasanterResponse> GetRecordAsync(
+        long referenceId,
+        CancellationToken cancellationToken = default)
+        => PostAsync($"api/items/{referenceId}/Get", new Dictionary<string, object?>(), cancellationToken);
+
     /// <summary>サイト設定を取り出す。マッピング先の列を調べるのに使う。</summary>
     public Task<PleasanterResponse> GetSiteAsync(
         long siteId,

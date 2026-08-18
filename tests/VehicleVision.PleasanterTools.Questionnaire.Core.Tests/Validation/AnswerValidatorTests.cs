@@ -236,4 +236,26 @@ public class AnswerValidatorTests
 
         Assert.Empty(errors);
     }
+
+    [Fact]
+    public void 添付が必須の設問はファイルが無ければエラー()
+    {
+        var definition = Definition(Q("q1", QuestionType.File, required: true));
+
+        var errors = AnswerValidator.Validate(definition, [new Answer("q1", [])]);
+
+        Assert.Equal([ValidationErrorCode.Required], Codes(errors));
+    }
+
+    [Fact]
+    public void 添付の設問は値が無くてもファイルがあれば通る()
+    {
+        // **添付の設問は Values を持たない。** 値の有無で見ると必ず未回答になってしまう
+        var definition = Definition(Q("q1", QuestionType.File, required: true));
+
+        var errors = AnswerValidator.Validate(
+            definition, [new Answer("q1", []) { FileNames = ["a.png"] }]);
+
+        Assert.Empty(errors);
+    }
 }
