@@ -53,6 +53,17 @@ updates:
       - "6-eco:npm"
     commit-message:
       prefix: npm の依存を更新する
+    ignore:
+      # **TypeScript のメジャー更新を止める。**
+      # svelte-check 4.7.6 の peerDependencies は `^5.0.0 || ^6.0.0` で、
+      # 7 系を入れると `npm ci` が依存解決で失敗する（2026-08-19 に実測）。
+      #
+      # **周辺の道具が 7 系を宣言したら、この ignore を外すこと。**
+      # 確認する場所: https://registry.npmjs.org/svelte-check の
+      # versions[latest].peerDependencies.typescript
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
     groups:
       # Svelte / Vite は道具立てとして一体で上げる
       frontend-tooling:

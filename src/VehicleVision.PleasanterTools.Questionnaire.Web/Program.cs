@@ -46,6 +46,7 @@ builder.Services.AddSingleton<IResponseOutbox, ResponseOutbox>();
 builder.Services.AddSingleton<IResponseTokenStore, ResponseTokenStore>();
 builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
+builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
 
 builder.Services.AddSingleton(pleasanterOptions);
 builder.Services.AddSingleton(new PleasanterDateTime(pleasanterOptions.ApiKeyUserTimeZoneId));
@@ -56,6 +57,18 @@ builder.Services.AddHttpClient<PleasanterApiClient>(client =>
 
 builder.Services.AddSingleton<ResponseIntake>();
 
+// **HTTP でやり取りする JSON も定義と同じ設定にする。**
+// 既定のままだと LocalizedText が言語コードのオブジェクトにならず、
+// **画面に文言が出ないし、管理画面から送られた定義も読めない**
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Encoder = SurveyJson.Options.Encoder;
+    options.SerializerOptions.DefaultIgnoreCondition = SurveyJson.Options.DefaultIgnoreCondition;
+    foreach (var converter in SurveyJson.Options.Converters)
+    {
+        options.SerializerOptions.Converters.Add(converter);
+    }
+});
 // ---- 添付ファイル ----------------------------------------------------------
 // **3 層で受ける**（_documents/非機能設計.md 1 章）。
 // 1. 拡張子の許可リスト 2. 先頭バイトとの一致 は常に有効。3. ウイルススキャンは既定で無効
@@ -142,16 +155,21 @@ builder.Services.AddSingleton(submissionGuardOptions);
 builder.Services.AddSingleton(serviceProvider => new SubmissionGuard(
     secretKey, submissionGuardOptions, serviceProvider.GetRequiredService<TimeProvider>()));
 
-// **既定は厳しく。** 緩めるのは検証環境だけにすること
+// **既定は厳しく。** 緩めるのは検証環境だけにすること。
+// 端から端まで通す試験は 1 つの IP から大量に叩くので、既定のままだと自分で枠を使い切る
 var loginPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"], out var configured)
-    ? configured
+    builder.Configuration["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"], out var configuredLogin)
+    ? configuredLogin
     : 10;
 
 var submitPermitLimit = int.TryParse(
     builder.Configuration["QUESTIONNAIRE_SUBMITS_PER_MIN"], out var configuredSubmits)
     ? configuredSubmits
     : 20;
+var requestPermitLimit = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_REQUESTS_PER_MIN"], out var configuredRequests)
+    ? configuredRequests
+    : 60;
 
 builder.Services
     .AddAuthentication(AdminAuthSchemes.Session)
@@ -182,7 +200,7 @@ builder.Services.AddRateLimiter(options =>
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 60,
+                    PermitLimit = requestPermitLimit,
                     Window = TimeSpan.FromMinutes(1),
                 })),
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
@@ -258,6 +276,7 @@ app.UseStaticFiles();
 
 app.MapFormEndpoints();
 app.MapAdminAuthEndpoints();
+app.MapAdminSurveyEndpoints();
 
 // **Defender for Storage を使うときだけ受け口を生やす。**
 // 使わない構成で認証の外の口を開けたままにしない
