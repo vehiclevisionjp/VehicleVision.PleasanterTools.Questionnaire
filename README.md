@@ -62,6 +62,8 @@ git submodule update --init --recursive
 | [`_documents/アプリケーション設計.md`](_documents/アプリケーション設計.md) | プロジェクト構成・API・送信ワーカー |
 | [`_documents/画面設計.md`](_documents/画面設計.md) | 回答画面・管理アプリ |
 | [`_documents/非機能設計.md`](_documents/非機能設計.md) | セキュリティ・障害時・テスト・運用 |
+| [`_documents/ブランチ運用方針.md`](_documents/ブランチ運用方針.md) | ブランチ・保護ルール |
+| [`_documents/リリース手順書.md`](_documents/リリース手順書.md) | バージョンの付け方・リリース手順 |
 | [`tools/pleasanter-testenv/`](tools/pleasanter-testenv/README.md) | 検証環境（Docker） |
 | `_reference/Implem.Pleasanter` | Pleasanter 本体（**AGPL v3 / 参照専用**）。[README](_reference/README.md) |
 | `App_Data/Parameters/` | 設定ファイル |
