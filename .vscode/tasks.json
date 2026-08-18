@@ -1,0 +1,226 @@
+{
+  // VS Code のタスク。**コマンドを覚えなくても回せる**ことを目的にしている。
+  //
+  // **資格情報の実値をここへ書かないこと。** 入っているのは検証環境用の固定値だけ
+  // （App_Data/Parameters/README.md）。
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ビルド",
+      "detail": "ソリューション全体をビルドする",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/VehicleVision.PleasanterTools.Questionnaire.slnx"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile",
+      "presentation": { "reveal": "silent", "clear": true }
+    },
+    {
+      "label": "ビルド（Release）",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "-c",
+        "Release",
+        "${workspaceFolder}/VehicleVision.PleasanterTools.Questionnaire.slnx"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+
+    {
+      "label": "テスト（単体）",
+      "detail": "結合テストを除く。**環境変数を渡さないので結合テストは中身を実行せず終わる**",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/VehicleVision.PleasanterTools.Questionnaire.slnx",
+        "--filter",
+        "FullyQualifiedName!~Integration.Tests"
+      ],
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "テスト（結合・3 RDBMS）",
+      "detail": "**先に「検証環境を起動（SQL Server）」を実行しておくこと。** DB とアプリが要る",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests"
+      ],
+      "options": { "env": { "QUESTIONNAIRE_INTEGRATION": "1" } },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "テスト（結合・ウイルススキャンあり）",
+      "detail": "**clamav プロファイルで起動しておくこと。** EICAR で実際に弾けるかを見る",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests",
+        "--filter",
+        "FullyQualifiedName~AttachmentScanEndToEndTests"
+      ],
+      "options": {
+        "env": { "QUESTIONNAIRE_INTEGRATION": "1", "QUESTIONNAIRE_VIRUSSCAN": "1" }
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "テスト（このファイル）",
+      "detail": "開いているテストファイルのクラスだけを実行する",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/VehicleVision.PleasanterTools.Questionnaire.slnx",
+        "--filter",
+        "FullyQualifiedName~${fileBasenameNoExtension}"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+
+    {
+      "label": "フロントエンド: 依存を入れる",
+      "type": "shell",
+      "command": "npm",
+      "args": ["ci"],
+      "options": {
+        "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "フロントエンド: 型検査",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "check"],
+      "options": {
+        "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "フロントエンド: ビルド",
+      "detail": "成果物は .Web/wwwroot へ出る",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "build"],
+      "options": {
+        "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "フロントエンド: 開発サーバ",
+      "detail": "**/api は localhost:8081 へ中継される。** 検証環境を起動しておくこと",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "dev"],
+      "options": {
+        "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Frontend"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+
+    {
+      "label": "検証環境を起動（SQL Server）",
+      "detail": "Pleasanter と SQL Server と本アプリ。**初回は数分かかる**",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "--profile", "sqlserver", "up", "-d", "--wait"],
+      "problemMatcher": []
+    },
+    {
+      "label": "検証環境を起動（PostgreSQL）",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "--profile", "postgres", "up", "-d", "--wait"],
+      "problemMatcher": []
+    },
+    {
+      "label": "検証環境を起動（MySQL）",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "--profile", "mysql", "up", "-d", "--wait"],
+      "problemMatcher": []
+    },
+    {
+      "label": "検証環境を起動（ウイルススキャンあり）",
+      "detail": "**clamav は定義データベースの取得が終わるまで ready にならない**（初回は数分）",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--profile",
+        "sqlserver",
+        "--profile",
+        "clamav",
+        "up",
+        "-d",
+        "--wait"
+      ],
+      "options": { "env": { "DEV_VIRUSSCAN_ENABLED": "true" } },
+      "problemMatcher": []
+    },
+    {
+      "label": "検証環境をアプリだけ作り直す",
+      "detail": "コードを変えた後に使う。DB は残る",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "--profile", "sqlserver", "up", "-d", "--build", "--wait", "app"],
+      "problemMatcher": []
+    },
+    {
+      "label": "検証環境を止める",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "--profile", "sqlserver", "--profile", "postgres", "--profile", "mysql", "--profile", "clamav", "down"],
+      "problemMatcher": []
+    },
+    {
+      "label": "検証環境のログ（アプリ）",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "logs", "-f", "app"],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+
+    {
+      "label": "smoke（動いているアプリへ当てる）",
+      "detail": "配信・セキュリティヘッダ・管理画面の入口を見る",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/smoke.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "ライセンス検査",
+      "detail": "**Pleasanter 本体（AGPL）への参照が混ざっていないか**を見る",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/license-check.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "秘密の鍵を作る",
+      "detail": "QUESTIONNAIRE_SECRET_KEY に入れる値を作る。**失うと 2 要素が全部使えなくなる**",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web",
+        "--",
+        "--generate-secret-key"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
