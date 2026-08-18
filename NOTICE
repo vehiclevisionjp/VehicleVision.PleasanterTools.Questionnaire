@@ -28,6 +28,7 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.DependencyInjection 10.0.11 / MIT
   Microsoft.Extensions.Hosting.Abstractions 10.0.11 / MIT
   Microsoft.Extensions.Logging.Abstractions 10.0.11 / MIT
+  Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
 
 フロントエンド（ビルド時のみ使用。**成果物へは svelte のランタイムのみ含まれる**）
 
@@ -44,6 +45,7 @@ Copyright (C) PMC Co.,Ltd.
   xunit.runner.visualstudio 3.1.4 / Apache-2.0
   Microsoft.NET.Test.Sdk 17.14.1 / MIT
   coverlet.collector 6.0.4 / MIT
+  Microsoft.Extensions.TimeProvider.Testing 10.9.0 / MIT
 
 **依存を追加したら、ここへ追記してからコミットすること。**
 
