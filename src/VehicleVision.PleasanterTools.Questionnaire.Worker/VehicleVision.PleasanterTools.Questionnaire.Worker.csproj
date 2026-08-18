@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Core\VehicleVision.PleasanterTools.Questionnaire.Core.csproj" />
+    <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Data\VehicleVision.PleasanterTools.Questionnaire.Data.csproj" />
+    <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Pleasanter\VehicleVision.PleasanterTools.Questionnaire.Pleasanter.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
