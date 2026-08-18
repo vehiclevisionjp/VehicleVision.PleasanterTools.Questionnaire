@@ -67,6 +67,12 @@ check_header "/" "referrer-policy" "Referrer-Policy"
 check_header "/" "permissions-policy" "Permissions-Policy"
 
 echo
+echo "== 管理画面の配信 =="
+check_status "/admin" 200 "管理画面の入口"
+# **回答画面とは別の束。** 回答者へ管理画面のコードを配らない
+check_status "/admin/surveys/00000000-0000-0000-0000-000000000000" 200 "管理画面の画面内遷移"
+
+echo
 echo "== 管理画面の認証 =="
 check_status "/api/admin/session" 200 "状態は誰でも見られる"
 # **合言葉を通していない相手に、登録の入口を開けない**
