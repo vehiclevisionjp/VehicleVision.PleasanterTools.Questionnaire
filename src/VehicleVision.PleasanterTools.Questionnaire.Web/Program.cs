@@ -43,6 +43,7 @@ builder.Services.AddSingleton<IResponseOutbox, ResponseOutbox>();
 builder.Services.AddSingleton<IResponseTokenStore, ResponseTokenStore>();
 builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
+builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
 
 builder.Services.AddSingleton(pleasanterOptions);
 builder.Services.AddSingleton(new PleasanterDateTime(pleasanterOptions.ApiKeyUserTimeZoneId));
@@ -81,11 +82,17 @@ builder.Services.AddSingleton(new AdminAuthOptions());
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
 
-// **既定は厳しく。** 緩めるのは検証環境だけにすること
+// **既定は厳しく。** 緩めるのは検証環境だけにすること。
+// 端から端まで通す試験は 1 つの IP から大量に叩くので、既定のままだと自分で枠を使い切る
 var loginPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"], out var configured)
-    ? configured
+    builder.Configuration["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"], out var configuredLogin)
+    ? configuredLogin
     : 10;
+
+var requestPermitLimit = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_REQUESTS_PER_MIN"], out var configuredRequests)
+    ? configuredRequests
+    : 60;
 
 builder.Services
     .AddAuthentication(AdminAuthSchemes.Session)
@@ -116,7 +123,7 @@ builder.Services.AddRateLimiter(options =>
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 60,
+                    PermitLimit = requestPermitLimit,
                     Window = TimeSpan.FromMinutes(1),
                 })),
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
@@ -180,6 +187,7 @@ app.UseStaticFiles();
 
 app.MapFormEndpoints();
 app.MapAdminAuthEndpoints();
+app.MapAdminSurveyEndpoints();
 
 // **`/f/{publicId}` は画面側で解釈する。** サーバは同じ入口を返すだけ。
 // 存在しない公開 ID でも同じ応答にして、総当たりで実在が分からないようにする
