@@ -4,6 +4,20 @@
 # **開発環境（ホスト）に .NET SDK も node も要求しない**ようにするためのもの。
 # 実行は compose.yaml から行う。
 
+# ---- フロントエンド ---------------------------------------------------------
+# **ホストに node を要求しないため、ここでビルドする**
+FROM node:24-alpine AS frontend
+WORKDIR /frontend
+
+COPY src/VehicleVision.PleasanterTools.Questionnaire.Frontend/package.json ./
+COPY src/VehicleVision.PleasanterTools.Questionnaire.Frontend/package-lock.json ./
+RUN npm ci
+
+COPY src/VehicleVision.PleasanterTools.Questionnaire.Frontend/ ./
+# vite.config.ts の outDir は ../{Web}/wwwroot を指すので、その位置を用意しておく
+RUN mkdir -p /VehicleVision.PleasanterTools.Questionnaire.Web && npm run build
+
+# ---- サーバ -----------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
@@ -23,6 +37,8 @@ WORKDIR /app
 # **資格情報の実値は入れない。** 環境変数か Key Vault から読む
 COPY App_Data/ App_Data/
 COPY --from=build /app/publish .
+# 回答画面のビルド成果物
+COPY --from=frontend /VehicleVision.PleasanterTools.Questionnaire.Web/wwwroot ./wwwroot
 
 # **root で動かさない。**
 USER $APP_UID

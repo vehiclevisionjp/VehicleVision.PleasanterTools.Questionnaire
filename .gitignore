@@ -12,6 +12,8 @@ _dist/
 ## node（フロントエンド: TypeScript + Vite + Svelte）
 node_modules/
 .vite/
+## フロントエンドのビルド成果物（Dockerfile か npm run build で作る）
+src/VehicleVision.PleasanterTools.Questionnaire.Web/wwwroot/
 
 ## secrets / local config（接続文字列・APIキーはコミットしない）
 appsettings.*.local.json

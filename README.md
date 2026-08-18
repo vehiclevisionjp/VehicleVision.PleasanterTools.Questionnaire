@@ -71,13 +71,29 @@ docker compose --profile "*" down -v              # 後片付け
 
 ### ホストで直接ビルドする場合
 
-.NET 10 SDK が要る（`global.json` で固定）。
+.NET 10 SDK が要る（`global.json` で固定）。フロントエンドを直接ビルドするなら Node も要る。
+
+```bash
+cd src/VehicleVision.PleasanterTools.Questionnaire.Frontend
+npm ci && npm run build   # 成果物は .Web/wwwroot へ出る
+```
+
 
 ```bash
 dotnet build
 dotnet test
 ./scripts/license-check.sh
 ```
+
+#### 動作確認（起動しているアプリへ HTTP で当てる）
+
+```bash
+docker compose --profile sqlserver up -d --wait
+./scripts/smoke.sh
+```
+
+**単体テストでは見えない部分**（静的ファイルの配信・SPA のフォールバック・
+セキュリティヘッダ・存在しない公開 ID の扱い）を見る。
 
 #### 結合テスト（実機の Pleasanter に当てる）
 

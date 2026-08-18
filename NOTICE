@@ -29,6 +29,15 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.Hosting.Abstractions 10.0.11 / MIT
   Microsoft.Extensions.Logging.Abstractions 10.0.11 / MIT
 
+フロントエンド（ビルド時のみ使用。**成果物へは svelte のランタイムのみ含まれる**）
+
+  svelte 5.56.9 / MIT / https://www.npmjs.com/package/svelte
+  vite 8.2.1 / MIT / https://www.npmjs.com/package/vite
+  @sveltejs/vite-plugin-svelte 7.3.0 / MIT
+  svelte-check 4.7.6 / MIT
+  sass 1.102.0 / MIT
+  typescript 6.0.3 / Apache-2.0
+
 テスト時のみ使用するもの
 
   xunit 2.9.3 / Apache-2.0

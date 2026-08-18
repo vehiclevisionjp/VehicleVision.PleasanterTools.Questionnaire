@@ -106,7 +106,15 @@ app.Use(async (context, next) =>
 
 app.UseRateLimiter();
 
+// 回答画面（TypeScript + Vite + Svelte のビルド成果物）
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapFormEndpoints();
+
+// **`/f/{publicId}` は画面側で解釈する。** サーバは同じ入口を返すだけ。
+// 存在しない公開 ID でも同じ応答にして、総当たりで実在が分からないようにする
+app.MapFallbackToFile("/f/{**path}", "index.html");
 
 // 生存確認。**アンケートの情報を出さない**
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
