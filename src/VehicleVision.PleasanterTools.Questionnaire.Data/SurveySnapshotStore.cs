@@ -81,7 +81,23 @@ public sealed record SurveyRecord(
     long PleasanterSiteId,
     string? ResponseJsonColumn,
     int Status,
-    int? PublishedVersion);
+    int? PublishedVersion,
+    DateTime? AcceptFrom = null,
+    DateTime? AcceptTo = null,
+    int? ResponseLimit = null);
+
+/// <summary>アンケートの状態。</summary>
+public enum SurveyStatus
+{
+    /// <summary>下書き。**公開していないので回答できない。**</summary>
+    Draft = 0,
+
+    /// <summary>公開中。</summary>
+    Published = 1,
+
+    /// <summary>停止中。理由は <c>SuspendedReason</c>。</summary>
+    Suspended = 2,
+}
 
 /// <summary>Dapper を使った実装。</summary>
 public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : ISurveyRepository
@@ -99,6 +115,8 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             + $"  {q("PleasanterSiteId")} = @PleasanterSiteId, "
             + $"  {q("ResponseJsonColumn")} = @ResponseJsonColumn, "
             + $"  {q("Status")} = @Status, {q("PublishedVersion")} = @PublishedVersion, "
+            + $"  {q("AcceptFrom")} = @AcceptFrom, {q("AcceptTo")} = @AcceptTo, "
+            + $"  {q("ResponseLimit")} = @ResponseLimit, "
             + $"  {q("UpdatedAt")} = @Now "
             + $"WHERE {q("SurveyId")} = @SurveyId",
             new
@@ -110,6 +128,9 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.ResponseJsonColumn,
                 survey.Status,
                 survey.PublishedVersion,
+                survey.AcceptFrom,
+                survey.AcceptTo,
+                survey.ResponseLimit,
                 Now = now,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -123,9 +144,11 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             $"INSERT INTO {q("Surveys")} "
             + $"  ({q("SurveyId")}, {q("PublicId")}, {q("Title")}, {q("PleasanterSiteId")}, "
             + $"   {q("ResponseJsonColumn")}, {q("Status")}, {q("PublishedVersion")}, "
+            + $"   {q("AcceptFrom")}, {q("AcceptTo")}, {q("ResponseLimit")}, "
             + $"   {q("CreatedAt")}, {q("UpdatedAt")}) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
-            + "        @ResponseJsonColumn, @Status, @PublishedVersion, @Now, @Now)",
+            + "        @ResponseJsonColumn, @Status, @PublishedVersion, "
+            + "        @AcceptFrom, @AcceptTo, @ResponseLimit, @Now, @Now)",
             new
             {
                 survey.SurveyId,
@@ -135,6 +158,9 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.ResponseJsonColumn,
                 survey.Status,
                 survey.PublishedVersion,
+                survey.AcceptFrom,
+                survey.AcceptTo,
+                survey.ResponseLimit,
                 Now = now,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -197,7 +223,8 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(new CommandDefinition(
             $"SELECT {q("SurveyId")}, {q("PublicId")}, {q("Title")}, {q("PleasanterSiteId")}, "
-            + $"       {q("ResponseJsonColumn")}, {q("Status")}, {q("PublishedVersion")} "
+            + $"       {q("ResponseJsonColumn")}, {q("Status")}, {q("PublishedVersion")}, "
+            + $"       {q("AcceptFrom")}, {q("AcceptTo")}, {q("ResponseLimit")} "
             + $"FROM {q("Surveys")} WHERE {q("PublicId")} = @PublicId",
             new { PublicId = publicId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);

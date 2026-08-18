@@ -21,6 +21,16 @@ public interface IResponseTokenStore
         string responseToken,
         CancellationToken cancellationToken = default);
 
+    /// <summary>行が無ければ作る。**既にある <c>ReferenceId</c> は触らない。**</summary>
+    /// <remarks>
+    /// 受付のたびに <c>ReferenceId</c> を <c>null</c> で上書きすると、
+    /// **編集が <c>Update</c> ではなく <c>Create</c> になり二重登録になる。**
+    /// </remarks>
+    Task EnsureAsync(
+        string responseToken,
+        Guid surveyId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>対応を保存する。<paramref name="referenceId"/> が <c>null</c> なら未作成のまま記録する。</summary>
     Task SaveAsync(
         string responseToken,
@@ -43,6 +53,18 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
             $"SELECT {q("PleasanterReferenceId")} FROM {q("ResponseTokens")} "
             + $"WHERE {q("ResponseToken")} = @ResponseToken",
             new { ResponseToken = responseToken },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    public async Task EnsureAsync(
+        string responseToken,
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(
+            SqlDialect.EnsureResponseToken(connectionFactory.Provider),
+            new { ResponseToken = responseToken, SurveyId = surveyId, Now = DateTime.UtcNow },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 

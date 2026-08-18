@@ -126,6 +126,36 @@ public static class SqlDialect
         _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
     };
 
+    /// <summary>
+    /// トークンの行が無ければ作る SQL。**既にある <c>ReferenceId</c> は触らない。**
+    /// </summary>
+    /// <remarks>
+    /// 受付のたびに <c>ReferenceId</c> を <c>null</c> で上書きすると、
+    /// **編集が Update ではなく Create になり二重登録になる**（実際に踏んだ）。
+    /// </remarks>
+    public static string EnsureResponseToken(DatabaseProvider provider) => provider switch
+    {
+        DatabaseProvider.SqlServer =>
+            "IF NOT EXISTS (SELECT 1 FROM [ResponseTokens] WHERE [ResponseToken] = @ResponseToken) " +
+            "INSERT INTO [ResponseTokens] " +
+            "  ([ResponseToken], [SurveyId], [PleasanterReferenceId], [CreatedAt], [UpdatedAt]) " +
+            "VALUES (@ResponseToken, @SurveyId, NULL, @Now, @Now);",
+
+        DatabaseProvider.PostgreSql =>
+            "INSERT INTO \"ResponseTokens\" " +
+            "  (\"ResponseToken\", \"SurveyId\", \"PleasanterReferenceId\", \"CreatedAt\", \"UpdatedAt\") " +
+            "VALUES (@ResponseToken, @SurveyId, NULL, @Now, @Now) " +
+            "ON CONFLICT (\"ResponseToken\") DO NOTHING",
+
+        DatabaseProvider.MySql =>
+            "INSERT INTO `ResponseTokens` " +
+            "  (`ResponseToken`, `SurveyId`, `PleasanterReferenceId`, `CreatedAt`, `UpdatedAt`) " +
+            "VALUES (@ResponseToken, @SurveyId, NULL, @Now, @Now) " +
+            "ON DUPLICATE KEY UPDATE `UpdatedAt` = VALUES(`UpdatedAt`)",
+
+        _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
+    };
+
     /// <summary>トークンと <c>ReferenceId</c> の対応を保存する SQL。</summary>
     public static string SaveResponseToken(DatabaseProvider provider) => provider switch
     {

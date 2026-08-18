@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Dapper" Version="2.1.79" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
@@ -23,6 +24,8 @@
     <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Data\VehicleVision.PleasanterTools.Questionnaire.Data.csproj" />
     <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Pleasanter\VehicleVision.PleasanterTools.Questionnaire.Pleasanter.csproj" />
     <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Core\VehicleVision.PleasanterTools.Questionnaire.Core.csproj" />
+    <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Worker\VehicleVision.PleasanterTools.Questionnaire.Worker.csproj" />
+    <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Web\VehicleVision.PleasanterTools.Questionnaire.Web.csproj" />
   </ItemGroup>
 
 </Project>
