@@ -37,6 +37,23 @@
     const max = question.settings.scaleMaximum ?? 5;
     return Array.from({ length: Math.max(0, max - min + 1) }, (_, index) => min + index);
   });
+
+  function setFiles(files: File[]) {
+    answer = { ...current, files };
+  }
+
+  /** 添付の上限を文字で出す。**選んでから弾かれるより先に伝える。** */
+  const fileLimits = $derived.by(() => {
+    const parts: string[] = [];
+    if (question.settings.maxFileCount !== undefined) {
+      parts.push(`${question.settings.maxFileCount} 件まで`);
+    }
+    if (question.settings.maxFileSizeBytes !== undefined) {
+      const megabytes = Math.floor(question.settings.maxFileSizeBytes / (1024 * 1024));
+      parts.push(megabytes > 0 ? `1 件 ${megabytes} MB まで` : `1 件 ${question.settings.maxFileSizeBytes} バイトまで`);
+    }
+    return parts.join(' / ');
+  });
 </script>
 
 <!-- 説明文ブロックは回答を持たない -->
@@ -157,6 +174,26 @@
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}
       />
+    {:else if question.type === 'File'}
+      <!-- **受け付けるかどうかはサーバが決める。** ここは選びやすさのためだけ -->
+      <input
+        type="file"
+        multiple={(question.settings.maxFileCount ?? 1) > 1}
+        aria-labelledby={labelId}
+        aria-describedby={error ? errorId : undefined}
+        aria-invalid={error !== undefined}
+        onchange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))}
+      />
+      {#if fileLimits !== ''}
+        <p class="description">{fileLimits}</p>
+      {/if}
+      {#if (current.files ?? []).length > 0}
+        <ul class="files">
+          {#each current.files ?? [] as file (file.name)}
+            <li>{file.name}</li>
+          {/each}
+        </ul>
+      {/if}
     {:else if question.type === 'Time'}
       <input
         type="time"
@@ -239,6 +276,13 @@
 
   .other {
     margin-top: 0.5rem;
+  }
+
+  .files {
+    margin: 0.5rem 0 0;
+    padding-left: 1.25rem;
+    color: var(--muted);
+    font-size: 0.9rem;
   }
 
   .scale {
