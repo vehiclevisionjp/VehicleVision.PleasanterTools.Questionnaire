@@ -41,6 +41,8 @@ Copyright (C) PMC Co.,Ltd.
   svelte-check 4.7.6 / MIT
   sass 1.102.0 / MIT
   typescript 6.0.3 / Apache-2.0
+  qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
+  @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://github.com/DefinitelyTyped/DefinitelyTyped
 
 テスト時のみ使用するもの
 

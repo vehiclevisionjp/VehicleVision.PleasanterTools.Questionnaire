@@ -221,8 +221,10 @@ app.Use(async (context, next) =>
     headers["X-Content-Type-Options"] = "nosniff";
     headers["Referrer-Policy"] = "no-referrer";
     headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()";
+    // **2 要素の QR は data: URI で描く。** 外部から画像を取りに行かせない
     headers["Content-Security-Policy"] =
-        "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
+        "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; "
+        + "base-uri 'self'; object-src 'none'";
     await next();
 });
 
@@ -239,6 +241,9 @@ app.MapFormEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminSurveyEndpoints();
 
+// **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
+app.MapGet("/admin", () => Results.File("admin.html", "text/html"));
+app.MapFallbackToFile("/admin/{**path}", "admin.html");
 // **Defender for Storage を使うときだけ受け口を生やす。**
 // 使わない構成で認証の外の口を開けたままにしない
 if (attachmentOptions.VirusScan is

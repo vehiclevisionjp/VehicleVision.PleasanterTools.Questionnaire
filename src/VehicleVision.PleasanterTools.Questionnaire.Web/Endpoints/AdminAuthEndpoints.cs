@@ -61,6 +61,19 @@ public static class AdminAuthEndpoints
             }
 
             var pending = await context.AuthenticateAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+
+            // **途中状態の相手にだけ、2 要素の登録が要るかを返す。**
+            // 未認証の相手へ返すと、その利用者が 2 要素を登録済みかどうかが漏れる
+            var needsEnrollment = false;
+            if (pending.Succeeded
+                && pending.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) is { } id
+                && Guid.TryParse(id, out var pendingUserId))
+            {
+                var user = await store.FindByIdAsync(pendingUserId, cancellationToken)
+                    .ConfigureAwait(false);
+                needsEnrollment = user is not null && !user.HasTotp;
+            }
+
             return Results.Ok(new
             {
                 authenticated = false,
@@ -68,6 +81,7 @@ public static class AdminAuthEndpoints
                 // **途中状態かどうかは画面の出し分けに要る**
                 pending = pending.Succeeded,
                 pendingLoginId = pending.Succeeded ? pending.Principal?.Identity?.Name : null,
+                needsEnrollment,
             });
         });
 
