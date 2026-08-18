@@ -55,30 +55,78 @@ export interface SubmitResult {
   /** 設問 ID → エラーの種別。サーバ側の検証結果。 */
   errors?: Record<string, string[]>;
   rejection?: RejectionReason;
+  /** 添付を受け付けてもらえなかった理由。 */
+  attachmentErrors?: AttachmentError[];
 }
 
-/** 回答を送る。**受け付けられたら 202 が返る**（Pleasanter へはこの後ワーカーが送る）。 */
+/** 添付 1 件を受け付けなかった理由。 */
+export interface AttachmentError {
+  questionId?: string;
+  fileName?: string;
+  reason: string;
+}
+
+/** 設問に紐づく添付。**欄の名前が設問 ID になる。** */
+export interface Attachment {
+  questionId: string;
+  file: File;
+}
+
+/**
+ * 回答を送る。**受け付けられたら 202 が返る**（Pleasanter へはこの後ワーカーが送る）。
+ *
+ * **添付があるときは `multipart/form-data` で送る。**
+ * 添付だけ先に預ける口は無く、サーバは送信待ちへ保存する前に中身を検査する
+ * （`_documents/添付ファイル検査-運用手順書.md`）。
+ */
 export async function submitAnswers(
   publicId: string,
   responseToken: string,
   answers: PayloadAnswer[],
+  attachments: Attachment[] = [],
 ): Promise<SubmitResult> {
-  const response = await fetch(
-    `/api/forms/${encodeURIComponent(publicId)}/responses/${encodeURIComponent(responseToken)}`,
-    {
+  const url = `/api/forms/${encodeURIComponent(publicId)}/responses/${encodeURIComponent(responseToken)}`;
+
+  let request: RequestInit;
+  if (attachments.length === 0) {
+    request = {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ answers }),
-    },
-  );
+    };
+  } else {
+    const form = new FormData();
+    form.append('answers', JSON.stringify({ answers }));
+    for (const attachment of attachments) {
+      form.append(attachment.questionId, attachment.file, attachment.file.name);
+    }
+    // **content-type を自分で付けない。** 境界文字列はブラウザが決める
+    request = { method: 'PUT', body: form };
+  }
+
+  const response = await fetch(url, request);
 
   if (response.status === 202) {
     return { accepted: true };
   }
 
+  if (response.status === 413) {
+    return { accepted: false, errors: { '': ['TooLarge'] } };
+  }
+
+  if (response.status === 503) {
+    // **ウイルススキャナへ到達できない。** 添付を受け付けられない状態が続いている
+    return { accepted: false, errors: { '': ['ScannerUnavailable'] } };
+  }
+
   if (response.status === 400 || response.status === 422) {
-    const body = (await response.json().catch(() => ({}))) as { errors?: Record<string, string[]> };
-    return { accepted: false, errors: body.errors ?? {} };
+    const body = (await response.json().catch(() => ({}))) as {
+      errors?: Record<string, string[]>;
+      attachments?: AttachmentError[];
+    };
+    return body.attachments
+      ? { accepted: false, attachmentErrors: body.attachments }
+      : { accepted: false, errors: body.errors ?? {} };
   }
 
   if (response.status === 403) {
