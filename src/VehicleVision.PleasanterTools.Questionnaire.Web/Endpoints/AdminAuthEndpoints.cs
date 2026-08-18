@@ -30,15 +30,7 @@ public static class AdminAuthEndpoints
     public static IEndpointRouteBuilder MapAdminAuthEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin");
-
-        // **管理画面の応答を途中の経路に残さない**
-        group.AddEndpointFilter(async (context, next) =>
-        {
-            var headers = context.HttpContext.Response.Headers;
-            headers.CacheControl = "no-store, no-cache, must-revalidate";
-            headers.Pragma = "no-cache";
-            return await next(context);
-        });
+        AdminAuthSchemes.AddNoStore(group);
 
         // ---- 今の状態 --------------------------------------------------------
         group.MapGet("/session", async (
@@ -84,9 +76,9 @@ public static class AdminAuthEndpoints
             }
 
             // **短すぎる合言葉を通さない。** 最初の 1 人こそ全権を持つ
-            if (request.Password.Length < 12)
+            if (!AdminPasswordPolicy.IsAcceptable(request.Password))
             {
-                return Results.BadRequest(new { message = "合言葉は 12 文字以上にしてください。" });
+                return Results.BadRequest(new { message = AdminPasswordPolicy.Message });
             }
 
             var created = await authenticator
@@ -227,6 +219,9 @@ public static class AdminAuthEndpoints
             // **途中状態も一緒に消す。** 残しておくと 2 要素から再開できてしまう
             await context.SignOutAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+
+            // 2 要素の登録し直しの途中も消す
+            await context.SignOutAsync(AdminAuthSchemes.Reenroll).ConfigureAwait(false);
             return Results.Ok(new { signedOut = true });
         });
 
@@ -282,7 +277,8 @@ public static class AdminAuthEndpoints
             : AdminRole.Editor,
     };
 
-    private static Task SignInPendingAsync(HttpContext context, AdminUser user, string? secret)
+    /// <summary>合言葉まで通った状態にする。**ここでは何も操作させない。**</summary>
+    internal static Task SignInPendingAsync(HttpContext context, AdminUser user, string? secret)
     {
         var claims = new List<Claim>
         {
@@ -335,11 +331,43 @@ public static class AdminAuthSchemes
     /// <summary>合言葉だけ通った途中の状態。**ここでは何も操作させない。**</summary>
     public const string Pending = "Admin.Pending";
 
+    /// <summary>
+    /// ログイン済みのまま 2 要素を登録し直している途中の状態。
+    /// **共有鍵をここに預ける。**
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Pending"/> と分けているのは、
+    /// **登録し直しの途中の cookie がログインの途中として使えないようにする**ため。
+    /// </remarks>
+    public const string Reenroll = "Admin.Reenroll";
+
     /// <summary>ログインの試行に掛けるレート制限の名前。</summary>
     public const string LoginRateLimitPolicy = "admin-login";
 
+    /// <summary>ログイン済みなら通す認可の名前。</summary>
+    public const string SessionPolicy = "Admin.Session.Any";
+
+    /// <summary>
+    /// <see cref="AdminRole.Administrator"/> だけ通す認可の名前。
+    /// **他人に触れるのはこの役割だけ。**
+    /// </summary>
+    public const string AdministratorPolicy = "Admin.Session.Administrator";
+
     /// <summary>途中状態を保つ長さ。**短くする。**</summary>
     public static readonly TimeSpan PendingLifetime = TimeSpan.FromMinutes(5);
+
+    /// <summary>2 要素を登録し直す途中を保つ長さ。**短くする。**</summary>
+    public static readonly TimeSpan ReenrollLifetime = TimeSpan.FromMinutes(5);
+
+    /// <summary>管理画面の応答を途中の経路に残さない。</summary>
+    public static void AddNoStore(RouteGroupBuilder group) =>
+        group.AddEndpointFilter(async (context, next) =>
+        {
+            var headers = context.HttpContext.Response.Headers;
+            headers.CacheControl = "no-store, no-cache, must-revalidate";
+            headers.Pragma = "no-cache";
+            return await next(context);
+        });
 
     /// <summary>ログインを保つ長さ。</summary>
     public static readonly TimeSpan SessionLifetime = TimeSpan.FromHours(8);

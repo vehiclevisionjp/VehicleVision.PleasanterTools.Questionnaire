@@ -16,6 +16,13 @@ public sealed record AdminAuthOptions
 
     /// <summary>認証アプリに表示するサービス名。</summary>
     public string Issuer { get; init; } = "アンケート";
+
+    /// <summary>招待が使える長さ。</summary>
+    /// <remarks>
+    /// **期限を必ず持たせる**（<c>_documents/非機能設計.md</c> 1 章）。
+    /// 期限の無い招待は、後から拾われて使われる。
+    /// </remarks>
+    public TimeSpan InvitationLifetime { get; init; } = TimeSpan.FromHours(48);
 }
 
 /// <summary>合言葉の照合の結果。</summary>
