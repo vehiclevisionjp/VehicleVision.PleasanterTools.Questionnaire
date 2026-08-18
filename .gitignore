@@ -34,3 +34,6 @@ temp/
 
 ## Parameters のローカル上書き（実値。コミットしない）
 App_Data/Parameters/*.local.json
+
+## 検証環境の出力
+tools/pleasanter-testenv/results/
