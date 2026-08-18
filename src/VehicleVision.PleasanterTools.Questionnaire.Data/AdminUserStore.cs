@@ -81,6 +81,17 @@ public interface IAdminUserStore
 
     Task SetDisabledAsync(Guid adminUserId, bool isDisabled, CancellationToken cancellationToken = default);
 
+    /// <summary>止める。**最後の有効な <see cref="AdminRole.Administrator"/> は止めさせない。**</summary>
+    /// <returns>止められたかどうか。<c>false</c> なら**最後の 1 人だった**。</returns>
+    Task<bool> TryDisableAsync(Guid adminUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>役割を変える。**最後の有効な <see cref="AdminRole.Administrator"/> は降格させない。**</summary>
+    /// <returns>変えられたかどうか。<c>false</c> なら**最後の 1 人だった**。</returns>
+    Task<bool> TrySetRoleAsync(
+        Guid adminUserId,
+        AdminRole role,
+        CancellationToken cancellationToken = default);
+
     /// <summary>ログインが通ったことを記録し、失敗回数と締め出しを消す。</summary>
     Task RecordSuccessAsync(Guid adminUserId, CancellationToken cancellationToken = default);
 
@@ -227,6 +238,71 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
             + $"{Q("UpdatedAt")} = @Now WHERE {Q("AdminUserId")} = @AdminUserId",
             new { AdminUserId = adminUserId, IsDisabled = isDisabled, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
+
+    public Task<bool> TryDisableAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
+        // **最後の 1 人でなければ止める。** 既に止まっている相手は、人数を減らさないので通す
+        GuardedUpdateAsync(
+            $"{Q("IsDisabled")} = @Disabled",
+            $"({Q("Role")} <> @Administrator OR {Q("IsDisabled")} = @Disabled OR {OtherAdministratorExists()})",
+            new { AdminUserId = adminUserId },
+            cancellationToken);
+
+    public Task<bool> TrySetRoleAsync(
+        Guid adminUserId,
+        AdminRole role,
+        CancellationToken cancellationToken = default) =>
+        // **降格でなければ素通し。** 昇格や、元から Editor の相手は誰も締め出さない
+        GuardedUpdateAsync(
+            $"{Q("Role")} = @Role",
+            $"(@Role = @Administrator OR {Q("Role")} <> @Administrator "
+            + $"OR {Q("IsDisabled")} = @Disabled OR {OtherAdministratorExists()})",
+            new { AdminUserId = adminUserId, Role = (int)role },
+            cancellationToken);
+
+    /// <summary>他に有効な <see cref="AdminRole.Administrator"/> が居るかを見る条件。</summary>
+    /// <remarks>
+    /// <para>
+    /// **副問い合わせを派生表で包んでいるのは MySQL のため。**
+    /// 「更新する表を副問い合わせで直接読む」ことができない（ERROR 1093）。
+    /// 派生表にすると 3 者とも通る。
+    /// </para>
+    /// <para>
+    /// **1 文にまとめているのは、読んでから書く形を避けるため。**
+    /// ただし PostgreSQL / MySQL は読みが待たないので、
+    /// **2 人が同時に互いを止めれば理論上は擦り抜ける。**
+    /// 管理者の人数と操作の頻度からは実際上起き得ないと判断し、
+    /// 直列化する取引まではしていない。
+    /// </para>
+    /// </remarks>
+    private string OtherAdministratorExists() =>
+        $"EXISTS (SELECT 1 FROM (SELECT {Q("AdminUserId")}, {Q("Role")}, {Q("IsDisabled")} "
+        + $"FROM {Q("AdminUsers")}) AS {Q("other")} "
+        + $"WHERE {Q("other")}.{Q("AdminUserId")} <> @AdminUserId "
+        + $"AND {Q("other")}.{Q("Role")} = @Administrator "
+        + $"AND {Q("other")}.{Q("IsDisabled")} = @Enabled)";
+
+    /// <summary>誰も入れなくならないことを確かめてから更新する。</summary>
+    private async Task<bool> GuardedUpdateAsync(
+        string assignment,
+        string guard,
+        object parameters,
+        CancellationToken cancellationToken)
+    {
+        var arguments = new DynamicParameters(parameters);
+        arguments.Add("Now", DbTime.UtcNowTruncated());
+        arguments.Add("Administrator", (int)AdminRole.Administrator);
+        arguments.Add("Disabled", true);
+        arguments.Add("Enabled", false);
+
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var affected = await connection.ExecuteAsync(new CommandDefinition(
+            $"UPDATE {Q("AdminUsers")} SET {assignment}, {Q("UpdatedAt")} = @Now "
+            + $"WHERE {Q("AdminUserId")} = @AdminUserId AND {guard}",
+            arguments,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return affected == 1;
+    }
 
     public Task RecordSuccessAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
         ExecuteAsync(
