@@ -18,11 +18,20 @@
     <Company>PMC Co.,Ltd.</Company>
     <Product>VehicleVision.PleasanterTools.Questionnaire</Product>
     <Copyright>Copyright (C) PMC Co.,Ltd.</Copyright>
+    <!-- デュアルライセンス（AGPL-3.0-or-later OR 商用）。LICENSING.md を参照。
+         NuGet の PackageLicenseExpression は LicenseRef-* を含む式を受け付けないため
+         ライセンスファイルを参照する -->
+    <PackageLicenseFile>LICENSING.md</PackageLicenseFile>
   </PropertyGroup>
 
   <!--
     Pleasanter 本体（GNU AGPL v3）はコピー・流用・リンク・プロジェクト参照しない。
-    本アプリは Pleasanter の「標準 API を叩く別アプリ」であり、本体の派生著作物にしない。
-    _reference/ は事実確認のための参照専用。詳細は _reference/README.md。
+    本アプリは Pleasanter の「標準 Web API を叩く別アプリ」であり、本体の派生著作物にしない。
+
+    **本製品はデュアルライセンス（AGPL-3.0-or-later OR 商用）で提供する。**
+    Pleasanter の著作権は当社に無いため、本体を取り込むと商用ライセンスでの提供が
+    できなくなる。「どうせ AGPL 側があるから取り込んでよい」ではない。
+    同じ理由で、依存 OSS は寛容ライセンス（MIT / BSD 系 / Apache-2.0）に限定する。
+    詳細は LICENSING.md / _reference/README.md。
   -->
 </Project>

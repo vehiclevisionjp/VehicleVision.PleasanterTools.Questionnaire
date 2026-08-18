@@ -78,4 +78,17 @@ Claude Code は [`CLAUDE.md`](CLAUDE.md)、その他のエージェントは [`A
 
 ## ライセンス
 
+**デュアルライセンス**で提供します。詳細は [`LICENSING.md`](LICENSING.md)。
+
+| | ライセンス | 想定する利用 |
+|---|---|---|
+| A | [GNU AGPL v3 以降](LICENSE) | オープンソースとして利用・改変・再配布する場合 |
+| B | [PMC 商用ライセンス](LICENSE-COMMERCIAL.md) | AGPL の義務を負わずに利用したい場合（個別契約） |
+
+SPDX 表記: `AGPL-3.0-or-later OR LicenseRef-PMC-Commercial`
+
+**Pleasanter 本体（AGPL v3）を取り込まないことが、デュアルライセンスの前提です。**
+取り込むと商用ライセンスでの提供ができなくなります。依存 OSS も寛容ライセンス
+（MIT / BSD 系 / Apache-2.0）に限定します（[`NOTICE`](NOTICE)）。
+
 Copyright (C) PMC Co.,Ltd.

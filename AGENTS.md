@@ -26,6 +26,9 @@ Claude Code はローカルで `CLAUDE.md` を読み、そこから同じ参照�
 5. **作業中の PR タイトルには `WIP:` を付ける**（`[WIP]` ではない）。完了したら外す
 6. **Pleasanter 本体（AGPL v3）のコードを取り込まないこと。** コピー・流用・リンク・
    プロジェクト参照のいずれも禁止。`_reference/` は事実確認のための参照専用
-   （[`_reference/README.md`](_reference/README.md)）
-7. **Pleasanter の API キーをブラウザへ渡さないこと。** 資格情報はサーバ側だけで保持する
+   （[`_reference/README.md`](_reference/README.md)）。
+   **本製品はデュアルライセンス（AGPL ＋ 商用）。取り込むと商用側を提供できなくなる**
+7. **依存 OSS は寛容ライセンス（MIT / BSD 系 / Apache-2.0）に限定すること。**
+   追加時にライセンスを一次情報で確認し、[`NOTICE`](../NOTICE) へ追記する
+8. **Pleasanter の API キーをブラウザへ渡さないこと。** 資格情報はサーバ側だけで保持する
 
