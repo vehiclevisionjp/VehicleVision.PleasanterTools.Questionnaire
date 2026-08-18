@@ -31,7 +31,14 @@ public sealed class SecretProtector
     private readonly byte[] key;
 
     /// <param name="base64Key">256 ビットの鍵を Base64 にしたもの。</param>
-    public SecretProtector(string base64Key)
+    public SecretProtector(string base64Key) => key = DecodeKey(base64Key);
+
+    /// <summary>設定から受け取った鍵を読む。**書式と長さをここ 1 か所で見る。**</summary>
+    /// <remarks>
+    /// 同じ設定値は <see cref="SubmissionGuard"/> も使う。
+    /// **鍵の検証を写して持たない。** 片方だけ緩いと、そこから短い鍵が入る。
+    /// </remarks>
+    public static byte[] DecodeKey(string base64Key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(base64Key);
 
@@ -53,7 +60,7 @@ public sealed class SecretProtector
                 nameof(base64Key));
         }
 
-        key = decoded;
+        return decoded;
     }
 
     /// <summary>新しい鍵を作る。**設定に書く値を作るためのもの。**</summary>
