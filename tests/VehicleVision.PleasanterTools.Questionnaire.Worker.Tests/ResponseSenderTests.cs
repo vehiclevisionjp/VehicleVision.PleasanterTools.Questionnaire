@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
@@ -22,6 +23,9 @@ public class ResponseSenderTests
 
         public List<string> RequestedPaths { get; } = [];
 
+        /// <summary>送った本文。**何を Pleasanter へ渡したかを見るため。**</summary>
+        public List<string> RequestedBodies { get; } = [];
+
         public StubHandler Enqueue(HttpStatusCode status, string body)
         {
             _responses.Enqueue((status, body));
@@ -35,10 +39,16 @@ public class ResponseSenderTests
             return this;
         }
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestedPaths.Add(request.RequestUri!.AbsolutePath);
+
+            if (request.Content is not null)
+            {
+                RequestedBodies.Add(
+                    await request.Content.ReadAsStringAsync(cancellationToken));
+            }
 
             var (status, body) = _responses.Count > 0
                 ? _responses.Dequeue()
@@ -49,10 +59,10 @@ public class ResponseSenderTests
                 throw new HttpRequestException("到達できない");
             }
 
-            return Task.FromResult(new HttpResponseMessage(status.Value)
+            return new HttpResponseMessage(status.Value)
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json"),
-            });
+            };
         }
     }
 
@@ -135,6 +145,29 @@ public class ResponseSenderTests
         var (sender, _, _) = Build(new StubHandler());
 
         Assert.Equal(SendOutcome.Idle, await sender.SendOnceAsync());
+    }
+
+    [Fact]
+    public async Task 正本の列へ添付のBase64を載せない()
+    {
+        // **列が添付本文で埋まるうえ、応答不明時の照合はこの列を部分一致で引く**
+        var content = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+        var base64 = Convert.ToBase64String(content);
+        var payload = ResponsePayload.Create(
+            Token,
+            [Answer.Of("q1", "満足"), new Answer("q2", []) { FileNames = ["a.png"] }],
+            [new AnsweredAttachment("q2", new IncomingAttachment("a.png", content))]);
+
+        var handler = new StubHandler().Enqueue(HttpStatusCode.OK, "{\"Id\":1,\"StatusCode\":200}");
+        var (sender, outbox, _) = Build(handler);
+        outbox.Enqueue(new PendingResponse(Token, SurveyId, 1, payload.ToJson(), 0));
+
+        Assert.Equal(SendOutcome.Sent, await sender.SendOnceAsync());
+
+        var body = Assert.Single(handler.RequestedBodies);
+        Assert.DoesNotContain(base64, body, StringComparison.Ordinal);
+        // ファイル名は正本に残す
+        Assert.Contains("a.png", body, StringComparison.Ordinal);
     }
 
     [Fact]

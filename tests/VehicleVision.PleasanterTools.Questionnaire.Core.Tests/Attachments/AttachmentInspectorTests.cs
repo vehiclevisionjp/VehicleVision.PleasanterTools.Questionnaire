@@ -144,4 +144,89 @@ public class AttachmentInspectorTests
 
         Assert.Empty(rejections);
     }
+
+    [Fact]
+    public async Task 送信全体の合計が上限を超えたら拒否する()
+    {
+        // **1 件あたりの上限だけでは足りない。** 上限内の添付を設問の数だけ並べられる
+        var policy = AttachmentPolicy.Create(
+            allowedExtensions: ["txt"],
+            maxFileSizeBytes: 1024,
+            maxFileCount: 2,
+            maxTotalBytes: 1500);
+
+        var rejections = await new AttachmentInspector(policy).InspectSubmissionAsync(
+        [
+            new AnsweredAttachment("q1", new IncomingAttachment("a.txt", new byte[1000])),
+            new AnsweredAttachment("q2", new IncomingAttachment("b.txt", new byte[1000])),
+        ]);
+
+        Assert.Equal(AttachmentRejectionReason.TotalTooLarge, rejections.Single().Reason);
+    }
+
+    [Fact]
+    public async Task 合計の上限は既定で1件あたりと個数から決まる()
+    {
+        // 1024 バイト × 2 件 = 2048 バイトまで
+        var rejections = await new AttachmentInspector(Policy()).InspectSubmissionAsync(
+        [
+            new AnsweredAttachment("q1", new IncomingAttachment("a.txt", new byte[1024])),
+            new AnsweredAttachment("q2", new IncomingAttachment("b.txt", new byte[1024])),
+            new AnsweredAttachment("q3", new IncomingAttachment("c.txt", new byte[1])),
+        ]);
+
+        Assert.Equal(AttachmentRejectionReason.TotalTooLarge, rejections.Single().Reason);
+    }
+
+    [Fact]
+    public async Task 個数の上限は設問ごとに見る()
+    {
+        // 設問をまたいで合算しない。**上限は「1 設問あたり」**
+        var rejections = await new AttachmentInspector(Policy()).InspectSubmissionAsync(
+        [
+            new AnsweredAttachment("q1", Png("a.png")),
+            new AnsweredAttachment("q1", Png("b.png")),
+            new AnsweredAttachment("q2", Png("c.png")),
+        ]);
+
+        Assert.Empty(rejections);
+    }
+
+    [Fact]
+    public async Task 設問ごとの上限で絞り込める()
+    {
+        // 設問側が「1 件まで」と言っているので、共通の上限（2 件）より厳しくなる
+        var rejections = await new AttachmentInspector(Policy()).InspectSubmissionAsync(
+            [
+                new AnsweredAttachment("q1", Png("a.png")),
+                new AnsweredAttachment("q1", Png("b.png")),
+            ],
+            policyFor: _ => Policy().Tighten(maxFileCount: 1, maxFileSizeBytes: null));
+
+        var rejection = rejections.Single();
+        Assert.Equal(AttachmentRejectionReason.TooMany, rejection.Reason);
+        Assert.Equal("q1", rejection.QuestionId);
+    }
+
+    [Fact]
+    public void 設問ごとの上限で共通の上限より緩くはならない()
+    {
+        // **アンケートを作る人が書いた値で、運用者が決めた上限を超えられないこと**
+        var tightened = Policy().Tighten(maxFileCount: 100, maxFileSizeBytes: 100_000);
+
+        Assert.Equal(2, tightened.MaxFileCount);
+        Assert.Equal(1024, tightened.MaxFileSizeBytes);
+    }
+
+    [Fact]
+    public async Task 拒否した添付にはどの設問かが付く()
+    {
+        var rejections = await new AttachmentInspector(Policy()).InspectSubmissionAsync(
+            [new AnsweredAttachment("q1", new IncomingAttachment("a.exe", PngHeader))]);
+
+        var rejection = rejections.Single();
+        Assert.Equal(AttachmentRejectionReason.ExtensionNotAllowed, rejection.Reason);
+        Assert.Equal("q1", rejection.QuestionId);
+        Assert.Equal("a.exe", rejection.FileName);
+    }
 }

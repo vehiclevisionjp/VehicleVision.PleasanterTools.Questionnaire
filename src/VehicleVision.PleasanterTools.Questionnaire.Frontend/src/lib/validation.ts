@@ -11,6 +11,23 @@ import { hasChoices, isDisplayOnly } from './types';
 export function validateQuestion(question: Question, answer: AnswerState | undefined): string | null {
   if (isDisplayOnly(question)) return null;
 
+  // **添付の設問は値ではなくファイルの有無で見る。** サーバ側と同じ見方にする
+  if (question.type === 'File') {
+    const files = answer?.files ?? [];
+    if (files.length === 0) {
+      return question.isRequired ? 'ファイルを選んでください' : null;
+    }
+    if (question.settings.maxFileCount !== undefined && files.length > question.settings.maxFileCount) {
+      return `ファイルは ${question.settings.maxFileCount} 件までです`;
+    }
+    const tooLarge = files.find(
+      (file) =>
+        question.settings.maxFileSizeBytes !== undefined &&
+        file.size > question.settings.maxFileSizeBytes,
+    );
+    return tooLarge ? `${tooLarge.name}: ファイルが大きすぎます` : null;
+  }
+
   const values = (answer?.values ?? []).filter((value) => value.trim() !== '');
 
   if (values.length === 0) {

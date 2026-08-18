@@ -71,6 +71,11 @@ public interface ISurveyRepository
     Task<SurveyRecord?> FindByPublicIdAsync(
         string publicId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>内部 ID からアンケートを引く。管理画面が使う。</summary>
+    Task<SurveyRecord?> FindBySurveyIdAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>アンケートの 1 行。</summary>
@@ -227,6 +232,22 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             + $"       {q("AcceptFrom")}, {q("AcceptTo")}, {q("ResponseLimit")} "
             + $"FROM {q("Surveys")} WHERE {q("PublicId")} = @PublicId",
             new { PublicId = publicId },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    public async Task<SurveyRecord?> FindBySurveyIdAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        var q = (string name) => SqlDialect.Quote(connectionFactory.Provider, name);
+
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(new CommandDefinition(
+            $"SELECT {q("SurveyId")}, {q("PublicId")}, {q("Title")}, {q("PleasanterSiteId")}, "
+            + $"       {q("ResponseJsonColumn")}, {q("Status")}, {q("PublishedVersion")}, "
+            + $"       {q("AcceptFrom")}, {q("AcceptTo")}, {q("ResponseLimit")} "
+            + $"FROM {q("Surveys")} WHERE {q("SurveyId")} = @SurveyId",
+            new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 

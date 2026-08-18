@@ -27,6 +27,18 @@ public enum MappingProblemCode
     /// <summary>スクリプト変換なのにスクリプトが空。</summary>
     EmptyScript,
 
+    /// <summary>添付の割り当てなのに、形が <c>1 : 0 : 1</c> になっていない。</summary>
+    InvalidAttachmentShape,
+
+    /// <summary>添付の口に、添付以外の設問を繋いでいる。</summary>
+    NonFileQuestionAsAttachment,
+
+    /// <summary>添付列なのに、添付の口を使っていない。</summary>
+    AttachmentColumnNeedsFilePort,
+
+    /// <summary>添付の口なのに、書き込み先が添付列でない。</summary>
+    FilePortNeedsAttachmentColumn,
+
     /// <summary>どこへも割り当てられていない設問。**拒否はしないが警告する。**</summary>
     UnmappedQuestion,
 }
@@ -48,10 +60,15 @@ public sealed record MappingProblem(
 /// <summary>マッピングを保存する前に検査する。</summary>
 public static class MappingValidator
 {
+    /// <param name="isAttachmentColumn">
+    /// 添付列かどうかの判定。**列名の決まりは Pleasanter 側の知識**なので、
+    /// ここでは持たずに受け取る。渡さなければ列名の側は確かめない。
+    /// </param>
     public static ImmutableArray<MappingProblem> Validate(
         MappingDefinition mapping,
         SurveyDefinition definition,
-        IReadOnlyCollection<string>? reservedColumns = null)
+        IReadOnlyCollection<string>? reservedColumns = null,
+        Func<string, bool>? isAttachmentColumn = null)
     {
         ArgumentNullException.ThrowIfNull(mapping);
         ArgumentNullException.ThrowIfNull(definition);
@@ -81,7 +98,32 @@ public static class MappingValidator
                     MappingProblemCode.ReservedColumn, assignment.TargetColumn));
             }
 
-            if (!assignment.HasValidShape)
+            var usesFilePort = assignment.Sources.Any(source => source.Port is QuestionPort.Files);
+            var targetsAttachment = isAttachmentColumn?.Invoke(assignment.TargetColumn) ?? usesFilePort;
+
+            if (usesFilePort)
+            {
+                // **添付は 1 : 0 : 1 に限る**（2026-08-18 決定。変換は掛けない）
+                if (assignment.Sources.Length != 1 || assignment.Converter is not null)
+                {
+                    problems.Add(new MappingProblem(
+                        MappingProblemCode.InvalidAttachmentShape, assignment.TargetColumn));
+                }
+
+                if (!targetsAttachment)
+                {
+                    // 添付の中身は Base64。**添付列以外へ入れると列が本文で埋まる**
+                    problems.Add(new MappingProblem(
+                        MappingProblemCode.FilePortNeedsAttachmentColumn, assignment.TargetColumn));
+                }
+            }
+            else if (targetsAttachment)
+            {
+                // 名前だけを添付列へ入れても、ファイルとしては取り出せない
+                problems.Add(new MappingProblem(
+                    MappingProblemCode.AttachmentColumnNeedsFilePort, assignment.TargetColumn));
+            }
+            else if (!assignment.HasValidShape)
             {
                 problems.Add(new MappingProblem(
                     MappingProblemCode.InvalidShape, assignment.TargetColumn));
@@ -108,6 +150,14 @@ public static class MappingValidator
                 {
                     problems.Add(new MappingProblem(
                         MappingProblemCode.DisplayOnlyQuestionAsSource,
+                        assignment.TargetColumn,
+                        source.QuestionId));
+                }
+                else if (source.Port is QuestionPort.Files && question.Type is not QuestionType.File)
+                {
+                    // 添付を持たない設問から中身は取り出せない
+                    problems.Add(new MappingProblem(
+                        MappingProblemCode.NonFileQuestionAsAttachment,
                         assignment.TargetColumn,
                         source.QuestionId));
                 }

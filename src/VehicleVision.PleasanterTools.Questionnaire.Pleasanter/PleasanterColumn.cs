@@ -49,6 +49,14 @@ public static partial class PleasanterColumn
     public static bool AcceptsMultipleValues(PleasanterColumnKind kind) =>
         kind is PleasanterColumnKind.Attachments;
 
+    /// <summary>添付列か。</summary>
+    /// <remarks>
+    /// **列名の決まりは Pleasanter 側の知識。**
+    /// <c>.Core</c> の検査へはこの判定を渡して使う。
+    /// </remarks>
+    public static bool IsAttachment(string columnName) =>
+        KindOf(columnName) is PleasanterColumnKind.Attachments;
+
     /// <summary><c>Class</c> 列の文字数上限。実機で確認した値。</summary>
     /// <remarks><c>nvarchar(2048 バイト)</c> ＝ 1024 文字（<c>_documents/実機検証結果.md</c> 1 章）。</remarks>
     public const int ClassMaxLength = 1024;
