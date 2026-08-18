@@ -33,6 +33,10 @@ public class ResponseIntakeAttachmentTests
             string publicId, CancellationToken cancellationToken = default) =>
             Task.FromResult(survey);
 
+        public Task<SurveyRecord?> FindBySurveyIdAsync(
+            Guid surveyId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(survey);
+
         public Task PublishAsync(
             Guid surveyId,
             int version,
