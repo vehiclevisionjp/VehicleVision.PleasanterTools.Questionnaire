@@ -115,7 +115,8 @@ public sealed class ResponseSender(
         var record = recordBuilder.Build(
             mapped.Columns,
             snapshot.ResponseJsonColumn,
-            snapshot.ResponseJsonColumn is null ? null : payload.WithoutFileContent().ToJson());
+            snapshot.ResponseJsonColumn is null ? null : payload.WithoutFileContent().ToJson(),
+            CollectAttachments(mapped, payload));
 
         if (!record.Problems.IsEmpty)
         {
@@ -267,6 +268,49 @@ public sealed class ResponseSender(
             .RescheduleAsync(claimed.ResponseToken, next, error, cancellationToken)
             .ConfigureAwait(false);
         return SendOutcome.Rescheduled;
+    }
+
+    /// <summary>添付列へ入れる中身を、回答から取り出す。</summary>
+    /// <remarks>
+    /// <para>
+    /// 割り当てがある列は、添付が無くても空で入れる。
+    /// </para>
+    /// <para>
+    /// **ただし空を送っても前の添付は消えない**（実機で確認。
+    /// <c>_documents/実機検証結果.md</c> 8 章）。**添付を外す編集は今のところ反映されない。**
+    /// 消すには <c>Guid</c> を添えた削除の指定が要り、そのためには送信前に
+    /// 既存の添付を読み直す必要がある。**どう直すかは #9 で決める。**
+    /// </para>
+    /// </remarks>
+    private static Dictionary<string, IReadOnlyList<PleasanterAttachment>> CollectAttachments(
+        MappingResult mapped,
+        ResponsePayload payload)
+    {
+        var result = new Dictionary<string, IReadOnlyList<PleasanterAttachment>>(
+            StringComparer.OrdinalIgnoreCase);
+
+        if (mapped.AttachmentColumns.IsEmpty)
+        {
+            return result;
+        }
+
+        var filesByQuestion = payload.Answers
+            .GroupBy(answer => answer.QuestionId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().Files, StringComparer.Ordinal);
+
+        foreach (var (columnName, questionId) in mapped.AttachmentColumns)
+        {
+            var files = filesByQuestion.GetValueOrDefault(questionId);
+
+            result[columnName] = files.IsDefaultOrEmpty
+                ? []
+                : [.. files
+                    // **中身が落ちているものは送らない。** 正本 JSON から読み直した場合など
+                    .Where(file => !string.IsNullOrEmpty(file.Base64))
+                    .Select(file => new PleasanterAttachment(file.Name, file.Base64!))];
+        }
+
+        return result;
     }
 
     private async Task<SendOutcome> DeadLetterAsync(
