@@ -32,6 +32,9 @@ public sealed class AttachmentInspector(AttachmentPolicy policy, IVirusScanner? 
     /// <summary>先頭バイトの照合に必要な長さ。</summary>
     private const int SignatureProbeLength = 16;
 
+    /// <summary>共通の受け入れ条件。**設問ごとに絞り込むときの元になる。**</summary>
+    public AttachmentPolicy Policy => policy;
+
     /// <summary>設問 1 つ分の添付を検査する。</summary>
     public Task<ImmutableArray<AttachmentRejection>> InspectAsync(
         IReadOnlyList<IncomingAttachment> attachments,
