@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -109,13 +110,24 @@ public sealed class ResponseSender(
                 cancellationToken).ConfigureAwait(false);
         }
 
+        var referenceId = await tokens
+            .FindReferenceIdAsync(claimed.ResponseToken, cancellationToken)
+            .ConfigureAwait(false);
+
+        // **前の添付は明示的に消さないと残る**（_documents/実機検証結果.md 8 章）。
+        // Guid は取り出さないと分からないので、**添付を扱う編集のときだけ**読み直す。
+        // 添付を使わないアンケートに往復を増やさない
+        var attachments = await CollectAttachmentsAsync(
+            mapped, payload, referenceId, cancellationToken).ConfigureAwait(false);
+
         // **正本の列へ添付の Base64 を載せない。** 列が添付本文で埋まるうえ、
         // 応答不明時の照合はこの列を部分一致で引くので、巨大な文字列は検索の邪魔になる
         // （<c>_documents/アーキテクチャ方針.md</c> 9 章）
         var record = recordBuilder.Build(
             mapped.Columns,
             snapshot.ResponseJsonColumn,
-            snapshot.ResponseJsonColumn is null ? null : payload.WithoutFileContent().ToJson());
+            snapshot.ResponseJsonColumn is null ? null : payload.WithoutFileContent().ToJson(),
+            attachments);
 
         if (!record.Problems.IsEmpty)
         {
@@ -124,10 +136,6 @@ public sealed class ResponseSender(
                 $"列へ写せない: {string.Join(" / ", record.Problems.Select(p => $"{p.ColumnName}:{p.Reason}"))}",
                 cancellationToken).ConfigureAwait(false);
         }
-
-        var referenceId = await tokens
-            .FindReferenceIdAsync(claimed.ResponseToken, cancellationToken)
-            .ConfigureAwait(false);
 
         var response = referenceId is null
             ? await pleasanter.CreateAsync(snapshot.PleasanterSiteId, record.Body, cancellationToken)
@@ -267,6 +275,98 @@ public sealed class ResponseSender(
             .RescheduleAsync(claimed.ResponseToken, next, error, cancellationToken)
             .ConfigureAwait(false);
         return SendOutcome.Rescheduled;
+    }
+
+    /// <summary>添付列へ送る指示を組み立てる。</summary>
+    /// <remarks>
+    /// <para>
+    /// **送り直すたびに、前の添付を消してから足す。**
+    /// 空配列を送っても消えないので、<c>Guid</c> を添えた削除の指定が要る
+    /// （<c>_documents/実機検証結果.md</c> 8 章）。
+    /// </para>
+    /// <para>
+    /// **読み直すのは、添付の割り当てがあり、かつ既にレコードがあるときだけ。**
+    /// 添付を使わないアンケートに往復を増やさない。
+    /// </para>
+    /// </remarks>
+    private async Task<Dictionary<string, PleasanterAttachmentColumn>> CollectAttachmentsAsync(
+        MappingResult mapped,
+        ResponsePayload payload,
+        long? referenceId,
+        CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<string, PleasanterAttachmentColumn>(StringComparer.OrdinalIgnoreCase);
+
+        if (mapped.AttachmentColumns.IsEmpty)
+        {
+            return result;
+        }
+
+        var filesByQuestion = payload.Answers
+            .GroupBy(answer => answer.QuestionId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().Files, StringComparer.Ordinal);
+
+        var existing = referenceId is null
+            ? []
+            : await ReadExistingAttachmentsAsync(referenceId.Value, cancellationToken)
+                .ConfigureAwait(false);
+
+        foreach (var (columnName, questionId) in mapped.AttachmentColumns)
+        {
+            var files = filesByQuestion.GetValueOrDefault(questionId);
+
+            var added = files.IsDefaultOrEmpty
+                ? []
+                : files
+                    // **中身が落ちているものは送らない。** 正本 JSON から読み直した場合など
+                    .Where(file => !string.IsNullOrEmpty(file.Base64))
+                    .Select(file => new PleasanterAttachment(file.Name, file.Base64!))
+                    .ToArray();
+
+            result[columnName] = new PleasanterAttachmentColumn(
+                added,
+                existing.GetValueOrDefault(columnName, []));
+        }
+
+        return result;
+    }
+
+    /// <summary>今そのレコードに付いている添付の <c>Guid</c> を、列ごとに読む。</summary>
+    private async Task<Dictionary<string, IReadOnlyList<string>>> ReadExistingAttachmentsAsync(
+        long referenceId,
+        CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+
+        var response = await pleasanter.GetRecordAsync(referenceId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var row = response.Body?["Response"]?["Data"]?.AsArray()?.FirstOrDefault();
+        if (row?["AttachmentsHash"] is not JsonObject hash)
+        {
+            return result;
+        }
+
+        foreach (var (columnName, files) in hash)
+        {
+            if (files is not JsonArray array)
+            {
+                continue;
+            }
+
+            var guids = array
+                .Select(file => file?["Guid"]?.GetValue<string>())
+                .Where(guid => !string.IsNullOrEmpty(guid))
+                .Select(guid => guid!)
+                .ToArray();
+
+            if (guids.Length > 0)
+            {
+                result[columnName] = guids;
+            }
+        }
+
+        return result;
     }
 
     private async Task<SendOutcome> DeadLetterAsync(

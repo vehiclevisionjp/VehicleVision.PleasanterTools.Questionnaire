@@ -8,6 +8,37 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 /// <param name="Reason">理由。</param>
 public sealed record ColumnConversionProblem(string ColumnName, string Reason);
 
+/// <summary>Pleasanter へ送る添付 1 件。</summary>
+/// <param name="Name">ファイル名。</param>
+/// <param name="Base64">中身。</param>
+/// <remarks>
+/// **フィールド名は <c>Name</c> ＋ <c>Base64</c> ＋ <c>Added</c>。**
+/// <c>FileName</c> ＋ <c>Base64Binary</c> で送ると <c>400 Invalid json data</c> になる
+/// （<c>_documents/実機検証結果.md</c> 6 章）。
+/// </remarks>
+public sealed record PleasanterAttachment(string Name, string Base64);
+
+/// <summary>添付列 1 本に対する指示。</summary>
+/// <param name="Added">足す添付。</param>
+/// <param name="DeletedGuids">消す添付の <c>Guid</c>。</param>
+/// <remarks>
+/// <para>
+/// **足すだけでは前の添付が残る。** 空配列を送っても消えない（実機で確認。
+/// <c>_documents/実機検証結果.md</c> 8 章）。
+/// </para>
+/// <para>
+/// **消すには <c>Guid</c> と <c>Deleted</c> を送る。**
+/// <c>Guid</c> は <c>Get</c> でしか得られない。
+/// </para>
+/// </remarks>
+public sealed record PleasanterAttachmentColumn(
+    IReadOnlyList<PleasanterAttachment> Added,
+    IReadOnlyList<string> DeletedGuids)
+{
+    public static PleasanterAttachmentColumn Of(params PleasanterAttachment[] added) =>
+        new(added, []);
+}
+
 /// <summary>Pleasanter へ送るレコードの中身。</summary>
 /// <param name="Body">リクエストボディへ載せる内容。</param>
 /// <param name="Problems">写せなかった列。</param>
@@ -28,10 +59,16 @@ public sealed record PleasanterRecord(
 /// </remarks>
 public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
 {
+    /// <param name="attachments">
+    /// 添付列 → 添付。**値のマッピングとは別に受け取る。**
+    /// 中身は Base64 で大きく、文字列の配列として変換へ通す形にしたくない
+    /// （<c>_documents/アーキテクチャ方針.md</c> 8 章）。
+    /// </param>
     public PleasanterRecord Build(
         IReadOnlyDictionary<string, ImmutableArray<string>> columns,
         string? responseJsonColumn = null,
-        string? responseJson = null)
+        string? responseJson = null,
+        IReadOnlyDictionary<string, PleasanterAttachmentColumn>? attachments = null)
     {
         ArgumentNullException.ThrowIfNull(columns);
 
@@ -49,9 +86,10 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
 
             if (kind is PleasanterColumnKind.Attachments)
             {
-                // 添付は Base64 を伴うので、マッピングの出力からは組み立てない
+                // **添付の中身は値の流れに乗らない。** ここへ来るのは名前だけを
+                // 添付列へ入れようとした場合で、ファイルとしては取り出せない
                 problems.Add(new ColumnConversionProblem(
-                    columnName, "添付列はマッピングの出力先にできない"));
+                    columnName, "添付列には添付の口（Files）を繋ぐこと"));
                 continue;
             }
 
@@ -90,6 +128,8 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
             }
         }
 
+        AddAttachments(attachments, hashes, problems);
+
         var body = new Dictionary<string, object?>(StringComparer.Ordinal);
         foreach (var (kind, hash) in hashes)
         {
@@ -97,6 +137,66 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
         }
 
         return new PleasanterRecord(body, problems.ToImmutable());
+    }
+
+    private static void AddAttachments(
+        IReadOnlyDictionary<string, PleasanterAttachmentColumn>? attachments,
+        Dictionary<PleasanterColumnKind, Dictionary<string, object?>> hashes,
+        ImmutableArray<ColumnConversionProblem>.Builder problems)
+    {
+        if (attachments is null || attachments.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var (columnName, column) in attachments)
+        {
+            if (PleasanterColumn.KindOf(columnName) is not PleasanterColumnKind.Attachments)
+            {
+                problems.Add(new ColumnConversionProblem(
+                    columnName, "添付の書き込み先が添付列ではない"));
+                continue;
+            }
+
+            // **消す指示を先に置く。** 同じ列で消してから足す
+            var entries = new List<Dictionary<string, object?>>();
+
+            foreach (var guid in column.DeletedGuids)
+            {
+                entries.Add(new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    // **削除時の Guid は必ず大文字**（Pleasanter のマニュアル。2026-08-18 参照）
+                    ["Guid"] = guid.ToUpperInvariant(),
+                    ["Deleted"] = true,
+                });
+            }
+
+            foreach (var file in column.Added)
+            {
+                entries.Add(new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["Name"] = file.Name,
+                    ["Base64"] = file.Base64,
+                    ["Added"] = true,
+                });
+            }
+
+            if (entries.Count == 0)
+            {
+                // **空配列を送っても何も起きない。** 送るだけ無駄なので入れない
+                continue;
+            }
+
+            // **入れるものが決まってから入れ物を作る。** 先に作ると空の
+            // AttachmentsHash が本体に残る
+            if (!hashes.TryGetValue(PleasanterColumnKind.Attachments, out var hash))
+            {
+                hash = new Dictionary<string, object?>(StringComparer.Ordinal);
+                hashes[PleasanterColumnKind.Attachments] = hash;
+            }
+
+            hash[columnName] = entries.ToArray();
+        }
     }
 
     private bool TryConvert(
