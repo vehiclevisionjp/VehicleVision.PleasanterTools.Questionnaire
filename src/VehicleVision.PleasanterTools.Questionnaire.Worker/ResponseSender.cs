@@ -109,10 +109,13 @@ public sealed class ResponseSender(
                 cancellationToken).ConfigureAwait(false);
         }
 
+        // **正本の列へ添付の Base64 を載せない。** 列が添付本文で埋まるうえ、
+        // 応答不明時の照合はこの列を部分一致で引くので、巨大な文字列は検索の邪魔になる
+        // （<c>_documents/アーキテクチャ方針.md</c> 9 章）
         var record = recordBuilder.Build(
             mapped.Columns,
             snapshot.ResponseJsonColumn,
-            snapshot.ResponseJsonColumn is null ? null : claimed.PayloadJson);
+            snapshot.ResponseJsonColumn is null ? null : payload.WithoutFileContent().ToJson());
 
         if (!record.Problems.IsEmpty)
         {

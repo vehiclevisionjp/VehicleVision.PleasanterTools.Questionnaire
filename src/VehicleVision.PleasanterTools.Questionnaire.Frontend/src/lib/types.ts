@@ -105,6 +105,11 @@ export type RejectionReason =
 export interface AnswerState {
   values: string[];
   otherText: string;
+  /**
+   * 添付ファイル。**送信のたびに選び直してもらう。**
+   * 一度送った添付をブラウザ側で持ち続けられないため（File は保存できない）。
+   */
+  files?: File[];
 }
 
 /** 既定の言語。**翻訳漏れでも画面を落とさない。** */

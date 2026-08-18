@@ -36,6 +36,12 @@
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |
 | `QUESTIONNAIRE_SUBMITS_PER_MIN` | 送信元 IP ごとの回答送信の上限（1 分あたり・既定 20） |
+| `QUESTIONNAIRE_ATTACHMENT_*` | 添付の許可拡張子・サイズ・個数の上限 |
+| `QUESTIONNAIRE_VIRUSSCAN_*` | ウイルススキャン（**既定は無効**） |
+
+添付とウイルススキャンの項目は
+[`_documents/添付ファイル検査-運用手順書.md`](../../_documents/添付ファイル検査-運用手順書.md)
+5 章に一覧がある。**ここへ書き写さないこと。**
 
 ### `QUESTIONNAIRE_SECRET_KEY` について
 

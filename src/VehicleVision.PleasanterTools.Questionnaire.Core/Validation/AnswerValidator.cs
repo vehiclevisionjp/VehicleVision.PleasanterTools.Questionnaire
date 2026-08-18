@@ -84,6 +84,19 @@ public static class AnswerValidator
             return;
         }
 
+        // **添付の設問は値ではなくファイルの有無で見る。**
+        // 実体（拡張子・先頭バイト・ウイルス）の検査は入口で済ませてある
+        // （_documents/添付ファイル検査-運用手順書.md）
+        if (question.Type is QuestionType.File)
+        {
+            if (question.IsRequired && (answer?.FileNames.IsDefaultOrEmpty ?? true))
+            {
+                errors.Add(new ValidationError(question.QuestionId, ValidationErrorCode.Required));
+            }
+
+            return;
+        }
+
         if (answer is null || answer.IsEmpty)
         {
             if (question.IsRequired)

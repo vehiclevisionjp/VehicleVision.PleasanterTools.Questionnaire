@@ -8,6 +8,7 @@
     requestTicket,
     submitAnswers,
   } from './lib/api';
+  import type { Attachment } from './lib/api';
   import type { AnswerState, PayloadAnswer, RejectionReason, SurveyDefinition } from './lib/types';
   import { isDisplayOnly, text } from './lib/types';
   import { validatePage } from './lib/validation';
@@ -30,6 +31,8 @@
   let submitError = $state('');
   /** 前に送った回答を読めたか。**読めなければ編集を出せない。** */
   let canEdit = $state(false);
+  /** 添付を受け付けなかった理由。**どのファイルが駄目かを出す。** */
+  let attachmentMessages = $state<string[]>([]);
 
   const pages = $derived(definition?.pages ?? []);
   const currentPage = $derived(pages[pageIndex]);
@@ -121,6 +124,35 @@
     window.scrollTo({ top: 0 });
   }
 
+  /** 選ばれた添付を、設問と組にして取り出す。 */
+  function toAttachments(): Attachment[] {
+    return Object.entries(answers).flatMap(([questionId, answer]) =>
+      (answer.files ?? []).map((file) => ({ questionId, file })),
+    );
+  }
+
+  /** 添付が受け付けられなかった理由を、回答者に分かる言葉にする。 */
+  function attachmentMessage(reason: string, fileName?: string): string {
+    const name = fileName ?? '添付ファイル';
+    switch (reason) {
+      case 'extensionNotAllowed':
+        return `${name}: この種類のファイルは受け付けていません`;
+      case 'contentDoesNotMatchExtension':
+        return `${name}: ファイルの中身が拡張子と一致しません`;
+      case 'tooLarge':
+        return `${name}: ファイルが大きすぎます`;
+      case 'totalTooLarge':
+        return '添付の合計サイズが大きすぎます';
+      case 'tooMany':
+        return '添付できる個数を超えています';
+      case 'invalidFileName':
+        return `${name}: ファイル名に使えない文字が含まれています`;
+      default:
+        // **検出したことは伝えない**（サーバ側も理由を丸めて返す）
+        return `${name}: 受け付けられない添付です`;
+    }
+  }
+
   function toPayload(): PayloadAnswer[] {
     return Object.entries(answers)
       .filter(([questionId]) => {
@@ -139,9 +171,16 @@
 
     submitting = true;
     submitError = '';
+    attachmentMessages = [];
 
     try {
-      const result = await submitAnswers(publicId, responseToken, toPayload(), { ticket, trap });
+      const result = await submitAnswers(
+        publicId,
+        responseToken,
+        toPayload(),
+        { ticket, trap },
+        toAttachments(),
+      );
       if (result.accepted) {
         canEdit = true;
         screen = 'completed';
@@ -173,6 +212,11 @@
 
       // **入力内容は消さない。** 失われたら再入力してもらう以外に手が無い
       submitError = '送信できませんでした。入力内容はそのままです。少し時間を置いてもう一度お試しください。';
+      if (result.attachmentErrors) {
+        attachmentMessages = result.attachmentErrors.map((error) =>
+          attachmentMessage(error.reason, error.fileName ?? undefined),
+        );
+      }
       if (result.errors) {
         const mapped: Record<string, string> = {};
         for (const [questionId, codes] of Object.entries(result.errors)) {
@@ -287,7 +331,13 @@
         />
       </div>
 
-      {#if submitError}
+      {#if attachmentMessages.length > 0}
+        <ul class="error" role="alert">
+          {#each attachmentMessages as message (message)}
+            <li>{message}</li>
+          {/each}
+        </ul>
+      {:else if submitError}
         <p class="error" role="alert">{submitError}</p>
       {/if}
 
