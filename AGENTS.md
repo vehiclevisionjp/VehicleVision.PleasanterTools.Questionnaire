@@ -1,0 +1,31 @@
+# エージェント向けリポジトリ指示
+
+このファイルは `AGENTS.md` 標準（<https://agents.md/>）を読むコーディングエージェント向けの指示です。
+**主な想定はローカルで動かす Codex CLI などです。**
+
+GitHub 上のエージェントは `.github/copilot-instructions.md` を直接読みます。
+Claude Code はローカルで `CLAUDE.md` を読み、そこから同じ参照元を取り込みます。
+**このファイルが要るのは、AGENTS.md 標準が include の仕組みを規定しておらず、
+規約の本文が無いと届かないためです。**
+
+**規約の全文は [`.github/copilot-instructions.md`](.github/copilot-instructions.md) にあります。
+以下は同ファイルの「必ず守る規約」の写しです。作業前に参照元を必ず開いてください。**
+
+<!-- この節は .github/copilot-instructions.md から生成される。ここを直接編集しないこと。
+     編集は .github/copilot-instructions.md 側で行い、`scripts/sync-agents.sh` を実行する。 -->
+
+## 必ず守る規約
+
+**この節は例外なく守ること。** 詳細は同ファイル内の各節を参照。
+
+1. **日本語で書くこと。** Issue・PR のタイトルと本文、コミットメッセージ、コードレビューコメント、
+   CodeQL やセキュリティ警告の解説。すべて日本語
+2. **PR の base は分岐元の `develop`。** `master` を base にしないこと
+3. **PR 本文に `Closes #N` を書くこと。** Issue と PR を必ず紐付ける
+4. **コミットメッセージに `[skip ci]` を含めないこと。** 引用しただけでも push 全体の CI がスキップされる
+5. **作業中の PR タイトルには `WIP:` を付ける**（`[WIP]` ではない）。完了したら外す
+6. **Pleasanter 本体（AGPL v3）のコードを取り込まないこと。** コピー・流用・リンク・
+   プロジェクト参照のいずれも禁止。`_reference/` は事実確認のための参照専用
+   （[`_reference/README.md`](_reference/README.md)）
+7. **Pleasanter の API キーをブラウザへ渡さないこと。** 資格情報はサーバ側だけで保持する
+
