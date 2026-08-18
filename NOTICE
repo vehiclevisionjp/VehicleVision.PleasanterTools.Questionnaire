@@ -26,6 +26,8 @@ Copyright (C) PMC Co.,Ltd.
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
   Microsoft.Extensions.DependencyInjection 10.0.11 / MIT
+  Microsoft.Extensions.Hosting.Abstractions 10.0.11 / MIT
+  Microsoft.Extensions.Logging.Abstractions 10.0.11 / MIT
 
 テスト時のみ使用するもの
 
