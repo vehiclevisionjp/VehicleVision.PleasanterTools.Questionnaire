@@ -13,8 +13,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// **トークンはハッシュのみを置く。** 表を読めた人がそのまま招待を使えては意味が無い。
 /// </para>
 /// </remarks>
-[Migration(3, "管理者の招待")]
-public sealed class M0003_AdminInvitations : Migration
+[Migration(4, "管理者の招待")]
+public sealed class M0004_AdminInvitations : Migration
 {
     public override void Up()
     {

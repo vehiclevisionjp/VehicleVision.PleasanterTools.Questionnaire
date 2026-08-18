@@ -71,6 +71,11 @@ builder.Services.AddSingleton<AdminAuthenticator>();
 builder.Services.AddSingleton<AdminUserService>();
 
 // **既定は厳しく。** 緩めるのは検証環境だけにすること
+var requestPermitLimit = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_REQUESTS_PER_MIN"], out var configuredRequests)
+    ? configuredRequests
+    : 60;
+
 var loginPermitLimit = int.TryParse(
     builder.Configuration["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"], out var configured)
     ? configured
@@ -126,7 +131,7 @@ builder.Services.AddRateLimiter(options =>
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 60,
+                    PermitLimit = requestPermitLimit,
                     Window = TimeSpan.FromMinutes(1),
                 })),
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
