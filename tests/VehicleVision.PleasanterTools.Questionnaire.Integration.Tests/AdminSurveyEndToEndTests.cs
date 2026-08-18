@@ -397,6 +397,103 @@ public class AdminSurveyEndToEndTests
         Assert.Equal("Radio", definition["pages"]![0]!["questions"]![0]!["type"]!.GetValue<string>());
     }
 
+    /// <summary>添付の設問 1 つを添付列へ繋ぐ下書き。</summary>
+    private static object AttachmentDraftBody(string surveyId, int revision, string port) => new
+    {
+        revision,
+        definition = new
+        {
+            surveyId,
+            version = 1,
+            title = new { ja = "添付の割り当て" },
+            pages = new[]
+            {
+                new
+                {
+                    pageId = "page-1",
+                    questions = new[]
+                    {
+                        new
+                        {
+                            questionId = "qf",
+                            type = "File",
+                            title = new { ja = "資料" },
+                            isRequired = false,
+                            choices = Array.Empty<object>(),
+                        },
+                    },
+                },
+            },
+        },
+        mapping = new
+        {
+            assignments = new[]
+            {
+                new
+                {
+                    targetColumn = "AttachmentsA",
+                    sources = new[] { new { questionId = "qf", port } },
+                    converter = (object?)null,
+                },
+            },
+        },
+    };
+
+    [Fact]
+    public async Task 添付の割り当ては不備なく保存できる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}", AttachmentDraftBody(surveyId, 0, "Files")))
+        {
+            save.EnsureSuccessStatusCode();
+        }
+
+        using var problems = await http.GetAsync($"/api/admin/surveys/{surveyId}/problems");
+        problems.EnsureSuccessStatusCode();
+
+        Assert.Empty((await ReadAsync(problems))!.AsArray());
+    }
+
+    [Fact]
+    public async Task 添付列に名前だけを繋ぐと公開できない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        // 名前だけを添付列へ入れても、ファイルとしては取り出せない
+        using (var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}", AttachmentDraftBody(surveyId, 0, "FileNames")))
+        {
+            // **直している途中でも保存はできる**
+            save.EnsureSuccessStatusCode();
+        }
+
+        using (var problems = await http.GetAsync($"/api/admin/surveys/{surveyId}/problems"))
+        {
+            var found = (await ReadAsync(problems))!.AsArray();
+            Assert.Contains(
+                found,
+                problem => problem!["code"]!.GetValue<string>() == "AttachmentColumnNeedsFilePort");
+        }
+
+        // **拒否するのは公開のときだけ**
+        using var publish = await http.PostAsJsonAsync($"/api/admin/surveys/{surveyId}/publish", new { });
+        Assert.Equal(HttpStatusCode.BadRequest, publish.StatusCode);
+    }
+
     [Fact]
     public async Task 公開用IDは推測できない値になる()
     {
