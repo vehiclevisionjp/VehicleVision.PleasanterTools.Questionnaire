@@ -1,6 +1,8 @@
 import { acceptLanguageHeader, t } from './i18n/state.svelte';
 import type {
   AdminSession,
+  AuditLogFilter,
+  AuditLogPage,
   MappingDefinition,
   MappingProblem,
   SurveyDefinition,
@@ -146,3 +148,36 @@ export const suspend = (surveyId: string) =>
 
 export const resume = (surveyId: string) =>
   call<{ status: string }>(`/api/admin/surveys/${surveyId}/resume`, { method: 'POST', json: {} });
+
+/**
+ * 管理操作の記録を読む。
+ *
+ * **絞り込みはサーバへ渡す。** 全件受け取って画面で絞ると、
+ * 増え続ける表を毎回そのまま送ることになる。
+ */
+export const listAuditLogs = (
+  filter: AuditLogFilter,
+  offset: number,
+  limit: number,
+) => {
+  const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+
+  if (filter.failedOnly) {
+    query.set('failedOnly', 'true');
+  }
+
+  if (filter.action.trim() !== '') {
+    query.set('action', filter.action.trim());
+  }
+
+  // **空欄は「指定なし」。** 空文字を送るとサーバ側で日付として読めない
+  if (filter.from !== '') {
+    query.set('from', filter.from);
+  }
+
+  if (filter.to !== '') {
+    query.set('to', filter.to);
+  }
+
+  return call<AuditLogPage>(`/api/admin/audit-logs?${query}`);
+};

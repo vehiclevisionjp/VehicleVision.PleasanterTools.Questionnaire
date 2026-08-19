@@ -159,6 +159,18 @@ test.describe('取説用の写し（ログイン済み）', () => {
     await shoot(page, 'answer-04-not-found');
   });
 
+  test('管理画面：操作の記録', async ({ page }) => {
+    // **ここまでの試験で記録が溜まっている**（初期設定・2 要素の登録・アンケートの作成）
+    await page.goto('/admin/audit-logs');
+
+    await expect(page.getByRole('heading', { name: '操作の記録' })).toBeVisible();
+
+    // **空の表を撮らない。** 取説に載せる図としては何も伝わらない
+    await expect(page.locator('tbody tr').first()).toBeVisible();
+
+    await shoot(page, 'admin-09-audit-log');
+  });
+
   test('管理画面：ログイン', async ({ page }) => {
     test.skip(secretBase32 === '', '先の試験で 2 要素を登録できていない');
 

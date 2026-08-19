@@ -26,7 +26,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// 本当に見たいもの（変えた操作）が埋もれる。
 /// </para>
 /// </remarks>
-public sealed class AuditLogFilter(
+public sealed partial class AuditLogFilter(
     IAuditLogStore store,
     ILogger<AuditLogFilter> logger) : IEndpointFilter
 {
@@ -108,7 +108,36 @@ public sealed class AuditLogFilter(
     private static string ActionOf(HttpContext http)
     {
         var pattern = (http.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText;
-        return $"{http.Request.Method} {pattern ?? http.Request.Path.Value ?? "/"}";
+        return $"{http.Request.Method} {Readable(pattern ?? http.Request.Path.Value ?? "/")}";
+    }
+
+    /// <summary>経路から型の制約を落とす。<c>{surveyId:guid}</c> → <c>{surveyId}</c>。</summary>
+    /// <remarks>
+    /// **制約は経路を照合するための都合で、読む人には要らない。**
+    /// 残すと 1 行が横に長くなり、同じ操作かどうかも見分けにくくなる。
+    /// </remarks>
+    [System.Text.RegularExpressions.GeneratedRegex(
+        @"\{([A-Za-z_][A-Za-z0-9_]*):[^}]*\}",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex RouteConstraintPattern();
+
+    private static string Readable(string pattern) =>
+        RouteConstraintPattern().Replace(pattern, "{$1}");
+
+    /// <summary>送信元。**IPv4 を IPv6 の形で残さない。**</summary>
+    /// <remarks>
+    /// Kestrel は IPv4 の接続を <c>::ffff:172.18.0.7</c> の形で返すことがある。
+    /// **同じ相手が 2 通りの書き方で残ると、送信元で絞れなくなる。**
+    /// </remarks>
+    private static string? IpAddressOf(HttpContext http)
+    {
+        var address = http.Connection.RemoteIpAddress;
+        if (address is null)
+        {
+            return null;
+        }
+
+        return (address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address).ToString();
     }
 
     private async Task WriteAsync(HttpContext http, int statusCode)
@@ -124,7 +153,7 @@ public sealed class AuditLogFilter(
                 targetType,
                 targetId,
                 DetailOf(http),
-                http.Connection.RemoteIpAddress?.ToString()),
+                IpAddressOf(http)),
             http.RequestAborted)
             .ConfigureAwait(false);
     }
