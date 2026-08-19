@@ -20,6 +20,37 @@
 
 name: questionnaire-dev
 
+# **アプリとマイグレーションで同じ設定を使う。**
+# 二重に書くと、片方だけ直したときに「当てたはずなのに古い」が起きる
+x-app-environment: &app-environment
+    ASPNETCORE_ENVIRONMENT: Development
+    # **Azure の実行環境は既定 UTC。** 明示しないと回答日時が 9 時間ずれる
+    # （_documents/実機検証結果.md 4 章）
+    TZ: Asia/Tokyo
+    # 接続先はプロファイルに応じて .env か環境変数で差し替える
+    QUESTIONNAIRE_DB_PROVIDER: ${DEV_DB_PROVIDER:-SqlServer}
+    QUESTIONNAIRE_DB_CONNECTIONSTRING: ${DEV_DB_CONNECTIONSTRING:-Server=db;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True}
+    # **検証環境は自己署名の証明書を使うので、暗号化の検査を緩める。**
+    # 本番では設定しないこと（設定すると平文のまま起動できてしまう）
+    QUESTIONNAIRE_DB_ALLOW_INSECURE: "true"
+    QUESTIONNAIRE_PLEASANTER_BASEURL: http://pleasanter:8080
+    # **実値をここへ書かない。** 検証環境用の固定値のみ
+    QUESTIONNAIRE_PLEASANTER_APIKEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
+    # **管理者の 2 要素の共有鍵を守る鍵。** これを失うと登録済みの 2 要素が全て使えなくなる。
+    # 本番では App Service の設定か Key Vault に置き、**控えを取っておくこと**。
+    # ここにあるのは検証環境用の固定値
+    QUESTIONNAIRE_SECRET_KEY: ${DEV_SECRET_KEY:-4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=}
+    # **検証環境だけ緩める。** 端から端まで通す試験が既定の枠（10 回）を使い切るため。
+    # **本番では設定しないこと**
+    # **端から端まで通す試験は 1 件ごとに管理者を作り直す**（setup ＋ 2 要素の登録）。
+    # 試験が増えるほど枠を食うので、検証環境では大きめに取る。**本番では設定しないこと**
+    QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN: ${DEV_LOGIN_ATTEMPTS:-2000}
+    QUESTIONNAIRE_REQUESTS_PER_MIN: ${DEV_REQUESTS_PER_MIN:-6000}
+    # ウイルススキャンは既定で無効。clamav profile と併せて有効にする
+    QUESTIONNAIRE_VIRUSSCAN_ENABLED: ${DEV_VIRUSSCAN_ENABLED:-false}
+    QUESTIONNAIRE_VIRUSSCAN_HOST: clamav
+    QUESTIONNAIRE_VIRUSSCAN_PORT: "3310"
+
 include:
   - path: tools/pleasanter-testenv/docker-compose.yml
 
@@ -91,40 +122,33 @@ services:
       retries: 40
       start_period: 180s
 
+  # ---- スキーマを当てる ------------------------------------------------------
+  # **アプリ起動時の自動適用はしない**（_documents/データモデル設計.md 5 章。
+  # スケールアウト時に同時実行され得る）。**その代わり、起動より前に当てる係を置く。**
+  # app は完了を待ってから立ち上がるので、`up --wait` 一発で順番が揃う。
+  #
+  # **DB へ depends_on を書かない。** 使う DB はプロファイルごとに違い、書くと
+  # 選んでいない DB まで一緒に起動してしまう。代わりに中で待つ（--wait-for-db）。
+  # SQL Server は初回の起動が長いので余裕を取る
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["sqlserver", "postgres", "mysql", "app"]
+    environment: *app-environment
+    command: ["--migrate", "--wait-for-db=180"]
+    restart: "no"
+
   # ---- 本アプリ ------------------------------------------------------------
   app:
     build:
       context: .
       dockerfile: Dockerfile
     profiles: ["sqlserver", "postgres", "mysql", "app"]
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      # **Azure の実行環境は既定 UTC。** 明示しないと回答日時が 9 時間ずれる
-      # （_documents/実機検証結果.md 4 章）
-      TZ: Asia/Tokyo
-      # 接続先はプロファイルに応じて .env か環境変数で差し替える
-      QUESTIONNAIRE_DB_PROVIDER: ${DEV_DB_PROVIDER:-SqlServer}
-      QUESTIONNAIRE_DB_CONNECTIONSTRING: ${DEV_DB_CONNECTIONSTRING:-Server=db;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True}
-      # **検証環境は自己署名の証明書を使うので、暗号化の検査を緩める。**
-      # 本番では設定しないこと（設定すると平文のまま起動できてしまう）
-      QUESTIONNAIRE_DB_ALLOW_INSECURE: "true"
-      QUESTIONNAIRE_PLEASANTER_BASEURL: http://pleasanter:8080
-      # **実値をここへ書かない。** 検証環境用の固定値のみ
-      QUESTIONNAIRE_PLEASANTER_APIKEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
-      # **管理者の 2 要素の共有鍵を守る鍵。** これを失うと登録済みの 2 要素が全て使えなくなる。
-      # 本番では App Service の設定か Key Vault に置き、**控えを取っておくこと**。
-      # ここにあるのは検証環境用の固定値
-      QUESTIONNAIRE_SECRET_KEY: ${DEV_SECRET_KEY:-4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=}
-      # **検証環境だけ緩める。** 端から端まで通す試験が既定の枠（10 回）を使い切るため。
-      # **本番では設定しないこと**
-      # **端から端まで通す試験は 1 件ごとに管理者を作り直す**（setup ＋ 2 要素の登録）。
-      # 試験が増えるほど枠を食うので、検証環境では大きめに取る。**本番では設定しないこと**
-      QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN: ${DEV_LOGIN_ATTEMPTS:-2000}
-      QUESTIONNAIRE_REQUESTS_PER_MIN: ${DEV_REQUESTS_PER_MIN:-6000}
-      # ウイルススキャンは既定で無効。clamav profile と併せて有効にする
-      QUESTIONNAIRE_VIRUSSCAN_ENABLED: ${DEV_VIRUSSCAN_ENABLED:-false}
-      QUESTIONNAIRE_VIRUSSCAN_HOST: clamav
-      QUESTIONNAIRE_VIRUSSCAN_PORT: "3310"
+    environment: *app-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "${DEV_APP_PORT:-8081}:8080"
     networks:
