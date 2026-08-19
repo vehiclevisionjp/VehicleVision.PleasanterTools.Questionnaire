@@ -195,6 +195,112 @@ public class ResponseIntakeAttachmentTests
     }
 
     [Fact]
+    public async Task 隠れている設問の回答は送信待ちへ入れない()
+    {
+        // **落とさないと、画面を通さずに送るだけで隠した設問へ書き込める**（Issue #41）
+        var definition = new SurveyDefinition
+        {
+            SurveyId = SurveyId.ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("検証用"),
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = QuestionType.Radio,
+                            Title = LocalizedText.Japanese("利用中か"),
+                            Choices =
+                            [
+                                new Choice("yes", LocalizedText.Japanese("はい")),
+                                new Choice("no", LocalizedText.Japanese("いいえ")),
+                            ],
+                        },
+                        new Question
+                        {
+                            QuestionId = "q2",
+                            Type = QuestionType.Text,
+                            Title = LocalizedText.Japanese("サービス名"),
+                            VisibleWhen = new VisibilityCondition
+                            {
+                                Rules = [new ConditionRule("q1", ConditionOperator.Equals, "yes")],
+                            },
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var (intake, outbox) = Intake(definition);
+
+        var result = await intake.SubmitAsync(
+            PublicId,
+            Token,
+            [Answer.Of("q1", "no"), Answer.Of("q2", "入ってはいけない値")],
+            []);
+
+        Assert.True(result.Accepted);
+        Assert.NotNull(outbox.SavedPayload);
+        Assert.DoesNotContain("入ってはいけない値", outbox.SavedPayload, StringComparison.Ordinal);
+        Assert.Contains("q1", outbox.SavedPayload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 見えている設問の回答はそのまま入る()
+    {
+        var definition = new SurveyDefinition
+        {
+            SurveyId = SurveyId.ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("検証用"),
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = QuestionType.Radio,
+                            Title = LocalizedText.Japanese("利用中か"),
+                            Choices =
+                            [
+                                new Choice("yes", LocalizedText.Japanese("はい")),
+                                new Choice("no", LocalizedText.Japanese("いいえ")),
+                            ],
+                        },
+                        new Question
+                        {
+                            QuestionId = "q2",
+                            Type = QuestionType.Text,
+                            Title = LocalizedText.Japanese("サービス名"),
+                            VisibleWhen = new VisibilityCondition
+                            {
+                                Rules = [new ConditionRule("q1", ConditionOperator.Equals, "yes")],
+                            },
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var (intake, outbox) = Intake(definition);
+
+        var result = await intake.SubmitAsync(
+            PublicId, Token, [Answer.Of("q1", "yes"), Answer.Of("q2", "ある社のもの")], []);
+
+        Assert.True(result.Accepted);
+        Assert.Contains("ある社のもの", outbox.SavedPayload!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task 添付は検査を通ってから送信待ちへ入る()
     {
         var (intake, outbox) = Intake();

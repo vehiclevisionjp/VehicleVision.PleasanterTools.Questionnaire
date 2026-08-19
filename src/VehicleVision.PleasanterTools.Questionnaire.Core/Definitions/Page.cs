@@ -12,4 +12,11 @@ public sealed record Page
     public LocalizedText? Description { get; init; }
 
     public ImmutableArray<Question> Questions { get; init; } = [];
+
+    /// <summary>このページを終えたときの行き先（Issue #41）。</summary>
+    /// <remarks>
+    /// **<c>null</c> は「次のページへ」。** 分かれた道を合流させるために使う。
+    /// **選択肢の行き先が優先される**（そちらが <c>null</c> のときにここへ落ちる）。
+    /// </remarks>
+    public PageTransition? Next { get; init; }
 }
