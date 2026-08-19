@@ -109,6 +109,27 @@ public static partial class SqlDialect
         _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
     };
 
+    /// <summary>管理操作の記録を新しい順に読む SQL。</summary>
+    /// <remarks>
+    /// **件数の絞り方が 3 者で違う。** SQL Server は <c>OFFSET/FETCH</c>、
+    /// PostgreSQL と MySQL は <c>LIMIT</c>。
+    /// **MySQL は <c>OFFSET/FETCH</c> を解さない**（8.4 で確認）。
+    /// </remarks>
+    public static string ListAuditLogs(DatabaseProvider provider)
+    {
+        const string columns =
+            "SELECT [OccurredAt], [AdminUserId], [Action], [StatusCode], " +
+            "       [TargetType], [TargetId], [DetailJson], [IpAddress] " +
+            "FROM [AuditLogs] ORDER BY [OccurredAt] DESC, [AuditLogId] DESC ";
+
+        return Format(provider, columns + (provider switch
+        {
+            DatabaseProvider.SqlServer => "OFFSET 0 ROWS FETCH NEXT @Limit ROWS ONLY",
+            DatabaseProvider.PostgreSql or DatabaseProvider.MySql => "LIMIT @Limit",
+            _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
+        }));
+    }
+
     /// <summary>MySQL で確保した行を読み直す SQL。</summary>
     /// <remarks><see cref="ClaimPendingResponse"/> が <c>RETURNING</c> を使えないため。</remarks>
     public const string ReadClaimedResponseForMySql =

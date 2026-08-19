@@ -35,6 +35,9 @@ public static class AdminAuthEndpoints
         var group = builder.MapGroup("/api/admin");
         AdminAuthSchemes.AddNoStore(group);
 
+        // **管理操作を残す**（Issue #19）。読み取りは残さない
+        group.AddEndpointFilter<AuditLogFilter>();
+
         // ---- 今の状態 --------------------------------------------------------
         group.MapGet("/session", async (
             HttpContext context,
@@ -99,6 +102,10 @@ public static class AdminAuthEndpoints
             AdminAuthenticator authenticator,
             CancellationToken cancellationToken) =>
         {
+            // **誰が狙われているかは、記録に残っていないと分からない。**
+            // 合言葉は預けない（AuditNotes の但し書き）
+            AuditNotes.Add(context, "loginId", request.LoginId);
+
             if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
             {
                 return Results.BadRequest(new
@@ -140,6 +147,10 @@ public static class AdminAuthEndpoints
             AdminAuthenticator authenticator,
             CancellationToken cancellationToken) =>
         {
+            // **誰が狙われているかは、記録に残っていないと分からない。**
+            // 合言葉は預けない（AuditNotes の但し書き）
+            AuditNotes.Add(context, "loginId", request.LoginId);
+
             if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
             {
                 return Results.Json(

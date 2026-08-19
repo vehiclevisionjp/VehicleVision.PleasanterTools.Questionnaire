@@ -5,6 +5,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 
@@ -27,6 +28,9 @@ public static class AdminSurveyEndpoints
         var group = builder.MapGroup("/api/admin/surveys")
             .RequireAuthorization(policy => policy.AddAuthenticationSchemes(AdminAuthSchemes.Session)
                 .RequireAuthenticatedUser());
+
+        // **管理操作を残す**（Issue #19）。読み取りは残さない
+        group.AddEndpointFilter<AuditLogFilter>();
 
         // **管理画面の応答を途中の経路に残さない**
         group.AddEndpointFilter(async (context, next) =>
