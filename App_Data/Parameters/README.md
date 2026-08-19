@@ -32,6 +32,12 @@
 | `QUESTIONNAIRE_PLEASANTER_APIKEY` | Pleasanter の API キー |
 | `QUESTIONNAIRE_PLEASANTER_TIMEZONE` | API キーに紐づくユーザのタイムゾーン |
 | `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト） |
+| `QUESTIONNAIRE_ATTACHMENT_*` | 添付の許可拡張子・サイズ・個数の上限 |
+| `QUESTIONNAIRE_VIRUSSCAN_*` | ウイルススキャン（**既定は無効**） |
+
+添付とウイルススキャンの項目は
+[`_documents/添付ファイル検査-運用手順書.md`](../../_documents/添付ファイル検査-運用手順書.md)
+5 章に一覧がある。**ここへ書き写さないこと。**
 
 ### `QUESTIONNAIRE_SECRET_KEY` について
 
