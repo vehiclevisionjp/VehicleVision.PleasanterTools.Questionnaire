@@ -1,8 +1,16 @@
 <script lang="ts">
-  import { createSurvey, duplicateSurvey, listSurveys, resume, suspend } from '../lib/api';
+  import {
+    createSurvey,
+    duplicateSurvey,
+    listSurveys,
+    resume,
+    saveAsTemplate,
+    suspend,
+  } from '../lib/api';
   import { isPublished, surveyStatusKey, type SurveySummary } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
   import SurveyQrCode from './SurveyQrCode.svelte';
+  import TemplatePanel from './TemplatePanel.svelte';
 
   interface Props {
     onopen: (surveyId: string) => void;
@@ -13,9 +21,17 @@
      * （`AdminSurveyEndpoints`）。ここで隠すのは、押せない釦を出さないため。
      */
     canDuplicate?: boolean;
+    /**
+     * テンプレートを出してよい相手か（Issue #58）。**Administrator だけ。**
+     *
+     * **複製と同じ理由。** テンプレートから作るのは書き込み先のサイトを
+     * 新しく決める操作で、誤ると別の業務のサイトへ回答が流れ込む。
+     * **サーバ側でも同じ判定をしている**（`AdminTemplateEndpoints`）。
+     */
+    canUseTemplates?: boolean;
   }
 
-  let { onopen, canDuplicate = false }: Props = $props();
+  let { onopen, canDuplicate = false, canUseTemplates = false }: Props = $props();
 
   let surveys = $state<SurveySummary[]>([]);
   let loading = $state(true);
@@ -39,6 +55,15 @@
    * **描くのは画面の中だけ。** サーバへ URL を送らない
    */
   let showingQr = $state<SurveySummary | null>(null);
+
+  /** テンプレートの一覧を開いているか（Issue #58）。 */
+  let showingTemplates = $state(false);
+
+  /** テンプレートにしようとしているアンケート。**1 度確かめる。** */
+  let templating = $state<SurveySummary | null>(null);
+  let templateBusy = $state(false);
+  /** テンプレートにできたことを伝える。**一覧の見た目は変わらないため。** */
+  let templateSaved = $state(false);
 
   $effect(() => {
     void reload();
@@ -119,6 +144,34 @@
     onopen(result.value.surveyId);
   }
 
+  function openTemplate(survey: SurveySummary) {
+    error = '';
+    templateSaved = false;
+    templating = survey;
+  }
+
+  async function makeTemplate() {
+    const source = templating;
+    if (source === null || templateBusy) {
+      return;
+    }
+
+    error = '';
+    templateBusy = true;
+    const result = await saveAsTemplate(source.surveyId);
+    templateBusy = false;
+
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    templating = null;
+    // **アンケートの一覧は変わらない**ので、できたことを言葉で伝える
+    templateSaved = true;
+    showingTemplates = true;
+  }
+
   async function toggle(survey: SurveySummary) {
     const result = survey.status === 1 ? await suspend(survey.surveyId) : await resume(survey.surveyId);
     if (!result.ok) {
@@ -149,6 +202,15 @@
 
 <header class="bar">
   <h1>{t('list.title')}</h1>
+  {#if canUseTemplates}
+    <button
+      type="button"
+      class="secondary"
+      onclick={() => (showingTemplates = !showingTemplates)}
+    >
+      {t('template.open')}
+    </button>
+  {/if}
   <button type="button" onclick={() => (creating = !creating)}>
     {creating ? t('list.cancel') : t('list.create')}
   </button>
@@ -214,6 +276,27 @@
   />
 {/if}
 
+{#if templating}
+  <div class="create">
+    <h2>{t('template.saveTitle', { title: templating.title })}</h2>
+    <p class="hint">{t('template.saveDescription')}</p>
+    <div class="actions">
+      <button type="button" disabled={templateBusy} onclick={makeTemplate}>
+        {t('template.saveSubmit')}
+      </button>
+      <button type="button" class="secondary" onclick={() => (templating = null)}>
+        {t('duplicate.cancel')}
+      </button>
+    </div>
+  </div>
+{/if}
+
+{#if templateSaved}<p class="saved" role="status">{t('template.saved')}</p>{/if}
+
+{#if showingTemplates && canUseTemplates}
+  <TemplatePanel oncreated={onopen} />
+{/if}
+
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 
 {#if loading}
@@ -269,6 +352,11 @@
                 {t('duplicate.open')}
               </button>
             {/if}
+            {#if canUseTemplates}
+              <button type="button" class="secondary" onclick={() => openTemplate(survey)}>
+                {t('template.save')}
+              </button>
+            {/if}
           </td>
         </tr>
       {/each}
@@ -280,13 +368,15 @@
   .bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 0.5rem;
     margin-bottom: 1.5rem;
   }
 
   h1 {
     font-size: 1.35rem;
     margin: 0;
+    /* **釦は右端へ寄せる。** 見出しと釦の間を空ける */
+    margin-right: auto;
   }
 
   .create {
@@ -400,5 +490,10 @@
 
   .error {
     color: var(--error);
+  }
+
+  .saved {
+    color: #067647;
+    font-size: 0.9rem;
   }
 </style>

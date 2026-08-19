@@ -10,6 +10,7 @@ import type {
   SurveyDefinition,
   SurveyDraft,
   SurveySummary,
+  SurveyTemplateSummary,
 } from './types';
 
 /**
@@ -139,6 +140,51 @@ export const duplicateSurvey = (
     method: 'POST',
     json: { pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
   });
+
+// ---- テンプレート -----------------------------------------------------------
+
+/**
+ * テンプレートの一覧（Issue #58）。
+ *
+ * **アンケートの一覧には出てこない。** 逆も同じ。
+ */
+export const listTemplates = () => call<SurveyTemplateSummary[]>('/api/admin/templates');
+
+/**
+ * アンケートをテンプレートにする。
+ *
+ * **題名は指定しない。** 元のアンケートの題名をそのまま写す。
+ * 題名は多言語の器なので、1 つの文字列を送ると
+ * 日本語の題名が英語として保存されてしまう。
+ */
+export const saveAsTemplate = (surveyId: string) =>
+  call<{ templateId: string }>('/api/admin/templates', {
+    method: 'POST',
+    json: { surveyId },
+  });
+
+/**
+ * テンプレートからアンケートを作る。
+ *
+ * **書き込み先のサイトはここで指定する。** テンプレートは持っていない。
+ * **公開用 ID はサーバが作る**ので、同じテンプレートから作った
+ * アンケートが同じ URL を指すことはない。
+ */
+export const createSurveyFromTemplate = (
+  templateId: string,
+  pleasanterSiteId: number,
+  responseJsonColumn?: string,
+) =>
+  call<{ surveyId: string; publicId: string }>(`/api/admin/templates/${templateId}/surveys`, {
+    method: 'POST',
+    json: { pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
+  });
+
+/** テンプレートを消す。**消せるのはテンプレートだけ**（アンケートには回答が紐づく）。 */
+export const deleteTemplate = (templateId: string) =>
+  call<void>(`/api/admin/templates/${templateId}`, { method: 'DELETE' });
+
+// ---- アンケートの下書き -----------------------------------------------------
 
 export const loadDraft = (surveyId: string) => call<SurveyDraft>(`/api/admin/surveys/${surveyId}`);
 

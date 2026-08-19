@@ -356,6 +356,26 @@ export const ja = {
   'qr.download': '画像を保存',
   'qr.close': '閉じる',
   'qr.failed': 'QR コードを作れませんでした。下の URL をそのままお使いください。',
+  // ---- アンケートのテンプレート（Issue #58） ----
+  'template.open': 'テンプレート',
+  'template.title': 'テンプレート',
+  'template.description':
+    'よくある形を写して、新しいアンケートの下書きを作れます。テンプレートは Pleasanter のサイトを持たないので、そこから作るときにサイト ID を指定します。',
+  'template.empty': 'テンプレートはまだありません。アンケートの一覧から作れます。',
+  'template.use': 'これから作る',
+  'template.useTitle': '「{title}」から作る',
+  'template.useSubmit': 'アンケートを作る',
+  'template.siteId': '作るアンケートの Pleasanter のサイト ID',
+  'template.siteIdHint':
+    'テンプレートは書き込み先を持ちません。1 アンケート = 1 サイトなので、他のアンケートが使っていないサイトを指定してください。',
+  'template.delete': '削除',
+  'template.deleteConfirm': '本当に削除する',
+  'template.save': 'テンプレートにする',
+  'template.saveTitle': '「{title}」をテンプレートにする',
+  'template.saveDescription':
+    '設問・選択肢・分岐・マッピングを写します。書き込み先のサイトと公開用 URL は写しません。',
+  'template.saveSubmit': 'テンプレートにする',
+  'template.saved': 'テンプレートにしました。',
 } as const;
 
 /** 文言の鍵。**日本語のカタログが一覧そのもの。** */
@@ -715,6 +735,26 @@ export const en: Record<MessageKey, string> = {
   'qr.download': 'Save image',
   'qr.close': 'Close',
   'qr.failed': 'Could not draw the QR code. Please use the URL below as it is.',
+  // ---- アンケートのテンプレート（Issue #58） ----
+  'template.open': 'Templates',
+  'template.title': 'Templates',
+  'template.description':
+    'Copy a familiar shape into a new survey draft. A template has no Pleasanter site of its own, so you give the site ID when you create a survey from it.',
+  'template.empty': 'No template yet. You can make one from the survey list.',
+  'template.use': 'Create from this',
+  'template.useTitle': 'Create from "{title}"',
+  'template.useSubmit': 'Create survey',
+  'template.siteId': 'Pleasanter site ID for the new survey',
+  'template.siteIdHint':
+    'A template has no target site. One survey writes to one site, so pick a site no other survey uses.',
+  'template.delete': 'Delete',
+  'template.deleteConfirm': 'Delete for real',
+  'template.save': 'Save as template',
+  'template.saveTitle': 'Save "{title}" as a template',
+  'template.saveDescription':
+    'Questions, choices, branching and mapping are copied. The target site and the public URL are not.',
+  'template.saveSubmit': 'Save as template',
+  'template.saved': 'Saved as a template.',
 };
 
 const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };
