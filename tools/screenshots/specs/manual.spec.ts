@@ -171,6 +171,15 @@ test.describe('取説用の写し（ログイン済み）', () => {
     await shoot(page, 'admin-09-audit-log');
   });
 
+  test('管理画面：送信状況', async ({ page }) => {
+    await page.goto('/admin/outbox');
+
+    await expect(page.getByRole('heading', { name: '送信状況' })).toBeVisible();
+
+    // **滞留が無くても「無い」と読めること。** 空の画面こそ取説に要る
+    await shoot(page, 'admin-10-outbox');
+  });
+
   test('管理画面：ログイン', async ({ page }) => {
     test.skip(secretBase32 === '', '先の試験で 2 要素を登録できていない');
 

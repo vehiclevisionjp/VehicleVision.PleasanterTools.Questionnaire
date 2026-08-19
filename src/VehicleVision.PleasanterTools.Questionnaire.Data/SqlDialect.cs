@@ -156,6 +156,54 @@ public static partial class SqlDialect
         return builder.ToString();
     }
 
+    /// <summary>滞留の状況を 1 回で読む SQL。</summary>
+    /// <remarks>
+    /// <para>
+    /// **件数と最古の時刻を別々に数えない**（Issue #45）。画面を開くたびに
+    /// 送信待ちの表を 4 回走査することになる。
+    /// <c>CASE</c> を使った集約は 3 者とも同じ書き方で通る。
+    /// </para>
+    /// <para>
+    /// **1 行しか返らない**（<c>GROUP BY</c> が無い集約）。表が空でも
+    /// 件数は 0、時刻は <c>NULL</c> の行が返る。
+    /// </para>
+    /// <para>
+    /// **数える型が 3 者で違う。** <c>COUNT</c> は SQL Server が <c>int</c>、
+    /// PostgreSQL と MySQL が <c>bigint</c> なので、受け側は 64 ビットで取る。
+    /// </para>
+    /// </remarks>
+    public const string OutboxStatus =
+        "SELECT "
+        + "  COUNT(CASE WHEN [Status] <> @DeadLetterStatus THEN 1 END) AS [PendingCount], "
+        + "  MIN(CASE WHEN [Status] <> @DeadLetterStatus THEN [CreatedAt] END) AS [OldestPendingAt], "
+        + "  COUNT(CASE WHEN [Status] = @DeadLetterStatus THEN 1 END) AS [DeadLetterCount], "
+        + "  MIN(CASE WHEN [Status] = @DeadLetterStatus THEN [UpdatedAt] END) AS [OldestDeadLetterAt] "
+        + "FROM [Responses]";
+
+    /// <summary>デッドレターを新しい順に読む SQL。</summary>
+    /// <remarks>
+    /// <para>
+    /// **<c>PayloadJson</c> を選ばない。** 回答本文には個人情報が入り得るので、
+    /// 画面へ渡る経路に載せない（Issue #45）。
+    /// </para>
+    /// <para>
+    /// **<c>LEFT JOIN</c>。** アンケートが消えていても、
+    /// 届いていない回答が残っていることは見えなければならない。
+    /// </para>
+    /// <para>
+    /// **並びを 2 本の列で決める。** 時刻は秒までしか持たない（<see cref="DbTime"/>）ので、
+    /// 同じ秒の行が複数あるとページ送りで取りこぼす。
+    /// </para>
+    /// </remarks>
+    public static string ListDeadLetters(DatabaseProvider provider) =>
+        "SELECT r.[ResponseToken], r.[SurveyId], s.[Title] AS [SurveyTitle], "
+        + "       r.[SurveyVersion], r.[RetryCount], r.[LastError], "
+        + "       r.[CreatedAt], r.[UpdatedAt] "
+        + "FROM [Responses] r LEFT JOIN [Surveys] s ON s.[SurveyId] = r.[SurveyId] "
+        + "WHERE r.[Status] = @DeadLetterStatus "
+        + "ORDER BY r.[UpdatedAt] DESC, r.[ResponseToken] DESC "
+        + Page(provider);
+
     /// <summary>MySQL で確保した行を読み直す SQL。</summary>
     /// <remarks><see cref="ClaimPendingResponse"/> が <c>RETURNING</c> を使えないため。</remarks>
     public const string ReadClaimedResponseForMySql =

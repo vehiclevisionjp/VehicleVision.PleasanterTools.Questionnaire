@@ -39,6 +39,26 @@ public static class DbTime
         new DateTime(value.Ticks - (value.Ticks % TimeSpan.TicksPerSecond), value.Kind),
         DateTimeKind.Unspecified);
 
+    /// <summary>DB から読んだ時刻に UTC の印を付ける。</summary>
+    /// <remarks>
+    /// <para>
+    /// **列は時間帯を持たないので、読んだ値の種別は
+    /// <see cref="DateTimeKind.Unspecified"/> になる**（<see cref="ForDb"/>）。
+    /// そのまま JSON にすると末尾に <c>Z</c> が付かず、
+    /// **画面が端末の時間帯として読む**（日本なら 9 時間ずれる）。
+    /// </para>
+    /// <para>
+    /// **入っているのは常に UTC** なので、印を付け直すのが正しい。
+    /// 値そのものは動かさない。
+    /// </para>
+    /// </remarks>
+    public static DateTime AsUtc(DateTime value) =>
+        DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+    /// <summary>DB から読んだ時刻に UTC の印を付ける。**未設定はそのまま。**</summary>
+    public static DateTime? AsUtc(DateTime? value) =>
+        value is { } present ? AsUtc(present) : null;
+
     /// <summary>秒未満を切り捨てる。</summary>
     /// <remarks>DB へ渡すなら <see cref="ForDb"/> を使う。</remarks>
     public static DateTime Truncate(DateTime value) =>

@@ -98,6 +98,19 @@ public class ResponseIntakeAttachmentTests
         public Task<int> CountPendingAsync(
             Guid? surveyId = null, CancellationToken cancellationToken = default) =>
             Task.FromResult(SavedPayload is null ? 0 : 1);
+
+        // ---- 管理画面から読む口。**受付の試験では使わない** --------------------
+
+        public Task<OutboxStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new OutboxStatus(SavedPayload is null ? 0 : 1, null, 0, null));
+
+        public Task<IReadOnlyList<DeadLetterView>> ListDeadLettersAsync(
+            DeadLetterQuery query, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<DeadLetterView>>([]);
+
+        public Task<Guid?> RequeueDeadLetterAsync(
+            string responseToken, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Guid?>(null);
     }
 
     private sealed class FakeTokens : IResponseTokenStore

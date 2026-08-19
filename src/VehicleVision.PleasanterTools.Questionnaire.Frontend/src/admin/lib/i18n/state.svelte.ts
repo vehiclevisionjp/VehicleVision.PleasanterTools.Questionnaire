@@ -3,6 +3,7 @@ import {
   browserLanguages,
   DEFAULT_LANGUAGE,
   formatDateTime as formatDateTimeIn,
+  formatElapsed as formatElapsedIn,
   negotiateLanguage,
   type Language,
 } from '../../../lib/i18n/language';
@@ -47,6 +48,11 @@ export function t(key: MessageKey, parameters?: Record<string, string | number>)
 /** 日時を今の言語で書く。 */
 export function formatDateTime(value: Date): string {
   return formatDateTimeIn(value, current);
+}
+
+/** その時刻からどれだけ経ったかを今の言語で書く。 */
+export function formatElapsed(value: Date): string {
+  return formatElapsedIn(value, current);
 }
 
 /**

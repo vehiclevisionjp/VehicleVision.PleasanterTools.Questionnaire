@@ -17,6 +17,8 @@ public static class AuditNotes
 {
     private const string ItemKey = "questionnaire:audit_notes";
 
+    private const string TargetKey = "questionnaire:audit_target";
+
     /// <summary>補足を 1 つ預ける。</summary>
     /// <remarks>**制御文字は落として長さも切る**（<see cref="LogSafe"/>）。</remarks>
     public static void Add(HttpContext context, string key, string? value)
@@ -36,4 +38,30 @@ public static class AuditNotes
     /// <summary>預かった補足。</summary>
     internal static IReadOnlyDictionary<string, string>? Of(HttpContext context) =>
         context.Items[ItemKey] as Dictionary<string, string>;
+
+    /// <summary>この操作が何に対して行われたかを明示する。</summary>
+    /// <remarks>
+    /// <para>
+    /// **経路の値から対象が分からないときに使う**（<see cref="AuditLogFilter"/> は
+    /// 経路の値しか見ない）。デッドレターの再送のように、
+    /// **対象の識別子が経路に出せない**入口のためにある。
+    /// </para>
+    /// <para>
+    /// **<c>ResponseToken</c> を渡さないこと。** 監査ログへ入れない決まり
+    /// （<c>_documents/データモデル設計.md</c> 2.6）。代わりにアンケートの識別子を渡す。
+    /// </para>
+    /// </remarks>
+    public static void SetTarget(HttpContext context, string targetType, string? targetId)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetType);
+
+        // **無い対象は「(なし)」ではなく無いままにする**（列は NULL 可）
+        context.Items[TargetKey] =
+            (LogSafe.Text(targetType), targetId is null ? null : LogSafe.Text(targetId));
+    }
+
+    /// <summary>明示された対象。**無ければ経路の値から見分ける。**</summary>
+    internal static (string TargetType, string? TargetId)? TargetOf(HttpContext context) =>
+        context.Items[TargetKey] as (string, string?)?;
 }

@@ -120,6 +120,40 @@ public class AuditLogFilterTests
     }
 
     [Fact]
+    public async Task 経路に出せない対象は入口が明示する()
+    {
+        // **デッドレターの再送は `ResponseToken` を経路に出せない**
+        // （監査ログへ入れない決まり。`_documents/データモデル設計.md` 2.6）。
+        // 代わりに、どのアンケートの回答を戻したかを入口が預ける
+        var context = Request("POST", "/api/admin/outbox/dead-letters/requeue", Guid.NewGuid());
+        var surveyId = Guid.NewGuid();
+        AuditNotes.SetTarget(context, "Survey", surveyId.ToString());
+
+        var store = await RunAsync(context, Results.Ok());
+
+        var entry = Assert.Single(store.Written);
+        Assert.Equal("Survey", entry.TargetType);
+        Assert.Equal(surveyId.ToString(), entry.TargetId);
+    }
+
+    [Fact]
+    public async Task 明示した対象は経路の値より優先する()
+    {
+        // **経路の値から見分けた対象で上書きされないこと**
+        var context = Request(
+            "POST",
+            "/api/admin/surveys/{surveyId}/something",
+            Guid.NewGuid(),
+            [("surveyId", "経路の値")]);
+
+        AuditNotes.SetTarget(context, "Survey", "明示した値");
+
+        var store = await RunAsync(context, Results.Ok());
+
+        Assert.Equal("明示した値", Assert.Single(store.Written).TargetId);
+    }
+
+    [Fact]
     public async Task 経路の型の制約は落とす()
     {
         // **制約は照合の都合で、読む人には要らない。** 残すと 1 行が横に長くなる
