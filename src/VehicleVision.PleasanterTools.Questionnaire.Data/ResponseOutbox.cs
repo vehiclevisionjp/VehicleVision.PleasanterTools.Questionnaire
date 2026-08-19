@@ -331,15 +331,31 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
 
     /// <summary>集約の結果を受ける行。</summary>
     /// <remarks>
-    /// **件数を <c>long</c> で受ける。** <c>COUNT</c> の型が 3 者で違い
-    /// （SQL Server は <c>int</c>、他は <c>bigint</c>）、
-    /// <c>int</c> で受けると RDBMS によってだけ落ちる。
+    /// <para>
+    /// **<c>COUNT</c> の型が 3 者で違う。** SQL Server は <c>int</c>、
+    /// PostgreSQL と MySQL は <c>bigint</c>。
+    /// </para>
+    /// <para>
+    /// **位置引数の record で受けないこと。** Dapper は引数の型で組み立て先を探すので、
+    /// <c>long</c> と書くと SQL Server で、<c>int</c> と書くと他の 2 つで
+    /// 「合う組み立て方が無い」と言って落ちる。
+    /// **書き換え可能な属性にすると、Dapper が型を合わせて入れてくれる。**
+    /// </para>
+    /// <para>
+    /// SQL 側で <c>CAST</c> して揃える手もあるが、**その書き方も 3 者で違う**
+    /// （<c>BIGINT</c> / <c>SIGNED</c>）ので、受け側で吸収する方が短い。
+    /// </para>
     /// </remarks>
-    private sealed record OutboxStatusRow(
-        long PendingCount,
-        DateTime? OldestPendingAt,
-        long DeadLetterCount,
-        DateTime? OldestDeadLetterAt);
+    private sealed class OutboxStatusRow
+    {
+        public long PendingCount { get; set; }
+
+        public DateTime? OldestPendingAt { get; set; }
+
+        public long DeadLetterCount { get; set; }
+
+        public DateTime? OldestDeadLetterAt { get; set; }
+    }
 
     public async Task<OutboxStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
