@@ -109,25 +109,51 @@ public static partial class SqlDialect
         _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
     };
 
-    /// <summary>管理操作の記録を新しい順に読む SQL。</summary>
+    /// <summary>件数を絞る句。<c>@Limit</c> と <c>@Offset</c> を使う。</summary>
     /// <remarks>
-    /// **件数の絞り方が 3 者で違う。** SQL Server は <c>OFFSET/FETCH</c>、
+    /// **書き方が 3 者で違う。** SQL Server は <c>OFFSET/FETCH</c>、
     /// PostgreSQL と MySQL は <c>LIMIT</c>。
     /// **MySQL は <c>OFFSET/FETCH</c> を解さない**（8.4 で確認）。
+    /// **どちらも <c>ORDER BY</c> が要る**ので、呼ぶ側で必ず付けること。
     /// </remarks>
-    public static string ListAuditLogs(DatabaseProvider provider)
+    public static string Page(DatabaseProvider provider) => provider switch
     {
-        const string columns =
-            "SELECT [OccurredAt], [AdminUserId], [Action], [StatusCode], " +
-            "       [TargetType], [TargetId], [DetailJson], [IpAddress] " +
-            "FROM [AuditLogs] ORDER BY [OccurredAt] DESC, [AuditLogId] DESC ";
+        DatabaseProvider.SqlServer => "OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY",
+        DatabaseProvider.PostgreSql or DatabaseProvider.MySql => "LIMIT @Limit OFFSET @Offset",
+        _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
+    };
 
-        return Format(provider, columns + (provider switch
+    /// <summary><c>LIKE</c> の逃がし文字。</summary>
+    /// <remarks>
+    /// **円記号を使わない。** MySQL は文字列リテラルの中でも円記号を逃がし文字として
+    /// 解するので、<c>ESCAPE</c> の指定そのものが 3 者で書き分けになる。
+    /// **記号を変えれば書き分けが要らない。**
+    /// </remarks>
+    public const char LikeEscape = '!';
+
+    /// <summary><c>LIKE</c> へ渡す値から記号を逃がす。</summary>
+    /// <remarks>
+    /// **逃がさないと、利用者が書いた <c>%</c> が「何でも」になる。**
+    /// SQL の挿し込みにはならない（値は引数で渡すため）が、
+    /// **絞ったつもりで絞れていない**のは、監査ログを読む道具として致命的。
+    /// </remarks>
+    public static string EscapeLike(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        var builder = new System.Text.StringBuilder(value.Length);
+        foreach (var character in value)
         {
-            DatabaseProvider.SqlServer => "OFFSET 0 ROWS FETCH NEXT @Limit ROWS ONLY",
-            DatabaseProvider.PostgreSql or DatabaseProvider.MySql => "LIMIT @Limit",
-            _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
-        }));
+            // **`[` は SQL Server だけの記号。** 3 者で同じ結果にするため常に逃がす
+            if (character is LikeEscape or '%' or '_' or '[')
+            {
+                builder.Append(LikeEscape);
+            }
+
+            builder.Append(character);
+        }
+
+        return builder.ToString();
     }
 
     /// <summary>MySQL で確保した行を読み直す SQL。</summary>

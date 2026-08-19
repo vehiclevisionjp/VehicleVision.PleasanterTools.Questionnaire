@@ -232,6 +232,11 @@ builder.Services.AddSingleton(new ResponseSenderOptions());
 builder.Services.AddSingleton<ResponseSender>();
 builder.Services.AddHostedService<ResponseSenderHostedService>();
 
+// **管理操作の記録は放っておくと増え続ける**（_documents/データモデル設計.md）。
+// 期限を過ぎた分を消す係を常駐させる。**既定は 365 日残す**
+builder.Services.AddSingleton(AuditLogRetentionOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddHostedService<AuditLogRetentionService>();
+
 // ---- レート制限 ------------------------------------------------------------
 // **DB へ書く前に効かせる。** 書いてから弾いても消費は起きている
 // （_documents/非機能設計.md 1 章）
@@ -346,6 +351,7 @@ app.MapFormEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
+app.MapAdminAuditLogEndpoints();
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
 app.MapGet("/admin", () => Results.File("admin.html", "text/html"));

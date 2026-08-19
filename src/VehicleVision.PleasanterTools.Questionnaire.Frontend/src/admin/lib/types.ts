@@ -239,3 +239,43 @@ export function withText(
 export function displayText(value: LocalizedText | undefined, language: Language): string {
   return value?.[language] ?? value?.[DEFAULT_LANGUAGE] ?? '';
 }
+
+/**
+ * 管理操作の記録 1 件。
+ *
+ * **本文は入っていない**（`_documents/データモデル設計.md` 2.6）。
+ * 残るのは宛先・結果・対象の識別子と、入口が明示して預けた補足だけ。
+ *
+ * **値が無い項目は `null` ではなく「無い」**。サーバは null のプロパティを
+ * 落として返すので（`DefaultIgnoreCondition`）、`!== null` では守れない。
+ * **`?` を外すと、型検査は通るのに画面が真っ白になる。**
+ */
+export interface AuditLogEntry {
+  occurredAt: string;
+  adminUserId?: string | null;
+  /** 操作した管理者の名前。**もう居ない管理者の記録では無い。** */
+  adminLoginId?: string | null;
+  action: string;
+  /** 結果の HTTP 状態。**列を足す前の記録では無い。** */
+  statusCode?: number | null;
+  targetType?: string | null;
+  targetId?: string | null;
+  /** 補足の JSON 文字列。**そのまま出さず、必ず逃がして描くこと。** */
+  detail?: string | null;
+  ipAddress?: string | null;
+}
+
+/** 記録の 1 ページ。 */
+export interface AuditLogPage {
+  entries: AuditLogEntry[];
+  /** 次のページがあるか。**総数は数えない**（増え続ける表を毎回数えないため）。 */
+  hasMore: boolean;
+}
+
+/** 記録の絞り込み。 */
+export interface AuditLogFilter {
+  failedOnly: boolean;
+  action: string;
+  from: string;
+  to: string;
+}

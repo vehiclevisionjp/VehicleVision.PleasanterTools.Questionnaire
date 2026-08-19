@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
   import SignInPanel from './components/SignInPanel.svelte';
   import SurveyEditor from './components/SurveyEditor.svelte';
@@ -15,6 +16,9 @@
   /** 開いているアンケート。**URL に出す**（再読み込みで戻れるように） */
   let openSurveyId = $state(readSurveyId());
 
+  /** 操作の記録を開いているか。**これも URL に出す。** */
+  let openAuditLog = $state(readAuditLog());
+
   $effect(() => {
     void refresh();
   });
@@ -26,7 +30,10 @@
 
   $effect(() => {
     // 戻る・進むに追従する
-    const onPop = () => (openSurveyId = readSurveyId());
+    const onPop = () => {
+      openSurveyId = readSurveyId();
+      openAuditLog = readAuditLog();
+    };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   });
@@ -36,13 +43,24 @@
     return match?.[1] ?? null;
   }
 
+  function readAuditLog(): boolean {
+    return /^\/admin\/audit-logs\/?$/.test(location.pathname);
+  }
+
   function open(surveyId: string) {
     openSurveyId = surveyId;
     history.pushState(null, '', `/admin/surveys/${surveyId}`);
   }
 
+  function openAudit() {
+    openSurveyId = null;
+    openAuditLog = true;
+    history.pushState(null, '', '/admin/audit-logs');
+  }
+
   function back() {
     openSurveyId = null;
+    openAuditLog = false;
     history.pushState(null, '', '/admin');
   }
 
@@ -77,6 +95,7 @@
   async function signOut() {
     await logout();
     openSurveyId = null;
+    openAuditLog = false;
     history.replaceState(null, '', '/admin');
     await refresh();
   }
@@ -87,6 +106,15 @@
    * **合言葉を通した（＝途中状態の）相手にだけ出す。**
    * 未認証の相手に登録画面を見せない。
    */
+  /**
+   * 操作の記録を見せてよい相手か。
+   *
+   * **Administrator だけ。** 誰が何をしたかは Editor へ見せる情報ではない。
+   * **入口を隠すだけでは守りにならない**ので、サーバ側でも同じ判定をしている
+   * （`AdminAuditLogEndpoints`）。ここで隠すのは、押せない釦を出さないため。
+   */
+  const canSeeAuditLog = $derived(session?.role === 'Administrator');
+
   const needsEnrollment = $derived(
     session !== undefined &&
       !session.authenticated &&
@@ -118,11 +146,21 @@
         </select>
       </label>
 
+      {#if canSeeAuditLog}
+        <button type="button" class="link" onclick={openAudit}>{t('audit.open')}</button>
+      {/if}
+
       <button type="button" class="link" onclick={signOut}>{t('app.signOut')}</button>
     </header>
 
-    <main>
-      {#if openSurveyId}
+    <!--
+      **記録の一覧だけ広く使う。** 7 列あって識別子も入るので、
+      他の画面と同じ幅だと横に流さないと読めない
+    -->
+    <main class:wide={openAuditLog && canSeeAuditLog}>
+      {#if openAuditLog && canSeeAuditLog}
+        <AuditLogList onback={back} />
+      {:else if openSurveyId}
         <SurveyEditor surveyId={openSurveyId} onback={back} />
       {:else}
         <SurveyList onopen={open} />
@@ -226,6 +264,10 @@
     max-width: 56rem;
     margin: 0 auto;
     padding: 2rem 1.5rem 4rem;
+  }
+
+  main.wide {
+    max-width: 80rem;
   }
 
   .status {

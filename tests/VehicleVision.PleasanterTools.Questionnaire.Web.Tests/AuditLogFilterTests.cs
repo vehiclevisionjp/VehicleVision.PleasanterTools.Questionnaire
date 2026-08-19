@@ -29,10 +29,15 @@ public class AuditLogFilterTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<AuditEntry>> ListAsync(
-            int limit,
+        public Task<IReadOnlyList<AuditLogView>> ListAsync(
+            AuditLogQuery query,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AuditEntry>>(Written);
+            Task.FromResult<IReadOnlyList<AuditLogView>>([]);
+
+        public Task<int> DeleteOlderThanAsync(
+            DateTime threshold,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Written.RemoveAll(entry => entry.OccurredAt < threshold));
     }
 
     private static DefaultHttpContext Request(
@@ -112,6 +117,34 @@ public class AuditLogFilterTests
         Assert.Equal(StatusCodes.Status200OK, entry.StatusCode);
         Assert.Equal("AdminUser", entry.TargetType);
         Assert.Equal(target.ToString(), entry.TargetId);
+    }
+
+    [Fact]
+    public async Task 経路の型の制約は落とす()
+    {
+        // **制約は照合の都合で、読む人には要らない。** 残すと 1 行が横に長くなる
+        var store = await RunAsync(
+            Request(
+                "POST",
+                "/api/admin/surveys/{surveyId:guid}/publish",
+                Guid.NewGuid()),
+            Results.Ok());
+
+        var entry = Assert.Single(store.Written);
+        Assert.Equal("POST /api/admin/surveys/{surveyId}/publish", entry.Action);
+    }
+
+    [Fact]
+    public async Task IPv4はIPv6の形で残さない()
+    {
+        // **同じ相手が 2 通りの書き方で残ると、送信元で絞れなくなる**
+        var context = Request("POST", "/api/admin/login");
+        context.Connection.RemoteIpAddress =
+            System.Net.IPAddress.Parse("203.0.113.10").MapToIPv6();
+
+        var store = await RunAsync(context, Results.Ok());
+
+        Assert.Equal("203.0.113.10", Assert.Single(store.Written).IpAddress);
     }
 
     [Fact]

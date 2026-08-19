@@ -1,0 +1,185 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Worker;
+
+namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
+
+/// <summary>管理操作の記録が、期限を過ぎたら消えること。</summary>
+public class AuditLogRetentionTests
+{
+    private sealed class FakeStore : IAuditLogStore
+    {
+        public List<DateTime> Thresholds { get; } = [];
+
+        public int DeleteResult { get; set; }
+
+        public Exception? ThrowOnDelete { get; set; }
+
+        /// <summary>呼ばれた回数。**投げたときも数える。** 失敗を待つために要る。</summary>
+        public int Attempts;
+
+        public Task WriteAsync(AuditEntry entry, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<AuditLogView>> ListAsync(
+            AuditLogQuery query,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<AuditLogView>>([]);
+
+        public Task<int> DeleteOlderThanAsync(
+            DateTime threshold,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref Attempts);
+
+            if (ThrowOnDelete is { } exception)
+            {
+                throw exception;
+            }
+
+            Thresholds.Add(threshold);
+            return Task.FromResult(DeleteResult);
+        }
+    }
+
+    private static IConfiguration Configuration(string? retentionDays) =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(retentionDays is null
+                ? []
+                : new Dictionary<string, string?>
+                {
+                    [AuditLogRetentionOptions.RetentionDaysKey] = retentionDays,
+                })
+            .Build();
+
+    // ---- 設定 ---------------------------------------------------------------
+
+    [Fact]
+    public void 既定は一年残す()
+    {
+        // **既定を「消さない」にしない。** 決めないまま運用が始まると増え続ける
+        var options = AuditLogRetentionOptions.FromConfiguration(Configuration(null));
+
+        Assert.Equal(365, options.RetentionDays);
+        Assert.True(options.Enabled);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    public void 零以下にすると消さない(string value)
+    {
+        var options = AuditLogRetentionOptions.FromConfiguration(Configuration(value));
+
+        Assert.False(options.Enabled);
+    }
+
+    [Fact]
+    public void 読めない値は黙って既定へ落とさない()
+    {
+        // **設定したつもりが効いていない状態を作らない**
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => AuditLogRetentionOptions.FromConfiguration(Configuration("いつまでも")));
+
+        Assert.Contains(
+            AuditLogRetentionOptions.RetentionDaysKey, exception.Message, StringComparison.Ordinal);
+    }
+
+    // ---- 掃除 ---------------------------------------------------------------
+
+    private static (FakeStore Store, AuditLogRetentionService Service, FakeTimeProvider Time)
+        Build(AuditLogRetentionOptions options)
+    {
+        var store = new FakeStore();
+        var time = new FakeTimeProvider(DateTimeOffset.Parse(
+            "2026-08-19T09:00:00+09:00", System.Globalization.CultureInfo.InvariantCulture));
+        time.SetLocalTimeZone(TimeZoneInfo.Utc);
+
+        return (
+            store,
+            new AuditLogRetentionService(
+                store, options, NullLogger<AuditLogRetentionService>.Instance, time),
+            time);
+    }
+
+    [Fact]
+    public async Task 期限より前を消す()
+    {
+        var options = new AuditLogRetentionOptions
+        {
+            RetentionDays = 30,
+            SweepInterval = TimeSpan.FromHours(6),
+        };
+
+        var (store, service, time) = Build(options);
+
+        await service.StartAsync(CancellationToken.None);
+
+        // **起動直後には走らせない。** 全インスタンスが一斉に大きな DELETE を投げないように
+        Assert.Empty(store.Thresholds);
+
+        time.Advance(TimeSpan.FromHours(6));
+        await WaitForAsync(() => store.Thresholds.Count > 0);
+
+        await service.StopAsync(CancellationToken.None);
+
+        var threshold = Assert.Single(store.Thresholds);
+        Assert.Equal(time.GetLocalNow().DateTime.AddDays(-30), threshold, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task 消さない設定なら触らない()
+    {
+        var (store, service, time) = Build(new AuditLogRetentionOptions { RetentionDays = 0 });
+
+        await service.StartAsync(CancellationToken.None);
+        time.Advance(TimeSpan.FromDays(1));
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Empty(store.Thresholds);
+    }
+
+    [Fact]
+    public async Task 消せなくても止まらない()
+    {
+        // **掃除の失敗でアプリを止めない**
+        var options = new AuditLogRetentionOptions
+        {
+            RetentionDays = 30,
+            SweepInterval = TimeSpan.FromHours(1),
+        };
+
+        var (store, service, time) = Build(options);
+        store.ThrowOnDelete = new InvalidOperationException("消せない");
+
+        await service.StartAsync(CancellationToken.None);
+
+        // **失敗を見届けてから次へ進める。** 待たずに時計を進めると、
+        // 常駐側がまだ待ち直していないので 2 周目が起きない
+        time.Advance(TimeSpan.FromHours(1));
+        await WaitForAsync(() => Volatile.Read(ref store.Attempts) >= 1);
+
+        // 失敗しても次の周期へ進む
+        store.ThrowOnDelete = null;
+        await WaitForAsync(() => false, TimeSpan.FromMilliseconds(50));
+        time.Advance(TimeSpan.FromHours(1));
+        await WaitForAsync(() => store.Thresholds.Count > 0);
+
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.NotEmpty(store.Thresholds);
+    }
+
+    /// <summary>常駐の処理が追い付くまで待つ。**時計を進めても、走るのは別のタスク。**</summary>
+    private static async Task WaitForAsync(Func<bool> condition, TimeSpan? atMost = null)
+    {
+        var limit = (int)((atMost ?? TimeSpan.FromSeconds(2)).TotalMilliseconds / 10);
+
+        for (var attempt = 0; attempt < limit && !condition(); attempt++)
+        {
+            await Task.Delay(10);
+        }
+    }
+}
