@@ -1,38 +1,47 @@
 <script lang="ts">
   import {
+    displayText,
     isAttachmentColumn,
-    text,
     type ColumnAssignment,
     type MappingDefinition,
     type Question,
     type QuestionPort,
   } from '../lib/types';
+  import type { Language } from '../../lib/i18n/language';
+  import { t } from '../lib/i18n/state.svelte';
+  import type { MessageKey } from '../lib/i18n/messages';
 
   interface Props {
     mapping: MappingDefinition;
     questions: Question[];
+    /** 設問の文言をどの言語で出すか。**設問エディタで選んでいる言語に揃える。** */
+    editing: Language;
     onchange: (mapping: MappingDefinition) => void;
   }
 
-  let { mapping, questions, onchange }: Props = $props();
+  let { mapping, questions, editing, onchange }: Props = $props();
 
-  /** 変換の種類。**入力が複数なら必ずどれかが要る。** */
-  const converters = [
-    { value: '', label: '（変換なし）' },
-    { value: 'join', label: 'つなぐ（join）' },
-    { value: 'map', label: '値を置き換える（map）' },
-    { value: 'toCheck', label: 'チェック列にする（toCheck）' },
-    { value: 'contains', label: '含むか（contains）' },
-    { value: 'constant', label: '固定値（constant）' },
-    { value: 'coalesce', label: '最初の非空（coalesce）' },
-    { value: 'when', label: '条件（when）' },
-    { value: 'script', label: 'スクリプト（script）' },
+  /**
+   * 変換の種類。**入力が複数なら必ずどれかが要る。**
+   *
+   * **値は変換の名前そのもの**（サーバへ渡る）。文言は鍵から引く
+   */
+  const converters: { value: string; key: MessageKey }[] = [
+    { value: '', key: 'converter.none' },
+    { value: 'join', key: 'converter.join' },
+    { value: 'map', key: 'converter.map' },
+    { value: 'toCheck', key: 'converter.toCheck' },
+    { value: 'contains', key: 'converter.contains' },
+    { value: 'constant', key: 'converter.constant' },
+    { value: 'coalesce', key: 'converter.coalesce' },
+    { value: 'when', key: 'converter.when' },
+    { value: 'script', key: 'converter.script' },
   ];
 
-  const ports: { value: QuestionPort; label: string }[] = [
-    { value: 'Value', label: '回答の値' },
-    { value: 'OtherText', label: 'その他の自由記述' },
-    { value: 'FileNames', label: '添付の名前' },
+  const ports: { value: QuestionPort; key: MessageKey }[] = [
+    { value: 'Value', key: 'port.Value' },
+    { value: 'OtherText', key: 'port.OtherText' },
+    { value: 'FileNames', key: 'port.FileNames' },
   ];
 
   const answerable = $derived(questions.filter((question) => question.type !== 'Note'));
@@ -114,7 +123,12 @@
 
   function questionLabel(questionId: string): string {
     const question = questions.find((q) => q.questionId === questionId);
-    return question ? text(question.title) || questionId : `${questionId}（存在しません）`;
+    if (!question) {
+      return t('mapping.missingQuestion', { questionId });
+    }
+
+    // **回答画面で出る文字列と同じ見え方にする。** 未翻訳なら日本語へ落ちる
+    return displayText(question.title, editing) || questionId;
   }
 
   /** その割り当てが添付のものか。 */
@@ -128,31 +142,29 @@
 
 <section>
   <div class="bar">
-    <h2>Pleasanter への割り当て</h2>
+    <h2>{t('mapping.title')}</h2>
     <div class="buttons">
-      <button type="button" class="secondary small" onclick={add}>列を足す</button>
+      <button type="button" class="secondary small" onclick={add}>{t('mapping.addColumn')}</button>
       <button
         type="button"
         class="secondary small"
         disabled={fileQuestions.length === 0}
-        title={fileQuestions.length === 0 ? '添付の設問がありません' : ''}
-        onclick={addAttachment}>添付の列を足す</button
+        title={fileQuestions.length === 0 ? t('mapping.noFileQuestion') : ''}
+        onclick={addAttachment}>{t('mapping.addAttachmentColumn')}</button
       >
     </div>
   </div>
 
   <!-- **出力は必ず 1 本。** だから循環参照も合流の衝突も起こらない -->
   <p class="lead">
-    設問（入力）を 1 つ以上選び、必要なら変換をはさんで、Pleasanter の列 1 本へ書きます。
-    <strong>入力が複数のときは変換が必要です。</strong>
+    {t('mapping.lead')}
+    <strong>{t('mapping.leadStrong')}</strong>
     <br />
-    <strong>添付だけは別枠です。</strong>添付の設問 1 つを添付列へそのまま繋ぎ、変換は掛けられません。
+    <strong>{t('mapping.attachmentLeadStrong')}</strong>{t('mapping.attachmentLead')}
   </p>
 
   {#if mapping.assignments.length === 0}
-    <p class="status">
-      まだ割り当てがありません。このままでも公開できますが、回答は Pleasanter に残りません。
-    </p>
+    <p class="status">{t('mapping.empty')}</p>
   {/if}
 
   {#each mapping.assignments as assignment, index (index)}
@@ -160,10 +172,12 @@
     <div class="assignment" class:attachment>
       <div class="row">
         <label class="target">
-          書き込み先の列
+          {t('mapping.targetColumn')}
           <input
             type="text"
-            placeholder={attachment ? 'AttachmentsA など' : 'ClassA / NumA など'}
+            placeholder={attachment
+              ? t('mapping.attachmentColumnPlaceholder')
+              : t('mapping.targetColumnPlaceholder')}
             value={assignment.targetColumn}
             oninput={(event) => patch(index, { targetColumn: event.currentTarget.value })}
           />
@@ -171,10 +185,10 @@
 
         {#if attachment}
           <!-- **添付に変換は掛けられない。** 選ばせない -->
-          <span class="fixed">変換なし（添付は固定）</span>
+          <span class="fixed">{t('mapping.converterFixed')}</span>
         {:else}
           <label class="converter">
-            変換
+            {t('mapping.converter')}
             <select
               value={assignment.converter?.operation ?? ''}
               onchange={(event) => {
@@ -188,7 +202,7 @@
               }}
             >
               {#each converters as converter (converter.value)}
-                <option value={converter.value}>{converter.label}</option>
+                <option value={converter.value}>{t(converter.key)}</option>
               {/each}
             </select>
           </label>
@@ -198,17 +212,17 @@
           type="button"
           class="icon danger"
           onclick={() => remove(index)}
-          aria-label="この割り当てを削除">×</button
+          aria-label={t('mapping.removeAssignment')}>×</button
         >
       </div>
 
       {#if !attachment && assignment.converter == null && assignment.sources.length !== 1}
-        <p class="warn">変換が無いときは入力をちょうど 1 つにしてください。</p>
+        <p class="warn">{t('mapping.needsSingleSource')}</p>
       {/if}
 
       {#if attachment && assignment.targetColumn === ''}
         <!-- **列は型ごとに 26 本しか無い** -->
-        <p class="warn">空いている添付列がありません。使っていない添付列を空けてください。</p>
+        <p class="warn">{t('mapping.noAttachmentColumnLeft')}</p>
       {/if}
 
       <div class="sources">
@@ -229,7 +243,7 @@
             </select>
 
             {#if attachment}
-              <span class="fixed">添付そのもの</span>
+              <span class="fixed">{t('mapping.attachmentPort')}</span>
             {:else}
               <select
                 value={source.port}
@@ -243,7 +257,7 @@
                   })}
               >
                 {#each ports as port (port.value)}
-                  <option value={port.value}>{port.label}</option>
+                  <option value={port.value}>{t(port.key)}</option>
                 {/each}
               </select>
 
@@ -251,7 +265,7 @@
                 type="button"
                 class="icon danger"
                 onclick={() => removeSource(index, sourceIndex)}
-                aria-label="入力を削除">×</button
+                aria-label={t('mapping.removeSource')}>×</button
               >
             {/if}
           </div>
@@ -259,15 +273,15 @@
 
         {#if attachment}
           <!-- **送り直しは置き換え。** 前の添付は消える -->
-          <p class="hint">回答を送り直すと、Pleasanter 側の添付は新しいものへ置き換わります。</p>
+          <p class="hint">{t('mapping.attachmentReplaceHint')}</p>
         {:else}
           <button type="button" class="secondary small" onclick={() => addSource(index)}>
-            入力を足す
+            {t('mapping.addSource')}
           </button>
 
           {#if assignment.sources.length > 1}
             <!-- **並び順が変換へ渡す順。** 入れ替えると結果が変わる -->
-            <p class="hint">上から順に変換へ渡します。</p>
+            <p class="hint">{t('mapping.sourceOrderHint')}</p>
           {/if}
         {/if}
       </div>

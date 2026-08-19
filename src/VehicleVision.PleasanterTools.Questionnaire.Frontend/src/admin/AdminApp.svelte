@@ -3,8 +3,10 @@
   import SignInPanel from './components/SignInPanel.svelte';
   import SurveyEditor from './components/SurveyEditor.svelte';
   import SurveyList from './components/SurveyList.svelte';
-  import { getSession, logout } from './lib/api';
+  import { getSession, logout, saveLanguage } from './lib/api';
   import type { AdminSession } from './lib/types';
+  import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../lib/i18n/language';
+  import { language, resolveLanguage, t } from './lib/i18n/state.svelte';
 
   let session = $state<AdminSession>();
   let loading = $state(true);
@@ -15,6 +17,11 @@
 
   $effect(() => {
     void refresh();
+  });
+
+  $effect(() => {
+    // **タブの題名も言語に合わせる**
+    document.title = t('app.title');
   });
 
   $effect(() => {
@@ -50,6 +57,21 @@
 
     failed = false;
     session = result.value;
+
+    // **利用者ごとの設定 → ブラウザの言語設定 → `ja`**
+    // （`_documents/多言語対応方針.md` 2 章）
+    resolveLanguage(session.language ?? null);
+  }
+
+  /**
+    * 表示言語を切り替える。
+    *
+    * **画面を先に切り替えてから保存する。** 保存に失敗しても
+    * その場の操作は続けられる方がよい（次に開いたときに戻るだけ）。
+    */
+  async function changeLanguage(next: Language) {
+    resolveLanguage(next);
+    await saveLanguage(next);
   }
 
   async function signOut() {
@@ -75,14 +97,28 @@
 
 <div class="shell">
   {#if loading}
-    <p class="status">読み込んでいます…</p>
+    <p class="status">{t('app.loading')}</p>
   {:else if failed}
-    <p class="status">読み込めませんでした。時間を置いて再読み込みしてください。</p>
+    <p class="status">{t('app.loadFailed')}</p>
   {:else if session?.authenticated}
     <header class="top">
-      <span class="brand">アンケート管理</span>
+      <span class="brand">{t('app.title')}</span>
       <span class="who">{session.loginId}</span>
-      <button type="button" class="link" onclick={signOut}>ログアウト</button>
+
+      <!-- **利用者ごとの設定として残す。** 端末を変えても付いてくる -->
+      <label class="language">
+        <span class="visually-hidden">{t('app.language')}</span>
+        <select
+          value={language()}
+          onchange={(event) => changeLanguage(event.currentTarget.value as Language)}
+        >
+          {#each SUPPORTED_LANGUAGES as option (option)}
+            <option value={option}>{LANGUAGE_NAMES[option]}</option>
+          {/each}
+        </select>
+      </label>
+
+      <button type="button" class="link" onclick={signOut}>{t('app.signOut')}</button>
     </header>
 
     <main>
@@ -153,6 +189,28 @@
     margin-left: auto;
     color: var(--muted);
     font-size: 0.85rem;
+  }
+
+  .language select {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.2rem 0.35rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #fff;
+    color: #101828;
+  }
+
+  /* **読み上げには残す。** 目で見れば分かるが、耳では分からない */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .link {

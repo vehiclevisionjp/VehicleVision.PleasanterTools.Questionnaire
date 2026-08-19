@@ -2,14 +2,19 @@
   import {
     hasChoices,
     isDisplayOnly,
+    questionTypeKey,
     questionTypes,
     text,
     withText,
     type Question,
   } from '../lib/types';
+  import type { Language } from '../../lib/i18n/language';
+  import { t } from '../lib/i18n/state.svelte';
 
   interface Props {
     question: Question;
+    /** 入力欄が書き込む言語。**管理画面の表示言語とは別。** */
+    editing: Language;
     /** 割り当て先の列。**無いと「Pleasanter に残らない」ことが分からない** */
     mappedColumns: string[];
     canMoveUp: boolean;
@@ -19,8 +24,16 @@
     onmove: (direction: -1 | 1) => void;
   }
 
-  let { question, mappedColumns, canMoveUp, canMoveDown, onchange, onremove, onmove }: Props =
-    $props();
+  let {
+    question,
+    editing,
+    mappedColumns,
+    canMoveUp,
+    canMoveDown,
+    onchange,
+    onremove,
+    onmove,
+  }: Props = $props();
 
   const showChoices = $derived(hasChoices(question.type));
   const displayOnly = $derived(isDisplayOnly(question.type));
@@ -34,7 +47,11 @@
     update({
       choices: [
         ...question.choices,
-        { value: `choice-${next}`, label: withText(undefined, `選択肢 ${next}`) },
+        {
+          value: `choice-${next}`,
+          // **最初の文言は編集中の言語へ入れる。** 他の言語は空のまま
+          label: withText(undefined, t('question.defaultChoiceLabel', { number: next }), editing),
+        },
       ],
     });
   }
@@ -55,9 +72,10 @@
     <input
       class="title"
       type="text"
-      placeholder="設問の文言"
-      value={text(question.title)}
-      oninput={(event) => update({ title: withText(question.title, event.currentTarget.value) })}
+      placeholder={t('question.titlePlaceholder')}
+      value={text(question.title, editing)}
+      oninput={(event) =>
+        update({ title: withText(question.title, event.currentTarget.value, editing) })}
     />
 
     <select
@@ -72,13 +90,19 @@
         });
       }}
     >
-      {#each questionTypes as option (option.value)}
-        <option value={option.value}>{option.label}</option>
+      {#each questionTypes as option (option)}
+        <option value={option}>{t(questionTypeKey(option))}</option>
       {/each}
     </select>
 
     <div class="actions">
-      <button type="button" class="icon" disabled={!canMoveUp} onclick={() => onmove(-1)} aria-label="上へ">
+      <button
+        type="button"
+        class="icon"
+        disabled={!canMoveUp}
+        onclick={() => onmove(-1)}
+        aria-label={t('question.moveUp')}
+      >
         ↑
       </button>
       <button
@@ -86,19 +110,21 @@
         class="icon"
         disabled={!canMoveDown}
         onclick={() => onmove(1)}
-        aria-label="下へ">↓</button
+        aria-label={t('question.moveDown')}>↓</button
       >
-      <button type="button" class="icon danger" onclick={onremove} aria-label="削除">×</button>
+      <button type="button" class="icon danger" onclick={onremove} aria-label={t('question.remove')}>
+        ×
+      </button>
     </div>
   </div>
 
   <input
     class="description"
     type="text"
-    placeholder="補足（任意）"
-    value={text(question.description)}
+    placeholder={t('question.descriptionPlaceholder')}
+    value={text(question.description, editing)}
     oninput={(event) =>
-      update({ description: withText(question.description, event.currentTarget.value) })}
+      update({ description: withText(question.description, event.currentTarget.value, editing) })}
   />
 
   <div class="meta">
@@ -111,17 +137,17 @@
           checked={question.isRequired}
           onchange={(event) => update({ isRequired: event.currentTarget.checked })}
         />
-        必須
+        {t('question.required')}
       </label>
     {/if}
 
     {#if displayOnly}
-      <span class="note">回答を持たない表示専用の要素です。</span>
+      <span class="note">{t('question.displayOnly')}</span>
     {:else if mappedColumns.length === 0}
       <!-- **拒否はしないが伝える。** 気付かずに公開すると回答が Pleasanter に残らない -->
-      <span class="unmapped">未割り当て（Pleasanter に残りません）</span>
+      <span class="unmapped">{t('question.unmapped')}</span>
     {:else}
-      <span class="mapped">→ {mappedColumns.join(' / ')}</span>
+      <span class="mapped">{t('question.mapped', { columns: mappedColumns.join(' / ') })}</span>
     {/if}
   </div>
 
@@ -132,15 +158,17 @@
           <input
             type="text"
             class="choice-label"
-            placeholder="画面に出る文字列"
-            value={text(choice.label)}
+            placeholder={t('question.choiceLabelPlaceholder')}
+            value={text(choice.label, editing)}
             oninput={(event) =>
-              updateChoice(index, { label: withText(choice.label, event.currentTarget.value) })}
+              updateChoice(index, {
+                label: withText(choice.label, event.currentTarget.value, editing),
+              })}
           />
           <input
             type="text"
             class="choice-value"
-            placeholder="保存される値"
+            placeholder={t('question.choiceValuePlaceholder')}
             value={choice.value}
             oninput={(event) => updateChoice(index, { value: event.currentTarget.value })}
           />
@@ -150,25 +178,32 @@
               checked={choice.isOther === true}
               onchange={(event) => updateChoice(index, { isOther: event.currentTarget.checked })}
             />
-            その他
+            {t('question.choiceIsOther')}
           </label>
-          <button type="button" class="icon danger" onclick={() => removeChoice(index)} aria-label="選択肢を削除">
+          <button
+            type="button"
+            class="icon danger"
+            onclick={() => removeChoice(index)}
+            aria-label={t('question.removeChoice')}
+          >
             ×
           </button>
         </div>
       {/each}
 
-      <button type="button" class="secondary small" onclick={addChoice}>選択肢を足す</button>
+      <button type="button" class="secondary small" onclick={addChoice}>
+        {t('question.addChoice')}
+      </button>
 
       <!-- **保存される値が Pleasanter の列に入る。** 画面の文字列ではない -->
-      <p class="hint">左が画面に出る文字列、右が Pleasanter へ保存される値です。</p>
+      <p class="hint">{t('question.choiceHint')}</p>
     </div>
   {/if}
 
   {#if question.type === 'Scale' || question.type === 'Rating'}
     <div class="range">
       <label>
-        下限
+        {t('question.scaleMinimum')}
         <input
           type="number"
           value={question.settings.scaleMinimum ?? 1}
@@ -179,7 +214,7 @@
         />
       </label>
       <label>
-        上限
+        {t('question.scaleMaximum')}
         <input
           type="number"
           value={question.settings.scaleMaximum ?? 5}

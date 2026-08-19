@@ -1,3 +1,6 @@
+import { DEFAULT_LANGUAGE, type Language } from '../../lib/i18n/language';
+import { ja, type MessageKey } from './i18n/messages';
+
 /** 言語コードをキーにした表示文字列。**器は最初から用意する。** */
 export type LocalizedText = Record<string, string>;
 
@@ -14,20 +17,29 @@ export type QuestionType =
   | 'File'
   | 'Note';
 
-/** 画面に出す並び。**説明文ブロックは最後**（回答を持たないため） */
-export const questionTypes: { value: QuestionType; label: string }[] = [
-  { value: 'Text', label: '短い文章' },
-  { value: 'Paragraph', label: '長い文章' },
-  { value: 'Radio', label: '単一選択' },
-  { value: 'Checkbox', label: '複数選択' },
-  { value: 'Dropdown', label: 'プルダウン' },
-  { value: 'Scale', label: '尺度' },
-  { value: 'Rating', label: '星' },
-  { value: 'Date', label: '日付' },
-  { value: 'Time', label: '時刻' },
-  { value: 'File', label: '添付' },
-  { value: 'Note', label: '説明文（回答なし）' },
+/**
+ * 画面に出す並び。**説明文ブロックは最後**（回答を持たないため）
+ *
+ * **文言はここに持たない。** 鍵から引く（`_documents/多言語対応方針.md` 4 章）。
+ */
+export const questionTypes: QuestionType[] = [
+  'Text',
+  'Paragraph',
+  'Radio',
+  'Checkbox',
+  'Dropdown',
+  'Scale',
+  'Rating',
+  'Date',
+  'Time',
+  'File',
+  'Note',
 ];
+
+/** 設問の形式の文言の鍵。**形式を足すと鍵が無くなり、型検査で落ちる。** */
+export function questionTypeKey(type: QuestionType): MessageKey {
+  return `questionType.${type}`;
+}
 
 /** 選択肢を持つ形式か。 */
 export function hasChoices(type: QuestionType): boolean {
@@ -139,11 +151,19 @@ export interface SurveySummary {
   updatedAt: string;
 }
 
-export const surveyStatusLabels: Record<number, string> = {
-  0: '下書き',
-  1: '公開中',
-  2: '停止中',
-};
+/** アンケートの状態の文言の鍵。 */
+export function surveyStatusKey(status: number): MessageKey {
+  switch (status) {
+    case 0:
+      return 'status.draft';
+    case 1:
+      return 'status.published';
+    case 2:
+      return 'status.suspended';
+    default:
+      return 'status.unknown';
+  }
+}
 
 export interface MappingProblem {
   code: string;
@@ -152,20 +172,16 @@ export interface MappingProblem {
   isBlocking: boolean;
 }
 
-export const problemMessages: Record<string, string> = {
-  InvalidShape: '入力が複数あるのに変換がありません（または入力がありません）',
-  DuplicateTargetColumn: '同じ列への割り当てが重複しています',
-  MissingTargetColumn: '書き込み先の列が指定されていません',
-  QuestionNotInDefinition: '存在しない設問を入力にしています',
-  DisplayOnlyQuestionAsSource: '説明文ブロックは入力にできません',
-  ReservedColumn: '予約列は書き込み先にできません',
-  EmptyScript: 'スクリプトが空です',
-  InvalidAttachmentShape: '添付の割り当ては入力 1 つ・変換なしにしてください',
-  NonFileQuestionAsAttachment: '添付の設問しか添付列へは繋げません',
-  AttachmentColumnNeedsFilePort: '添付列には「添付そのもの」を繋いでください',
-  FilePortNeedsAttachmentColumn: '「添付そのもの」は添付列にしか繋げません',
-  UnmappedQuestion: 'どの列にも割り当てられていません（Pleasanter に残りません）',
-};
+/**
+ * マッピングの不備の文言の鍵。
+ *
+ * **サーバ側に符号が増えたときに落とさない。**
+ * 鍵が無ければ符号そのものを出す（`null` を返す）。
+ */
+export function problemKey(code: string): MessageKey | null {
+  const key = `problem.${code}`;
+  return key in ja ? (key as MessageKey) : null;
+}
 
 export interface AdminSession {
   authenticated: boolean;
@@ -176,14 +192,50 @@ export interface AdminSession {
   pendingLoginId?: string | null;
   /** **途中状態のときだけ意味がある。** 2 要素をまだ登録していない */
   needsEnrollment?: boolean;
+
+  /**
+   * 利用者ごとの表示言語。`null` は「まだ選んでいない」。
+   *
+   * **画面の初期値を決めるためのもの**（`_documents/多言語対応方針.md` 2 章）。
+   */
+  language?: string | null;
 }
 
-/** 既定の言語の文字列を取り出す。 */
-export function text(value: LocalizedText | undefined): string {
-  return value?.['ja'] ?? '';
+/**
+ * その言語の文字列を取り出す。**落とさない。**
+ *
+ * **編集画面では既定の言語へ落とさない。** 落とすと、
+ * 英語の欄に日本語が出たまま「入力済み」に見えてしまい、
+ * そのまま保存すると日本語が英語として保存される。
+ */
+export function text(value: LocalizedText | undefined, language: Language): string {
+  return value?.[language] ?? '';
 }
 
-/** 既定の言語へ書き込む。**器は多言語のまま保つ。** */
-export function withText(value: LocalizedText | undefined, next: string): LocalizedText {
-  return { ...(value ?? {}), ja: next };
+/**
+ * その言語へ書き込む。**器は多言語のまま保つ。**
+ *
+ * **空にした言語は鍵ごと消す。** 空文字を残すと、回答画面の
+ * `LocalizedText.Get` が既定の言語へ落ちずに空文字を返す
+ * （`_documents/多言語対応方針.md` 5 章）。
+ */
+export function withText(
+  value: LocalizedText | undefined,
+  next: string,
+  language: Language,
+): LocalizedText {
+  const updated = { ...(value ?? {}) };
+
+  if (next === '') {
+    delete updated[language];
+  } else {
+    updated[language] = next;
+  }
+
+  return updated;
+}
+
+/** 回答画面で実際に出る文字列。**未入力なら既定の言語へ落ちる。** */
+export function displayText(value: LocalizedText | undefined, language: Language): string {
+  return value?.[language] ?? value?.[DEFAULT_LANGUAGE] ?? '';
 }

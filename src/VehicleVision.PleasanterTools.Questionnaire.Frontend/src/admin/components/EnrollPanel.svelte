@@ -1,6 +1,7 @@
 <script lang="ts">
   import QRCode from 'qrcode';
   import { beginEnrollment, completeEnrollment } from '../lib/api';
+  import { t } from '../lib/i18n/state.svelte';
 
   interface Props {
     /** 登録が終わったので状態を読み直してほしい。 */
@@ -69,10 +70,10 @@
 
 <div class="panel">
   {#if recoveryCodes.length > 0}
-    <h1>復旧コードを控えてください</h1>
+    <h1>{t('enroll.recoveryTitle')}</h1>
     <p class="lead">
-      <strong>この画面を閉じると二度と表示できません。</strong>
-      端末を失ったときは、このコードでログインします。1 つにつき 1 回だけ使えます。
+      <strong>{t('enroll.recoveryLeadStrong')}</strong>
+      {t('enroll.recoveryLead')}
     </p>
 
     <ul class="codes">
@@ -81,33 +82,35 @@
       {/each}
     </ul>
 
-    <button type="button" class="secondary" onclick={copyCodes}>コピーする</button>
+    <button type="button" class="secondary" onclick={copyCodes}>{t('enroll.copy')}</button>
 
     <label class="acknowledge">
       <input type="checkbox" bind:checked={acknowledged} />
-      控えました
+      {t('enroll.acknowledged')}
     </label>
 
-    <button type="button" disabled={!acknowledged} onclick={onadvance}>管理画面へ進む</button>
+    <button type="button" disabled={!acknowledged} onclick={onadvance}>
+      {t('enroll.proceed')}
+    </button>
   {:else}
-    <h1>2 要素認証を登録する</h1>
+    <h1>{t('enroll.title')}</h1>
     <p class="lead">
-      管理画面は全アンケートの定義と回答に触れます。<strong>合言葉だけでは通しません。</strong>
-      認証アプリで下の QR を読み取ってください。
+      {t('enroll.lead')}<strong>{t('enroll.leadStrong')}</strong>
+      {t('enroll.leadTail')}
     </p>
 
     {#if qrDataUrl}
-      <img class="qr" src={qrDataUrl} alt="認証アプリで読み取る QR コード" />
+      <img class="qr" src={qrDataUrl} alt={t('enroll.qrAlt')} />
     {/if}
 
     <p class="secret">
-      読み取れないときは、この文字列を手で入力してください。<br />
+      {t('enroll.secretHint')}<br />
       <code>{groupedSecret}</code>
     </p>
 
     <form onsubmit={submit}>
       <label>
-        認証アプリに出た 6 桁の数字
+        {t('enroll.codeLabel')}
         <input type="text" inputmode="numeric" autocomplete="one-time-code" bind:value={code} required />
       </label>
 
@@ -116,7 +119,7 @@
       <!-- **一度打ってもらってから有効にする。** 読み取りに失敗していた場合、
            そのまま有効にすると本人が入れなくなる -->
       <button type="submit" disabled={busy || secret === ''}>
-        {busy ? '確認しています…' : '登録する'}
+        {busy ? t('enroll.checking') : t('enroll.register')}
       </button>
     </form>
   {/if}
