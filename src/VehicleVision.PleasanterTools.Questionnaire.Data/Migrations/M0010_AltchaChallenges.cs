@@ -17,8 +17,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// 過ぎたものを覚えておく意味は無い（放っておくと増え続ける）。
 /// </para>
 /// </remarks>
-[Migration(8, "使い終えた proof-of-work の課題")]
-public sealed class M0008_AltchaChallenges : Migration
+[Migration(10, "使い終えた proof-of-work の課題")]
+public sealed class M0010_AltchaChallenges : Migration
 {
     public override void Up()
     {

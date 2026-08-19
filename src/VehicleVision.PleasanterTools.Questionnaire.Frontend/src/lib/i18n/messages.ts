@@ -65,6 +65,8 @@ export const ja = {
   // ---- 送信できなかった -----------------------------------------------------
   'submit.tooManyRequests': '送信が混み合っています。少し時間を置いてもう一度お試しください。',
   'submit.rejected': '送信を受け付けられませんでした。もう一度「送信する」を押してください。',
+  'submit.insecureContext':
+    'この画面は安全な接続（https）で開いてください。今の状態では送信できません。',
   'submit.failed': '送信できませんでした。入力内容はそのままです。少し時間を置いてもう一度お試しください。',
 
   // ---- 添付 -----------------------------------------------------------------
@@ -167,6 +169,8 @@ export const en: Record<MessageKey, string> = {
 
   'submit.tooManyRequests': 'The service is busy. Please wait a moment and submit again.',
   'submit.rejected': 'Your response was not accepted. Please press "Submit" again.',
+  'submit.insecureContext':
+    'Please open this page over a secure connection (https). It cannot be submitted as is.',
   'submit.failed':
     'We could not submit your response. Your answers are still here — please wait a moment and try again.',
 

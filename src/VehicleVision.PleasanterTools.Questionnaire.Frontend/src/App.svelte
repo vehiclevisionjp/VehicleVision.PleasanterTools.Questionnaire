@@ -192,8 +192,7 @@
     responseToken = issued.responseToken;
     ticket = issued.ticket;
 
-    // **待たない。** 解けたら入るだけで、入力は先に進められる。
-    // 解けなくても送信は止めない（サーバ側でどのみち断られる）
+    // **待たない。** 解けたら入るだけで、入力は先に進められる
     if (issued.altcha) {
       void solveAltcha(issued.altcha).then((solved) => {
         altcha = solved ?? '';

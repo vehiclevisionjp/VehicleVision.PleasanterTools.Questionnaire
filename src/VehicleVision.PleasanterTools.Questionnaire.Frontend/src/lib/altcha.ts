@@ -13,6 +13,8 @@
  * 送信チケット・最短時間・honeypot と重ねて初めて意味がある。
  */
 
+import { sha256Hex } from './sha256';
+
 /** サーバから来る課題。 */
 export interface AltchaChallenge {
   algorithm: string;
@@ -30,10 +32,25 @@ function toHex(buffer: ArrayBuffer): string {
 }
 
 /**
+ * 1 回分の計算。
+ *
+ * **`crypto.subtle` があればそれを使い、無ければ自前で計算する。**
+ * Web Crypto は「安全なコンテキスト」（https か localhost）でしか使えず、
+ * 平文の http で開かれると `undefined` になる。
+ * **そこで諦めると、回答の送信が丸ごと通らなくなる**（実際に踏んだ）。
+ */
+async function digest(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  if (typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined') {
+    return toHex(await crypto.subtle.digest('SHA-256', bytes));
+  }
+
+  return sha256Hex(bytes);
+}
+
+/**
  * 課題を解いて、送信に添える解答を作る。
  *
- * **見つからなければ `null`。** 解けなかったときに送信を止めるのではなく、
- * 呼ぶ側が判断できるようにする（サーバ側でどのみち断られる）。
+ * **解けなければ `null`。** 送信を止めるのではなく、呼ぶ側が判断できるようにする。
  *
  * **画面を止めない。** 一定回数ごとに制御を返すので、
  * 解いている間も入力できる。
@@ -54,12 +71,9 @@ export async function solveAltcha(
       return null;
     }
 
-    const digest = await crypto.subtle.digest(
-      'SHA-256',
-      encoder.encode(challenge.salt + String(number)),
-    );
+    const hash = await digest(encoder.encode(challenge.salt + String(number)));
 
-    if (toHex(digest) === challenge.challenge) {
+    if (hash === challenge.challenge) {
       return btoa(
         JSON.stringify({
           algorithm: challenge.algorithm,
