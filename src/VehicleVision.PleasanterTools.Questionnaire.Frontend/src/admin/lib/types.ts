@@ -51,10 +51,90 @@ export function isDisplayOnly(type: QuestionType): boolean {
   return type === 'Note';
 }
 
+/**
+ * ページを離れるときの行き先の種類。
+ *
+ * **値はサーバの列挙そのもの**（`Core/Definitions/Branching.cs`）。
+ * JSON では文字列で載るので、綴りを変えると読めなくなる。
+ */
+export type PageTransitionKind = 'Next' | 'Page' | 'Submit';
+
+/**
+ * 行き先 1 つ。
+ *
+ * **`pageId` はサーバが `null` のとき落として返す。** `?` を外さないこと。
+ */
+export interface PageTransition {
+  kind: PageTransitionKind;
+  pageId?: string | null;
+}
+
+/** 表示条件の比べ方。**値はサーバの列挙そのもの。** */
+export type ConditionOperator =
+  | 'Equals'
+  | 'NotEquals'
+  | 'Contains'
+  | 'Answered'
+  | 'NotAnswered'
+  | 'GreaterThan'
+  | 'LessThan';
+
+/** 画面に出す並び。**値を持たない比べ方は最後。** */
+export const conditionOperators: ConditionOperator[] = [
+  'Equals',
+  'NotEquals',
+  'Contains',
+  'GreaterThan',
+  'LessThan',
+  'Answered',
+  'NotAnswered',
+];
+
+/** 比べ方の文言の鍵。**比べ方を足すと鍵が無くなり、型検査で落ちる。** */
+export function conditionOperatorKey(operator: ConditionOperator): MessageKey {
+  return `conditionOperator.${operator}`;
+}
+
+/** 比べる値が要る比べ方か。 */
+export function needsConditionValue(operator: ConditionOperator): boolean {
+  return operator !== 'Answered' && operator !== 'NotAnswered';
+}
+
+/** 選択肢の中から選ばせる比べ方か。**無い選択肢を書かせないため。** */
+export function picksFromChoices(operator: ConditionOperator): boolean {
+  return operator === 'Equals' || operator === 'NotEquals';
+}
+
+/** 複数の条件のまとめ方。 */
+export type ConditionMatch = 'All' | 'Any';
+
+/** 条件 1 つ。**`value` はサーバが `null` のとき落として返す。** */
+export interface ConditionRule {
+  questionId: string;
+  operator: ConditionOperator;
+  value?: string | null;
+}
+
+/**
+ * 表示条件。
+ *
+ * **`isEmpty` はサーバの計算プロパティ。** 応答には載るが、送るときは要らない。
+ */
+export interface VisibilityCondition {
+  match: ConditionMatch;
+  rules: ConditionRule[];
+}
+
 export interface Choice {
   value: string;
   label: LocalizedText;
   isOther?: boolean;
+  /**
+   * これを選んだときの行き先（Issue #41）。
+   *
+   * **無ければページ末尾の行き先に従う。** 単一選択にしか置けない。
+   */
+  next?: PageTransition | null;
 }
 
 export interface QuestionSettings {
@@ -76,6 +156,12 @@ export interface Question {
   isRequired: boolean;
   choices: Choice[];
   settings: QuestionSettings;
+  /**
+   * この設問を出す条件（Issue #41）。
+   *
+   * **無ければ常に出す。** 参照できるのは自分より前の設問だけ。
+   */
+  visibleWhen?: VisibilityCondition | null;
 }
 
 export interface Page {
@@ -83,6 +169,12 @@ export interface Page {
   title?: LocalizedText;
   description?: LocalizedText;
   questions: Question[];
+  /**
+   * このページを終えたときの行き先（Issue #41）。
+   *
+   * **無ければ次のページへ。** 選択肢の行き先が優先される。
+   */
+  next?: PageTransition | null;
 }
 
 export interface SurveyDefinition {
