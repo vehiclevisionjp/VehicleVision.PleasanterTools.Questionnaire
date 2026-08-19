@@ -109,6 +109,37 @@ export function formatDateTime(value: Date, language: Language): string {
   }).format(value);
 }
 
+/** 経過時間を「〜前」の形で書くときの単位。**大きい方から見る。** */
+const ELAPSED_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['day', 86_400_000],
+  ['hour', 3_600_000],
+  ['minute', 60_000],
+];
+
+/**
+ * ある時刻からどれだけ経ったかを言語に合わせて書く。
+ *
+ * **文言を自前で持たない**（`Intl.RelativeTimeFormat`）。
+ * 「3 日前」「3 days ago」の言い回しや単複は言語ごとに違い、
+ * 鍵で持つと言語を足すたびに書き分けが増える。
+ *
+ * **一番大きい単位だけで書く。** 滞留に気付くのが目的なので、
+ * 「2 日 3 時間 12 分」の精度は要らない。
+ */
+export function formatElapsed(from: Date, language: Language, now: Date = new Date()): string {
+  const elapsed = now.getTime() - from.getTime();
+  const format = new Intl.RelativeTimeFormat(LOCALES[language], { numeric: 'auto' });
+
+  for (const [unit, span] of ELAPSED_UNITS) {
+    if (Math.abs(elapsed) >= span) {
+      return format.format(-Math.floor(elapsed / span), unit);
+    }
+  }
+
+  // **1 分未満は「0 分前」ではなく「今」と読ませる**
+  return format.format(0, 'minute');
+}
+
 /**
  * 差し込みのある文言を組み立てる。
  *

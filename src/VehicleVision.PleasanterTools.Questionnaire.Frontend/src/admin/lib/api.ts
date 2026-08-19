@@ -3,7 +3,9 @@ import type {
   AdminSession,
   AuditLogFilter,
   AuditLogPage,
+  DeadLetterPage,
   MappingDefinition,
+  OutboxStatus,
   MappingProblem,
   SurveyDefinition,
   SurveyDraft,
@@ -198,3 +200,31 @@ export const listAuditLogs = (
 
   return call<AuditLogPage>(`/api/admin/audit-logs?${query}`);
 };
+
+// ---- 送信状況 ---------------------------------------------------------------
+
+/**
+ * 滞留の状況を読む。
+ *
+ * **数えるのはサーバ側で 1 回。** 件数と最古の時刻を別々に問い合わせない。
+ */
+export const getOutboxStatus = () => call<OutboxStatus>('/api/admin/outbox/status');
+
+/** 送信できなかった回答を読む。**回答本文は返らない。** */
+export const listDeadLetters = (offset: number, limit: number) => {
+  const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+
+  return call<DeadLetterPage>(`/api/admin/outbox/dead-letters?${query}`);
+};
+
+/**
+ * 送信できなかった回答を送信待ちへ戻す。
+ *
+ * **回答トークンは本文で送る。** URL に載せると、サーバ側で
+ * 監査ログの経路の値として記録されてしまう（トークンは記録しない決まり）。
+ */
+export const requeueDeadLetter = (responseToken: string) =>
+  call<{ requeued: boolean }>('/api/admin/outbox/dead-letters/requeue', {
+    method: 'POST',
+    json: { responseToken },
+  });

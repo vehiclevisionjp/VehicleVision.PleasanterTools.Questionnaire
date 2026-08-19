@@ -1,6 +1,7 @@
 <script lang="ts">
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
+  import OutboxStatusPanel from './components/OutboxStatusPanel.svelte';
   import SignInPanel from './components/SignInPanel.svelte';
   import SurveyEditor from './components/SurveyEditor.svelte';
   import SurveyList from './components/SurveyList.svelte';
@@ -19,6 +20,9 @@
   /** 操作の記録を開いているか。**これも URL に出す。** */
   let openAuditLog = $state(readAuditLog());
 
+  /** 送信状況を開いているか。**これも URL に出す。** */
+  let openOutbox = $state(readOutbox());
+
   $effect(() => {
     void refresh();
   });
@@ -33,6 +37,7 @@
     const onPop = () => {
       openSurveyId = readSurveyId();
       openAuditLog = readAuditLog();
+      openOutbox = readOutbox();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -47,20 +52,35 @@
     return /^\/admin\/audit-logs\/?$/.test(location.pathname);
   }
 
+  function readOutbox(): boolean {
+    return /^\/admin\/outbox\/?$/.test(location.pathname);
+  }
+
   function open(surveyId: string) {
     openSurveyId = surveyId;
+    openAuditLog = false;
+    openOutbox = false;
     history.pushState(null, '', `/admin/surveys/${surveyId}`);
   }
 
   function openAudit() {
     openSurveyId = null;
+    openOutbox = false;
     openAuditLog = true;
     history.pushState(null, '', '/admin/audit-logs');
+  }
+
+  function openDelivery() {
+    openSurveyId = null;
+    openAuditLog = false;
+    openOutbox = true;
+    history.pushState(null, '', '/admin/outbox');
   }
 
   function back() {
     openSurveyId = null;
     openAuditLog = false;
+    openOutbox = false;
     history.pushState(null, '', '/admin');
   }
 
@@ -96,6 +116,7 @@
     await logout();
     openSurveyId = null;
     openAuditLog = false;
+    openOutbox = false;
     history.replaceState(null, '', '/admin');
     await refresh();
   }
@@ -121,6 +142,15 @@
    * （`AdminAuditLogEndpoints`）。
    */
   const canSeeAuditLog = $derived(isAdministrator);
+
+  /**
+   * 送信状況を見せてよい相手か。
+   *
+   * **Administrator だけ。** 届いていない回答があることも、
+   * 送り直すという操作も、Editor へ開く情報ではない。
+   * **サーバ側でも同じ判定をしている**（`AdminOutboxEndpoints`）。
+   */
+  const canSeeOutbox = $derived(session?.role === 'Administrator');
 
   const needsEnrollment = $derived(
     session !== undefined &&
@@ -153,6 +183,10 @@
         </select>
       </label>
 
+      {#if canSeeOutbox}
+        <button type="button" class="link" onclick={openDelivery}>{t('outbox.open')}</button>
+      {/if}
+
       {#if canSeeAuditLog}
         <button type="button" class="link" onclick={openAudit}>{t('audit.open')}</button>
       {/if}
@@ -161,12 +195,14 @@
     </header>
 
     <!--
-      **記録の一覧だけ広く使う。** 7 列あって識別子も入るので、
+      **表を出す画面だけ広く使う。** 列が多くて識別子も入るので、
       他の画面と同じ幅だと横に流さないと読めない
     -->
-    <main class:wide={openAuditLog && canSeeAuditLog}>
+    <main class:wide={(openAuditLog && canSeeAuditLog) || (openOutbox && canSeeOutbox)}>
       {#if openAuditLog && canSeeAuditLog}
         <AuditLogList onback={back} />
+      {:else if openOutbox && canSeeOutbox}
+        <OutboxStatusPanel onback={back} />
       {:else if openSurveyId}
         <SurveyEditor surveyId={openSurveyId} onback={back} />
       {:else}

@@ -371,3 +371,48 @@ export interface AuditLogFilter {
   from: string;
   to: string;
 }
+
+/**
+ * 送信の滞留の状況。
+ *
+ * **回答の中身は入っていない**（`_documents/データモデル設計.md` 2.5）。
+ * 出るのは件数と滞留の時刻だけ。
+ *
+ * **1 件も無い時刻は `null` ではなく「無い」**。サーバは null のプロパティを
+ * 落として返すので、`?` を外すと画面が真っ白になる。
+ */
+export interface OutboxStatus {
+  /** 送信待ちの件数。**デッドレターは含まない。** */
+  pendingCount: number;
+  /** 送信待ちのうち、最も古い受付時刻。**いつから詰まっているか。** */
+  oldestPendingAt?: string | null;
+  deadLetterCount: number;
+  /** デッドレターのうち、最も古い最終試行の時刻。 */
+  oldestDeadLetterAt?: string | null;
+}
+
+/**
+ * 送信できなかった回答 1 件。
+ *
+ * **回答本文は届かない。** サーバ側の型にも入る場所が無い。
+ */
+export interface DeadLetterEntry {
+  responseToken: string;
+  surveyId: string;
+  /** アンケートの題名。**消えたアンケートでは無い。** */
+  surveyTitle?: string | null;
+  surveyVersion: number;
+  retryCount: number;
+  /** 最後に失敗した理由。**そのまま出さず、必ず逃がして描くこと。** */
+  lastError?: string | null;
+  /** 回答を受け付けた時刻。**ここからずっと届いていない。** */
+  receivedAt: string;
+  lastAttemptAt: string;
+}
+
+/** 送信できなかった回答の 1 ページ。 */
+export interface DeadLetterPage {
+  entries: DeadLetterEntry[];
+  /** 次のページがあるか。**総数は数えない。** */
+  hasMore: boolean;
+}
