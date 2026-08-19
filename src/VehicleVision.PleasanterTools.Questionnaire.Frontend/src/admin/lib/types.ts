@@ -1,4 +1,5 @@
 import { DEFAULT_LANGUAGE, type Language } from '../../lib/i18n/language';
+import type { SurveyTheme } from '../../lib/theme';
 import { ja, type MessageKey } from './i18n/messages';
 
 /** 言語コードをキーにした表示文字列。**器は最初から用意する。** */
@@ -186,6 +187,13 @@ export interface SurveyDefinition {
   displayMode: 'Paged' | 'OneQuestionPerPage';
   showProgress: boolean;
   allowEditingAfterSubmit: boolean;
+  /**
+   * 回答画面の見た目（Issue #56）。
+   *
+   * **無ければ既定の見た目。** 検査と書体の並びは回答画面と同じものを使う
+   * （`lib/theme.ts`）。2 か所に持つと片方だけ緩んでも気付けない。
+   */
+  theme?: SurveyTheme | null;
   pages: Page[];
 }
 

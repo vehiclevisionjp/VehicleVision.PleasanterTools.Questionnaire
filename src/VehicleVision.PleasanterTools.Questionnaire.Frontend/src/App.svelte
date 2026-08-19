@@ -22,6 +22,7 @@
     type Language,
   } from './lib/i18n/language';
   import { serverValidationKey, translator, type MessageKey } from './lib/i18n/messages';
+  import { applyTheme, headerImageUrl } from './lib/theme';
 
   type Screen = 'loading' | 'answering' | 'answered' | 'completed' | 'rejected' | 'error';
 
@@ -92,6 +93,16 @@
    * 画面を進めるためだけのもの（`lib/flow.ts`）。
    */
   const path = $derived(tracePath(definition, answers));
+
+  $effect(() => {
+    // **管理者が決めた見た目を反映する**（Issue #56）。
+    // **CSS のカスタムプロパティへ入れるだけ**で、スタイル表は組み立てない
+    // （`lib/theme.ts`）。設定が無ければ何も入らず、今までの見た目のまま
+    applyTheme(document.documentElement, definition?.theme);
+  });
+
+  /** ヘッダ画像の URL。**本アプリの口だけを指す**（外部へ取りに行かない）。 */
+  const headerImage = $derived(definition ? headerImageUrl(publicId, definition.theme) : null);
 
   /** 画面に出す区切り。**1 問 1 ページ表示なら 1 設問で 1 区切り。** */
   const steps = $derived(toSteps(path, definition?.displayMode ?? 'Paged'));
@@ -411,6 +422,11 @@
     </button>
   {:else if definition && currentPage}
     <header>
+      <!-- **飾り。** 意味は題名が伝えるので `alt` は空にする
+           （読み上げに「ヘッダ画像」と挟まる方が邪魔になる） -->
+      {#if headerImage}
+        <img class="header-image" src={headerImage} alt="" />
+      {/if}
       <h1>{text(definition.title, language)}</h1>
       {#if definition.description}
         <p class="lead">{text(definition.description, language)}</p>
@@ -491,19 +507,23 @@
 </main>
 
 <style lang="scss">
+  /* **テーマで差し替わるのはここに書いた既定値**（Issue #56）。
+     何も指定されなければ、この値のまま＝今までの見た目 */
   :global(:root) {
     --border: #d0d5dd;
     --muted: #667085;
     --error: #b42318;
     --accent: #175cd3;
     --bg: #f9fafb;
+    --text: #101828;
+    --font: system-ui, sans-serif;
   }
 
   :global(body) {
     margin: 0;
     background: var(--bg);
-    font-family: system-ui, sans-serif;
-    color: #101828;
+    font-family: var(--font);
+    color: var(--text);
     line-height: 1.6;
   }
 
@@ -559,6 +579,16 @@
     margin-top: 1.5rem;
   }
 
+  /* **横幅に収める。** 縦横比は保つ（縦長の画像で画面が埋まらないよう上限を置く） */
+  .header-image {
+    display: block;
+    width: 100%;
+    max-height: 14rem;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+
   .language {
     display: flex;
     align-items: center;
@@ -573,6 +603,8 @@
       padding: 0.25rem 0.4rem;
       border: 1px solid var(--border);
       border-radius: 4px;
+      /* **地が白なので文字色もテーマに追随させない。**
+         明るい文字色を選ばれると、白地に白い文字になって読めなくなる */
       background: #fff;
       color: #101828;
     }
