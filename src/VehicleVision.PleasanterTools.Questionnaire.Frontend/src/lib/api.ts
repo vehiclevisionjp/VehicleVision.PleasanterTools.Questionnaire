@@ -1,30 +1,132 @@
-import type { FormResponse, PayloadAnswer, RejectionReason } from './types';
+import type { FormResponse, PayloadAnswer, RejectionReason, Ticket } from './types';
 
 /** 回答トークンの保存先。**URL には載せない。** */
 const TOKEN_STORAGE_PREFIX = 'questionnaire.token.';
 
-/**
- * 回答トークンを取り出す。無ければ作る。
- *
- * **これを知っている人はその回答を書き換えられる**ので、URL・メール・ログへ載せない
- * （`_documents/アーキテクチャ方針.md` 9 章）。
- */
-export function getOrCreateResponseToken(publicId: string): string {
-  const key = TOKEN_STORAGE_PREFIX + publicId;
-  const existing = localStorage.getItem(key);
-  if (existing) return existing;
+/** 「この端末で回答済み」の印の保存先。 */
+const SUBMITTED_STORAGE_PREFIX = 'questionnaire.submitted.';
 
-  // **暗号論的乱数から作る。** Math.random は使わない
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  const token = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  localStorage.setItem(key, token);
-  return token;
+/** 同じ印を Cookie にも置くときの名前。 */
+const SUBMITTED_COOKIE_PREFIX = 'q.a.';
+
+/** 印を残す期間（秒）。180 日。 */
+const SUBMITTED_MAX_AGE = 180 * 24 * 60 * 60;
+
+/**
+ * Web Storage を触る。**使えない状況でも画面を落とさない。**
+ *
+ * プライベートブラウジングや iframe の制限で、参照した瞬間に例外が飛ぶことがある。
+ * **回答できなくなる方が、多重投稿を許すより重い。**
+ */
+function readStorage(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 
-/** 既に回答済みか（この端末で）。 */
+function writeStorage(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // 保存できなくても回答は続けられる
+  }
+}
+
+function removeStorage(key: string): void {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // 同上
+  }
+}
+
+/**
+ * 回答済みの印を置く Cookie の属性。
+ *
+ * **`path` を `/f/{publicId}` に絞る。** こうすると API の要求には付かず、
+ * 回答画面の JavaScript から読むためだけの Cookie になる。
+ * **入るのは真偽値だけで、回答者を識別する値は入れない。**
+ */
+function cookieAttributes(publicId: string): string {
+  const secure = location.protocol === 'https:' ? '; secure' : '';
+  return `; path=/f/${encodeURIComponent(publicId)}; max-age=${SUBMITTED_MAX_AGE}; samesite=lax${secure}`;
+}
+
+function readCookie(name: string): string | null {
+  try {
+    const found = document.cookie
+      .split(';')
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith(`${name}=`));
+    return found ? found.slice(name.length + 1) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** この端末に残っている回答トークン。無ければ `null`。 */
+export function readResponseToken(publicId: string): string | null {
+  return readStorage(TOKEN_STORAGE_PREFIX + publicId);
+}
+
+/**
+ * 送信チケットを受け取る。**回答トークンもサーバが決める。**
+ *
+ * 端末が既にトークンを持っていれば、それを渡して同じ回答を指し続ける
+ * （渡さないと、編集のたびに別の回答になる）。
+ * **トークンは本文で送る。** URL に載せると経路のログへ残る。
+ */
+export async function requestTicket(publicId: string): Promise<Ticket | null> {
+  const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}/ticket`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ responseToken: readResponseToken(publicId) }),
+  });
+
+  if (!response.ok) return null;
+
+  const ticket = (await response.json()) as Ticket;
+  writeStorage(TOKEN_STORAGE_PREFIX + publicId, ticket.responseToken);
+  return ticket;
+}
+
+/**
+ * この端末から回答済みか。
+ *
+ * **「防止」ではなく「抑止」。** Web Storage も Cookie も回答者が消せるし、
+ * 端末を変えれば残らない。**2 か所に置くのは、片方だけ消えても効くようにするため**
+ * （Safari は JavaScript が置いた Cookie を 7 日で切ることがある）。
+ */
 export function hasSubmitted(publicId: string): boolean {
-  return localStorage.getItem(TOKEN_STORAGE_PREFIX + publicId) !== null;
+  return (
+    readStorage(SUBMITTED_STORAGE_PREFIX + publicId) !== null ||
+    readCookie(SUBMITTED_COOKIE_PREFIX + publicId) !== null
+  );
+}
+
+/** 回答済みの印を残す。 */
+export function markSubmitted(publicId: string): void {
+  writeStorage(SUBMITTED_STORAGE_PREFIX + publicId, '1');
+  try {
+    document.cookie = `${SUBMITTED_COOKIE_PREFIX}${publicId}=1${cookieAttributes(publicId)}`;
+  } catch {
+    // Cookie が使えなくても Web Storage 側が残る
+  }
+}
+
+/** この端末の回答を忘れる。**「新しい回答を送信する」を選んだとき。** */
+export function forgetSubmission(publicId: string): void {
+  removeStorage(TOKEN_STORAGE_PREFIX + publicId);
+  removeStorage(SUBMITTED_STORAGE_PREFIX + publicId);
+  try {
+    document.cookie = `${SUBMITTED_COOKIE_PREFIX}${publicId}=; path=/f/${encodeURIComponent(
+      publicId,
+    )}; max-age=0`;
+  } catch {
+    // 同上
+  }
 }
 
 export interface LoadResult {
@@ -59,6 +161,14 @@ export interface SubmitResult {
   attachmentErrors?: AttachmentError[];
 }
 
+/** 送信するときに一緒に渡すもの。 */
+export interface SubmitContext {
+  /** 画面を開いたときにサーバが発行した送信チケット。 */
+  ticket: string;
+  /** ハニーポット項目の値。**人が触れば埋まらない。** */
+  trap: string;
+}
+
 /** 添付 1 件を受け付けなかった理由。 */
 export interface AttachmentError {
   questionId?: string;
@@ -73,16 +183,21 @@ export interface Attachment {
 }
 
 /**
+/**
  * 回答を送る。**受け付けられたら 202 が返る**（Pleasanter へはこの後ワーカーが送る）。
  *
  * **添付があるときは `multipart/form-data` で送る。**
  * 添付だけ先に預ける口は無く、サーバは送信待ちへ保存する前に中身を検査する
  * （`_documents/添付ファイル検査-運用手順書.md`）。
+ *
+ * **チケットと罠はどちらの送り方でも同じ場所に載せる。**
+ * multipart のときは `answers` の欄へまとめて入れるので、サーバ側の読み方は 1 つで済む。
  */
 export async function submitAnswers(
   publicId: string,
   responseToken: string,
   answers: PayloadAnswer[],
+  context: SubmitContext,
   attachments: Attachment[] = [],
 ): Promise<SubmitResult> {
   const url = `/api/forms/${encodeURIComponent(publicId)}/responses/${encodeURIComponent(responseToken)}`;
@@ -92,11 +207,14 @@ export async function submitAnswers(
     request = {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ answers }),
+      body: JSON.stringify({ answers, ticket: context.ticket, trap: context.trap }),
     };
   } else {
     const form = new FormData();
-    form.append('answers', JSON.stringify({ answers }));
+    form.append(
+      'answers',
+      JSON.stringify({ answers, ticket: context.ticket, trap: context.trap }),
+    );
     for (const attachment of attachments) {
       form.append(attachment.questionId, attachment.file, attachment.file.name);
     }
@@ -107,6 +225,8 @@ export async function submitAnswers(
   const response = await fetch(url, request);
 
   if (response.status === 202) {
+    // **受け付けられて初めて印を置く。** 開いただけで回答済みにしない
+    markSubmitted(publicId);
     return { accepted: true };
   }
 
@@ -136,7 +256,7 @@ export async function submitAnswers(
 
   if (response.status === 429) {
     // **レート制限。** 少し待てば通る
-    return { accepted: false, rejection: undefined, errors: { '': ['TooManyRequests'] } };
+    return { accepted: false, rejection: 'tooManyRequests' };
   }
 
   return { accepted: false, rejection: 'notFound' };

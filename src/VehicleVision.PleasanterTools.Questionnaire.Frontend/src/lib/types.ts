@@ -79,8 +79,27 @@ export interface PayloadAnswer {
   fileNames?: string[];
 }
 
-/** 受付を断られた理由。 */
-export type RejectionReason = 'notStarted' | 'closed' | 'suspended' | 'notFound';
+/** サーバが発行する送信チケットと回答トークン。 */
+export interface Ticket {
+  /** この端末の回答を指すトークン。**サーバが決める。** */
+  responseToken: string;
+  /** 送信時にそのまま返す署名付きのチケット。 */
+  ticket: string;
+}
+
+/**
+ * 受付を断られた理由。
+ *
+ * - `rejected` は bot 対策で断られたとき（**理由の内訳は返らない**）
+ * - `tooManyRequests` はレート制限。画面側で付ける
+ */
+export type RejectionReason =
+  | 'notStarted'
+  | 'closed'
+  | 'suspended'
+  | 'notFound'
+  | 'rejected'
+  | 'tooManyRequests';
 
 /** 設問の回答（画面が持つ形）。 */
 export interface AnswerState {

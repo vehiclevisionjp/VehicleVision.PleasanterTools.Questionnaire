@@ -134,6 +134,29 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
 builder.Services.AddSingleton<AdminUserService>();
 
+// ---- bot 対策 --------------------------------------------------------------
+// **外部の CAPTCHA を使わない**（_documents/非機能設計.md 1 章）。
+// 完全匿名を掲げている以上、回答者の IP や操作の癖を第三者へ送れない。
+// 代わりに送信チケット・最短時間・ハニーポットを重ねる（Services/SubmissionGuard.cs）
+var submissionGuardOptions = new SubmissionGuardOptions
+{
+    // **切れるのは検証環境のため。** 本番で切らないこと
+    Enabled = !string.Equals(
+        builder.Configuration["QUESTIONNAIRE_BOT_MITIGATION"], "off", StringComparison.OrdinalIgnoreCase),
+    MinimumElapsed = TimeSpan.FromSeconds(
+        int.TryParse(builder.Configuration["QUESTIONNAIRE_SUBMIT_MIN_SECONDS"], out var minSeconds)
+            ? minSeconds
+            : 3),
+    Lifetime = TimeSpan.FromHours(
+        int.TryParse(builder.Configuration["QUESTIONNAIRE_SUBMIT_TICKET_HOURS"], out var ticketHours)
+            ? ticketHours
+            : 24),
+};
+
+builder.Services.AddSingleton(submissionGuardOptions);
+builder.Services.AddSingleton(serviceProvider => new SubmissionGuard(
+    secretKey, submissionGuardOptions, serviceProvider.GetRequiredService<TimeProvider>()));
+
 // **既定は厳しく。** 緩めるのは検証環境だけにすること。
 // 端から端まで通す試験は 1 つの IP から大量に叩くので、既定のままだと自分で枠を使い切る
 var loginPermitLimit = int.TryParse(
@@ -141,6 +164,10 @@ var loginPermitLimit = int.TryParse(
     ? configuredLogin
     : 10;
 
+var submitPermitLimit = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_SUBMITS_PER_MIN"], out var configuredSubmits)
+    ? configuredSubmits
+    : 20;
 var requestPermitLimit = int.TryParse(
     builder.Configuration["QUESTIONNAIRE_REQUESTS_PER_MIN"], out var configuredRequests)
     ? configuredRequests
@@ -207,6 +234,18 @@ builder.Services.AddRateLimiter(options =>
                     PermitLimit = 600,
                     Window = TimeSpan.FromMinutes(1),
                 })));
+
+    // **回答の送信だけ別枠にする。** 書き込みは読み取りより高くつくので、
+    // 画面を開くだけの要求と同じ枠で数えない。
+    // **NAT の内側から大勢が答えることがある**ので、締めすぎないこと
+    options.AddPolicy(FormEndpoints.SubmitRateLimitPolicy, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = submitPermitLimit,
+                Window = TimeSpan.FromMinutes(1),
+            }));
 
     // **ログインの試行だけは別枠で厳しくする。**
     // 全体の枠に紛れさせると、1 分に 60 回の総当たりが通ってしまう。

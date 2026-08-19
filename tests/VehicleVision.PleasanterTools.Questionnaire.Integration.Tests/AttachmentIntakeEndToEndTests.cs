@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -69,7 +71,24 @@ public class AttachmentIntakeEndToEndTests
         ],
     };
 
-    private static MultipartFormDataContent Multipart(string fileName, byte[] content)
+    /// <summary>送信チケットを受け取る。</summary>
+    /// <remarks>
+    /// **回答トークンはサーバが発行する**（bot 対策。<c>Services/SubmissionGuard.cs</c>）。
+    /// 画面が勝手に決めた値では送信できない。
+    /// </remarks>
+    private static async Task<(string ResponseToken, string Ticket)> IssueTicketAsync(
+        HttpClient http,
+        string publicId)
+    {
+        using var response = await http.PostAsJsonAsync(
+            $"/api/forms/{publicId}/ticket", new { });
+        response.EnsureSuccessStatusCode();
+
+        var body = JsonNode.Parse(await response.Content.ReadAsStringAsync());
+        return (body!["responseToken"]!.GetValue<string>(), body["ticket"]!.GetValue<string>());
+    }
+
+    private static MultipartFormDataContent Multipart(string fileName, byte[] content, string ticket)
     {
         var form = new MultipartFormDataContent
         {
@@ -78,6 +97,9 @@ public class AttachmentIntakeEndToEndTests
                     JsonSerializer.Serialize(new
                     {
                         answers = new[] { new { questionId = "q1", values = new[] { "満足" } } },
+                        // **チケットと罠は答えと同じ欄へ入れる。** サーバの読み方を 1 つにするため
+                        ticket,
+                        trap = "",
                     }),
                     Encoding.UTF8,
                     "application/json"),
@@ -111,12 +133,16 @@ public class AttachmentIntakeEndToEndTests
         await surveys.PublishAsync(surveyId, 1, Definition(), new MappingDefinition(), null);
 
         using var http = new HttpClient { BaseAddress = new Uri(BaseUrl) };
-        var token = NewToken();
+
+        // **チケットを受け取り、最短時間を待ってから送る。**
+        // 人が読んで入力する時間より速い送信は bot として断られる
+        var (token, ticket) = await IssueTicketAsync(http, publicId);
+        await Task.Delay(TimeSpan.FromSeconds(4));
 
         try
         {
             using (var accepted = await http.PutAsync(
-                $"/api/forms/{publicId}/responses/{token}", Multipart("a.png", PngHeader)))
+                $"/api/forms/{publicId}/responses/{token}", Multipart("a.png", PngHeader, ticket)))
             {
                 Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
             }
@@ -132,10 +158,12 @@ public class AttachmentIntakeEndToEndTests
             Assert.Contains("a.png", payload, StringComparison.Ordinal);
 
             // 中身が拡張子と食い違う添付は受け付けない
-            var rejectedToken = NewToken();
+            var (rejectedToken, rejectedTicket) = await IssueTicketAsync(http, publicId);
+            await Task.Delay(TimeSpan.FromSeconds(4));
+
             using var rejected = await http.PutAsync(
                 $"/api/forms/{publicId}/responses/{rejectedToken}",
-                Multipart("a.png", [0x4D, 0x5A, 0x00]));
+                Multipart("a.png", [0x4D, 0x5A, 0x00], rejectedTicket));
 
             Assert.Equal(HttpStatusCode.UnprocessableEntity, rejected.StatusCode);
             Assert.Contains(
