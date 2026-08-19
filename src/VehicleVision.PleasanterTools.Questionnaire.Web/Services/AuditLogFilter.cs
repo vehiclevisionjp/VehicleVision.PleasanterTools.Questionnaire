@@ -166,6 +166,14 @@ public sealed partial class AuditLogFilter(
 
     private static (string? TargetType, string? TargetId) TargetOf(HttpContext http)
     {
+        // **入口が明示したものを優先する**（AuditNotes.SetTarget）。
+        // 対象の識別子を経路へ出せない入口がある
+        // （デッドレターの再送。`ResponseToken` は監査ログへ入れない）
+        if (AuditNotes.TargetOf(http) is { } declared)
+        {
+            return declared;
+        }
+
         foreach (var (routeKey, targetType) in Targets)
         {
             if (http.Request.RouteValues.TryGetValue(routeKey, out var value)

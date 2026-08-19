@@ -193,6 +193,16 @@ public static class ServerMessages
             ServerMessageKeys.DuplicateSiteIdMustDiffer,
             "複製先には、元とは別の Pleasanter のサイト ID を指定してください。",
             "Specify a Pleasanter site ID other than the one the original survey writes to.");
+        // ---- 送信状況 -------------------------------------------------------
+        Add(
+            ServerMessageKeys.ResponseTokenRequired,
+            "戻す回答を指定してください。",
+            "Specify which response to put back.");
+
+        Add(
+            ServerMessageKeys.DeadLetterNotFound,
+            "その回答は見つかりません。既に送信待ちへ戻されたか、送信できた可能性があります。",
+            "That response was not found. It may have already been put back, or it may have been sent.");
 
         return catalog.ToFrozenDictionary(StringComparer.Ordinal);
     }

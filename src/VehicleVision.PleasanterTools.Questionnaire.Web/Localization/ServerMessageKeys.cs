@@ -81,4 +81,13 @@ public static class ServerMessageKeys
 
     /// <summary>複製先に元と同じサイトを指定した。**1 アンケート = 1 サイト。**</summary>
     public const string DuplicateSiteIdMustDiffer = "surveys.duplicateSiteIdMustDiffer";
+    // ---- 送信状況 -----------------------------------------------------------
+
+    /// <summary>戻す回答を指定していない。</summary>
+    public const string ResponseTokenRequired = "outbox.responseTokenRequired";
+
+    /// <summary>
+    /// 戻す先が見つからない。**既に誰かが戻した / 送信できて消えた場合を含む。**
+    /// </summary>
+    public const string DeadLetterNotFound = "outbox.deadLetterNotFound";
 }
