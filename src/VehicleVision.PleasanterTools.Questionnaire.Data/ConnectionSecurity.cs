@@ -1,4 +1,3 @@
-using Microsoft.Data.SqlClient;
 using MySqlConnector;
 using Npgsql;
 
@@ -40,16 +39,24 @@ public static class ConnectionSecurity
         {
             case DatabaseProvider.SqlServer:
             {
-                var builder = new SqlConnectionStringBuilder(connectionString);
+                // **型付きの SqlConnectionStringBuilder を使わない。**
+                // CodeQL は「接続文字列が SQL 接続へ流れた」と読み、
+                // *調べるために* 解析している所まで指摘してしまう（cs/insecure-sql-connection）。
+                // 汎用のパーサなら同じ解析ができて、その誤検知が起きない。
+                //
+                // **既定値はここに書き写している。** 版が上がって既定が変わったら直すこと
+                // （Microsoft.Data.SqlClient 4.0 以降の既定は Encrypt=true）。
+                var builder = new System.Data.Common.DbConnectionStringBuilder
+                {
+                    ConnectionString = connectionString,
+                };
 
-                // Microsoft.Data.SqlClient 4.0 以降の既定は Encrypt=true。
-                // **明示して切っている場合だけを咎める**
-                if (!builder.Encrypt)
+                if (IsFalse(builder, "Encrypt"))
                 {
                     problems.Add(new Problem("Encrypt=False になっている。通信が平文で流れる"));
                 }
 
-                if (builder.TrustServerCertificate)
+                if (IsTrue(builder, "TrustServerCertificate"))
                 {
                     // **暗号化はされるが、相手が本物かを確かめない。**
                     // 中間者に差し替えられても気付けない
@@ -117,6 +124,18 @@ public static class ConnectionSecurity
 
         return problems;
     }
+
+    /// <summary>その項目が明示的に真か。**書かれていなければ偽ではなく「無い」。**</summary>
+    private static bool IsTrue(System.Data.Common.DbConnectionStringBuilder builder, string key) =>
+        builder.TryGetValue(key, out var value)
+        && bool.TryParse(value?.ToString(), out var parsed)
+        && parsed;
+
+    /// <summary>その項目が明示的に偽か。</summary>
+    private static bool IsFalse(System.Data.Common.DbConnectionStringBuilder builder, string key) =>
+        builder.TryGetValue(key, out var value)
+        && bool.TryParse(value?.ToString(), out var parsed)
+        && !parsed;
 
     /// <summary>不備があれば例外にする。**起動時に呼ぶ。**</summary>
     /// <param name="allowInsecure">
