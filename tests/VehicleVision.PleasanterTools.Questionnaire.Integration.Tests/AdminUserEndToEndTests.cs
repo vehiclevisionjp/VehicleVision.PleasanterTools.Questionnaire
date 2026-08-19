@@ -211,6 +211,32 @@ public class AdminUserEndToEndTests
         Assert.Equal(HttpStatusCode.Forbidden, invite.StatusCode);
     }
 
+    /// <summary>
+    /// **アンケートの複製は Administrator だけ**（Issue #46）。
+    /// 書き込み先のサイトを新しく決める操作であり、
+    /// 誤ると別の業務のサイトへ回答が流れ込む。
+    /// **認可は入口で効く**ので、アンケートが在るかどうかより先に断られる。
+    /// </summary>
+    [Fact]
+    public async Task Editorはアンケートを複製できない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var admin = await SignedInAdministratorAsync();
+        var (_, token) = await InviteAsync(admin, "editor", "Editor");
+        using var editor = await AcceptAsync(token, EditorPassword);
+
+        using var duplicate = await PostAsync(
+            editor,
+            $"/api/admin/surveys/{Guid.NewGuid()}/duplicate",
+            new { pleasanterSiteId = 2L });
+
+        Assert.Equal(HttpStatusCode.Forbidden, duplicate.StatusCode);
+    }
+
     [Fact]
     public async Task Editorも自分の合言葉は変えられる()
     {

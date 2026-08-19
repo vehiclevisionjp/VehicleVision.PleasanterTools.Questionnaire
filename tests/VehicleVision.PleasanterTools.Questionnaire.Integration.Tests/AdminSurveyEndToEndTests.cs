@@ -516,4 +516,94 @@ public class AdminSurveyEndToEndTests
         Assert.NotEqual(a, b);
         Assert.True(a.Length >= 20, $"公開用 ID が短すぎる: {a}");
     }
+
+    /// <summary>
+    /// 複製が下書きとして作られ、**公開用 ID を使い回さない**こと（Issue #46）。
+    /// </summary>
+    [Fact]
+    public async Task 複製すると別の公開用IDを持つ下書きができる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true)))
+        {
+            save.EnsureSuccessStatusCode();
+        }
+
+        using var original = await http.GetAsync("/api/admin/surveys");
+        var originalPublicId = (await ReadAsync(original))!.AsArray()
+            .Single(row => row!["surveyId"]!.GetValue<string>() == surveyId)!["publicId"]!
+            .GetValue<string>();
+
+        string copyId;
+        using (var duplicate = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/duplicate", new { pleasanterSiteId = 2L }))
+        {
+            Assert.Equal(HttpStatusCode.Created, duplicate.StatusCode);
+            var body = await ReadAsync(duplicate);
+            copyId = body!["surveyId"]!.GetValue<string>();
+
+            // **使い回さない**（_documents/データモデル設計.md 3 章）
+            Assert.NotEqual(originalPublicId, body["publicId"]!.GetValue<string>());
+        }
+
+        Assert.NotEqual(surveyId, copyId);
+
+        using (var draft = await http.GetAsync($"/api/admin/surveys/{copyId}"))
+        {
+            draft.EnsureSuccessStatusCode();
+            var body = await ReadAsync(draft);
+            Assert.Equal(0, body!["revision"]!.GetValue<int>());
+            Assert.Equal("満足度調査のコピー", body["definition"]!["title"]!["ja"]!.GetValue<string>());
+            // **マッピングも写る**
+            Assert.Single(body["mapping"]!["assignments"]!.AsArray());
+        }
+
+        using (var list = await http.GetAsync("/api/admin/surveys"))
+        {
+            var copy = (await ReadAsync(list))!.AsArray()
+                .Single(row => row!["surveyId"]!.GetValue<string>() == copyId)!;
+
+            // **公開状態も公開済みの版も写さない**
+            Assert.Equal(0, copy["status"]!.GetValue<int>());
+            Assert.Null(copy["publishedVersion"]);
+            Assert.Equal(2L, copy["pleasanterSiteId"]!.GetValue<long>());
+        }
+    }
+
+    /// <summary>
+    /// **1 アンケート = 1 サイト。** 元と同じサイトを指定させない（Issue #46）。
+    /// </summary>
+    [Fact]
+    public async Task 複製先に元と同じサイトは指定できない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        // 元は pleasanterSiteId = 1
+        using var same = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/duplicate", new { pleasanterSiteId = 1L });
+        Assert.Equal(HttpStatusCode.BadRequest, same.StatusCode);
+
+        using var missing = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/duplicate", new { pleasanterSiteId = 0L });
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+
+        // **無いアンケートは複製できない**
+        using var unknown = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{Guid.NewGuid()}/duplicate", new { pleasanterSiteId = 2L });
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
 }

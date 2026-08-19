@@ -189,6 +189,11 @@ public static class ServerMessages
             "この版は既に公開されています。読み直してからもう一度お試しください。",
             "This version has already been published. Reload and try again.");
 
+        Add(
+            ServerMessageKeys.DuplicateSiteIdMustDiffer,
+            "複製先には、元とは別の Pleasanter のサイト ID を指定してください。",
+            "Specify a Pleasanter site ID other than the one the original survey writes to.");
+
         return catalog.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }

@@ -25,6 +25,25 @@ public sealed record SurveySummary(
     int? PublishedVersion,
     DateTime UpdatedAt);
 
+/// <summary>複製で作るアンケートの、**写さない値**（Issue #46）。</summary>
+/// <param name="SurveyId">複製先の内部 ID。</param>
+/// <param name="PublicId">
+/// **新しく作った推測不能な値**（<see cref="Core.Definitions.SurveyPublicId.Generate"/>）。
+/// **元の値を使い回さない**（<c>_documents/データモデル設計.md</c> 3 章）。
+/// </param>
+/// <param name="PleasanterSiteId">
+/// 書き込み先のサイト。**元の値を写さない。** 1 アンケート = 1 サイトなので、
+/// 写すと 2 つのアンケートが同じサイトへ書き込む。
+/// </param>
+/// <param name="ResponseJsonColumn">
+/// 回答 JSON の正本を入れる列。**サイトに紐づく値なので、元の値を写さない。**
+/// </param>
+public sealed record SurveyDuplicationTarget(
+    Guid SurveyId,
+    string PublicId,
+    long PleasanterSiteId,
+    string? ResponseJsonColumn);
+
 /// <summary>下書きが、読んだ後に他の人に書き換えられていた。</summary>
 /// <remarks>
 /// **黙って上書きしない。** 管理画面で「他の人が更新した」と伝えて読み直させる。
@@ -65,6 +84,20 @@ public interface ISurveyDraftStore
         SurveyDefinition definition,
         MappingDefinition mapping,
         int expectedRevision,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>アンケートを丸ごと写して、新しい**下書き**を作る（Issue #46）。</summary>
+    /// <param name="sourceSurveyId">写す元のアンケート。</param>
+    /// <param name="target">写さない値。**呼ぶ側が決める。**</param>
+    /// <returns>元のアンケートが無ければ <c>false</c>。</returns>
+    /// <remarks>
+    /// **アンケートの行と下書きを 1 つのトランザクションで入れる。**
+    /// 途中で失敗したときに、設問の無いアンケートや、
+    /// 親の無いページが残ると、画面からも消せなくなる。
+    /// </remarks>
+    Task<bool> DuplicateAsync(
+        Guid sourceSurveyId,
+        SurveyDuplicationTarget target,
         CancellationToken cancellationToken = default);
 }
 
@@ -133,13 +166,29 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await LoadAsync(connection, transaction: null, surveyId, cancellationToken)
+            .ConfigureAwait(false);
+    }
 
+    /// <summary>下書きを読む。**トランザクションの中からも呼べる。**</summary>
+    /// <remarks>
+    /// **複製は読みと書きを 1 つのトランザクションに入れる**ため、
+    /// 接続とトランザクションを外から渡せるようにしてある。
+    /// 読んだ後に元が書き換わると、写した先が新旧の混ざったものになる。
+    /// </remarks>
+    private async Task<SurveyDraft?> LoadAsync(
+        DbConnection connection,
+        DbTransaction? transaction,
+        Guid surveyId,
+        CancellationToken cancellationToken)
+    {
         var survey = await connection.QueryFirstOrDefaultAsync<SurveyRow>(Sql(
             "SELECT [SurveyId], [TitleJson], [DescriptionJson], "
             + "       [ConfirmationMessageJson], [DisplayMode], [ShowProgress], "
             + "       [AllowEditingAfterSubmit], [PublishedVersion], [DraftRevision] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         if (survey is null)
@@ -151,6 +200,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             "SELECT [PageId], [TitleJson], [DescriptionJson], [NextJson] FROM [Pages] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
         var questions = (await connection.QueryAsync<QuestionRow>(Sql(
@@ -158,6 +208,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "       [DescriptionJson], [IsRequired], [SettingsJson], [VisibleWhenJson] "
             + "FROM [Questions] WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
         // **設問の一覧で絞る。** アンケートを跨いだ選択肢が混ざらないようにする
@@ -166,6 +217,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "FROM [QuestionChoices] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
         var assignments = (await connection.QueryAsync<AssignmentRow>(Sql(
@@ -173,6 +225,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "       [ConverterConfigJson] FROM [ColumnAssignments] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
         var sources = (await connection.QueryAsync<SourceRow>(Sql(
@@ -181,6 +234,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "JOIN [ColumnAssignments] a ON a.[AssignmentId] = s.[AssignmentId] "
             + "WHERE a.[SurveyId] = @SurveyId ORDER BY s.[SortOrder]",
             new { SurveyId = surveyId },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
         var choicesByQuestion = choices
@@ -325,6 +379,76 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return expectedRevision + 1;
+    }
+
+    public async Task<bool> DuplicateAsync(
+        Guid sourceSurveyId,
+        SurveyDuplicationTarget target,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection
+            .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        // **同じトランザクションの中で読む。** 読んでから書くまでの間に
+        // 元が保存されると、写した先が新旧の混ざったものになる
+        var source = await LoadAsync(connection, transaction, sourceSurveyId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (source is null)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        var definition = SurveyDuplication.Copy(source.Definition, target.SurveyId.ToString());
+        var now = DbTime.UtcNowTruncated();
+
+        // **下書きとして作る**（Issue #46）。公開状態も公開済みの版も写さない。
+        // **受付期間・回答上限も写さない。** 公開の設定であり、
+        // 期限切れの期間を引き継いだ複製は、作った直後から回答できない
+        await connection.ExecuteAsync(Sql(
+            "INSERT INTO [Surveys] "
+            + "  ([SurveyId], [PublicId], [Title], [PleasanterSiteId], "
+            + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
+            + "   [DraftRevision], [DisplayMode], [ShowProgress], "
+            + "   [AllowEditingAfterSubmit], [TitleJson], [DescriptionJson], "
+            + "   [ConfirmationMessageJson], [CreatedAt], [UpdatedAt]) "
+            + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
+            + "        @ResponseJsonColumn, @Status, NULL, "
+            + "        0, @DisplayMode, @ShowProgress, "
+            + "        @AllowEditingAfterSubmit, @TitleJson, @DescriptionJson, "
+            + "        @ConfirmationMessageJson, @Now, @Now)",
+            new
+            {
+                target.SurveyId,
+                target.PublicId,
+                target.PleasanterSiteId,
+                target.ResponseJsonColumn,
+                Status = (int)SurveyStatus.Draft,
+                DisplayMode = (int)definition.DisplayMode,
+                definition.ShowProgress,
+                definition.AllowEditingAfterSubmit,
+                TitleJson = WriteText(definition.Title),
+                DescriptionJson = WriteText(definition.Description),
+                ConfirmationMessageJson = WriteText(definition.ConfirmationMessage),
+                // 一覧に出す用の平文。**多言語の正本は TitleJson**
+                Title = Shorten(definition.Title.Get(LocalizedText.DefaultLanguage), 512),
+                Now = now,
+            },
+            transaction,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        // **保存と同じ道を通す。** 別に書くと、後から足した項目を
+        // 複製だけ写し漏らす（分岐がまさにそうなりやすい）
+        await InsertDraftAsync(
+            connection, transaction, target.SurveyId, definition, source.Mapping, cancellationToken)
+            .ConfigureAwait(false);
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return true;
     }
 
     private async Task DeleteDraftAsync(
