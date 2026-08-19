@@ -335,6 +335,18 @@ export const ja = {
   'outbox.previous': '前へ',
   'outbox.next': '次へ',
   'outbox.page': '{from}〜{to} 件目',
+  // ---- プレビュー（Issue #51） ----
+  'preview.open': 'プレビュー',
+  'preview.title': 'プレビュー',
+  'preview.close': '編集へ戻る',
+  'preview.restart': '最初から',
+  'preview.language': '見る言語',
+  'preview.notice': '回答画面と同じ描き方で、保存前の下書きを確かめています。入力しても保存も送信もされません。',
+  'preview.next': '次へ',
+  'preview.back': '戻る',
+  'preview.end': 'ここが最後です。実際の画面では送信の釦が出ます。',
+  'preview.stepCount': '{current} / {total}',
+  'preview.empty': '出せる設問がありません。',
 } as const;
 
 /** 文言の鍵。**日本語のカタログが一覧そのもの。** */
@@ -673,6 +685,18 @@ export const en: Record<MessageKey, string> = {
   'outbox.previous': 'Previous',
   'outbox.next': 'Next',
   'outbox.page': 'Showing {from}-{to}',
+  // ---- Preview ----
+  'preview.open': 'Preview',
+  'preview.title': 'Preview',
+  'preview.close': 'Back to editing',
+  'preview.restart': 'Start over',
+  'preview.language': 'Preview language',
+  'preview.notice': 'Showing the unsaved draft exactly as the answer screen draws it. Nothing you type is saved or sent.',
+  'preview.next': 'Next',
+  'preview.back': 'Back',
+  'preview.end': 'This is the last step. The real screen shows a submit button here.',
+  'preview.stepCount': '{current} / {total}',
+  'preview.empty': 'No question can be shown.',
 };
 
 const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };

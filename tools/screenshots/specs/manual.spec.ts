@@ -42,7 +42,13 @@ async function mask(page: import('@playwright/test').Page): Promise<void> {
 }
 
 /** 撮った写しに豆腐が無いことを、撮るたびに確かめる。 */
-async function shoot(page: import('@playwright/test').Page, name: string): Promise<void> {
+async function shoot(
+  page: import('@playwright/test').Page,
+  name: string,
+  // **重ねて出す画面は画面の高さで撮る。** 画面いっぱいに固定して出すものを
+  // ページ全体で撮ると、重なっていない部分まで写って図として読めなくなる
+  fullPage = true,
+): Promise<void> {
   await mask(page);
 
   const report = await findTofu(page, japaneseSamples);
@@ -51,13 +57,14 @@ async function shoot(page: import('@playwright/test').Page, name: string): Promi
     `${name} を撮る前に日本語が描けていない。豆腐: ${report.tofu.join('')} / 書体: ${report.fontFamily}`,
   ).toEqual([]);
 
-  await page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
+  await page.screenshot({ path: `${shots}/${name}.png`, fullPage });
 }
 
 test.describe.configure({ mode: 'serial' });
 
 
 let publicId = '';
+let surveyId = '';
 let secretBase32 = '';
 
 test.describe('取説用の写し', () => {
@@ -110,6 +117,7 @@ test.describe('取説用の写し（ログイン済み）', () => {
     // 画面で通したログインの cookie を持っていない（401 になる）
     const survey = await prepareSurvey(page.request, demoSiteId);
     publicId = survey.publicId;
+    surveyId = survey.surveyId;
 
     await page.goto('/admin');
     await expect(page.getByRole('heading', { name: 'アンケート' })).toBeVisible();
@@ -157,6 +165,17 @@ test.describe('取説用の写し（ログイン済み）', () => {
     await page.goto('/f/pub-not-exist');
     await expect(page.getByRole('heading', { name: 'アンケートが見つかりません' })).toBeVisible();
     await shoot(page, 'answer-04-not-found');
+  });
+
+  test('管理画面：プレビュー', async ({ page }) => {
+    test.skip(surveyId === '', '先の試験でアンケートを作れていない');
+
+    // **公開する前に、回答画面と同じ描き方で確かめる画面**
+    await page.goto(`/admin/surveys/${surveyId}`);
+    await page.getByRole('button', { name: 'プレビュー' }).click();
+
+    await expect(page.getByRole('dialog', { name: 'プレビュー' })).toBeVisible();
+    await shoot(page, 'admin-11-preview', false);
   });
 
   test('管理画面：操作の記録', async ({ page }) => {
