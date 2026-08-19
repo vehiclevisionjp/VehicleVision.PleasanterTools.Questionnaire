@@ -400,6 +400,22 @@ export const ja = {
   'themeFont.Serif': '明朝体',
   'themeFont.Rounded': '丸ゴシック体',
   'themeFont.Monospace': '等幅',
+  // ---- 回答数の上限と停止の理由（Issue #53） ----
+  'list.columnResponses': '回答数',
+  'list.responseCount': '{count} 件',
+  'list.responseCountOfLimit': '{count} / {limit} 件',
+  'status.suspendedManually': '手で停止',
+  'status.suspendedByLimit': '上限に達したため自動停止',
+  'settings.open': '公開設定',
+  'settings.title': '「{title}」の公開設定',
+  'settings.responseLimit': '回答数の上限（任意）',
+  'settings.responseLimitHint':
+    '空欄なら上限なしです。上限に達すると自動で受付を停止します。'
+    + '受け付けた回答は、まだ Pleasanter へ届いていない分も数えます。',
+  'settings.limitInvalid': '回答数の上限は 1 以上の数字で入力してください。',
+  'settings.noAutoResume': '上限を引き上げても自動では再開しません。「再開」を押してください。',
+  'settings.submit': '保存する',
+  'settings.cancel': 'やめる',
 } as const;
 
 /** 文言の鍵。**日本語のカタログが一覧そのもの。** */
@@ -803,6 +819,22 @@ export const en: Record<MessageKey, string> = {
   'themeFont.Serif': 'Serif',
   'themeFont.Rounded': 'Rounded',
   'themeFont.Monospace': 'Monospace',
+  'list.columnResponses': 'Responses',
+  'list.responseCount': '{count}',
+  'list.responseCountOfLimit': '{count} of {limit}',
+  'status.suspendedManually': 'Paused by an administrator',
+  'status.suspendedByLimit': 'Paused automatically: response limit reached',
+  'settings.open': 'Settings',
+  'settings.title': 'Settings for "{title}"',
+  'settings.responseLimit': 'Response limit (optional)',
+  'settings.responseLimitHint':
+    'Leave it empty for no limit. Responses stop being accepted once the limit is reached. '
+    + 'Responses that have not reached Pleasanter yet are counted too.',
+  'settings.limitInvalid': 'Enter the response limit as a number of 1 or more.',
+  'settings.noAutoResume':
+    'Raising the limit does not resume the survey. Press Resume when you are ready.',
+  'settings.submit': 'Save',
+  'settings.cancel': 'Cancel',
 };
 
 const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };

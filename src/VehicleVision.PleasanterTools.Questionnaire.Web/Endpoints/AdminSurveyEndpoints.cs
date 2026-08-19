@@ -462,29 +462,78 @@ public static class AdminSurveyEndpoints
             });
         });
 
+        // ---- 公開設定 --------------------------------------------------------
+        // **回答数の上限を編集できるようにする**（Issue #53）。
+        // 列はあったが、どこからも書けなかった
+        group.MapPut("/{surveyId:guid}/settings", async (
+            Guid surveyId,
+            SurveySettingsRequest request,
+            HttpContext context,
+            ISurveyRepository surveys,
+            CancellationToken cancellationToken) =>
+        {
+            // **0 と負の数を断る。** 0 を上限として保存すると、
+            // 公開しているのに誰も回答できないアンケートができる。
+            // 上限を外したいときは null を送ってもらう
+            if (request.ResponseLimit is { } limit && limit <= 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.ResponseLimitMustBePositive, RequestLanguage.Of(context)),
+                });
+            }
+
+            var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (record is null)
+            {
+                return Results.NotFound();
+            }
+
+            // **上限を引き上げても勝手に再開しない**（_documents/データモデル設計.md 2.1）。
+            // 再開するかどうかは人が決める
+            await surveys
+                .SaveAsync(record with { ResponseLimit = request.ResponseLimit }, cancellationToken)
+                .ConfigureAwait(false);
+
+            return Results.Ok(new { responseLimit = request.ResponseLimit });
+        });
+
         // ---- 停止と再開 ------------------------------------------------------
         group.MapPost("/{surveyId:guid}/suspend", (
             Guid surveyId,
             HttpContext context,
             ISurveyRepository surveys,
+            IResponseTokenStore tokens,
             CancellationToken cancellationToken) =>
-            ChangeStatusAsync(surveyId, SurveyStatus.Suspended, context, surveys, cancellationToken));
+            ChangeStatusAsync(
+                surveyId, SurveyStatus.Suspended, context, surveys, tokens, cancellationToken));
 
         group.MapPost("/{surveyId:guid}/resume", (
             Guid surveyId,
             HttpContext context,
             ISurveyRepository surveys,
+            IResponseTokenStore tokens,
             CancellationToken cancellationToken) =>
-            ChangeStatusAsync(surveyId, SurveyStatus.Published, context, surveys, cancellationToken));
+            ChangeStatusAsync(
+                surveyId, SurveyStatus.Published, context, surveys, tokens, cancellationToken));
 
         return builder;
     }
 
+    /// <summary>停止と再開。**理由を必ず書き換える。**</summary>
+    /// <remarks>
+    /// **手で止めたのか、上限で自動停止したのかを残す**
+    /// （<c>_documents/データモデル設計.md</c> 2.1）。
+    /// 残さないと、管理画面で「なぜ止まっているのか」が分からない。
+    /// </remarks>
     private static async Task<IResult> ChangeStatusAsync(
         Guid surveyId,
         SurveyStatus status,
         HttpContext context,
         ISurveyRepository surveys,
+        IResponseTokenStore tokens,
         CancellationToken cancellationToken)
     {
         var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken).ConfigureAwait(false);
@@ -513,8 +562,40 @@ public static class AdminSurveyEndpoints
             });
         }
 
-        await surveys.SaveAsync(record with { Status = (int)status }, cancellationToken)
-            .ConfigureAwait(false);
+        // **上限に達したまま再開させない。** 再開しても最初の回答で再び自動停止するだけで、
+        // 押した人には「再開できたのに止まっている」としか見えない。
+        // **先に上限を引き上げてもらう**
+        if (status is SurveyStatus.Published && record.ResponseLimit is { } limit && limit > 0)
+        {
+            var accepted = await tokens.CountAcceptedAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (accepted >= limit)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.ResponseLimitReached,
+                        RequestLanguage.Of(context),
+                        accepted,
+                        limit),
+                });
+            }
+        }
+
+        var updated = status is SurveyStatus.Suspended
+            ? record with
+            {
+                Status = (int)status,
+                SuspendedReason = (int)SurveySuspendedReason.Manual,
+                // **DB へ入れる時刻は必ず DbTime を通す**（秒未満と Kind の落とし穴）
+                SuspendedAt = DbTime.UtcNowTruncated(),
+            }
+            // **再開したら理由を消す。** 残すと、次に一覧を見た人が
+            // 動いているアンケートに停止の理由が付いているのを見ることになる
+            : record with { Status = (int)status, SuspendedReason = null, SuspendedAt = null };
+
+        await surveys.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
         return Results.Ok(new { status = status.ToString() });
     }
@@ -544,6 +625,12 @@ public static class AdminSurveyEndpoints
     public sealed record DuplicateSurveyRequest(
         long PleasanterSiteId,
         string? ResponseJsonColumn);
+
+    /// <summary>公開設定の保存（Issue #53）。</summary>
+    /// <param name="ResponseLimit">
+    /// 受け付ける回答の上限。**<c>null</c> は「上限なし」。**
+    /// </param>
+    public sealed record SurveySettingsRequest(int? ResponseLimit);
 
     /// <summary>下書きの保存。</summary>
     /// <param name="Revision">読んだときの版。**これが今の版と違えば拒否する。**</param>

@@ -5,9 +5,15 @@
     listSurveys,
     resume,
     saveAsTemplate,
+    saveSurveySettings,
     suspend,
   } from '../lib/api';
-  import { isPublished, surveyStatusKey, type SurveySummary } from '../lib/types';
+  import {
+    isPublished,
+    suspendedReasonKey,
+    surveyStatusKey,
+    type SurveySummary,
+  } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
   import SurveyQrCode from './SurveyQrCode.svelte';
   import TemplatePanel from './TemplatePanel.svelte';
@@ -64,6 +70,12 @@
   let templateBusy = $state(false);
   /** テンプレートにできたことを伝える。**一覧の見た目は変わらないため。** */
   let templateSaved = $state(false);
+
+  /** 公開設定を開いているアンケート。**1 度に 1 つだけ開く。** */
+  let settingsFor = $state<SurveySummary | null>(null);
+  /** 回答数の上限。**空欄は「上限なし」。** */
+  let settingsLimit = $state('');
+  let settingsBusy = $state(false);
 
   $effect(() => {
     void reload();
@@ -175,6 +187,7 @@
   async function toggle(survey: SurveySummary) {
     const result = survey.status === 1 ? await suspend(survey.surveyId) : await resume(survey.surveyId);
     if (!result.ok) {
+      // **上限に達したままの再開はサーバが断る。** その理由をそのまま出す
       error = result.message;
       return;
     }
@@ -185,6 +198,55 @@
   function toggleQr(survey: SurveySummary) {
     // **同じ行をもう一度押したら閉じる。** 開きっぱなしで表が押し下げられない
     showingQr = showingQr?.surveyId === survey.surveyId ? null : survey;
+  }
+
+  function openSettings(survey: SurveySummary) {
+    error = '';
+    settingsFor = survey;
+    settingsLimit = survey.responseLimit == null ? '' : String(survey.responseLimit);
+  }
+
+  async function saveSettings(event: SubmitEvent) {
+    event.preventDefault();
+    const target = settingsFor;
+    if (target === null || settingsBusy) {
+      return;
+    }
+
+    error = '';
+
+    // **空欄は「上限なし」。** 0 を送らない（サーバも断るが、ここで伝える方が早い）
+    const trimmed = settingsLimit.trim();
+    let limit: number | null = null;
+    if (trimmed !== '') {
+      limit = Number(trimmed);
+      if (!Number.isInteger(limit) || limit <= 0) {
+        error = t('settings.limitInvalid');
+        return;
+      }
+    }
+
+    settingsBusy = true;
+    const result = await saveSurveySettings(target.surveyId, limit);
+    settingsBusy = false;
+
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    settingsFor = null;
+    await reload();
+  }
+
+  /** 受付数の表示。**上限があれば「/ 上限」を添える。** */
+  function responses(survey: SurveySummary): string {
+    return survey.responseLimit == null
+      ? t('list.responseCount', { count: survey.responseCount })
+      : t('list.responseCountOfLimit', {
+          count: survey.responseCount,
+          limit: survey.responseLimit,
+        });
   }
 
   /** 回答用 URL。**公開用 ID しか出さない。** */
@@ -297,6 +359,28 @@
   <TemplatePanel oncreated={onopen} />
 {/if}
 
+{#if settingsFor}
+  <form class="create" onsubmit={saveSettings}>
+    <h2>{t('settings.title', { title: settingsFor.title })}</h2>
+    <label>
+      {t('settings.responseLimit')}
+      <input type="text" inputmode="numeric" bind:value={settingsLimit} />
+      <span class="hint">{t('settings.responseLimitHint')}</span>
+    </label>
+    <!--
+      **上限を引き上げても勝手には再開しない**（_documents/データモデル設計.md 2.1）。
+      押す人がそれを知らないと、止まったままなのを不具合だと受け取る
+    -->
+    <p class="hint">{t('settings.noAutoResume')}</p>
+    <div class="actions">
+      <button type="submit" disabled={settingsBusy}>{t('settings.submit')}</button>
+      <button type="button" class="secondary" onclick={() => (settingsFor = null)}>
+        {t('settings.cancel')}
+      </button>
+    </div>
+  </form>
+{/if}
+
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 
 {#if loading}
@@ -310,6 +394,7 @@
         <th>{t('list.columnTitle')}</th>
         <th>{t('list.columnStatus')}</th>
         <th>{t('list.columnVersion')}</th>
+        <th>{t('list.columnResponses')}</th>
         <th>{t('list.columnUrl')}</th>
         <th>{t('list.columnUpdated')}</th>
         <th></th>
@@ -325,8 +410,19 @@
           </td>
           <td>
             <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
+            <!--
+              **なぜ止まっているのかが分かること**（_documents/データモデル設計.md 2.1）。
+              理由の付いていない古い停止では、鍵が無いので何も出さない
+            -->
+            {#if survey.status === 2}
+              {@const reasonKey = suspendedReasonKey(survey.suspendedReason)}
+              {#if reasonKey}
+                <span class="reason">{t(reasonKey)}</span>
+              {/if}
+            {/if}
           </td>
           <td>{survey.publishedVersion ?? '—'}</td>
+          <td class="responses">{responses(survey)}</td>
           <td>
             {#if isPublished(survey)}
               <a href={formUrl(survey.publicId)} target="_blank" rel="noreferrer">
@@ -347,6 +443,9 @@
                 {t('qr.open')}
               </button>
             {/if}
+            <button type="button" class="secondary" onclick={() => openSettings(survey)}>
+              {t('settings.open')}
+            </button>
             {#if canDuplicate}
               <button type="button" class="secondary" onclick={() => openDuplicate(survey)}>
                 {t('duplicate.open')}
@@ -468,6 +567,19 @@
 
   .muted {
     color: var(--muted);
+  }
+
+  /* 停止の理由は状態の下に小さく添える */
+  .reason {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: normal;
+  }
+
+  .responses {
+    white-space: nowrap;
   }
 
   .status-0 {
