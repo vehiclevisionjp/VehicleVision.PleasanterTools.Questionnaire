@@ -287,6 +287,17 @@ export const ja = {
   'flow.UnknownConditionQuestion': '表示条件が、存在しない設問を見ています',
   'flow.ForwardConditionReference': '表示条件が、自分より後ろの設問を見ています',
   'flow.UnknownChoiceValue': '表示条件が、その設問に無い選択肢を見ています',
+  // ---- アンケートの複製（Issue #46） ----
+  'duplicate.open': '複製',
+  'duplicate.title': '「{title}」を複製',
+  'duplicate.description':
+    '設問・選択肢・ページ・分岐・マッピングを写し、下書きとして作ります。'
+    + '公開状態・公開済みの版・回答は写しません。',
+  'duplicate.siteId': '複製先の Pleasanter のサイト ID',
+  'duplicate.siteIdHint': '1 アンケート = 1 サイトです。元とは別のサイトを指定してください。',
+  'duplicate.jsonColumn': '回答 JSON を入れる列（任意）',
+  'duplicate.submit': '複製する',
+  'duplicate.cancel': 'やめる',
 } as const;
 
 /** 文言の鍵。**日本語のカタログが一覧そのもの。** */
@@ -576,6 +587,18 @@ export const en: Record<MessageKey, string> = {
   'flow.UnknownConditionQuestion': 'The condition looks at a question that does not exist',
   'flow.ForwardConditionReference': 'The condition looks at a later question',
   'flow.UnknownChoiceValue': 'The condition looks at a value that is not a choice of that question',
+  // ---- アンケートの複製（Issue #46） ----
+  'duplicate.open': 'Duplicate',
+  'duplicate.title': 'Duplicate "{title}"',
+  'duplicate.description':
+    'Questions, choices, pages, branching and mapping are copied into a new draft. '
+    + 'The publication state, published versions and responses are not copied.',
+  'duplicate.siteId': 'Pleasanter site ID for the copy',
+  'duplicate.siteIdHint':
+    'One survey writes to one site. Specify a site other than the original one.',
+  'duplicate.jsonColumn': 'Column for the response JSON (optional)',
+  'duplicate.submit': 'Duplicate',
+  'duplicate.cancel': 'Cancel',
 };
 
 const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };

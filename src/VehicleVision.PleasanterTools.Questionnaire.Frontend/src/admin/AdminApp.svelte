@@ -107,13 +107,20 @@
    * 未認証の相手に登録画面を見せない。
    */
   /**
+   * Administrator か。
+   *
+   * **入口を隠すだけでは守りにならない**ので、サーバ側でも同じ判定をしている。
+   * ここで隠すのは、押せない釦を出さないため。
+   */
+  const isAdministrator = $derived(session?.role === 'Administrator');
+
+  /**
    * 操作の記録を見せてよい相手か。
    *
-   * **Administrator だけ。** 誰が何をしたかは Editor へ見せる情報ではない。
-   * **入口を隠すだけでは守りにならない**ので、サーバ側でも同じ判定をしている
-   * （`AdminAuditLogEndpoints`）。ここで隠すのは、押せない釦を出さないため。
+   * **Administrator だけ。** 誰が何をしたかは Editor へ見せる情報ではない
+   * （`AdminAuditLogEndpoints`）。
    */
-  const canSeeAuditLog = $derived(session?.role === 'Administrator');
+  const canSeeAuditLog = $derived(isAdministrator);
 
   const needsEnrollment = $derived(
     session !== undefined &&
@@ -163,7 +170,12 @@
       {:else if openSurveyId}
         <SurveyEditor surveyId={openSurveyId} onback={back} />
       {:else}
-        <SurveyList onopen={open} />
+        <!--
+          **複製は Administrator だけ**（Issue #46）。
+          書き込み先のサイトを新しく決める操作であり、
+          誤ると別の業務のサイトへ回答が流れ込む。サーバ側でも同じ判定をしている
+        -->
+        <SurveyList onopen={open} canDuplicate={isAdministrator} />
       {/if}
     </main>
   {:else if needsEnrollment}
