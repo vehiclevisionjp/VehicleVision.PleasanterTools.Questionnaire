@@ -1,0 +1,429 @@
+import { DEFAULT_LANGUAGE, interpolate, type Language } from '../../../lib/i18n/language';
+
+/**
+ * 管理画面の文言。
+ *
+ * **日本語のカタログが鍵の一覧そのもの。**
+ * 英語は `Record<MessageKey, string>` として書くので、
+ * **足し忘れると型検査（`npm run check` / `npm run build`）で落ちる**
+ * （`_documents/多言語対応方針.md` 4 章）。
+ *
+ * **回答画面の文言と混ぜない。** 束を分けてあるので、
+ * 混ぜると回答者へ管理画面の文言まで配ることになる。
+ */
+export const ja = {
+  // ---- 共通 ---------------------------------------------------------------
+  'app.title': 'アンケート管理',
+  'app.signOut': 'ログアウト',
+  'app.loading': '読み込んでいます…',
+  'app.loadFailed': '読み込めませんでした。時間を置いて再読み込みしてください。',
+  'app.language': '表示言語',
+  'app.networkError': '通信できませんでした。',
+  'app.requestFailed': '処理できませんでした（{status}）。',
+
+  // ---- ログイン -----------------------------------------------------------
+  'signIn.setupTitle': '最初の管理者を登録する',
+  'signIn.title': '管理画面にログイン',
+  'signIn.setupLead': 'まだ管理者が登録されていません。最初の 1 人を作ってください。',
+  'signIn.setupLeadStrong': 'この入口はここで一度きりです。',
+  'signIn.loginId': 'ログイン ID',
+  'signIn.password': '合言葉',
+  'signIn.passwordConfirmation': '合言葉（確認）',
+  'signIn.passwordHint': '{minimum} 文字以上にしてください。',
+  'signIn.passwordTooShort': '合言葉は {minimum} 文字以上にしてください。',
+  'signIn.passwordMismatch': '確認用の合言葉が一致しません。',
+  'signIn.checking': '確認しています…',
+  'signIn.register': '登録する',
+  'signIn.next': '次へ',
+  'signIn.signIn': 'ログイン',
+  'signIn.totpTitle': '認証アプリの数字を入力',
+  'signIn.totpLead': '認証アプリに表示されている 6 桁の数字を入力してください。',
+  'signIn.totpLabel': '6 桁の数字',
+  'signIn.recoveryTitle': '復旧コードを入力',
+  'signIn.recoveryLead': '登録時に控えた復旧コードを 1 つ入力してください。',
+  'signIn.recoveryLeadStrong': '一度使うと無効になります。',
+  'signIn.recoveryLabel': '復旧コード',
+  'signIn.useRecovery': '認証アプリが使えない（復旧コードを使う）',
+  'signIn.useTotp': '認証アプリを使う',
+
+  // ---- 2 要素の登録 -------------------------------------------------------
+  'enroll.title': '2 要素認証を登録する',
+  'enroll.lead': '管理画面は全アンケートの定義と回答に触れます。',
+  'enroll.leadStrong': '合言葉だけでは通しません。',
+  'enroll.leadTail': '認証アプリで下の QR を読み取ってください。',
+  'enroll.qrAlt': '認証アプリで読み取る QR コード',
+  'enroll.secretHint': '読み取れないときは、この文字列を手で入力してください。',
+  'enroll.codeLabel': '認証アプリに出た 6 桁の数字',
+  'enroll.checking': '確認しています…',
+  'enroll.register': '登録する',
+  'enroll.recoveryTitle': '復旧コードを控えてください',
+  'enroll.recoveryLeadStrong': 'この画面を閉じると二度と表示できません。',
+  'enroll.recoveryLead': '端末を失ったときは、このコードでログインします。1 つにつき 1 回だけ使えます。',
+  'enroll.copy': 'コピーする',
+  'enroll.acknowledged': '控えました',
+  'enroll.proceed': '管理画面へ進む',
+
+  // ---- アンケート一覧 -----------------------------------------------------
+  'list.title': 'アンケート',
+  'list.create': '新しく作る',
+  'list.cancel': 'やめる',
+  'list.newTitle': '題名',
+  'list.newSiteId': 'Pleasanter のサイト ID',
+  'list.newSiteIdInvalid': 'Pleasanter のサイト ID を数字で入力してください。',
+  'list.newJsonColumn': '回答 JSON を入れる列（任意）',
+  'list.newJsonColumnPlaceholder': 'DescriptionA など',
+  'list.newJsonColumnHint': '正本を残す列です。後から変えると既存の回答を設問へ戻せなくなります。',
+  'list.submit': '作る',
+  'list.empty': 'まだアンケートがありません。',
+  'list.columnTitle': '題名',
+  'list.columnStatus': '状態',
+  'list.columnVersion': '公開中の版',
+  'list.columnUrl': '回答用 URL',
+  'list.columnUpdated': '更新',
+  'list.notPublished': '未公開',
+  'list.suspend': '停止',
+  'list.resume': '再開',
+  'status.draft': '下書き',
+  'status.published': '公開中',
+  'status.suspended': '停止中',
+  'status.unknown': '不明',
+
+  // ---- 設問エディタ -------------------------------------------------------
+  'editor.back': '← 一覧へ',
+  'editor.revision': '下書き rev.{revision}',
+  'editor.working': '処理しています…',
+  'editor.saveDraft': '下書きを保存',
+  'editor.publish': '公開する',
+  'editor.saved': '保存しました。まだ回答画面には出ていません。',
+  'editor.published': '{version} 版として公開しました。',
+  'editor.conflictTitle': '他の人がこのアンケートを更新しました。',
+  'editor.conflictLead': '読み直してください。',
+  'editor.conflictDetail': 'ここでの変更は保存されていません。読み直すと失われます。',
+  'editor.reload': '読み直す',
+  'editor.title': '題名',
+  'editor.description': '説明（任意）',
+  'editor.confirmationMessage': '送信後に出す文言（任意）',
+  'editor.showProgress': '進捗バーを出す',
+  'editor.allowEditingAfterSubmit': '送信後の編集を許す',
+  'editor.nextVersion': '公開すると {version} 版になります',
+  'editor.pageTitlePlaceholder': '{number} ページ目の見出し（任意）',
+  'editor.removePage': 'ページを削除',
+  'editor.addQuestion': '設問を足す',
+  'editor.addPage': 'ページを足す（改ページ）',
+  'editor.editingLanguage': '編集する言語',
+  'editor.editingLanguageHint':
+    '入力した文言はこの言語に入ります。他の言語の文言はそのまま残ります。',
+  'editor.fallbackNotice': 'この言語の文言がまだ無い欄は、回答画面では日本語が出ます。',
+
+  // ---- 設問 ---------------------------------------------------------------
+  'question.titlePlaceholder': '設問の文言',
+  'question.descriptionPlaceholder': '補足（任意）',
+  'question.moveUp': '上へ',
+  'question.moveDown': '下へ',
+  'question.remove': '削除',
+  'question.required': '必須',
+  'question.displayOnly': '回答を持たない表示専用の要素です。',
+  'question.unmapped': '未割り当て（Pleasanter に残りません）',
+  'question.mapped': '→ {columns}',
+  'question.choiceLabelPlaceholder': '画面に出る文字列',
+  'question.choiceValuePlaceholder': '保存される値',
+  'question.choiceIsOther': 'その他',
+  'question.removeChoice': '選択肢を削除',
+  'question.addChoice': '選択肢を足す',
+  'question.choiceHint': '左が画面に出る文字列、右が Pleasanter へ保存される値です。',
+  'question.defaultChoiceLabel': '選択肢 {number}',
+  'question.scaleMinimum': '下限',
+  'question.scaleMaximum': '上限',
+
+  // ---- 設問の形式 ---------------------------------------------------------
+  'questionType.Text': '短い文章',
+  'questionType.Paragraph': '長い文章',
+  'questionType.Radio': '単一選択',
+  'questionType.Checkbox': '複数選択',
+  'questionType.Dropdown': 'プルダウン',
+  'questionType.Scale': '尺度',
+  'questionType.Rating': '星',
+  'questionType.Date': '日付',
+  'questionType.Time': '時刻',
+  'questionType.File': '添付',
+  'questionType.Note': '説明文（回答なし）',
+
+  // ---- マッピング ---------------------------------------------------------
+  'mapping.title': 'Pleasanter への割り当て',
+  'mapping.addColumn': '列を足す',
+  'mapping.addAttachmentColumn': '添付の列を足す',
+  'mapping.noFileQuestion': '添付の設問がありません',
+  'mapping.lead':
+    '設問（入力）を 1 つ以上選び、必要なら変換をはさんで、Pleasanter の列 1 本へ書きます。',
+  'mapping.leadStrong': '入力が複数のときは変換が必要です。',
+  'mapping.attachmentLeadStrong': '添付だけは別枠です。',
+  'mapping.attachmentLead': '添付の設問 1 つを添付列へそのまま繋ぎ、変換は掛けられません。',
+  'mapping.empty':
+    'まだ割り当てがありません。このままでも公開できますが、回答は Pleasanter に残りません。',
+  'mapping.targetColumn': '書き込み先の列',
+  'mapping.targetColumnPlaceholder': 'ClassA / NumA など',
+  'mapping.attachmentColumnPlaceholder': 'AttachmentsA など',
+  'mapping.converterFixed': '変換なし（添付は固定）',
+  'mapping.converter': '変換',
+  'mapping.removeAssignment': 'この割り当てを削除',
+  'mapping.needsSingleSource': '変換が無いときは入力をちょうど 1 つにしてください。',
+  'mapping.noAttachmentColumnLeft': '空いている添付列がありません。使っていない添付列を空けてください。',
+  'mapping.attachmentPort': '添付そのもの',
+  'mapping.removeSource': '入力を削除',
+  'mapping.attachmentReplaceHint': '回答を送り直すと、Pleasanter 側の添付は新しいものへ置き換わります。',
+  'mapping.addSource': '入力を足す',
+  'mapping.sourceOrderHint': '上から順に変換へ渡します。',
+  'mapping.missingQuestion': '{questionId}（存在しません）',
+
+  // ---- 変換の種類 ---------------------------------------------------------
+  'converter.none': '（変換なし）',
+  'converter.join': 'つなぐ（join）',
+  'converter.map': '値を置き換える（map）',
+  'converter.toCheck': 'チェック列にする（toCheck）',
+  'converter.contains': '含むか（contains）',
+  'converter.constant': '固定値（constant）',
+  'converter.coalesce': '最初の非空（coalesce）',
+  'converter.when': '条件（when）',
+  'converter.script': 'スクリプト（script）',
+
+  // ---- 入力の口 -----------------------------------------------------------
+  'port.Value': '回答の値',
+  'port.OtherText': 'その他の自由記述',
+  'port.FileNames': '添付の名前',
+
+  // ---- マッピングの不備 ---------------------------------------------------
+  'problem.InvalidShape': '入力が複数あるのに変換がありません（または入力がありません）',
+  'problem.DuplicateTargetColumn': '同じ列への割り当てが重複しています',
+  'problem.MissingTargetColumn': '書き込み先の列が指定されていません',
+  'problem.QuestionNotInDefinition': '存在しない設問を入力にしています',
+  'problem.DisplayOnlyQuestionAsSource': '説明文ブロックは入力にできません',
+  'problem.ReservedColumn': '予約列は書き込み先にできません',
+  'problem.EmptyScript': 'スクリプトが空です',
+  'problem.InvalidAttachmentShape': '添付の割り当ては入力 1 つ・変換なしにしてください',
+  'problem.NonFileQuestionAsAttachment': '添付の設問しか添付列へは繋げません',
+  'problem.AttachmentColumnNeedsFilePort': '添付列には「添付そのもの」を繋いでください',
+  'problem.FilePortNeedsAttachmentColumn': '「添付そのもの」は添付列にしか繋げません',
+  'problem.UnmappedQuestion': 'どの列にも割り当てられていません（Pleasanter に残りません）',
+} as const;
+
+/** 文言の鍵。**日本語のカタログが一覧そのもの。** */
+export type MessageKey = keyof typeof ja;
+
+/**
+ * 英語の文言。
+ *
+ * **`Record<MessageKey, string>` にしてあるので、
+ * 鍵を足して訳を忘れると型検査で落ちる。**
+ */
+export const en: Record<MessageKey, string> = {
+  'app.title': 'Survey administration',
+  'app.signOut': 'Sign out',
+  'app.loading': 'Loading…',
+  'app.loadFailed': 'Could not load. Please wait a moment and reload the page.',
+  'app.language': 'Display language',
+  'app.networkError': 'Could not reach the server.',
+  'app.requestFailed': 'The request could not be processed ({status}).',
+
+  'signIn.setupTitle': 'Register the first administrator',
+  'signIn.title': 'Sign in to administration',
+  'signIn.setupLead': 'No administrator has been registered yet. Create the first one.',
+  'signIn.setupLeadStrong': 'This entry point works only once.',
+  'signIn.loginId': 'Sign-in ID',
+  'signIn.password': 'Passphrase',
+  'signIn.passwordConfirmation': 'Passphrase (confirm)',
+  'signIn.passwordHint': 'Use at least {minimum} characters.',
+  'signIn.passwordTooShort': 'Use a passphrase of at least {minimum} characters.',
+  'signIn.passwordMismatch': 'The confirmation does not match.',
+  'signIn.checking': 'Checking…',
+  'signIn.register': 'Register',
+  'signIn.next': 'Next',
+  'signIn.signIn': 'Sign in',
+  'signIn.totpTitle': 'Enter the code from your authenticator',
+  'signIn.totpLead': 'Enter the 6-digit code shown in your authenticator app.',
+  'signIn.totpLabel': '6-digit code',
+  'signIn.recoveryTitle': 'Enter a recovery code',
+  'signIn.recoveryLead': 'Enter one of the recovery codes you saved when you registered.',
+  'signIn.recoveryLeadStrong': 'Each code works only once.',
+  'signIn.recoveryLabel': 'Recovery code',
+  'signIn.useRecovery': 'I cannot use my authenticator (use a recovery code)',
+  'signIn.useTotp': 'Use my authenticator',
+
+  'enroll.title': 'Register two-factor authentication',
+  'enroll.lead': 'Administration reaches every survey definition and every response.',
+  'enroll.leadStrong': 'A passphrase alone is not enough.',
+  'enroll.leadTail': 'Scan the QR code below with your authenticator app.',
+  'enroll.qrAlt': 'QR code to scan with your authenticator app',
+  'enroll.secretHint': 'If you cannot scan it, type this string into your app instead.',
+  'enroll.codeLabel': '6-digit code from your authenticator',
+  'enroll.checking': 'Checking…',
+  'enroll.register': 'Register',
+  'enroll.recoveryTitle': 'Write down your recovery codes',
+  'enroll.recoveryLeadStrong': 'They can never be shown again once you close this screen.',
+  'enroll.recoveryLead': 'If you lose your device, you sign in with one of these. Each works once.',
+  'enroll.copy': 'Copy',
+  'enroll.acknowledged': 'I have written them down',
+  'enroll.proceed': 'Go to administration',
+
+  'list.title': 'Surveys',
+  'list.create': 'New survey',
+  'list.cancel': 'Cancel',
+  'list.newTitle': 'Title',
+  'list.newSiteId': 'Pleasanter site ID',
+  'list.newSiteIdInvalid': 'Enter the Pleasanter site ID as a number.',
+  'list.newJsonColumn': 'Column for the response JSON (optional)',
+  'list.newJsonColumnPlaceholder': 'DescriptionA, for example',
+  'list.newJsonColumnHint':
+    'This column keeps the authoritative copy. Changing it later makes existing responses unreadable as answers.',
+  'list.submit': 'Create',
+  'list.empty': 'There are no surveys yet.',
+  'list.columnTitle': 'Title',
+  'list.columnStatus': 'Status',
+  'list.columnVersion': 'Published version',
+  'list.columnUrl': 'Response URL',
+  'list.columnUpdated': 'Updated',
+  'list.notPublished': 'Not published',
+  'list.suspend': 'Pause',
+  'list.resume': 'Resume',
+  'status.draft': 'Draft',
+  'status.published': 'Published',
+  'status.suspended': 'Paused',
+  'status.unknown': 'Unknown',
+
+  'editor.back': '← Back to the list',
+  'editor.revision': 'Draft rev.{revision}',
+  'editor.working': 'Working…',
+  'editor.saveDraft': 'Save draft',
+  'editor.publish': 'Publish',
+  'editor.saved': 'Saved. It is not on the response screen yet.',
+  'editor.published': 'Published as version {version}.',
+  'editor.conflictTitle': 'Someone else updated this survey.',
+  'editor.conflictLead': 'Please reload it.',
+  'editor.conflictDetail': 'Your changes here are not saved. Reloading discards them.',
+  'editor.reload': 'Reload',
+  'editor.title': 'Title',
+  'editor.description': 'Description (optional)',
+  'editor.confirmationMessage': 'Message shown after submitting (optional)',
+  'editor.showProgress': 'Show a progress bar',
+  'editor.allowEditingAfterSubmit': 'Allow editing after submitting',
+  'editor.nextVersion': 'Publishing makes this version {version}',
+  'editor.pageTitlePlaceholder': 'Heading for page {number} (optional)',
+  'editor.removePage': 'Remove this page',
+  'editor.addQuestion': 'Add a question',
+  'editor.addPage': 'Add a page (page break)',
+  'editor.editingLanguage': 'Language being edited',
+  'editor.editingLanguageHint':
+    'What you type goes into this language. Text in other languages is kept as it is.',
+  'editor.fallbackNotice':
+    'Fields with no text in this language fall back to Japanese on the response screen.',
+
+  'question.titlePlaceholder': 'Question text',
+  'question.descriptionPlaceholder': 'Note (optional)',
+  'question.moveUp': 'Move up',
+  'question.moveDown': 'Move down',
+  'question.remove': 'Remove',
+  'question.required': 'Required',
+  'question.displayOnly': 'This element is display-only and takes no answer.',
+  'question.unmapped': 'Not assigned (nothing will be kept in Pleasanter)',
+  'question.mapped': '→ {columns}',
+  'question.choiceLabelPlaceholder': 'Text shown on screen',
+  'question.choiceValuePlaceholder': 'Value that is stored',
+  'question.choiceIsOther': 'Other',
+  'question.removeChoice': 'Remove this choice',
+  'question.addChoice': 'Add a choice',
+  'question.choiceHint': 'The left side is shown on screen; the right side is stored in Pleasanter.',
+  'question.defaultChoiceLabel': 'Choice {number}',
+  'question.scaleMinimum': 'Minimum',
+  'question.scaleMaximum': 'Maximum',
+
+  'questionType.Text': 'Short answer',
+  'questionType.Paragraph': 'Long answer',
+  'questionType.Radio': 'Single choice',
+  'questionType.Checkbox': 'Multiple choice',
+  'questionType.Dropdown': 'Dropdown',
+  'questionType.Scale': 'Scale',
+  'questionType.Rating': 'Rating',
+  'questionType.Date': 'Date',
+  'questionType.Time': 'Time',
+  'questionType.File': 'File upload',
+  'questionType.Note': 'Note (no answer)',
+
+  'mapping.title': 'Assignment to Pleasanter',
+  'mapping.addColumn': 'Add a column',
+  'mapping.addAttachmentColumn': 'Add an attachment column',
+  'mapping.noFileQuestion': 'There is no file upload question',
+  'mapping.lead':
+    'Pick one or more questions as inputs, optionally put a converter in between, and write to one Pleasanter column.',
+  'mapping.leadStrong': 'A converter is required when there is more than one input.',
+  'mapping.attachmentLeadStrong': 'Attachments are a special case.',
+  'mapping.attachmentLead':
+    'One file upload question connects straight to an attachment column, and no converter can be applied.',
+  'mapping.empty':
+    'Nothing is assigned yet. You can still publish, but no response will be kept in Pleasanter.',
+  'mapping.targetColumn': 'Target column',
+  'mapping.targetColumnPlaceholder': 'ClassA / NumA, for example',
+  'mapping.attachmentColumnPlaceholder': 'AttachmentsA, for example',
+  'mapping.converterFixed': 'No converter (fixed for attachments)',
+  'mapping.converter': 'Converter',
+  'mapping.removeAssignment': 'Remove this assignment',
+  'mapping.needsSingleSource': 'With no converter, there must be exactly one input.',
+  'mapping.noAttachmentColumnLeft':
+    'No attachment column is free. Free up one that is not in use.',
+  'mapping.attachmentPort': 'The attachment itself',
+  'mapping.removeSource': 'Remove this input',
+  'mapping.attachmentReplaceHint':
+    'Sending a response again replaces the attachments on the Pleasanter side.',
+  'mapping.addSource': 'Add an input',
+  'mapping.sourceOrderHint': 'Inputs are passed to the converter from the top down.',
+  'mapping.missingQuestion': '{questionId} (does not exist)',
+
+  'converter.none': '(no converter)',
+  'converter.join': 'Join',
+  'converter.map': 'Map values',
+  'converter.toCheck': 'To a check column',
+  'converter.contains': 'Contains',
+  'converter.constant': 'Constant',
+  'converter.coalesce': 'First non-empty',
+  'converter.when': 'Condition',
+  'converter.script': 'Script',
+
+  'port.Value': 'The answer value',
+  'port.OtherText': 'The free text for "Other"',
+  'port.FileNames': 'The attachment file names',
+
+  'problem.InvalidShape': 'There are several inputs but no converter (or no input at all)',
+  'problem.DuplicateTargetColumn': 'The same column is assigned more than once',
+  'problem.MissingTargetColumn': 'No target column is given',
+  'problem.QuestionNotInDefinition': 'An input refers to a question that does not exist',
+  'problem.DisplayOnlyQuestionAsSource': 'A note block cannot be used as an input',
+  'problem.ReservedColumn': 'A reserved column cannot be a target',
+  'problem.EmptyScript': 'The script is empty',
+  'problem.InvalidAttachmentShape':
+    'An attachment assignment needs exactly one input and no converter',
+  'problem.NonFileQuestionAsAttachment':
+    'Only a file upload question can be connected to an attachment column',
+  'problem.AttachmentColumnNeedsFilePort':
+    'An attachment column needs "the attachment itself" connected to it',
+  'problem.FilePortNeedsAttachmentColumn':
+    '"The attachment itself" can only be connected to an attachment column',
+  'problem.UnmappedQuestion': 'Not assigned to any column (nothing will be kept in Pleasanter)',
+};
+
+const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };
+
+/** 文言を引く関数。 */
+export type Translate = (
+  key: MessageKey,
+  parameters?: Record<string, string | number>,
+) => string;
+
+/**
+ * その言語の文言を引く関数を作る。
+ *
+ * **翻訳が無ければ既定の言語へ落ちる**（`_documents/多言語対応方針.md` 1 章）。
+ */
+export function translator(language: Language): Translate {
+  const catalog = CATALOGS[language] ?? CATALOGS[DEFAULT_LANGUAGE];
+
+  return (key, parameters) =>
+    interpolate(catalog[key] || CATALOGS[DEFAULT_LANGUAGE][key], parameters, language);
+}

@@ -1,3 +1,4 @@
+import { acceptLanguageHeader, t } from './i18n/state.svelte';
 import type {
   AdminSession,
   MappingDefinition,
@@ -29,12 +30,18 @@ async function call<T>(
       ...rest,
       // **cookie を必ず送る。** 認証は cookie で持っている
       credentials: 'same-origin',
-      headers:
-        json === undefined ? rest.headers : { 'Content-Type': 'application/json', ...rest.headers },
+      headers: {
+        // **画面が描いている言語をサーバへ伝える。**
+        // サーバが返す文言と画面の文言を揃えるため
+        // （`_documents/多言語対応方針.md` 2 章）
+        'Accept-Language': acceptLanguageHeader(),
+        ...(json === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...rest.headers,
+      },
       body: json === undefined ? rest.body : JSON.stringify(json),
     });
   } catch {
-    return { ok: false, status: 0, message: '通信できませんでした。' };
+    return { ok: false, status: 0, message: t('app.networkError') };
   }
 
   if (response.status === 204) {
@@ -55,10 +62,11 @@ async function call<T>(
     return { ok: true, value: body as T };
   }
 
+  // **サーバの文言をそのまま出す。** 要求した言語で返ってきている
   const message =
     typeof body === 'object' && body !== null && 'message' in body
       ? String((body as { message: unknown }).message)
-      : `処理できませんでした（${response.status}）。`;
+      : t('app.requestFailed', { status: response.status });
 
   return { ok: false, status: response.status, message, body };
 }
@@ -89,6 +97,17 @@ export const completeEnrollment = (code: string) =>
   });
 
 export const logout = () => call<{ signedOut: boolean }>('/api/admin/logout', { method: 'POST', json: {} });
+
+/**
+ * 管理画面を出す言語を決める。
+ *
+ * **`null` で「選んでいない」に戻す。** ブラウザの言語設定に従うようになる。
+ */
+export const saveLanguage = (language: string | null) =>
+  call<{ language: string | null }>('/api/admin/me/language', {
+    method: 'PUT',
+    json: { language },
+  });
 
 // ---- アンケート -------------------------------------------------------------
 

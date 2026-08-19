@@ -39,3 +39,8 @@ App_Data/Parameters/*.local.json
 
 ## 検証環境の出力
 tools/pleasanter-testenv/results/
+
+# 写しを撮ったときの生成物。**報告書と失敗時の記録は git へ入れない**
+# （毎回変わるので、取り込むたびに衝突する）
+tools/screenshots/report/
+tools/screenshots/artifacts/

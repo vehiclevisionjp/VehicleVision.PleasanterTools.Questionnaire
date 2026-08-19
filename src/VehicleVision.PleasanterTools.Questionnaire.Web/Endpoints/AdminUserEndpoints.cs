@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -70,13 +72,20 @@ public static class AdminUserEndpoints
         // ---- 追加（招待を出す） ----------------------------------------------
         users.MapPost("", async (
             AdminUserCreateRequest request,
+            HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
             CancellationToken cancellationToken) =>
         {
+            var language = RequestLanguage.Of(context);
+
             if (ParseRole(request.Role) is not { } role)
             {
-                return Results.BadRequest(new { message = "役割は Editor か Administrator を指定してください。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.RoleMustBeEditorOrAdministrator, language),
+                });
             }
 
             var (outcome, invitation) = await service
@@ -85,12 +94,13 @@ public static class AdminUserEndpoints
 
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(InvitationBody(invitation!))
-                : Failure(outcome);
+                : Failure(outcome, language);
         });
 
         // ---- 招待の出し直し --------------------------------------------------
         users.MapPost("/{adminUserId:guid}/invitation", async (
             Guid adminUserId,
+            HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
             CancellationToken cancellationToken) =>
@@ -101,35 +111,46 @@ public static class AdminUserEndpoints
 
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(InvitationBody(invitation!))
-                : Failure(outcome);
+                : Failure(outcome, RequestLanguage.Of(context));
         });
 
         // ---- 無効化・有効化 --------------------------------------------------
         users.MapPost("/{adminUserId:guid}/disable", (
             Guid adminUserId,
+            HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
             CancellationToken cancellationToken) =>
-            SetDisabledAsync(adminUserId, principal, service, isDisabled: true, cancellationToken));
+            SetDisabledAsync(
+                adminUserId, context, principal, service, isDisabled: true, cancellationToken));
 
         users.MapPost("/{adminUserId:guid}/enable", (
             Guid adminUserId,
+            HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
             CancellationToken cancellationToken) =>
-            SetDisabledAsync(adminUserId, principal, service, isDisabled: false, cancellationToken));
+            SetDisabledAsync(
+                adminUserId, context, principal, service, isDisabled: false, cancellationToken));
 
         // ---- 役割の変更 ------------------------------------------------------
         users.MapPost("/{adminUserId:guid}/role", async (
             Guid adminUserId,
             AdminRoleRequest request,
+            HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
             CancellationToken cancellationToken) =>
         {
+            var language = RequestLanguage.Of(context);
+
             if (ParseRole(request.Role) is not { } role)
             {
-                return Results.BadRequest(new { message = "役割は Editor か Administrator を指定してください。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.RoleMustBeEditorOrAdministrator, language),
+                });
             }
 
             var outcome = await service
@@ -138,7 +159,7 @@ public static class AdminUserEndpoints
 
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(new { role = role.ToString() })
-                : Failure(outcome);
+                : Failure(outcome, language);
         });
     }
 
@@ -150,6 +171,7 @@ public static class AdminUserEndpoints
         // ---- 合言葉の変更 ----------------------------------------------------
         me.MapPost("/password", async (
             AdminPasswordChangeRequest request,
+            HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
             CancellationToken cancellationToken) =>
@@ -162,8 +184,37 @@ public static class AdminUserEndpoints
 
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(new { changed = true })
-                : Failure(outcome);
+                : Failure(outcome, RequestLanguage.Of(context));
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
+        // ---- 表示言語 --------------------------------------------------------
+        // **自分の設定なので役割を問わない。** 他人の言語は変えられない
+        me.MapPut("/language", async (
+            AdminLanguageRequest request,
+            HttpContext context,
+            ClaimsPrincipal principal,
+            IAdminUserStore store,
+            CancellationToken cancellationToken) =>
+        {
+            // **空なら「選んでいない」へ戻す。** ブラウザの言語設定に従うようになる
+            var language = string.IsNullOrWhiteSpace(request.Language)
+                ? null
+                : SupportedLanguages.Normalize(request.Language);
+
+            if (!string.IsNullOrWhiteSpace(request.Language) && language is null)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.UnsupportedLanguage, RequestLanguage.Of(context)),
+                });
+            }
+
+            await store.SetLanguageAsync(ActorId(principal), language, cancellationToken)
+                .ConfigureAwait(false);
+
+            return Results.Ok(new { language });
+        });
 
         // ---- 2 要素の登録し直し（端末を替えたとき） --------------------------
         me.MapPost("/totp/begin", async (
@@ -184,7 +235,7 @@ public static class AdminUserEndpoints
 
             if (outcome is not AdminUserOutcome.Succeeded)
             {
-                return Failure(outcome);
+                return Failure(outcome, RequestLanguage.Of(context));
             }
 
             var loginId = principal.Identity?.Name ?? string.Empty;
@@ -214,7 +265,11 @@ public static class AdminUserEndpoints
                 || pendingId != actorId
                 || reenroll.Principal?.FindFirstValue(ReenrollSecretClaim) is not { Length: > 0 } secret)
             {
-                return Results.BadRequest(new { message = "登録をやり直してください。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.EnrollmentRestartRequired, RequestLanguage.Of(context)),
+                });
             }
 
             var codes = await authenticator
@@ -224,7 +279,11 @@ public static class AdminUserEndpoints
             if (codes is null)
             {
                 return Results.Json(
-                    new { message = "数字が合いません。認証アプリの表示をご確認ください。" },
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.TotpCodeMismatch, RequestLanguage.Of(context)),
+                    },
                     statusCode: StatusCodes.Status401Unauthorized);
             }
 
@@ -250,7 +309,7 @@ public static class AdminUserEndpoints
 
             if (outcome is not AdminUserOutcome.Succeeded)
             {
-                return Failure(outcome);
+                return Failure(outcome, RequestLanguage.Of(context));
             }
 
             // **合言葉を決めただけでは入れない。** 2 要素まで通って初めてログインとする
@@ -260,6 +319,7 @@ public static class AdminUserEndpoints
 
     private static async Task<IResult> SetDisabledAsync(
         Guid adminUserId,
+        HttpContext context,
         ClaimsPrincipal principal,
         AdminUserService service,
         bool isDisabled,
@@ -271,7 +331,7 @@ public static class AdminUserEndpoints
 
         return outcome is AdminUserOutcome.Succeeded
             ? Results.Ok(new { isDisabled })
-            : Failure(outcome);
+            : Failure(outcome, RequestLanguage.Of(context));
     }
 
     /// <summary>結果を応答へ写す。</summary>
@@ -279,44 +339,45 @@ public static class AdminUserEndpoints
     /// **招待だけは理由を分けない。** 無い・期限切れ・使用済みを区別して返すと、
     /// トークンの当たり外れを外から確かめられる。
     /// </remarks>
-    private static IResult Failure(AdminUserOutcome outcome) => outcome switch
+    private static IResult Failure(AdminUserOutcome outcome, string language)
     {
-        AdminUserOutcome.NotFound =>
-            Results.NotFound(new { message = "その管理者は見つかりません。" }),
+        string Message(string key) => ServerMessages.Get(key, language);
 
-        AdminUserOutcome.DuplicateLoginId =>
-            Results.Conflict(new { message = "そのログイン ID は既に使われています。" }),
+        return outcome switch
+        {
+            AdminUserOutcome.NotFound =>
+                Results.NotFound(new { message = Message(ServerMessageKeys.AdminUserNotFound) }),
 
-        AdminUserOutcome.InvalidInput =>
-            Results.BadRequest(new { message = "入力をご確認ください。" }),
+            AdminUserOutcome.DuplicateLoginId =>
+                Results.Conflict(new { message = Message(ServerMessageKeys.DuplicateLoginId) }),
 
-        AdminUserOutcome.WeakPassword =>
-            Results.BadRequest(new { message = AdminPasswordPolicy.Message }),
+            AdminUserOutcome.InvalidInput =>
+                Results.BadRequest(new { message = Message(ServerMessageKeys.InvalidInput) }),
 
-        AdminUserOutcome.SelfNotAllowed =>
-            Results.Conflict(new { message = "自分自身には行えません。別の管理者に依頼してください。" }),
+            AdminUserOutcome.WeakPassword =>
+                Results.BadRequest(new { message = AdminPasswordPolicy.Message(language) }),
 
-        AdminUserOutcome.LastAdministrator =>
-            Results.Conflict(new
-            {
-                message = "他にログインできる管理者が居ません。"
-                    + "先に別の管理者を追加し、その管理者がログインできることを確かめてください。",
-            }),
+            AdminUserOutcome.SelfNotAllowed =>
+                Results.Conflict(new { message = Message(ServerMessageKeys.SelfNotAllowed) }),
 
-        AdminUserOutcome.LockedOut =>
-            Results.Json(
-                new { message = "試行が続いたため、しばらく操作できません。時間を置いてお試しください。" },
-                statusCode: StatusCodes.Status423Locked),
+            AdminUserOutcome.LastAdministrator =>
+                Results.Conflict(new { message = Message(ServerMessageKeys.LastAdministrator) }),
 
-        AdminUserOutcome.InvitationInvalid =>
-            Results.Json(
-                new { message = "招待が使えません。招待をやり直してください。" },
+            AdminUserOutcome.LockedOut =>
+                Results.Json(
+                    new { message = Message(ServerMessageKeys.OperationTemporarilyLocked) },
+                    statusCode: StatusCodes.Status423Locked),
+
+            AdminUserOutcome.InvitationInvalid =>
+                Results.Json(
+                    new { message = Message(ServerMessageKeys.InvitationInvalid) },
+                    statusCode: StatusCodes.Status401Unauthorized),
+
+            _ => Results.Json(
+                new { message = Message(ServerMessageKeys.CurrentPasswordRejected) },
                 statusCode: StatusCodes.Status401Unauthorized),
-
-        _ => Results.Json(
-            new { message = "今の合言葉が正しくありません。" },
-            statusCode: StatusCodes.Status401Unauthorized),
-    };
+        };
+    }
 
     private static object InvitationBody(IssuedInvitation invitation) => new
     {
@@ -376,6 +437,9 @@ public static class AdminUserEndpoints
 
     /// <summary>今の合言葉。</summary>
     public sealed record AdminPasswordRequest(string? Password);
+
+    /// <summary>管理画面を出す言語。**空なら「選んでいない」に戻す。**</summary>
+    public sealed record AdminLanguageRequest(string? Language);
 
     /// <summary>使い捨てパスワード。</summary>
     public sealed record AdminCodeRequest(string? Code);

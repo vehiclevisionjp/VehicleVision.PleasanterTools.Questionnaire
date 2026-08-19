@@ -70,6 +70,12 @@ internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUser
         CancellationToken cancellationToken = default) =>
         UpdateAsync(adminUserId, user => user with { IsDisabled = isDisabled });
 
+    public Task SetLanguageAsync(
+        Guid adminUserId,
+        string? language,
+        CancellationToken cancellationToken = default) =>
+        UpdateAsync(adminUserId, user => user with { Language = language });
+
     public Task<bool> TryDisableAsync(Guid adminUserId, CancellationToken cancellationToken = default)
     {
         if (!users.TryGetValue(adminUserId, out var user))

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createSurvey, listSurveys, resume, suspend } from '../lib/api';
-  import { surveyStatusLabels, type SurveySummary } from '../lib/types';
+  import { surveyStatusKey, type SurveySummary } from '../lib/types';
+  import { formatDateTime, t } from '../lib/i18n/state.svelte';
 
   interface Props {
     onopen: (surveyId: string) => void;
@@ -41,7 +42,7 @@
 
     const siteId = Number(newSiteId);
     if (!Number.isInteger(siteId) || siteId <= 0) {
-      error = 'Pleasanter のサイト ID を数字で入力してください。';
+      error = t('list.newSiteIdInvalid');
       return;
     }
 
@@ -74,54 +75,59 @@
   }
 
   function formatDate(value: string): string {
-    // **保存されているのは UTC。** 見る人の時間帯で出す
+    // **保存されているのは UTC。** 見る人の時間帯で、見る人の言語の書式で出す
+    // （`_documents/多言語対応方針.md` 4 章）
     const parsed = new Date(value.endsWith('Z') ? value : `${value}Z`);
-    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('ja-JP');
+    return Number.isNaN(parsed.getTime()) ? value : formatDateTime(parsed);
   }
 </script>
 
 <header class="bar">
-  <h1>アンケート</h1>
+  <h1>{t('list.title')}</h1>
   <button type="button" onclick={() => (creating = !creating)}>
-    {creating ? 'やめる' : '新しく作る'}
+    {creating ? t('list.cancel') : t('list.create')}
   </button>
 </header>
 
 {#if creating}
   <form class="create" onsubmit={create}>
     <label>
-      題名
+      {t('list.newTitle')}
       <input type="text" bind:value={newTitle} required />
     </label>
     <label>
-      Pleasanter のサイト ID
+      {t('list.newSiteId')}
       <input type="text" inputmode="numeric" bind:value={newSiteId} required />
     </label>
     <label>
-      回答 JSON を入れる列（任意）
-      <input type="text" placeholder="DescriptionA など" bind:value={newJsonColumn} />
+      {t('list.newJsonColumn')}
+      <input
+        type="text"
+        placeholder={t('list.newJsonColumnPlaceholder')}
+        bind:value={newJsonColumn}
+      />
       <!-- **途中で変えると既存の回答が読めなくなる。** 先に決めておくのが安全 -->
-      <span class="hint">正本を残す列です。後から変えると既存の回答を設問へ戻せなくなります。</span>
+      <span class="hint">{t('list.newJsonColumnHint')}</span>
     </label>
-    <button type="submit">作る</button>
+    <button type="submit">{t('list.submit')}</button>
   </form>
 {/if}
 
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 
 {#if loading}
-  <p class="status">読み込んでいます…</p>
+  <p class="status">{t('app.loading')}</p>
 {:else if surveys.length === 0}
-  <p class="status">まだアンケートがありません。</p>
+  <p class="status">{t('list.empty')}</p>
 {:else}
   <table>
     <thead>
       <tr>
-        <th>題名</th>
-        <th>状態</th>
-        <th>公開中の版</th>
-        <th>回答用 URL</th>
-        <th>更新</th>
+        <th>{t('list.columnTitle')}</th>
+        <th>{t('list.columnStatus')}</th>
+        <th>{t('list.columnVersion')}</th>
+        <th>{t('list.columnUrl')}</th>
+        <th>{t('list.columnUpdated')}</th>
         <th></th>
       </tr>
     </thead>
@@ -133,7 +139,9 @@
               {survey.title}
             </button>
           </td>
-          <td><span class="status-{survey.status}">{surveyStatusLabels[survey.status] ?? '不明'}</span></td>
+          <td>
+            <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
+          </td>
           <td>{survey.publishedVersion ?? '—'}</td>
           <td>
             {#if survey.publishedVersion !== null}
@@ -141,14 +149,14 @@
                 {survey.publicId}
               </a>
             {:else}
-              <span class="muted">未公開</span>
+              <span class="muted">{t('list.notPublished')}</span>
             {/if}
           </td>
           <td class="muted">{formatDate(survey.updatedAt)}</td>
           <td>
             {#if survey.publishedVersion !== null}
               <button type="button" class="secondary" onclick={() => toggle(survey)}>
-                {survey.status === 1 ? '停止' : '再開'}
+                {survey.status === 1 ? t('list.suspend') : t('list.resume')}
               </button>
             {/if}
           </td>

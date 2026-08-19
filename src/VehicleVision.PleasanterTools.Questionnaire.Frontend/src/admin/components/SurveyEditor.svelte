@@ -1,7 +1,7 @@
 <script lang="ts">
   import { loadDraft, publish, saveDraft } from '../lib/api';
   import {
-    problemMessages,
+    problemKey,
     text,
     withText,
     type MappingDefinition,
@@ -10,6 +10,13 @@
     type Question,
     type SurveyDefinition,
   } from '../lib/types';
+  import {
+    DEFAULT_LANGUAGE,
+    LANGUAGE_NAMES,
+    SUPPORTED_LANGUAGES,
+    type Language,
+  } from '../../lib/i18n/language';
+  import { language, t } from '../lib/i18n/state.svelte';
   import MappingEditor from './MappingEditor.svelte';
   import QuestionEditor from './QuestionEditor.svelte';
 
@@ -19,6 +26,17 @@
   }
 
   let { surveyId, onback }: Props = $props();
+
+  /**
+    * 入力欄が書き込む言語。
+    *
+    * **管理画面の表示言語とは別。** 日本語の画面で英語の設問を書くことがある。
+    * 初期値は表示言語に合わせる（たいていは同じ言語を編集する）。
+    *
+    * **`LocalizedText` の器は変えない。** 編集していない言語の文言はそのまま残る
+    * （`_documents/多言語対応方針.md` 5 章）。
+    */
+  let editing = $state<Language>(language());
 
   let definition = $state<SurveyDefinition>();
   let mapping = $state<MappingDefinition>({ assignments: [] });
@@ -90,7 +108,8 @@
     const question: Question = {
       questionId: newId('q'),
       type: 'Text',
-      title: withText(undefined, ''),
+      // **空の器で作る。** 文言は編集中の言語へ入る
+      title: {},
       isRequired: false,
       choices: [],
       settings: {},
@@ -160,7 +179,7 @@
     }
 
     revision = result.value.revision;
-    notice = '保存しました。まだ回答画面には出ていません。';
+    notice = t('editor.saved');
   }
 
   async function doPublish() {
@@ -182,35 +201,41 @@
     }
 
     warnings = result.value.warnings;
-    notice = `${result.value.version} 版として公開しました。`;
+    notice = t('editor.published', { version: result.value.version });
     await load(surveyId);
   }
 
   function describe(problem: MappingProblem): string {
-    const base = problemMessages[problem.code] ?? problem.code;
-    const where = problem.targetColumn ? `［${problem.targetColumn}］` : '';
+    // **知らない符号でも落とさない。** 符号そのものを出す
+    const key = problemKey(problem.code);
+    const base = key ? t(key) : problem.code;
+    const where = problem.targetColumn ? `[${problem.targetColumn}] ` : '';
     const detail = problem.detail ? `（${problem.detail}）` : '';
     return `${where}${base}${detail}`;
   }
 </script>
 
 <header class="bar">
-  <button type="button" class="link" onclick={onback}>← 一覧へ</button>
+  <button type="button" class="link" onclick={onback}>{t('editor.back')}</button>
 
   <div class="right">
-    <span class="revision">下書き rev.{revision}</span>
+    <span class="revision">{t('editor.revision', { revision })}</span>
     <button type="button" class="secondary" onclick={save} disabled={saving || loading}>
-      {saving ? '処理しています…' : '下書きを保存'}
+      {saving ? t('editor.working') : t('editor.saveDraft')}
     </button>
-    <button type="button" onclick={doPublish} disabled={saving || loading}>公開する</button>
+    <button type="button" onclick={doPublish} disabled={saving || loading}>
+      {t('editor.publish')}
+    </button>
   </div>
 </header>
 
 {#if conflict}
   <div class="conflict" role="alert">
-    <p><strong>他の人がこのアンケートを更新しました。</strong> 読み直してください。</p>
-    <p class="small">ここでの変更は保存されていません。読み直すと失われます。</p>
-    <button type="button" class="secondary" onclick={() => load(surveyId)}>読み直す</button>
+    <p><strong>{t('editor.conflictTitle')}</strong> {t('editor.conflictLead')}</p>
+    <p class="small">{t('editor.conflictDetail')}</p>
+    <button type="button" class="secondary" onclick={() => load(surveyId)}>
+      {t('editor.reload')}
+    </button>
   </div>
 {/if}
 
@@ -226,41 +251,69 @@
 {/if}
 
 {#if loading}
-  <p class="status">読み込んでいます…</p>
+  <p class="status">{t('app.loading')}</p>
 {:else if definition}
+  <!-- **入力欄が書き込む言語を選ぶ。**
+       他の言語の文言は触らない（`_documents/多言語対応方針.md` 5 章） -->
+  <section class="editing-language">
+    <label>
+      {t('editor.editingLanguage')}
+      <select
+        value={editing}
+        onchange={(event) => (editing = event.currentTarget.value as Language)}
+      >
+        {#each SUPPORTED_LANGUAGES as option (option)}
+          <option value={option}>{LANGUAGE_NAMES[option]}</option>
+        {/each}
+      </select>
+    </label>
+    <p class="hint">{t('editor.editingLanguageHint')}</p>
+    {#if editing !== DEFAULT_LANGUAGE}
+      <!-- **未翻訳の落とし先は ja。** 空のまま公開しても画面は空にならない -->
+      <p class="hint">{t('editor.fallbackNotice')}</p>
+    {/if}
+  </section>
+
   <section class="survey">
     <label class="big">
-      題名
+      {t('editor.title')}
       <input
         type="text"
-        value={text(definition.title)}
-        oninput={(event) =>
-          (definition = { ...definition!, title: withText(definition!.title, event.currentTarget.value) })}
-      />
-    </label>
-
-    <label>
-      説明（任意）
-      <input
-        type="text"
-        value={text(definition.description)}
+        value={text(definition.title, editing)}
         oninput={(event) =>
           (definition = {
             ...definition!,
-            description: withText(definition!.description, event.currentTarget.value),
+            title: withText(definition!.title, event.currentTarget.value, editing),
           })}
       />
     </label>
 
     <label>
-      送信後に出す文言（任意）
+      {t('editor.description')}
       <input
         type="text"
-        value={text(definition.confirmationMessage)}
+        value={text(definition.description, editing)}
         oninput={(event) =>
           (definition = {
             ...definition!,
-            confirmationMessage: withText(definition!.confirmationMessage, event.currentTarget.value),
+            description: withText(definition!.description, event.currentTarget.value, editing),
+          })}
+      />
+    </label>
+
+    <label>
+      {t('editor.confirmationMessage')}
+      <input
+        type="text"
+        value={text(definition.confirmationMessage, editing)}
+        oninput={(event) =>
+          (definition = {
+            ...definition!,
+            confirmationMessage: withText(
+              definition!.confirmationMessage,
+              event.currentTarget.value,
+              editing,
+            ),
           })}
       />
     </label>
@@ -272,7 +325,7 @@
           checked={definition.showProgress}
           onchange={(event) => (definition = { ...definition!, showProgress: event.currentTarget.checked })}
         />
-        進捗バーを出す
+        {t('editor.showProgress')}
       </label>
 
       <label class="inline">
@@ -282,10 +335,10 @@
           onchange={(event) =>
             (definition = { ...definition!, allowEditingAfterSubmit: event.currentTarget.checked })}
         />
-        送信後の編集を許す
+        {t('editor.allowEditingAfterSubmit')}
       </label>
 
-      <span class="next-version">公開すると {definition.version} 版になります</span>
+      <span class="next-version">{t('editor.nextVersion', { version: definition.version })}</span>
     </div>
   </section>
 
@@ -296,11 +349,19 @@
         <input
           class="page-title"
           type="text"
-          placeholder={`${pageIndex + 1} ページ目の見出し（任意）`}
-          value={text(page.title)}
-          oninput={(event) => updatePage(pageIndex, { title: withText(page.title, event.currentTarget.value) })}
+          placeholder={t('editor.pageTitlePlaceholder', { number: pageIndex + 1 })}
+          value={text(page.title, editing)}
+          oninput={(event) =>
+            updatePage(pageIndex, {
+              title: withText(page.title, event.currentTarget.value, editing),
+            })}
         />
-        <button type="button" class="icon danger" onclick={() => removePage(pageIndex)} aria-label="ページを削除">
+        <button
+          type="button"
+          class="icon danger"
+          onclick={() => removePage(pageIndex)}
+          aria-label={t('editor.removePage')}
+        >
           ×
         </button>
       </div>
@@ -308,6 +369,7 @@
       {#each page.questions as question, questionIndex (question.questionId)}
         <QuestionEditor
           {question}
+          {editing}
           mappedColumns={columnsFor(question.questionId)}
           canMoveUp={questionIndex > 0}
           canMoveDown={questionIndex < page.questions.length - 1}
@@ -318,14 +380,19 @@
       {/each}
 
       <button type="button" class="secondary small" onclick={() => addQuestion(pageIndex)}>
-        設問を足す
+        {t('editor.addQuestion')}
       </button>
     </section>
   {/each}
 
-  <button type="button" class="secondary" onclick={addPage}>ページを足す（改ページ）</button>
+  <button type="button" class="secondary" onclick={addPage}>{t('editor.addPage')}</button>
 
-  <MappingEditor {mapping} questions={allQuestions} onchange={(next) => (mapping = next)} />
+  <MappingEditor
+    {mapping}
+    questions={allQuestions}
+    {editing}
+    onchange={(next) => (mapping = next)}
+  />
 {/if}
 
 <style lang="scss">
@@ -354,6 +421,40 @@
     color: var(--accent);
     font: inherit;
     cursor: pointer;
+  }
+
+  .editing-language {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 1rem;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0;
+    }
+
+    select {
+      font: inherit;
+      padding: 0.25rem 0.4rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+      color: #101828;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+    }
   }
 
   .survey,

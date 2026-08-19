@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -25,7 +27,8 @@ public static class AdminAuthEndpoints
     private const string EnrollmentSecretClaim = "questionnaire:totp_enrollment_secret";
 
     /// <summary>段階を問わず同じ文言を返す。</summary>
-    private const string InvalidMessage = "ログイン ID または入力内容が正しくありません。";
+    private static string InvalidMessage(HttpContext context) =>
+        ServerMessages.Get(ServerMessageKeys.InvalidCredentials, RequestLanguage.Of(context));
 
     public static IEndpointRouteBuilder MapAdminAuthEndpoints(this IEndpointRouteBuilder builder)
     {
@@ -43,12 +46,24 @@ public static class AdminAuthEndpoints
             var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             if (session.Succeeded)
             {
+                // **利用者ごとの言語は画面の初期値。** 未設定なら null を返し、
+                // 画面はブラウザの言語設定へ落とす（_documents/多言語対応方針.md 2 章）
+                string? language = null;
+                if (session.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) is { } sessionId
+                    && Guid.TryParse(sessionId, out var sessionUserId))
+                {
+                    var user = await store.FindByIdAsync(sessionUserId, cancellationToken)
+                        .ConfigureAwait(false);
+                    language = SupportedLanguages.Normalize(user?.Language);
+                }
+
                 return Results.Ok(new
                 {
                     authenticated = true,
                     setupRequired,
                     loginId = session.Principal?.Identity?.Name,
                     role = session.Principal?.FindFirstValue(ClaimTypes.Role),
+                    language,
                 });
             }
 
@@ -86,13 +101,18 @@ public static class AdminAuthEndpoints
         {
             if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
             {
-                return Results.BadRequest(new { message = "ログイン ID と合言葉を入力してください。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.LoginIdAndPasswordRequired, RequestLanguage.Of(context)),
+                });
             }
 
             // **短すぎる合言葉を通さない。** 最初の 1 人こそ全権を持つ
             if (!AdminPasswordPolicy.IsAcceptable(request.Password))
             {
-                return Results.BadRequest(new { message = AdminPasswordPolicy.Message });
+                return Results.BadRequest(
+                    new { message = AdminPasswordPolicy.Message(RequestLanguage.Of(context)) });
             }
 
             var created = await authenticator
@@ -102,7 +122,11 @@ public static class AdminAuthEndpoints
             if (created is null)
             {
                 // **既に居るなら、ここは二度と使えない**
-                return Results.Conflict(new { message = "管理者は既に登録されています。" });
+                return Results.Conflict(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.AdministratorAlreadyExists, RequestLanguage.Of(context)),
+                });
             }
 
             await SignInPendingAsync(context, created, secret: null).ConfigureAwait(false);
@@ -118,7 +142,9 @@ public static class AdminAuthEndpoints
         {
             if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
             {
-                return Results.Json(new { message = InvalidMessage }, statusCode: StatusCodes.Status401Unauthorized);
+                return Results.Json(
+                    new { message = InvalidMessage(context) },
+                    statusCode: StatusCodes.Status401Unauthorized);
             }
 
             var result = await authenticator
@@ -137,13 +163,18 @@ public static class AdminAuthEndpoints
 
                 case PasswordOutcome.LockedOut:
                     return Results.Json(
-                        new { message = "試行が続いたため、しばらくログインできません。時間を置いてお試しください。" },
+                        new
+                        {
+                            message = ServerMessages.Get(
+                                ServerMessageKeys.LoginTemporarilyLocked, RequestLanguage.Of(context)),
+                        },
                         statusCode: StatusCodes.Status423Locked);
 
                 default:
                     // **止められている利用者も同じ文言にする**
                     return Results.Json(
-                        new { message = InvalidMessage }, statusCode: StatusCodes.Status401Unauthorized);
+                        new { message = InvalidMessage(context) },
+                        statusCode: StatusCodes.Status401Unauthorized);
             }
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
@@ -182,7 +213,11 @@ public static class AdminAuthEndpoints
             var secret = pending.Principal.FindFirstValue(EnrollmentSecretClaim);
             if (string.IsNullOrEmpty(secret))
             {
-                return Results.BadRequest(new { message = "登録をやり直してください。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.EnrollmentRestartRequired, RequestLanguage.Of(context)),
+                });
             }
 
             var user = ReadPending(pending.Principal);
@@ -193,7 +228,11 @@ public static class AdminAuthEndpoints
             if (codes is null)
             {
                 return Results.Json(
-                    new { message = "数字が合いません。認証アプリの表示をご確認ください。" },
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.TotpCodeMismatch, RequestLanguage.Of(context)),
+                    },
                     statusCode: StatusCodes.Status401Unauthorized);
             }
 
@@ -265,7 +304,11 @@ public static class AdminAuthEndpoints
             case SecondFactorOutcome.LockedOut:
                 await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
                 return Results.Json(
-                    new { message = "試行が続いたため、しばらくログインできません。時間を置いてお試しください。" },
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.LoginTemporarilyLocked, RequestLanguage.Of(context)),
+                    },
                     statusCode: StatusCodes.Status423Locked);
 
             case SecondFactorOutcome.NotEnrolled:
@@ -273,7 +316,8 @@ public static class AdminAuthEndpoints
 
             default:
                 return Results.Json(
-                    new { message = InvalidMessage }, statusCode: StatusCodes.Status401Unauthorized);
+                    new { message = InvalidMessage(context) },
+                    statusCode: StatusCodes.Status401Unauthorized);
         }
     }
 

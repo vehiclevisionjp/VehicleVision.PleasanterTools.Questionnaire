@@ -7,6 +7,15 @@
     verifyTotp,
   } from '../lib/api';
   import type { AdminSession } from '../lib/types';
+  import { t } from '../lib/i18n/state.svelte';
+
+  /**
+   * 合言葉の最低の長さ。
+   *
+   * **サーバ側（`Web/Services/AdminPasswordPolicy.cs`）と揃えること。**
+   * ここで通してもサーバが断る。画面側は打ち直しを減らすためだけのもの。
+   */
+  const MINIMUM_PASSWORD_LENGTH = 12;
 
   interface Props {
     session: AdminSession;
@@ -35,12 +44,12 @@
     error = '';
 
     if (isSetup) {
-      if (password.length < 12) {
-        error = '合言葉は 12 文字以上にしてください。';
+      if (password.length < MINIMUM_PASSWORD_LENGTH) {
+        error = t('signIn.passwordTooShort', { minimum: MINIMUM_PASSWORD_LENGTH });
         return;
       }
       if (password !== confirmation) {
-        error = '確認用の合言葉が一致しません。';
+        error = t('signIn.passwordMismatch');
         return;
       }
     }
@@ -91,24 +100,24 @@
 
 <div class="panel">
   {#if step === 'password'}
-    <h1>{isSetup ? '最初の管理者を登録する' : '管理画面にログイン'}</h1>
+    <h1>{isSetup ? t('signIn.setupTitle') : t('signIn.title')}</h1>
 
     {#if isSetup}
       <!-- **既定の合言葉を仕込まない。** 変え忘れた既定値が残らないようにしている -->
       <p class="lead">
-        まだ管理者が登録されていません。最初の 1 人を作ってください。
-        <strong>この入口はここで一度きりです。</strong>
+        {t('signIn.setupLead')}
+        <strong>{t('signIn.setupLeadStrong')}</strong>
       </p>
     {/if}
 
     <form onsubmit={submitPassword}>
       <label>
-        ログイン ID
+        {t('signIn.loginId')}
         <input type="text" autocomplete="username" bind:value={loginId} required />
       </label>
 
       <label>
-        合言葉
+        {t('signIn.password')}
         <input
           type="password"
           autocomplete={isSetup ? 'new-password' : 'current-password'}
@@ -119,31 +128,31 @@
 
       {#if isSetup}
         <label>
-          合言葉（確認）
+          {t('signIn.passwordConfirmation')}
           <input type="password" autocomplete="new-password" bind:value={confirmation} required />
         </label>
-        <p class="hint">12 文字以上にしてください。</p>
+        <p class="hint">{t('signIn.passwordHint', { minimum: MINIMUM_PASSWORD_LENGTH })}</p>
       {/if}
 
       {#if error}<p class="error" role="alert">{error}</p>{/if}
 
       <button type="submit" disabled={busy}>
-        {busy ? '確認しています…' : isSetup ? '登録する' : '次へ'}
+        {busy ? t('signIn.checking') : isSetup ? t('signIn.register') : t('signIn.next')}
       </button>
     </form>
   {:else}
-    <h1>{step === 'totp' ? '認証アプリの数字を入力' : '復旧コードを入力'}</h1>
+    <h1>{step === 'totp' ? t('signIn.totpTitle') : t('signIn.recoveryTitle')}</h1>
     <p class="lead">
       {#if step === 'totp'}
-        認証アプリに表示されている 6 桁の数字を入力してください。
+        {t('signIn.totpLead')}
       {:else}
-        登録時に控えた復旧コードを 1 つ入力してください。<strong>一度使うと無効になります。</strong>
+        {t('signIn.recoveryLead')}<strong>{t('signIn.recoveryLeadStrong')}</strong>
       {/if}
     </p>
 
     <form onsubmit={submitCode}>
       <label>
-        {step === 'totp' ? '6 桁の数字' : '復旧コード'}
+        {step === 'totp' ? t('signIn.totpLabel') : t('signIn.recoveryLabel')}
         <input
           type="text"
           inputmode={step === 'totp' ? 'numeric' : 'text'}
@@ -155,7 +164,9 @@
 
       {#if error}<p class="error" role="alert">{error}</p>{/if}
 
-      <button type="submit" disabled={busy}>{busy ? '確認しています…' : 'ログイン'}</button>
+      <button type="submit" disabled={busy}>
+        {busy ? t('signIn.checking') : t('signIn.signIn')}
+      </button>
     </form>
 
     <button
@@ -167,7 +178,7 @@
         error = '';
       }}
     >
-      {step === 'totp' ? '認証アプリが使えない（復旧コードを使う）' : '認証アプリを使う'}
+      {step === 'totp' ? t('signIn.useRecovery') : t('signIn.useTotp')}
     </button>
   {/if}
 </div>
