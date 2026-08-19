@@ -30,6 +30,7 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.Logging.Abstractions 10.0.11 / MIT
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
   nClam 9.0.0 / Apache-2.0 / https://github.com/tekmaven/nClam
+  Ixnas.AltchaNet 1.2.1 / BSD-2-Clause / https://github.com/ixnas/altcha-dotnet
   Azure.Storage.Blobs 12.29.1 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
 

@@ -27,6 +27,10 @@ export default defineConfig({
     reducedMotion: 'reduce',
     screenshot: 'off',
     trace: 'off',
+    // **容器の /dev/shm は既定で 64 MB しかない。**
+    // 画面全体の写しを撮るときに足りず「Unable to capture screenshot」で落ちる
+    // （実際に踏んだ）。**写しの内容とは関係のない、容器側の都合。**
+    launchOptions: { args: ['--disable-dev-shm-usage'] },
 
   },
 

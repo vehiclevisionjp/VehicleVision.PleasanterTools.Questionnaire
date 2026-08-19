@@ -76,7 +76,7 @@ public class AttachmentIntakeEndToEndTests
     /// **回答トークンはサーバが発行する**（bot 対策。<c>Services/SubmissionGuard.cs</c>）。
     /// 画面が勝手に決めた値では送信できない。
     /// </remarks>
-    private static async Task<(string ResponseToken, string Ticket)> IssueTicketAsync(
+    private static async Task<(string ResponseToken, string Ticket, string Altcha)> IssueTicketAsync(
         HttpClient http,
         string publicId)
     {
@@ -85,10 +85,16 @@ public class AttachmentIntakeEndToEndTests
         response.EnsureSuccessStatusCode();
 
         var body = JsonNode.Parse(await response.Content.ReadAsStringAsync());
-        return (body!["responseToken"]!.GetValue<string>(), body["ticket"]!.GetValue<string>());
+
+        // **proof-of-work も解いておく**（Issue #55）。画面と同じことをする
+        return (
+            body!["responseToken"]!.GetValue<string>(),
+            body["ticket"]!.GetValue<string>(),
+            AltchaSolver.Solve(body));
     }
 
-    private static MultipartFormDataContent Multipart(string fileName, byte[] content, string ticket)
+    private static MultipartFormDataContent Multipart(
+        string fileName, byte[] content, string ticket, string altcha)
     {
         var form = new MultipartFormDataContent
         {
@@ -100,6 +106,7 @@ public class AttachmentIntakeEndToEndTests
                         // **チケットと罠は答えと同じ欄へ入れる。** サーバの読み方を 1 つにするため
                         ticket,
                         trap = "",
+                        altcha,
                     }),
                     Encoding.UTF8,
                     "application/json"),
@@ -136,13 +143,13 @@ public class AttachmentIntakeEndToEndTests
 
         // **チケットを受け取り、最短時間を待ってから送る。**
         // 人が読んで入力する時間より速い送信は bot として断られる
-        var (token, ticket) = await IssueTicketAsync(http, publicId);
+        var (token, ticket, altcha) = await IssueTicketAsync(http, publicId);
         await Task.Delay(TimeSpan.FromSeconds(4));
 
         try
         {
             using (var accepted = await http.PutAsync(
-                $"/api/forms/{publicId}/responses/{token}", Multipart("a.png", PngHeader, ticket)))
+                $"/api/forms/{publicId}/responses/{token}", Multipart("a.png", PngHeader, ticket, altcha)))
             {
                 Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
             }
@@ -158,12 +165,12 @@ public class AttachmentIntakeEndToEndTests
             Assert.Contains("a.png", payload, StringComparison.Ordinal);
 
             // 中身が拡張子と食い違う添付は受け付けない
-            var (rejectedToken, rejectedTicket) = await IssueTicketAsync(http, publicId);
+            var (rejectedToken, rejectedTicket, rejectedAltcha) = await IssueTicketAsync(http, publicId);
             await Task.Delay(TimeSpan.FromSeconds(4));
 
             using var rejected = await http.PutAsync(
                 $"/api/forms/{publicId}/responses/{rejectedToken}",
-                Multipart("a.png", [0x4D, 0x5A, 0x00], rejectedTicket));
+                Multipart("a.png", [0x4D, 0x5A, 0x00], rejectedTicket, rejectedAltcha));
 
             Assert.Equal(HttpStatusCode.UnprocessableEntity, rejected.StatusCode);
             Assert.Contains(

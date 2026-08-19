@@ -1,3 +1,4 @@
+import type { AltchaChallenge } from './altcha';
 import { DEFAULT_LANGUAGE, type Language } from './i18n/language';
 import type { SurveyTheme } from './theme';
 
@@ -129,6 +130,13 @@ export interface Ticket {
   responseToken: string;
   /** 送信時にそのまま返す署名付きのチケット。 */
   ticket: string;
+  /**
+   * proof-of-work の課題（Issue #55）。
+   *
+   * **切っているときは付いてこない。** サーバは null の項目を落として返すので、
+   * `!== null` では守れない。
+   */
+  altcha?: AltchaChallenge | null;
 }
 
 /**
