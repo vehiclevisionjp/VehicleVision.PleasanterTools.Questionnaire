@@ -127,6 +127,35 @@ public class ConnectionSecurityTests
             allowInsecure: true);
     }
 
+    // ---- 接続を作るとき -----------------------------------------------------
+
+    [Fact]
+    public void 黙っている接続文字列には暗号化を立てる()
+    {
+        // **ドライバの既定に頼らない。** 版で変わり得るし、書かれていないものは読む側にも伝わらない
+        var factory = new DbConnectionFactory(
+            DatabaseProvider.SqlServer,
+            "Server=db;Database=Q;UID=sa;PWD=x");
+
+        using var connection = factory.Create();
+
+        Assert.Contains("Encrypt=True", connection.ConnectionString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void 書いてある値は上書きしない()
+    {
+        // **意図して緩めた設定を黙って戻さない。** 何を試しているのか分からなくなる
+        // （緩めていること自体は EnsureSecure が咎める）
+        var factory = new DbConnectionFactory(
+            DatabaseProvider.SqlServer,
+            "Server=db;Database=Q;UID=sa;PWD=x;Encrypt=False");
+
+        using var connection = factory.Create();
+
+        Assert.Contains("Encrypt=False", connection.ConnectionString, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void 咎める理由に接続文字列そのものを入れない()
     {
