@@ -347,6 +347,15 @@ export const ja = {
   'preview.end': 'ここが最後です。実際の画面では送信の釦が出ます。',
   'preview.stepCount': '{current} / {total}',
   'preview.empty': '出せる設問がありません。',
+  // ---- 回答用 URL の QR コード（Issue #57） ----
+  'qr.open': 'QR コード',
+  'qr.title': '「{title}」の QR コード',
+  'qr.description':
+    'この画面の中だけで描いています。サーバへは送っていないので、回答用 URL がサーバの記録に残ることはありません。',
+  'qr.alt': '回答用 URL の QR コード',
+  'qr.download': '画像を保存',
+  'qr.close': '閉じる',
+  'qr.failed': 'QR コードを作れませんでした。下の URL をそのままお使いください。',
 } as const;
 
 /** 文言の鍵。**日本語のカタログが一覧そのもの。** */
@@ -697,6 +706,15 @@ export const en: Record<MessageKey, string> = {
   'preview.end': 'This is the last step. The real screen shows a submit button here.',
   'preview.stepCount': '{current} / {total}',
   'preview.empty': 'No question can be shown.',
+  // ---- 回答用 URL の QR コード（Issue #57） ----
+  'qr.open': 'QR code',
+  'qr.title': 'QR code for "{title}"',
+  'qr.description':
+    'Drawn in this browser only. It is never sent to the server, so the answer URL is not added to any server-side log.',
+  'qr.alt': 'QR code for the answer URL',
+  'qr.download': 'Save image',
+  'qr.close': 'Close',
+  'qr.failed': 'Could not draw the QR code. Please use the URL below as it is.',
 };
 
 const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };

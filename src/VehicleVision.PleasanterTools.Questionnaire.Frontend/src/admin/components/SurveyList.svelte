@@ -1,7 +1,8 @@
 <script lang="ts">
   import { createSurvey, duplicateSurvey, listSurveys, resume, suspend } from '../lib/api';
-  import { surveyStatusKey, type SurveySummary } from '../lib/types';
+  import { isPublished, surveyStatusKey, type SurveySummary } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
+  import SurveyQrCode from './SurveyQrCode.svelte';
 
   interface Props {
     onopen: (surveyId: string) => void;
@@ -31,6 +32,13 @@
   let copyJsonColumn = $state('');
   /** 二重送信で 2 つ複製されないようにする */
   let duplicateBusy = $state(false);
+
+  /**
+   * QR コードを出しているアンケート（Issue #57）。**1 度に 1 つだけ。**
+   *
+   * **描くのは画面の中だけ。** サーバへ URL を送らない
+   */
+  let showingQr = $state<SurveySummary | null>(null);
 
   $effect(() => {
     void reload();
@@ -121,6 +129,11 @@
     await reload();
   }
 
+  function toggleQr(survey: SurveySummary) {
+    // **同じ行をもう一度押したら閉じる。** 開きっぱなしで表が押し下げられない
+    showingQr = showingQr?.surveyId === survey.surveyId ? null : survey;
+  }
+
   /** 回答用 URL。**公開用 ID しか出さない。** */
   function formUrl(publicId: string): string {
     return `${location.origin}/f/${publicId}`;
@@ -192,6 +205,15 @@
   </form>
 {/if}
 
+{#if showingQr}
+  <SurveyQrCode
+    url={formUrl(showingQr.publicId)}
+    title={showingQr.title}
+    publicId={showingQr.publicId}
+    onclose={() => (showingQr = null)}
+  />
+{/if}
+
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 
 {#if loading}
@@ -223,7 +245,7 @@
           </td>
           <td>{survey.publishedVersion ?? '—'}</td>
           <td>
-            {#if survey.publishedVersion !== null}
+            {#if isPublished(survey)}
               <a href={formUrl(survey.publicId)} target="_blank" rel="noreferrer">
                 {survey.publicId}
               </a>
@@ -233,9 +255,13 @@
           </td>
           <td class="muted">{formatDate(survey.updatedAt)}</td>
           <td class="row-actions">
-            {#if survey.publishedVersion !== null}
+            {#if isPublished(survey)}
               <button type="button" class="secondary" onclick={() => toggle(survey)}>
                 {survey.status === 1 ? t('list.suspend') : t('list.resume')}
+              </button>
+              <!-- **公開していないものには出さない。** 出しても読めない URL になる -->
+              <button type="button" class="secondary" onclick={() => toggleQr(survey)}>
+                {t('qr.open')}
               </button>
             {/if}
             {#if canDuplicate}

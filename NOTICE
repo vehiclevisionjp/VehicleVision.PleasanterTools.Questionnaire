@@ -33,7 +33,7 @@ Copyright (C) PMC Co.,Ltd.
   Azure.Storage.Blobs 12.29.1 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
 
-フロントエンド（ビルド時のみ使用。**成果物へは svelte のランタイムのみ含まれる**）
+フロントエンド（**成果物へ含まれるのは svelte のランタイムと qrcode のみ。** 残りはビルド時だけ使う）
 
   svelte 5.56.9 / MIT / https://www.npmjs.com/package/svelte
   vite 8.2.1 / MIT / https://www.npmjs.com/package/vite

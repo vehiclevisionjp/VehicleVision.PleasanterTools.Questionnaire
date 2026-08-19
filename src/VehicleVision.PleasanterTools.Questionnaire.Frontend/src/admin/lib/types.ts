@@ -239,8 +239,25 @@ export interface SurveySummary {
   title: string;
   pleasanterSiteId: number;
   status: number;
-  publishedVersion: number | null;
+  /**
+   * 公開済みの版。**一度も公開していなければ「無い」。**
+   *
+   * **`null` ではなく「無い」**。サーバは null のプロパティを落として返すので
+   * （`DefaultIgnoreCondition`）、`?` を外すと未公開のアンケートが
+   * 公開済みとして描かれる。判定は {@link isPublished} を使うこと。
+   */
+  publishedVersion?: number | null;
   updatedAt: string;
+}
+
+/**
+ * 一度でも公開したことがあるか。
+ *
+ * **`!== null` では守れない。** サーバは null のプロパティを落として返すので、
+ * 未公開のときは `null` ではなく `undefined` になる。
+ */
+export function isPublished(survey: SurveySummary): boolean {
+  return (survey.publishedVersion ?? null) !== null;
 }
 
 /** アンケートの状態の文言の鍵。 */
