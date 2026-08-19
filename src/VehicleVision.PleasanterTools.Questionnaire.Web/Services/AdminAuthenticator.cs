@@ -325,7 +325,9 @@ public sealed class AdminAuthenticator(
         };
 
         await store.CreateAsync(user, cancellationToken).ConfigureAwait(false);
-        logger.LogInformation("最初の管理者を作った（LoginId={LoginId}）", loginId);
+        // **利用者が書いた文字列をそのままログへ出さない。**
+        // 改行を含めれば、ログの行を偽装できる（CodeQL の cs/log-forging）
+        logger.LogInformation("最初の管理者を作った（LoginId={LoginId}）", LogSafe.Text(loginId));
         return user;
     }
 

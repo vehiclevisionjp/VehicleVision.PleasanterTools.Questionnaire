@@ -29,6 +29,18 @@ var provider = Enum.Parse<DatabaseProvider>(
 var connectionString = builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"]
     ?? throw new InvalidOperationException("QUESTIONNAIRE_DB_CONNECTIONSTRING が設定されていない");
 
+// **DB への通信が平文で流れていないかを起動時に見る。**
+// 接続文字列は運用者が与えるのでコードからは中身が見えず、
+// 暗号化を切った設定のまま本番へ出ても気付けない（CodeQL の cs/insecure-sql-connection）。
+// **既定は厳しい側。** 検証環境は自己署名の証明書を使うので明示して緩める
+ConnectionSecurity.EnsureSecure(
+    provider,
+    connectionString,
+    allowInsecure: string.Equals(
+        builder.Configuration["QUESTIONNAIRE_DB_ALLOW_INSECURE"],
+        "true",
+        StringComparison.OrdinalIgnoreCase));
+
 var pleasanterOptions = new PleasanterOptions
 {
     BaseUrl = builder.Configuration["QUESTIONNAIRE_PLEASANTER_BASEURL"]
