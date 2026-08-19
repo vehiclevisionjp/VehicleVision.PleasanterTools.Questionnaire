@@ -149,6 +149,63 @@ test.describe('分岐', () => {
     await expect(page.getByText('利用していますか')).toBeHidden();
   });
 
+  test('プレビューでも分岐を辿れる', async ({ page }) => {
+    // **プレビューは回答画面と同じ描き方でなければ意味がない**
+    // （`_documents/画面設計.md` 2 章）。別に描くと
+    // 「プレビューでは出たのに本番では出ない」が起きる
+    const survey = await prepareBranchingSurvey(page.request, demoSiteId);
+
+    await page.goto(`/admin/surveys/${survey.surveyId}`);
+    await page.getByRole('button', { name: 'プレビュー' }).click();
+
+    const sheet = page.getByRole('dialog', { name: 'プレビュー' });
+    await expect(sheet).toBeVisible();
+
+    // **保存されないことが画面に出ている**
+    await expect(sheet.getByText('保存も送信もされません')).toBeVisible();
+
+    // 条件つきの設問が出し分けられる
+    await expect(sheet.getByText('サービス名')).toBeHidden();
+    await sheet.getByRole('radio', { name: 'はい' }).check();
+    await expect(sheet.getByText('サービス名')).toBeVisible();
+
+    // 「いいえ」でページを飛ばす
+    await sheet.getByRole('radio', { name: 'いいえ' }).check();
+    await sheet.getByRole('button', { name: '次へ' }).click();
+
+    await expect(sheet.getByRole('heading', { name: 'ご意見' })).toBeVisible();
+    await expect(sheet.getByRole('heading', { name: '良かった点' })).toBeHidden();
+
+    // **送信の釦は出さない。** 押せる釦があると、押した人は送れたと思う
+    await expect(sheet.getByRole('button', { name: '送信する' })).toBeHidden();
+    await expect(sheet.getByText('ここが最後です')).toBeVisible();
+
+    // 編集へ戻れる
+    await sheet.getByRole('button', { name: '編集へ戻る' }).click();
+    await expect(sheet).toBeHidden();
+  });
+
+  test('プレビューでは回答が保存されない', async ({ page }) => {
+    const survey = await prepareBranchingSurvey(page.request, demoSiteId);
+
+    const before = await page.request.get('/api/admin/outbox/status');
+    const pendingBefore = ((await before.json()) as { pendingCount: number }).pendingCount;
+
+    await page.goto(`/admin/surveys/${survey.surveyId}`);
+    await page.getByRole('button', { name: 'プレビュー' }).click();
+
+    const sheet = page.getByRole('dialog', { name: 'プレビュー' });
+    await sheet.getByRole('radio', { name: 'いいえ' }).check();
+    await sheet.getByRole('button', { name: '次へ' }).click();
+    await sheet.getByRole('textbox').first().fill('これは保存されてはいけない');
+
+    // **送信待ちが増えていないこと。** 増えていたら、プレビューが本物を作っている
+    const after = await page.request.get('/api/admin/outbox/status');
+    const pendingAfter = ((await after.json()) as { pendingCount: number }).pendingCount;
+
+    expect(pendingAfter).toBe(pendingBefore);
+  });
+
   test('前へ戻って答えを変えると経路も変わる', async ({ page }) => {
     test.skip(publicId === '', '先の試験でアンケートを公開できていない');
 

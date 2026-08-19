@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SurveyPreview from './SurveyPreview.svelte';
   import { loadDraft, publish, saveDraft } from '../lib/api';
   import {
     displayText,
@@ -49,6 +50,9 @@
   let editing = $state<Language>(language());
 
   let definition = $state<SurveyDefinition>();
+
+  /** プレビューを開いているか。**保存前の下書きをそのまま見る。** */
+  let previewing = $state(false);
   let mapping = $state<MappingDefinition>({ assignments: [] });
   let revision = $state(0);
 
@@ -323,6 +327,14 @@
 
   <div class="right">
     <span class="revision">{t('editor.revision', { revision })}</span>
+    <button
+      type="button"
+      class="secondary"
+      onclick={() => (previewing = true)}
+      disabled={loading || definition === undefined}
+    >
+      {t('preview.open')}
+    </button>
     <button type="button" class="secondary" onclick={save} disabled={saving || loading}>
       {saving ? t('editor.working') : t('editor.saveDraft')}
     </button>
@@ -556,7 +568,36 @@
   />
 {/if}
 
+<!--
+  **編集画面の上に重ねる。** 別の経路にすると保存前の下書きを渡せない。
+  **開いている間は編集の続きを触らせない**（下敷きの入力に触れると
+  見ているものと食い違う）
+-->
+{#if previewing && definition}
+  <div class="overlay" role="dialog" aria-modal="true" aria-label={t('preview.title')}>
+    <div class="sheet">
+      <SurveyPreview {definition} onclose={() => (previewing = false)} />
+    </div>
+  </div>
+{/if}
+
 <style lang="scss">
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    overflow-y: auto;
+    background: rgb(16 24 40 / 45%);
+  }
+
+  .sheet {
+    max-width: 56rem;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    background: var(--bg);
+    border-radius: 10px;
+  }
+
   .bar {
     display: flex;
     align-items: center;
