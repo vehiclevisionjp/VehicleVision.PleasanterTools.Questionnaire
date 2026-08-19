@@ -127,6 +127,37 @@ services:
       QUESTIONNAIRE_VIRUSSCAN_PORT: "3310"
     ports:
       - "${DEV_APP_PORT:-8081}:8080"
+    networks:
+      default:
+        aliases:
+          # **`app` という名前でブラウザから開かない。**
+          # Chrome は `.app` を HSTS のプリロード一覧に持っており、
+          # 単一ラベルの `app` でも https へ強制されて ERR_SSL_PROTOCOL_ERROR になる
+          # （実測。curl では http のまま 200 が返る）
+          - questionnaire-app
+
+  # ---- 取説用の写しを撮る ----------------------------------------------------
+  # **ホストに Playwright とブラウザを入れない。**
+  # **日本語フォントを入れてある**（入れないと文字が豆腐になる）
+  #
+  # **先に検証環境を起こしておくこと**（app が要る）。
+  # app は DB のプロファイル側で定義されているので、ここでは depends_on を書けない。
+  #
+  #   docker compose --profile sqlserver up -d --wait
+  #   docker compose --profile sqlserver --profile screenshots run --rm screenshots
+  screenshots:
+    build:
+      context: ./tools/screenshots
+      dockerfile: Dockerfile
+    profiles: ["screenshots"]
+    environment:
+      TZ: Asia/Tokyo
+      # コンテナ同士なので、外向けの番号ではなく service 名で繋ぐ
+      QUESTIONNAIRE_BASE_URL: http://questionnaire-app:8080
+    volumes:
+      # 撮った写しと報告書をホストへ出す
+      - ./tools/screenshots/shots:/work/shots
+      - ./tools/screenshots/report:/work/report
 
 volumes:
   postgres-data:

@@ -1,0 +1,13 @@
+{
+  "name": "questionnaire-screenshots",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "取説用の画面の写しを撮る",
+  "scripts": {
+    "shot": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}
