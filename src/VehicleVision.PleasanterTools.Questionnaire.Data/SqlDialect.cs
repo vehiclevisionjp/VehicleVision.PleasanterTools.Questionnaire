@@ -266,44 +266,25 @@ public static partial class SqlDialect
         _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
     };
 
-    /// <summary>
-    /// トークンの行が無ければ作る SQL。**既にある <c>ReferenceId</c> は触らない。**
-    /// </summary>
+    /// <summary>回答トークンの行を、無ければ作る SQL。</summary>
     /// <remarks>
     /// <para>
-    /// 受付のたびに <c>ReferenceId</c> を <c>null</c> で上書きすると、
-    /// **編集が Update ではなく Create になり二重登録になる**（実際に踏んだ）。
+    /// **作ったかどうかを「影響した行数」で判断しない。**
+    /// MySQL は既定で「一致した行数」を返す（<c>UseAffectedRows=false</c>）ので、
+    /// <c>ON DUPLICATE KEY UPDATE</c> で値を変えなくても 1 行と報告する。
+    /// **SQL Server と PostgreSQL では 0 行**なので、同じ判定が 3 者で割れる。
     /// </para>
     /// <para>
-    /// **3 者とも「作ったら 1 行、既にあったら 0 行」を返すこと**（Issue #53）。
-    /// 呼ぶ側はこの数で「新しい回答か、前の回答の編集か」を見分けており、
-    /// 見分けを誤ると受付数が二重に増える。
-    /// **MySQL は <c>ON DUPLICATE KEY UPDATE</c> で値を変えると 2 行と報告する**ので、
-    /// 自分自身を代入して「変えない更新」にしてある（0 行になる）。
+    /// **素直に入れて、重複なら入れ直さない。** 作ったかどうかは、
+    /// 呼ぶ側が主キーの衝突で見分ける（<c>ResponseTokenStore.EnsureAsync</c>）。
+    /// **DB が一意性を守るので、競合しても二重には入らない。**
     /// </para>
     /// </remarks>
-    public static string EnsureResponseToken(DatabaseProvider provider) => provider switch
-    {
-        DatabaseProvider.SqlServer =>
-            "IF NOT EXISTS (SELECT 1 FROM [ResponseTokens] WHERE [ResponseToken] = @ResponseToken) " +
-            "INSERT INTO [ResponseTokens] " +
-            "  ([ResponseToken], [SurveyId], [PleasanterReferenceId], [CreatedAt], [UpdatedAt]) " +
-            "VALUES (@ResponseToken, @SurveyId, NULL, @Now, @Now);",
+    public const string InsertResponseToken =
+        "INSERT INTO [ResponseTokens] " +
+        "  ([ResponseToken], [SurveyId], [PleasanterReferenceId], [CreatedAt], [UpdatedAt]) " +
+        "VALUES (@ResponseToken, @SurveyId, NULL, @Now, @Now)";
 
-        DatabaseProvider.PostgreSql =>
-            "INSERT INTO \"ResponseTokens\" " +
-            "  (\"ResponseToken\", \"SurveyId\", \"PleasanterReferenceId\", \"CreatedAt\", \"UpdatedAt\") " +
-            "VALUES (@ResponseToken, @SurveyId, NULL, @Now, @Now) " +
-            "ON CONFLICT (\"ResponseToken\") DO NOTHING",
-
-        DatabaseProvider.MySql =>
-            "INSERT INTO `ResponseTokens` " +
-            "  (`ResponseToken`, `SurveyId`, `PleasanterReferenceId`, `CreatedAt`, `UpdatedAt`) " +
-            "VALUES (@ResponseToken, @SurveyId, NULL, @Now, @Now) " +
-            "ON DUPLICATE KEY UPDATE `SurveyId` = `SurveyId`",
-
-        _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
-    };
 
     /// <summary>トークンと <c>ReferenceId</c> の対応を保存する SQL。</summary>
     public static string SaveResponseToken(DatabaseProvider provider) => provider switch

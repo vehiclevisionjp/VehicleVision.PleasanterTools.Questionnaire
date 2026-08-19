@@ -87,16 +87,39 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(responseToken);
+
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        // **3 者とも「作ったら 1 行、既にあったら 0 行」になるように書いてある**
-        // （SqlDialect.EnsureResponseToken）。件数の増減はここでしか判断できない
-        var affected = await connection.ExecuteAsync(Sql(
-            SqlDialect.EnsureResponseToken(connectionFactory.Provider),
-            new { ResponseToken = responseToken, SurveyId = surveyId, Now = DbTime.UtcNowTruncated() },
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        // **作ったかどうかを「影響した行数」で判断しない。**
+        // MySQL は既定で「一致した行数」を返すので、3 者で数え方が割れる
+        // （実際に MySQL でだけ落ちた）。**主キーの衝突で見分ける。**
+        try
+        {
+            await connection.ExecuteAsync(Sql(
+                SqlDialect.InsertResponseToken,
+                new { ResponseToken = responseToken, SurveyId = surveyId, Now = DbTime.ForDb(DateTime.Now) },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        return affected > 0;
+            return true;
+        }
+        catch (DbException)
+        {
+            // **例外の番号で判断しない**（3 者で違う）。
+            // **行が在ることを確かめて、在れば「既にあった」。**
+            // 在らなければ本当の失敗なので、そのまま投げ直す
+            var found = await connection.ExecuteScalarAsync<int?>(Sql(
+                "SELECT 1 FROM [ResponseTokens] WHERE [ResponseToken] = @ResponseToken",
+                new { ResponseToken = responseToken },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+            if (found is null)
+            {
+                throw;
+            }
+
+            return false;
+        }
     }
 
     public async Task<int> CountAcceptedAsync(
