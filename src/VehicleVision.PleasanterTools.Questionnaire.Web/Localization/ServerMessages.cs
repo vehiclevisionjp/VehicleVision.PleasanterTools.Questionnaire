@@ -195,7 +195,6 @@ public static class ServerMessages
             "Specify a Pleasanter site ID other than the one the original survey writes to.");
 
         Add(
-<<<<<<< HEAD
             ServerMessageKeys.SurveyIsTemplate,
             "これはテンプレートです。テンプレートは公開できません。"
                 + "テンプレートからアンケートを作ってください。",
@@ -217,7 +216,9 @@ public static class ServerMessages
             ServerMessageKeys.HeaderImageRejected,
             "この画像は使えません。PNG・JPEG・GIF・WebP の 2 MB 以内の画像を選んでください。",
             "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 2 MB.");
-=======
+
+        // ---- 回答数の上限 ---------------------------------------------------
+        Add(
             ServerMessageKeys.ResponseLimitMustBePositive,
             "回答数の上限は 1 以上にしてください。上限を設けない場合は空欄にしてください。",
             "The response limit must be at least 1. Leave it empty for no limit.");
@@ -228,7 +229,7 @@ public static class ServerMessages
             + "再開するには、先に上限を引き上げてください。",
             "The response limit has been reached ({0} of {1}). "
             + "Raise the limit before resuming.");
->>>>>>> c52b4f3 (管理画面で回答数の上限を編集し、なぜ止まっているのかを見られるようにする)
+
         // ---- 送信状況 -------------------------------------------------------
         Add(
             ServerMessageKeys.ResponseTokenRequired,
