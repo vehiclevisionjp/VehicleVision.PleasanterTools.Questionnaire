@@ -4,6 +4,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 
@@ -43,17 +44,26 @@ public static class AdminSurveyEndpoints
         // ---- 作成 ------------------------------------------------------------
         group.MapPost("/", async (
             CreateSurveyRequest request,
+            HttpContext context,
             ISurveyRepository surveys,
             CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.Title))
             {
-                return Results.BadRequest(new { message = "題名を入力してください。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SurveyTitleRequired, RequestLanguage.Of(context)),
+                });
             }
 
             if (request.PleasanterSiteId <= 0)
             {
-                return Results.BadRequest(new { message = "Pleasanter のサイト ID を指定してください。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PleasanterSiteIdRequired, RequestLanguage.Of(context)),
+                });
             }
 
             var surveyId = Guid.NewGuid();
@@ -85,12 +95,17 @@ public static class AdminSurveyEndpoints
         group.MapPut("/{surveyId:guid}", async (
             Guid surveyId,
             SaveDraftRequest request,
+            HttpContext context,
             ISurveyDraftStore drafts,
             CancellationToken cancellationToken) =>
         {
             if (request.Definition is null || request.Mapping is null)
             {
-                return Results.BadRequest(new { message = "定義とマッピングの両方が要ります。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.DefinitionAndMappingRequired, RequestLanguage.Of(context)),
+                });
             }
 
             // **不備があっても保存はさせる。** 直している途中で保存できないと作業にならない。
@@ -108,7 +123,8 @@ public static class AdminSurveyEndpoints
                 // **黙って上書きしない。** 読み直させる
                 return Results.Conflict(new
                 {
-                    message = "他の人がこのアンケートを更新しました。読み直してください。",
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SurveyUpdatedByOther, RequestLanguage.Of(context)),
                     actualRevision = exception.Actual,
                 });
             }
@@ -154,14 +170,19 @@ public static class AdminSurveyEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "公開できません。マッピングの不備を直してください。",
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PublishBlockedByMapping, RequestLanguage.Of(context)),
                     problems = blocking.Select(Describe),
                 });
             }
 
             if (draft.Definition.AllQuestions.All(question => question.IsDisplayOnly))
             {
-                return Results.BadRequest(new { message = "回答できる設問がありません。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.NoAnswerableQuestion, RequestLanguage.Of(context)),
+                });
             }
 
             var publishedBy = context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } id
@@ -179,10 +200,16 @@ public static class AdminSurveyEndpoints
                     publishedBy,
                     cancellationToken).ConfigureAwait(false);
             }
-            catch (InvalidOperationException exception)
+            catch (InvalidOperationException)
             {
-                // **版は不変。** 同時に 2 人が公開を押した場合など
-                return Results.Conflict(new { message = exception.Message });
+                // **版は不変。** 同時に 2 人が公開を押した場合など。
+                // **例外の文言をそのまま返さない。** 内部の事情を管理画面へ出さないためと、
+                // 文言が日本語で焼き付いていて英語にできないため
+                return Results.Conflict(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.VersionAlreadyPublished, RequestLanguage.Of(context)),
+                });
             }
 
             var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
@@ -205,15 +232,17 @@ public static class AdminSurveyEndpoints
         // ---- 停止と再開 ------------------------------------------------------
         group.MapPost("/{surveyId:guid}/suspend", (
             Guid surveyId,
+            HttpContext context,
             ISurveyRepository surveys,
             CancellationToken cancellationToken) =>
-            ChangeStatusAsync(surveyId, SurveyStatus.Suspended, surveys, cancellationToken));
+            ChangeStatusAsync(surveyId, SurveyStatus.Suspended, context, surveys, cancellationToken));
 
         group.MapPost("/{surveyId:guid}/resume", (
             Guid surveyId,
+            HttpContext context,
             ISurveyRepository surveys,
             CancellationToken cancellationToken) =>
-            ChangeStatusAsync(surveyId, SurveyStatus.Published, surveys, cancellationToken));
+            ChangeStatusAsync(surveyId, SurveyStatus.Published, context, surveys, cancellationToken));
 
         return builder;
     }
@@ -221,6 +250,7 @@ public static class AdminSurveyEndpoints
     private static async Task<IResult> ChangeStatusAsync(
         Guid surveyId,
         SurveyStatus status,
+        HttpContext context,
         ISurveyRepository surveys,
         CancellationToken cancellationToken)
     {
@@ -233,7 +263,11 @@ public static class AdminSurveyEndpoints
         // **公開していないものは再開できない。** 版が無いので回答画面が組み立てられない
         if (status is SurveyStatus.Published && record.PublishedVersion is null)
         {
-            return Results.BadRequest(new { message = "まだ公開されていません。" });
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.NotPublishedYet, RequestLanguage.Of(context)),
+            });
         }
 
         await surveys.SaveAsync(record with { Status = (int)status }, cancellationToken)

@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
+
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 /// <summary>管理者の合言葉に求める条件。</summary>
@@ -17,6 +19,7 @@ public static class AdminPasswordPolicy
     public static bool IsAcceptable(string? password) =>
         password is not null && password.Length >= MinimumLength;
 
-    /// <summary>合っていないときに返す文言。</summary>
-    public static string Message => $"合言葉は {MinimumLength} 文字以上にしてください。";
+    /// <summary>合っていないときに返す文言。**言語に合わせて返す。**</summary>
+    public static string Message(string? language) =>
+        ServerMessages.Get(ServerMessageKeys.PasswordTooShort, language, MinimumLength);
 }
