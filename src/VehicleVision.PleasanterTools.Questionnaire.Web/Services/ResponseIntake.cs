@@ -18,6 +18,10 @@ public enum IntakeRejection
     NotStarted,
 
     /// <summary>受付が終わっている。</summary>
+    /// <remarks>
+    /// **終了日時を過ぎた場合と、回答数が上限に達した場合の両方**
+    /// （<c>_documents/画面設計.md</c> 1 章）。**回答者へ区別を見せない。**
+    /// </remarks>
     Closed,
 
     /// <summary>停止中。</summary>
@@ -93,6 +97,15 @@ public sealed class ResponseIntake(
             return (null, rejection ?? IntakeRejection.NotFound);
         }
 
+        // **上限に達していれば、そもそも画面を出さない。**
+        // 最後まで入力させてから断る方が悪い（_documents/画面設計.md 1 章）
+        var (limitRejection, _) = await CheckLimitAsync(survey, cancellationToken)
+            .ConfigureAwait(false);
+        if (limitRejection is not null)
+        {
+            return (null, limitRejection);
+        }
+
         var snapshot = await snapshots
             .FindAsync(survey.SurveyId, survey.PublishedVersion.Value, cancellationToken)
             .ConfigureAwait(false);
@@ -166,6 +179,15 @@ public sealed class ResponseIntake(
             return IntakeResult.Reject(rejection ?? IntakeRejection.NotFound);
         }
 
+        // **検証や添付の検査より前に見る。** 受け付けられないと分かっているものに
+        // ウイルススキャンまで走らせない。**数えるのはここの 1 回だけ**
+        var (limitRejection, accepted) = await CheckLimitAsync(survey, cancellationToken)
+            .ConfigureAwait(false);
+        if (limitRejection is { } limitReason)
+        {
+            return IntakeResult.Reject(limitReason);
+        }
+
         var version = survey.PublishedVersion.Value;
         var snapshot = await snapshots.FindAsync(survey.SurveyId, version, cancellationToken)
             .ConfigureAwait(false);
@@ -214,8 +236,10 @@ public sealed class ResponseIntake(
         }
 
         // **トークンの行を先に用意する。** 送信待ちだけがあって対応表が無い状態を作らない。
-        // **既にある ReferenceId は触らない。** 消すと編集が新規作成になり二重登録になる
-        await tokens
+        // **既にある ReferenceId は触らない。** 消すと編集が新規作成になり二重登録になる。
+        //
+        // **作ったか既にあったかを受け取る。** 前の回答の編集は受付数を増やさない
+        var isNewResponse = await tokens
             .EnsureAsync(responseToken, survey.SurveyId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -232,7 +256,77 @@ public sealed class ResponseIntake(
             .SaveAsync(responseToken, survey.SurveyId, version, payload.ToJson(), cancellationToken)
             .ConfigureAwait(false);
 
+        // **この回答で上限に届いたなら、ここで止める。**
+        // 次の人が入力し終えてから断られるのを減らす。
+        // **数え直さない。** 受付の前に数えた件数に、今受け付けた 1 件を足せば足りる
+        if (survey.ResponseLimit is { } limit
+            && accepted is { } before
+            && (isNewResponse ? before + 1 : before) >= limit)
+        {
+            await surveys
+                .SuspendForResponseLimitAsync(survey.SurveyId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         return IntakeResult.Ok();
+    }
+
+    /// <summary>回答数の上限に達していないかを見る（Issue #53）。</summary>
+    /// <returns>
+    /// 断る理由（受け付けてよければ <c>null</c>）と、**今の受付数**。
+    /// 上限が無ければ数えないので件数は <c>null</c>。
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// **上限が無ければ問い合わせない。** 受け付けのたびに走る処理なので、
+    /// 上限を使っていないアンケートに費用を掛けない。
+    /// </para>
+    /// <para>
+    /// **数え方は「受け付けた回答の件数」**
+    /// （<see cref="IResponseTokenStore.CountAcceptedAsync"/>）。
+    /// 送信待ち・Pleasanter へ届いた分・デッドレターのどれかではなく、
+    /// **その 3 つを合わせたもの**を数える。回答者には受付完了と伝えているので、
+    /// まだ届いていない回答も「受け付けた」に含める。
+    /// </para>
+    /// <para>
+    /// **上限に達していたら自動で止める。** 断るだけだと、
+    /// 管理画面では公開中のまま見え、回答者は最後まで入力してから断られ続ける。
+    /// **再開はしない**（<c>_documents/データモデル設計.md</c> 2.1）。
+    /// </para>
+    /// <para>
+    /// ⚠️ **同時に届いた回答が上限をわずかに超えることはある。**
+    /// 数えてから受け付けるまでの間に別の回答が入ると、両方とも通る。
+    /// 厳密にするには受付を直列化するしかなく、**上限は座席数ではなく目安**なので割に合わない。
+    /// 超えた分は次の受付で自動停止に吸収される。
+    /// </para>
+    /// </remarks>
+    private async Task<(IntakeRejection? Rejection, int? Accepted)> CheckLimitAsync(
+        SurveyRecord survey,
+        CancellationToken cancellationToken)
+    {
+        // **0 以下は「上限なし」として扱う。** 公開直後に 0 が入っていて
+        // 誰も回答できない、という壊れ方をさせない
+        if (survey.ResponseLimit is not { } limit || limit <= 0)
+        {
+            return (null, null);
+        }
+
+        var accepted = await tokens
+            .CountAcceptedAsync(survey.SurveyId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (accepted < limit)
+        {
+            return (null, accepted);
+        }
+
+        await surveys
+            .SuspendForResponseLimitAsync(survey.SurveyId, cancellationToken)
+            .ConfigureAwait(false);
+
+        // **「受付終了」として返す。** 上限の有無も到達も回答者へは見せない
+        // （_documents/画面設計.md 1 章）
+        return (IntakeRejection.Closed, accepted);
     }
 
     /// <summary>自分の回答を読む。</summary>
@@ -339,7 +433,13 @@ public sealed class ResponseIntake(
 
         if (survey.Status == (int)SurveyStatus.Suspended)
         {
-            return IntakeRejection.Suspended;
+            // **上限に達して自動で止めた場合は「受付終了」として見せる**
+            // （_documents/画面設計.md 1 章の遷移図でも上限到達は受付終了）。
+            // 「停止中」は一時的に見えるので、もう再開しないものに使わない。
+            // **どちらも既存の理由に丸めるので、内部の事情は漏れない**
+            return survey.SuspendedReason == (int)SurveySuspendedReason.ResponseLimitReached
+                ? IntakeRejection.Closed
+                : IntakeRejection.Suspended;
         }
 
         if (survey.Status != (int)SurveyStatus.Published)

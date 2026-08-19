@@ -22,12 +22,39 @@ public interface IResponseTokenStore
         CancellationToken cancellationToken = default);
 
     /// <summary>行が無ければ作る。**既にある <c>ReferenceId</c> は触らない。**</summary>
+    /// <returns>
+    /// このとき作ったなら <c>true</c>。既にあったなら <c>false</c>。
+    /// **「新しい回答か、前の回答の編集か」はここでしか分からない**
+    /// （どちらも同じ入口を通る）。受付数を数える側がこれで判断する（Issue #53）。
+    /// </returns>
     /// <remarks>
     /// 受付のたびに <c>ReferenceId</c> を <c>null</c> で上書きすると、
     /// **編集が <c>Update</c> ではなく <c>Create</c> になり二重登録になる。**
     /// </remarks>
-    Task EnsureAsync(
+    Task<bool> EnsureAsync(
         string responseToken,
+        Guid surveyId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>そのアンケートが受け付けた回答の件数（Issue #53）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **数えるのはこの表。** 送信待ち（<c>Responses</c>）は**送信できたら消える**ので、
+    /// 数えると届いた分だけ件数が減っていく。デッドレターだけを数えても足りない。
+    /// **回答者には受付完了と伝えている**以上、まだ Pleasanter へ届いていない回答も
+    /// 「受け付けた」に含めるのが素直（<c>_documents/画面設計.md</c> 1 章）。
+    /// </para>
+    /// <para>
+    /// **回答 1 件につき 1 行**（トークンが主キー）。回答を編集しても同じトークンを使うので、
+    /// **編集で件数が増えることはない。**
+    /// </para>
+    /// <para>
+    /// **1 回の問い合わせで済ませる。** <c>IX_ResponseTokens_SurveyId</c> があるので
+    /// 表の全体は走らない。**上限を設けたアンケートは上限に達した時点で自動停止する**ので、
+    /// 数える対象の行数は上限の大きさで頭打ちになる。
+    /// </para>
+    /// </remarks>
+    Task<int> CountAcceptedAsync(
         Guid surveyId,
         CancellationToken cancellationToken = default);
 
@@ -55,15 +82,34 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
-    public async Task EnsureAsync(
+    public async Task<bool> EnsureAsync(
         string responseToken,
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(Sql(
+
+        // **3 者とも「作ったら 1 行、既にあったら 0 行」になるように書いてある**
+        // （SqlDialect.EnsureResponseToken）。件数の増減はここでしか判断できない
+        var affected = await connection.ExecuteAsync(Sql(
             SqlDialect.EnsureResponseToken(connectionFactory.Provider),
             new { ResponseToken = responseToken, SurveyId = surveyId, Now = DbTime.UtcNowTruncated() },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return affected > 0;
+    }
+
+    public async Task<int> CountAcceptedAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // **COUNT の型は 3 者で違う**（SQL Server は int、他は bigint）が、
+        // 単独の値として取る分には Dapper が合わせてくれる
+        return await connection.ExecuteScalarAsync<int>(Sql(
+            "SELECT COUNT(*) FROM [ResponseTokens] WHERE [SurveyId] = @SurveyId",
+            new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 

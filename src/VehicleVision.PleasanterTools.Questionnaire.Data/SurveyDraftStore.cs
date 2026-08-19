@@ -16,6 +16,17 @@ public sealed record SurveyDraft(
     int Revision);
 
 /// <summary>一覧に出すアンケートの要約。</summary>
+/// <param name="SuspendedReason">
+/// 止まっている理由（<see cref="SurveySuspendedReason"/>）。**止まっていなければ <c>null</c>。**
+/// **管理画面で「なぜ止まっているのか」が分かること**
+/// （<c>_documents/データモデル設計.md</c> 2.1）。
+/// </param>
+/// <param name="SuspendedAt">止めた時刻（UTC）。</param>
+/// <param name="ResponseLimit">受け付ける回答の上限。<c>null</c> なら上限なし。</param>
+/// <param name="ResponseCount">
+/// 受け付けた回答の件数。**まだ Pleasanter へ届いていない分も含む**
+/// （<see cref="IResponseTokenStore.CountAcceptedAsync"/>）。
+/// </param>
 public sealed record SurveySummary(
     Guid SurveyId,
     string PublicId,
@@ -23,7 +34,11 @@ public sealed record SurveySummary(
     long PleasanterSiteId,
     int Status,
     int? PublishedVersion,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    int? SuspendedReason = null,
+    DateTime? SuspendedAt = null,
+    int? ResponseLimit = null,
+    int ResponseCount = 0);
 
 /// <summary>複製で作るアンケートの、**写さない値**（Issue #46）。</summary>
 /// <param name="SurveyId">複製先の内部 ID。</param>
@@ -210,22 +225,76 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
     private DatabaseProvider Provider => connectionFactory.Provider;
 
+    /// <summary>一覧の 1 行を受ける。</summary>
+    /// <remarks>
+    /// **<c>COUNT</c> の型が 3 者で違う**（SQL Server は <c>int</c>、
+    /// PostgreSQL と MySQL は <c>bigint</c>）。**位置引数の record で受けないこと。**
+    /// Dapper は引数の型で組み立て先を探すので、どちらで書いても
+    /// いずれかの RDBMS で「合う組み立て方が無い」と言って落ちる
+    /// （<c>ResponseOutbox.OutboxStatusRow</c> と同じ理由）。
+    /// </remarks>
+    private sealed class SummaryRow
+    {
+        public Guid SurveyId { get; set; }
+
+        public string PublicId { get; set; } = string.Empty;
+
+        public string Title { get; set; } = string.Empty;
+
+        public long PleasanterSiteId { get; set; }
+
+        public int Status { get; set; }
+
+        public int? PublishedVersion { get; set; }
+
+        public int? SuspendedReason { get; set; }
+
+        public DateTime? SuspendedAt { get; set; }
+
+        public int? ResponseLimit { get; set; }
+
+        public long ResponseCount { get; set; }
+
+        public DateTime UpdatedAt { get; set; }
+    }
+
     public async Task<IReadOnlyList<SurveySummary>> ListAsync(
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         // **テンプレートは出さない**（Issue #58）。
         // 書き込み先も公開用 URL も持たないので、アンケートの表に並べると
-        // 「未公開のアンケート」に見えてしまう
-        var rows = await connection.QueryAsync<SurveySummary>(Sql(
-            "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
-            + "       [Status], [PublishedVersion], [UpdatedAt] "
-            + "FROM [Surveys] WHERE [IsTemplate] = @IsTemplate "
-            + "ORDER BY [UpdatedAt] DESC",
+        // 「未公開のアンケート」に見えてしまう。
+        //
+        // **受付数は相関副問い合わせで一緒に読む**（Issue #53）。画面を開くたびに
+        // アンケートの本数だけ問い合わせを増やさない。
+        // **GROUP BY は使わない**（MySQL の ONLY_FULL_GROUP_BY で書き分けが要る）
+        var rows = await connection.QueryAsync<SummaryRow>(Sql(
+            "SELECT s.[SurveyId], s.[PublicId], s.[Title], s.[PleasanterSiteId], "
+            + "       s.[Status], s.[PublishedVersion], s.[UpdatedAt], "
+            + "       s.[SuspendedReason], s.[SuspendedAt], s.[ResponseLimit], "
+            + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
+            + "        WHERE t.[SurveyId] = s.[SurveyId]) AS [ResponseCount] "
+            + "FROM [Surveys] s WHERE s.[IsTemplate] = @IsTemplate "
+            + "ORDER BY s.[UpdatedAt] DESC",
             new { IsTemplate = false },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        return rows.ToList();
+        return
+        [
+            .. rows.Select(row => new SurveySummary(
+                row.SurveyId,
+                row.PublicId,
+                row.Title,
+                row.PleasanterSiteId,
+                row.Status,
+                row.PublishedVersion,
+                row.UpdatedAt,
+                row.SuspendedReason,
+                row.SuspendedAt,
+                row.ResponseLimit,
+                (int)row.ResponseCount)),
+        ];
     }
 
     public async Task<IReadOnlyList<SurveyTemplateSummary>> ListTemplatesAsync(

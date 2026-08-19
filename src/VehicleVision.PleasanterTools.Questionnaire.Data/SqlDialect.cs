@@ -270,8 +270,17 @@ public static partial class SqlDialect
     /// トークンの行が無ければ作る SQL。**既にある <c>ReferenceId</c> は触らない。**
     /// </summary>
     /// <remarks>
+    /// <para>
     /// 受付のたびに <c>ReferenceId</c> を <c>null</c> で上書きすると、
     /// **編集が Update ではなく Create になり二重登録になる**（実際に踏んだ）。
+    /// </para>
+    /// <para>
+    /// **3 者とも「作ったら 1 行、既にあったら 0 行」を返すこと**（Issue #53）。
+    /// 呼ぶ側はこの数で「新しい回答か、前の回答の編集か」を見分けており、
+    /// 見分けを誤ると受付数が二重に増える。
+    /// **MySQL は <c>ON DUPLICATE KEY UPDATE</c> で値を変えると 2 行と報告する**ので、
+    /// 自分自身を代入して「変えない更新」にしてある（0 行になる）。
+    /// </para>
     /// </remarks>
     public static string EnsureResponseToken(DatabaseProvider provider) => provider switch
     {
@@ -291,7 +300,7 @@ public static partial class SqlDialect
             "INSERT INTO `ResponseTokens` " +
             "  (`ResponseToken`, `SurveyId`, `PleasanterReferenceId`, `CreatedAt`, `UpdatedAt`) " +
             "VALUES (@ResponseToken, @SurveyId, NULL, @Now, @Now) " +
-            "ON DUPLICATE KEY UPDATE `UpdatedAt` = VALUES(`UpdatedAt`)",
+            "ON DUPLICATE KEY UPDATE `SurveyId` = `SurveyId`",
 
         _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
     };

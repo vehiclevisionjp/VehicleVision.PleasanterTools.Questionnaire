@@ -89,13 +89,16 @@ public sealed class FakeTokenStore : IResponseTokenStore
         string responseToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(Map.TryGetValue(responseToken, out var id) ? id : null);
 
-    public Task EnsureAsync(
+    public Task<bool> EnsureAsync(
         string responseToken, Guid surveyId, CancellationToken cancellationToken = default)
     {
         // **既にある ReferenceId は触らない**
-        Map.TryAdd(responseToken, null);
-        return Task.CompletedTask;
+        return Task.FromResult(Map.TryAdd(responseToken, null));
     }
+
+    public Task<int> CountAcceptedAsync(
+        Guid surveyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Map.Count);
 
     public Task SaveAsync(
         string responseToken,

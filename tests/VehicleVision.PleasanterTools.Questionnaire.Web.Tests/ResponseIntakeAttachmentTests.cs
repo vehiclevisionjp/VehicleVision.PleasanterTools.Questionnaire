@@ -47,6 +47,10 @@ public class ResponseIntakeAttachmentTests
 
         public Task SaveAsync(SurveyRecord record, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public Task<bool> SuspendForResponseLimitAsync(
+            Guid surveyId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
     }
 
     private sealed class FakeSnapshots(SurveySnapshot snapshot) : ISurveySnapshotStore
@@ -119,9 +123,13 @@ public class ResponseIntakeAttachmentTests
             string responseToken, CancellationToken cancellationToken = default) =>
             Task.FromResult<long?>(null);
 
-        public Task EnsureAsync(
+        public Task<bool> EnsureAsync(
             string responseToken, Guid surveyId, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+            Task.FromResult(true);
+
+        public Task<int> CountAcceptedAsync(
+            Guid surveyId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
 
         public Task SaveAsync(
             string responseToken,

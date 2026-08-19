@@ -94,6 +94,27 @@ public interface ISurveyRepository
     Task<SurveyRecord?> FindBySurveyIdAsync(
         Guid surveyId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>回答数が上限に達したので受付を止める（Issue #53）。</summary>
+    /// <returns>このとき止めたなら <c>true</c>。既に止まっていたなら <c>false</c>。</returns>
+    /// <remarks>
+    /// <para>
+    /// **1 文の <c>UPDATE</c> で行う。** 受け付けるたびに走る処理なので、
+    /// 読んでから書くと同時の受付どうしで踏み合う。
+    /// </para>
+    /// <para>
+    /// **公開中の行だけを止める**（<c>Status</c> を条件に入れてある）。
+    /// これで 2 つのことが同時に守られる。
+    /// **手で止めた理由を上書きしない**（既に停止中なら 0 行）ことと、
+    /// **下書きへ戻したアンケートを勝手に停止中にしない**こと。
+    /// </para>
+    /// <para>
+    /// **止めるだけで、再開はしない**（<c>_documents/データモデル設計.md</c> 2.1）。
+    /// </para>
+    /// </remarks>
+    Task<bool> SuspendForResponseLimitAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>アンケートの 1 行。</summary>
@@ -104,6 +125,14 @@ public interface ISurveyRepository
 /// <see cref="PleasanterSiteId"/> は 0 が入っている。公開も停止もできない
 /// （<c>AdminSurveyEndpoints</c> で断る）。
 /// </param>
+/// <param name="ResponseLimit">
+/// 受け付ける回答の上限。<c>null</c> なら上限なし。
+/// **数えるのは <c>ResponseTokens</c> の行**（<see cref="IResponseTokenStore.CountAcceptedAsync"/>）。
+/// </param>
+/// <param name="SuspendedReason">
+/// 止まっている理由（<see cref="SurveySuspendedReason"/>）。**止まっていなければ <c>null</c>。**
+/// </param>
+/// <param name="SuspendedAt">止めた時刻（UTC）。</param>
 public sealed record SurveyRecord(
     Guid SurveyId,
     string PublicId,
@@ -115,7 +144,9 @@ public sealed record SurveyRecord(
     DateTime? AcceptFrom = null,
     DateTime? AcceptTo = null,
     int? ResponseLimit = null,
-    bool IsTemplate = false);
+    bool IsTemplate = false,
+    int? SuspendedReason = null,
+    DateTime? SuspendedAt = null);
 
 /// <summary>アンケートの状態。</summary>
 public enum SurveyStatus
@@ -128,6 +159,31 @@ public enum SurveyStatus
 
     /// <summary>停止中。理由は <c>SuspendedReason</c>。</summary>
     Suspended = 2,
+}
+
+/// <summary>受付を止めている理由。</summary>
+/// <remarks>
+/// <para>
+/// **「管理者が手で止めた」と「閾値で自動停止した」を区別する**
+/// （<c>_documents/データモデル設計.md</c> 2.1）。区別が付かないと、
+/// 管理画面で「なぜ止まっているのか」が分からない。
+/// </para>
+/// <para>
+/// **0 を使わない。** 列は <c>NULL</c> 可で、<c>NULL</c> が「止まっていない」を表す。
+/// 0 を割り当てると、既定値と「手で止めた」が見分けられなくなる。
+/// </para>
+/// </remarks>
+public enum SurveySuspendedReason
+{
+    /// <summary>管理者が手で止めた。**人が再開する。**</summary>
+    Manual = 1,
+
+    /// <summary>回答数が上限に達したので自動で止めた。</summary>
+    /// <remarks>
+    /// **勝手に再開しない**（<c>_documents/データモデル設計.md</c> 2.1）。
+    /// 上限を引き上げるか、そのまま終わらせるかは人が決める。
+    /// </remarks>
+    ResponseLimitReached = 2,
 }
 
 /// <summary>Dapper を使った実装。</summary>
@@ -153,6 +209,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             + "  [Status] = @Status, [PublishedVersion] = @PublishedVersion, "
             + "  [AcceptFrom] = @AcceptFrom, [AcceptTo] = @AcceptTo, "
             + "  [ResponseLimit] = @ResponseLimit, "
+            + "  [SuspendedReason] = @SuspendedReason, [SuspendedAt] = @SuspendedAt, "
             + "  [UpdatedAt] = @Now "
             + "WHERE [SurveyId] = @SurveyId",
             new
@@ -167,6 +224,8 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.AcceptFrom,
                 survey.AcceptTo,
                 survey.ResponseLimit,
+                survey.SuspendedReason,
+                survey.SuspendedAt,
                 Now = now,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -181,10 +240,12 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             + "  ([SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "   [AcceptFrom], [AcceptTo], [ResponseLimit], "
+            + "   [SuspendedReason], [SuspendedAt], "
             + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, @PublishedVersion, "
-            + "        @AcceptFrom, @AcceptTo, @ResponseLimit, @Now, @Now)",
+            + "        @AcceptFrom, @AcceptTo, @ResponseLimit, "
+            + "        @SuspendedReason, @SuspendedAt, @Now, @Now)",
             new
             {
                 survey.SurveyId,
@@ -197,6 +258,8 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.AcceptFrom,
                 survey.AcceptTo,
                 survey.ResponseLimit,
+                survey.SuspendedReason,
+                survey.SuspendedAt,
                 Now = now,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -256,7 +319,8 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(Sql(
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
-            + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate] "
+            + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate], "
+            + "       [SuspendedReason], [SuspendedAt] "
             + "FROM [Surveys] WHERE [PublicId] = @PublicId",
             new { PublicId = publicId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -270,10 +334,39 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(Sql(
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
-            + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate] "
+            + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate], "
+            + "       [SuspendedReason], [SuspendedAt] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    public async Task<bool> SuspendForResponseLimitAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // **公開中の行しか止めない。** 既に停止中なら 0 行で終わり、
+        // 手で止めた理由（Manual）を上書きしない。何度呼んでも同じ結果になる
+        var affected = await connection.ExecuteAsync(Sql(
+            "UPDATE [Surveys] SET "
+            + "  [Status] = @SuspendedStatus, "
+            + "  [SuspendedReason] = @Reason, "
+            + "  [SuspendedAt] = @Now, "
+            + "  [UpdatedAt] = @Now "
+            + "WHERE [SurveyId] = @SurveyId AND [Status] = @PublishedStatus",
+            new
+            {
+                SurveyId = surveyId,
+                SuspendedStatus = (int)SurveyStatus.Suspended,
+                PublishedStatus = (int)SurveyStatus.Published,
+                Reason = (int)SurveySuspendedReason.ResponseLimitReached,
+                Now = DbTime.UtcNowTruncated(),
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return affected > 0;
     }
 
     private DatabaseProvider Provider => connectionFactory.Provider;
