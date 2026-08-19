@@ -72,6 +72,16 @@ builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
 // **ヘッダ画像の置き場**（Issue #56）。外部のストレージへは置かない
 builder.Services.AddSingleton<ISurveyAssetStore, SurveyAssetStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
+builder.Services.AddSingleton<IAltchaChallengeStore, AltchaChallengeStore>();
+
+// **bot 対策の 4 枚目**（Issue #55）。送信チケット・最短時間・honeypot と重ねる。
+// **自前設置なので、回答者の情報を第三者へ送らない**（完全匿名と両立する）
+builder.Services.AddSingleton(AltchaOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton(serviceProvider => new AltchaGuard(
+    builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
+        ?? throw new InvalidOperationException("QUESTIONNAIRE_SECRET_KEY が設定されていない"),
+    serviceProvider.GetRequiredService<AltchaOptions>(),
+    serviceProvider.GetRequiredService<IAltchaChallengeStore>()));
 
 builder.Services.AddSingleton(pleasanterOptions);
 builder.Services.AddSingleton(new PleasanterDateTime(pleasanterOptions.ApiKeyUserTimeZoneId));

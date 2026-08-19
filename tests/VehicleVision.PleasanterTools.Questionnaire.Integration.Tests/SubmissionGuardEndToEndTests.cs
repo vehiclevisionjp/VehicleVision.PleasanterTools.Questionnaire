@@ -42,7 +42,7 @@ public class SubmissionGuardEndToEndTests
         JsonNode.Parse(await response.Content.ReadAsStringAsync());
 
     /// <summary>送信チケットを取る。</summary>
-    private static async Task<(string ResponseToken, string Ticket)> IssueAsync(
+    private static async Task<(string ResponseToken, string Ticket, string Altcha)> IssueAsync(
         HttpClient http, string publicId, string? responseToken = null)
     {
         using var response = await http.PostAsJsonAsync(
@@ -50,14 +50,24 @@ public class SubmissionGuardEndToEndTests
         response.EnsureSuccessStatusCode();
 
         var body = await ReadAsync(response);
-        return (body!["responseToken"]!.GetValue<string>(), body["ticket"]!.GetValue<string>());
+
+        // **proof-of-work も解いておく**（Issue #55）。画面と同じことをする
+        return (
+            body!["responseToken"]!.GetValue<string>(),
+            body["ticket"]!.GetValue<string>(),
+            AltchaSolver.Solve(body));
     }
 
     private static Task<HttpResponseMessage> SubmitAsync(
-        HttpClient http, string publicId, string responseToken, string? ticket, string trap = "") =>
+        HttpClient http,
+        string publicId,
+        string responseToken,
+        string? ticket,
+        string trap = "",
+        string altcha = "") =>
         http.PutAsJsonAsync(
             $"/api/forms/{publicId}/responses/{responseToken}",
-            new { answers = Array.Empty<object>(), ticket, trap });
+            new { answers = Array.Empty<object>(), ticket, trap, altcha });
 
     [Fact]
     public async Task 実在しない公開IDでもチケットは同じように出る()
@@ -69,7 +79,7 @@ public class SubmissionGuardEndToEndTests
 
         using var http = CreateClient();
 
-        var (token, ticket) = await IssueAsync(http, NewPublicId());
+        var (token, ticket, altcha) = await IssueAsync(http, NewPublicId());
 
         // **サーバが決めた回答トークン。** 24 バイトを 16 進で書いた 48 文字
         Assert.Equal(48, token.Length);
@@ -87,8 +97,8 @@ public class SubmissionGuardEndToEndTests
         using var http = CreateClient();
         var publicId = NewPublicId();
 
-        var (first, _) = await IssueAsync(http, publicId);
-        var (second, _) = await IssueAsync(http, publicId, first);
+        var (first, _, _) = await IssueAsync(http, publicId);
+        var (second, _, _) = await IssueAsync(http, publicId, first);
 
         // **同じ回答を指し続けられないと、編集のたびに別の回答になる**
         Assert.Equal(first, second);
@@ -104,7 +114,7 @@ public class SubmissionGuardEndToEndTests
 
         using var http = CreateClient();
 
-        var (token, _) = await IssueAsync(http, NewPublicId(), "not-a-token");
+        var (token, _, _) = await IssueAsync(http, NewPublicId(), "not-a-token");
 
         Assert.Equal(48, token.Length);
         Assert.NotEqual("not-a-token", token);
@@ -120,7 +130,7 @@ public class SubmissionGuardEndToEndTests
 
         using var http = CreateClient();
         var publicId = NewPublicId();
-        var (token, _) = await IssueAsync(http, publicId);
+        var (token, _, _) = await IssueAsync(http, publicId);
 
         using var response = await SubmitAsync(http, publicId, token, ticket: null);
 
@@ -138,9 +148,9 @@ public class SubmissionGuardEndToEndTests
 
         using var http = CreateClient();
         var publicId = NewPublicId();
-        var (token, ticket) = await IssueAsync(http, publicId);
+        var (token, ticket, altcha) = await IssueAsync(http, publicId);
 
-        using var response = await SubmitAsync(http, publicId, token, ticket, trap: "http://spam");
+        using var response = await SubmitAsync(http, publicId, token, ticket, trap: "http://spam", altcha: altcha);
 
         // **なぜ断ったかは返さない。** 返すと bot にどこを直せばよいか教えることになる
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -157,10 +167,10 @@ public class SubmissionGuardEndToEndTests
 
         using var http = CreateClient();
         var publicId = NewPublicId();
-        var (token, ticket) = await IssueAsync(http, publicId);
+        var (token, ticket, altcha) = await IssueAsync(http, publicId);
 
         // **人間はチケットを受け取った直後には送信できない**
-        using var response = await SubmitAsync(http, publicId, token, ticket);
+        using var response = await SubmitAsync(http, publicId, token, ticket, altcha: altcha);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("rejected", (await ReadAsync(response))!["reason"]!.GetValue<string>());
@@ -175,7 +185,7 @@ public class SubmissionGuardEndToEndTests
         }
 
         using var http = CreateClient();
-        var (token, ticket) = await IssueAsync(http, NewPublicId());
+        var (token, ticket, altcha) = await IssueAsync(http, NewPublicId());
 
         using var response = await SubmitAsync(http, NewPublicId(), token, ticket);
 

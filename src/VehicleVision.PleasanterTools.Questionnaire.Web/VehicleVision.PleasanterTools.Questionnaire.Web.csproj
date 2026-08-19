@@ -4,6 +4,8 @@
     <!-- パスワードのハッシュ（PBKDF2）は ASP.NET Core の共有フレームワークに含まれるため
          PackageReference は要らない（NU1510） -->
     <!-- TOTP（RFC 6238）。MIT。**自前で書かない** -->
+    <!-- bot 対策の proof-of-work（Issue #55）。BSD-2-Clause -->
+    <PackageReference Include="Ixnas.AltchaNet" Version="1.2.1" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.1" />
     <PackageReference Include="nClam" Version="9.0.0" />
     <PackageReference Include="Otp.NET" Version="1.4.1" />

@@ -167,6 +167,13 @@ export interface SubmitContext {
   ticket: string;
   /** ハニーポット項目の値。**人が触れば埋まらない。** */
   trap: string;
+  /**
+   * proof-of-work の解答（Issue #55）。
+   *
+   * **解けていなければ空。** 送らずに断られる方が、
+   * 解けるまで送信を止めて待たせるより分かりやすい。
+   */
+  altcha?: string;
 }
 
 /** 添付 1 件を受け付けなかった理由。 */
@@ -207,13 +214,23 @@ export async function submitAnswers(
     request = {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ answers, ticket: context.ticket, trap: context.trap }),
+      body: JSON.stringify({
+        answers,
+        ticket: context.ticket,
+        trap: context.trap,
+        altcha: context.altcha,
+      }),
     };
   } else {
     const form = new FormData();
     form.append(
       'answers',
-      JSON.stringify({ answers, ticket: context.ticket, trap: context.trap }),
+      JSON.stringify({
+        answers,
+        ticket: context.ticket,
+        trap: context.trap,
+        altcha: context.altcha,
+      }),
     );
     for (const attachment of attachments) {
       form.append(attachment.questionId, attachment.file, attachment.file.name);

@@ -20,7 +20,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// 画面側の名前と揃えること。
 /// </param>
 public sealed record SubmitRequest(
-    ImmutableArray<PayloadAnswer> Answers, string? Ticket = null, string? Trap = null);
+    ImmutableArray<PayloadAnswer> Answers,
+    string? Ticket = null,
+    string? Trap = null,
+    /// <summary>proof-of-work の解答（Issue #55）。**base64 の JSON。**</summary>
+    string? Altcha = null);
 
 /// <summary>送信チケットの要求。</summary>
 /// <param name="ResponseToken">
@@ -31,7 +35,11 @@ public sealed record SubmitRequest(
 public sealed record TicketRequest(string? ResponseToken = null);
 
 /// <summary>回答画面へ返す送信チケット。</summary>
-public sealed record TicketResponse(string ResponseToken, string Ticket);
+/// <param name="Altcha">
+/// proof-of-work の課題（Issue #55）。**切っているときは <c>null</c>。**
+/// 画面はこれを解いて、送信時に解答を添える。
+/// </param>
+public sealed record TicketResponse(string ResponseToken, string Ticket, object? Altcha = null);
 
 /// <summary>回答画面へ返す定義。</summary>
 /// <remarks>
@@ -106,7 +114,8 @@ public static class FormEndpoints
         forms.MapPost("/{publicId}/ticket", (
             string publicId,
             TicketRequest request,
-            SubmissionGuard guard) =>
+            SubmissionGuard guard,
+            AltchaGuard altcha) =>
         {
             // **端末が持っていない・書式が壊れていれば、こちらで作る。**
             // 回答トークンは推測不能でなければならない値なので、
@@ -115,7 +124,12 @@ public static class FormEndpoints
                 ? token
                 : NewResponseToken();
 
-            return Results.Ok(new TicketResponse(responseToken, guard.Issue(publicId, responseToken)));
+            // **課題もここで出す。** 画面を開いた時点から解き始められるので、
+            // 書き終えるころには計算が済んでいる（待たせない）
+            return Results.Ok(new TicketResponse(
+                responseToken,
+                guard.Issue(publicId, responseToken),
+                altcha.Options.Enabled ? altcha.Issue() : null));
         });
 
         forms.MapGet("/{publicId}/responses/{responseToken}", async (
@@ -140,6 +154,7 @@ public static class FormEndpoints
             string responseToken,
             ResponseIntake intake,
             SubmissionGuard guard,
+            AltchaGuard altcha,
             ILogger<SubmissionGuard> logger,
             AttachmentOptions attachmentOptions,
             ILoggerFactory loggerFactory,
@@ -202,6 +217,16 @@ public static class FormEndpoints
                 // **理由は外へ返さない。** 返すと、bot がどこを直せばよいか分かる。
                 // 記録は残す（回答本文とトークンは書かない）
                 logger.LogWarning("回答の送信を bot 対策で断った。理由: {Reason}", reason);
+                return Results.Json(
+                    new { reason = "rejected" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            // **proof-of-work も見る。** チケットと重ねる（Issue #55）。
+            // **同じ解答は 2 度通らない**（使い終えた課題を覚えている）
+            if (await altcha.CheckAsync(request.Altcha, cancellationToken) is { } altchaReason)
+            {
+                // **理由は外へ返さない**（上と同じ）
+                logger.LogWarning("回答の送信を proof-of-work で断った。理由: {Reason}", altchaReason);
                 return Results.Json(
                     new { reason = "rejected" }, statusCode: StatusCodes.Status403Forbidden);
             }

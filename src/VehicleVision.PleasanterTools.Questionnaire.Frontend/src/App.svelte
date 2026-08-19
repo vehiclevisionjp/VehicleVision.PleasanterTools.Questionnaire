@@ -9,6 +9,7 @@
     submitAnswers,
   } from './lib/api';
   import type { Attachment } from './lib/api';
+  import { solveAltcha } from './lib/altcha';
   import { toSteps, tracePath } from './lib/flow';
   import type { AnswerState, PayloadAnswer, RejectionReason, SurveyDefinition } from './lib/types';
   import { isDisplayOnly, text } from './lib/types';
@@ -75,6 +76,13 @@
   let ticket = $state('');
   /** ハニーポット項目。**人が触らない場所に置いてあるので、空のままのはず。** */
   let trap = $state('');
+  /**
+   * proof-of-work の解答（Issue #55）。
+   *
+   * **画面を開いた時点から解き始める。** 書き終えるころには計算が済んでいるので、
+   * 送信の時に待たせない。
+   */
+  let altcha = $state('');
   /** 今どの区切りを見ているか。**ページではなく「区切り」の番号**（1 問 1 ページ表示があるため） */
   let stepIndex = $state(0);
   let answers = $state<Record<string, AnswerState>>({});
@@ -183,6 +191,14 @@
 
     responseToken = issued.responseToken;
     ticket = issued.ticket;
+
+    // **待たない。** 解けたら入るだけで、入力は先に進められる。
+    // 解けなくても送信は止めない（サーバ側でどのみち断られる）
+    if (issued.altcha) {
+      void solveAltcha(issued.altcha).then((solved) => {
+        altcha = solved ?? '';
+      });
+    }
 
     for (const page of definition.pages) {
       for (const question of page.questions) {
@@ -297,7 +313,7 @@
         publicId,
         responseToken,
         toPayload(),
-        { ticket, trap },
+        { ticket, trap, altcha },
         toAttachments(),
       );
       if (result.accepted) {
@@ -319,6 +335,12 @@
         if (reissued) {
           responseToken = reissued.responseToken;
           ticket = reissued.ticket;
+
+          // **課題も取り直す。** 使い終えた解答は 2 度通らない
+          altcha = '';
+          if (reissued.altcha) {
+            altcha = (await solveAltcha(reissued.altcha)) ?? '';
+          }
         }
         return;
       }
