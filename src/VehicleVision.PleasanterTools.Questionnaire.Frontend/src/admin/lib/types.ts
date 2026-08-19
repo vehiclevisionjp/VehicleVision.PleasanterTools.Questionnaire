@@ -85,7 +85,17 @@ export interface SurveyDefinition {
   pages: Page[];
 }
 
-export type QuestionPort = 'Value' | 'OtherText' | 'FileNames';
+export type QuestionPort = 'Value' | 'OtherText' | 'FileNames' | 'Files';
+
+/**
+ * 添付列か。
+ *
+ * **列名の決まりは Pleasanter 側のもの。** 画面では選び分けのためだけに使い、
+ * 最終的な判定はサーバ側で行う。
+ */
+export function isAttachmentColumn(column: string): boolean {
+  return /^Attachments([A-Z]|[0-9]{3})$/.test(column);
+}
 
 export interface MappingSource {
   questionId: string;
@@ -150,6 +160,10 @@ export const problemMessages: Record<string, string> = {
   DisplayOnlyQuestionAsSource: '説明文ブロックは入力にできません',
   ReservedColumn: '予約列は書き込み先にできません',
   EmptyScript: 'スクリプトが空です',
+  InvalidAttachmentShape: '添付の割り当ては入力 1 つ・変換なしにしてください',
+  NonFileQuestionAsAttachment: '添付の設問しか添付列へは繋げません',
+  AttachmentColumnNeedsFilePort: '添付列には「添付そのもの」を繋いでください',
+  FilePortNeedsAttachmentColumn: '「添付そのもの」は添付列にしか繋げません',
   UnmappedQuestion: 'どの列にも割り当てられていません（Pleasanter に残りません）',
 };
 

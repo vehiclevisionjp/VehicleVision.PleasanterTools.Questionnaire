@@ -268,6 +268,7 @@ app.MapAdminSurveyEndpoints();
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
 app.MapGet("/admin", () => Results.File("admin.html", "text/html"));
 app.MapFallbackToFile("/admin/{**path}", "admin.html");
+
 // **Defender for Storage を使うときだけ受け口を生やす。**
 // 使わない構成で認証の外の口を開けたままにしない
 if (attachmentOptions.VirusScan is
