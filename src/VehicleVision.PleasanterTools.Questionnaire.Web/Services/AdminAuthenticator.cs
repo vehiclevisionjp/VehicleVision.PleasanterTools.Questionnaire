@@ -16,6 +16,13 @@ public sealed record AdminAuthOptions
 
     /// <summary>認証アプリに表示するサービス名。</summary>
     public string Issuer { get; init; } = "アンケート";
+
+    /// <summary>招待が使える長さ。</summary>
+    /// <remarks>
+    /// **期限を必ず持たせる**（<c>_documents/非機能設計.md</c> 1 章）。
+    /// 期限の無い招待は、後から拾われて使われる。
+    /// </remarks>
+    public TimeSpan InvitationLifetime { get; init; } = TimeSpan.FromHours(48);
 }
 
 /// <summary>合言葉の照合の結果。</summary>
@@ -279,6 +286,11 @@ public sealed class AdminAuthenticator(
         // **登録に使った時間枠はもう使えない。** そのままログインへ流用させない
         await store.TryConsumeTotpTimeStepAsync(adminUserId, timeStep, cancellationToken)
             .ConfigureAwait(false);
+
+        // **ここまで来たらログインが 1 回通ったのと同じ。**
+        // 合言葉と使い捨てパスワードの両方が揃っており、この後 `Admin.Session` になる。
+        // 記録しないと、**入れているのに「一度も入っていない」ように見える**
+        await store.RecordSuccessAsync(adminUserId, cancellationToken).ConfigureAwait(false);
 
         var codes = RecoveryCode.Generate();
         await store.ReplaceRecoveryCodesAsync(
