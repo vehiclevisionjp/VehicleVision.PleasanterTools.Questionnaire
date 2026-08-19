@@ -376,6 +376,30 @@ export const ja = {
     '設問・選択肢・分岐・マッピングを写します。書き込み先のサイトと公開用 URL は写しません。',
   'template.saveSubmit': 'テンプレートにする',
   'template.saved': 'テンプレートにしました。',
+  // ---- テーマ（Issue #56） ----
+  'theme.title': '回答画面の見た目',
+  'theme.lead':
+    '色と書体、ヘッダ画像を設定できます。設定しなければ既定の見た目のままです。公開すると反映されます。',
+  'theme.accentColor': '強調の色',
+  'theme.backgroundColor': '地の色',
+  'theme.textColor': '文字の色',
+  'theme.useDefault': '既定に戻す',
+  'theme.notSet': '既定のまま',
+  'theme.font': '書体',
+  'theme.fontHint':
+    '回答者の端末が持っている書体から選びます。外部から書体を読み込まないため、端末に無ければ近い書体になります。',
+  'theme.headerImage': 'ヘッダ画像',
+  'theme.headerImageHint':
+    'PNG・JPEG・GIF・WebP の 2 MB 以内。回答画面の題名の上に出ます。外部の URL は指定できません。',
+  'theme.headerImagePreview': '設定中のヘッダ画像',
+  'theme.chooseImage': '画像を選ぶ',
+  'theme.uploading': '送っています…',
+  'theme.removeImage': '画像を外す',
+  'themeFont.System': '端末の既定',
+  'themeFont.Sans': 'ゴシック体',
+  'themeFont.Serif': '明朝体',
+  'themeFont.Rounded': '丸ゴシック体',
+  'themeFont.Monospace': '等幅',
 } as const;
 
 /** 文言の鍵。**日本語のカタログが一覧そのもの。** */
@@ -755,6 +779,30 @@ export const en: Record<MessageKey, string> = {
     'Questions, choices, branching and mapping are copied. The target site and the public URL are not.',
   'template.saveSubmit': 'Save as template',
   'template.saved': 'Saved as a template.',
+  // ---- Theme ----
+  'theme.title': 'Look of the answer screen',
+  'theme.lead':
+    'Set the colors, the typeface and a header image. Leave them alone to keep the default look. Changes take effect when you publish.',
+  'theme.accentColor': 'Accent color',
+  'theme.backgroundColor': 'Background color',
+  'theme.textColor': 'Text color',
+  'theme.useDefault': 'Back to default',
+  'theme.notSet': 'Using the default',
+  'theme.font': 'Typeface',
+  'theme.fontHint':
+    'Chosen from typefaces the respondent already has. No web font is fetched, so a similar one is used when it is missing.',
+  'theme.headerImage': 'Header image',
+  'theme.headerImageHint':
+    'PNG, JPEG, GIF or WebP, up to 2 MB. Shown above the title on the answer screen. External URLs cannot be used.',
+  'theme.headerImagePreview': 'Current header image',
+  'theme.chooseImage': 'Choose an image',
+  'theme.uploading': 'Uploading…',
+  'theme.removeImage': 'Remove the image',
+  'themeFont.System': 'Device default',
+  'themeFont.Sans': 'Sans serif',
+  'themeFont.Serif': 'Serif',
+  'themeFont.Rounded': 'Rounded',
+  'themeFont.Monospace': 'Monospace',
 };
 
 const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };

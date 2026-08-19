@@ -30,6 +30,8 @@
   import { language, t } from '../lib/i18n/state.svelte';
   import MappingEditor from './MappingEditor.svelte';
   import QuestionEditor from './QuestionEditor.svelte';
+  import ThemeEditor from './ThemeEditor.svelte';
+  import { adminAssetUrl } from '../lib/api';
 
   interface Props {
     surveyId: string;
@@ -481,6 +483,14 @@
     </div>
   </section>
 
+  <!-- **見た目は設問と同じく定義の一部**（Issue #56）。
+       保存も公開も、設問とまとめてこの画面の釦で行う -->
+  <ThemeEditor
+    {surveyId}
+    theme={definition.theme}
+    onchange={(next) => (definition = { ...definition!, theme: next })}
+  />
+
   {#each definition.pages as page, pageIndex (page.pageId)}
     {@const targets = jumpTargets(pageIndex)}
     {@const stale = staleTargetId(page.next, targets.map((target) => target.pageId))}
@@ -576,7 +586,15 @@
 {#if previewing && definition}
   <div class="overlay" role="dialog" aria-modal="true" aria-label={t('preview.title')}>
     <div class="sheet">
-      <SurveyPreview {definition} onclose={() => (previewing = false)} />
+      <!-- **ヘッダ画像は管理画面の口から見る。**
+           公開前の画像は回答画面の口からは出ない -->
+      <SurveyPreview
+        {definition}
+        headerImageUrl={definition.theme?.headerImageId
+          ? adminAssetUrl(surveyId, definition.theme.headerImageId)
+          : null}
+        onclose={() => (previewing = false)}
+      />
     </div>
   </div>
 {/if}

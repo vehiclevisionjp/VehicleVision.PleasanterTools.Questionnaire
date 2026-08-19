@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.Features;
@@ -69,6 +69,33 @@ public static class FormEndpoints
             return definition is null
                 ? ToProblem(rejection)
                 : Results.Ok(new FormResponse(publicId, definition));
+        });
+
+        // **ヘッダ画像を配る**（Issue #56）。
+        // **本アプリが配る。** テーマに外部の URL を持たせていないので、
+        // 回答者のブラウザが第三者へ要求を出すことは無い（完全匿名）。
+        //
+        // **公開中の版が指している画像だけを返す。** 下書きで差し替えた画像も、
+        // 停止中のアンケートの画像も出さない。無ければ 404（アンケートが無いときと同じ応答）
+        forms.MapGet("/{publicId}/header-image", async (
+            string publicId,
+            HttpContext context,
+            ResponseIntake intake,
+            CancellationToken cancellationToken) =>
+        {
+            var image = await intake.GetPublishedHeaderImageAsync(publicId, cancellationToken);
+
+            // **型は保存時にサーバが決めた値だが、配る前にもう一度確かめる。**
+            // 画像以外の型を自分のドメインから配らない
+            if (image is null || !HeaderImage.IsAllowedContentType(image.ContentType))
+            {
+                return Results.NotFound();
+            }
+
+            // **差し替えると識別子が変わる**ので、URL の `?v=` も変わる。
+            // 版ごとに別の URL になるため、長く持たせても古い画像が残らない
+            context.Response.Headers.CacheControl = "public, max-age=86400";
+            return Results.File(image.Content, image.ContentType);
         });
 
         // **送信チケットを出す。** 画面を開いた時刻を署名に閉じ込めて返すだけで、

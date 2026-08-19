@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -73,7 +73,8 @@ public sealed class ResponseIntake(
     IResponseOutbox outbox,
     IResponseTokenStore tokens,
     AttachmentInspector? inspector = null,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    ISurveyAssetStore? assets = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -99,6 +100,44 @@ public sealed class ResponseIntake(
         return snapshot is null
             ? (null, IntakeRejection.NotFound)
             : (snapshot.Definition, null);
+    }
+
+    /// <summary>公開中のヘッダ画像を返す（Issue #56）。**無ければ <c>null</c>。**</summary>
+    /// <remarks>
+    /// <para>
+    /// **公開中の版が指している画像だけを返す。** 下書きで差し替えた画像も、
+    /// 受付を停止したアンケートの画像も出さない。
+    /// <see cref="GetPublishedAsync"/> と同じ関門を通す。
+    /// </para>
+    /// <para>
+    /// **アンケートを跨いで読ませない。** 画像はアンケートと識別子の組で引く。
+    /// </para>
+    /// </remarks>
+    public async Task<SurveyAsset?> GetPublishedHeaderImageAsync(
+        string publicId,
+        CancellationToken cancellationToken = default)
+    {
+        if (assets is null)
+        {
+            return null;
+        }
+
+        var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (CheckAcceptable(survey) is not null || survey?.PublishedVersion is null)
+        {
+            return null;
+        }
+
+        var snapshot = await snapshots
+            .FindAsync(survey.SurveyId, survey.PublishedVersion.Value, cancellationToken)
+            .ConfigureAwait(false);
+
+        return snapshot?.Definition.Theme?.HeaderImage() is { } assetId
+            ? await assets.FindAsync(survey.SurveyId, assetId, cancellationToken)
+                .ConfigureAwait(false)
+            : null;
     }
 
     /// <summary>回答を受け付ける。</summary>

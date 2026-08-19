@@ -1,4 +1,6 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Http.Features;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Flow;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -184,6 +186,22 @@ public static class AdminSurveyEndpoints
                 });
             }
 
+            // **色は形を検査してからでないと通さない**（Issue #56）。
+            // 画面の色欄は `#rrggbb` しか作れないので、ここへ形の違う値が来るのは
+            // **画面を通さずに送られたとき。** 黙って捨てず、断って気付かせる。
+            // **保存させない側に倒す。** 設問の不備（公開のときに弾く）と違い、
+            // これは直しようのある入力の誤りではなく、**画面が作り得ない値**
+            var invalidColors = request.Definition.Theme?.InvalidColors() ?? [];
+            if (!invalidColors.IsEmpty)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.ThemeColorInvalid, RequestLanguage.Of(context)),
+                    fields = invalidColors,
+                });
+            }
+
             // **不備があっても保存はさせる。** 直している途中で保存できないと作業にならない。
             // **拒否するのは公開のとき**
             try
@@ -204,6 +222,109 @@ public static class AdminSurveyEndpoints
                     actualRevision = exception.Actual,
                 });
             }
+        });
+
+        // ---- ヘッダ画像（Issue #56） ------------------------------------------
+        // **回答の添付と同じ道を通す**（拡張子・先頭バイト・大きさ）。
+        // 管理者が上げるものでも緩めない。**公開アンケートを見た全員へ配るファイル**なので、
+        // 乗っ取られた 1 つの管理者の口が、そのまま配布の口になる
+        group.MapPost("/{surveyId:guid}/theme/header-image", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            ISurveyAssetStore assets,
+            CancellationToken cancellationToken) =>
+        {
+            var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (survey is null)
+            {
+                return Results.NotFound();
+            }
+
+            // **要求本文の上限を明示する。既定値に任せない**（_documents/非機能設計.md 1 章）
+            var bodySize = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (bodySize is { IsReadOnly: false })
+            {
+                bodySize.MaxRequestBodySize = HeaderImage.MaxRequestBodyBytes;
+            }
+
+            if (!context.Request.HasFormContentType)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.HeaderImageRejected, RequestLanguage.Of(context)),
+                });
+            }
+
+            IFormFile? file;
+            try
+            {
+                var form = await context.Request.ReadFormAsync(cancellationToken);
+                file = form.Files.GetFile("image") ?? form.Files.FirstOrDefault();
+            }
+            catch (BadHttpRequestException exception)
+            {
+                // 上限超過（413）と壊れた本文（400）を、そのままの意味で返す
+                return Results.StatusCode(exception.StatusCode);
+            }
+
+            if (file is null)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.HeaderImageRejected, RequestLanguage.Of(context)),
+                });
+            }
+
+            using var buffer = new MemoryStream((int)Math.Max(file.Length, 0));
+            await file.CopyToAsync(buffer, cancellationToken);
+
+            // **ファイル名は名乗ったまま渡す。** ここで整えると、
+            // パス区切りを含む名前を弾く検査が働かなくなる
+            var incoming = new IncomingAttachment(file.FileName, buffer.ToArray());
+            var rejections = await HeaderImage.InspectAsync(incoming, cancellationToken);
+
+            // **配信する型は、検査を通った拡張子からこちらで決める。**
+            // ブラウザが名乗った Content-Type は使わない
+            var contentType = HeaderImage.ContentTypeOf(file.FileName);
+
+            if (!rejections.IsEmpty || contentType is null)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.HeaderImageRejected, RequestLanguage.Of(context)),
+                    reasons = rejections.Select(rejection => rejection.Reason.ToString()),
+                });
+            }
+
+            // **行は上書きしない。** 差し替えても、公開済みの版が指している画像は変わらない
+            var assetId = await assets.AddAsync(
+                surveyId, contentType, file.FileName, incoming.Content.ToArray(), cancellationToken)
+                .ConfigureAwait(false);
+
+            // **下書きへは書かない。** 定義の保存は下書きの版と照合して行う決まりなので、
+            // ここで書くと版が合わずに黙った上書きになる。**画面が定義へ入れて保存する**
+            return Results.Ok(new { assetId });
+        });
+
+        // **編集中の画像を管理画面へ返す。** 公開前の画像は回答画面の口からは出ない
+        group.MapGet("/{surveyId:guid}/assets/{assetId:guid}", async (
+            Guid surveyId,
+            Guid assetId,
+            ISurveyAssetStore assets,
+            CancellationToken cancellationToken) =>
+        {
+            var asset = await assets.FindAsync(surveyId, assetId, cancellationToken)
+                .ConfigureAwait(false);
+
+            // **配る前に型を確かめる。** 画像以外を自分のドメインから配らない
+            return asset is null || !HeaderImage.IsAllowedContentType(asset.ContentType)
+                ? Results.NotFound()
+                : Results.File(asset.Content, asset.ContentType);
         });
 
         // ---- 公開前の検査 ----------------------------------------------------

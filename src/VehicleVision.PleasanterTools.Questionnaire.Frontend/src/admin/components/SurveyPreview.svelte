@@ -8,6 +8,7 @@
   import { validatePage } from '../../lib/validation';
   import type { SurveyDefinition } from '../lib/types';
   import { language as adminLanguage, t } from '../lib/i18n/state.svelte';
+  import { applyTheme } from '../../lib/theme';
 
   /**
    * 公開する前に、回答画面と同じ描き方で確かめる。
@@ -26,10 +27,30 @@
   interface Props {
     /** 編集中の定義。**保存前のものをそのまま受け取る。** */
     definition: SurveyDefinition;
+    /**
+     * ヘッダ画像の URL。**無ければ出さない。**
+     *
+     * **編集画面から渡してもらう。** 回答画面の口は公開中の版が指す画像しか
+     * 返さないので、上げたばかりの画像はここからは見えない。
+     */
+    headerImageUrl?: string | null;
     onclose: () => void;
   }
 
-  let { definition, onclose }: Props = $props();
+  let { definition, headerImageUrl = null, onclose }: Props = $props();
+
+  /**
+   * テーマを写す枠（Issue #56）。
+   *
+   * **`:root` へは書かない。** 回答画面と違い、ここは管理画面の中なので、
+   * 全体へ書くと編集画面そのものの色まで変わる。
+   * **枠へ書けば、その中だけが変わる**（カスタムプロパティは下へ伝わる）。
+   */
+  let paper = $state<HTMLElement>();
+
+  $effect(() => {
+    applyTheme(paper, definition.theme);
+  });
 
   /**
    * 見る言語。
@@ -132,7 +153,11 @@
   <!-- **保存されないことを画面に出す。** 本物と見分けが付かないと事故になる -->
   <p class="notice" role="status">{t('preview.notice')}</p>
 
-  <div class="paper">
+  <div class="paper" bind:this={paper}>
+    <!-- **飾り。** 回答画面と同じく `alt` は空にする -->
+    {#if headerImageUrl}
+      <img class="header-image" src={headerImageUrl} alt="" />
+    {/if}
     <h2>{text(definition.title, language)}</h2>
     {#if definition.description}
       <p class="lead">{text(definition.description, language)}</p>
@@ -228,11 +253,30 @@
   }
 
   .paper {
+    /* **回答画面の既定値をここへ置き直す**（Issue #56）。
+       テーマがあれば `applyTheme` が同じ名前をこの要素の style へ入れて上書きする
+       （要素に直接書いた値が、この規則より強い）。
+       **管理画面の `:root` の値をそのまま使わない。** 地の色が別物になる */
+    --bg: #fff;
+    --text: #101828;
+    --font: system-ui, sans-serif;
+
     max-width: 40rem;
     padding: 1.5rem;
-    background: #fff;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
     border: 1px solid var(--border);
     border-radius: 8px;
+  }
+
+  .header-image {
+    display: block;
+    width: 100%;
+    max-height: 10rem;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 1rem;
   }
 
   h2 {

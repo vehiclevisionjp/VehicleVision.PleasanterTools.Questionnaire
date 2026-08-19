@@ -199,6 +199,35 @@ export const saveDraft = (
     json: { definition, mapping, revision },
   });
 
+/**
+ * ヘッダ画像を上げる（Issue #56）。
+ *
+ * **返るのは識別子だけ。** 下書きへは書かないので、
+ * 呼んだ側が定義のテーマへ入れて保存すること。
+ * **サーバが書くと、下書きの版と照合せずに書くことになる**（黙った上書きになる）。
+ *
+ * **`Content-Type` は指定しない。** `FormData` を渡すと境界付きの型を
+ * ブラウザが付けるので、こちらで書くと壊れる。
+ */
+export const uploadHeaderImage = (surveyId: string, file: File) => {
+  const body = new FormData();
+  body.append('image', file);
+
+  return call<{ assetId: string }>(`/api/admin/surveys/${surveyId}/theme/header-image`, {
+    method: 'POST',
+    body,
+  });
+};
+
+/**
+ * 編集中のヘッダ画像を見る URL。
+ *
+ * **管理画面の口を使う。** 回答画面の口は公開中の版が指す画像しか返さないので、
+ * 上げたばかりの画像はまだ出ない。
+ */
+export const adminAssetUrl = (surveyId: string, assetId: string): string =>
+  `/api/admin/surveys/${encodeURIComponent(surveyId)}/assets/${encodeURIComponent(assetId)}`;
+
 export const loadProblems = (surveyId: string) =>
   call<MappingProblem[]>(`/api/admin/surveys/${surveyId}/problems`);
 

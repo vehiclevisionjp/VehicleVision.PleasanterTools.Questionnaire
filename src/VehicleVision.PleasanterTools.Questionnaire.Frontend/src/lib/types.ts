@@ -1,4 +1,5 @@
 import { DEFAULT_LANGUAGE, type Language } from './i18n/language';
+import type { SurveyTheme } from './theme';
 
 /** サーバから来る設問の形式。`.Core` の QuestionType と対応する。 */
 export type QuestionType =
@@ -105,6 +106,8 @@ export interface SurveyDefinition {
   showProgress: boolean;
   confirmationMessage?: LocalizedText;
   allowEditingAfterSubmit: boolean;
+  /** 回答画面の見た目（Issue #56）。**無ければ既定の見た目。** */
+  theme?: SurveyTheme | null;
 }
 
 export interface FormResponse {

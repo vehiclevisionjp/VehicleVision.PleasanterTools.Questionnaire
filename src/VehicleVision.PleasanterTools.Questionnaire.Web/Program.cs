@@ -69,6 +69,8 @@ builder.Services.AddSingleton<IResponseTokenStore, ResponseTokenStore>();
 builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
 builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
+// **ヘッダ画像の置き場**（Issue #56）。外部のストレージへは置かない
+builder.Services.AddSingleton<ISurveyAssetStore, SurveyAssetStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
 
 builder.Services.AddSingleton(pleasanterOptions);

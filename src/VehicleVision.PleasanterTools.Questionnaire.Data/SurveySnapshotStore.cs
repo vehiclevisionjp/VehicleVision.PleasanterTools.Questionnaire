@@ -53,9 +53,20 @@ public sealed class SurveySnapshotStore(IDbConnectionFactory connectionFactory) 
         var mapping = SurveyJson.Deserialize<MappingDefinition>(row.MappingJson);
 
         // **読めない版は「無い」として扱う。** 送信ワーカーがデッドレターへ回す
-        return definition is null || mapping is null
-            ? null
-            : new SurveySnapshot(definition, mapping, row.PleasanterSiteId, row.ResponseJsonColumn);
+        if (definition is null || mapping is null)
+        {
+            return null;
+        }
+
+        // **見た目の値は、回答画面へ渡す前にここで形を検査する**（Issue #56）。
+        // 版は不変なので直せない。**検査を足す前に固まった版**や、
+        // DB を直接書き換えられた版が、そのまま回答者のブラウザへ届くのを止める。
+        // **公開済みの版そのものは書き換えない。** 読むたびに落とすだけ
+        var theme = definition.Theme?.Sanitized();
+        definition = definition with { Theme = theme is null || theme.IsDefault ? null : theme };
+
+        return new SurveySnapshot(
+            definition, mapping, row.PleasanterSiteId, row.ResponseJsonColumn);
     }
 }
 

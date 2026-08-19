@@ -33,6 +33,19 @@ public sealed record SurveyDefinition
     /// <summary>回答の編集を許すか。</summary>
     public bool AllowEditingAfterSubmit { get; init; } = true;
 
+    /// <summary>回答画面の見た目（Issue #56）。**<c>null</c> なら既定の見た目。**</summary>
+    /// <remarks>
+    /// <para>
+    /// **<c>null</c> を「既定」の意味で残す。** 空の <see cref="SurveyTheme"/> を
+    /// 既定値にすると、テーマを一度も触っていない定義の JSON にも
+    /// <c>theme</c> が載ってしまい、**公開済みの版の JSON が版ごとに変わる。**
+    /// </para>
+    /// <para>
+    /// **回答画面へ渡す前に <see cref="SurveyTheme.Sanitized"/> を通すこと。**
+    /// </para>
+    /// </remarks>
+    public SurveyTheme? Theme { get; init; }
+
     /// <summary>全ページの設問を順に返す。</summary>
     public IEnumerable<Question> AllQuestions => Pages.SelectMany(page => page.Questions);
 
