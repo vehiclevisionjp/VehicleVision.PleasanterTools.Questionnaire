@@ -232,6 +232,61 @@ export const ja = {
   'audit.next': '次へ',
   'audit.page': '{from}〜{to} 件目',
   'audit.retention': '記録は一定期間を過ぎると自動で消えます。',
+
+  // ---- 分岐（ジャンプ） ---------------------------------------------------
+  'branching.choiceNext': '選んだときの行き先',
+  'branching.pageNext': 'このページを終えたら',
+  'branching.followPage': 'ページの行き先に従う',
+  'branching.toNextPage': '次のページへ',
+  'branching.toSubmit': '送信へ進む',
+  'branching.pageNumber': '{number} ページ目',
+  'branching.pageWithTitle': '{number} ページ目「{title}」',
+  'branching.noLaterPage': 'このページより後ろにページがありません。',
+  'branching.staleTarget': '{pageId}（今は選べない飛び先）',
+  'branching.backwardHint':
+    '飛べるのは後ろのページだけです。前へ戻すと無限に回るアンケートになるため、一覧に出していません。',
+  'branching.lockedByOther':
+    '同じページの「{question}」が既に行き先を持っています。行き先を持てる設問は 1 ページに 1 つだけです。',
+  'branching.unsupportedType': '行き先を置けるのは、1 つだけ選ぶ設問（ラジオ・プルダウン）だけです。',
+
+  // ---- 分岐（表示条件） ---------------------------------------------------
+  'condition.title': '表示条件',
+  'condition.none': '条件なし（いつも出す）',
+  'condition.add': '条件を足す',
+  'condition.remove': 'この条件を削除',
+  'condition.match': 'まとめ方',
+  'condition.matchAll': 'すべて満たす',
+  'condition.matchAny': 'どれか満たす',
+  'condition.valuePlaceholder': '比べる値',
+  'condition.noEarlierQuestion': 'この設問より前に設問がありません。表示条件は前の設問しか見られません。',
+  'condition.earlierOnly': '選べるのは、この設問より前にある設問だけです。',
+  'condition.unknownChoice': 'この値は今の選択肢にありません。条件が成立しないままになります。',
+  'condition.staleValue': '{value}（今は無い選択肢）',
+  'condition.invalidReference': '{questionId}（この設問より前にありません）',
+
+  // ---- 比べ方 -------------------------------------------------------------
+  'conditionOperator.Equals': '＝ 等しい',
+  'conditionOperator.NotEquals': '≠ 等しくない',
+  'conditionOperator.Contains': '文字として含む',
+  'conditionOperator.GreaterThan': '＞ より大きい',
+  'conditionOperator.LessThan': '＜ より小さい',
+  'conditionOperator.Answered': '答えている',
+  'conditionOperator.NotAnswered': '答えていない',
+
+  // ---- 分岐の不備 ---------------------------------------------------------
+  'flow.title': '分岐の不備',
+  'flow.lead': 'このままでは公開できません。',
+  'flow.fromServer': '公開が断られました。',
+  'flow.where': '{page} / {question}',
+  'flow.UnknownPage': '飛び先のページがありません',
+  'flow.BackwardTransition': '飛び先が前のページを向いています',
+  'flow.SelfTransition': '自分自身へ飛ぼうとしています',
+  'flow.UnreachablePage': 'どう答えても辿り着けないページです',
+  'flow.MultipleBranchingQuestions': '1 ページに、行き先を持つ設問が 2 つ以上あります',
+  'flow.TransitionOnUnsupportedQuestion': '1 つだけ選ぶ設問でないのに行き先が付いています',
+  'flow.UnknownConditionQuestion': '表示条件が、存在しない設問を見ています',
+  'flow.ForwardConditionReference': '表示条件が、自分より後ろの設問を見ています',
+  'flow.UnknownChoiceValue': '表示条件が、その設問に無い選択肢を見ています',
 } as const;
 
 /** 文言の鍵。**日本語のカタログが一覧そのもの。** */
@@ -462,6 +517,65 @@ export const en: Record<MessageKey, string> = {
   'audit.next': 'Next',
   'audit.page': 'Showing {from}-{to}',
   'audit.retention': 'Entries are removed automatically after a retention period.',
+
+  // ---- Branching (jumps) --------------------------------------------------
+  'branching.choiceNext': 'Where this choice goes',
+  'branching.pageNext': 'When this page is finished',
+  'branching.followPage': 'Follow the destination of the page',
+  'branching.toNextPage': 'Go to the next page',
+  'branching.toSubmit': 'Go to submission',
+  'branching.pageNumber': 'Page {number}',
+  'branching.pageWithTitle': 'Page {number} "{title}"',
+  'branching.noLaterPage': 'There is no page after this one.',
+  'branching.staleTarget': '{pageId} (no longer a valid destination)',
+  'branching.backwardHint':
+    'Only later pages can be jumped to. Going back would make a survey that loops forever, so earlier pages are not listed.',
+  'branching.lockedByOther':
+    '"{question}" on this page already carries destinations. Only one question per page may carry them.',
+  'branching.unsupportedType':
+    'Only questions with a single answer (radio, dropdown) can carry destinations.',
+
+  // ---- Branching (visibility) ---------------------------------------------
+  'condition.title': 'Show this question when',
+  'condition.none': 'No condition (always shown)',
+  'condition.add': 'Add a condition',
+  'condition.remove': 'Remove this condition',
+  'condition.match': 'Combine with',
+  'condition.matchAll': 'All of them',
+  'condition.matchAny': 'Any of them',
+  'condition.valuePlaceholder': 'Value to compare',
+  'condition.noEarlierQuestion':
+    'There is no question before this one. A condition can only look at earlier questions.',
+  'condition.earlierOnly': 'Only questions before this one can be chosen.',
+  'condition.unknownChoice':
+    'This value is not among the current choices, so the condition can never be met.',
+  'condition.staleValue': '{value} (no longer a choice)',
+  'condition.invalidReference': '{questionId} (not before this question)',
+
+  // ---- Comparisons --------------------------------------------------------
+  'conditionOperator.Equals': 'equals',
+  'conditionOperator.NotEquals': 'does not equal',
+  'conditionOperator.Contains': 'contains the text',
+  'conditionOperator.GreaterThan': 'is greater than',
+  'conditionOperator.LessThan': 'is less than',
+  'conditionOperator.Answered': 'is answered',
+  'conditionOperator.NotAnswered': 'is not answered',
+
+  // ---- Branching problems -------------------------------------------------
+  'flow.title': 'Problems with the branching',
+  'flow.lead': 'It cannot be published as it is.',
+  'flow.fromServer': 'Publishing was refused.',
+  'flow.where': '{page} / {question}',
+  'flow.UnknownPage': 'The destination page does not exist',
+  'flow.BackwardTransition': 'The destination points at an earlier page',
+  'flow.SelfTransition': 'The destination points at the page itself',
+  'flow.UnreachablePage': 'No set of answers can reach this page',
+  'flow.MultipleBranchingQuestions': 'More than one question on this page carries destinations',
+  'flow.TransitionOnUnsupportedQuestion':
+    'A question that does not take a single answer carries destinations',
+  'flow.UnknownConditionQuestion': 'The condition looks at a question that does not exist',
+  'flow.ForwardConditionReference': 'The condition looks at a later question',
+  'flow.UnknownChoiceValue': 'The condition looks at a value that is not a choice of that question',
 };
 
 const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };
