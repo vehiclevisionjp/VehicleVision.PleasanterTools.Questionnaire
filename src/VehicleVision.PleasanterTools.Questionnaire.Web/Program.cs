@@ -7,6 +7,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
+using VehicleVision.PleasanterTools.Questionnaire.Web;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
@@ -40,6 +41,15 @@ ConnectionSecurity.EnsureSecure(
         builder.Configuration["QUESTIONNAIRE_DB_ALLOW_INSECURE"],
         "true",
         StringComparison.OrdinalIgnoreCase));
+
+// **マイグレーションを当てる口。** アプリ起動時の自動適用はしない
+// （_documents/データモデル設計.md 5 章。スケールアウト時に同時実行され得る）。
+// **当てる道具を別に作らない。** 接続文字列の読み方が二重になり、片方だけ直す事故が起きる
+if (MigrationCommand.IsRequested(args))
+{
+    Environment.ExitCode = await MigrationCommand.RunAsync(provider, connectionString, args);
+    return;
+}
 
 var pleasanterOptions = new PleasanterOptions
 {
@@ -273,6 +283,26 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(5),
             }));
 });
+
+// **スキーマが揃っていないまま起動しない。**
+// 列の無い状態で動くと `Invalid column name` としか出ず、
+// 「マイグレーションを当て忘れている」とは分からない（Issue #32。実際に 21 件落ちた）。
+// **自動では当てない。** 何が足りないかを言って止まる
+if (!string.Equals(
+    builder.Configuration["QUESTIONNAIRE_DB_SKIP_MIGRATION_CHECK"],
+    "true",
+    StringComparison.OrdinalIgnoreCase))
+{
+    var pendingMigrations = DatabaseMigrator.PendingMigrations(provider, connectionString);
+    if (pendingMigrations.Count > 0)
+    {
+        throw new InvalidOperationException(
+            "DB のスキーマが古い。当たっていないマイグレーションがある: "
+            + string.Join(" / ", pendingMigrations)
+            + "。--migrate を付けて起動すると当たる"
+            + "（開発環境の手順は _documents/開発環境.md）");
+    }
+}
 
 var app = builder.Build();
 

@@ -1,5 +1,6 @@
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Web;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
@@ -53,6 +54,35 @@ public class DatabaseMigrationTests
         DatabaseMigrator.MigrateUp(provider, connectionString);
 
         Assert.False(DatabaseMigrator.HasPendingMigrations(provider, connectionString));
+
+        // **足りないものを名前で言えること。** 「当て忘れている」だけでは直せない
+        Assert.Empty(DatabaseMigrator.PendingMigrations(provider, connectionString));
+    }
+
+    [Fact]
+    public async Task 繋がらないDBは待った末に理由を返す()
+    {
+        // **DB は要らない。** 届かない宛先へ繋ぎに行くだけ
+        var failure = await DatabaseMigrator.WaitForDatabaseAsync(
+            DatabaseProvider.PostgreSql,
+            // 予約済みの記録用アドレス（RFC 5737）。**誰も応答しない**
+            "Host=192.0.2.1;Port=15432;Database=q;Username=postgres;Password=x;Timeout=1",
+            TimeSpan.FromSeconds(2));
+
+        // **黙って先へ進まないこと。** 進むと FluentMigrator 側で分かりにくく落ちる
+        Assert.NotNull(failure);
+    }
+
+    [Fact]
+    public void 合図が無ければマイグレーションの起動ではない()
+    {
+        Assert.False(MigrationCommand.IsRequested(["--generate-secret-key"]));
+        Assert.True(MigrationCommand.IsRequested(["--migrate"]));
+        Assert.True(MigrationCommand.IsRequested(["--migrate-status"]));
+
+        // **前方一致で拾わない。** --migrate-status を --migrate と読むと、
+        // 「見るだけ」のつもりが当ててしまう
+        Assert.False(MigrationCommand.IsRequested(["--migrated"]));
     }
 
     [Theory]

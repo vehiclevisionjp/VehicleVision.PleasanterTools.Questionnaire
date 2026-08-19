@@ -169,6 +169,28 @@
       "problemMatcher": []
     },
     {
+      "label": "マイグレーションを当てる",
+      "detail": "**アプリ起動時には当たらない**（同時実行を避けるため）。DB を替えたときは環境変数も合わせる",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose", "--profile", "app", "run", "--rm", "--no-deps",
+        "migrate", "--migrate", "--wait-for-db=180"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "マイグレーションの状態を見る",
+      "detail": "当てずに、足りていないものを並べるだけ",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose", "--profile", "app", "run", "--rm", "--no-deps",
+        "migrate", "--migrate-status"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "検証環境をアプリだけ作り直す",
       "detail": "コードを変えた後に使う。DB は残る",
       "type": "shell",

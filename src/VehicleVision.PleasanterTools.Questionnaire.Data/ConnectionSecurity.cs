@@ -53,7 +53,11 @@ public static class ConnectionSecurity
 
                 if (IsFalse(builder, "Encrypt"))
                 {
-                    problems.Add(new Problem("Encrypt=False になっている。通信が平文で流れる"));
+                    // **実際には平文にならない。** DbConnectionFactory が必ず暗号化を立てる。
+                    // それでも咎めるのは、**できない指定を黙って読み替えないため**。
+                    // 「切ったつもりで動いている」状態を作らない
+                    problems.Add(new Problem(
+                        "Encrypt=False になっている。この設定は通らない（接続は必ず暗号化する）"));
                 }
 
                 if (IsTrue(builder, "TrustServerCertificate"))
@@ -140,6 +144,8 @@ public static class ConnectionSecurity
     /// <summary>不備があれば例外にする。**起動時に呼ぶ。**</summary>
     /// <param name="allowInsecure">
     /// 検証環境のために緩める。**本番で真にしないこと。**
+    /// **緩むのは証明書の確認まで。** 暗号化そのものは緩まない
+    /// （<see cref="DbConnectionFactory"/> が必ず立てる）。
     /// </param>
     public static void EnsureSecure(
         DatabaseProvider provider,
