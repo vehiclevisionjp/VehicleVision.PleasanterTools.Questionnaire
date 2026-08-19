@@ -46,12 +46,11 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
         string responseToken,
         CancellationToken cancellationToken = default)
     {
-        var q = (string name) => SqlDialect.Quote(connectionFactory.Provider, name);
 
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.QueryFirstOrDefaultAsync<long?>(new CommandDefinition(
-            $"SELECT {q("PleasanterReferenceId")} FROM {q("ResponseTokens")} "
-            + $"WHERE {q("ResponseToken")} = @ResponseToken",
+        return await connection.QueryFirstOrDefaultAsync<long?>(Sql(
+            "SELECT [PleasanterReferenceId] FROM [ResponseTokens] "
+            + "WHERE [ResponseToken] = @ResponseToken",
             new { ResponseToken = responseToken },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -62,7 +61,7 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition(
+        await connection.ExecuteAsync(Sql(
             SqlDialect.EnsureResponseToken(connectionFactory.Provider),
             new { ResponseToken = responseToken, SurveyId = surveyId, Now = DbTime.UtcNowTruncated() },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -75,7 +74,7 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition(
+        await connection.ExecuteAsync(Sql(
             SqlDialect.SaveResponseToken(connectionFactory.Provider),
             new
             {
@@ -86,6 +85,20 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
+
+    private DatabaseProvider Provider => connectionFactory.Provider;
+
+    /// <summary>SQL を組み立てる。**識別子は角括弧で囲む。**</summary>
+    /// <remarks>
+    /// **生の文字列連結をしない**ための口（<c>SqlDialect.Format</c>）。
+    /// 角括弧の中だけが RDBMS ごとの引用符へ書き換わる。
+    /// </remarks>
+    private CommandDefinition Sql(
+        string sql,
+        object? parameters = null,
+        DbTransaction? transaction = null,
+        CancellationToken cancellationToken = default) =>
+        new(SqlDialect.Format(Provider, sql), parameters, transaction, cancellationToken: cancellationToken);
 
     private async Task<DbConnection> OpenAsync(CancellationToken cancellationToken)
     {

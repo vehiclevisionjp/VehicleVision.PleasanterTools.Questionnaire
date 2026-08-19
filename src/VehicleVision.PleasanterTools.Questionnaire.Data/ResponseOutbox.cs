@@ -79,7 +79,7 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition(
+        await connection.ExecuteAsync(Sql(
             SqlDialect.SaveResponse(Provider),
             new
             {
@@ -119,21 +119,21 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
 
         if (SqlDialect.SupportsReturning(Provider))
         {
-            return await connection.QueryFirstOrDefaultAsync<PendingResponse>(new CommandDefinition(
+            return await connection.QueryFirstOrDefaultAsync<PendingResponse>(Sql(
                 SqlDialect.ClaimPendingResponse(Provider),
                 parameters,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
 
         // MySQL は RETURNING が無いので、確保してから読み直す
-        var affected = await connection.ExecuteAsync(new CommandDefinition(
+        var affected = await connection.ExecuteAsync(Sql(
             SqlDialect.ClaimPendingResponse(Provider),
             parameters,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return affected == 0
             ? null
-            : await connection.QueryFirstOrDefaultAsync<PendingResponse>(new CommandDefinition(
+            : await connection.QueryFirstOrDefaultAsync<PendingResponse>(Sql(
                 SqlDialect.ReadClaimedResponseForMySql,
                 parameters,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -143,8 +143,8 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
     {
         // **送信できたら消す。「念のため」残さない**（個人情報を含み得るため）
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Q("Responses")} WHERE {Q("ResponseToken")} = @ResponseToken",
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [Responses] WHERE [ResponseToken] = @ResponseToken",
             new { ResponseToken = responseToken },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -156,15 +156,15 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {Q("Responses")} SET " +
-            $"  {Q("Status")} = @PendingStatus, " +
-            $"  {Q("RetryCount")} = {Q("RetryCount")} + 1, " +
-            $"  {Q("NextAttemptAt")} = @NextAttemptAt, " +
-            $"  {Q("LastError")} = @Error, " +
-            $"  {Q("LockedBy")} = NULL, {Q("LockedUntil")} = NULL, " +
-            $"  {Q("UpdatedAt")} = @Now " +
-            $"WHERE {Q("ResponseToken")} = @ResponseToken",
+        await connection.ExecuteAsync(Sql(
+            "UPDATE [Responses] SET " +
+            "  [Status] = @PendingStatus, " +
+            "  [RetryCount] = [RetryCount] + 1, " +
+            "  [NextAttemptAt] = @NextAttemptAt, " +
+            "  [LastError] = @Error, " +
+            "  [LockedBy] = NULL, [LockedUntil] = NULL, " +
+            "  [UpdatedAt] = @Now " +
+            "WHERE [ResponseToken] = @ResponseToken",
             new
             {
                 ResponseToken = responseToken,
@@ -182,13 +182,13 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {Q("Responses")} SET " +
-            $"  {Q("Status")} = @DeadLetterStatus, " +
-            $"  {Q("LastError")} = @Error, " +
-            $"  {Q("LockedBy")} = NULL, {Q("LockedUntil")} = NULL, " +
-            $"  {Q("UpdatedAt")} = @Now " +
-            $"WHERE {Q("ResponseToken")} = @ResponseToken",
+        await connection.ExecuteAsync(Sql(
+            "UPDATE [Responses] SET " +
+            "  [Status] = @DeadLetterStatus, " +
+            "  [LastError] = @Error, " +
+            "  [LockedBy] = NULL, [LockedUntil] = NULL, " +
+            "  [UpdatedAt] = @Now " +
+            "WHERE [ResponseToken] = @ResponseToken",
             new
             {
                 ResponseToken = responseToken,
@@ -203,12 +203,12 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
     {
         // **確保中に落ちたら未送信へ戻る。** 回答を失わないための仕掛け
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {Q("Responses")} SET " +
-            $"  {Q("Status")} = @PendingStatus, " +
-            $"  {Q("LockedBy")} = NULL, {Q("LockedUntil")} = NULL, " +
-            $"  {Q("UpdatedAt")} = @Now " +
-            $"WHERE {Q("Status")} = @SendingStatus AND {Q("LockedUntil")} < @Now",
+        return await connection.ExecuteAsync(Sql(
+            "UPDATE [Responses] SET " +
+            "  [Status] = @PendingStatus, " +
+            "  [LockedBy] = NULL, [LockedUntil] = NULL, " +
+            "  [UpdatedAt] = @Now " +
+            "WHERE [Status] = @SendingStatus AND [LockedUntil] < @Now",
             new
             {
                 PendingStatus = (int)ResponseStatus.Pending,
@@ -223,9 +223,9 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.QueryFirstOrDefaultAsync<string>(new CommandDefinition(
-            $"SELECT {Q("PayloadJson")} FROM {Q("Responses")} "
-            + $"WHERE {Q("ResponseToken")} = @ResponseToken",
+        return await connection.QueryFirstOrDefaultAsync<string>(Sql(
+            "SELECT [PayloadJson] FROM [Responses] "
+            + "WHERE [ResponseToken] = @ResponseToken",
             new { ResponseToken = responseToken },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -234,21 +234,32 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         Guid? surveyId = null,
         CancellationToken cancellationToken = default)
     {
-        var filter = surveyId is null ? string.Empty : $" AND {Q("SurveyId")} = @SurveyId";
+        var filter = surveyId is null ? string.Empty : " AND [SurveyId] = @SurveyId";
 
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            $"SELECT COUNT(*) FROM {Q("Responses")} WHERE {Q("Status")} <> @DeadLetterStatus{filter}",
+        return await connection.ExecuteScalarAsync<int>(Sql(
+            $"SELECT COUNT(*) FROM [Responses] WHERE [Status] <> @DeadLetterStatus{filter}",
             new { DeadLetterStatus = (int)ResponseStatus.DeadLetter, SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
-    private string Q(string identifier) => SqlDialect.Quote(Provider, identifier);
 
 
     /// <summary>失敗の理由は列の桁に収める。**回答本文は入れないこと。**</summary>
     private static string? Truncate(string? error) =>
         error is null ? null : error.Length <= 1024 ? error : error[..1024];
+
+    /// <summary>SQL を組み立てる。**識別子は角括弧で囲む。**</summary>
+    /// <remarks>
+    /// **生の文字列連結をしない**ための口（<c>SqlDialect.Format</c>）。
+    /// 角括弧の中だけが RDBMS ごとの引用符へ書き換わる。
+    /// </remarks>
+    private CommandDefinition Sql(
+        string sql,
+        object? parameters = null,
+        DbTransaction? transaction = null,
+        CancellationToken cancellationToken = default) =>
+        new(SqlDialect.Format(Provider, sql), parameters, transaction, cancellationToken: cancellationToken);
 
     private async Task<DbConnection> OpenAsync(CancellationToken cancellationToken)
     {

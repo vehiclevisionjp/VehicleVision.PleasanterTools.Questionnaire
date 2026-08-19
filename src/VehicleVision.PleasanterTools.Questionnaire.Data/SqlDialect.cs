@@ -5,8 +5,53 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// **方言差はここだけに置く。** 呼び出し側へ散らさない
 /// （<c>_documents/アーキテクチャ方針.md</c> 13 章）。
 /// </remarks>
-public static class SqlDialect
+public static partial class SqlDialect
 {
+    /// <summary>SQL の中の識別子を、その RDBMS の引用符へ書き換える。</summary>
+    /// <remarks>
+    /// <para>
+    /// **SQL を SQL のまま書けるようにするためのもの。**
+    /// 文字列の連結と補間で組み立てると、読むのに頭の中で展開する必要があるうえ、
+    /// **引用を忘れても動いてしまう**ので気付けない。
+    /// </para>
+    /// <code>
+    /// Format(provider, "SELECT [PublicId] FROM [Surveys] WHERE [SurveyId] = @SurveyId")
+    /// </code>
+    /// <para>
+    /// **角括弧で囲んだ所だけが書き換わる。** 素の識別子はそのまま残るので、
+    /// 囲み忘れが目で見て分かる。SQL Server では書き換えが起きない
+    /// （角括弧がそのまま引用符になる）。
+    /// </para>
+    /// <para>
+    /// ⚠️ **文字列リテラルを含む SQL には使わないこと。**
+    /// リテラルの中の <c>[</c> まで書き換えてしまう。
+    /// 値はパラメータで渡すのが決まりなので、今のところ該当する SQL は無い。
+    /// </para>
+    /// </remarks>
+    public static string Format(DatabaseProvider provider, string sql)
+    {
+        ArgumentNullException.ThrowIfNull(sql);
+
+        // SQL Server は角括弧がそのまま引用符。**触らない**
+        if (provider is DatabaseProvider.SqlServer)
+        {
+            return sql;
+        }
+
+        return IdentifierPattern().Replace(
+            sql,
+            match => Quote(provider, match.Groups[1].Value));
+    }
+
+    /// <summary>角括弧で囲まれた識別子。</summary>
+    /// <remarks>
+    /// **識別子として妥当な形だけを拾う。** 配列の添字などを巻き込まないため。
+    /// </remarks>
+    [System.Text.RegularExpressions.GeneratedRegex(
+        @"\[([A-Za-z_][A-Za-z0-9_]*)\]",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex IdentifierPattern();
+
     /// <summary>識別子を引用する。</summary>
     public static string Quote(DatabaseProvider provider, string identifier) => provider switch
     {

@@ -163,8 +163,8 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.QueryFirstOrDefaultAsync<AdminUser>(new CommandDefinition(
-            $"SELECT {Select()} FROM {Q("AdminUsers")} WHERE {Q("LoginId")} = @LoginId",
+        return await connection.QueryFirstOrDefaultAsync<AdminUser>(Sql(
+            $"SELECT {Select()} FROM [AdminUsers] WHERE [LoginId] = @LoginId",
             new { LoginId = loginId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -174,8 +174,8 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.QueryFirstOrDefaultAsync<AdminUser>(new CommandDefinition(
-            $"SELECT {Select()} FROM {Q("AdminUsers")} WHERE {Q("AdminUserId")} = @AdminUserId",
+        return await connection.QueryFirstOrDefaultAsync<AdminUser>(Sql(
+            $"SELECT {Select()} FROM [AdminUsers] WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -183,8 +183,8 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
     public async Task<IReadOnlyList<AdminUser>> ListAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await connection.QueryAsync<AdminUser>(new CommandDefinition(
-            $"SELECT {Select()} FROM {Q("AdminUsers")} ORDER BY {Q("LoginId")}",
+        var rows = await connection.QueryAsync<AdminUser>(Sql(
+            $"SELECT {Select()} FROM [AdminUsers] ORDER BY [LoginId]",
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return rows.ToList();
     }
@@ -192,8 +192,8 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
     public async Task<bool> IsEmptyAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        var count = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
-            $"SELECT COUNT(*) FROM {Q("AdminUsers")}",
+        var count = await connection.ExecuteScalarAsync<long>(Sql(
+            "SELECT COUNT(*) FROM [AdminUsers]",
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return count == 0;
     }
@@ -203,11 +203,11 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         var now = DbTime.UtcNowTruncated();
 
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"INSERT INTO {Q("AdminUsers")} ("
-            + $"{Q("AdminUserId")}, {Q("LoginId")}, {Q("PasswordHash")}, {Q("Role")}, "
-            + $"{Q("IsDisabled")}, {Q("TotpSecretEncrypted")}, {Q("TotpEnabledAt")}, "
-            + $"{Q("FailedLoginCount")}, {Q("CreatedAt")}, {Q("UpdatedAt")}) "
+        await connection.ExecuteAsync(Sql(
+            "INSERT INTO [AdminUsers] ("
+            + "[AdminUserId], [LoginId], [PasswordHash], [Role], "
+            + "[IsDisabled], [TotpSecretEncrypted], [TotpEnabledAt], "
+            + "[FailedLoginCount], [CreatedAt], [UpdatedAt]) "
             + "VALUES (@AdminUserId, @LoginId, @PasswordHash, @Role, "
             + "@IsDisabled, @TotpSecretEncrypted, @TotpEnabledAt, 0, @Now, @Now)",
             new
@@ -229,8 +229,8 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         string passwordHash,
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
-            $"UPDATE {Q("AdminUsers")} SET {Q("PasswordHash")} = @PasswordHash, "
-            + $"{Q("UpdatedAt")} = @Now WHERE {Q("AdminUserId")} = @AdminUserId",
+            "UPDATE [AdminUsers] SET [PasswordHash] = @PasswordHash, "
+            + "[UpdatedAt] = @Now WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId, PasswordHash = passwordHash, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
 
@@ -239,9 +239,9 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         string secretEncrypted,
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
-            $"UPDATE {Q("AdminUsers")} SET {Q("TotpSecretEncrypted")} = @Secret, "
-            + $"{Q("TotpEnabledAt")} = @Now, {Q("UpdatedAt")} = @Now "
-            + $"WHERE {Q("AdminUserId")} = @AdminUserId",
+            "UPDATE [AdminUsers] SET [TotpSecretEncrypted] = @Secret, "
+            + "[TotpEnabledAt] = @Now, [UpdatedAt] = @Now "
+            + "WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId, Secret = secretEncrypted, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
 
@@ -250,8 +250,8 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         bool isDisabled,
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
-            $"UPDATE {Q("AdminUsers")} SET {Q("IsDisabled")} = @IsDisabled, "
-            + $"{Q("UpdatedAt")} = @Now WHERE {Q("AdminUserId")} = @AdminUserId",
+            "UPDATE [AdminUsers] SET [IsDisabled] = @IsDisabled, "
+            + "[UpdatedAt] = @Now WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId, IsDisabled = isDisabled, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
 
@@ -260,16 +260,16 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         string? language,
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
-            $"UPDATE {Q("AdminUsers")} SET {Q("Language")} = @Language, "
-            + $"{Q("UpdatedAt")} = @Now WHERE {Q("AdminUserId")} = @AdminUserId",
+            "UPDATE [AdminUsers] SET [Language] = @Language, "
+            + "[UpdatedAt] = @Now WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId, Language = language, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
 
     public Task<bool> TryDisableAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
         // **最後の 1 人でなければ止める。** 既に止まっている相手は、人数を減らさないので通す
         GuardedUpdateAsync(
-            $"{Q("IsDisabled")} = @Disabled",
-            $"({Q("Role")} <> @Administrator OR {Q("IsDisabled")} = @Disabled OR {OtherAdministratorExists()})",
+            "[IsDisabled] = @Disabled",
+            $"([Role] <> @Administrator OR [IsDisabled] = @Disabled OR {OtherAdministratorExists()})",
             new { AdminUserId = adminUserId },
             cancellationToken);
 
@@ -279,9 +279,9 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         CancellationToken cancellationToken = default) =>
         // **降格でなければ素通し。** 昇格や、元から Editor の相手は誰も締め出さない
         GuardedUpdateAsync(
-            $"{Q("Role")} = @Role",
-            $"(@Role = @Administrator OR {Q("Role")} <> @Administrator "
-            + $"OR {Q("IsDisabled")} = @Disabled OR {OtherAdministratorExists()})",
+            "[Role] = @Role",
+            "(@Role = @Administrator OR [Role] <> @Administrator "
+            + $"OR [IsDisabled] = @Disabled OR {OtherAdministratorExists()})",
             new { AdminUserId = adminUserId, Role = (int)role },
             cancellationToken);
 
@@ -311,12 +311,12 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
     /// </para>
     /// </remarks>
     private string OtherAdministratorExists() =>
-        $"EXISTS (SELECT 1 FROM (SELECT {Q("AdminUserId")}, {Q("Role")}, {Q("IsDisabled")}, "
-        + $"{Q("LastLoginAt")} FROM {Q("AdminUsers")}) AS {Q("other")} "
-        + $"WHERE {Q("other")}.{Q("AdminUserId")} <> @AdminUserId "
-        + $"AND {Q("other")}.{Q("Role")} = @Administrator "
-        + $"AND {Q("other")}.{Q("IsDisabled")} = @Enabled "
-        + $"AND {Q("other")}.{Q("LastLoginAt")} IS NOT NULL)";
+        "EXISTS (SELECT 1 FROM (SELECT [AdminUserId], [Role], [IsDisabled], "
+        + "[LastLoginAt] FROM [AdminUsers]) AS [other] "
+        + "WHERE [other].[AdminUserId] <> @AdminUserId "
+        + "AND [other].[Role] = @Administrator "
+        + "AND [other].[IsDisabled] = @Enabled "
+        + "AND [other].[LastLoginAt] IS NOT NULL)";
 
     /// <summary>誰も入れなくならないことを確かめてから更新する。</summary>
     private async Task<bool> GuardedUpdateAsync(
@@ -332,9 +332,9 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         arguments.Add("Enabled", false);
 
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        var affected = await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {Q("AdminUsers")} SET {assignment}, {Q("UpdatedAt")} = @Now "
-            + $"WHERE {Q("AdminUserId")} = @AdminUserId AND {guard}",
+        var affected = await connection.ExecuteAsync(Sql(
+            $"UPDATE [AdminUsers] SET {assignment}, [UpdatedAt] = @Now "
+            + $"WHERE [AdminUserId] = @AdminUserId AND {guard}",
             arguments,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -343,9 +343,9 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
 
     public Task RecordSuccessAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
         ExecuteAsync(
-            $"UPDATE {Q("AdminUsers")} SET {Q("LastLoginAt")} = @Now, "
-            + $"{Q("FailedLoginCount")} = 0, {Q("LockedUntil")} = NULL, {Q("UpdatedAt")} = @Now "
-            + $"WHERE {Q("AdminUserId")} = @AdminUserId",
+            "UPDATE [AdminUsers] SET [LastLoginAt] = @Now, "
+            + "[FailedLoginCount] = 0, [LockedUntil] = NULL, [UpdatedAt] = @Now "
+            + "WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
 
@@ -356,15 +356,15 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
         // **DB 側で足す。** 読んでから書くと、同時に来た試行を数え落とす
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {Q("AdminUsers")} SET {Q("FailedLoginCount")} = {Q("FailedLoginCount")} + 1, "
-            + $"{Q("UpdatedAt")} = @Now WHERE {Q("AdminUserId")} = @AdminUserId",
+        await connection.ExecuteAsync(Sql(
+            "UPDATE [AdminUsers] SET [FailedLoginCount] = [FailedLoginCount] + 1, "
+            + "[UpdatedAt] = @Now WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId, Now = DbTime.UtcNowTruncated() },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            $"SELECT {Q("FailedLoginCount")} FROM {Q("AdminUsers")} "
-            + $"WHERE {Q("AdminUserId")} = @AdminUserId",
+        return await connection.ExecuteScalarAsync<int>(Sql(
+            "SELECT [FailedLoginCount] FROM [AdminUsers] "
+            + "WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -374,8 +374,8 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         DateTime lockedUntilUtc,
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
-            $"UPDATE {Q("AdminUsers")} SET {Q("LockedUntil")} = @LockedUntil, "
-            + $"{Q("UpdatedAt")} = @Now WHERE {Q("AdminUserId")} = @AdminUserId",
+            "UPDATE [AdminUsers] SET [LockedUntil] = @LockedUntil, "
+            + "[UpdatedAt] = @Now WHERE [AdminUserId] = @AdminUserId",
             new
             {
                 AdminUserId = adminUserId,
@@ -396,17 +396,17 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
             .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
         // **入れ替える。** 古いものを残すと、配り直した意味が無くなる
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Q("AdminRecoveryCodes")} WHERE {Q("AdminUserId")} = @AdminUserId",
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [AdminRecoveryCodes] WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         foreach (var codeHash in codeHashes)
         {
-            await connection.ExecuteAsync(new CommandDefinition(
-                $"INSERT INTO {Q("AdminRecoveryCodes")} ("
-                + $"{Q("RecoveryCodeId")}, {Q("AdminUserId")}, {Q("CodeHash")}, {Q("CreatedAt")}) "
+            await connection.ExecuteAsync(Sql(
+                "INSERT INTO [AdminRecoveryCodes] ("
+                + "[RecoveryCodeId], [AdminUserId], [CodeHash], [CreatedAt]) "
                 + "VALUES (@RecoveryCodeId, @AdminUserId, @CodeHash, @Now)",
                 new
                 {
@@ -427,9 +427,9 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await connection.QueryAsync<RecoveryCodeRow>(new CommandDefinition(
-            $"SELECT {Q("RecoveryCodeId")}, {Q("CodeHash")} FROM {Q("AdminRecoveryCodes")} "
-            + $"WHERE {Q("AdminUserId")} = @AdminUserId AND {Q("UsedAt")} IS NULL",
+        var rows = await connection.QueryAsync<RecoveryCodeRow>(Sql(
+            "SELECT [RecoveryCodeId], [CodeHash] FROM [AdminRecoveryCodes] "
+            + "WHERE [AdminUserId] = @AdminUserId AND [UsedAt] IS NULL",
             new { AdminUserId = adminUserId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return rows.ToList();
@@ -443,9 +443,9 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
 
         // **未使用の行だけを更新し、更新できた件数で判断する。**
         // 読んでから書くと、同時に来た 2 つが両方とも通ってしまう
-        var affected = await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {Q("AdminRecoveryCodes")} SET {Q("UsedAt")} = @Now "
-            + $"WHERE {Q("RecoveryCodeId")} = @RecoveryCodeId AND {Q("UsedAt")} IS NULL",
+        var affected = await connection.ExecuteAsync(Sql(
+            "UPDATE [AdminRecoveryCodes] SET [UsedAt] = @Now "
+            + "WHERE [RecoveryCodeId] = @RecoveryCodeId AND [UsedAt] IS NULL",
             new { RecoveryCodeId = recoveryCodeId, Now = DbTime.UtcNowTruncated() },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -460,26 +460,39 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
         // **前に進むときだけ更新する。** 読んでから書くと、同時に来た 2 つが両方とも通る
-        var affected = await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {Q("AdminUsers")} SET {Q("TotpLastTimeStep")} = @TimeStep "
-            + $"WHERE {Q("AdminUserId")} = @AdminUserId "
-            + $"AND ({Q("TotpLastTimeStep")} IS NULL OR {Q("TotpLastTimeStep")} < @TimeStep)",
+        var affected = await connection.ExecuteAsync(Sql(
+            "UPDATE [AdminUsers] SET [TotpLastTimeStep] = @TimeStep "
+            + "WHERE [AdminUserId] = @AdminUserId "
+            + "AND ([TotpLastTimeStep] IS NULL OR [TotpLastTimeStep] < @TimeStep)",
             new { AdminUserId = adminUserId, TimeStep = timeStep },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return affected == 1;
     }
 
-    private string Select() => string.Join(", ", SelectColumns.Select(Q));
+    /// <summary>読み出す列の並び。**引用は SqlDialect.Format が行う。**</summary>
+    private static string Select() =>
+        string.Join(", ", SelectColumns.Select(name => "[" + name + "]"));
 
     private async Task ExecuteAsync(string sql, object parameters, CancellationToken cancellationToken)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition(
+        await connection.ExecuteAsync(Sql(
             sql, parameters, cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
-    private string Q(string identifier) => SqlDialect.Quote(Provider, identifier);
+
+    /// <summary>SQL を組み立てる。**識別子は角括弧で囲む。**</summary>
+    /// <remarks>
+    /// **生の文字列連結をしない**ための口（<c>SqlDialect.Format</c>）。
+    /// 角括弧の中だけが RDBMS ごとの引用符へ書き換わる。
+    /// </remarks>
+    private CommandDefinition Sql(
+        string sql,
+        object? parameters = null,
+        DbTransaction? transaction = null,
+        CancellationToken cancellationToken = default) =>
+        new(SqlDialect.Format(Provider, sql), parameters, transaction, cancellationToken: cancellationToken);
 
     private async Task<DbConnection> OpenAsync(CancellationToken cancellationToken)
     {
