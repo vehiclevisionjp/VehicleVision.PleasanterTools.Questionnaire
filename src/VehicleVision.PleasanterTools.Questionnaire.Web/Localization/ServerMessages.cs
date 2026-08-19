@@ -1,4 +1,4 @@
-using System.Collections.Frozen;
+﻿using System.Collections.Frozen;
 using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
@@ -205,6 +205,17 @@ public static class ServerMessages
             ServerMessageKeys.TemplateSourceRequired,
             "テンプレートの元にするアンケートを指定してください。",
             "Specify the survey to make a template from.");
+
+        // ---- テーマ ---------------------------------------------------------
+        Add(
+            ServerMessageKeys.ThemeColorInvalid,
+            "色は #rrggbb の形で指定してください。",
+            "Specify colors in the #rrggbb form.");
+
+        Add(
+            ServerMessageKeys.HeaderImageRejected,
+            "この画像は使えません。PNG・JPEG・GIF・WebP の 2 MB 以内の画像を選んでください。",
+            "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 2 MB.");
         // ---- 送信状況 -------------------------------------------------------
         Add(
             ServerMessageKeys.ResponseTokenRequired,

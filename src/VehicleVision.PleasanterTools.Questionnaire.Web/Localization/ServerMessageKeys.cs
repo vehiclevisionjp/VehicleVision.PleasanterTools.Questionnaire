@@ -1,4 +1,4 @@
-namespace VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
+﻿namespace VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 /// <summary>サーバが画面へ返す文言の鍵。</summary>
 /// <remarks>
@@ -92,6 +92,16 @@ public static class ServerMessageKeys
 
     /// <summary>テンプレートの元にするアンケートを指定していない。</summary>
     public const string TemplateSourceRequired = "templates.sourceRequired";
+    /// テーマの色の形が違う（Issue #56）。
+    /// **受け付けるのは <c>#rgb</c> と <c>#rrggbb</c> だけ。**
+    /// </summary>
+    public const string ThemeColorInvalid = "surveys.themeColorInvalid";
+
+    /// <summary>
+    /// ヘッダ画像を受け付けられない。
+    /// **理由の内訳は文言にしない**（拡張子・中身・大きさのどれで落ちたかは別で返す）。
+    /// </summary>
+    public const string HeaderImageRejected = "surveys.headerImageRejected";
     // ---- 送信状況 -----------------------------------------------------------
 
     /// <summary>戻す回答を指定していない。</summary>
