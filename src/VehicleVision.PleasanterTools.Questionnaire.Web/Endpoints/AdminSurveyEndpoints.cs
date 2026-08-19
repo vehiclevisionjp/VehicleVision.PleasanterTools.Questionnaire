@@ -114,6 +114,18 @@ public static class AdminSurveyEndpoints
                 return Results.NotFound();
             }
 
+            // **テンプレートは複製の口から作らせない**（Issue #58）。
+            // テンプレートはサイトを持たず、題名に「のコピー」も付けたくない。
+            // 専用の口（`AdminTemplateEndpoints`）を通させる
+            if (source.IsTemplate)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SurveyIsTemplate, RequestLanguage.Of(context)),
+                });
+            }
+
             // **元と同じサイトを断る。** 1 アンケート = 1 サイトなので、
             // 同じサイトへ 2 つのアンケートが書き込むと、回答がどちらのものか分からなくなる
             if (source.PleasanterSiteId == request.PleasanterSiteId)
@@ -223,6 +235,22 @@ public static class AdminSurveyEndpoints
             if (draft is null)
             {
                 return Results.NotFound();
+            }
+
+            // **テンプレートは公開できない**（Issue #58）。
+            // 書き込み先のサイトを持たないので、公開できてしまうと
+            // 受け付けた回答の行き先が無いまま溜まる。
+            // **ここで 1 回引くのは、公開の後に引き直す分とは別。**
+            // 後の引き直しは版が進んだ行を読むためのもので、前倒しにできない
+            var beforePublish = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (beforePublish is { IsTemplate: true })
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SurveyIsTemplate, RequestLanguage.Of(context)),
+                });
             }
 
             // **公開のときだけ拒否する。** 壊れた定義で回答を受け付けると、
@@ -342,6 +370,16 @@ public static class AdminSurveyEndpoints
         if (record is null)
         {
             return Results.NotFound();
+        }
+
+        // **テンプレートには状態が無い**（Issue #58）。公開しないので止める対象でもない
+        if (record.IsTemplate)
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.SurveyIsTemplate, RequestLanguage.Of(context)),
+            });
         }
 
         // **公開していないものは再開できない。** 版が無いので回答画面が組み立てられない

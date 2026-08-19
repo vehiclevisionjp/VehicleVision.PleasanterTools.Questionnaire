@@ -209,9 +209,16 @@
         <!--
           **複製は Administrator だけ**（Issue #46）。
           書き込み先のサイトを新しく決める操作であり、
-          誤ると別の業務のサイトへ回答が流れ込む。サーバ側でも同じ判定をしている
+          誤ると別の業務のサイトへ回答が流れ込む。サーバ側でも同じ判定をしている。
+
+          **テンプレートも同じ**（Issue #58）。テンプレートから作るときに
+          サイトを決めるので、複製と同じ危なさがある
         -->
-        <SurveyList onopen={open} canDuplicate={isAdministrator} />
+        <SurveyList
+          onopen={open}
+          canDuplicate={isAdministrator}
+          canUseTemplates={isAdministrator}
+        />
       {/if}
     </main>
   {:else if needsEnrollment}

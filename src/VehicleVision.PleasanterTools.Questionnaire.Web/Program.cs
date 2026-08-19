@@ -351,6 +351,7 @@ app.MapFormEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
+app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 

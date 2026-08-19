@@ -193,6 +193,18 @@ public static class ServerMessages
             ServerMessageKeys.DuplicateSiteIdMustDiffer,
             "複製先には、元とは別の Pleasanter のサイト ID を指定してください。",
             "Specify a Pleasanter site ID other than the one the original survey writes to.");
+
+        Add(
+            ServerMessageKeys.SurveyIsTemplate,
+            "これはテンプレートです。テンプレートは公開できません。"
+                + "テンプレートからアンケートを作ってください。",
+            "This is a template. Templates cannot be published. Create a survey from it first.");
+
+        // ---- テンプレート ---------------------------------------------------
+        Add(
+            ServerMessageKeys.TemplateSourceRequired,
+            "テンプレートの元にするアンケートを指定してください。",
+            "Specify the survey to make a template from.");
         // ---- 送信状況 -------------------------------------------------------
         Add(
             ServerMessageKeys.ResponseTokenRequired,

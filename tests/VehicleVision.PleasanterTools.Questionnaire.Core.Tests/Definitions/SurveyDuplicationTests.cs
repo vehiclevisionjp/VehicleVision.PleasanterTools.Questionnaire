@@ -219,4 +219,49 @@ public class SurveyDuplicationTests
 
         Assert.Throws<ArgumentException>(() => SurveyDuplication.Copy(source, "  "));
     }
+
+    /// <summary>
+    /// テンプレートは題名をそのまま写す（Issue #58）。
+    ///
+    /// **「のコピー」を付けない。** テンプレートは元と並べて置くものではなく、
+    /// そこから作ったアンケートに付くと、**回答者に見える題名**が汚れる。
+    /// </summary>
+    [Fact]
+    public void 題名を写すときは_のコピー_を付けない()
+    {
+        var copy = SurveyDuplication.Copy(CreateDefinition(), NewSurveyId, renameAsCopy: false);
+
+        Assert.Equal("満足度調査", copy.Title.Get("ja"));
+        Assert.Equal("Satisfaction survey", copy.Title.Get("en"));
+    }
+
+    /// <summary>題名を写しても、写すもの・写さないものは複製と同じ。</summary>
+    [Fact]
+    public void 題名を写しても版と_ID_は作り直す()
+    {
+        var copy = SurveyDuplication.Copy(CreateDefinition(), NewSurveyId, renameAsCopy: false);
+
+        Assert.Equal(NewSurveyId, copy.SurveyId);
+        // **公開済みの版は写さないので、次に公開されるのは 1 版目**
+        Assert.Equal(1, copy.Version);
+
+        // **設問も分岐もそのまま写る**（複製と同じ道を通っていること）
+        Assert.Equal("p3", copy.Pages[0].Next!.PageId);
+        Assert.Equal(
+            PageTransitionKind.Submit, copy.Pages[0].Questions[0].Choices[0].Next!.Kind);
+        Assert.Equal("no", Assert.Single(copy.Pages[1].Questions[0].VisibleWhen!.Rules).Value);
+    }
+
+    /// <summary>**元は変えない。** テンプレートにしても元の題名は元のまま。</summary>
+    [Fact]
+    public void 題名を写しても元の定義を変えない()
+    {
+        var source = CreateDefinition();
+
+        _ = SurveyDuplication.Copy(source, NewSurveyId, renameAsCopy: false);
+
+        Assert.Equal("満足度調査", source.Title.Get("ja"));
+        Assert.Equal(4, source.Version);
+        Assert.Equal("11111111-1111-1111-1111-111111111111", source.SurveyId);
+    }
 }

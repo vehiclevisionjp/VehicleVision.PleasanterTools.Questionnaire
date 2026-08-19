@@ -260,6 +260,18 @@ export function isPublished(survey: SurveySummary): boolean {
   return (survey.publishedVersion ?? null) !== null;
 }
 
+/**
+ * 一覧に出すテンプレートの要約（Issue #58）。
+ *
+ * **サイト ID も公開用 ID も無い。** テンプレートは書き込み先を持たず、
+ * 公開もされないので、サーバ側の型（`SurveyTemplateSummary`）にも入っていない。
+ */
+export interface SurveyTemplateSummary {
+  templateId: string;
+  title: string;
+  updatedAt: string;
+}
+
 /** アンケートの状態の文言の鍵。 */
 export function surveyStatusKey(status: number): MessageKey {
   switch (status) {

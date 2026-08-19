@@ -86,6 +86,13 @@ public interface ISurveyRepository
 }
 
 /// <summary>アンケートの 1 行。</summary>
+/// <param name="IsTemplate">
+/// テンプレートか（Issue #58）。
+///
+/// **テンプレートは Pleasanter のサイトを持たない**ので、
+/// <see cref="PleasanterSiteId"/> は 0 が入っている。公開も停止もできない
+/// （<c>AdminSurveyEndpoints</c> で断る）。
+/// </param>
 public sealed record SurveyRecord(
     Guid SurveyId,
     string PublicId,
@@ -96,7 +103,8 @@ public sealed record SurveyRecord(
     int? PublishedVersion,
     DateTime? AcceptFrom = null,
     DateTime? AcceptTo = null,
-    int? ResponseLimit = null);
+    int? ResponseLimit = null,
+    bool IsTemplate = false);
 
 /// <summary>アンケートの状態。</summary>
 public enum SurveyStatus
@@ -114,6 +122,12 @@ public enum SurveyStatus
 /// <summary>Dapper を使った実装。</summary>
 public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : ISurveyRepository
 {
+    /// <remarks>
+    /// **<c>IsTemplate</c> は書かない**（Issue #58）。
+    /// テンプレートかどうかは作るときに決まるもので、
+    /// ここで書くと、テンプレートの行を読んで書き戻した拍子に旗が落ちる。
+    /// テンプレートを作るのは <see cref="ISurveyDraftStore.SaveAsTemplateAsync"/> だけ。
+    /// </remarks>
     public async Task SaveAsync(SurveyRecord survey, CancellationToken cancellationToken = default)
     {
         var now = DbTime.UtcNowTruncated();
@@ -231,7 +245,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(Sql(
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
-            + "       [AcceptFrom], [AcceptTo], [ResponseLimit] "
+            + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate] "
             + "FROM [Surveys] WHERE [PublicId] = @PublicId",
             new { PublicId = publicId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -245,7 +259,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(Sql(
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
-            + "       [AcceptFrom], [AcceptTo], [ResponseLimit] "
+            + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
