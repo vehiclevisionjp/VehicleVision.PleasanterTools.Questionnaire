@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Flow;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -74,7 +73,7 @@ public static class AdminSurveyEndpoints
             var surveyId = Guid.NewGuid();
             var record = new SurveyRecord(
                 surveyId,
-                GeneratePublicId(),
+                SurveyPublicId.Generate(),
                 request.Title.Trim(),
                 request.PleasanterSiteId,
                 request.ResponseJsonColumn,
@@ -85,6 +84,66 @@ public static class AdminSurveyEndpoints
 
             return Results.Created($"/api/admin/surveys/{surveyId}", new { surveyId, record.PublicId });
         });
+
+        // ---- 複製（Administrator だけ） --------------------------------------
+        // **設問・選択肢・ページ・分岐・マッピングを写し、下書きとして作る**（Issue #46）。
+        // 似たアンケートを作り直すたびに手で入れ直さずに済ませる。
+        // **Editor には行わせない。** 書き込み先のサイトを新しく決める操作であり、
+        // 誤ると別の業務のサイトへ回答が流れ込む
+        group.MapPost("/{surveyId:guid}/duplicate", async (
+            Guid surveyId,
+            DuplicateSurveyRequest request,
+            HttpContext context,
+            ISurveyDraftStore drafts,
+            ISurveyRepository surveys,
+            CancellationToken cancellationToken) =>
+        {
+            if (request.PleasanterSiteId <= 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PleasanterSiteIdRequired, RequestLanguage.Of(context)),
+                });
+            }
+
+            var source = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (source is null)
+            {
+                return Results.NotFound();
+            }
+
+            // **元と同じサイトを断る。** 1 アンケート = 1 サイトなので、
+            // 同じサイトへ 2 つのアンケートが書き込むと、回答がどちらのものか分からなくなる
+            if (source.PleasanterSiteId == request.PleasanterSiteId)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.DuplicateSiteIdMustDiffer, RequestLanguage.Of(context)),
+                });
+            }
+
+            var target = new SurveyDuplicationTarget(
+                Guid.NewGuid(),
+                // **公開用 ID は使い回さない**（_documents/データモデル設計.md 3 章）
+                SurveyPublicId.Generate(),
+                request.PleasanterSiteId,
+                string.IsNullOrWhiteSpace(request.ResponseJsonColumn)
+                    ? null
+                    : request.ResponseJsonColumn.Trim());
+
+            // **失敗したら 1 行も残さない。** 中途半端な行は画面からも消せない
+            var duplicated = await drafts.DuplicateAsync(surveyId, target, cancellationToken)
+                .ConfigureAwait(false);
+
+            return duplicated
+                ? Results.Created(
+                    $"/api/admin/surveys/{target.SurveyId}",
+                    new { surveyId = target.SurveyId, target.PublicId })
+                : Results.NotFound();
+        }).RequireAuthorization(AdminAuthSchemes.AdministratorPolicy);
 
         // ---- 下書きを読む ----------------------------------------------------
         group.MapGet("/{surveyId:guid}", async (
@@ -310,18 +369,20 @@ public static class AdminSurveyEndpoints
         isBlocking = problem.IsBlocking,
     };
 
-    /// <summary>回答用 URL に使う推測不能な値。</summary>
-    /// <remarks>
-    /// **サイト ID や <c>SurveyId</c> を URL に出さない**
-    /// （<c>_documents/データモデル設計.md</c> 3 章）。
-    /// 順番に並んだ値だと、総当たりで他のアンケートを見つけられる。
-    /// </remarks>
-    private static string GeneratePublicId() =>
-        "pub-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
-
     /// <summary>アンケートを新しく作る。</summary>
     public sealed record CreateSurveyRequest(
         string? Title,
+        long PleasanterSiteId,
+        string? ResponseJsonColumn);
+
+    /// <summary>アンケートを複製する（Issue #46）。</summary>
+    /// <param name="PleasanterSiteId">
+    /// **複製先が書き込むサイト。** 元の値を写さないので、必ず指定させる。
+    /// </param>
+    /// <param name="ResponseJsonColumn">
+    /// 回答 JSON の正本を入れる列。**サイトに紐づく値なので写さない。**
+    /// </param>
+    public sealed record DuplicateSurveyRequest(
         long PleasanterSiteId,
         string? ResponseJsonColumn);
 

@@ -121,6 +121,23 @@ export const createSurvey = (title: string, pleasanterSiteId: number, responseJs
     json: { title, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
   });
 
+/**
+ * アンケートを複製する（Issue #46）。
+ *
+ * **公開用 ID はサーバが作り直す。** 使い回すと 2 つのアンケートが同じ URL を指す。
+ * **書き込み先のサイトは写さない**ので、ここで新しく指定する。
+ * **Administrator だけが通る**（サーバ側で判定する）。
+ */
+export const duplicateSurvey = (
+  surveyId: string,
+  pleasanterSiteId: number,
+  responseJsonColumn?: string,
+) =>
+  call<{ surveyId: string; publicId: string }>(`/api/admin/surveys/${surveyId}/duplicate`, {
+    method: 'POST',
+    json: { pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
+  });
+
 export const loadDraft = (surveyId: string) => call<SurveyDraft>(`/api/admin/surveys/${surveyId}`);
 
 export const saveDraft = (

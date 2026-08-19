@@ -328,4 +328,161 @@ public class SurveyDraftStoreTests
 
         Assert.Null(await drafts.LoadAsync(Guid.NewGuid()));
     }
+
+    /// <summary>
+    /// 複製で設問・選択肢・**分岐**・マッピングが写ること（Issue #46）。
+    /// **下書きは列で持っている**ので、写し漏れると黙って消える。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 複製すると分岐もマッピングも写る(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+
+        var definition = new SurveyDefinition
+        {
+            SurveyId = surveyId.ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("複製の元"),
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "page-1",
+                    Next = PageTransition.To("page-3"),
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = QuestionType.Radio,
+                            Title = LocalizedText.Japanese("満足度"),
+                            Choices =
+                            [
+                                new Choice(
+                                    "good",
+                                    LocalizedText.Japanese("よい"),
+                                    Next: PageTransition.Submit),
+                                new Choice("bad", LocalizedText.Japanese("わるい")),
+                            ],
+                        },
+                        new Question
+                        {
+                            QuestionId = "q2",
+                            Type = QuestionType.Text,
+                            Title = LocalizedText.Japanese("理由"),
+                            VisibleWhen = new VisibilityCondition
+                            {
+                                Match = ConditionMatch.Any,
+                                Rules = [new ConditionRule("q1", ConditionOperator.Equals, "bad")],
+                            },
+                        },
+                    ],
+                },
+                new Page { PageId = "page-3", Questions = [] },
+            ],
+        };
+
+        var mapping = new MappingDefinition
+        {
+            Assignments = [ColumnAssignment.Direct("ClassA", new MappingSource("q1"))],
+        };
+
+        await drafts.SaveAsync(surveyId, definition, mapping, expectedRevision: 0);
+
+        var target = new SurveyDuplicationTarget(
+            Guid.NewGuid(), $"pub-{Guid.NewGuid():N}", PleasanterSiteId: 2, ResponseJsonColumn: null);
+
+        Assert.True(await drafts.DuplicateAsync(surveyId, target));
+
+        var copy = await drafts.LoadAsync(target.SurveyId);
+        Assert.NotNull(copy);
+
+        // **題名は「〜のコピー」。** 一覧で元と見分けが付かないと取り違える
+        Assert.Equal("複製の元のコピー", copy.Definition.Title.Get("ja"));
+
+        var page = copy.Definition.Pages[0];
+        Assert.Equal("page-3", page.Next!.PageId);
+        Assert.Equal(PageTransitionKind.Submit, page.Questions[0].Choices[0].Next!.Kind);
+        Assert.Null(page.Questions[0].Choices[1].Next);
+        Assert.Equal("bad", Assert.Single(page.Questions[1].VisibleWhen!.Rules).Value);
+
+        var assignment = Assert.Single(copy.Mapping.Assignments);
+        Assert.Equal("ClassA", assignment.TargetColumn);
+        Assert.Equal("q1", Assert.Single(assignment.Sources).QuestionId);
+
+        // **元は変わらない**
+        var source = await drafts.LoadAsync(surveyId);
+        Assert.Equal("複製の元", source!.Definition.Title.Get("ja"));
+    }
+
+    /// <summary>
+    /// **公開用 ID・サイト・公開状態・公開済みの版は写さない**（Issue #46）。
+    /// 写すと 2 つのアンケートが同じ URL と同じサイトを指す。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 複製は下書きとして作られる(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+
+        await drafts.SaveAsync(
+            surveyId, Definition(surveyId, "q1"), new MappingDefinition(), expectedRevision: 0);
+
+        // 元を公開しておく。**公開済みの版が写らないことを見る**
+        var published = await drafts.LoadAsync(surveyId);
+        await surveys.PublishAsync(surveyId, 1, published!.Definition, published.Mapping, null);
+        var original = await surveys.FindBySurveyIdAsync(surveyId);
+        await surveys.SaveAsync(original! with { Status = (int)SurveyStatus.Published });
+
+        var target = new SurveyDuplicationTarget(
+            Guid.NewGuid(), $"pub-{Guid.NewGuid():N}", PleasanterSiteId: 999, ResponseJsonColumn: null);
+
+        Assert.True(await drafts.DuplicateAsync(surveyId, target));
+
+        var record = await surveys.FindBySurveyIdAsync(target.SurveyId);
+        Assert.NotNull(record);
+        Assert.Equal((int)SurveyStatus.Draft, record.Status);
+        Assert.Null(record.PublishedVersion);
+        Assert.Equal(999, record.PleasanterSiteId);
+        Assert.Equal(target.PublicId, record.PublicId);
+        Assert.NotEqual(original!.PublicId, record.PublicId);
+
+        // **公開していないので、次に公開されるのは 1 版目**
+        var copy = await drafts.LoadAsync(target.SurveyId);
+        Assert.Equal(1, copy!.Definition.Version);
+        Assert.Equal(0, copy.Revision);
+    }
+
+    /// <summary>**中途半端な行を残さない**（Issue #46）。元が無ければ 1 行も入れない。</summary>
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 無いアンケートは複製できない(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var target = new SurveyDuplicationTarget(
+            Guid.NewGuid(), $"pub-{Guid.NewGuid():N}", PleasanterSiteId: 2, ResponseJsonColumn: null);
+
+        Assert.False(await drafts.DuplicateAsync(Guid.NewGuid(), target));
+
+        // **アンケートの行も作られていない**
+        Assert.Null(await surveys.FindBySurveyIdAsync(target.SurveyId));
+    }
 }

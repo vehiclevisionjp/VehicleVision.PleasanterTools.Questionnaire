@@ -78,4 +78,7 @@ public static class ServerMessageKeys
 
     /// <summary>その版は既にある。**同時に 2 人が公開を押した場合など。**</summary>
     public const string VersionAlreadyPublished = "surveys.versionAlreadyPublished";
+
+    /// <summary>複製先に元と同じサイトを指定した。**1 アンケート = 1 サイト。**</summary>
+    public const string DuplicateSiteIdMustDiffer = "surveys.duplicateSiteIdMustDiffer";
 }

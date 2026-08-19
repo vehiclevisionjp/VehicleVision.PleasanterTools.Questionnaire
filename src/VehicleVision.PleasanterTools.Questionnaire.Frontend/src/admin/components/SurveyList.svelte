@@ -1,13 +1,20 @@
 <script lang="ts">
-  import { createSurvey, listSurveys, resume, suspend } from '../lib/api';
+  import { createSurvey, duplicateSurvey, listSurveys, resume, suspend } from '../lib/api';
   import { surveyStatusKey, type SurveySummary } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
 
   interface Props {
     onopen: (surveyId: string) => void;
+    /**
+     * 複製を出してよい相手か。**Administrator だけ。**
+     *
+     * **隠すだけでは守りにならない**ので、サーバ側でも同じ判定をしている
+     * （`AdminSurveyEndpoints`）。ここで隠すのは、押せない釦を出さないため。
+     */
+    canDuplicate?: boolean;
   }
 
-  let { onopen }: Props = $props();
+  let { onopen, canDuplicate = false }: Props = $props();
 
   let surveys = $state<SurveySummary[]>([]);
   let loading = $state(true);
@@ -17,6 +24,13 @@
   let newTitle = $state('');
   let newSiteId = $state('');
   let newJsonColumn = $state('');
+
+  /** 複製を開いているアンケート。**1 度に 1 つだけ開く。** */
+  let duplicating = $state<SurveySummary | null>(null);
+  let copySiteId = $state('');
+  let copyJsonColumn = $state('');
+  /** 二重送信で 2 つ複製されないようにする */
+  let duplicateBusy = $state(false);
 
   $effect(() => {
     void reload();
@@ -56,6 +70,44 @@
     newSiteId = '';
     newJsonColumn = '';
     creating = false;
+    onopen(result.value.surveyId);
+  }
+
+  function openDuplicate(survey: SurveySummary) {
+    error = '';
+    duplicating = survey;
+    // **元のサイト ID を入れておかない。** 出したままだと、
+    // そのまま押されて 2 つのアンケートが同じサイトへ書き込む
+    copySiteId = '';
+    copyJsonColumn = '';
+  }
+
+  async function duplicate(event: SubmitEvent) {
+    event.preventDefault();
+    const source = duplicating;
+    if (source === null || duplicateBusy) {
+      return;
+    }
+
+    error = '';
+
+    const siteId = Number(copySiteId);
+    if (!Number.isInteger(siteId) || siteId <= 0) {
+      error = t('list.newSiteIdInvalid');
+      return;
+    }
+
+    duplicateBusy = true;
+    const result = await duplicateSurvey(source.surveyId, siteId, copyJsonColumn);
+    duplicateBusy = false;
+
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    duplicating = null;
+    // **複製したものをそのまま開く。** 直すために複製している
     onopen(result.value.surveyId);
   }
 
@@ -113,6 +165,33 @@
   </form>
 {/if}
 
+{#if duplicating}
+  <form class="create" onsubmit={duplicate}>
+    <h2>{t('duplicate.title', { title: duplicating.title })}</h2>
+    <p class="hint">{t('duplicate.description')}</p>
+    <label>
+      {t('duplicate.siteId')}
+      <input type="text" inputmode="numeric" bind:value={copySiteId} required />
+      <!-- **1 アンケート = 1 サイト。** 元と同じサイトはサーバが断る -->
+      <span class="hint">{t('duplicate.siteIdHint')}</span>
+    </label>
+    <label>
+      {t('duplicate.jsonColumn')}
+      <input
+        type="text"
+        placeholder={t('list.newJsonColumnPlaceholder')}
+        bind:value={copyJsonColumn}
+      />
+    </label>
+    <div class="actions">
+      <button type="submit" disabled={duplicateBusy}>{t('duplicate.submit')}</button>
+      <button type="button" class="secondary" onclick={() => (duplicating = null)}>
+        {t('duplicate.cancel')}
+      </button>
+    </div>
+  </form>
+{/if}
+
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 
 {#if loading}
@@ -153,10 +232,15 @@
             {/if}
           </td>
           <td class="muted">{formatDate(survey.updatedAt)}</td>
-          <td>
+          <td class="row-actions">
             {#if survey.publishedVersion !== null}
               <button type="button" class="secondary" onclick={() => toggle(survey)}>
                 {survey.status === 1 ? t('list.suspend') : t('list.resume')}
+              </button>
+            {/if}
+            {#if canDuplicate}
+              <button type="button" class="secondary" onclick={() => openDuplicate(survey)}>
+                {t('duplicate.open')}
               </button>
             {/if}
           </td>
@@ -187,6 +271,24 @@
     background: #fff;
     border: 1px solid var(--border);
     border-radius: 8px;
+  }
+
+  .create h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  /*
+    停止と複製が並ぶ。**`td` は `display: flex` にしない**（表の桁が崩れる）ので、
+    釦どうしの間だけを空ける
+  */
+  .row-actions button + button {
+    margin-left: 0.5rem;
   }
 
   label {
