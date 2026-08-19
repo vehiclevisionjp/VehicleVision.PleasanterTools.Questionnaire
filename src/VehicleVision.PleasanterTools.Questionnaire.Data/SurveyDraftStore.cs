@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Data.Common;
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -169,6 +169,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         int DisplayMode,
         bool ShowProgress,
         bool AllowEditingAfterSubmit,
+        string? ThemeJson,
         int? PublishedVersion,
         int DraftRevision);
 
@@ -202,6 +203,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string? ConverterConfigJson);
 
     private sealed record SourceRow(Guid AssignmentId, string QuestionId, int Port);
+
+    /// <summary>複製で写すヘッダ画像の 1 行。</summary>
+    private sealed record AssetRow(
+        string ContentType, string FileName, long ByteSize, string ContentBase64);
 
     private DatabaseProvider Provider => connectionFactory.Provider;
 
@@ -261,7 +266,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         var survey = await connection.QueryFirstOrDefaultAsync<SurveyRow>(Sql(
             "SELECT [SurveyId], [TitleJson], [DescriptionJson], "
             + "       [ConfirmationMessageJson], [DisplayMode], [ShowProgress], "
-            + "       [AllowEditingAfterSubmit], [PublishedVersion], [DraftRevision] "
+            + "       [AllowEditingAfterSubmit], [ThemeJson], [PublishedVersion], "
+            + "       [DraftRevision] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
@@ -366,6 +372,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             DisplayMode = (DisplayMode)survey.DisplayMode,
             ShowProgress = survey.ShowProgress,
             AllowEditingAfterSubmit = survey.AllowEditingAfterSubmit,
+            // **読んだ時点で形を検査する**（Issue #56）。DB を直接書き換えられた行や、
+            // 検査を足す前に保存された行を、そのまま画面へ流さない
+            Theme = ReadTheme(survey.ThemeJson),
             Pages = pages
                 .Select(page => new Page
                 {
@@ -416,6 +425,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "  [ConfirmationMessageJson] = @ConfirmationMessageJson, "
             + "  [DisplayMode] = @DisplayMode, [ShowProgress] = @ShowProgress, "
             + "  [AllowEditingAfterSubmit] = @AllowEditingAfterSubmit, "
+            + "  [ThemeJson] = @ThemeJson, "
             + "  [Title] = @Title, [UpdatedAt] = @Now "
             + "WHERE [SurveyId] = @SurveyId AND [DraftRevision] = @ExpectedRevision",
             new
@@ -428,6 +438,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 DisplayMode = (int)definition.DisplayMode,
                 definition.ShowProgress,
                 definition.AllowEditingAfterSubmit,
+                ThemeJson = WriteTheme(definition.Theme),
                 // 一覧に出す用の平文。**多言語の正本は TitleJson**
                 Title = Shorten(definition.Title.Get(LocalizedText.DefaultLanguage), 512),
                 Now = DbTime.UtcNowTruncated(),
@@ -620,6 +631,17 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             source.Definition, target.SurveyId.ToString(), target.RenameAsCopy);
         var now = DbTime.UtcNowTruncated();
 
+        // **ヘッダ画像は写す**（Issue #56）。画像は元のアンケートに紐づいており、
+        // 読み出しをアンケートで絞っている以上、識別子だけ写しても複製先からは読めない。
+        // **同じトランザクションの中で写す。** 途中で失敗すると、
+        // 出ない画像を指したままの複製が残る
+        definition = definition with
+        {
+            Theme = await CopyHeaderImageAsync(
+                connection, transaction, definition.Theme, target.SurveyId, now, cancellationToken)
+                .ConfigureAwait(false),
+        };
+
         // **下書きとして作る**（Issue #46）。公開状態も公開済みの版も写さない。
         // **受付期間・回答上限も写さない。** 公開の設定であり、
         // 期限切れの期間を引き継いだ複製は、作った直後から回答できない
@@ -629,12 +651,13 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "   [DraftRevision], [DisplayMode], [ShowProgress], "
             + "   [AllowEditingAfterSubmit], [TitleJson], [DescriptionJson], "
-            + "   [ConfirmationMessageJson], [IsTemplate], [CreatedAt], [UpdatedAt]) "
+            + "   [ConfirmationMessageJson], [IsTemplate], [ThemeJson], "
+            + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, NULL, "
             + "        0, @DisplayMode, @ShowProgress, "
             + "        @AllowEditingAfterSubmit, @TitleJson, @DescriptionJson, "
-            + "        @ConfirmationMessageJson, @IsTemplate, @Now, @Now)",
+            + "        @ConfirmationMessageJson, @IsTemplate, @ThemeJson, @Now, @Now)",
             new
             {
                 target.SurveyId,
@@ -649,6 +672,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 TitleJson = WriteText(definition.Title),
                 DescriptionJson = WriteText(definition.Description),
                 ConfirmationMessageJson = WriteText(definition.ConfirmationMessage),
+                ThemeJson = WriteTheme(definition.Theme),
                 // 一覧に出す用の平文。**多言語の正本は TitleJson**
                 Title = Shorten(definition.Title.Get(LocalizedText.DefaultLanguage), 512),
                 Now = now,
@@ -833,6 +857,90 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     cancellationToken: cancellationToken)).ConfigureAwait(false);
             }
         }
+    }
+
+    /// <summary>ヘッダ画像を複製先へ写し、新しい識別子を指すテーマを返す。</summary>
+    /// <remarks>
+    /// <para>
+    /// **中身を読んで入れ直す。** <c>INSERT ... SELECT</c> で同じ表を跨ぐ書き方は
+    /// 3 者で通り方が揃わない（<c>_documents/データモデル設計.md</c> 4 章）。
+    /// 画像は 1 枚・数 MB なので、読んで書く方が安い。
+    /// </para>
+    /// <para>
+    /// **元の画像が見つからなければ、指定ごと落とす。** 出ない画像を指したままにすると、
+    /// 複製した人は「設定してあるのに出ない」を追うことになる。
+    /// </para>
+    /// </remarks>
+    private async Task<SurveyTheme?> CopyHeaderImageAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        SurveyTheme? theme,
+        Guid targetSurveyId,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (theme?.HeaderImage() is not { } assetId)
+        {
+            return theme;
+        }
+
+        var source = await connection.QueryFirstOrDefaultAsync<AssetRow>(Sql(
+            "SELECT [ContentType], [FileName], [ByteSize], [ContentBase64] "
+            + "FROM [SurveyAssets] WHERE [AssetId] = @AssetId",
+            new { AssetId = assetId },
+            transaction,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        if (source is null)
+        {
+            return theme with { HeaderImageId = null };
+        }
+
+        var copiedId = Guid.NewGuid();
+
+        await connection.ExecuteAsync(Sql(
+            "INSERT INTO [SurveyAssets] "
+            + "  ([AssetId], [SurveyId], [ContentType], [FileName], [ByteSize], "
+            + "   [ContentBase64], [CreatedAt]) "
+            + "VALUES (@AssetId, @SurveyId, @ContentType, @FileName, @ByteSize, "
+            + "        @ContentBase64, @Now)",
+            new
+            {
+                AssetId = copiedId,
+                SurveyId = targetSurveyId,
+                source.ContentType,
+                source.FileName,
+                source.ByteSize,
+                source.ContentBase64,
+                Now = now,
+            },
+            transaction,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return theme with { HeaderImageId = copiedId.ToString() };
+    }
+
+    /// <summary>テーマを読む。**形の正しくない値は捨てる。**</summary>
+    /// <remarks>
+    /// **既定と区別する。** 何も指定していないテーマは <c>null</c> にして返す。
+    /// 空のテーマを返すと、触っていない定義の JSON にも <c>theme</c> が載る。
+    /// </remarks>
+    private static SurveyTheme? ReadTheme(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        var theme = SurveyJson.Deserialize<SurveyTheme>(json)?.Sanitized();
+        return theme is null || theme.IsDefault ? null : theme;
+    }
+
+    /// <summary>テーマを書く。**既定なら NULL。**</summary>
+    private static string? WriteTheme(SurveyTheme? theme)
+    {
+        var sanitized = theme?.Sanitized();
+        return sanitized is null || sanitized.IsDefault ? null : SurveyJson.Serialize(sanitized);
     }
 
     private static LocalizedText? ReadText(string? json) =>
