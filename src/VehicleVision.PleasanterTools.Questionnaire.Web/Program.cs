@@ -69,6 +69,7 @@ builder.Services.AddSingleton<IResponseTokenStore, ResponseTokenStore>();
 builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
 builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
+builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
 
 builder.Services.AddSingleton(pleasanterOptions);
 builder.Services.AddSingleton(new PleasanterDateTime(pleasanterOptions.ApiKeyUserTimeZoneId));

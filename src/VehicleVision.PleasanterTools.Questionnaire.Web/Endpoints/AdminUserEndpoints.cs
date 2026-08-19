@@ -34,6 +34,9 @@ public static class AdminUserEndpoints
         var group = builder.MapGroup("/api/admin");
         AdminAuthSchemes.AddNoStore(group);
 
+        // **管理操作を残す**（Issue #19）。読み取りは残さない
+        group.AddEndpointFilter<AuditLogFilter>();
+
         MapUsers(group);
         MapSelf(group);
         MapInvitationAcceptance(group);
@@ -78,6 +81,10 @@ public static class AdminUserEndpoints
             CancellationToken cancellationToken) =>
         {
             var language = RequestLanguage.Of(context);
+
+            // **誰を何にしようとしたかまで残す。** 断られた試みも記録に残る
+            AuditNotes.Add(context, "loginId", request.LoginId);
+            AuditNotes.Add(context, "role", request.Role);
 
             if (ParseRole(request.Role) is not { } role)
             {
@@ -143,6 +150,9 @@ public static class AdminUserEndpoints
             CancellationToken cancellationToken) =>
         {
             var language = RequestLanguage.Of(context);
+
+            // **何の役割にしようとしたかまで残す。** 断られた試みも記録に残る
+            AuditNotes.Add(context, "role", request.Role);
 
             if (ParseRole(request.Role) is not { } role)
             {
