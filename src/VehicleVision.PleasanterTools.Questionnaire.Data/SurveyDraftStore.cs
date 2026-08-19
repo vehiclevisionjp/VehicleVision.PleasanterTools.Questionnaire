@@ -44,6 +44,28 @@ public sealed record SurveyDuplicationTarget(
     long PleasanterSiteId,
     string? ResponseJsonColumn);
 
+/// <summary>一覧に出すテンプレートの要約（Issue #58）。</summary>
+/// <remarks>
+/// **サイト ID も公開用 ID も出さない。** テンプレートは書き込み先を持たず、
+/// 公開もされないので、画面に出す意味が無い。
+/// </remarks>
+/// <param name="TemplateId">テンプレートの内部 ID。**<c>Surveys</c> の行 1 つ。**</param>
+public sealed record SurveyTemplateSummary(
+    Guid TemplateId,
+    string Title,
+    DateTime UpdatedAt);
+
+/// <summary>テンプレートとして作る行の、**写さない値**（Issue #58）。</summary>
+/// <param name="TemplateId">作るテンプレートの内部 ID。</param>
+/// <param name="PublicId">
+/// **新しく作った推測不能な値**（<see cref="Core.Definitions.SurveyPublicId.Generate"/>）。
+/// テンプレートは公開しないので誰にも渡らないが、**列が一意かつ NOT NULL** なので入れる。
+/// **元の値を使い回さない**（<c>_documents/データモデル設計.md</c> 3 章）。
+/// </param>
+public sealed record SurveyTemplateTarget(
+    Guid TemplateId,
+    string PublicId);
+
 /// <summary>下書きが、読んだ後に他の人に書き換えられていた。</summary>
 /// <remarks>
 /// **黙って上書きしない。** 管理画面で「他の人が更新した」と伝えて読み直させる。
@@ -99,6 +121,41 @@ public interface ISurveyDraftStore
         Guid sourceSurveyId,
         SurveyDuplicationTarget target,
         CancellationToken cancellationToken = default);
+
+    /// <summary>テンプレートの一覧（Issue #58）。</summary>
+    /// <remarks>**アンケートの一覧には出さない。** 逆も同じ。</remarks>
+    Task<IReadOnlyList<SurveyTemplateSummary>> ListTemplatesAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>アンケートを丸ごと写して、**テンプレート**を作る（Issue #58）。</summary>
+    /// <param name="sourceSurveyId">写す元のアンケート。**テンプレートは指定できない。**</param>
+    /// <returns>元が無い、または元がテンプレートだったときは <c>false</c>。</returns>
+    Task<bool> SaveAsTemplateAsync(
+        Guid sourceSurveyId,
+        SurveyTemplateTarget target,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>テンプレートを丸ごと写して、新しい**下書き**を作る（Issue #58）。</summary>
+    /// <param name="templateId">写す元のテンプレート。**アンケートは指定できない。**</param>
+    /// <param name="target">
+    /// 写さない値。**書き込み先のサイトは呼ぶ側が決める**
+    /// （テンプレートは持っていない）。
+    /// </param>
+    /// <returns>元が無い、または元がテンプレートでなかったときは <c>false</c>。</returns>
+    Task<bool> CreateFromTemplateAsync(
+        Guid templateId,
+        SurveyDuplicationTarget target,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>テンプレートを消す（Issue #58）。</summary>
+    /// <returns>そのテンプレートが無かったときは <c>false</c>。</returns>
+    /// <remarks>
+    /// **消せるのはテンプレートだけ。** アンケートには回答が紐づいており、
+    /// 消すと Pleasanter 側に残った回答の出どころが辿れなくなる。
+    /// </remarks>
+    Task<bool> DeleteTemplateAsync(
+        Guid templateId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Dapper を使った実装。</summary>
@@ -152,10 +209,29 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        // **テンプレートは出さない**（Issue #58）。
+        // 書き込み先も公開用 URL も持たないので、アンケートの表に並べると
+        // 「未公開のアンケート」に見えてしまう
         var rows = await connection.QueryAsync<SurveySummary>(Sql(
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [Status], [PublishedVersion], [UpdatedAt] "
-            + "FROM [Surveys] ORDER BY [UpdatedAt] DESC",
+            + "FROM [Surveys] WHERE [IsTemplate] = @IsTemplate "
+            + "ORDER BY [UpdatedAt] DESC",
+            new { IsTemplate = false },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<SurveyTemplateSummary>> ListTemplatesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await connection.QueryAsync<SurveyTemplateSummary>(Sql(
+            "SELECT [SurveyId] AS [TemplateId], [Title], [UpdatedAt] "
+            + "FROM [Surveys] WHERE [IsTemplate] = @IsTemplate "
+            + "ORDER BY [UpdatedAt] DESC",
+            new { IsTemplate = true },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return rows.ToList();
@@ -381,19 +457,156 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         return expectedRevision + 1;
     }
 
-    public async Task<bool> DuplicateAsync(
+    public Task<bool> DuplicateAsync(
         Guid sourceSurveyId,
         SurveyDuplicationTarget target,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(target);
 
+        return CopyAsync(
+            sourceSurveyId,
+            sourceIsTemplate: false,
+            new CopyTarget(
+                target.SurveyId,
+                target.PublicId,
+                target.PleasanterSiteId,
+                target.ResponseJsonColumn,
+                IsTemplate: false,
+                // **元と並ぶので「のコピー」を付ける。** 同じ題名が 2 つ並ぶと見分けられない
+                RenameAsCopy: true),
+            cancellationToken);
+    }
+
+    public Task<bool> SaveAsTemplateAsync(
+        Guid sourceSurveyId,
+        SurveyTemplateTarget target,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        return CopyAsync(
+            sourceSurveyId,
+            sourceIsTemplate: false,
+            new CopyTarget(
+                target.TemplateId,
+                target.PublicId,
+                // **テンプレートは書き込み先を持たない**（Issue #58）。
+                // そこから作るときに指定させる
+                NoPleasanterSiteId,
+                ResponseJsonColumn: null,
+                IsTemplate: true,
+                // **テンプレートには「のコピー」を付けない。** 元と並べて置くものではない
+                RenameAsCopy: false),
+            cancellationToken);
+    }
+
+    public Task<bool> CreateFromTemplateAsync(
+        Guid templateId,
+        SurveyDuplicationTarget target,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        return CopyAsync(
+            templateId,
+            sourceIsTemplate: true,
+            new CopyTarget(
+                target.SurveyId,
+                target.PublicId,
+                target.PleasanterSiteId,
+                target.ResponseJsonColumn,
+                IsTemplate: false,
+                // **テンプレートから作るものに「のコピー」は付けない。**
+                // 元は並んで見えないので、付けても何の写しか分からない
+                RenameAsCopy: false),
+            cancellationToken);
+    }
+
+    public async Task<bool> DeleteTemplateAsync(
+        Guid templateId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection
+            .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        // **先に親を消して、テンプレートであることを SQL の側で確かめる。**
+        // 子から消すと、間違ってアンケートの ID を渡されたときに
+        // 設問だけ消えて行が残る
+        var deleted = await connection.ExecuteAsync(Sql(
+            "DELETE FROM [Surveys] "
+            + "WHERE [SurveyId] = @SurveyId AND [IsTemplate] = @IsTemplate",
+            new { SurveyId = templateId, IsTemplate = true },
+            transaction,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        if (deleted != 1)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        await DeleteDraftAsync(connection, transaction, templateId, cancellationToken)
+            .ConfigureAwait(false);
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>写して 1 行作るときの、**写さない値**。</summary>
+    /// <remarks>
+    /// **複製もテンプレートも、写すものは同じで写さないものだけが違う。**
+    /// 道を分けると、後から足した項目を片方だけ写し漏らす。
+    /// </remarks>
+    /// <param name="RenameAsCopy">題名の後ろへ「のコピー」を付けるか。</param>
+    private sealed record CopyTarget(
+        Guid SurveyId,
+        string PublicId,
+        long PleasanterSiteId,
+        string? ResponseJsonColumn,
+        bool IsTemplate,
+        bool RenameAsCopy);
+
+    /// <summary>テンプレートが持つサイト ID。**「書き込み先が無い」を表す。**</summary>
+    /// <remarks>
+    /// **列を NULL 可にしない。** 回答を書き込む経路すべてで
+    /// 「サイトが無い」を持ち回ることになる。テンプレートは公開できないので
+    /// （<c>AdminSurveyEndpoints</c> で断る）、この値が使われることはない。
+    /// </remarks>
+    private const long NoPleasanterSiteId = 0;
+
+    /// <summary>元を丸ごと写して、新しい行と下書きを作る。</summary>
+    /// <param name="sourceIsTemplate">
+    /// 元がテンプレートであることを期待するか。**食い違ったら写さない。**
+    /// アンケートの ID をテンプレートの口へ渡す（またはその逆）と、
+    /// サイトを持たないアンケートや、公開できるテンプレートができてしまう。
+    /// </param>
+    private async Task<bool> CopyAsync(
+        Guid sourceSurveyId,
+        bool sourceIsTemplate,
+        CopyTarget target,
+        CancellationToken cancellationToken)
+    {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection
             .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
         // **同じトランザクションの中で読む。** 読んでから書くまでの間に
-        // 元が保存されると、写した先が新旧の混ざったものになる
+        // 元が保存されると、写した先が新旧の混ざったものになる。
+        // **種類が食い違ったら何もしない**（アンケートとテンプレートの取り違え）
+        var actualIsTemplate = await connection.QueryFirstOrDefaultAsync<bool?>(Sql(
+            "SELECT [IsTemplate] FROM [Surveys] WHERE [SurveyId] = @SurveyId",
+            new { SurveyId = sourceSurveyId },
+            transaction,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        if (actualIsTemplate != sourceIsTemplate)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
         var source = await LoadAsync(connection, transaction, sourceSurveyId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -403,7 +616,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             return false;
         }
 
-        var definition = SurveyDuplication.Copy(source.Definition, target.SurveyId.ToString());
+        var definition = SurveyDuplication.Copy(
+            source.Definition, target.SurveyId.ToString(), target.RenameAsCopy);
         var now = DbTime.UtcNowTruncated();
 
         // **下書きとして作る**（Issue #46）。公開状態も公開済みの版も写さない。
@@ -415,18 +629,19 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "   [DraftRevision], [DisplayMode], [ShowProgress], "
             + "   [AllowEditingAfterSubmit], [TitleJson], [DescriptionJson], "
-            + "   [ConfirmationMessageJson], [CreatedAt], [UpdatedAt]) "
+            + "   [ConfirmationMessageJson], [IsTemplate], [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, NULL, "
             + "        0, @DisplayMode, @ShowProgress, "
             + "        @AllowEditingAfterSubmit, @TitleJson, @DescriptionJson, "
-            + "        @ConfirmationMessageJson, @Now, @Now)",
+            + "        @ConfirmationMessageJson, @IsTemplate, @Now, @Now)",
             new
             {
                 target.SurveyId,
                 target.PublicId,
                 target.PleasanterSiteId,
                 target.ResponseJsonColumn,
+                target.IsTemplate,
                 Status = (int)SurveyStatus.Draft,
                 DisplayMode = (int)definition.DisplayMode,
                 definition.ShowProgress,

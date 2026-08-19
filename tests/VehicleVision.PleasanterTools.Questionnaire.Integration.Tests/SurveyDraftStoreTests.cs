@@ -485,4 +485,170 @@ public class SurveyDraftStoreTests
         // **アンケートの行も作られていない**
         Assert.Null(await surveys.FindBySurveyIdAsync(target.SurveyId));
     }
+
+    // ---- テンプレート（Issue #58） -----------------------------------------
+
+    /// <summary>
+    /// テンプレートにすると、設問も分岐もマッピングも写る（Issue #58）。
+    ///
+    /// **題名には「のコピー」を付けない。** そこから作るアンケートの題名になる。
+    /// **書き込み先のサイトは持たない。** そこから作るときに指定させる。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task テンプレートは題名をそのまま写す(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+
+        var definition = Definition(surveyId, "q1") with
+        {
+            Title = LocalizedText.Japanese("テンプレートの元"),
+        };
+
+        var mapping = new MappingDefinition
+        {
+            Assignments = [ColumnAssignment.Direct("ClassA", new MappingSource("q1"))],
+        };
+
+        await drafts.SaveAsync(surveyId, definition, mapping, expectedRevision: 0);
+
+        var target = new SurveyTemplateTarget(Guid.NewGuid(), $"pub-{Guid.NewGuid():N}");
+        Assert.True(await drafts.SaveAsTemplateAsync(surveyId, target));
+
+        var template = await drafts.LoadAsync(target.TemplateId);
+        Assert.NotNull(template);
+        Assert.Equal("テンプレートの元", template.Definition.Title.Get("ja"));
+        Assert.Equal("ClassA", Assert.Single(template.Mapping.Assignments).TargetColumn);
+
+        // **アンケートの一覧には出ない。** 出ると「未公開のアンケート」に見える
+        var listed = await drafts.ListAsync();
+        Assert.DoesNotContain(listed, item => item.SurveyId == target.TemplateId);
+
+        // **テンプレートの一覧には出る**
+        var templates = await drafts.ListTemplatesAsync();
+        Assert.Contains(templates, item => item.TemplateId == target.TemplateId);
+    }
+
+    /// <summary>
+    /// テンプレートから作ったアンケートは、**下書き**で、
+    /// **公開用 ID とサイトを作り直している**（Issue #58）。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task テンプレートから作ると下書きになる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+
+        await drafts.SaveAsync(
+            surveyId, Definition(surveyId, "q1"), new MappingDefinition(), expectedRevision: 0);
+
+        var templateTarget = new SurveyTemplateTarget(Guid.NewGuid(), $"pub-{Guid.NewGuid():N}");
+        Assert.True(await drafts.SaveAsTemplateAsync(surveyId, templateTarget));
+
+        var target = new SurveyDuplicationTarget(
+            Guid.NewGuid(), $"pub-{Guid.NewGuid():N}", PleasanterSiteId: 777, ResponseJsonColumn: null);
+
+        Assert.True(await drafts.CreateFromTemplateAsync(templateTarget.TemplateId, target));
+
+        var record = await surveys.FindBySurveyIdAsync(target.SurveyId);
+        Assert.NotNull(record);
+        Assert.False(record.IsTemplate);
+        Assert.Equal((int)SurveyStatus.Draft, record.Status);
+        Assert.Null(record.PublishedVersion);
+        Assert.Equal(777, record.PleasanterSiteId);
+
+        // **公開用 ID は使い回さない**
+        Assert.NotEqual(templateTarget.PublicId, record.PublicId);
+
+        // **題名に「のコピー」は付かない**（回答者に見える文字列）
+        var created = await drafts.LoadAsync(target.SurveyId);
+        Assert.Equal("満足度調査", created!.Definition.Title.Get("ja"));
+    }
+
+    /// <summary>
+    /// **アンケートとテンプレートを取り違えたら何もしない**（Issue #58）。
+    /// サイトを持たないアンケートや、公開できるテンプレートができてしまう。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 種類が違えば写さない(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+
+        await drafts.SaveAsync(
+            surveyId, Definition(surveyId, "q1"), new MappingDefinition(), expectedRevision: 0);
+
+        var templateTarget = new SurveyTemplateTarget(Guid.NewGuid(), $"pub-{Guid.NewGuid():N}");
+        Assert.True(await drafts.SaveAsTemplateAsync(surveyId, templateTarget));
+
+        // アンケートをテンプレートの口へ渡す
+        var fromSurvey = new SurveyDuplicationTarget(
+            Guid.NewGuid(), $"pub-{Guid.NewGuid():N}", PleasanterSiteId: 3, ResponseJsonColumn: null);
+        Assert.False(await drafts.CreateFromTemplateAsync(surveyId, fromSurvey));
+        Assert.Null(await surveys.FindBySurveyIdAsync(fromSurvey.SurveyId));
+
+        // テンプレートをアンケートの口へ渡す
+        var fromTemplate = new SurveyTemplateTarget(Guid.NewGuid(), $"pub-{Guid.NewGuid():N}");
+        Assert.False(await drafts.SaveAsTemplateAsync(templateTarget.TemplateId, fromTemplate));
+        Assert.Null(await surveys.FindBySurveyIdAsync(fromTemplate.TemplateId));
+
+        var duplicate = new SurveyDuplicationTarget(
+            Guid.NewGuid(), $"pub-{Guid.NewGuid():N}", PleasanterSiteId: 4, ResponseJsonColumn: null);
+        Assert.False(await drafts.DuplicateAsync(templateTarget.TemplateId, duplicate));
+        Assert.Null(await surveys.FindBySurveyIdAsync(duplicate.SurveyId));
+    }
+
+    /// <summary>**消せるのはテンプレートだけ**（Issue #58）。</summary>
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task テンプレートだけ消せる(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+
+        await drafts.SaveAsync(
+            surveyId, Definition(surveyId, "q1"), new MappingDefinition(), expectedRevision: 0);
+
+        // **アンケートは消せない。** 設問だけ消えて行が残ることもない
+        Assert.False(await drafts.DeleteTemplateAsync(surveyId));
+        var survived = await drafts.LoadAsync(surveyId);
+        Assert.Single(survived!.Definition.Pages[0].Questions);
+
+        var templateTarget = new SurveyTemplateTarget(Guid.NewGuid(), $"pub-{Guid.NewGuid():N}");
+        Assert.True(await drafts.SaveAsTemplateAsync(surveyId, templateTarget));
+
+        Assert.True(await drafts.DeleteTemplateAsync(templateTarget.TemplateId));
+        Assert.Null(await surveys.FindBySurveyIdAsync(templateTarget.TemplateId));
+        Assert.Null(await drafts.LoadAsync(templateTarget.TemplateId));
+
+        // **2 度目は無い**
+        Assert.False(await drafts.DeleteTemplateAsync(templateTarget.TemplateId));
+    }
 }

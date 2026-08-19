@@ -49,6 +49,9 @@ public sealed partial class AuditLogFilter(
     [
         ("adminUserId", "AdminUser"),
         ("surveyId", "Survey"),
+        // **テンプレートはアンケートと別の対象として残す**（Issue #58）。
+        // 同じ Survey にすると、消えたテンプレートの記録がアンケートのものに見える
+        ("templateId", "SurveyTemplate"),
     ];
 
     public async ValueTask<object?> InvokeAsync(

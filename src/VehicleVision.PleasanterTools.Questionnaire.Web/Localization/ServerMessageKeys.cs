@@ -81,6 +81,17 @@ public static class ServerMessageKeys
 
     /// <summary>複製先に元と同じサイトを指定した。**1 アンケート = 1 サイト。**</summary>
     public const string DuplicateSiteIdMustDiffer = "surveys.duplicateSiteIdMustDiffer";
+
+    /// <summary>
+    /// テンプレートに対してアンケートの操作をしようとした（Issue #58）。
+    /// **テンプレートは書き込み先を持たないので公開できない。**
+    /// </summary>
+    public const string SurveyIsTemplate = "surveys.isTemplate";
+
+    // ---- テンプレート -------------------------------------------------------
+
+    /// <summary>テンプレートの元にするアンケートを指定していない。</summary>
+    public const string TemplateSourceRequired = "templates.sourceRequired";
     // ---- 送信状況 -----------------------------------------------------------
 
     /// <summary>戻す回答を指定していない。</summary>

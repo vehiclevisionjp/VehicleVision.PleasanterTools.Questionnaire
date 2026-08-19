@@ -34,12 +34,21 @@ public static class SurveyDuplication
     /// <summary>複製した定義を作る。</summary>
     /// <param name="source">元の定義。**変えない。**</param>
     /// <param name="newSurveyId">複製先の内部 ID。</param>
+    /// <param name="renameAsCopy">
+    /// 題名の後ろへ「のコピー」を付けるか。
+    /// **テンプレートのときは付けない**（Issue #58）。
+    /// テンプレートは元と並べて置くものではなく、
+    /// そこから作ったアンケートに「のコピー」が付くと、回答者に見える題名が汚れる。
+    /// </param>
     /// <remarks>
     /// **<c>with</c> で丸ごと写し、変えるものだけを並べる。**
     /// 項目を 1 つずつ並べて写すと、後から足した項目（分岐がそうだった）を
     /// 写し漏らしても気付けない。
     /// </remarks>
-    public static SurveyDefinition Copy(SurveyDefinition source, string newSurveyId)
+    public static SurveyDefinition Copy(
+        SurveyDefinition source,
+        string newSurveyId,
+        bool renameAsCopy = true)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentException.ThrowIfNullOrWhiteSpace(newSurveyId);
@@ -49,7 +58,7 @@ public static class SurveyDuplication
             SurveyId = newSurveyId,
             // **公開済みの版は写さないので、次に公開されるのは 1 版目**
             Version = 1,
-            Title = CopyTitle(source.Title),
+            Title = renameAsCopy ? CopyTitle(source.Title) : source.Title,
         };
     }
 
