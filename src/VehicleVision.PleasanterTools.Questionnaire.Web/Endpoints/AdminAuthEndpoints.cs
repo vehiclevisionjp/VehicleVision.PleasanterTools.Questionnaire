@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
@@ -45,12 +46,24 @@ public static class AdminAuthEndpoints
             var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             if (session.Succeeded)
             {
+                // **利用者ごとの言語は画面の初期値。** 未設定なら null を返し、
+                // 画面はブラウザの言語設定へ落とす（_documents/多言語対応方針.md 2 章）
+                string? language = null;
+                if (session.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) is { } sessionId
+                    && Guid.TryParse(sessionId, out var sessionUserId))
+                {
+                    var user = await store.FindByIdAsync(sessionUserId, cancellationToken)
+                        .ConfigureAwait(false);
+                    language = SupportedLanguages.Normalize(user?.Language);
+                }
+
                 return Results.Ok(new
                 {
                     authenticated = true,
                     setupRequired,
                     loginId = session.Principal?.Identity?.Name,
                     role = session.Principal?.FindFirstValue(ClaimTypes.Role),
+                    language,
                 });
             }
 

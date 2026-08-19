@@ -38,6 +38,13 @@ public sealed record AdminUser
     /// <summary>直前に通した時間枠。**同じ枠を二度通さないための印。**</summary>
     public long? TotpLastTimeStep { get; init; }
 
+    /// <summary>管理画面を出す言語。<c>null</c> は「まだ選んでいない」。</summary>
+    /// <remarks>
+    /// **画面の初期値を決めるためのもの。** サーバの応答の言語はここでは決めない
+    /// （<c>_documents/多言語対応方針.md</c> 2 章）。
+    /// </remarks>
+    public string? Language { get; init; }
+
 
     public DateTime? LockedUntil { get; init; }
     public DateTime CreatedAt { get; init; }
@@ -80,6 +87,12 @@ public interface IAdminUserStore
         CancellationToken cancellationToken = default);
 
     Task SetDisabledAsync(Guid adminUserId, bool isDisabled, CancellationToken cancellationToken = default);
+
+    /// <summary>管理画面を出す言語を決める。<c>null</c> で「選んでいない」に戻す。</summary>
+    Task SetLanguageAsync(
+        Guid adminUserId,
+        string? language,
+        CancellationToken cancellationToken = default);
 
     /// <summary>止める。**最後の <see cref="AdminRole.Administrator"/> は止めさせない。**</summary>
     /// <returns>
@@ -140,7 +153,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
     [
         "AdminUserId", "LoginId", "PasswordHash", "Role", "IsDisabled", "TotpSecretEncrypted",
         "TotpEnabledAt", "LastLoginAt", "FailedLoginCount", "TotpLastTimeStep", "LockedUntil",
-        "CreatedAt", "UpdatedAt",
+        "Language", "CreatedAt", "UpdatedAt",
     ];
 
     private DatabaseProvider Provider => connectionFactory.Provider;
@@ -240,6 +253,16 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
             $"UPDATE {Q("AdminUsers")} SET {Q("IsDisabled")} = @IsDisabled, "
             + $"{Q("UpdatedAt")} = @Now WHERE {Q("AdminUserId")} = @AdminUserId",
             new { AdminUserId = adminUserId, IsDisabled = isDisabled, Now = DbTime.UtcNowTruncated() },
+            cancellationToken);
+
+    public Task SetLanguageAsync(
+        Guid adminUserId,
+        string? language,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(
+            $"UPDATE {Q("AdminUsers")} SET {Q("Language")} = @Language, "
+            + $"{Q("UpdatedAt")} = @Now WHERE {Q("AdminUserId")} = @AdminUserId",
+            new { AdminUserId = adminUserId, Language = language, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
 
     public Task<bool> TryDisableAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>

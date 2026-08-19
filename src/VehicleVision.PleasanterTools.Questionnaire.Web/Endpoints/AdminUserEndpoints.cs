@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
@@ -185,6 +186,35 @@ public static class AdminUserEndpoints
                 ? Results.Ok(new { changed = true })
                 : Failure(outcome, RequestLanguage.Of(context));
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
+        // ---- 表示言語 --------------------------------------------------------
+        // **自分の設定なので役割を問わない。** 他人の言語は変えられない
+        me.MapPut("/language", async (
+            AdminLanguageRequest request,
+            HttpContext context,
+            ClaimsPrincipal principal,
+            IAdminUserStore store,
+            CancellationToken cancellationToken) =>
+        {
+            // **空なら「選んでいない」へ戻す。** ブラウザの言語設定に従うようになる
+            var language = string.IsNullOrWhiteSpace(request.Language)
+                ? null
+                : SupportedLanguages.Normalize(request.Language);
+
+            if (!string.IsNullOrWhiteSpace(request.Language) && language is null)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.UnsupportedLanguage, RequestLanguage.Of(context)),
+                });
+            }
+
+            await store.SetLanguageAsync(ActorId(principal), language, cancellationToken)
+                .ConfigureAwait(false);
+
+            return Results.Ok(new { language });
+        });
 
         // ---- 2 要素の登録し直し（端末を替えたとき） --------------------------
         me.MapPost("/totp/begin", async (
@@ -407,6 +437,9 @@ public static class AdminUserEndpoints
 
     /// <summary>今の合言葉。</summary>
     public sealed record AdminPasswordRequest(string? Password);
+
+    /// <summary>管理画面を出す言語。**空なら「選んでいない」に戻す。**</summary>
+    public sealed record AdminLanguageRequest(string? Language);
 
     /// <summary>使い捨てパスワード。</summary>
     public sealed record AdminCodeRequest(string? Code);
