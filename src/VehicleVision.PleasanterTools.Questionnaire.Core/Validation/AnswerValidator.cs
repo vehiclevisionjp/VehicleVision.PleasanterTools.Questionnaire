@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Flow;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Validation;
 
@@ -44,9 +45,13 @@ public static class AnswerValidator
             .GroupBy(answer => answer.QuestionId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
+        // **回答に応じて辿った経路の中だけを見る**（Issue #41）。
+        // 通らなかったページの必須を求めると、答えようのない設問で弾くことになる
+        var path = SurveyFlow.Trace(definition, answers);
+
         var targets = pageId is null
-            ? definition.AllQuestions.ToList()
-            : definition.Pages
+            ? path.Pages.SelectMany(page => page.Questions).ToList()
+            : path.Pages
                 .Where(page => page.PageId == pageId)
                 .SelectMany(page => page.Questions)
                 .ToList();
@@ -62,6 +67,13 @@ public static class AnswerValidator
 
         foreach (var question in targets)
         {
+            // **出していない設問は検証しない。** 必須も効かない。
+            // 残っている答えは落とす側の仕事（ResponseIntake）
+            if (!path.Visible(question.QuestionId))
+            {
+                continue;
+            }
+
             answerByQuestion.TryGetValue(question.QuestionId, out var answer);
             ValidateQuestion(question, answer, errors);
         }

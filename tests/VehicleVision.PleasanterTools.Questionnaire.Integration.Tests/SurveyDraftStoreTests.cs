@@ -75,6 +75,84 @@ public class SurveyDraftStoreTests
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public async Task 分岐も保存して読み直せる(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **下書きは列で持っている。** 分岐を足したら、そこも足さないと黙って消える
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+
+        var definition = new SurveyDefinition
+        {
+            SurveyId = surveyId.ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("分岐の見本"),
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "page-1",
+                    Next = PageTransition.To("page-3"),
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = QuestionType.Radio,
+                            Title = LocalizedText.Japanese("満足度"),
+                            Choices =
+                            [
+                                new Choice(
+                                    "good",
+                                    LocalizedText.Japanese("よい"),
+                                    Next: PageTransition.Submit),
+                                new Choice("bad", LocalizedText.Japanese("わるい")),
+                            ],
+                        },
+                        new Question
+                        {
+                            QuestionId = "q2",
+                            Type = QuestionType.Text,
+                            Title = LocalizedText.Japanese("理由"),
+                            VisibleWhen = new VisibilityCondition
+                            {
+                                Match = ConditionMatch.Any,
+                                Rules =
+                                [
+                                    new ConditionRule("q1", ConditionOperator.Equals, "bad"),
+                                ],
+                            },
+                        },
+                    ],
+                },
+                new Page { PageId = "page-3", Questions = [] },
+            ],
+        };
+
+        await drafts.SaveAsync(surveyId, definition, new MappingDefinition(), expectedRevision: 0);
+
+        var loaded = await drafts.LoadAsync(surveyId);
+        Assert.NotNull(loaded);
+
+        var page = loaded.Definition.Pages[0];
+        Assert.Equal("page-3", page.Next!.PageId);
+        Assert.Equal(PageTransitionKind.Submit, page.Questions[0].Choices[0].Next!.Kind);
+
+        // **行き先を持たない選択肢は NULL のまま**
+        Assert.Null(page.Questions[0].Choices[1].Next);
+
+        var condition = page.Questions[1].VisibleWhen;
+        Assert.NotNull(condition);
+        Assert.Equal(ConditionMatch.Any, condition.Match);
+        Assert.Equal("bad", Assert.Single(condition.Rules).Value);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public async Task 保存して読み直すと同じ定義になる(DatabaseProvider provider, string connectionString)
     {
         if (!Enabled)

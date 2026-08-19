@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Flow;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
@@ -177,6 +178,26 @@ public static class AdminSurveyEndpoints
                     message = ServerMessages.Get(
                         ServerMessageKeys.PublishBlockedByMapping, RequestLanguage.Of(context)),
                     problems = blocking.Select(Describe),
+                });
+            }
+
+            // **分岐が壊れたまま公開しない**（Issue #41）。
+            // 無限に回る・辿り着けないページがある、といった不備は
+            // **公開してからでは回答者にしか見えない**
+            var flowProblems = SurveyFlowValidator.Validate(draft.Definition);
+            if (flowProblems.Length > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PublishBlockedByFlow, RequestLanguage.Of(context)),
+                    flow = flowProblems.Select(problem => new
+                    {
+                        code = problem.Code.ToString(),
+                        pageId = problem.PageId,
+                        questionId = problem.QuestionId,
+                        detail = problem.Detail,
+                    }),
                 });
             }
 

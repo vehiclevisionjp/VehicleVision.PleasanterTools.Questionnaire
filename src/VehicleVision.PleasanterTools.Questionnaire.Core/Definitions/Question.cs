@@ -21,6 +21,21 @@ public sealed record Question
 
     public QuestionSettings Settings { get; init; } = new();
 
+    /// <summary>この設問を出す条件（Issue #41）。</summary>
+    /// <remarks>
+    /// **<c>null</c> なら常に出す。** ページを飛ばすのがジャンプ、
+    /// 同じページの中で出し分けるのがこちら。
+    /// **参照できるのは自分より前の設問だけ**（<c>SurveyFlowValidator</c> が弾く）。
+    /// </remarks>
+    public VisibilityCondition? VisibleWhen { get; init; }
+
+    /// <summary>選択肢に行き先を持っているか。</summary>
+    public bool HasChoiceTransitions =>
+        !Choices.IsDefaultOrEmpty && Choices.Any(choice => choice.Next is not null);
+
+    /// <summary>行き先を持てる形式か。**単一選択だけ。**</summary>
+    public bool CanCarryTransitions => Type is QuestionType.Radio or QuestionType.Dropdown;
+
     /// <summary>選択肢を持つ形式か。</summary>
     public bool HasChoices =>
         Type is QuestionType.Radio or QuestionType.Checkbox or QuestionType.Dropdown;

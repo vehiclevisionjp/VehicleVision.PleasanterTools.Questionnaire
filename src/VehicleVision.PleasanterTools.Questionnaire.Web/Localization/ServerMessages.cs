@@ -170,6 +170,11 @@ public static class ServerMessages
             "Cannot publish. Fix the problems in the mapping first.");
 
         Add(
+            ServerMessageKeys.PublishBlockedByFlow,
+            "公開できません。分岐の不備を直してください。",
+            "Cannot publish. Fix the problems in the branching first.");
+
+        Add(
             ServerMessageKeys.NoAnswerableQuestion,
             "回答できる設問がありません。",
             "There is no question that can be answered.");

@@ -82,7 +82,11 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         int? PublishedVersion,
         int DraftRevision);
 
-    private sealed record PageRow(string PageId, string? TitleJson, string? DescriptionJson);
+    private sealed record PageRow(
+        string PageId,
+        string? TitleJson,
+        string? DescriptionJson,
+        string? NextJson);
 
     private sealed record QuestionRow(
         string QuestionId,
@@ -91,9 +95,15 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string TitleJson,
         string? DescriptionJson,
         bool IsRequired,
-        string? SettingsJson);
+        string? SettingsJson,
+        string? VisibleWhenJson);
 
-    private sealed record ChoiceRow(string QuestionId, string Value, string LabelJson, bool IsOther);
+    private sealed record ChoiceRow(
+        string QuestionId,
+        string Value,
+        string LabelJson,
+        bool IsOther,
+        string? NextJson);
 
     private sealed record AssignmentRow(
         Guid AssignmentId,
@@ -138,21 +148,21 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         }
 
         var pages = (await connection.QueryAsync<PageRow>(Sql(
-            "SELECT [PageId], [TitleJson], [DescriptionJson] FROM [Pages] "
+            "SELECT [PageId], [TitleJson], [DescriptionJson], [NextJson] FROM [Pages] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
         var questions = (await connection.QueryAsync<QuestionRow>(Sql(
             "SELECT [QuestionId], [PageId], [QuestionType], [TitleJson], "
-            + "       [DescriptionJson], [IsRequired], [SettingsJson] "
+            + "       [DescriptionJson], [IsRequired], [SettingsJson], [VisibleWhenJson] "
             + "FROM [Questions] WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
         // **設問の一覧で絞る。** アンケートを跨いだ選択肢が混ざらないようにする
         var choices = (await connection.QueryAsync<ChoiceRow>(Sql(
-            "SELECT [QuestionId], [Value], [LabelJson], [IsOther] "
+            "SELECT [QuestionId], [Value], [LabelJson], [IsOther], [NextJson] "
             + "FROM [QuestionChoices] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
@@ -180,7 +190,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 group => group
                     .Select(choice => new Choice(
                         choice.Value, ReadText(choice.LabelJson) ?? LocalizedText.Japanese(choice.Value),
-                        choice.IsOther))
+                        choice.IsOther,
+                        Read<PageTransition>(choice.NextJson)))
                     .ToImmutableArray(),
                 StringComparer.Ordinal);
 
@@ -201,6 +212,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                             ? new QuestionSettings()
                             : SurveyJson.Deserialize<QuestionSettings>(question.SettingsJson)
                                 ?? new QuestionSettings(),
+                        VisibleWhen = Read<VisibilityCondition>(question.VisibleWhenJson),
                     })
                     .ToImmutableArray(),
                 StringComparer.Ordinal);
@@ -231,6 +243,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     Title = ReadText(page.TitleJson),
                     Description = ReadText(page.DescriptionJson),
                     Questions = questionsByPage.GetValueOrDefault(page.PageId, []),
+                    Next = Read<PageTransition>(page.NextJson),
                 })
                 .ToImmutableArray(),
         };
@@ -368,8 +381,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
             await connection.ExecuteAsync(Sql(
                 "INSERT INTO [Pages] ([PageId], [SurveyId], [SortOrder], "
-                + "[TitleJson], [DescriptionJson]) "
-                + "VALUES (@PageId, @SurveyId, @SortOrder, @TitleJson, @DescriptionJson)",
+                + "[TitleJson], [DescriptionJson], [NextJson]) "
+                + "VALUES (@PageId, @SurveyId, @SortOrder, @TitleJson, @DescriptionJson, "
+                + "@NextJson)",
                 new
                 {
                     page.PageId,
@@ -377,6 +391,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     SortOrder = pageIndex,
                     TitleJson = WriteText(page.Title),
                     DescriptionJson = WriteText(page.Description),
+                    NextJson = Write(page.Next),
                 },
                 transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -388,9 +403,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 await connection.ExecuteAsync(Sql(
                     "INSERT INTO [Questions] ([QuestionId], [SurveyId], [PageId], "
                     + "[SortOrder], [QuestionType], [TitleJson], "
-                    + "[DescriptionJson], [IsRequired], [SettingsJson]) "
+                    + "[DescriptionJson], [IsRequired], [SettingsJson], [VisibleWhenJson]) "
                     + "VALUES (@QuestionId, @SurveyId, @PageId, @SortOrder, @QuestionType, "
-                    + "@TitleJson, @DescriptionJson, @IsRequired, @SettingsJson)",
+                    + "@TitleJson, @DescriptionJson, @IsRequired, @SettingsJson, @VisibleWhenJson)",
                     new
                     {
                         question.QuestionId,
@@ -402,6 +417,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                         DescriptionJson = WriteText(question.Description),
                         question.IsRequired,
                         SettingsJson = SurveyJson.Serialize(question.Settings),
+                        VisibleWhenJson = Write(question.VisibleWhen),
                     },
                     transaction,
                     cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -413,9 +429,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     await connection.ExecuteAsync(Sql(
                         "INSERT INTO [QuestionChoices] ([ChoiceId], [SurveyId], "
                         + "[QuestionId], [SortOrder], [Value], [LabelJson], "
-                        + "[IsOther]) "
+                        + "[IsOther], [NextJson]) "
                         + "VALUES (@ChoiceId, @SurveyId, @QuestionId, @SortOrder, @Value, "
-                        + "@LabelJson, @IsOther)",
+                        + "@LabelJson, @IsOther, @NextJson)",
                         new
                         {
                             ChoiceId = Guid.NewGuid(),
@@ -425,6 +441,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                             choice.Value,
                             LabelJson = WriteText(choice.Label),
                             choice.IsOther,
+                            NextJson = Write(choice.Next),
                         },
                         transaction,
                         cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -502,6 +519,20 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
     /// **生の文字列連結をしない**ための口（<c>SqlDialect.Format</c>）。
     /// 角括弧の中だけが RDBMS ごとの引用符へ書き換わる。
     /// </remarks>
+    /// <summary>分岐の設定を読む。**壊れていたら「無い」として扱う。**</summary>
+    /// <remarks>
+    /// **例外にしない。** 1 か所の壊れで下書きがまるごと開けなくなると、
+    /// 直す手立てが DB の直接操作しか無くなる。
+    /// </remarks>
+    private static T? Read<T>(string? json)
+        where T : class =>
+        string.IsNullOrWhiteSpace(json) ? null : SurveyJson.Deserialize<T>(json);
+
+    /// <summary>分岐の設定を書く。**無いときは NULL。**</summary>
+    private static string? Write<T>(T? value)
+        where T : class =>
+        value is null ? null : SurveyJson.Serialize(value);
+
     private CommandDefinition Sql(
         string sql,
         object? parameters = null,

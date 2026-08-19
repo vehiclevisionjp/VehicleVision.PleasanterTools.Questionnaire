@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Flow;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Validation;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
@@ -179,7 +180,15 @@ public sealed class ResponseIntake(
             .EnsureAsync(responseToken, survey.SurveyId, cancellationToken)
             .ConfigureAwait(false);
 
-        var payload = ResponsePayload.Create(responseToken, answersWithFiles, files);
+        // **通らなかったページ・出していない設問の回答は落とす**（Issue #41）。
+        // 落とさないと、画面を通さずに送るだけで隠した設問へ書き込める。
+        // **検証の後で落とす。** 先に落とすと「知らない設問」の指摘が出せなくなる
+        var visible = SurveyFlow.Trace(snapshot.Definition, answersWithFiles);
+        var kept = answersWithFiles
+            .Where(answer => visible.Visible(answer.QuestionId))
+            .ToList();
+
+        var payload = ResponsePayload.Create(responseToken, kept, files);
         await outbox
             .SaveAsync(responseToken, survey.SurveyId, version, payload.ToJson(), cancellationToken)
             .ConfigureAwait(false);

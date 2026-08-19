@@ -71,6 +71,9 @@ public static class ServerMessageKeys
 
     public const string NoAnswerableQuestion = "surveys.noAnswerableQuestion";
 
+    /// <summary>分岐が壊れていて公開できない。</summary>
+    public const string PublishBlockedByFlow = "surveys.publishBlockedByFlow";
+
     public const string NotPublishedYet = "surveys.notPublishedYet";
 
     /// <summary>その版は既にある。**同時に 2 人が公開を押した場合など。**</summary>
