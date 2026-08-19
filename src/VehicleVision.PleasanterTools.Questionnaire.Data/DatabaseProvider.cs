@@ -80,6 +80,10 @@ public sealed class DbConnectionFactory : IDbConnectionFactory
     /// **できない指定を黙って読み替えるのではなく、言ってから守る。**
     /// </para>
     /// </remarks>
-    private static string Encrypted(string connectionString) =>
-        new SqlConnectionStringBuilder(connectionString) { Encrypt = true }.ConnectionString;
+    private static string Encrypted(string connectionString)
+    {
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        builder.Encrypt = true;
+        return builder.ConnectionString;
+    }
 }
