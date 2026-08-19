@@ -65,6 +65,19 @@ public sealed class FakeOutbox : IResponseOutbox
         Enqueue(new PendingResponse(responseToken, surveyId, surveyVersion, payloadJson, 0));
         return Task.CompletedTask;
     }
+
+    // ---- 管理画面から読む口。**送信の流れの試験では使わない** ------------------
+
+    public Task<OutboxStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(new OutboxStatus(_pending.Count, null, DeadLettered.Count, null));
+
+    public Task<IReadOnlyList<DeadLetterView>> ListDeadLettersAsync(
+        DeadLetterQuery query, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DeadLetterView>>([]);
+
+    public Task<Guid?> RequeueDeadLetterAsync(
+        string responseToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult<Guid?>(null);
 }
 
 /// <summary>トークン対応表の代わり。</summary>
