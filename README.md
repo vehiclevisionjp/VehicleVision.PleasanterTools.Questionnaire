@@ -41,6 +41,10 @@ Pleasanter 本体（`Pleasanter_1.5.7.0`）に揃えている。
 
 ## 開発をはじめる
 
+**VS Code を使うなら [`_documents/開発環境.md`](_documents/開発環境.md) を見ること。**
+ビルド・テスト・デバッグ・検証環境の起動を `.vscode` のタスクと構成にまとめてある
+（環境変数を手で並べなくてよい）。
+
 ```bash
 git clone https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Questionnaire.git
 cd VehicleVision.PleasanterTools.Questionnaire
