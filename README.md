@@ -39,6 +39,11 @@ Pleasanter 本体（`Pleasanter_1.5.7.0`）に揃えている。
 | フロントエンド | TypeScript + Vite + Svelte + SCSS |
 | Pleasanter との接続 | 標準 Web API |
 
+## 貢献する
+
+**貢献の前に [`CLA.md`](CLA.md) への署名が要ります**（デュアルライセンスのため）。
+手順は [`CONTRIBUTING.md`](CONTRIBUTING.md) を見てください。
+
 ## 開発をはじめる
 
 **VS Code を使うなら [`_documents/開発環境.md`](_documents/開発環境.md) を見ること。**
