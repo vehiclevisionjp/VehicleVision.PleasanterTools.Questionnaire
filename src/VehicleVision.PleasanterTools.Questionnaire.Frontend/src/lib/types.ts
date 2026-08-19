@@ -1,3 +1,5 @@
+import { DEFAULT_LANGUAGE, type Language } from './i18n/language';
+
 /** サーバから来る設問の形式。`.Core` の QuestionType と対応する。 */
 export type QuestionType =
   | 'Text'
@@ -112,11 +114,13 @@ export interface AnswerState {
   files?: File[];
 }
 
-/** 既定の言語。**翻訳漏れでも画面を落とさない。** */
-const DEFAULT_LANGUAGE = 'ja';
-
-/** 表示文字列を取り出す。無ければ既定の言語、それも無ければ空文字。 */
-export function text(value: LocalizedText | undefined, language = DEFAULT_LANGUAGE): string {
+/**
+ * 表示文字列を取り出す。無ければ既定の言語、それも無ければ空文字。
+ *
+ * **言語は必ず渡す。** 既定値を持たせると、
+ * 言語を渡し忘れた場所が日本語のまま静かに残る。
+ */
+export function text(value: LocalizedText | undefined, language: Language): string {
   if (!value) return '';
   return value[language] ?? value[DEFAULT_LANGUAGE] ?? '';
 }

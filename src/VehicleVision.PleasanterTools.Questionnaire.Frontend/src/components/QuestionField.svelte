@@ -1,15 +1,21 @@
 <script lang="ts">
   import type { AnswerState, Question } from '../lib/types';
   import { text } from '../lib/types';
+  import type { Language } from '../lib/i18n/language';
+  import { translator } from '../lib/i18n/messages';
 
   interface Props {
     question: Question;
+    /** 画面に出す言語。**設問の文言も画面の文言もこれで決まる。** */
+    language: Language;
     /** **まだ初期化されていないことがある。** 辞書からそのまま渡ってくるため */
     answer: AnswerState | undefined;
     error?: string;
   }
 
-  let { question, answer = $bindable(), error }: Props = $props();
+  let { question, language, answer = $bindable(), error }: Props = $props();
+
+  const t = $derived(translator(language));
 
   /** 読み取り用。未初期化なら空の回答として扱う。 */
   const current = $derived<AnswerState>(answer ?? { values: [], otherText: '' });
@@ -46,11 +52,15 @@
   const fileLimits = $derived.by(() => {
     const parts: string[] = [];
     if (question.settings.maxFileCount !== undefined) {
-      parts.push(`${question.settings.maxFileCount} 件まで`);
+      parts.push(t('question.fileCountLimit', { count: question.settings.maxFileCount }));
     }
     if (question.settings.maxFileSizeBytes !== undefined) {
       const megabytes = Math.floor(question.settings.maxFileSizeBytes / (1024 * 1024));
-      parts.push(megabytes > 0 ? `1 件 ${megabytes} MB まで` : `1 件 ${question.settings.maxFileSizeBytes} バイトまで`);
+      parts.push(
+        megabytes > 0
+          ? t('question.fileSizeLimitMegabytes', { megabytes })
+          : t('question.fileSizeLimitBytes', { bytes: question.settings.maxFileSizeBytes }),
+      );
     }
     return parts.join(' / ');
   });
@@ -59,18 +69,20 @@
 <!-- 説明文ブロックは回答を持たない -->
 {#if question.type === 'Note'}
   <section class="note">
-    <h3>{text(question.title)}</h3>
-    {#if question.description}<p>{text(question.description)}</p>{/if}
+    <h3>{text(question.title, language)}</h3>
+    {#if question.description}<p>{text(question.description, language)}</p>{/if}
   </section>
 {:else}
   <fieldset class="field" class:has-error={error !== undefined}>
     <legend id={labelId}>
-      {text(question.title)}
-      {#if question.isRequired}<span class="required" aria-label="必須">*</span>{/if}
+      {text(question.title, language)}
+      {#if question.isRequired}
+        <span class="required" aria-label={t('question.required')}>*</span>
+      {/if}
     </legend>
 
     {#if question.description}
-      <p class="description">{text(question.description)}</p>
+      <p class="description">{text(question.description, language)}</p>
     {/if}
 
     {#if question.type === 'Text'}
@@ -80,7 +92,7 @@
         aria-describedby={error ? errorId : undefined}
         aria-invalid={error !== undefined}
         maxlength={question.settings.maxLength}
-        placeholder={text(question.settings.placeholder)}
+        placeholder={text(question.settings.placeholder, language)}
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}
       />
@@ -91,7 +103,7 @@
         aria-describedby={error ? errorId : undefined}
         aria-invalid={error !== undefined}
         maxlength={question.settings.maxLength}
-        placeholder={text(question.settings.placeholder)}
+        placeholder={text(question.settings.placeholder, language)}
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}
       ></textarea>
@@ -105,7 +117,7 @@
             checked={current.values.includes(choice.value)}
             onchange={() => setSingle(choice.value)}
           />
-          <span>{text(choice.label)}</span>
+          <span>{text(choice.label, language)}</span>
         </label>
       {/each}
     {:else if question.type === 'Checkbox'}
@@ -117,7 +129,7 @@
             checked={current.values.includes(choice.value)}
             onchange={(event) => toggleMultiple(choice.value, event.currentTarget.checked)}
           />
-          <span>{text(choice.label)}</span>
+          <span>{text(choice.label, language)}</span>
         </label>
       {/each}
     {:else if question.type === 'Dropdown'}
@@ -127,15 +139,15 @@
         value={current.values[0] ?? ''}
         onchange={(event) => setSingle(event.currentTarget.value)}
       >
-        <option value="">選択してください</option>
+        <option value="">{t('question.selectPlaceholder')}</option>
         {#each question.choices as choice (choice.value)}
-          <option value={choice.value}>{text(choice.label)}</option>
+          <option value={choice.value}>{text(choice.label, language)}</option>
         {/each}
       </select>
     {:else if question.type === 'Scale'}
       <div class="scale" role="radiogroup" aria-labelledby={labelId}>
         {#if question.settings.scaleMinimumLabel}
-          <span class="scale-label">{text(question.settings.scaleMinimumLabel)}</span>
+          <span class="scale-label">{text(question.settings.scaleMinimumLabel, language)}</span>
         {/if}
         {#each scaleValues as value (value)}
           <label class="scale-item">
@@ -150,7 +162,7 @@
           </label>
         {/each}
         {#if question.settings.scaleMaximumLabel}
-          <span class="scale-label">{text(question.settings.scaleMaximumLabel)}</span>
+          <span class="scale-label">{text(question.settings.scaleMaximumLabel, language)}</span>
         {/if}
       </div>
     {:else if question.type === 'Rating'}
@@ -160,7 +172,7 @@
             type="button"
             class="star"
             class:filled={Number(current.values[0] ?? '0') >= value}
-            aria-label={`${value} / ${scaleValues.at(-1)}`}
+            aria-label={t('question.ratingLabel', { value, max: scaleValues.at(-1) ?? value })}
             aria-pressed={current.values.includes(String(value))}
             onclick={() => setSingle(String(value))}>★</button
           >
@@ -203,7 +215,7 @@
         oninput={(event) => setSingle(event.currentTarget.value)}
       />
     {:else}
-      <p class="unsupported">この設問形式にはまだ対応していません（{question.type}）</p>
+      <p class="unsupported">{t('question.unsupported', { type: question.type })}</p>
     {/if}
 
     <!-- 「その他」を選んだときだけ自由記述を出す -->
@@ -211,8 +223,8 @@
       <input
         type="text"
         class="other"
-        placeholder="その他の内容"
-        aria-label="その他の内容"
+        placeholder={t('question.otherText')}
+        aria-label={t('question.otherText')}
         value={current.otherText}
         oninput={(event) => (answer = { ...current, otherText: event.currentTarget.value })}
       />

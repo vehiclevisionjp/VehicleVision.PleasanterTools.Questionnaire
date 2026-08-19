@@ -12,8 +12,57 @@
   import type { AnswerState, PayloadAnswer, RejectionReason, SurveyDefinition } from './lib/types';
   import { isDisplayOnly, text } from './lib/types';
   import { validatePage } from './lib/validation';
+  import {
+    applyDocumentLanguage,
+    browserLanguages,
+    LANGUAGE_NAMES,
+    negotiateLanguage,
+    SUPPORTED_LANGUAGES,
+    type Language,
+  } from './lib/i18n/language';
+  import { serverValidationKey, translator, type MessageKey } from './lib/i18n/messages';
 
   type Screen = 'loading' | 'answering' | 'answered' | 'completed' | 'rejected' | 'error';
+
+  /**
+    * 画面に出す言語。
+    *
+    * **URL の `?lang=` → ブラウザの言語設定 → `ja`**
+    * （`_documents/多言語対応方針.md` 2 章）。
+    * **サーバへは送らず、どこにも保存しない。**
+    * 保存すると「回答済みの印」と組み合わさって回答者を絞り込む材料になる。
+    */
+  let language = $state<Language>(
+    negotiateLanguage(new URLSearchParams(location.search).get('lang'), browserLanguages()),
+  );
+
+  const t = $derived(translator(language));
+
+  $effect(() => {
+    // **読み上げの声と行折り返しが変わる。** `<html lang>` を合わせておく
+    applyDocumentLanguage(language);
+  });
+
+  $effect(() => {
+    // **題名も言語に合わせる。** タブに出るのはこれ
+    const title = definition ? text(definition.title, language) : '';
+    if (title !== '') {
+      document.title = title;
+    }
+  });
+
+  /**
+    * 言語を切り替える。**URL を書き換えるだけ。**
+    *
+    * Web Storage にも Cookie にもサーバにも残さない。
+    * 共有された URL がそのまま言語の指定になる。
+    */
+  function changeLanguage(next: Language) {
+    language = next;
+    const url = new URL(location.href);
+    url.searchParams.set('lang', next);
+    history.replaceState(null, '', url);
+  }
 
   let screen = $state<Screen>('loading');
   let rejection = $state<RejectionReason>();
@@ -107,7 +156,7 @@
   /** ページ遷移時に、そのページ分だけ見る。 */
   function checkCurrentPage(): boolean {
     if (!currentPage) return true;
-    errors = validatePage(currentPage.questions, answers);
+    errors = validatePage(currentPage.questions, answers, t);
     return Object.keys(errors).length === 0;
   }
 
@@ -131,26 +180,27 @@
     );
   }
 
+  /** 添付が受け付けられなかった理由。**符号を文言へ当てるだけ。** */
+  const ATTACHMENT_MESSAGES: Record<string, MessageKey> = {
+    extensionNotAllowed: 'attachment.extensionNotAllowed',
+    contentDoesNotMatchExtension: 'attachment.contentDoesNotMatchExtension',
+    tooLarge: 'attachment.tooLarge',
+    totalTooLarge: 'attachment.totalTooLarge',
+    tooMany: 'attachment.tooMany',
+    invalidFileName: 'attachment.invalidFileName',
+  };
+
   /** 添付が受け付けられなかった理由を、回答者に分かる言葉にする。 */
   function attachmentMessage(reason: string, fileName?: string): string {
-    const name = fileName ?? '添付ファイル';
-    switch (reason) {
-      case 'extensionNotAllowed':
-        return `${name}: この種類のファイルは受け付けていません`;
-      case 'contentDoesNotMatchExtension':
-        return `${name}: ファイルの中身が拡張子と一致しません`;
-      case 'tooLarge':
-        return `${name}: ファイルが大きすぎます`;
-      case 'totalTooLarge':
-        return '添付の合計サイズが大きすぎます';
-      case 'tooMany':
-        return '添付できる個数を超えています';
-      case 'invalidFileName':
-        return `${name}: ファイル名に使えない文字が含まれています`;
-      default:
-        // **検出したことは伝えない**（サーバ側も理由を丸めて返す）
-        return `${name}: 受け付けられない添付です`;
-    }
+    const name = fileName ?? t('attachment.defaultName');
+
+    // **検出したことは伝えない**（サーバ側も理由を丸めて返す）
+    return t(ATTACHMENT_MESSAGES[reason] ?? 'attachment.unknown', { name });
+  }
+
+  /** サーバが返した検証エラーの符号を文言へ当てる。 */
+  function serverValidationMessage(code: string): string {
+    return t(serverValidationKey(code));
   }
 
   function toPayload(): PayloadAnswer[] {
@@ -192,8 +242,8 @@
       if (result.rejection === 'rejected' || result.rejection === 'tooManyRequests') {
         submitError =
           result.rejection === 'tooManyRequests'
-            ? '送信が混み合っています。少し時間を置いてもう一度お試しください。'
-            : '送信を受け付けられませんでした。もう一度「送信する」を押してください。';
+            ? t('submit.tooManyRequests')
+            : t('submit.rejected');
 
         // **チケットが切れていただけのことがある。** 取り直して次の操作で通るようにする
         const reissued = await requestTicket(publicId);
@@ -211,7 +261,7 @@
       }
 
       // **入力内容は消さない。** 失われたら再入力してもらう以外に手が無い
-      submitError = '送信できませんでした。入力内容はそのままです。少し時間を置いてもう一度お試しください。';
+      submitError = t('submit.failed');
       if (result.attachmentErrors) {
         attachmentMessages = result.attachmentErrors.map((error) =>
           attachmentMessage(error.reason, error.fileName ?? undefined),
@@ -220,12 +270,12 @@
       if (result.errors) {
         const mapped: Record<string, string> = {};
         for (const [questionId, codes] of Object.entries(result.errors)) {
-          mapped[questionId] = codes.join(' / ');
+          mapped[questionId] = codes.map(serverValidationMessage).join(' / ');
         }
         errors = mapped;
       }
     } catch {
-      submitError = '送信できませんでした。入力内容はそのままです。少し時間を置いてもう一度お試しください。';
+      submitError = t('submit.failed');
     } finally {
       submitting = false;
     }
@@ -237,57 +287,76 @@
     location.reload();
   }
 
-  const rejectionMessage: Record<RejectionReason, string> = {
-    notStarted: 'このアンケートはまだ受付を開始していません。',
-    closed: 'このアンケートの受付は終了しました。',
-    suspended: 'このアンケートは現在受付を停止しています。',
-    notFound: 'このアンケートは見つかりませんでした。URL をご確認ください。',
-    rejected: '送信を受け付けられませんでした。ページを開き直してお試しください。',
-    tooManyRequests: '送信が混み合っています。少し時間を置いてお試しください。',
+  const REJECTION_MESSAGES: Record<RejectionReason, MessageKey> = {
+    notStarted: 'rejected.notStarted',
+    closed: 'rejected.closed',
+    suspended: 'rejected.suspended',
+    notFound: 'rejected.notFound',
+    rejected: 'rejected.rejected',
+    tooManyRequests: 'rejected.tooManyRequests',
   };
 </script>
 
 <main>
+  <!-- **言語の切り替えは URL を書き換えるだけ。**
+       どこにも保存しないので、回答者を追う材料にならない
+       （`_documents/多言語対応方針.md` 3 章） -->
+  <div class="language">
+    <label for="language">{t('form.languageLabel')}</label>
+    <select
+      id="language"
+      value={language}
+      onchange={(event) => changeLanguage(event.currentTarget.value as Language)}
+    >
+      {#each SUPPORTED_LANGUAGES as option (option)}
+        <option value={option}>{LANGUAGE_NAMES[option]}</option>
+      {/each}
+    </select>
+  </div>
+
   {#if screen === 'loading'}
-    <p class="status">読み込んでいます…</p>
+    <p class="status">{t('status.loading')}</p>
   {:else if screen === 'rejected'}
     <!-- **理由を明示する。「エラー」で済ませない** -->
-    <h1>{rejection === 'notFound' ? 'アンケートが見つかりません' : '受付時間外です'}</h1>
-    <p class="status">{rejectionMessage[rejection ?? 'notFound']}</p>
+    <h1>{rejection === 'notFound' ? t('rejected.notFound.title') : t('rejected.closed.title')}</h1>
+    <p class="status">{t(REJECTION_MESSAGES[rejection ?? 'notFound'])}</p>
   {:else if screen === 'error'}
-    <h1>URL が正しくありません</h1>
-    <p class="status">アンケートの URL をご確認ください。</p>
+    <h1>{t('error.badUrl.title')}</h1>
+    <p class="status">{t('error.badUrl')}</p>
   {:else if screen === 'answered' && definition}
     <!-- **同じ端末からの再訪**（`_documents/画面設計.md` 1 章）。
          編集するか、新しく回答するかを選ばせる -->
-    <h1>この端末では回答済みです</h1>
+    <h1>{t('answered.title')}</h1>
     {#if definition.allowEditingAfterSubmit && canEdit}
-      <p class="status">前回の回答を編集できます。</p>
-      <button type="button" onclick={() => (screen = 'answering')}>回答を編集する</button>
+      <p class="status">{t('answered.canEdit')}</p>
+      <button type="button" onclick={() => (screen = 'answering')}>{t('completed.edit')}</button>
     {:else if definition.allowEditingAfterSubmit}
       <!-- **前の回答が読めない。** 送信済みで Pleasanter へ渡った後や、
            トークンだけ消えた後はこちらになる -->
-      <p class="status">前回の回答内容は読み出せませんでした。</p>
+      <p class="status">{t('answered.cannotRead')}</p>
     {:else}
-      <p class="status">このアンケートは回答の編集を受け付けていません。</p>
+      <p class="status">{t('answered.editingNotAllowed')}</p>
     {/if}
     <button type="button" class="secondary" onclick={answerAgain}>
-      新しい回答として送信する
+      {t('answered.answerAgain')}
     </button>
-    <p class="note">
-      「新しい回答として送信する」を選ぶと、前回とは別の回答として登録されます。
-    </p>
+    <p class="note">{t('answered.answerAgainNote')}</p>
   {:else if screen === 'completed' && definition}
-    <h1>{text(definition.confirmationMessage) || '回答を受け付けました'}</h1>
-    <p class="status">ご協力ありがとうございました。</p>
+    <!-- **管理者が入れた文言が先。** 無ければ本アプリの文言へ落とす -->
+    <h1>{text(definition.confirmationMessage, language) || t('completed.title')}</h1>
+    <p class="status">{t('completed.thanks')}</p>
     {#if definition.allowEditingAfterSubmit}
-      <button type="button" onclick={() => (screen = 'answering')}>回答を編集する</button>
+      <button type="button" onclick={() => (screen = 'answering')}>{t('completed.edit')}</button>
     {/if}
-    <button type="button" class="secondary" onclick={answerAgain}>別の回答を送信する</button>
+    <button type="button" class="secondary" onclick={answerAgain}>
+      {t('completed.answerAgain')}
+    </button>
   {:else if definition && currentPage}
     <header>
-      <h1>{text(definition.title)}</h1>
-      {#if definition.description}<p class="lead">{text(definition.description)}</p>{/if}
+      <h1>{text(definition.title, language)}</h1>
+      {#if definition.description}
+        <p class="lead">{text(definition.description, language)}</p>
+      {/if}
 
       {#if definition.showProgress && pages.length > 1}
         <div
@@ -296,21 +365,26 @@
           aria-valuenow={progress}
           aria-valuemin="0"
           aria-valuemax="100"
-          aria-label="回答の進み具合"
+          aria-label={t('form.progressLabel')}
         >
           <div class="bar" style={`width:${progress}%`}></div>
         </div>
-        <p class="progress-text">{pageIndex + 1} / {pages.length} ページ</p>
+        <p class="progress-text">
+          {t('form.pageCount', { current: pageIndex + 1, total: pages.length })}
+        </p>
       {/if}
     </header>
 
-    {#if currentPage.title}<h2>{text(currentPage.title)}</h2>{/if}
-    {#if currentPage.description}<p class="lead">{text(currentPage.description)}</p>{/if}
+    {#if currentPage.title}<h2>{text(currentPage.title, language)}</h2>{/if}
+    {#if currentPage.description}
+      <p class="lead">{text(currentPage.description, language)}</p>
+    {/if}
 
     <form onsubmit={(event) => event.preventDefault()}>
       {#each currentPage.questions as question (question.questionId)}
         <QuestionField
           {question}
+          {language}
           bind:answer={answers[question.questionId]}
           error={errors[question.questionId]}
         />
@@ -320,7 +394,7 @@
            人には触れないので、埋まっていたら bot（`Services/SubmissionGuard.cs`）。
            **自動入力に拾われない名前にすること。** 拾われると正規の回答者を弾く -->
       <div class="trap" aria-hidden="true">
-        <label for="q-extra">この欄は入力しないでください</label>
+        <label for="q-extra">{t('form.trapLabel')}</label>
         <input
           id="q-extra"
           name="q-extra"
@@ -343,14 +417,14 @@
 
       <nav class="actions">
         {#if pageIndex > 0}
-          <button type="button" class="secondary" onclick={goBack}>戻る</button>
+          <button type="button" class="secondary" onclick={goBack}>{t('form.back')}</button>
         {/if}
         {#if isLastPage}
           <button type="button" onclick={submit} disabled={submitting}>
-            {submitting ? '送信しています…' : '送信する'}
+            {submitting ? t('form.submitting') : t('form.submit')}
           </button>
         {:else}
-          <button type="button" onclick={goNext}>次へ</button>
+          <button type="button" onclick={goNext}>{t('form.next')}</button>
         {/if}
       </nav>
     </form>
@@ -424,6 +498,25 @@
     gap: 0.75rem;
     justify-content: flex-end;
     margin-top: 1.5rem;
+  }
+
+  .language {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+
+    select {
+      font: inherit;
+      padding: 0.25rem 0.4rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+      color: #101828;
+    }
   }
 
   button {
