@@ -17,11 +17,46 @@ export type QuestionType =
 /** 言語コードをキーにした表示文字列。 */
 export type LocalizedText = Record<string, string>;
 
+/**
+ * ページを離れるときの行き先（Issue #41）。
+ *
+ * **値が無い項目はサーバが落として返す**ので、どれも省略可で書く。
+ */
+export interface PageTransition {
+  kind?: 'Next' | 'Page' | 'Submit';
+  pageId?: string | null;
+}
+
+/** 表示条件の比べ方。 */
+export type ConditionOperator =
+  | 'Equals'
+  | 'NotEquals'
+  | 'Contains'
+  | 'Answered'
+  | 'NotAnswered'
+  | 'GreaterThan'
+  | 'LessThan';
+
+/** 条件 1 つ。 */
+export interface ConditionRule {
+  questionId: string;
+  operator: ConditionOperator;
+  value?: string | null;
+}
+
+/** 設問を出す条件。 */
+export interface VisibilityCondition {
+  match?: 'All' | 'Any';
+  rules?: ConditionRule[];
+}
+
 export interface Choice {
   value: string;
   label: LocalizedText;
   /** 「その他」（自由記述を伴う選択肢）か。 */
   isOther: boolean;
+  /** これを選んだときの行き先。**無ければページ末尾の行き先に従う。** */
+  next?: PageTransition | null;
 }
 
 export interface QuestionSettings {
@@ -47,6 +82,8 @@ export interface Question {
   isRequired: boolean;
   choices: Choice[];
   settings: QuestionSettings;
+  /** この設問を出す条件。**無ければ常に出す。** */
+  visibleWhen?: VisibilityCondition | null;
 }
 
 export interface Page {
@@ -54,6 +91,8 @@ export interface Page {
   title?: LocalizedText;
   description?: LocalizedText;
   questions: Question[];
+  /** このページを終えたときの行き先。**無ければ次のページへ。** */
+  next?: PageTransition | null;
 }
 
 export interface SurveyDefinition {

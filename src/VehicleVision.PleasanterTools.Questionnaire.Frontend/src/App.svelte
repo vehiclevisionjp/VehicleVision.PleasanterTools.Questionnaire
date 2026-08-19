@@ -9,6 +9,7 @@
     submitAnswers,
   } from './lib/api';
   import type { Attachment } from './lib/api';
+  import { toSteps, tracePath } from './lib/flow';
   import type { AnswerState, PayloadAnswer, RejectionReason, SurveyDefinition } from './lib/types';
   import { isDisplayOnly, text } from './lib/types';
   import { validatePage } from './lib/validation';
@@ -73,7 +74,8 @@
   let ticket = $state('');
   /** ハニーポット項目。**人が触らない場所に置いてあるので、空のままのはず。** */
   let trap = $state('');
-  let pageIndex = $state(0);
+  /** 今どの区切りを見ているか。**ページではなく「区切り」の番号**（1 問 1 ページ表示があるため） */
+  let stepIndex = $state(0);
   let answers = $state<Record<string, AnswerState>>({});
   let errors = $state<Record<string, string>>({});
   let submitting = $state(false);
@@ -83,10 +85,25 @@
   /** 添付を受け付けなかった理由。**どのファイルが駄目かを出す。** */
   let attachmentMessages = $state<string[]>([]);
 
-  const pages = $derived(definition?.pages ?? []);
-  const currentPage = $derived(pages[pageIndex]);
-  const isLastPage = $derived(pageIndex >= pages.length - 1);
-  const progress = $derived(pages.length === 0 ? 0 : Math.round(((pageIndex + 1) / pages.length) * 100));
+  /**
+   * 回答から辿る経路。**答えを変えると変わる。**
+   *
+   * **正はサーバ側**（`Core/Flow/SurveyFlow.cs`）。ここはその写しで、
+   * 画面を進めるためだけのもの（`lib/flow.ts`）。
+   */
+  const path = $derived(tracePath(definition, answers));
+
+  /** 画面に出す区切り。**1 問 1 ページ表示なら 1 設問で 1 区切り。** */
+  const steps = $derived(toSteps(path, definition?.displayMode ?? 'Paged'));
+
+  const currentStep = $derived(steps[Math.min(stepIndex, Math.max(steps.length - 1, 0))]);
+  const currentPage = $derived(currentStep?.page);
+  const isLastStep = $derived(stepIndex >= steps.length - 1);
+
+  // **進みは経路の長さで測る。** 全ページ数で測ると、飛ばした先で 100% にならない
+  const progress = $derived(
+    steps.length === 0 ? 0 : Math.round(((Math.min(stepIndex, steps.length - 1) + 1) / steps.length) * 100),
+  );
 
   /** URL の `/f/{publicId}` から公開 ID を取る。 */
   function readPublicId(): string {
@@ -100,6 +117,33 @@
 
   $effect(() => {
     void start();
+  });
+
+  $effect(() => {
+    // **経路が縮んだら、行き過ぎた位置を戻す。**
+    // 前の答えを変えると、今いた区切りが無くなることがある
+    if (steps.length > 0 && stepIndex > steps.length - 1) {
+      stepIndex = steps.length - 1;
+    }
+  });
+
+  $effect(() => {
+    // **通らなくなった設問の入力を消す。**
+    // 残すと「見えないのに送られる」ことになり、サーバ側で落ちて食い違う
+    // （`ResponseIntake` が隠れた回答を落とす）。
+    // **消した結果で経路がさらに変わっても、消す対象は増えるだけなので落ち着く。**
+    for (const [questionId, answer] of Object.entries(answers)) {
+      if (path.visible.has(questionId)) {
+        continue;
+      }
+
+      const hasInput =
+        answer.values.length > 0 || answer.otherText !== '' || (answer.files?.length ?? 0) > 0;
+
+      if (hasInput) {
+        answers[questionId] = emptyAnswer();
+      }
+    }
   });
 
   async function start() {
@@ -153,22 +197,27 @@
     screen = hasSubmitted(publicId) ? 'answered' : 'answering';
   }
 
-  /** ページ遷移時に、そのページ分だけ見る。 */
-  function checkCurrentPage(): boolean {
-    if (!currentPage) return true;
-    errors = validatePage(currentPage.questions, answers, t);
+  /**
+   * 区切りを移るときに、その区切り分だけ見る。
+   *
+   * **出している設問だけを見る。** 条件で隠れている設問の必須を求めると、
+   * 答えようのない設問で止まる。
+   */
+  function checkCurrentStep(): boolean {
+    if (!currentStep) return true;
+    errors = validatePage(currentStep.questions, answers, t);
     return Object.keys(errors).length === 0;
   }
 
   function goNext() {
-    if (!checkCurrentPage()) return;
-    pageIndex = Math.min(pageIndex + 1, pages.length - 1);
+    if (!checkCurrentStep()) return;
+    stepIndex = Math.min(stepIndex + 1, Math.max(steps.length - 1, 0));
     errors = {};
     window.scrollTo({ top: 0 });
   }
 
   function goBack() {
-    pageIndex = Math.max(pageIndex - 1, 0);
+    stepIndex = Math.max(stepIndex - 1, 0);
     errors = {};
     window.scrollTo({ top: 0 });
   }
@@ -206,7 +255,16 @@
   function toPayload(): PayloadAnswer[] {
     return Object.entries(answers)
       .filter(([questionId]) => {
-        const question = pages.flatMap((page) => page.questions).find((q) => q.questionId === questionId);
+        // **出していない設問は送らない。** サーバ側でも落とすが、
+        // 送らない方が「見えないのに送られた」を作らずに済む
+        if (!path.visible.has(questionId)) {
+          return false;
+        }
+
+        const question = path.pages
+          .flatMap((page) => page.questions)
+          .find((candidate) => candidate.questionId === questionId);
+
         return question !== undefined && !isDisplayOnly(question);
       })
       .map(([questionId, answer]) => ({
@@ -217,7 +275,7 @@
   }
 
   async function submit() {
-    if (!checkCurrentPage()) return;
+    if (!checkCurrentStep()) return;
 
     submitting = true;
     submitError = '';
@@ -358,7 +416,7 @@
         <p class="lead">{text(definition.description, language)}</p>
       {/if}
 
-      {#if definition.showProgress && pages.length > 1}
+      {#if definition.showProgress && steps.length > 1}
         <div
           class="progress"
           role="progressbar"
@@ -370,7 +428,7 @@
           <div class="bar" style={`width:${progress}%`}></div>
         </div>
         <p class="progress-text">
-          {t('form.pageCount', { current: pageIndex + 1, total: pages.length })}
+          {t('form.pageCount', { current: Math.min(stepIndex, steps.length - 1) + 1, total: steps.length })}
         </p>
       {/if}
     </header>
@@ -381,7 +439,8 @@
     {/if}
 
     <form onsubmit={(event) => event.preventDefault()}>
-      {#each currentPage.questions as question (question.questionId)}
+      <!-- **出している設問だけを描く。** 条件で隠れているものは経路に含まれない -->
+      {#each currentStep?.questions ?? [] as question (question.questionId)}
         <QuestionField
           {question}
           {language}
@@ -416,10 +475,10 @@
       {/if}
 
       <nav class="actions">
-        {#if pageIndex > 0}
+        {#if stepIndex > 0}
           <button type="button" class="secondary" onclick={goBack}>{t('form.back')}</button>
         {/if}
-        {#if isLastPage}
+        {#if isLastStep}
           <button type="button" onclick={submit} disabled={submitting}>
             {submitting ? t('form.submitting') : t('form.submit')}
           </button>
