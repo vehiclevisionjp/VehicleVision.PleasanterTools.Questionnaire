@@ -216,6 +216,20 @@ public static class ServerMessages
             ServerMessageKeys.HeaderImageRejected,
             "この画像は使えません。PNG・JPEG・GIF・WebP の 2 MB 以内の画像を選んでください。",
             "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 2 MB.");
+
+        // ---- 回答数の上限 ---------------------------------------------------
+        Add(
+            ServerMessageKeys.ResponseLimitMustBePositive,
+            "回答数の上限は 1 以上にしてください。上限を設けない場合は空欄にしてください。",
+            "The response limit must be at least 1. Leave it empty for no limit.");
+
+        Add(
+            ServerMessageKeys.ResponseLimitReached,
+            "回答数が上限に達しています（{0} / {1} 件）。"
+            + "再開するには、先に上限を引き上げてください。",
+            "The response limit has been reached ({0} of {1}). "
+            + "Raise the limit before resuming.");
+
         // ---- 送信状況 -------------------------------------------------------
         Add(
             ServerMessageKeys.ResponseTokenRequired,

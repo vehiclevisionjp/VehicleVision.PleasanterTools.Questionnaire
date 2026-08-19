@@ -102,6 +102,13 @@ public static class ServerMessageKeys
     /// **理由の内訳は文言にしない**（拡張子・中身・大きさのどれで落ちたかは別で返す）。
     /// </summary>
     public const string HeaderImageRejected = "surveys.headerImageRejected";
+    /// <summary>回答数の上限に 0 以下を指定した。**上限を外すなら未指定にする。**</summary>
+    public const string ResponseLimitMustBePositive = "surveys.responseLimitMustBePositive";
+
+    /// <summary>
+    /// 上限に達しているので再開できない。**受付数（`{0}`）と上限（`{1}`）を差し込む。**
+    /// </summary>
+    public const string ResponseLimitReached = "surveys.responseLimitReached";
     // ---- 送信状況 -----------------------------------------------------------
 
     /// <summary>戻す回答を指定していない。</summary>

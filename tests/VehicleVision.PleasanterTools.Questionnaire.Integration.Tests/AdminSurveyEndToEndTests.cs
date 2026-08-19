@@ -397,6 +397,164 @@ public class AdminSurveyEndToEndTests
         Assert.Equal("Radio", definition["pages"]![0]!["questions"]![0]!["type"]!.GetValue<string>());
     }
 
+    /// <summary>公開済みのアンケートを 1 つ用意する。</summary>
+    private static async Task<string> PublishAsync(HttpClient http)
+    {
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true)))
+        {
+            save.EnsureSuccessStatusCode();
+        }
+
+        using (var publish = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/publish", new { }))
+        {
+            publish.EnsureSuccessStatusCode();
+        }
+
+        return surveyId;
+    }
+
+    /// <summary>一覧からその 1 行を読む。</summary>
+    private static async Task<JsonNode> SummaryAsync(HttpClient http, string surveyId)
+    {
+        using var list = await http.GetAsync("/api/admin/surveys");
+        list.EnsureSuccessStatusCode();
+
+        return (await ReadAsync(list))!.AsArray()
+            .Single(row => row!["surveyId"]!.GetValue<string>() == surveyId)!;
+    }
+
+    [Fact]
+    public async Task 回答数の上限を編集できる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **列はあったが、どこからも書けなかった**（Issue #53）
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+
+        using (var settings = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings", new { responseLimit = 100 }))
+        {
+            settings.EnsureSuccessStatusCode();
+        }
+
+        var summary = await SummaryAsync(http, surveyId);
+        Assert.Equal(100, summary["responseLimit"]!.GetValue<int>());
+        Assert.Equal(0, summary["responseCount"]!.GetValue<int>());
+
+        // **空にすれば上限なしへ戻せる**
+        using (var cleared = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings", new { responseLimit = (int?)null }))
+        {
+            cleared.EnsureSuccessStatusCode();
+        }
+
+        Assert.Null((await SummaryAsync(http, surveyId))["responseLimit"]);
+    }
+
+    [Fact]
+    public async Task 上限に0以下は指定できない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **0 を保存させない。** 公開しているのに誰も回答できないアンケートができる
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+
+        using var settings = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings", new { responseLimit = 0 });
+
+        Assert.Equal(HttpStatusCode.BadRequest, settings.StatusCode);
+    }
+
+    [Fact]
+    public async Task 手で止めると理由が一覧に出る()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+
+        using (var suspend = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/suspend", new { }))
+        {
+            suspend.EnsureSuccessStatusCode();
+        }
+
+        var suspended = await SummaryAsync(http, surveyId);
+        Assert.Equal(
+            (int)SurveySuspendedReason.Manual, suspended["suspendedReason"]!.GetValue<int>());
+        Assert.NotNull(suspended["suspendedAt"]);
+
+        using (var resume = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/resume", new { }))
+        {
+            resume.EnsureSuccessStatusCode();
+        }
+
+        // **再開したら理由を消す。** 動いているものに停止の理由が残らないこと
+        Assert.Null((await SummaryAsync(http, surveyId))["suspendedReason"]);
+    }
+
+    [Fact]
+    public async Task 上限に達したままでは再開できない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **再開しても最初の回答で再び自動停止するだけ。**
+        // 押した人には「再開できたのに止まっている」としか見えない
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+
+        using (var settings = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings", new { responseLimit = 1 }))
+        {
+            settings.EnsureSuccessStatusCode();
+        }
+
+        // **受け付けた回答の代わりに、対応表へ直に 1 行入れる。**
+        // 回答の送信は最短時間の判定を挟むので、ここで確かめたいこととは関係ない待ちが増える
+        var tokens = new ResponseTokenStore(
+            new DbConnectionFactory(DatabaseProvider.SqlServer, ConnectionString));
+        await tokens.EnsureAsync($"tok-{Guid.NewGuid():N}", Guid.Parse(surveyId));
+
+        using (var suspend = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/suspend", new { }))
+        {
+            suspend.EnsureSuccessStatusCode();
+        }
+
+        using var resume = await http.PostAsJsonAsync($"/api/admin/surveys/{surveyId}/resume", new { });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resume.StatusCode);
+
+        // **先に上限を引き上げれば再開できる**
+        using (var raised = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings", new { responseLimit = 2 }))
+        {
+            raised.EnsureSuccessStatusCode();
+        }
+
+        using var again = await http.PostAsJsonAsync($"/api/admin/surveys/{surveyId}/resume", new { });
+        again.EnsureSuccessStatusCode();
+    }
+
     /// <summary>添付の設問 1 つを添付列へ繋ぐ下書き。</summary>
     private static object AttachmentDraftBody(string surveyId, int revision, string port) => new
     {

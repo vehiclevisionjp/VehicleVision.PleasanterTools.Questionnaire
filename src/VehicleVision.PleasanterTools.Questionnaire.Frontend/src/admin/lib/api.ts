@@ -237,6 +237,18 @@ export const publish = (surveyId: string) =>
     json: {},
   });
 
+/**
+ * 公開設定を保存する（Issue #53）。
+ *
+ * **`null` で「上限なし」。** 0 はサーバが断る（誰も回答できない設定になるため）。
+ * **上限を引き上げても自動では再開しない。** 再開は人が押す。
+ */
+export const saveSurveySettings = (surveyId: string, responseLimit: number | null) =>
+  call<{ responseLimit: number | null }>(`/api/admin/surveys/${surveyId}/settings`, {
+    method: 'PUT',
+    json: { responseLimit },
+  });
+
 export const suspend = (surveyId: string) =>
   call<{ status: string }>(`/api/admin/surveys/${surveyId}/suspend`, { method: 'POST', json: {} });
 

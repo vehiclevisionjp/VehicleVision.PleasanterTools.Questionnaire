@@ -256,6 +256,23 @@ export interface SurveySummary {
    */
   publishedVersion?: number | null;
   updatedAt: string;
+  /**
+   * 止まっている理由（Issue #53）。**止まっていなければ「無い」。**
+   *
+   * サーバは null のプロパティを落として返すので、`?` を外さないこと。
+   */
+  suspendedReason?: number | null;
+  /** 止めた時刻。 */
+  suspendedAt?: string | null;
+  /** 受け付ける回答の上限。**「無い」なら上限なし。** */
+  responseLimit?: number | null;
+  /**
+   * 受け付けた回答の件数。
+   *
+   * **まだ Pleasanter へ届いていない分も含む。**
+   * 回答者には受付完了と伝えているので、届いたかどうかで数え方を変えない。
+   */
+  responseCount: number;
 }
 
 /**
@@ -291,6 +308,26 @@ export function surveyStatusKey(status: number): MessageKey {
       return 'status.suspended';
     default:
       return 'status.unknown';
+  }
+}
+
+/**
+ * 止まっている理由の文言の鍵（Issue #53）。
+ *
+ * **値はサーバの列挙そのもの**（`Data/SurveySnapshotStore.cs` の
+ * `SurveySuspendedReason`）。**0 は使わない**ので、`null` と取り違えない。
+ *
+ * **理由が付いていない停止もある**（この機能より前に止めたもの）。
+ * その場合は `null` を返し、画面は理由を出さない。
+ */
+export function suspendedReasonKey(reason: number | null | undefined): MessageKey | null {
+  switch (reason) {
+    case 1:
+      return 'status.suspendedManually';
+    case 2:
+      return 'status.suspendedByLimit';
+    default:
+      return null;
   }
 }
 
