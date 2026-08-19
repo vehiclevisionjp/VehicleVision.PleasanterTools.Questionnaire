@@ -49,6 +49,8 @@ Copyright (C) PMC Co.,Ltd.
   xunit 2.9.3 / Apache-2.0
   xunit.runner.visualstudio 4.0.0 / Apache-2.0
   Microsoft.NET.Test.Sdk 18.9.0 / MIT
+  @playwright/test 1.62.1 / Apache-2.0 / https://github.com/microsoft/playwright
+  Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物にのみ同梱。成果物には含まれない）
   coverlet.collector 10.0.1 / MIT
   Microsoft.Extensions.TimeProvider.Testing 10.9.0 / MIT
 
