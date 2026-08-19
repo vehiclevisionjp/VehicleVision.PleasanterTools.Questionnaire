@@ -26,8 +26,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// 読むときに <c>Theme</c> が <c>null</c>（＝既定の見た目）になるだけ。
 /// </para>
 /// </remarks>
-[Migration(8, "回答画面のテーマとヘッダ画像")]
-public sealed class M0008_SurveyTheme : Migration
+[Migration(9, "回答画面のテーマとヘッダ画像")]
+public sealed class M0009_SurveyTheme : Migration
 {
     public override void Up()
     {
