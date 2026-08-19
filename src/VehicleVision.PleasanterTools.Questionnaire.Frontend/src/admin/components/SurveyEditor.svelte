@@ -1,6 +1,7 @@
 <script lang="ts">
   import { loadDraft, publish, saveDraft } from '../lib/api';
   import {
+    displayText,
     problemKey,
     text,
     withText,
@@ -10,6 +11,15 @@
     type Question,
     type SurveyDefinition,
   } from '../lib/types';
+  import {
+    flowKey,
+    hasChoiceTransitions,
+    staleTargetId,
+    toTransition,
+    transitionValue,
+    validateFlow,
+    type FlowProblem,
+  } from '../lib/flow';
   import {
     DEFAULT_LANGUAGE,
     LANGUAGE_NAMES,
@@ -49,7 +59,18 @@
   let conflict = $state(false);
   let warnings = $state<MappingProblem[]>([]);
 
+  /** 公開が断られたときにサーバが返した分岐の不備。**サーバが最後の判定者。** */
+  let publishFlow = $state<FlowProblem[]>([]);
+
   const allQuestions = $derived(definition?.pages.flatMap((page) => page.questions) ?? []);
+
+  /**
+   * 編集中の分岐の不備。
+   *
+   * **公開して初めて弾かれると作り直しになる**ので、編集中にも出す（Issue #44）。
+   * **サーバ側の検査を緩める代わりではない。** 公開の口が改めて同じことを見る。
+   */
+  const flowProblems = $derived(definition ? validateFlow(definition) : []);
 
   $effect(() => {
     void load(surveyId);
@@ -187,16 +208,25 @@
     error = '';
     notice = '';
     warnings = [];
+    publishFlow = [];
 
     const result = await publish(surveyId);
     saving = false;
 
     if (!result.ok) {
       error = result.message;
-      const problems = (result.body as { problems?: MappingProblem[] } | undefined)?.problems;
-      if (problems) {
-        warnings = problems;
+      // **サーバが返した不備をそのまま出す。** 値が無い項目は落として返ってくる
+      const body = result.body as
+        | { problems?: MappingProblem[]; flow?: FlowProblem[] }
+        | undefined;
+      if (body?.problems) {
+        warnings = body.problems;
       }
+
+      if (body?.flow) {
+        publishFlow = body.flow;
+      }
+
       return;
     }
 
@@ -212,6 +242,79 @@
     const where = problem.targetColumn ? `[${problem.targetColumn}] ` : '';
     const detail = problem.detail ? `（${problem.detail}）` : '';
     return `${where}${base}${detail}`;
+  }
+
+  // ---- 分岐 -----------------------------------------------------------------
+
+  /** ページの見出し。**見出しが無ければ何ページ目かで呼ぶ。** */
+  function pageLabel(index: number): string {
+    const title = displayText(definition?.pages[index]?.title, editing);
+    return title === ''
+      ? t('branching.pageNumber', { number: index + 1 })
+      : t('branching.pageWithTitle', { number: index + 1, title });
+  }
+
+  /**
+   * そのページから飛べる先。
+   *
+   * **後ろのページだけを出す。** 前を向いた行き先は無限に回るアンケートになるので、
+   * 選ばせてから公開で弾くのではなく、はじめから一覧に出さない。
+   */
+  function jumpTargets(pageIndex: number): { pageId: string; label: string }[] {
+    return (definition?.pages ?? [])
+      .map((page, index) => ({ page, index }))
+      .filter((entry) => entry.index > pageIndex)
+      .map((entry) => ({ pageId: entry.page.pageId, label: pageLabel(entry.index) }));
+  }
+
+  /** その設問より前にある設問。**表示条件で見に行けるのはここだけ。** */
+  function priorQuestions(pageIndex: number, questionIndex: number): Question[] {
+    const pages = definition?.pages ?? [];
+    return [
+      ...pages.slice(0, pageIndex).flatMap((page) => page.questions),
+      ...(pages[pageIndex]?.questions.slice(0, questionIndex) ?? []),
+    ];
+  }
+
+  /**
+   * 同じページで既に行き先を持っている、別の設問の文言。無ければ `null`。
+   *
+   * **1 ページに行き先を持てる設問は 1 つだけ。** 2 つ目は付けさせない。
+   */
+  function branchTakenBy(pageIndex: number, questionIndex: number): string | null {
+    const questions = definition?.pages[pageIndex]?.questions ?? [];
+    const other = questions.find(
+      (question, index) => index !== questionIndex && hasChoiceTransitions(question),
+    );
+
+    return other ? displayText(other.title, editing) || other.questionId : null;
+  }
+
+  function describeFlow(problem: FlowProblem): string {
+    // **知らない符号でも落とさない。** 符号そのものを出す
+    const key = flowKey(problem.code);
+    const base = key ? t(key) : problem.code;
+    const where = whereOf(problem);
+    const detail = problem.detail ? `（${problem.detail}）` : '';
+    return where === '' ? `${base}${detail}` : `[${where}] ${base}${detail}`;
+  }
+
+  /** その不備がどこのものか。 */
+  function whereOf(problem: FlowProblem): string {
+    const pageIndex = definition?.pages.findIndex((page) => page.pageId === problem.pageId) ?? -1;
+    const page = pageIndex >= 0 ? pageLabel(pageIndex) : (problem.pageId ?? '');
+    const question = problem.questionId ? flowQuestionLabel(problem.questionId) : '';
+
+    if (page === '') return question;
+    if (question === '') return page;
+    return t('flow.where', { page, question });
+  }
+
+  function flowQuestionLabel(questionId: string): string {
+    const question = allQuestions.find((entry) => entry.questionId === questionId);
+    return question
+      ? displayText(question.title, editing) || questionId
+      : t('mapping.missingQuestion', { questionId });
   }
 </script>
 
@@ -248,6 +351,30 @@
       <li class:blocking={problem.isBlocking}>{describe(problem)}</li>
     {/each}
   </ul>
+{/if}
+
+<!-- **公開して初めて弾かれると作り直しになる。** 編集中にも同じことを出す -->
+{#if flowProblems.length > 0}
+  <section class="flow-problems" role="alert">
+    <p><strong>{t('flow.title')}</strong> {t('flow.lead')}</p>
+    <ul>
+      {#each flowProblems as problem, index (index)}
+        <li>{describeFlow(problem)}</li>
+      {/each}
+    </ul>
+  </section>
+{/if}
+
+<!-- **最後に判定するのはサーバ。** 断られた理由をそのまま出す -->
+{#if publishFlow.length > 0}
+  <section class="flow-problems from-server" role="alert">
+    <p><strong>{t('flow.fromServer')}</strong></p>
+    <ul>
+      {#each publishFlow as problem, index (index)}
+        <li>{describeFlow(problem)}</li>
+      {/each}
+    </ul>
+  </section>
 {/if}
 
 {#if loading}
@@ -343,6 +470,8 @@
   </section>
 
   {#each definition.pages as page, pageIndex (page.pageId)}
+    {@const targets = jumpTargets(pageIndex)}
+    {@const stale = staleTargetId(page.next, targets.map((target) => target.pageId))}
     <section class="page">
       <div class="page-head">
         <!-- **ページの区切りがそのまま改ページになる** -->
@@ -373,6 +502,9 @@
           mappedColumns={columnsFor(question.questionId)}
           canMoveUp={questionIndex > 0}
           canMoveDown={questionIndex < page.questions.length - 1}
+          jumpTargets={targets}
+          priorQuestions={priorQuestions(pageIndex, questionIndex)}
+          branchTakenBy={branchTakenBy(pageIndex, questionIndex)}
           onchange={(next) => updateQuestion(pageIndex, questionIndex, next)}
           onremove={() => removeQuestion(pageIndex, questionIndex)}
           onmove={(direction) => moveQuestion(pageIndex, questionIndex, direction)}
@@ -382,6 +514,35 @@
       <button type="button" class="secondary small" onclick={() => addQuestion(pageIndex)}>
         {t('editor.addQuestion')}
       </button>
+
+      <!-- **選択肢の行き先が優先される。** そちらが無いときにここへ落ちる -->
+      <div class="page-next">
+        <label class="inline">
+          {t('branching.pageNext')}
+          <select
+            value={transitionValue(page.next) || 'Next'}
+            onchange={(event) => {
+              const value = event.currentTarget.value;
+              // **「次のページへ」は行き先を持たないことにする。** 既定と同じ意味
+              updatePage(pageIndex, { next: value === 'Next' ? null : toTransition(value) });
+            }}
+          >
+            <option value="Next">{t('branching.toNextPage')}</option>
+            {#each targets as target, targetIndex (targetIndex)}
+              <option value={`page:${target.pageId}`}>{target.label}</option>
+            {/each}
+            <option value="Submit">{t('branching.toSubmit')}</option>
+            {#if stale !== null}
+              <!-- **今は選べない飛び先も出す。** 黙って別の行き先に変えない -->
+              <option value={`page:${stale}`}>{t('branching.staleTarget', { pageId: stale })}</option>
+            {/if}
+          </select>
+        </label>
+
+        {#if targets.length === 0}
+          <span class="hint">{t('branching.noLaterPage')}</span>
+        {/if}
+      </div>
     </section>
   {/each}
 
@@ -540,6 +701,54 @@
 
     .small {
       font-size: 0.85rem;
+      color: var(--muted);
+    }
+  }
+
+  .flow-problems {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    background: #fef3f2;
+    border: 1px solid var(--error);
+    border-radius: 6px;
+    font-size: 0.85rem;
+
+    p {
+      margin: 0 0 0.4rem;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 1.25rem;
+    }
+
+    &.from-server {
+      background: #fffaeb;
+      border-color: #fec84b;
+    }
+  }
+
+  .page-next {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--border);
+    font-size: 0.85rem;
+    color: var(--muted);
+
+    select {
+      font: inherit;
+      padding: 0.3rem 0.4rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+      color: #101828;
+    }
+
+    .hint {
       color: var(--muted);
     }
   }
