@@ -18,22 +18,29 @@ public sealed class SurveySnapshotStore(IDbConnectionFactory connectionFactory) 
         long PleasanterSiteId,
         string? ResponseJsonColumn);
 
+    /// <summary>SQL を組み立てる。**識別子は角括弧で囲む。**</summary>
+    private CommandDefinition Sql(
+        string sql,
+        object? parameters = null,
+        CancellationToken cancellationToken = default) =>
+        new(SqlDialect.Format(connectionFactory.Provider, sql),
+            parameters,
+            cancellationToken: cancellationToken);
+
     public async Task<SurveySnapshot?> FindAsync(
         Guid surveyId,
         int version,
         CancellationToken cancellationToken = default)
     {
-        var q = (string name) => SqlDialect.Quote(connectionFactory.Provider, name);
-
         await using var connection = connectionFactory.Create();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        var row = await connection.QueryFirstOrDefaultAsync<Row>(new CommandDefinition(
-            $"SELECT v.{q("DefinitionJson")}, v.{q("MappingJson")}, "
-            + $"       s.{q("PleasanterSiteId")}, s.{q("ResponseJsonColumn")} "
-            + $"FROM {q("SurveyVersions")} v "
-            + $"JOIN {q("Surveys")} s ON s.{q("SurveyId")} = v.{q("SurveyId")} "
-            + $"WHERE v.{q("SurveyId")} = @SurveyId AND v.{q("Version")} = @Version",
+        var row = await connection.QueryFirstOrDefaultAsync<Row>(Sql(
+            "SELECT v.[DefinitionJson], v.[MappingJson], "
+            + "       s.[PleasanterSiteId], s.[ResponseJsonColumn] "
+            + "FROM [SurveyVersions] v "
+            + "JOIN [Surveys] s ON s.[SurveyId] = v.[SurveyId] "
+            + "WHERE v.[SurveyId] = @SurveyId AND v.[Version] = @Version",
             new { SurveyId = surveyId, Version = version },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -109,21 +116,20 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
 {
     public async Task SaveAsync(SurveyRecord survey, CancellationToken cancellationToken = default)
     {
-        var q = (string name) => SqlDialect.Quote(connectionFactory.Provider, name);
         var now = DbTime.UtcNowTruncated();
 
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        var updated = await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {q("Surveys")} SET "
-            + $"  {q("PublicId")} = @PublicId, {q("Title")} = @Title, "
-            + $"  {q("PleasanterSiteId")} = @PleasanterSiteId, "
-            + $"  {q("ResponseJsonColumn")} = @ResponseJsonColumn, "
-            + $"  {q("Status")} = @Status, {q("PublishedVersion")} = @PublishedVersion, "
-            + $"  {q("AcceptFrom")} = @AcceptFrom, {q("AcceptTo")} = @AcceptTo, "
-            + $"  {q("ResponseLimit")} = @ResponseLimit, "
-            + $"  {q("UpdatedAt")} = @Now "
-            + $"WHERE {q("SurveyId")} = @SurveyId",
+        var updated = await connection.ExecuteAsync(Sql(
+            "UPDATE [Surveys] SET "
+            + "  [PublicId] = @PublicId, [Title] = @Title, "
+            + "  [PleasanterSiteId] = @PleasanterSiteId, "
+            + "  [ResponseJsonColumn] = @ResponseJsonColumn, "
+            + "  [Status] = @Status, [PublishedVersion] = @PublishedVersion, "
+            + "  [AcceptFrom] = @AcceptFrom, [AcceptTo] = @AcceptTo, "
+            + "  [ResponseLimit] = @ResponseLimit, "
+            + "  [UpdatedAt] = @Now "
+            + "WHERE [SurveyId] = @SurveyId",
             new
             {
                 survey.SurveyId,
@@ -145,12 +151,12 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             return;
         }
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"INSERT INTO {q("Surveys")} "
-            + $"  ({q("SurveyId")}, {q("PublicId")}, {q("Title")}, {q("PleasanterSiteId")}, "
-            + $"   {q("ResponseJsonColumn")}, {q("Status")}, {q("PublishedVersion")}, "
-            + $"   {q("AcceptFrom")}, {q("AcceptTo")}, {q("ResponseLimit")}, "
-            + $"   {q("CreatedAt")}, {q("UpdatedAt")}) "
+        await connection.ExecuteAsync(Sql(
+            "INSERT INTO [Surveys] "
+            + "  ([SurveyId], [PublicId], [Title], [PleasanterSiteId], "
+            + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
+            + "   [AcceptFrom], [AcceptTo], [ResponseLimit], "
+            + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, @PublishedVersion, "
             + "        @AcceptFrom, @AcceptTo, @ResponseLimit, @Now, @Now)",
@@ -179,14 +185,12 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         Guid? publishedBy,
         CancellationToken cancellationToken = default)
     {
-        var q = (string name) => SqlDialect.Quote(connectionFactory.Provider, name);
-
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
         // **版は不変。** 既にある版は上書きしない
-        var exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            $"SELECT COUNT(*) FROM {q("SurveyVersions")} "
-            + $"WHERE {q("SurveyId")} = @SurveyId AND {q("Version")} = @Version",
+        var exists = await connection.ExecuteScalarAsync<int>(Sql(
+            "SELECT COUNT(*) FROM [SurveyVersions] "
+            + "WHERE [SurveyId] = @SurveyId AND [Version] = @Version",
             new { SurveyId = surveyId, Version = version },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -196,10 +200,10 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 $"版 {version} は既に公開されている。版は不変なので上書きしない");
         }
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"INSERT INTO {q("SurveyVersions")} "
-            + $"  ({q("SurveyId")}, {q("Version")}, {q("DefinitionJson")}, {q("MappingJson")}, "
-            + $"   {q("PublishedAt")}, {q("PublishedBy")}) "
+        await connection.ExecuteAsync(Sql(
+            "INSERT INTO [SurveyVersions] "
+            + "  ([SurveyId], [Version], [DefinitionJson], [MappingJson], "
+            + "   [PublishedAt], [PublishedBy]) "
             + "VALUES (@SurveyId, @Version, @DefinitionJson, @MappingJson, @Now, @PublishedBy)",
             new
             {
@@ -212,9 +216,9 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {q("Surveys")} SET {q("PublishedVersion")} = @Version, {q("UpdatedAt")} = @Now "
-            + $"WHERE {q("SurveyId")} = @SurveyId",
+        await connection.ExecuteAsync(Sql(
+            "UPDATE [Surveys] SET [PublishedVersion] = @Version, [UpdatedAt] = @Now "
+            + "WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId, Version = version, Now = DbTime.UtcNowTruncated() },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -223,14 +227,12 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         string publicId,
         CancellationToken cancellationToken = default)
     {
-        var q = (string name) => SqlDialect.Quote(connectionFactory.Provider, name);
-
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(new CommandDefinition(
-            $"SELECT {q("SurveyId")}, {q("PublicId")}, {q("Title")}, {q("PleasanterSiteId")}, "
-            + $"       {q("ResponseJsonColumn")}, {q("Status")}, {q("PublishedVersion")}, "
-            + $"       {q("AcceptFrom")}, {q("AcceptTo")}, {q("ResponseLimit")} "
-            + $"FROM {q("Surveys")} WHERE {q("PublicId")} = @PublicId",
+        return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(Sql(
+            "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
+            + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
+            + "       [AcceptFrom], [AcceptTo], [ResponseLimit] "
+            + "FROM [Surveys] WHERE [PublicId] = @PublicId",
             new { PublicId = publicId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -239,17 +241,29 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        var q = (string name) => SqlDialect.Quote(connectionFactory.Provider, name);
-
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(new CommandDefinition(
-            $"SELECT {q("SurveyId")}, {q("PublicId")}, {q("Title")}, {q("PleasanterSiteId")}, "
-            + $"       {q("ResponseJsonColumn")}, {q("Status")}, {q("PublishedVersion")}, "
-            + $"       {q("AcceptFrom")}, {q("AcceptTo")}, {q("ResponseLimit")} "
-            + $"FROM {q("Surveys")} WHERE {q("SurveyId")} = @SurveyId",
+        return await connection.QueryFirstOrDefaultAsync<SurveyRecord>(Sql(
+            "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
+            + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
+            + "       [AcceptFrom], [AcceptTo], [ResponseLimit] "
+            + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
+
+    private DatabaseProvider Provider => connectionFactory.Provider;
+
+    /// <summary>SQL を組み立てる。**識別子は角括弧で囲む。**</summary>
+    /// <remarks>
+    /// **生の文字列連結をしない**ための口（<c>SqlDialect.Format</c>）。
+    /// 角括弧の中だけが RDBMS ごとの引用符へ書き換わる。
+    /// </remarks>
+    private CommandDefinition Sql(
+        string sql,
+        object? parameters = null,
+        DbTransaction? transaction = null,
+        CancellationToken cancellationToken = default) =>
+        new(SqlDialect.Format(Provider, sql), parameters, transaction, cancellationToken: cancellationToken);
 
     private async Task<DbConnection> OpenAsync(CancellationToken cancellationToken)
     {

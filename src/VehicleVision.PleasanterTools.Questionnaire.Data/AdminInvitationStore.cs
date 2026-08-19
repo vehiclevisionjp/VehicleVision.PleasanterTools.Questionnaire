@@ -61,8 +61,6 @@ public interface IAdminInvitationStore
 /// <summary>Dapper を使った実装。</summary>
 public sealed class AdminInvitationStore(IDbConnectionFactory connectionFactory) : IAdminInvitationStore
 {
-    private const string Table = "AdminInvitations";
-
     private DatabaseProvider Provider => connectionFactory.Provider;
 
     public async Task ReplaceAsync(
@@ -74,17 +72,17 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connectionFactory)
             .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
         // **未使用の分だけ消す。** 使用済みの行は、使われた事実として残す
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Q(Table)} WHERE {Q("AdminUserId")} = @AdminUserId "
-            + $"AND {Q("UsedAt")} IS NULL",
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [AdminInvitations] WHERE [AdminUserId] = @AdminUserId "
+            + "AND [UsedAt] IS NULL",
             new { invitation.AdminUserId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"INSERT INTO {Q(Table)} ("
-            + $"{Q("InvitationId")}, {Q("AdminUserId")}, {Q("TokenHash")}, {Q("ExpiresAt")}, "
-            + $"{Q("CreatedAt")}, {Q("CreatedBy")}) "
+        await connection.ExecuteAsync(Sql(
+            "INSERT INTO [AdminInvitations] ("
+            + "[InvitationId], [AdminUserId], [TokenHash], [ExpiresAt], "
+            + "[CreatedAt], [CreatedBy]) "
             + "VALUES (@InvitationId, @AdminUserId, @TokenHash, @ExpiresAt, @Now, @CreatedBy)",
             new
             {
@@ -106,10 +104,10 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connectionFactory)
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.QueryFirstOrDefaultAsync<AdminInvitation>(new CommandDefinition(
-            $"SELECT {Q("InvitationId")}, {Q("AdminUserId")}, {Q("TokenHash")}, {Q("ExpiresAt")}, "
-            + $"{Q("UsedAt")}, {Q("CreatedAt")}, {Q("CreatedBy")} FROM {Q(Table)} "
-            + $"WHERE {Q("TokenHash")} = @TokenHash",
+        return await connection.QueryFirstOrDefaultAsync<AdminInvitation>(Sql(
+            "SELECT [InvitationId], [AdminUserId], [TokenHash], [ExpiresAt], "
+            + "[UsedAt], [CreatedAt], [CreatedBy] FROM [AdminInvitations] "
+            + "WHERE [TokenHash] = @TokenHash",
             new { TokenHash = tokenHash },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -122,9 +120,9 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connectionFactory)
 
         // **未使用の行だけを更新し、更新できた件数で判断する。**
         // 読んでから書くと、同時に来た 2 つが両方とも通ってしまう
-        var affected = await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {Q(Table)} SET {Q("UsedAt")} = @Now "
-            + $"WHERE {Q("InvitationId")} = @InvitationId AND {Q("UsedAt")} IS NULL",
+        var affected = await connection.ExecuteAsync(Sql(
+            "UPDATE [AdminInvitations] SET [UsedAt] = @Now "
+            + "WHERE [InvitationId] = @InvitationId AND [UsedAt] IS NULL",
             new { InvitationId = invitationId, Now = DbTime.UtcNowTruncated() },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -136,9 +134,9 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connectionFactory)
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await connection.QueryAsync<Guid>(new CommandDefinition(
-            $"SELECT {Q("AdminUserId")} FROM {Q(Table)} "
-            + $"WHERE {Q("UsedAt")} IS NULL AND {Q("ExpiresAt")} > @Now",
+        var rows = await connection.QueryAsync<Guid>(Sql(
+            "SELECT [AdminUserId] FROM [AdminInvitations] "
+            + "WHERE [UsedAt] IS NULL AND [ExpiresAt] > @Now",
             new { Now = DbTime.ForDb(nowUtc) },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return rows.ToList();
@@ -149,14 +147,25 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connectionFactory)
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Q(Table)} WHERE {Q("AdminUserId")} = @AdminUserId "
-            + $"AND {Q("UsedAt")} IS NULL",
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [AdminInvitations] WHERE [AdminUserId] = @AdminUserId "
+            + "AND [UsedAt] IS NULL",
             new { AdminUserId = adminUserId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
-    private string Q(string identifier) => SqlDialect.Quote(Provider, identifier);
+
+    /// <summary>SQL を組み立てる。**識別子は角括弧で囲む。**</summary>
+    /// <remarks>
+    /// **生の文字列連結をしない**ための口（<c>SqlDialect.Format</c>）。
+    /// 角括弧の中だけが RDBMS ごとの引用符へ書き換わる。
+    /// </remarks>
+    private CommandDefinition Sql(
+        string sql,
+        object? parameters = null,
+        DbTransaction? transaction = null,
+        CancellationToken cancellationToken = default) =>
+        new(SqlDialect.Format(Provider, sql), parameters, transaction, cancellationToken: cancellationToken);
 
     private async Task<DbConnection> OpenAsync(CancellationToken cancellationToken)
     {

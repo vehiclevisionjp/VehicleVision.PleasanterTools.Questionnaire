@@ -109,10 +109,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await connection.QueryAsync<SurveySummary>(new CommandDefinition(
-            $"SELECT {Q("SurveyId")}, {Q("PublicId")}, {Q("Title")}, {Q("PleasanterSiteId")}, "
-            + $"       {Q("Status")}, {Q("PublishedVersion")}, {Q("UpdatedAt")} "
-            + $"FROM {Q("Surveys")} ORDER BY {Q("UpdatedAt")} DESC",
+        var rows = await connection.QueryAsync<SurveySummary>(Sql(
+            "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
+            + "       [Status], [PublishedVersion], [UpdatedAt] "
+            + "FROM [Surveys] ORDER BY [UpdatedAt] DESC",
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return rows.ToList();
@@ -124,11 +124,11 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        var survey = await connection.QueryFirstOrDefaultAsync<SurveyRow>(new CommandDefinition(
-            $"SELECT {Q("SurveyId")}, {Q("TitleJson")}, {Q("DescriptionJson")}, "
-            + $"       {Q("ConfirmationMessageJson")}, {Q("DisplayMode")}, {Q("ShowProgress")}, "
-            + $"       {Q("AllowEditingAfterSubmit")}, {Q("PublishedVersion")}, {Q("DraftRevision")} "
-            + $"FROM {Q("Surveys")} WHERE {Q("SurveyId")} = @SurveyId",
+        var survey = await connection.QueryFirstOrDefaultAsync<SurveyRow>(Sql(
+            "SELECT [SurveyId], [TitleJson], [DescriptionJson], "
+            + "       [ConfirmationMessageJson], [DisplayMode], [ShowProgress], "
+            + "       [AllowEditingAfterSubmit], [PublishedVersion], [DraftRevision] "
+            + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -137,39 +137,39 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             return null;
         }
 
-        var pages = (await connection.QueryAsync<PageRow>(new CommandDefinition(
-            $"SELECT {Q("PageId")}, {Q("TitleJson")}, {Q("DescriptionJson")} FROM {Q("Pages")} "
-            + $"WHERE {Q("SurveyId")} = @SurveyId ORDER BY {Q("SortOrder")}",
+        var pages = (await connection.QueryAsync<PageRow>(Sql(
+            "SELECT [PageId], [TitleJson], [DescriptionJson] FROM [Pages] "
+            + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
-        var questions = (await connection.QueryAsync<QuestionRow>(new CommandDefinition(
-            $"SELECT {Q("QuestionId")}, {Q("PageId")}, {Q("QuestionType")}, {Q("TitleJson")}, "
-            + $"       {Q("DescriptionJson")}, {Q("IsRequired")}, {Q("SettingsJson")} "
-            + $"FROM {Q("Questions")} WHERE {Q("SurveyId")} = @SurveyId ORDER BY {Q("SortOrder")}",
+        var questions = (await connection.QueryAsync<QuestionRow>(Sql(
+            "SELECT [QuestionId], [PageId], [QuestionType], [TitleJson], "
+            + "       [DescriptionJson], [IsRequired], [SettingsJson] "
+            + "FROM [Questions] WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
         // **設問の一覧で絞る。** アンケートを跨いだ選択肢が混ざらないようにする
-        var choices = (await connection.QueryAsync<ChoiceRow>(new CommandDefinition(
-            $"SELECT {Q("QuestionId")}, {Q("Value")}, {Q("LabelJson")}, {Q("IsOther")} "
-            + $"FROM {Q("QuestionChoices")} "
-            + $"WHERE {Q("SurveyId")} = @SurveyId ORDER BY {Q("SortOrder")}",
+        var choices = (await connection.QueryAsync<ChoiceRow>(Sql(
+            "SELECT [QuestionId], [Value], [LabelJson], [IsOther] "
+            + "FROM [QuestionChoices] "
+            + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
-        var assignments = (await connection.QueryAsync<AssignmentRow>(new CommandDefinition(
-            $"SELECT {Q("AssignmentId")}, {Q("TargetColumn")}, {Q("ConverterOperation")}, "
-            + $"       {Q("ConverterConfigJson")} FROM {Q("ColumnAssignments")} "
-            + $"WHERE {Q("SurveyId")} = @SurveyId ORDER BY {Q("SortOrder")}",
+        var assignments = (await connection.QueryAsync<AssignmentRow>(Sql(
+            "SELECT [AssignmentId], [TargetColumn], [ConverterOperation], "
+            + "       [ConverterConfigJson] FROM [ColumnAssignments] "
+            + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
-        var sources = (await connection.QueryAsync<SourceRow>(new CommandDefinition(
-            $"SELECT s.{Q("AssignmentId")}, s.{Q("QuestionId")}, s.{Q("Port")} "
-            + $"FROM {Q("AssignmentSources")} s "
-            + $"JOIN {Q("ColumnAssignments")} a ON a.{Q("AssignmentId")} = s.{Q("AssignmentId")} "
-            + $"WHERE a.{Q("SurveyId")} = @SurveyId ORDER BY s.{Q("SortOrder")}",
+        var sources = (await connection.QueryAsync<SourceRow>(Sql(
+            "SELECT s.[AssignmentId], s.[QuestionId], s.[Port] "
+            + "FROM [AssignmentSources] s "
+            + "JOIN [ColumnAssignments] a ON a.[AssignmentId] = s.[AssignmentId] "
+            + "WHERE a.[SurveyId] = @SurveyId ORDER BY s.[SortOrder]",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
@@ -266,15 +266,15 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
         // **版が合う行だけ進める。** 読んでから比べると、間に入った更新を取りこぼす
-        var advanced = await connection.ExecuteAsync(new CommandDefinition(
-            $"UPDATE {Q("Surveys")} SET "
-            + $"  {Q("DraftRevision")} = {Q("DraftRevision")} + 1, "
-            + $"  {Q("TitleJson")} = @TitleJson, {Q("DescriptionJson")} = @DescriptionJson, "
-            + $"  {Q("ConfirmationMessageJson")} = @ConfirmationMessageJson, "
-            + $"  {Q("DisplayMode")} = @DisplayMode, {Q("ShowProgress")} = @ShowProgress, "
-            + $"  {Q("AllowEditingAfterSubmit")} = @AllowEditingAfterSubmit, "
-            + $"  {Q("Title")} = @Title, {Q("UpdatedAt")} = @Now "
-            + $"WHERE {Q("SurveyId")} = @SurveyId AND {Q("DraftRevision")} = @ExpectedRevision",
+        var advanced = await connection.ExecuteAsync(Sql(
+            "UPDATE [Surveys] SET "
+            + "  [DraftRevision] = [DraftRevision] + 1, "
+            + "  [TitleJson] = @TitleJson, [DescriptionJson] = @DescriptionJson, "
+            + "  [ConfirmationMessageJson] = @ConfirmationMessageJson, "
+            + "  [DisplayMode] = @DisplayMode, [ShowProgress] = @ShowProgress, "
+            + "  [AllowEditingAfterSubmit] = @AllowEditingAfterSubmit, "
+            + "  [Title] = @Title, [UpdatedAt] = @Now "
+            + "WHERE [SurveyId] = @SurveyId AND [DraftRevision] = @ExpectedRevision",
             new
             {
                 SurveyId = surveyId,
@@ -296,8 +296,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         {
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
 
-            var actual = await connection.QueryFirstOrDefaultAsync<int?>(new CommandDefinition(
-                $"SELECT {Q("DraftRevision")} FROM {Q("Surveys")} WHERE {Q("SurveyId")} = @SurveyId",
+            var actual = await connection.QueryFirstOrDefaultAsync<int?>(Sql(
+                "SELECT [DraftRevision] FROM [Surveys] WHERE [SurveyId] = @SurveyId",
                 new { SurveyId = surveyId },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -321,34 +321,34 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         CancellationToken cancellationToken)
     {
         // **子から先に消す。** 親を先に消すと、参照先を失った行の掃除が難しくなる
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Q("AssignmentSources")} WHERE {Q("AssignmentId")} IN ("
-            + $"SELECT {Q("AssignmentId")} FROM {Q("ColumnAssignments")} "
-            + $"WHERE {Q("SurveyId")} = @SurveyId)",
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [AssignmentSources] WHERE [AssignmentId] IN ("
+            + "SELECT [AssignmentId] FROM [ColumnAssignments] "
+            + "WHERE [SurveyId] = @SurveyId)",
             new { SurveyId = surveyId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Q("ColumnAssignments")} WHERE {Q("SurveyId")} = @SurveyId",
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [ColumnAssignments] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Q("QuestionChoices")} WHERE {Q("SurveyId")} = @SurveyId",
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [QuestionChoices] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Q("Questions")} WHERE {Q("SurveyId")} = @SurveyId",
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [Questions] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Q("Pages")} WHERE {Q("SurveyId")} = @SurveyId",
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [Pages] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -366,9 +366,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         {
             var page = definition.Pages[pageIndex];
 
-            await connection.ExecuteAsync(new CommandDefinition(
-                $"INSERT INTO {Q("Pages")} ({Q("PageId")}, {Q("SurveyId")}, {Q("SortOrder")}, "
-                + $"{Q("TitleJson")}, {Q("DescriptionJson")}) "
+            await connection.ExecuteAsync(Sql(
+                "INSERT INTO [Pages] ([PageId], [SurveyId], [SortOrder], "
+                + "[TitleJson], [DescriptionJson]) "
                 + "VALUES (@PageId, @SurveyId, @SortOrder, @TitleJson, @DescriptionJson)",
                 new
                 {
@@ -385,10 +385,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             {
                 var question = page.Questions[questionIndex];
 
-                await connection.ExecuteAsync(new CommandDefinition(
-                    $"INSERT INTO {Q("Questions")} ({Q("QuestionId")}, {Q("SurveyId")}, {Q("PageId")}, "
-                    + $"{Q("SortOrder")}, {Q("QuestionType")}, {Q("TitleJson")}, "
-                    + $"{Q("DescriptionJson")}, {Q("IsRequired")}, {Q("SettingsJson")}) "
+                await connection.ExecuteAsync(Sql(
+                    "INSERT INTO [Questions] ([QuestionId], [SurveyId], [PageId], "
+                    + "[SortOrder], [QuestionType], [TitleJson], "
+                    + "[DescriptionJson], [IsRequired], [SettingsJson]) "
                     + "VALUES (@QuestionId, @SurveyId, @PageId, @SortOrder, @QuestionType, "
                     + "@TitleJson, @DescriptionJson, @IsRequired, @SettingsJson)",
                     new
@@ -410,10 +410,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 {
                     var choice = question.Choices[choiceIndex];
 
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        $"INSERT INTO {Q("QuestionChoices")} ({Q("ChoiceId")}, {Q("SurveyId")}, "
-                        + $"{Q("QuestionId")}, {Q("SortOrder")}, {Q("Value")}, {Q("LabelJson")}, "
-                        + $"{Q("IsOther")}) "
+                    await connection.ExecuteAsync(Sql(
+                        "INSERT INTO [QuestionChoices] ([ChoiceId], [SurveyId], "
+                        + "[QuestionId], [SortOrder], [Value], [LabelJson], "
+                        + "[IsOther]) "
                         + "VALUES (@ChoiceId, @SurveyId, @QuestionId, @SortOrder, @Value, "
                         + "@LabelJson, @IsOther)",
                         new
@@ -437,10 +437,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             var assignment = mapping.Assignments[index];
             var assignmentId = Guid.NewGuid();
 
-            await connection.ExecuteAsync(new CommandDefinition(
-                $"INSERT INTO {Q("ColumnAssignments")} ({Q("AssignmentId")}, {Q("SurveyId")}, "
-                + $"{Q("TargetColumn")}, {Q("ConverterOperation")}, {Q("ConverterConfigJson")}, "
-                + $"{Q("SortOrder")}) "
+            await connection.ExecuteAsync(Sql(
+                "INSERT INTO [ColumnAssignments] ([AssignmentId], [SurveyId], "
+                + "[TargetColumn], [ConverterOperation], [ConverterConfigJson], "
+                + "[SortOrder]) "
                 + "VALUES (@AssignmentId, @SurveyId, @TargetColumn, @ConverterOperation, "
                 + "@ConverterConfigJson, @SortOrder)",
                 new
@@ -461,9 +461,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             {
                 var source = assignment.Sources[sourceIndex];
 
-                await connection.ExecuteAsync(new CommandDefinition(
-                    $"INSERT INTO {Q("AssignmentSources")} ({Q("SourceId")}, {Q("AssignmentId")}, "
-                    + $"{Q("QuestionId")}, {Q("Port")}, {Q("SortOrder")}) "
+                await connection.ExecuteAsync(Sql(
+                    "INSERT INTO [AssignmentSources] ([SourceId], [AssignmentId], "
+                    + "[QuestionId], [Port], [SortOrder]) "
                     + "VALUES (@SourceId, @AssignmentId, @QuestionId, @Port, @SortOrder)",
                     new
                     {
@@ -496,7 +496,18 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
     private static string Shorten(string value, int max) =>
         value.Length <= max ? value : value[..max];
 
-    private string Q(string identifier) => SqlDialect.Quote(Provider, identifier);
+
+    /// <summary>SQL を組み立てる。**識別子は角括弧で囲む。**</summary>
+    /// <remarks>
+    /// **生の文字列連結をしない**ための口（<c>SqlDialect.Format</c>）。
+    /// 角括弧の中だけが RDBMS ごとの引用符へ書き換わる。
+    /// </remarks>
+    private CommandDefinition Sql(
+        string sql,
+        object? parameters = null,
+        DbTransaction? transaction = null,
+        CancellationToken cancellationToken = default) =>
+        new(SqlDialect.Format(Provider, sql), parameters, transaction, cancellationToken: cancellationToken);
 
     private async Task<DbConnection> OpenAsync(CancellationToken cancellationToken)
     {
