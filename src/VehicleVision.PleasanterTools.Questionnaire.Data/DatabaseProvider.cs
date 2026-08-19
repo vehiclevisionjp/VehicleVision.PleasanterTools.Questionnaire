@@ -63,20 +63,23 @@ public sealed class DbConnectionFactory : IDbConnectionFactory
         _ => throw new NotSupportedException($"対応していない RDBMS: {Provider}"),
     };
 
-    /// <summary>SQL Server 向けに暗号化を明示する。</summary>
+    /// <summary>SQL Server 向けに暗号化を立てる。</summary>
     /// <remarks>
-    /// **書いてある値は上書きしない。** 検証環境が意図して緩めている設定を
-    /// 黙って戻すと、何を試しているのか分からなくなる
-    /// （緩めていることは <see cref="ConnectionSecurity"/> が起動時に咎める）。
+    /// <para>
+    /// **<c>Encrypt=False</c> と書かれていても暗号化する。** ここは譲らない。
+    /// 「暗号化しない」という選択肢を残すと、逃げ道の設定 1 つで平文になる。
+    /// </para>
+    /// <para>
+    /// **<c>QUESTIONNAIRE_DB_ALLOW_INSECURE</c> が緩めるのは証明書の確認であって、
+    /// 暗号化ではない。** 検証環境が自己署名の証明書を使うための逃げ道なので、
+    /// <c>TrustServerCertificate</c> はそのまま通す。
+    /// </para>
+    /// <para>
+    /// なお <c>Encrypt=False</c> と書いてあること自体は
+    /// <see cref="ConnectionSecurity"/> が起動時に咎める。
+    /// **できない指定を黙って読み替えるのではなく、言ってから守る。**
+    /// </para>
     /// </remarks>
-    private static string Encrypted(string connectionString)
-    {
-        var builder = new SqlConnectionStringBuilder(connectionString);
-        if (!builder.ShouldSerialize(nameof(SqlConnectionStringBuilder.Encrypt)))
-        {
-            builder.Encrypt = true;
-        }
-
-        return builder.ConnectionString;
-    }
+    private static string Encrypted(string connectionString) =>
+        new SqlConnectionStringBuilder(connectionString) { Encrypt = true }.ConnectionString;
 }

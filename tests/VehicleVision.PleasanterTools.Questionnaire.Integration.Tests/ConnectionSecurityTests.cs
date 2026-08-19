@@ -20,7 +20,8 @@ public class ConnectionSecurityTests
             DatabaseProvider.SqlServer,
             "Server=db;Database=Q;UID=sa;PWD=x;Encrypt=False");
 
-        Assert.Contains(problems, problem => problem.Reason.Contains("平文", StringComparison.Ordinal));
+        // **できない指定を黙って読み替えない。**「切ったつもりで動いている」状態を作らない
+        Assert.Contains(problems, problem => problem.Reason.Contains("通らない", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -139,21 +140,59 @@ public class ConnectionSecurityTests
 
         using var connection = factory.Create();
 
-        Assert.Contains("Encrypt=True", connection.ConnectionString, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("True", Setting(connection.ConnectionString, "Encrypt"));
     }
 
     [Fact]
-    public void 書いてある値は上書きしない()
+    public void 切ると書いてあっても暗号化する()
     {
-        // **意図して緩めた設定を黙って戻さない。** 何を試しているのか分からなくなる
-        // （緩めていること自体は EnsureSecure が咎める）
+        // **ここは譲らない。** 「暗号化しない」を残すと、逃げ道の設定 1 つで平文になる
+        // （書いてあること自体は EnsureSecure が起動時に咎める）
         var factory = new DbConnectionFactory(
             DatabaseProvider.SqlServer,
             "Server=db;Database=Q;UID=sa;PWD=x;Encrypt=False");
 
         using var connection = factory.Create();
 
-        Assert.Contains("Encrypt=False", connection.ConnectionString, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("True", Setting(connection.ConnectionString, "Encrypt"));
+    }
+
+    [Fact]
+    public void 証明書を確かめない指定はそのまま通す()
+    {
+        // **緩めてよいのは証明書の確認だけ。** 検証環境は自己署名の証明書を使う
+        var factory = new DbConnectionFactory(
+            DatabaseProvider.SqlServer,
+            "Server=db;Database=Q;UID=sa;PWD=x;TrustServerCertificate=True");
+
+        using var connection = factory.Create();
+
+        Assert.Equal("True", Setting(connection.ConnectionString, "TrustServerCertificate"));
+    }
+
+    /// <summary>接続文字列の 1 項目を読む。</summary>
+    /// <remarks>
+    /// **部分一致で確かめない。** SqlConnectionStringBuilder はキー名を表示用へ均すので
+    /// （<c>TrustServerCertificate</c> は <c>Trust Server Certificate</c> になる）、
+    /// 書いた通りの文字列は出てこない。
+    /// </remarks>
+    private static string? Setting(string connectionString, string key)
+    {
+        var builder = new System.Data.Common.DbConnectionStringBuilder
+        {
+            ConnectionString = connectionString,
+        };
+
+        // **キー名の空白を落として突き合わせる**（Trust Server Certificate → TrustServerCertificate）
+        foreach (string name in builder.Keys)
+        {
+            if (name.Replace(" ", string.Empty).Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                return builder[name]?.ToString();
+            }
+        }
+
+        return null;
     }
 
     [Fact]
