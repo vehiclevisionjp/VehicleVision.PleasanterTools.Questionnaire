@@ -114,19 +114,23 @@ public class AuditLogRetentionTests
         };
 
         var (store, service, time) = Build(options);
+        var start = time.GetLocalNow().DateTime;
 
         await service.StartAsync(CancellationToken.None);
 
         // **起動直後には走らせない。** 全インスタンスが一斉に大きな DELETE を投げないように
         Assert.Empty(store.Thresholds);
 
-        time.Advance(TimeSpan.FromHours(6));
-        await WaitForAsync(() => store.Thresholds.Count > 0);
+        await AdvanceUntilAsync(time, options.SweepInterval, () => store.Thresholds.Count > 0);
+        var end = time.GetLocalNow().DateTime;
 
         await service.StopAsync(CancellationToken.None);
 
-        var threshold = Assert.Single(store.Thresholds);
-        Assert.Equal(time.GetLocalNow().DateTime.AddDays(-30), threshold, TimeSpan.FromMinutes(1));
+        Assert.NotEmpty(store.Thresholds);
+
+        // **時計を進めた回数は数えない**（常駐が待ち始める時機は測れない）。
+        // 消しに行った時点がどこであれ、30 日前を指していればよい
+        Assert.InRange(store.Thresholds[0], start.AddDays(-30), end.AddDays(-30));
     }
 
     [Fact]
@@ -156,30 +160,42 @@ public class AuditLogRetentionTests
 
         await service.StartAsync(CancellationToken.None);
 
-        // **失敗を見届けてから次へ進める。** 待たずに時計を進めると、
-        // 常駐側がまだ待ち直していないので 2 周目が起きない
-        time.Advance(TimeSpan.FromHours(1));
-        await WaitForAsync(() => Volatile.Read(ref store.Attempts) >= 1);
+        // **失敗を見届けてから次へ進める**
+        await AdvanceUntilAsync(
+            time, options.SweepInterval, () => Volatile.Read(ref store.Attempts) >= 1);
 
         // 失敗しても次の周期へ進む
         store.ThrowOnDelete = null;
-        await WaitForAsync(() => false, TimeSpan.FromMilliseconds(50));
-        time.Advance(TimeSpan.FromHours(1));
-        await WaitForAsync(() => store.Thresholds.Count > 0);
+        await AdvanceUntilAsync(time, options.SweepInterval, () => store.Thresholds.Count > 0);
 
         await service.StopAsync(CancellationToken.None);
 
         Assert.NotEmpty(store.Thresholds);
     }
 
-    /// <summary>常駐の処理が追い付くまで待つ。**時計を進めても、走るのは別のタスク。**</summary>
-    private static async Task WaitForAsync(Func<bool> condition, TimeSpan? atMost = null)
+    /// <summary>条件が満たされるまで、時計を進めながら待つ。</summary>
+    /// <remarks>
+    /// <para>
+    /// **1 回進めるだけでは足りない。** <c>StartAsync</c> が返った時点で、
+    /// 常駐側がまだ <c>Task.Delay</c> へ入っていないことがある。
+    /// **入る前に進めた分は無かったことになる**ので、そのまま待つと永久に起きない。
+    /// </para>
+    /// <para>
+    /// 手元では速くて通り、CI で落ちた（2026-08-19）。**待ち時間を伸ばしても直らない。**
+    /// 進め直すことでしか埋まらない。
+    /// </para>
+    /// </remarks>
+    private static async Task AdvanceUntilAsync(
+        FakeTimeProvider time,
+        TimeSpan step,
+        Func<bool> condition)
     {
-        var limit = (int)((atMost ?? TimeSpan.FromSeconds(2)).TotalMilliseconds / 10);
-
-        for (var attempt = 0; attempt < limit && !condition(); attempt++)
+        for (var attempt = 0; attempt < 100 && !condition(); attempt++)
         {
-            await Task.Delay(10);
+            time.Advance(step);
+
+            // **本物の時間で少し待つ。** 常駐側は別のタスクなので、進めた直後は走っていない
+            await Task.Delay(20);
         }
     }
 }
