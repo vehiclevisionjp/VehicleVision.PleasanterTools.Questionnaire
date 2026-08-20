@@ -45,6 +45,13 @@ public sealed record QuestionSettings
     /// **上限が無いと DB が溢れる**（<c>_documents/非機能設計.md</c> 1 章）。
     /// </remarks>
     public long? MaxFileSizeBytes { get; init; }
+
+    /// <summary>グリッドの行（Issue #54）。</summary>
+    /// <remarks>
+    /// **列（選択肢）は <c>Choices</c> の方。** 行はここ。
+    /// **1 行が 1 つの入力になる**ので、行を増やすほど使える列が減る。
+    /// </remarks>
+    public System.Collections.Immutable.ImmutableArray<GridRow> Rows { get; init; } = [];
 }
 
 /// <summary>文字列入力の形式検証。</summary>

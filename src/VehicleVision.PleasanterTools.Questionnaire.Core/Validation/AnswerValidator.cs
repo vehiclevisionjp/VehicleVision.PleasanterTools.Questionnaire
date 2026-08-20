@@ -119,6 +119,19 @@ public static class AnswerValidator
             return;
         }
 
+        // **グリッドは行ごとに見る**（Issue #54）。値の配列ではなく行の辞書に入る
+        if (question.HasRows)
+        {
+            ValidateGrid(question, answer, errors);
+            return;
+        }
+
+        if (question.Type is QuestionType.Ranking)
+        {
+            ValidateRanking(question, answer, errors);
+            return;
+        }
+
         if (!question.IsMultiValue && answer.Values.Length > 1)
         {
             errors.Add(new ValidationError(question.QuestionId, ValidationErrorCode.MultipleValuesNotAllowed));
@@ -134,6 +147,94 @@ public static class AnswerValidator
         foreach (var value in answer.Values)
         {
             ValidateScalar(question, value, errors);
+        }
+    }
+
+    /// <summary>グリッドを見る（Issue #54）。</summary>
+    /// <remarks>
+    /// **必須は「行が全部埋まっていること」。** 1 行でも空なら足りない。
+    /// 行の一部だけ答えて送れると、どこまで答えたのか誰にも分からなくなる。
+    /// </remarks>
+    private static void ValidateGrid(
+        Question question,
+        Answer answer,
+        ImmutableArray<ValidationError>.Builder errors)
+    {
+        var rows = question.Settings.Rows.IsDefaultOrEmpty
+            ? []
+            : question.Settings.Rows.Select(row => row.RowId).ToHashSet(StringComparer.Ordinal);
+
+        // **知らない行への答えは受け取らない。** 行を消した後の古い画面から届き得る
+        foreach (var rowId in answer.Rows.Keys.Where(rowId => !rows.Contains(rowId)))
+        {
+            errors.Add(new ValidationError(question.QuestionId, ValidationErrorCode.UnknownRow, rowId));
+        }
+
+        var values = question.Choices.IsDefaultOrEmpty
+            ? []
+            : question.Choices.Select(choice => choice.Value).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var rowId in rows)
+        {
+            var row = answer.Row(rowId).Where(value => !string.IsNullOrWhiteSpace(value)).ToList();
+
+            if (row.Count == 0)
+            {
+                if (question.IsRequired)
+                {
+                    errors.Add(new ValidationError(
+                        question.QuestionId, ValidationErrorCode.RowRequired, rowId));
+                }
+
+                continue;
+            }
+
+            // **1 つ選ぶグリッドで 2 つ来たら受け取らない**
+            if (question.Type is QuestionType.Grid && row.Count > 1)
+            {
+                errors.Add(new ValidationError(
+                    question.QuestionId, ValidationErrorCode.MultipleValuesNotAllowed, rowId));
+                continue;
+            }
+
+            foreach (var value in row.Where(value => !values.Contains(value)))
+            {
+                errors.Add(new ValidationError(
+                    question.QuestionId, ValidationErrorCode.UnknownChoice, value));
+            }
+        }
+    }
+
+    /// <summary>ランキングを見る（Issue #54）。</summary>
+    /// <remarks>
+    /// **並べた順そのものが答え。** 同じ項目が 2 回出てくると順位が決まらない。
+    /// **全部並べることは求めない**（上位だけ選ぶ使い方があるため）。
+    /// </remarks>
+    private static void ValidateRanking(
+        Question question,
+        Answer answer,
+        ImmutableArray<ValidationError>.Builder errors)
+    {
+        var values = question.Choices.IsDefaultOrEmpty
+            ? []
+            : question.Choices.Select(choice => choice.Value).ToHashSet(StringComparer.Ordinal);
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var value in answer.Values.Where(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            if (!values.Contains(value))
+            {
+                errors.Add(new ValidationError(
+                    question.QuestionId, ValidationErrorCode.UnknownChoice, value));
+                continue;
+            }
+
+            if (!seen.Add(value))
+            {
+                errors.Add(new ValidationError(
+                    question.QuestionId, ValidationErrorCode.DuplicateRank, value));
+            }
         }
     }
 

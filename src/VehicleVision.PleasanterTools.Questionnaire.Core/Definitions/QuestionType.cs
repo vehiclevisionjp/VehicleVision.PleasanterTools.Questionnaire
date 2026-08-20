@@ -37,6 +37,24 @@ public enum QuestionType
     /// <summary>ファイル添付。</summary>
     File,
 
+    /// <summary>選択グリッド（行列・行ごとに 1 つ選ぶ）。</summary>
+    /// <remarks>
+    /// **1 設問が行数ぶんの列を食い得る**（Issue #54）。
+    /// どう写すかはマッピングが決める。**行ごとに 1 つの入力を出す**ので、
+    /// 行ごとに列へ繋ぐことも、まとめて 1 列へ入れることもできる。
+    /// </remarks>
+    Grid,
+
+    /// <summary>チェックボックスグリッド（行列・行ごとに複数選ぶ）。</summary>
+    CheckboxGrid,
+
+    /// <summary>ランキング（順位付け）。</summary>
+    /// <remarks>
+    /// 回答は**選択肢を順位の順に並べたもの**。
+    /// マッピングでは選択肢ごとに順位を取り出せる。
+    /// </remarks>
+    Ranking,
+
     /// <summary>説明文ブロック。設問ではなく、Pleasanter の列へ写さない。</summary>
     Note,
 }

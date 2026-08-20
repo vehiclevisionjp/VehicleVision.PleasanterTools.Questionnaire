@@ -146,7 +146,7 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
             foreach (var source in assignment.Sources)
             {
                 answerByQuestion.TryGetValue(source.QuestionId, out var answer);
-                input.AddRange(Read(answer, source.Port));
+                input.AddRange(Read(answer, source.Port, source.RowId));
             }
 
             try
@@ -168,11 +168,32 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
         };
     }
 
-    private static ImmutableArray<string> Read(Answer? answer, QuestionPort port)
+    /// <summary>入力 1 つ分の値を取り出す。</summary>
+    /// <remarks>
+    /// **行が指定されていれば、その行だけを見る**（Issue #54）。
+    /// グリッドは行ごとの答え、ランキングはその項目の順位を返す。
+    /// </remarks>
+    private static ImmutableArray<string> Read(Answer? answer, QuestionPort port, string? rowId)
     {
         if (answer is null)
         {
             return [];
+        }
+
+        if (rowId is not null && port is QuestionPort.Value)
+        {
+            // **グリッドは行ごとの答え。** 行が無ければ空
+            var row = answer.Row(rowId);
+            if (!row.IsDefaultOrEmpty)
+            {
+                return row;
+            }
+
+            // **ランキングは順位。** 並べた順そのものが答えなので、位置を数える。
+            // **選ばれていなければ空**（「順位なし」を 0 で表さない）
+            return answer.RankOf(rowId) is { } rank
+                ? [rank.ToString(System.Globalization.CultureInfo.InvariantCulture)]
+                : [];
         }
 
         return port switch
