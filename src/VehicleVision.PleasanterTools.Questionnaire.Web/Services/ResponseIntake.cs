@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
