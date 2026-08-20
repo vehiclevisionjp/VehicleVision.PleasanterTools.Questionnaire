@@ -66,6 +66,34 @@ public class AuditLogRetentionTests
         Assert.True(options.Enabled);
     }
 
+    [Fact]
+    public void 知らせは既定で九十日残す()
+    {
+        // **監査ログより短い**（Issue #80）。知らせは運用のためのもので、
+        // **未読は日数に関わらず残る**ので、短くしても気付けなくならない
+        var options = AuditLogRetentionOptions.FromConfiguration(Configuration(null));
+
+        Assert.Equal(90, options.NotificationRetentionDays);
+        Assert.True(options.NotificationEnabled);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("30", true)]
+    public void 知らせの保持日数を設定から読む(string value, bool enabled)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [AuditLogRetentionOptions.NotificationRetentionDaysKey] = value,
+            })
+            .Build();
+
+        var options = AuditLogRetentionOptions.FromConfiguration(configuration);
+
+        Assert.Equal(enabled, options.NotificationEnabled);
+    }
+
     [Theory]
     [InlineData("0")]
     [InlineData("-1")]

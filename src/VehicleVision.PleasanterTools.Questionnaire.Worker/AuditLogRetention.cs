@@ -53,6 +53,20 @@ public sealed class AuditLogRetentionOptions
     public const string AttachmentRejectionRetentionDaysKey =
         "QUESTIONNAIRE_ATTACHMENT_REJECTION_RETENTION_DAYS";
 
+    /// <summary>管理者への知らせを残す日数。**0 以下にすると消さない。**（Issue #80）</summary>
+    /// <remarks>
+    /// ⚠️ **消えるのは既読になったものだけ**（<c>IAdminNotificationStore</c>）。
+    /// 未読は日数に関わらず残る。**気付く前に消えたら、溜める意味が無い。**
+    /// </remarks>
+    public int NotificationRetentionDays { get; init; } = 90;
+
+    /// <summary>管理者への知らせを消す仕組みが働くか。</summary>
+    public bool NotificationEnabled => NotificationRetentionDays > 0;
+
+    /// <summary>管理者への知らせの保持日数の設定名。</summary>
+    public const string NotificationRetentionDaysKey =
+        "QUESTIONNAIRE_NOTIFICATION_RETENTION_DAYS";
+
     /// <summary>消す仕組みが働くか。</summary>
     public bool Enabled => RetentionDays > 0;
 
@@ -83,6 +97,10 @@ public sealed class AuditLogRetentionOptions
                 configuration,
                 AttachmentRejectionRetentionDaysKey,
                 defaults.AttachmentRejectionRetentionDays),
+            NotificationRetentionDays = ReadDays(
+                configuration,
+                NotificationRetentionDaysKey,
+                defaults.NotificationRetentionDays),
         };
     }
 
@@ -122,7 +140,8 @@ public sealed class AuditLogRetentionService(
     AuditLogRetentionOptions options,
     ILogger<AuditLogRetentionService> logger,
     TimeProvider? timeProvider = null,
-    IAttachmentRejectionStore? rejections = null)
+    IAttachmentRejectionStore? rejections = null,
+    IAdminNotificationStore? notifications = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -147,7 +166,9 @@ public sealed class AuditLogRetentionService(
         }
 
         // **どちらも消さないなら、常駐する意味が無い**
-        if (!options.Enabled && !(rejections is not null && options.AttachmentRejectionEnabled))
+        if (!options.Enabled
+            && !(rejections is not null && options.AttachmentRejectionEnabled)
+            && !(notifications is not null && options.NotificationEnabled))
         {
             return;
         }
@@ -195,6 +216,24 @@ public sealed class AuditLogRetentionService(
                     {
                         logger.LogInformation(
                             "期限を過ぎた添付の記録を {Count} 件消した（{Threshold} より前）",
+                            deleted,
+                            threshold);
+                    }
+                }
+
+                // **既読になった知らせも同じ周期で掃除する**（Issue #80）。
+                // **未読は消えない**（ストア側が既読だけを対象にする）
+                if (notifications is not null && options.NotificationEnabled)
+                {
+                    var threshold = now.AddDays(-options.NotificationRetentionDays);
+                    var deleted = await notifications
+                        .DeleteOlderThanAsync(threshold, stoppingToken)
+                        .ConfigureAwait(false);
+
+                    if (deleted > 0)
+                    {
+                        logger.LogInformation(
+                            "期限を過ぎた既読の知らせを {Count} 件消した（{Threshold} より前）",
                             deleted,
                             threshold);
                     }
