@@ -162,6 +162,32 @@
     updateRows(next);
   }
 
+  /**
+   * NPS のかたちを一発で入れる（Issue #74）。
+   *
+   * **新しい形式にはしない。** NPS は「0〜10 で聞いて、両端に文言を置いた尺度」で、
+   * 形式を増やすと集計も画面も分岐が 1 本増えるだけになる。
+   *
+   * **今ある文言は上書きしない。** 押し間違いで書いたものを消さない。
+   */
+  function applyNpsPreset() {
+    update({
+      settings: {
+        ...question.settings,
+        scaleMinimum: 0,
+        scaleMaximum: 10,
+        scaleMinimumLabel:
+          text(question.settings.scaleMinimumLabel, editing) === ''
+            ? withText(question.settings.scaleMinimumLabel, t('question.npsMinimum'), editing)
+            : question.settings.scaleMinimumLabel,
+        scaleMaximumLabel:
+          text(question.settings.scaleMaximumLabel, editing) === ''
+            ? withText(question.settings.scaleMaximumLabel, t('question.npsMaximum'), editing)
+            : question.settings.scaleMaximumLabel,
+      },
+    });
+  }
+
   // ---- 表示条件 -------------------------------------------------------------
 
   /**
@@ -530,6 +556,58 @@
         />
       </label>
     </div>
+
+    {#if question.type === 'Scale'}
+      <div class="range">
+        <label>
+          {t('question.scaleMinimumLabel')}
+          <input
+            type="text"
+            placeholder={t('question.scaleEndPlaceholder')}
+            value={text(question.settings.scaleMinimumLabel, editing)}
+            oninput={(event) =>
+              update({
+                settings: {
+                  ...question.settings,
+                  scaleMinimumLabel: withText(
+                    question.settings.scaleMinimumLabel,
+                    event.currentTarget.value,
+                    editing,
+                  ),
+                },
+              })}
+          />
+        </label>
+        <label>
+          {t('question.scaleMaximumLabel')}
+          <input
+            type="text"
+            placeholder={t('question.scaleEndPlaceholder')}
+            value={text(question.settings.scaleMaximumLabel, editing)}
+            oninput={(event) =>
+              update({
+                settings: {
+                  ...question.settings,
+                  scaleMaximumLabel: withText(
+                    question.settings.scaleMaximumLabel,
+                    event.currentTarget.value,
+                    editing,
+                  ),
+                },
+              })}
+          />
+        </label>
+      </div>
+
+      <!--
+        **NPS は形式ではなく尺度の使い方**（Issue #74）。
+        形式を増やすと、集計も画面も分岐が 1 本増えるだけで得るものが無い
+      -->
+      <button type="button" class="secondary small" onclick={applyNpsPreset}>
+        {t('question.npsPreset')}
+      </button>
+      <p class="hint">{t('question.npsHint')}</p>
+    {/if}
   {/if}
 
   <!-- **同じページの中で出し分けるのがこちら。** ページを飛ばすのはジャンプ。

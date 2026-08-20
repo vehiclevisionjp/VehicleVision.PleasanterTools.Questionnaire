@@ -142,6 +142,14 @@ export const ja = {
   'question.moveRowUp': '行を上へ',
   'question.moveRowDown': '行を下へ',
   'question.defaultRowLabel': '行 {number}',
+  'question.scaleMinimumLabel': '下端の文言',
+  'question.scaleMaximumLabel': '上端の文言',
+  'question.scaleEndPlaceholder': '（省略できます）',
+  'question.npsPreset': 'NPS のかたちにする',
+  'question.npsHint':
+    '0〜10 の尺度にし、両端に文言を入れます。NPS は形式ではなく尺度の使い方なので、専用の形式は用意していません。',
+  'question.npsMinimum': 'まったく思わない',
+  'question.npsMaximum': '非常にそう思う',
   'question.rowHint':
     '行を 1 つ増やすごとに、Pleasanter の列を 1 つ使えます。識別子は割り当てで行を指すのに使うので、公開後は変えないでください。',
   'question.rowsEmpty': '行がありません。1 行も無いと、この設問には答えられません。',
@@ -591,6 +599,14 @@ export const en: Record<MessageKey, string> = {
   'question.moveRowUp': 'Move row up',
   'question.moveRowDown': 'Move row down',
   'question.defaultRowLabel': 'Row {number}',
+  'question.scaleMinimumLabel': 'Low end label',
+  'question.scaleMaximumLabel': 'High end label',
+  'question.scaleEndPlaceholder': '(optional)',
+  'question.npsPreset': 'Use the NPS shape',
+  'question.npsHint':
+    'Sets a 0-10 scale with labels at both ends. NPS is a way of using a scale, not a separate question type.',
+  'question.npsMinimum': 'Not at all likely',
+  'question.npsMaximum': 'Extremely likely',
   'question.rowHint':
     'Each row can use one Pleasanter column. The id is how assignments point at a row, so do not change it after publishing.',
   'question.rowsEmpty': 'No rows yet. Without a row this question cannot be answered.',
