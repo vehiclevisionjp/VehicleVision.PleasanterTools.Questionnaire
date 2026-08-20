@@ -1,8 +1,10 @@
-﻿using System.Net.Http.Json;
+﻿using System.Collections.Immutable;
+using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Validation;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
@@ -35,8 +37,17 @@ public class EndToEndTests
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_PLEASANTER_BASEURL")
             ?? "http://localhost:8080";
 
-    private static async Task<long> CreatePleasanterSiteAsync(HttpClient http, string title)
+    /// <param name="extraColumns">
+    /// 追加で用意する列。**用意していない列へ書いても Pleasanter は黙って捨てる**
+    /// ので、行ごとに列を分ける検証（Issue #74）ではここに足すこと。
+    /// </param>
+    private static async Task<long> CreatePleasanterSiteAsync(
+        HttpClient http,
+        string title,
+        params string[] extraColumns)
     {
+        string[] columnNames = ["ClassA", "NumA", "DescriptionA", .. extraColumns];
+
         var body = new
         {
             ApiKey,
@@ -44,15 +55,12 @@ public class EndToEndTests
             ReferenceType = "Results",
             SiteSettings = new
             {
-                Columns = new object[]
-                {
-                    new { ColumnName = "ClassA", LabelText = "満足度" },
-                    new { ColumnName = "NumA", LabelText = "点数" },
-                    new { ColumnName = "DescriptionA", LabelText = "回答JSON" },
-                },
+                Columns = columnNames
+                    .Select(name => new { ColumnName = name, LabelText = name })
+                    .ToArray(),
                 EditorColumnHash = new Dictionary<string, string[]>
                 {
-                    ["General"] = ["ClassA", "NumA", "DescriptionA"],
+                    ["General"] = columnNames,
                 },
             },
         };
@@ -198,6 +206,186 @@ public class EndToEndTests
         Assert.Equal("ok", updatedRow["ClassHash"]?["ClassA"]?.GetValue<string>());
         Assert.Equal(4, updatedRow["NumHash"]?["NumA"]?.GetValue<decimal>());
         Assert.Equal(referenceId, updatedRow["ResultId"]?.GetValue<long>());
+    }
+
+    // ---- グリッドとランキング（Issue #74）------------------------------------
+
+    private static SurveyDefinition GridDefinition() => new()
+    {
+        SurveyId = "s-grid",
+        Version = 1,
+        Title = LocalizedText.Japanese("グリッドの検証"),
+        Pages =
+        [
+            new Page
+            {
+                PageId = "p1",
+                Questions =
+                [
+                    new Question
+                    {
+                        QuestionId = "q-grid",
+                        Type = QuestionType.Grid,
+                        Title = LocalizedText.Japanese("それぞれについて教えてください"),
+                        IsRequired = true,
+                        Choices =
+                        [
+                            new Choice("good", LocalizedText.Japanese("良い")),
+                            new Choice("bad", LocalizedText.Japanese("悪い")),
+                        ],
+                        Settings = new QuestionSettings
+                        {
+                            Rows =
+                            [
+                                new GridRow("price", LocalizedText.Japanese("価格")),
+                                new GridRow("quality", LocalizedText.Japanese("品質")),
+                            ],
+                        },
+                    },
+                    new Question
+                    {
+                        QuestionId = "q-rank",
+                        Type = QuestionType.Ranking,
+                        Title = LocalizedText.Japanese("大事な順に選んでください"),
+                        Choices =
+                        [
+                            new Choice("speed", LocalizedText.Japanese("速さ")),
+                            new Choice("cost", LocalizedText.Japanese("安さ")),
+                        ],
+                    },
+                ],
+            },
+        ],
+    };
+
+    /// <summary>**行ごとに 1 列**。ランキングは順位を数値の列へ。</summary>
+    private static MappingDefinition GridMapping() => new()
+    {
+        Assignments =
+        [
+            ColumnAssignment.Direct(
+                "ClassA", new MappingSource("q-grid", QuestionPort.Value, "price")),
+            ColumnAssignment.Direct(
+                "ClassB", new MappingSource("q-grid", QuestionPort.Value, "quality")),
+            ColumnAssignment.Direct(
+                "NumA", new MappingSource("q-rank", QuestionPort.Value, "speed")),
+        ],
+    };
+
+    [Fact]
+    public async Task グリッドとランキングがPleasanterの列まで届く()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **行ごとの回答は Values を通らない。** 経路のどこかで落とすと、
+        // 受け付けたのに列が空のまま Pleasanter へ入る
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        var siteId = await CreatePleasanterSiteAsync(
+            http, $"E2E grid {Guid.NewGuid():N}", "ClassB");
+
+        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
+        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+
+        var surveys = new SurveyRepository(factory);
+        var snapshots = new SurveySnapshotStore(factory);
+        var outbox = new ResponseOutbox(factory);
+        var tokens = new ResponseTokenStore(factory);
+
+        var surveyId = Guid.NewGuid();
+        var publicId = $"pub-{Guid.NewGuid():N}";
+        await surveys.SaveAsync(new SurveyRecord(
+            surveyId, publicId, "グリッドの検証", siteId, "DescriptionA",
+            (int)SurveyStatus.Published, null));
+        await surveys.PublishAsync(surveyId, 1, GridDefinition(), GridMapping(), null);
+
+        var intake = new ResponseIntake(surveys, snapshots, outbox, tokens);
+        var pleasanter = new PleasanterApiClient(http, new PleasanterOptions
+        {
+            BaseUrl = PleasanterBaseUrl,
+            ApiKey = ApiKey,
+            ApiKeyUserTimeZoneId = "Asia/Tokyo",
+        });
+
+        var sender = new ResponseSender(
+            outbox,
+            tokens,
+            snapshots,
+            pleasanter,
+            new PleasanterRecordBuilder(new PleasanterDateTime("Asia/Tokyo")),
+            new MappingEvaluator(),
+            new ResponseSenderOptions(),
+            NullLogger<ResponseSender>.Instance);
+
+        var token = $"tok-{Guid.NewGuid():N}";
+        var gridAnswer = new Answer("q-grid", [])
+        {
+            Rows = new Dictionary<string, ImmutableArray<string>>(StringComparer.Ordinal)
+            {
+                ["price"] = ["good"],
+                ["quality"] = ["bad"],
+            }.ToImmutableDictionary(StringComparer.Ordinal),
+        };
+
+        // ランキングは並べた順そのものが答え。**speed が 1 位**
+        var accepted = await intake.SubmitAsync(
+            publicId, token, [gridAnswer, Answer.Of("q-rank", "speed", "cost")]);
+
+        Assert.True(accepted.Accepted);
+        Assert.Equal(SendOutcome.Sent, await sender.SendOnceAsync());
+
+        var found = await pleasanter.FindByResponseTokenAsync(siteId, "DescriptionA", token);
+        var row = found.Body?["Response"]?["Data"]?.AsArray()?.SingleOrDefault();
+
+        Assert.NotNull(row);
+        Assert.Equal("good", row["ClassHash"]?["ClassA"]?.GetValue<string>());
+        Assert.Equal("bad", row["ClassHash"]?["ClassB"]?.GetValue<string>());
+        Assert.Equal(1, row["NumHash"]?["NumA"]?.GetValue<decimal>());
+    }
+
+    [Fact]
+    public async Task グリッドは行が全部埋まっていないと受け付けない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **行の一部だけ答えて送れると、どこまで答えたのか誰にも分からなくなる**
+        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
+        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+
+        var surveys = new SurveyRepository(factory);
+        var surveyId = Guid.NewGuid();
+        var publicId = $"pub-{Guid.NewGuid():N}";
+
+        await surveys.SaveAsync(new SurveyRecord(
+            surveyId, publicId, "グリッドの検証", 0, "DescriptionA",
+            (int)SurveyStatus.Published, null));
+        await surveys.PublishAsync(surveyId, 1, GridDefinition(), GridMapping(), null);
+
+        var intake = new ResponseIntake(
+            surveys, new SurveySnapshotStore(factory), new ResponseOutbox(factory),
+            new ResponseTokenStore(factory));
+
+        var half = new Answer("q-grid", [])
+        {
+            Rows = new Dictionary<string, ImmutableArray<string>>(StringComparer.Ordinal)
+            {
+                ["price"] = ["good"],
+            }.ToImmutableDictionary(StringComparer.Ordinal),
+        };
+
+        var result = await intake.SubmitAsync(publicId, $"tok-{Guid.NewGuid():N}", [half]);
+
+        // **「見つからない」で落ちていないこと。** 引数を取り違えると、
+        // 検証に届かないまま試験だけが通る
+        Assert.Equal(IntakeRejection.Invalid, result.Rejection);
+        Assert.Contains(
+            result.Errors,
+            error => error.Code == ValidationErrorCode.RowRequired && error.Detail == "quality");
     }
 
     [Fact]
