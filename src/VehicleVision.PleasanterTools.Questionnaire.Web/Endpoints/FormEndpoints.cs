@@ -46,7 +46,15 @@ public sealed record TicketResponse(string ResponseToken, string Ticket, object?
 /// **Pleasanter の <c>ReferenceId</c> やサイト ID を含めない**
 /// （<c>_documents/画面設計.md</c> 1 章）。
 /// </remarks>
-public sealed record FormResponse(string PublicId, SurveyDefinition Definition);
+/// <param name="RequiresProofOfWork">
+/// このアンケートが proof-of-work を要るとしているか（Issue #66）。
+///
+/// **要否を伝えるのはこの口だけ。** 存在しない公開 ID に <c>404</c> を返す口なので、
+/// **実在をもともと隠していない。** 課題を出す口では出し分けない
+/// （<c>_documents/非機能設計.md</c> 1 章「識別子の秘匿」）。
+/// </param>
+public sealed record FormResponse(
+    string PublicId, SurveyDefinition Definition, bool RequiresProofOfWork);
 
 /// <summary>回答画面向けの口。**認証は無い。**</summary>
 public static class FormEndpoints
@@ -73,10 +81,11 @@ public static class FormEndpoints
             ResponseIntake intake,
             CancellationToken cancellationToken) =>
         {
-            var (definition, rejection) = await intake.GetPublishedAsync(publicId, cancellationToken);
-            return definition is null
+            var (form, rejection) = await intake.GetPublishedAsync(publicId, cancellationToken);
+            return form is null
                 ? ToProblem(rejection)
-                : Results.Ok(new FormResponse(publicId, definition));
+                : Results.Ok(new FormResponse(
+                    publicId, form.Definition, form.RequiresProofOfWork));
         });
 
         // **ヘッダ画像を配る**（Issue #56）。
@@ -125,7 +134,11 @@ public static class FormEndpoints
                 : NewResponseToken();
 
             // **課題もここで出す。** 画面を開いた時点から解き始められるので、
-            // 書き終えるころには計算が済んでいる（待たせない）
+            // 書き終えるころには計算が済んでいる（待たせない）。
+            //
+            // **アンケートごとの要否では出し分けない**（Issue #66）。
+            // 出し分けるには DB を見るしかなく、見た時点で応答の速さから
+            // 公開 ID の実在が分かる。**要否は `GET /api/forms/{publicId}` で伝える**
             return Results.Ok(new TicketResponse(
                 responseToken,
                 guard.Issue(publicId, responseToken),
@@ -222,8 +235,19 @@ public static class FormEndpoints
             }
 
             // **proof-of-work も見る。** チケットと重ねる（Issue #55）。
-            // **同じ解答は 2 度通らない**（使い終えた課題を覚えている）
-            if (await altcha.CheckAsync(request.Altcha, cancellationToken) is { } altchaReason)
+            // **同じ解答は 2 度通らない**（使い終えた課題を覚えている）。
+            //
+            // **要否は必ず DB の旗で決める**（Issue #66）。画面へも要否を返しているが、
+            // **画面が「要らない」と言ってきても信じない。** 信じると、
+            // 解答を付けずに投げるだけで proof-of-work を外せる。
+            //
+            // **アンケートが無いときも「要る」**として扱う（`RequiresProofOfWorkAsync`）。
+            // ここで「無いから要らない」にすると、公開 ID の実在が応答から分かる
+            var requiresProofOfWork = altcha.Options.Enabled
+                && await intake.RequiresProofOfWorkAsync(publicId, cancellationToken);
+
+            if (requiresProofOfWork
+                && await altcha.CheckAsync(request.Altcha, cancellationToken) is { } altchaReason)
             {
                 // **理由は外へ返さない**（上と同じ）
                 logger.LogWarning("回答の送信を proof-of-work で断った。理由: {Reason}", altchaReason);

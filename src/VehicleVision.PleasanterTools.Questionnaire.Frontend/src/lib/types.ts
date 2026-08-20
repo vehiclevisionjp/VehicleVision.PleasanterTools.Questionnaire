@@ -114,6 +114,17 @@ export interface SurveyDefinition {
 export interface FormResponse {
   publicId: string;
   definition: SurveyDefinition;
+  /**
+   * このアンケートが proof-of-work を要るとしているか（Issue #66）。
+   *
+   * **要否を伝えるのはこの口だけ。** 課題を出す口（`.../ticket`）は
+   * 要否に関わらず課題を返す（出し分けると公開 ID の実在が漏れる）。
+   *
+   * **分からなければ「要る」として扱うこと**（`?? true`）。
+   * 解かずに送って断られるより、要らない計算をする方が軽い。
+   * **どちらにせよ、受け付けるかどうかを決めるのはサーバ側。**
+   */
+  requiresProofOfWork?: boolean;
 }
 
 /** 送信する回答 1 件。 */

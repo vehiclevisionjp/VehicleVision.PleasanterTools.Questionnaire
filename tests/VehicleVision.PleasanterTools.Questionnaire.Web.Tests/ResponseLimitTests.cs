@@ -1,4 +1,4 @@
-using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
+﻿using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
@@ -73,7 +73,8 @@ public class ResponseLimitTests
     }
 
     /// <summary>送信待ちの代わり。</summary>
-    private sealed class FakeOutbox : IResponseOutbox
+    /// <remarks>**他の試験からも使う**ので <c>internal</c>（<c>ProofOfWorkPerSurveyTests</c>）。</remarks>
+    internal sealed class FakeOutbox : IResponseOutbox
     {
         private readonly Dictionary<string, string> _saved = new(StringComparer.Ordinal);
 
@@ -129,7 +130,8 @@ public class ResponseLimitTests
     }
 
     /// <summary>トークン対応表の代わり。**受付数はここの行数。**</summary>
-    private sealed class FakeTokens : IResponseTokenStore
+    /// <remarks>**他の試験からも使う**ので <c>internal</c>（<c>ProofOfWorkPerSurveyTests</c>）。</remarks>
+    internal sealed class FakeTokens : IResponseTokenStore
     {
         private readonly HashSet<string> _tokens = new(StringComparer.Ordinal);
 
@@ -340,9 +342,9 @@ public class ResponseLimitTests
         // **最後まで入力させてから断る方が悪い**（_documents/画面設計.md 1 章）
         var (intake, surveys, _) = Intake(responseLimit: 1, existingTokens: ["t1"]);
 
-        var (definition, rejection) = await intake.GetPublishedAsync(PublicId);
+        var (form, rejection) = await intake.GetPublishedAsync(PublicId);
 
-        Assert.Null(definition);
+        Assert.Null(form);
         Assert.Equal(IntakeRejection.Closed, rejection);
 
         // 開こうとした時点でも止める

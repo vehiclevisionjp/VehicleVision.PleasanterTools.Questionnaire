@@ -75,6 +75,13 @@
   let settingsFor = $state<SurveySummary | null>(null);
   /** 回答数の上限。**空欄は「上限なし」。** */
   let settingsLimit = $state('');
+  /**
+   * proof-of-work を課すか（Issue #66）。
+   *
+   * **サーバは null の項目を落として返す**ので `?? true` で受ける。
+   * **既定は有効**なので、分からないときは有効側に倒す。
+   */
+  let settingsProofOfWork = $state(true);
   let settingsBusy = $state(false);
 
   $effect(() => {
@@ -204,6 +211,7 @@
     error = '';
     settingsFor = survey;
     settingsLimit = survey.responseLimit == null ? '' : String(survey.responseLimit);
+    settingsProofOfWork = survey.requireProofOfWork ?? true;
   }
 
   async function saveSettings(event: SubmitEvent) {
@@ -227,7 +235,7 @@
     }
 
     settingsBusy = true;
-    const result = await saveSurveySettings(target.surveyId, limit);
+    const result = await saveSurveySettings(target.surveyId, limit, settingsProofOfWork);
     settingsBusy = false;
 
     if (!result.ok) {
@@ -372,6 +380,17 @@
       押す人がそれを知らないと、止まったままなのを不具合だと受け取る
     -->
     <p class="hint">{t('settings.noAutoResume')}</p>
+    <!--
+      **proof-of-work の要否**（Issue #66）。**公開し直さずに切り替えられる。**
+      **切っても他の bot 対策は外れない**ことを併せて出す。
+      出さないと「切る＝無防備」と受け取られ、切ってよい場面でも切れない
+    -->
+    <label class="check">
+      <input type="checkbox" bind:checked={settingsProofOfWork} />
+      {t('settings.proofOfWork')}
+    </label>
+    <p class="hint">{t('settings.proofOfWorkHint')}</p>
+    <p class="hint">{t('settings.proofOfWorkKeepsOthers')}</p>
     <div class="actions">
       <button type="submit" disabled={settingsBusy}>{t('settings.submit')}</button>
       <button type="button" class="secondary" onclick={() => (settingsFor = null)}>
@@ -520,6 +539,22 @@
     border-radius: 4px;
     font: inherit;
     box-sizing: border-box;
+  }
+
+  /*
+    **入り切りの札は文字の横に置く。** ここの `input` は文字入力の想定で
+    幅いっぱいに広がるので、そのままだと札が桁いっぱいの箱になる
+  */
+  label.check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  label.check input {
+    display: inline-block;
+    width: auto;
+    margin-top: 0;
   }
 
   .hint {

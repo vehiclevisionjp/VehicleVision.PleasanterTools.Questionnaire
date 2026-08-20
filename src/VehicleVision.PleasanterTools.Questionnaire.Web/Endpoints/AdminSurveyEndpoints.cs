@@ -464,7 +464,10 @@ public static class AdminSurveyEndpoints
 
         // ---- 公開設定 --------------------------------------------------------
         // **回答数の上限を編集できるようにする**（Issue #53）。
-        // 列はあったが、どこからも書けなかった
+        // 列はあったが、どこからも書けなかった。
+        //
+        // **proof-of-work の要否もここで切り替える**（Issue #66）。
+        // **定義ではなく運用の設定**なので、切り替えても公開し直さなくてよい
         group.MapPut("/{surveyId:guid}/settings", async (
             Guid surveyId,
             SurveySettingsRequest request,
@@ -491,13 +494,24 @@ public static class AdminSurveyEndpoints
                 return Results.NotFound();
             }
 
+            // **指定が無ければ今の値のまま**（Issue #66）。
+            // `bool` で受けて既定値の `false` を書き込むと、
+            // **項目を知らない相手が保存しただけで proof-of-work が黙って外れる**
+            var requireProofOfWork = request.RequireProofOfWork ?? record.RequireProofOfWork;
+
             // **上限を引き上げても勝手に再開しない**（_documents/データモデル設計.md 2.1）。
             // 再開するかどうかは人が決める
             await surveys
-                .SaveAsync(record with { ResponseLimit = request.ResponseLimit }, cancellationToken)
+                .SaveAsync(
+                    record with
+                    {
+                        ResponseLimit = request.ResponseLimit,
+                        RequireProofOfWork = requireProofOfWork,
+                    },
+                    cancellationToken)
                 .ConfigureAwait(false);
 
-            return Results.Ok(new { responseLimit = request.ResponseLimit });
+            return Results.Ok(new { responseLimit = request.ResponseLimit, requireProofOfWork });
         });
 
         // ---- 停止と再開 ------------------------------------------------------
@@ -630,7 +644,15 @@ public static class AdminSurveyEndpoints
     /// <param name="ResponseLimit">
     /// 受け付ける回答の上限。**<c>null</c> は「上限なし」。**
     /// </param>
-    public sealed record SurveySettingsRequest(int? ResponseLimit);
+    /// <param name="RequireProofOfWork">
+    /// 回答の送信に proof-of-work を課すか（Issue #66）。
+    /// **<c>null</c> は「変えない」。** <c>false</c> と取り違えないこと。
+    ///
+    /// **<c>bool</c> で受けないのは、省略されたときに <c>false</c> になるため。**
+    /// 項目を知らない相手が公開設定を保存しただけで、守りが黙って外れてしまう。
+    /// </param>
+    public sealed record SurveySettingsRequest(
+        int? ResponseLimit, bool? RequireProofOfWork = null);
 
     /// <summary>下書きの保存。</summary>
     /// <param name="Revision">読んだときの版。**これが今の版と違えば拒否する。**</param>

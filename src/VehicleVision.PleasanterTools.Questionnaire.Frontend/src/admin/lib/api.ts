@@ -242,12 +242,20 @@ export const publish = (surveyId: string) =>
  *
  * **`null` で「上限なし」。** 0 はサーバが断る（誰も回答できない設定になるため）。
  * **上限を引き上げても自動では再開しない。** 再開は人が押す。
+ *
+ * **proof-of-work の要否もここで切り替える**（Issue #66）。
+ * **定義ではなく運用の設定**なので、切り替えても公開し直さなくてよい。
+ * サーバは省略を「変えない」と解釈するので、**必ず今の値を添えて送る。**
  */
-export const saveSurveySettings = (surveyId: string, responseLimit: number | null) =>
-  call<{ responseLimit: number | null }>(`/api/admin/surveys/${surveyId}/settings`, {
-    method: 'PUT',
-    json: { responseLimit },
-  });
+export const saveSurveySettings = (
+  surveyId: string,
+  responseLimit: number | null,
+  requireProofOfWork: boolean,
+) =>
+  call<{ responseLimit: number | null; requireProofOfWork: boolean }>(
+    `/api/admin/surveys/${surveyId}/settings`,
+    { method: 'PUT', json: { responseLimit, requireProofOfWork } },
+  );
 
 export const suspend = (surveyId: string) =>
   call<{ status: string }>(`/api/admin/surveys/${surveyId}/suspend`, { method: 'POST', json: {} });

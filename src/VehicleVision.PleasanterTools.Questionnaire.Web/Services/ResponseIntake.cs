@@ -60,6 +60,21 @@ public sealed record IntakeResult(
         new(IntakeRejection.AttachmentRejected, Attachments: rejections);
 }
 
+/// <summary>回答画面へ渡す、公開中のアンケート 1 件。</summary>
+/// <param name="Definition">公開済みの版の定義。**下書きは入らない。**</param>
+/// <param name="RequiresProofOfWork">
+/// このアンケートが proof-of-work を要るとしているか（Issue #66）。
+///
+/// **ここで伝えてよい。** この口は存在しない公開 ID に <c>404</c> を返すので、
+/// **実在をもともと隠していない**（<c>_documents/非機能設計.md</c> 1 章「識別子の秘匿」）。
+/// 課題を出す口（<c>POST .../ticket</c>）では出し分けないこと。あちらは
+/// **DB を見ないことで実在を隠している。**
+///
+/// **画面はこれを見て、要るときだけ解く。**
+/// 受け付ける側は画面の言い分を信じず、必ず DB の旗で判定する。
+/// </param>
+public sealed record PublishedForm(SurveyDefinition Definition, bool RequiresProofOfWork);
+
 /// <summary>回答を受け付けて送信待ちへ入れる。</summary>
 /// <remarks>
 /// <para>
@@ -84,7 +99,7 @@ public sealed class ResponseIntake(
 
     /// <summary>公開中の定義を返す。回答画面が使う。</summary>
     /// <remarks>**下書きは絶対に返さない。** 公開済みの版だけを返す。</remarks>
-    public async Task<(SurveyDefinition? Definition, IntakeRejection? Rejection)> GetPublishedAsync(
+    public async Task<(PublishedForm? Form, IntakeRejection? Rejection)> GetPublishedAsync(
         string publicId,
         CancellationToken cancellationToken = default)
     {
@@ -112,7 +127,32 @@ public sealed class ResponseIntake(
 
         return snapshot is null
             ? (null, IntakeRejection.NotFound)
-            : (snapshot.Definition, null);
+            // **旗は版ではなくアンケートの行から取る**（Issue #66）。
+            // 運用の設定なので、公開し直さずに切り替えられる
+            : (new PublishedForm(snapshot.Definition, survey.RequireProofOfWork), null);
+    }
+
+    /// <summary>このアンケートが proof-of-work を要るとしているか（Issue #66）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **受け付ける側はこれを見る。** 画面が「要らない」と言ってきても信じない。
+    /// 画面へ返す旗（<see cref="PublishedForm.RequiresProofOfWork"/>）は
+    /// 待たせないための知らせでしかなく、**判定の根拠は必ず DB の行。**
+    /// </para>
+    /// <para>
+    /// **アンケートが無ければ「要る」。** ここで「無いから要らない」にすると、
+    /// 解答を付けずに投げるだけで公開 ID の実在が分かってしまう
+    /// （<c>_documents/非機能設計.md</c> 1 章「識別子の秘匿」）。
+    /// </para>
+    /// </remarks>
+    public async Task<bool> RequiresProofOfWorkAsync(
+        string publicId,
+        CancellationToken cancellationToken = default)
+    {
+        var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return survey?.RequireProofOfWork ?? true;
     }
 
     /// <summary>公開中のヘッダ画像を返す（Issue #56）。**無ければ <c>null</c>。**</summary>

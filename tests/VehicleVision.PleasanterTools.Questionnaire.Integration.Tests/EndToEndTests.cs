@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
@@ -150,9 +150,12 @@ public class EndToEndTests
             NullLogger<ResponseSender>.Instance);
 
         // --- 公開中の定義を返せる ---
-        var (definition, rejection) = await intake.GetPublishedAsync(publicId);
+        var (form, rejection) = await intake.GetPublishedAsync(publicId);
         Assert.Null(rejection);
-        Assert.Equal("ご満足いただけましたか", definition!.FindQuestion("q1")!.Title.Get("ja"));
+        Assert.Equal("ご満足いただけましたか", form!.Definition.FindQuestion("q1")!.Title.Get("ja"));
+
+        // **既定は proof-of-work を要る**（Issue #66）。移行しただけで守りが緩まない
+        Assert.True(form.RequiresProofOfWork);
 
         // --- 受付 ---
         var token = $"tok-{Guid.NewGuid():N}";
