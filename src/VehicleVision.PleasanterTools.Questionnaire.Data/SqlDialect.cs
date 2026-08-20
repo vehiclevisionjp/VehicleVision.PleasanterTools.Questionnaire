@@ -1,4 +1,4 @@
-namespace VehicleVision.PleasanterTools.Questionnaire.Data;
+﻿namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 
 /// <summary>RDBMS ごとに書き方が違う部分を閉じ込める。</summary>
 /// <remarks>
@@ -227,6 +227,25 @@ public static partial class SqlDialect
         + "FROM [Responses] r LEFT JOIN [Surveys] s ON s.[SurveyId] = r.[SurveyId] "
         + "WHERE r.[Status] = @DeadLetterStatus "
         + "ORDER BY r.[UpdatedAt] DESC, r.[ResponseToken] DESC "
+        + Page(provider);
+
+    /// <summary>添付を弾いた記録を新しい順に読む SQL（Issue #39）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **<c>LEFT JOIN</c>。** アンケートが消えていても、
+    /// 弾いた記録が残っていることは見えなければならない。
+    /// </para>
+    /// <para>
+    /// **並びを 2 本の列で決める。** 時刻は秒までしか持たない（<see cref="DbTime"/>）ので、
+    /// 同じ秒の行が複数あるとページ送りで取りこぼす。
+    /// </para>
+    /// </remarks>
+    public static string ListAttachmentRejections(DatabaseProvider provider) =>
+        "SELECT a.[OccurredAt], a.[SurveyId], s.[Title] AS [SurveyTitle], "
+        + "       a.[QuestionId], a.[Reason], a.[FileCount] "
+        + "FROM [AttachmentRejections] a "
+        + "LEFT JOIN [Surveys] s ON s.[SurveyId] = a.[SurveyId] "
+        + "ORDER BY a.[OccurredAt] DESC, a.[AttachmentRejectionId] DESC "
         + Page(provider);
 
     /// <summary>MySQL で確保した行を読み直す SQL。</summary>
