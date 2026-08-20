@@ -469,6 +469,35 @@ export interface OutboxStatus {
   deadLetterCount: number;
   /** デッドレターのうち、最も古い最終試行の時刻。 */
   oldestDeadLetterAt?: string | null;
+  /**
+   * 滞留による受付停止の状態（Issue #72）。
+   *
+   * **サーバは null のプロパティを落として返す**ので省略可で受ける。
+   */
+  backlog?: BacklogGuard | null;
+}
+
+/**
+ * 滞留による受付停止の状態（Issue #72）。
+ *
+ * **「送信待ちが多い」と「そのせいで受付を止めている」は別のこと。**
+ * 件数だけでは、止まっているかどうかが読み取れない。
+ */
+export interface BacklogGuard {
+  /** 閾値が設定されているか。**無効なら受付は止まらない。** */
+  enabled: boolean;
+  /** 滞留の総件数。**送信待ちとデッドレターの合計。** */
+  total: number;
+  /** 全体の上限。**0 なら段そのものが無効。** */
+  totalLimit: number;
+  /** 全アンケートの受付を止めているか。 */
+  totalBlocked: boolean;
+  /** アンケート単位の上限。 */
+  perSurveyLimit: number;
+  /** 滞留で止まっているアンケートの本数。 */
+  blockedSurveyCount: number;
+  /** 最後に数えた時刻。**一度も数えていなければ届かない。** */
+  sampledAt?: string | null;
 }
 
 /**

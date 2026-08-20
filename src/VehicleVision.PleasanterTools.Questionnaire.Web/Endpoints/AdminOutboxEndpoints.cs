@@ -51,10 +51,15 @@ public static class AdminOutboxEndpoints
         // ---- 滞留の状況 ------------------------------------------------------
         group.MapGet("/status", async (
             IResponseOutbox outbox,
+            ResponseBacklogGuard backlog,
             CancellationToken cancellationToken) =>
         {
             var status = await outbox.GetStatusAsync(cancellationToken).ConfigureAwait(false);
-            return Results.Ok(ToResponse(status));
+
+            // **見張りの状態も一緒に返す**（Issue #72）。
+            // 「送信待ちが多い」と「そのせいで受付を止めている」は別のことで、
+            // **止めていることは件数からは読み取れない**
+            return Results.Ok(ToResponse(status, backlog.GetStatus()));
         });
 
         // ---- デッドレターの一覧 ----------------------------------------------
@@ -125,7 +130,9 @@ public static class AdminOutboxEndpoints
     /// **時刻に UTC の印を付ける。** DB の列は時間帯を持たないので、
     /// そのまま返すと画面が端末の時間帯として読む（<see cref="DbTime.AsUtc(DateTime?)"/>）。
     /// </remarks>
-    public static OutboxStatusResponse ToResponse(OutboxStatus status)
+    public static OutboxStatusResponse ToResponse(
+        OutboxStatus status,
+        BacklogGuardStatus? backlog = null)
     {
         ArgumentNullException.ThrowIfNull(status);
 
@@ -133,7 +140,23 @@ public static class AdminOutboxEndpoints
             status.PendingCount,
             DbTime.AsUtc(status.OldestPendingAt),
             status.DeadLetterCount,
-            DbTime.AsUtc(status.OldestDeadLetterAt));
+            DbTime.AsUtc(status.OldestDeadLetterAt),
+            backlog is null ? null : ToResponse(backlog));
+    }
+
+    /// <summary>見張りの状態を応答の形にする（Issue #72）。</summary>
+    public static BacklogGuardResponse ToResponse(BacklogGuardStatus backlog)
+    {
+        ArgumentNullException.ThrowIfNull(backlog);
+
+        return new BacklogGuardResponse(
+            backlog.Enabled,
+            backlog.Total,
+            backlog.TotalLimit,
+            backlog.TotalBlocked,
+            backlog.PerSurveyLimit,
+            backlog.BlockedSurveyCount,
+            backlog.SampledAt?.UtcDateTime);
     }
 
     /// <summary>デッドレターの一覧を応答の形にする。</summary>
@@ -172,11 +195,35 @@ public static class AdminOutboxEndpoints
 /// <param name="OldestPendingAt">
 /// 最も古い滞留の受付時刻。**1 件も無ければ返らない**（null は落として返す）。
 /// </param>
+/// <param name="Backlog">滞留による受付停止の状態（Issue #72）。</param>
 public sealed record OutboxStatusResponse(
     int PendingCount,
     DateTime? OldestPendingAt,
     int DeadLetterCount,
-    DateTime? OldestDeadLetterAt);
+    DateTime? OldestDeadLetterAt,
+    BacklogGuardResponse? Backlog = null);
+
+/// <summary>滞留による受付停止の状態（Issue #72）。</summary>
+/// <remarks>
+/// **止めている理由を管理者が区別できるようにするためのもの。**
+/// 手で止めたのか、回答数の上限に達したのか、滞留で止まっているのかは
+/// 画面から見分けが付かなければならない。
+/// </remarks>
+/// <param name="Enabled">閾値が設定されているか。**無効なら受付は止まらない。**</param>
+/// <param name="Total">滞留の総件数。**送信待ちとデッドレターの合計。**</param>
+/// <param name="TotalLimit">全体の上限。**0 なら段そのものが無効。**</param>
+/// <param name="TotalBlocked">全アンケートの受付を止めているか。</param>
+/// <param name="PerSurveyLimit">アンケート単位の上限。</param>
+/// <param name="BlockedSurveyCount">滞留で止まっているアンケートの本数。</param>
+/// <param name="SampledAt">最後に数えた時刻。**一度も数えていなければ返らない。**</param>
+public sealed record BacklogGuardResponse(
+    bool Enabled,
+    int Total,
+    int TotalLimit,
+    bool TotalBlocked,
+    int PerSurveyLimit,
+    int BlockedSurveyCount,
+    DateTime? SampledAt);
 
 /// <summary>デッドレター 1 件の応答。</summary>
 /// <remarks>
