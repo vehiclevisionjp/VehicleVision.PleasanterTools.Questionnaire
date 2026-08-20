@@ -196,8 +196,9 @@ export const ja = {
   'mapping.removeSource': '入力を削除',
   'mapping.attachmentReplaceHint': '回答を送り直すと、Pleasanter 側の添付は新しいものへ置き換わります。',
   'mapping.rowUnset': '（行を選ぶ）',
-  'mapping.budgetEntry': '{prefix}: {used} / {available} 本',
-  'mapping.budgetOver': '{prefixes} の列が足りません。このままでは公開できません。',
+  'mapping.budgetEntry': '{prefix}: {used} / {available} 本（標準）',
+  'mapping.budgetOver':
+    '{prefixes} の列が標準の本数を超えています。項目拡張で列を増やしていない Pleasanter サイトでは、書いても保存されません。',
   'mapping.addSource': '入力を足す',
   'mapping.sourceOrderHint': '上から順に変換へ渡します。',
   'mapping.missingQuestion': '{questionId}（存在しません）',
@@ -655,7 +656,8 @@ export const en: Record<MessageKey, string> = {
     'Sending a response again replaces the attachments on the Pleasanter side.',
   'mapping.rowUnset': '(choose a row)',
   'mapping.budgetEntry': '{prefix}: {used} of {available}',
-  'mapping.budgetOver': 'Not enough {prefixes} columns. This cannot be published as is.',
+  'mapping.budgetOver':
+    '{prefixes} exceeds the standard number of columns. Unless the Pleasanter site has extra columns, the extras are not stored.',
   'mapping.addSource': 'Add an input',
   'mapping.sourceOrderHint': 'Inputs are passed to the converter from the top down.',
   'mapping.missingQuestion': '{questionId} (does not exist)',

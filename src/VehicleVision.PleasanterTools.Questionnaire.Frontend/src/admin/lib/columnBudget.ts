@@ -45,7 +45,13 @@ export interface ColumnUsage {
   used: number;
   available: number;
   remaining: number;
-  /** 足りているか。**足りていなければ公開できない。** */
+  /**
+   * 標準の本数に収まっているか。
+   *
+   * ⚠️ **超えていても公開は通る。** 実際に使える本数は Pleasanter サイト側の
+   * 設定（項目拡張）で決まり、こちらからは分からない。
+   * **超えたことを知らせるだけで、止めはしない。**
+   */
   fits: boolean;
 }
 
