@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -39,36 +39,42 @@ public static class ColumnBudget
 
     /// <summary>列名から型の接頭辞を取り出す。</summary>
     /// <remarks>
-    /// <c>ClassA</c> → <c>Class</c>、<c>Class012</c> → <c>Class</c>。
-    /// **末尾の英数字を落とすだけ。** 型の一覧を持たないのは、
-    /// 項目拡張で増えた列（<c>Class001</c> など）も同じ扱いにするため。
+    /// <para>
+    /// <c>ClassA</c> → <c>Class</c>、<c>Class012</c> → <c>Class</c>、
+    /// <c>Class</c> → <c>Class</c>。
+    /// </para>
+    /// <para>
+    /// **Pleasanter の列名は「接頭辞 ＋ <c>A</c>〜<c>Z</c> 1 文字」か
+    /// 「接頭辞 ＋ 数字」の 2 通りしかない**（<c>_documents/実機検証結果.md</c>）。
+    /// **どちらでもなければ、そのまま返す。**
+    /// </para>
+    /// <para>
+    /// ⚠️ **英字と数字の両方を落とさないこと。** 落とすと
+    /// <c>Class012</c> が <c>Clas</c> になり、<c>ClassA</c> と別の型として数えられる。
+    /// **型ごとの上限（26 本）がすり抜ける。**
+    /// </para>
     /// </remarks>
     public static string PrefixOf(string columnName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(columnName);
 
         var end = columnName.Length;
-        while (end > 0 && char.IsAsciiLetterOrDigit(columnName[end - 1]))
-        {
-            // **接頭辞そのものも英数字。** 1 文字は必ず残す
-            if (end - 1 == 0)
-            {
-                break;
-            }
 
-            var rest = columnName[..(end - 1)];
-            if (rest.Length > 0 && char.IsAsciiDigit(columnName[end - 1]))
+        if (char.IsAsciiDigit(columnName[end - 1]))
+        {
+            // 項目拡張で増えた列（Class001 など）
+            while (end > 1 && char.IsAsciiDigit(columnName[end - 1]))
             {
                 end--;
-                continue;
             }
-
-            // 末尾が英字のときは 1 文字だけ落とす（ClassA → Class）
+        }
+        else if (end > 1 && char.IsAsciiLetterUpper(columnName[end - 1]))
+        {
+            // 標準の列（ClassA 〜 ClassZ）。**大文字 1 文字だけ**
             end--;
-            break;
         }
 
-        return columnName[..Math.Max(end, 1)];
+        return columnName[..end];
     }
 
     /// <summary>今の割り当てで、型ごとに何本使っているか。</summary>
