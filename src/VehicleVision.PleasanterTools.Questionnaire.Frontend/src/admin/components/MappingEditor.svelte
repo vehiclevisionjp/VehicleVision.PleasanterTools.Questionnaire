@@ -2,11 +2,14 @@
   import {
     displayText,
     isAttachmentColumn,
+    rowPorts,
     type ColumnAssignment,
+    type LocalizedText,
     type MappingDefinition,
     type Question,
     type QuestionPort,
   } from '../lib/types';
+  import { measure } from '../lib/columnBudget';
   import type { Language } from '../../lib/i18n/language';
   import { t } from '../lib/i18n/state.svelte';
   import type { MessageKey } from '../lib/i18n/messages';
@@ -43,6 +46,17 @@
     { value: 'OtherText', key: 'port.OtherText' },
     { value: 'FileNames', key: 'port.FileNames' },
   ];
+
+  /**
+   * 型ごとに、いくつ列を使っているか（Issue #74）。
+   *
+   * **グリッドは 1 設問で行数ぶんの列を食う。**
+   * 保存や公開のときに初めて足りないと分かると、作り直しになる。
+   */
+  const usage = $derived(measure(mapping));
+
+  /** 足りていない型。**あれば公開できない。** */
+  const overflowing = $derived(usage.filter((entry) => !entry.fits));
 
   const answerable = $derived(questions.filter((question) => question.type !== 'Note'));
   const fileQuestions = $derived(questions.filter((question) => question.type === 'File'));
@@ -121,6 +135,17 @@
     patch(index, { sources: assignment.sources.filter((_, i) => i !== sourceIndex) });
   }
 
+  /**
+   * その設問が出す行（または項目）（Issue #74）。**出さない設問では空。**
+   *
+   * **サーバの `Question.RowPortIds` と同じ並び**にする。食い違うと、
+   * 画面で選べた行がサーバで「その設問に無い行」として弾かれる。
+   */
+  function rowPortsOf(questionId: string): { rowId: string; label: LocalizedText }[] {
+    const question = questions.find((candidate) => candidate.questionId === questionId);
+    return question === undefined ? [] : rowPorts(question);
+  }
+
   function questionLabel(questionId: string): string {
     const question = questions.find((q) => q.questionId === questionId);
     if (!question) {
@@ -165,6 +190,30 @@
 
   {#if mapping.assignments.length === 0}
     <p class="status">{t('mapping.empty')}</p>
+  {:else}
+    <!--
+      **列は型ごとに 26 本しかない**（Issue #74）。
+      グリッドは 1 設問で行数ぶんを食うので、作っている最中に見えないと手遅れになる
+    -->
+    <ul class="budget">
+      {#each usage as entry (entry.prefix)}
+        <li class:over={!entry.fits}>
+          {t('mapping.budgetEntry', {
+            prefix: entry.prefix,
+            used: entry.used,
+            available: entry.available,
+          })}
+        </li>
+      {/each}
+    </ul>
+
+    {#if overflowing.length > 0}
+      <p class="warn">
+        {t('mapping.budgetOver', {
+          prefixes: overflowing.map((entry) => entry.prefix).join(' / '),
+        })}
+      </p>
+    {/if}
   {/if}
 
   {#each mapping.assignments as assignment, index (index)}
@@ -245,6 +294,33 @@
             {#if attachment}
               <span class="fixed">{t('mapping.attachmentPort')}</span>
             {:else}
+              <!--
+                **グリッドとランキングは 1 設問が入力を複数出す**（Issue #74）。
+                どの行かを選ばないと、行をまたいだ値がまとめて 1 列へ入る
+              -->
+              {@const ports2 = rowPortsOf(source.questionId)}
+              {#if ports2.length > 0}
+                <select
+                  value={source.rowId ?? ''}
+                  onchange={(event) =>
+                    patch(index, {
+                      sources: assignment.sources.map((s, i) =>
+                        i === sourceIndex
+                          ? { ...s, rowId: event.currentTarget.value || undefined }
+                          : s,
+                      ),
+                    })}
+                >
+                  <!-- **選ばないままにもできるが、公開時に弾かれる。** 黙って通さない -->
+                  <option value="">{t('mapping.rowUnset')}</option>
+                  {#each ports2 as port (port.rowId)}
+                    <option value={port.rowId}>
+                      {displayText(port.label, editing) || port.rowId}
+                    </option>
+                  {/each}
+                </select>
+              {/if}
+
               <select
                 value={source.port}
                 onchange={(event) =>
@@ -290,6 +366,23 @@
 </section>
 
 <style lang="scss">
+  .budget {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    list-style: none;
+    margin: 0 0 0.75rem;
+    padding: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  /* **色だけに頼らない。** 文言そのものが「26 本中 30 本」と読める */
+  .budget .over {
+    color: var(--error);
+    font-weight: 600;
+  }
+
   .bar {
     display: flex;
     align-items: center;

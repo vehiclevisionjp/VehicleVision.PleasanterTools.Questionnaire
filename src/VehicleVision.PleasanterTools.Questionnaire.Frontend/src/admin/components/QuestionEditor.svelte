@@ -4,6 +4,7 @@
     conditionOperators,
     displayText,
     hasChoices,
+    hasRows,
     isDisplayOnly,
     needsConditionValue,
     picksFromChoices,
@@ -70,6 +71,10 @@
   }: Props = $props();
 
   const showChoices = $derived(hasChoices(question.type));
+
+  /** 行を編集させるか（Issue #74）。**列（選択肢）とは別の欄。** */
+  const showRows = $derived(hasRows(question.type));
+  const rows = $derived(question.settings.rows ?? []);
   const displayOnly = $derived(isDisplayOnly(question.type));
 
   /** 選択肢に行き先を置ける設問か。**1 つだけ選ぶ設問だけ。** */
@@ -110,6 +115,51 @@
 
   function removeChoice(index: number) {
     update({ choices: question.choices.filter((_, i) => i !== index) });
+  }
+
+  // ---- グリッドの行（Issue #74）----------------------------------------------
+
+  function updateRows(next: { rowId: string; label: Record<string, string> }[]) {
+    update({ settings: { ...question.settings, rows: next } });
+  }
+
+  function addRow() {
+    const number = rows.length + 1;
+    updateRows([
+      ...rows,
+      {
+        rowId: `row-${number}`,
+        // **最初の文言は編集中の言語へ入れる。** 他の言語は空のまま
+        label: withText(undefined, t('question.defaultRowLabel', { number }), editing),
+      },
+    ]);
+  }
+
+  function updateRow(index: number, patch: Partial<(typeof rows)[number]>) {
+    updateRows(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  function removeRow(index: number) {
+    updateRows(rows.filter((_, i) => i !== index));
+  }
+
+  /**
+   * 行を 1 つ動かす。
+   *
+   * **並びが画面の並びそのもの。** 後から行を足したときに、
+   * 消して作り直さずに済むようにする（作り直すと識別子が変わり、
+   * マッピングの指す先が消える）。
+   */
+  function moveRow(index: number, offset: number) {
+    const target = index + offset;
+    if (target < 0 || target >= rows.length) return;
+
+    const next = [...rows];
+    const [moved] = next.splice(index, 1);
+    if (moved === undefined) return;
+
+    next.splice(target, 0, moved);
+    updateRows(next);
   }
 
   // ---- 表示条件 -------------------------------------------------------------
@@ -226,6 +276,11 @@
               : question.choices.map((choice) => ({ ...choice, next: null }))
             : [],
           isRequired: isDisplayOnly(type) ? false : question.isRequired,
+          // **行を持たない形式にしたら行も落とす**（Issue #74）。
+          // 残すと、画面に出ないのにマッピングの指す先だけが生き続ける
+          settings: hasRows(type)
+            ? question.settings
+            : { ...question.settings, rows: undefined },
         });
       }}
     >
@@ -290,8 +345,75 @@
     {/if}
   </div>
 
+  {#if showRows}
+    <!--
+      **行と列を分けて出す。** グリッドは「行×選択肢」で、
+      どちらがどちらか分からなくなると、作った人の意図と逆の表ができる
+    -->
+    <div class="rows">
+      <p class="section">{t('question.rowsTitle')}</p>
+
+      {#each rows as row, index (index)}
+        <div class="row-line">
+          <input
+            type="text"
+            class="row-label"
+            placeholder={t('question.rowLabelPlaceholder')}
+            value={text(row.label, editing)}
+            oninput={(event) =>
+              updateRow(index, { label: withText(row.label, event.currentTarget.value, editing) })}
+          />
+          <input
+            type="text"
+            class="row-id"
+            placeholder={t('question.rowIdPlaceholder')}
+            value={row.rowId}
+            oninput={(event) => updateRow(index, { rowId: event.currentTarget.value })}
+          />
+          <button
+            type="button"
+            class="icon"
+            disabled={index === 0}
+            onclick={() => moveRow(index, -1)}
+            aria-label={t('question.moveRowUp')}>↑</button
+          >
+          <button
+            type="button"
+            class="icon"
+            disabled={index === rows.length - 1}
+            onclick={() => moveRow(index, 1)}
+            aria-label={t('question.moveRowDown')}>↓</button
+          >
+          <button
+            type="button"
+            class="icon danger"
+            onclick={() => removeRow(index)}
+            aria-label={t('question.removeRow')}>×</button
+          >
+        </div>
+      {/each}
+
+      <button type="button" class="secondary small" onclick={addRow}>
+        {t('question.addRow')}
+      </button>
+
+      <!-- **行を増やすほど Pleasanter の列を食う。** 作る前に分かるようにする -->
+      <p class="hint">{t('question.rowHint')}</p>
+
+      {#if rows.length === 0}
+        <p class="warn">{t('question.rowsEmpty')}</p>
+      {/if}
+    </div>
+  {/if}
+
   {#if showChoices}
     <div class="choices">
+      {#if showRows}
+        <!-- **選択肢が列になる。** 行の欄と取り違えさせない -->
+        <p class="section">{t('question.gridColumnsTitle')}</p>
+      {:else if question.type === 'Ranking'}
+        <p class="section">{t('question.rankingItemsTitle')}</p>
+      {/if}
       {#each question.choices as choice, index (index)}
         {@const stale = staleTargetId(choice.next, targetIds)}
         <div class="choice-block">
@@ -598,6 +720,34 @@
     margin-top: 0.75rem;
     padding-top: 0.75rem;
     border-top: 1px dashed var(--border);
+  }
+
+  .rows {
+    margin-top: 0.75rem;
+  }
+
+  .section {
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0 0 0.35rem;
+  }
+
+  .row-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .row-label {
+    flex: 2 1 12rem;
+  }
+
+  .row-id {
+    flex: 1 1 8rem;
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
   }
 
   .choice-block {
