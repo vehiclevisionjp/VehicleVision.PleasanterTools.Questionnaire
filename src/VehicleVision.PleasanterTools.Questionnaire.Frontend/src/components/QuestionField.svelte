@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { AnswerState, Question } from '../lib/types';
-  import { text } from '../lib/types';
+  import { allowsMultiplePerRow, rowValues, text } from '../lib/types';
   import type { Language } from '../lib/i18n/language';
   import { translator } from '../lib/i18n/messages';
 
@@ -47,6 +47,92 @@
   function setFiles(files: File[]) {
     answer = { ...current, files };
   }
+
+  // ---- グリッド（Issue #74）--------------------------------------------------
+
+  const rows = $derived(question.settings.rows ?? []);
+
+  /** その行で選ばれている値。 */
+  function row(rowId: string): string[] {
+    return rowValues(current, rowId);
+  }
+
+  function setRow(rowId: string, values: string[]) {
+    answer = { ...current, rows: { ...(current.rows ?? {}), [rowId]: values } };
+  }
+
+  function toggleCell(rowId: string, value: string, checked: boolean) {
+    if (!allowsMultiplePerRow(question)) {
+      // **1 行 1 つ。** 押した値で置き換える
+      setRow(rowId, checked ? [value] : []);
+      return;
+    }
+
+    const values = checked
+      ? [...row(rowId), value]
+      : row(rowId).filter((existing) => existing !== value);
+
+    setRow(rowId, values);
+  }
+
+  // ---- ランキング（Issue #74）------------------------------------------------
+
+  /**
+   * その項目の順位。**選ばれていなければ 0。**
+   *
+   * **1 から数える。** 0 始まりだと画面に出したときに読み違える。
+   */
+  function rankOf(value: string): number {
+    return current.values.indexOf(value) + 1;
+  }
+
+  /** 選ぶ・外す。**押した順に並ぶ。** */
+  function toggleRank(value: string) {
+    answer = {
+      ...current,
+      values: current.values.includes(value)
+        ? current.values.filter((existing) => existing !== value)
+        : [...current.values, value],
+    };
+  }
+
+  /**
+   * 順位を 1 つ動かす。
+   *
+   * **掴んで動かすだけにしない。** キーボードだけの人と読み上げの人が
+   * 順位を変えられないと、その設問に答えられなくなる。
+   */
+  function moveRank(value: string, offset: number) {
+    const index = current.values.indexOf(value);
+    const target = index + offset;
+    if (index < 0 || target < 0 || target >= current.values.length) return;
+
+    // **抜いて差し直す。** 添字への代入だと、
+    // 添字で取り出した値が undefined になり得る形になる（noUncheckedIndexedAccess）
+    const values = [...current.values];
+    const [moved] = values.splice(index, 1);
+    if (moved === undefined) return;
+
+    values.splice(target, 0, moved);
+    answer = { ...current, values };
+  }
+
+  /** 読み上げへ流す、今の順位。**押すたびに変わるので状態として出す。** */
+  const rankingStatus = $derived.by(() => {
+    if (question.type !== 'Ranking' || current.values.length === 0) return '';
+
+    const labels = new Map(question.choices.map((choice) => [choice.value, choice.label]));
+
+    return current.values
+      .map((value, index) =>
+        t('question.rankingStatus', {
+          label: text(labels.get(value), language),
+          rank: index + 1,
+          total: current.values.length,
+        }),
+      )
+      .join('. ');
+  });
 
   /** 添付の上限を文字で出す。**選んでから弾かれるより先に伝える。** */
   const fileLimits = $derived.by(() => {
@@ -206,6 +292,101 @@
           {/each}
         </ul>
       {/if}
+    {:else if question.type === 'Grid' || question.type === 'CheckboxGrid'}
+      <!--
+        **横に長い。** 画面本体を横スクロールさせず、表の中だけ流す。
+        **狭い画面では表をやめる**（下の @media で行ごとの塊にする）
+      -->
+      <div class="grid-scroll">
+        <table class="grid">
+          <thead>
+            <tr>
+              <th scope="col">{t('question.gridRowHeader')}</th>
+              {#each question.choices as choice (choice.value)}
+                <th scope="col">{text(choice.label, language)}</th>
+              {/each}
+            </tr>
+          </thead>
+          <tbody>
+            {#each rows as gridRow (gridRow.rowId)}
+              <tr>
+                <th scope="row">{text(gridRow.label, language)}</th>
+                {#each question.choices as choice (choice.value)}
+                  <td>
+                    <!--
+                      **見出しだけでは読み上げに足りない。** 表を線形に読むと
+                      「どの行のどの列か」が失われるので、入力自体に名前を付ける
+                    -->
+                    <label class="cell">
+                      <input
+                        type={allowsMultiplePerRow(question) ? 'checkbox' : 'radio'}
+                        name={`${question.questionId}-${gridRow.rowId}`}
+                        value={choice.value}
+                        checked={row(gridRow.rowId).includes(choice.value)}
+                        aria-label={t('question.gridRowLabel', {
+                          row: text(gridRow.label, language),
+                          choice: text(choice.label, language),
+                        })}
+                        onchange={(event) =>
+                          toggleCell(gridRow.rowId, choice.value, event.currentTarget.checked)}
+                      />
+                      <!-- **狭い画面でだけ出す。** 表のときは列見出しと重複する -->
+                      <span class="cell-label">{text(choice.label, language)}</span>
+                    </label>
+                  </td>
+                {/each}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {:else if question.type === 'Ranking'}
+      <p class="description">{t('question.rankingLead')}</p>
+
+      <ol class="ranking">
+        {#each question.choices as choice (choice.value)}
+          {@const rank = rankOf(choice.value)}
+          <li class="rank-item" class:ranked={rank > 0}>
+            <button
+              type="button"
+              class="rank-toggle"
+              aria-pressed={rank > 0}
+              onclick={() => toggleRank(choice.value)}
+            >
+              <span class="rank-badge">
+                {rank > 0 ? t('question.rankingRank', { rank }) : t('question.rankingUnranked')}
+              </span>
+              <span>{text(choice.label, language)}</span>
+            </button>
+
+            <!--
+              **掴んで動かすだけにしない。** キーボードと読み上げで順位を変えられること。
+              選んでいないものには出さない（動かす順位が無い）
+            -->
+            {#if rank > 0}
+              <span class="rank-actions">
+                <button
+                  type="button"
+                  class="rank-move"
+                  disabled={rank === 1}
+                  aria-label={`${text(choice.label, language)}: ${t('question.rankingUp')}`}
+                  onclick={() => moveRank(choice.value, -1)}>↑</button
+                >
+                <button
+                  type="button"
+                  class="rank-move"
+                  disabled={rank === current.values.length}
+                  aria-label={`${text(choice.label, language)}: ${t('question.rankingDown')}`}
+                  onclick={() => moveRank(choice.value, 1)}>↓</button
+                >
+              </span>
+            {/if}
+          </li>
+        {/each}
+      </ol>
+
+      <!-- **順位は押すたびに変わる。** 読み上げへ届かないと変わったことが分からない -->
+      <p class="visually-hidden" aria-live="polite">{rankingStatus}</p>
     {:else if question.type === 'Time'}
       <input
         type="time"
@@ -288,6 +469,180 @@
 
   .other {
     margin-top: 0.5rem;
+  }
+
+  /* ---- グリッド（Issue #74）------------------------------------------------ */
+
+  /* **画面本体を横スクロールさせない。** 溢れるのは表の中だけ */
+  .grid-scroll {
+    overflow-x: auto;
+  }
+
+  .grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  .grid th,
+  .grid td {
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem;
+    text-align: center;
+  }
+
+  .grid thead th {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* 行の見出しだけ左寄せ。**読む向きが列見出しと違う** */
+  .grid tbody th {
+    text-align: left;
+    font-weight: 500;
+  }
+
+  .cell {
+    display: block;
+    padding: 0.35rem;
+    cursor: pointer;
+  }
+
+  /* 表として出せている間は、列見出しと重複するので出さない */
+  .cell-label {
+    display: none;
+  }
+
+  /*
+    **狭い画面では表をやめる。** 列が 5 つも並ぶと、横に流しても読めない。
+    行ごとの塊にして縦に積み、選択肢の名前を各行へ出す
+  */
+  @media (max-width: 40rem) {
+    .grid,
+    .grid tbody,
+    .grid tr,
+    .grid td {
+      display: block;
+    }
+
+    /* 列見出しは畳んだ形では意味を持たない。**消すのではなく読み上げにだけ残す** */
+    .grid thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .grid tr {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+      padding: 0.5rem;
+    }
+
+    .grid tbody th {
+      display: block;
+      border-bottom: none;
+      font-weight: 600;
+      padding: 0.25rem 0.5rem 0.5rem;
+    }
+
+    .grid td {
+      border-bottom: none;
+      text-align: left;
+      padding: 0;
+    }
+
+    .cell {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .cell-label {
+      display: inline;
+    }
+  }
+
+  /* ---- ランキング（Issue #74）---------------------------------------------- */
+
+  .ranking {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .rank-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* **色だけに頼らない。** 左端の太い線と、順位そのものの文字で分かる */
+  .rank-item.ranked {
+    border-left: 4px solid var(--accent);
+  }
+
+  .rank-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .rank-badge {
+    flex: 0 0 auto;
+    min-width: 5rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .rank-item.ranked .rank-badge {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .rank-actions {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  /* **指で押せる大きさにする。** 並べ替えは押し間違えると順位が崩れる */
+  .rank-move {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .rank-move:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  /* 読み上げにだけ届かせる */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .files {

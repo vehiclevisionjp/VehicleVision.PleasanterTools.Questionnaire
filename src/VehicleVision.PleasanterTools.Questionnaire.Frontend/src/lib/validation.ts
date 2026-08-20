@@ -1,6 +1,6 @@
 import type { Translate } from './i18n/messages';
 import type { AnswerState, Question } from './types';
-import { hasChoices, isDisplayOnly } from './types';
+import { allowsMultiplePerRow, hasChoices, hasRows, isDisplayOnly, rowValues } from './types';
 
 /**
  * 画面側の検証。
@@ -36,19 +36,59 @@ export function validateQuestion(
     return tooLarge ? t('validation.fileTooLarge', { name: tooLarge.name }) : null;
   }
 
+  // **グリッドは行ごとに見る**（Issue #74）。値の配列ではなく行の辞書に入る
+  if (hasRows(question)) {
+    return validateGrid(question, answer, t);
+  }
+
   const values = (answer?.values ?? []).filter((value) => value.trim() !== '');
 
   if (values.length === 0) {
     return question.isRequired ? t('validation.required') : null;
   }
 
-  if (!hasChoices(question) && question.type !== 'Checkbox' && values.length > 1) {
+  // **ランキングは並べた順そのものが答え。** 同じ項目が 2 回出ると順位が決まらない
+  if (question.type === 'Ranking' && new Set(values).size !== values.length) {
+    return t('validation.duplicateRank');
+  }
+
+  // **選択肢を持たない形式は 1 つしか持てない。**
+  // ランキングは選択肢を持つ側（並べた順を全部返す）なので、ここでは弾かない
+  if (!hasChoices(question) && values.length > 1) {
     return t('validation.singleValueOnly');
   }
 
   for (const value of values) {
     const error = validateValue(question, value, t);
     if (error) return error;
+  }
+
+  return null;
+}
+
+/**
+ * グリッドを見る（Issue #74）。
+ *
+ * **必須は「行が全部埋まっていること」。** 1 行でも空なら足りない。
+ * 行の一部だけ答えて送れると、どこまで答えたのか誰にも分からなくなる。
+ * **サーバ側（`AnswerValidator`）と同じ見方。**
+ */
+function validateGrid(
+  question: Question,
+  answer: AnswerState | undefined,
+  t: Translate,
+): string | null {
+  for (const row of question.settings.rows ?? []) {
+    const values = rowValues(answer, row.rowId).filter((value) => value.trim() !== '');
+
+    if (values.length === 0) {
+      if (question.isRequired) return t('validation.rowRequired');
+      continue;
+    }
+
+    if (!allowsMultiplePerRow(question) && values.length > 1) {
+      return t('validation.singleValueOnly');
+    }
   }
 
   return null;

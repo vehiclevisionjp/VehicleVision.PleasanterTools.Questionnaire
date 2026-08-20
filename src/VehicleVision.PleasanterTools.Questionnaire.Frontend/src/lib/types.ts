@@ -14,6 +14,9 @@ export type QuestionType =
   | 'Date'
   | 'Time'
   | 'File'
+  | 'Grid'
+  | 'CheckboxGrid'
+  | 'Ranking'
   | 'Note';
 
 /** 言語コードをキーにした表示文字列。 */
@@ -74,6 +77,20 @@ export interface QuestionSettings {
   format?: 'None' | 'Email' | 'Url';
   maxFileCount?: number;
   maxFileSizeBytes?: number;
+  /**
+   * グリッドの行（Issue #74）。
+   *
+   * **列（選択肢）は `choices` の方。** 行はここ。
+   * **1 行が 1 つの入力になる**ので、行を増やすほど Pleasanter の列を食う。
+   */
+  rows?: GridRow[];
+}
+
+/** グリッドの行 1 つ（Issue #74）。 */
+export interface GridRow {
+  /** 行の識別子。**設問の中で一意。** マッピングはこれで行を指す。 */
+  rowId: string;
+  label: LocalizedText;
 }
 
 export interface Question {
@@ -133,6 +150,13 @@ export interface PayloadAnswer {
   values: string[];
   otherText?: string;
   fileNames?: string[];
+  /**
+   * 行ごとの回答（Issue #74）。
+   *
+   * **グリッドの回答はここにしか入っていない。**
+   * 落とすと、答えたのに未回答として弾かれる。
+   */
+  rows?: Record<string, string[]>;
 }
 
 /** サーバが発行する送信チケットと回答トークン。 */
@@ -169,6 +193,13 @@ export interface AnswerState {
   values: string[];
   otherText: string;
   /**
+   * 行ごとの回答（Issue #74）。行の識別子 → その行で選ばれた値。
+   *
+   * **グリッドはこちらだけを使い、`values` は使わない。**
+   * **ランキングは逆で、`values` に順位の順で並べる。**
+   */
+  rows?: Record<string, string[]>;
+  /**
    * 添付ファイル。**送信のたびに選び直してもらう。**
    * 一度送った添付をブラウザ側で持ち続けられないため（File は保存できない）。
    */
@@ -186,9 +217,35 @@ export function text(value: LocalizedText | undefined, language: Language): stri
   return value[language] ?? value[DEFAULT_LANGUAGE] ?? '';
 }
 
-/** 選択肢を持つ形式か。 */
+/**
+ * 選択肢を持つ形式か。
+ *
+ * **グリッドとランキングも選択肢を持つ。** グリッドは列、ランキングは並べる項目。
+ */
 export function hasChoices(question: Question): boolean {
-  return question.type === 'Radio' || question.type === 'Checkbox' || question.type === 'Dropdown';
+  return (
+    question.type === 'Radio' ||
+    question.type === 'Checkbox' ||
+    question.type === 'Dropdown' ||
+    question.type === 'Grid' ||
+    question.type === 'CheckboxGrid' ||
+    question.type === 'Ranking'
+  );
+}
+
+/** 行を持つ形式か（Issue #74）。**回答は `rows` に入る。** */
+export function hasRows(question: Question): boolean {
+  return question.type === 'Grid' || question.type === 'CheckboxGrid';
+}
+
+/** 1 行に複数選べる形式か。 */
+export function allowsMultiplePerRow(question: Question): boolean {
+  return question.type === 'CheckboxGrid';
+}
+
+/** その行で選ばれている値。**無ければ空。** */
+export function rowValues(answer: AnswerState | undefined, rowId: string): string[] {
+  return answer?.rows?.[rowId] ?? [];
 }
 
 /** 回答を持たない表示専用の要素か。 */

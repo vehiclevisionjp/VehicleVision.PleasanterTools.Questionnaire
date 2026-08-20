@@ -293,6 +293,19 @@
     return t(serverValidationKey(code));
   }
 
+  /** 何も選んでいない行を落とす。**全部空なら行そのものを送らない。** */
+  function compactRows(
+    rows: Record<string, string[]> | undefined,
+  ): Record<string, string[]> | undefined {
+    if (rows === undefined) return undefined;
+
+    const kept = Object.entries(rows).filter(([, values]) =>
+      values.some((value) => value.trim() !== ''),
+    );
+
+    return kept.length === 0 ? undefined : Object.fromEntries(kept);
+  }
+
   function toPayload(): PayloadAnswer[] {
     return Object.entries(answers)
       .filter(([questionId]) => {
@@ -312,6 +325,9 @@
         questionId,
         values: answer.values,
         otherText: answer.otherText === '' ? undefined : answer.otherText,
+        // **空の行は送らない。** 何も選んでいない行まで送ると、
+        // 正本 JSON に空の入れ物が並ぶ
+        rows: compactRows(answer.rows),
       }));
   }
 

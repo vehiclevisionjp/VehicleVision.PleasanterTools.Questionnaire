@@ -16,6 +16,9 @@ export type QuestionType =
   | 'Date'
   | 'Time'
   | 'File'
+  | 'Grid'
+  | 'CheckboxGrid'
+  | 'Ranking'
   | 'Note';
 
 /**
@@ -34,6 +37,9 @@ export const questionTypes: QuestionType[] = [
   'Date',
   'Time',
   'File',
+  'Grid',
+  'CheckboxGrid',
+  'Ranking',
   'Note',
 ];
 
@@ -42,9 +48,54 @@ export function questionTypeKey(type: QuestionType): MessageKey {
   return `questionType.${type}`;
 }
 
-/** 選択肢を持つ形式か。 */
+/**
+ * 選択肢を持つ形式か。
+ *
+ * **グリッドとランキングも選択肢を持つ。** グリッドは列、ランキングは並べる項目。
+ */
 export function hasChoices(type: QuestionType): boolean {
-  return type === 'Radio' || type === 'Checkbox' || type === 'Dropdown';
+  return (
+    type === 'Radio' ||
+    type === 'Checkbox' ||
+    type === 'Dropdown' ||
+    type === 'Grid' ||
+    type === 'CheckboxGrid' ||
+    type === 'Ranking'
+  );
+}
+
+/** 行を持つ形式か（Issue #74）。**列は `choices` の方。** */
+export function hasRows(type: QuestionType): boolean {
+  return type === 'Grid' || type === 'CheckboxGrid';
+}
+
+/**
+ * マッピングの入力を複数出す形式か（Issue #74）。
+ *
+ * **グリッドは行ごと、ランキングは項目ごと。**
+ * どちらも 1 設問が Pleasanter の列を複数食い得る。
+ */
+export function hasRowPorts(type: QuestionType): boolean {
+  return hasRows(type) || type === 'Ranking';
+}
+
+/**
+ * マッピングで指せる行（または項目）の識別子と文言。
+ *
+ * **サーバの `Question.RowPortIds` と同じ並び。** 食い違うと、
+ * 画面で選べた行がサーバで「その設問に無い行」として弾かれる。
+ */
+export function rowPorts(question: Question): { rowId: string; label: LocalizedText }[] {
+  if (hasRows(question.type)) {
+    return question.settings.rows ?? [];
+  }
+
+  if (question.type === 'Ranking') {
+    // **ランキングは選択肢そのものが入力になる。** 入る値は順位
+    return question.choices.map((choice) => ({ rowId: choice.value, label: choice.label }));
+  }
+
+  return [];
 }
 
 /** 回答を持たない表示専用の要素か。 */
@@ -147,6 +198,20 @@ export interface QuestionSettings {
   scaleMaximumLabel?: LocalizedText;
   maxFileCount?: number;
   maxFileSizeBytes?: number;
+  /**
+   * グリッドの行（Issue #74）。
+   *
+   * **列（選択肢）は `choices` の方。** 行はここ。
+   * **1 行が 1 つの入力になる**ので、行を増やすほど Pleasanter の列を食う。
+   */
+  rows?: GridRow[];
+}
+
+/** グリッドの行 1 つ（Issue #74）。 */
+export interface GridRow {
+  /** 行の識別子。**設問の中で一意。** マッピングはこれで行を指す。 */
+  rowId: string;
+  label: LocalizedText;
 }
 
 export interface Question {
@@ -212,6 +277,16 @@ export function isAttachmentColumn(column: string): boolean {
 export interface MappingSource {
   questionId: string;
   port: QuestionPort;
+  /**
+   * どの行（または順位を付ける項目）から取るか（Issue #74）。
+   *
+   * **グリッドとランキングでだけ使う。** 行を持つ設問で選ばないと、
+   * 行をまたいだ値がまとめて 1 列へ入る（公開時に弾かれる）。
+   *
+   * **既定の提案は「行ごとに 1 列」。** ただし複数の行を選んで
+   * `join` で 1 列へまとめてもよく、**決めるのは使う人。**
+   */
+  rowId?: string;
 }
 
 export interface MappingConverter {

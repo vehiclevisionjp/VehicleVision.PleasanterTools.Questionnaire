@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -265,6 +265,41 @@ public class GridMappingTests
 
         Assert.False(usage.Fits);
         Assert.Equal(-4, usage.Remaining);
+    }
+
+    [Theory]
+    [InlineData("ClassA", "Class")]
+    [InlineData("ClassZ", "Class")]
+    [InlineData("Class001", "Class")]
+    [InlineData("Class012", "Class")]
+    [InlineData("NumA", "Num")]
+    [InlineData("DateA", "Date")]
+    [InlineData("Attachments001", "Attachments")]
+    // **接頭辞だけの名前は、そのまま返す。** 落とすと別の型に化ける
+    [InlineData("Class", "Class")]
+    public void 列名から型の接頭辞を取り出す(string columnName, string expected)
+    {
+        Assert.Equal(expected, ColumnBudget.PrefixOf(columnName));
+    }
+
+    [Fact]
+    public void 標準の列と項目拡張の列を同じ型として数える()
+    {
+        // ⚠️ **英字と数字の両方を落とすと `Class012` が `Clas` になり、
+        // `ClassA` と別の型として数えられる。** 型ごとの上限がすり抜ける
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct("ClassA", new MappingSource("q-grid", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Class001", new MappingSource("q-grid", QuestionPort.Value, "quality")),
+            ],
+        };
+
+        var usage = Assert.Single(ColumnBudget.Measure(mapping));
+
+        Assert.Equal("Class", usage.Prefix);
+        Assert.Equal(2, usage.Used);
     }
 
     [Fact]
