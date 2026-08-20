@@ -24,6 +24,7 @@
   } from './lib/i18n/language';
   import { serverValidationKey, translator, type MessageKey } from './lib/i18n/messages';
   import { applyTheme, headerImageUrl } from './lib/theme';
+  import { clearDraft, hasDraft, readDraft, saveDraft } from './lib/draft';
 
   type Screen = 'loading' | 'answering' | 'answered' | 'completed' | 'rejected' | 'error';
 
@@ -93,6 +94,17 @@
    * ここを false にしても送信が通るようにはならない。
    */
   let requiresProofOfWork = $state(true);
+  /**
+   * 下書きを端末へ残してよいか（Issue #59）。
+   *
+   * ⚠️ **分からなければ残さない。** 端末は共有され得るので、
+   * 判断が付かないときは残さない側へ倒す。
+   */
+  let allowsDraft = $state(false);
+  /** 端末に前回の下書きがあるか。**勝手には戻さない。** */
+  let draftFound = $state(false);
+  /** 下書きから戻したことの知らせ。 */
+  let draftNotice = $state('');
   /** 今どの区切りを見ているか。**ページではなく「区切り」の番号**（1 問 1 ページ表示があるため） */
   let stepIndex = $state(0);
   let answers = $state<Record<string, AnswerState>>({});
@@ -195,6 +207,9 @@
     // **分からなければ解く側に倒す**（解かずに送って断られる方が重い）
     requiresProofOfWork = result.form.requiresProofOfWork ?? true;
 
+    // **分からなければ残さない側へ倒す**（Issue #59）
+    allowsDraft = result.form.allowsDraft ?? false;
+
     // **回答トークンと送信チケットをサーバから受け取る。**
     // チケットが無いと送信できないので、ここで失敗したら回答させない
     const issued = await requestTicket(publicId);
@@ -232,10 +247,66 @@
       }
     }
 
+    // **下書きは勝手に戻さない**（Issue #59）。
+    // 共有の端末では、前に使った人の回答をそのまま見せることになる。
+    // **サーバから読めた回答（編集）の方が確かなので、そちらがあれば下書きは出さない**
+    draftFound = allowsDraft && !canEdit && hasDraft(publicId);
+
     // **この端末から回答済みなら、いきなり空のフォームを出さない**
     // （`_documents/画面設計.md` 1 章「既に回答済み」）。
     // **消されたら分からない。** これは防止ではなく抑止
     screen = hasSubmitted(publicId) ? 'answered' : 'answering';
+  }
+
+  /**
+   * 書いた内容を端末へ残す（Issue #59）。
+   *
+   * **許可されたアンケートで、回答中のときだけ。**
+   * 完了画面や停止中の画面で書き足すことはない。
+   *
+   * **打つたびに書く。** 落ちる直前まで残っていてほしいので、間引かない。
+   * 書く先は端末の Web Storage で、通信は起きない。
+   */
+  $effect(() => {
+    // **中身を読んでから判定する。** 先に return すると、
+    // 回答の変化を見張る対象から外れて 2 度と走らない
+    const snapshot = $state.snapshot(answers) as Record<string, AnswerState>;
+
+    if (!allowsDraft || screen !== 'answering') return;
+
+    // ⚠️ **戻すかどうかを聞いている間は書かない。**
+    // 読み込み直後の回答は空なので、書くと「全部消した」と見なして
+    // **置いてある下書きを、戻す前に消してしまう**
+    if (draftFound) return;
+
+    saveDraft(publicId, snapshot);
+  });
+
+  /** 下書きから戻す。**回答者が押したときだけ。** */
+  function restoreDraft() {
+    const draft = readDraft(publicId);
+    draftFound = false;
+
+    if (draft === null) {
+      // 期限切れなどで消えていた
+      return;
+    }
+
+    for (const [questionId, answer] of Object.entries(draft)) {
+      // **今の定義に無い設問は戻さない。** 公開し直しで設問が消えていることがある
+      if (answers[questionId] === undefined) continue;
+
+      answers[questionId] = { ...answer };
+    }
+
+    draftNotice = t('draft.restored');
+  }
+
+  /** 下書きを捨てる。**共有の端末で、前の人の回答を消せる口。** */
+  function discardDraft() {
+    clearDraft(publicId);
+    draftFound = false;
+    draftNotice = t('draft.discarded');
   }
 
   /**
@@ -348,6 +419,9 @@
       );
       if (result.accepted) {
         canEdit = true;
+        // **送れたら下書きは要らない**（Issue #59）。端末へ残し続けない
+        clearDraft(publicId);
+        draftFound = false;
         screen = 'completed';
         return;
       }
@@ -501,6 +575,25 @@
       {/if}
     </header>
 
+    <!--
+      **勝手に戻さない**（Issue #59）。共有の端末では、
+      前に使った人の回答をそのまま見せることになる
+    -->
+    {#if draftFound}
+      <div class="draft" role="status">
+        <p>{t('draft.found')}</p>
+        <p class="draft-note">{t('draft.foundNote')}</p>
+        <div class="draft-actions">
+          <button type="button" onclick={restoreDraft}>{t('draft.restore')}</button>
+          <button type="button" class="secondary" onclick={discardDraft}>
+            {t('draft.discard')}
+          </button>
+        </div>
+      </div>
+    {:else if draftNotice !== ''}
+      <p class="draft-notice" role="status">{draftNotice}</p>
+    {/if}
+
     {#if currentPage.title}<h2>{text(currentPage.title, language)}</h2>{/if}
     {#if currentPage.description}
       <p class="lead">{text(currentPage.description, language)}</p>
@@ -597,6 +690,39 @@
 
   .lead {
     color: var(--muted);
+    margin: 0 0 1rem;
+  }
+
+  /* ---- 下書き（Issue #59）------------------------------------------------- */
+
+  .draft {
+    border: 1px solid var(--border);
+    /* **色だけに頼らない。** 左端の太い線でも「いつもと違う」が分かる */
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin: 0 0 1rem;
+  }
+
+  .draft p {
+    margin: 0 0 0.25rem;
+  }
+
+  .draft-note {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .draft-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .draft-notice {
+    color: var(--muted);
+    font-size: 0.9rem;
     margin: 0 0 1rem;
   }
 

@@ -51,6 +51,13 @@ export const ja = {
   'form.submitting': '送信しています…',
   'form.languageLabel': '言語',
   'form.trapLabel': 'この欄は入力しないでください',
+  'draft.found': '前回の続きがこの端末に残っています。',
+  'draft.foundNote':
+    'この端末を他の人と共有している場合は、内容を確かめてから再開してください。残さない場合は「破棄する」を押してください。',
+  'draft.restore': '続きから再開する',
+  'draft.discard': '破棄する',
+  'draft.restored': '前回の続きを読み込みました。',
+  'draft.discarded': '端末に残っていた下書きを消しました。',
 
   // ---- 設問 -----------------------------------------------------------------
   'question.required': '必須',
@@ -168,6 +175,13 @@ export const en: Record<MessageKey, string> = {
   'form.submitting': 'Submitting…',
   'form.languageLabel': 'Language',
   'form.trapLabel': 'Leave this field empty',
+  'draft.found': 'An unfinished answer is saved on this device.',
+  'draft.foundNote':
+    'If you share this device, check the content before resuming. Choose Discard to remove it.',
+  'draft.restore': 'Resume',
+  'draft.discard': 'Discard',
+  'draft.restored': 'Your unfinished answer has been loaded.',
+  'draft.discarded': 'The draft saved on this device has been removed.',
 
   'question.required': 'required',
   'question.selectPlaceholder': 'Select an option',
