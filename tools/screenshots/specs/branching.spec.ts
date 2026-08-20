@@ -180,7 +180,17 @@ test.describe('分岐', () => {
     await expect(sheet.getByRole('button', { name: '送信する' })).toBeHidden();
     await expect(sheet.getByText('ここが最後です')).toBeVisible();
 
-    // 編集へ戻れる
+    // **下敷きは巻き取らない。** どちらを操作しているのか分からなくなる
+    await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
+
+    // **Esc で閉じられる**
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
+
+    // 釦でも閉じられる
+    await page.getByRole('button', { name: 'プレビュー' }).click();
+    await expect(sheet).toBeVisible();
     await sheet.getByRole('button', { name: '編集へ戻る' }).click();
     await expect(sheet).toBeHidden();
   });
