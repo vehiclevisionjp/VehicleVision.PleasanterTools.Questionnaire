@@ -94,7 +94,9 @@ public sealed class ResponseIntake(
     AttachmentInspector? inspector = null,
     TimeProvider? timeProvider = null,
     ISurveyAssetStore? assets = null,
-    ResponseBacklogGuard? backlog = null)
+    ResponseBacklogGuard? backlog = null,
+    IAttachmentRejectionStore? rejections = null,
+    ILogger<ResponseIntake>? logger = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -272,21 +274,30 @@ public sealed class ResponseIntake(
             if (inspector is null)
             {
                 // 添付が来たのに検査の口が無い。**素通しにしない**
-                return IntakeResult.AttachmentsRejected(
-                [
-                    new AttachmentRejection(null, AttachmentRejectionReason.ScannerUnavailable),
-                ]);
+                ImmutableArray<AttachmentRejection> unavailable =
+                    [new AttachmentRejection(null, AttachmentRejectionReason.ScannerUnavailable)];
+
+                // **設定の誤りで全部弾いている状態こそ気付きたい**（Issue #39）
+                await RecordRejectionsAsync(survey.SurveyId, unavailable, cancellationToken)
+                    .ConfigureAwait(false);
+
+                return IntakeResult.AttachmentsRejected(unavailable);
             }
 
-            var rejections = await inspector.InspectSubmissionAsync(
+            var inspected = await inspector.InspectSubmissionAsync(
                 files,
                 questionId => PolicyFor(snapshot.Definition, questionId),
                 cancellationToken).ConfigureAwait(false);
 
-            if (!rejections.IsEmpty)
+            if (!inspected.IsEmpty)
             {
+                // **弾いたことを記録する**（Issue #39）。
+                // 対策が効いているか、設定が厳しすぎないかは、記録が無いと分からない
+                await RecordRejectionsAsync(survey.SurveyId, inspected, cancellationToken)
+                    .ConfigureAwait(false);
+
                 // **添付だけでなく回答ごと拒否する**
-                return IntakeResult.AttachmentsRejected(rejections);
+                return IntakeResult.AttachmentsRejected(inspected);
             }
         }
 
@@ -329,6 +340,72 @@ public sealed class ResponseIntake(
         }
 
         return IntakeResult.Ok();
+    }
+
+    /// <summary>添付を弾いたことを記録する（Issue #39）。</summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠️ **送信元もファイル名も残さない。** 回答者は完全匿名という前提があり、
+    /// **ファイル名には氏名が入り得る**（「履歴書_山田太郎.pdf」）。
+    /// 残すのは**いつ・どのアンケートで・どの理由で・何件**だけ。
+    /// </para>
+    /// <para>
+    /// **1 回の送信につき、理由ごとに 1 行にまとめる。** 1 件ずつ入れると、
+    /// 添付を並べて送るだけで行を好きなだけ増やせる。
+    /// </para>
+    /// <para>
+    /// **書けなくても受付の結果を変えない。** 記録は運用のためのもので、
+    /// これが失敗したせいで回答者への応答が変わってはいけない。
+    /// </para>
+    /// </remarks>
+    private async Task RecordRejectionsAsync(
+        Guid surveyId,
+        ImmutableArray<AttachmentRejection> rejected,
+        CancellationToken cancellationToken)
+    {
+        if (rejections is null || rejected.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        var now = _time.GetUtcNow().UtcDateTime;
+
+        var entries = rejected
+            .GroupBy(
+                rejection => (rejection.QuestionId, rejection.Reason),
+                new QuestionReasonComparer())
+            .Select(group => new AttachmentRejectionEntry(
+                now,
+                surveyId,
+                group.Key.QuestionId,
+                (int)group.Key.Reason,
+                group.Count()))
+            .ToList();
+
+        try
+        {
+            await rejections.WriteAsync(entries, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger?.LogError(exception, "添付を弾いた記録を書けなかった。受付の結果は変えない");
+        }
+    }
+
+    /// <summary>設問と理由の組で束ねる。**<c>QuestionId</c> は <c>null</c> があり得る。**</summary>
+    private sealed class QuestionReasonComparer
+        : IEqualityComparer<(string? QuestionId, AttachmentRejectionReason Reason)>
+    {
+        public bool Equals(
+            (string? QuestionId, AttachmentRejectionReason Reason) left,
+            (string? QuestionId, AttachmentRejectionReason Reason) right) =>
+            left.Reason == right.Reason
+            && string.Equals(left.QuestionId, right.QuestionId, StringComparison.Ordinal);
+
+        public int GetHashCode((string? QuestionId, AttachmentRejectionReason Reason) value) =>
+            HashCode.Combine(
+                value.QuestionId is null ? 0 : StringComparer.Ordinal.GetHashCode(value.QuestionId),
+                value.Reason);
     }
 
     /// <summary>滞留で受付を止めているかを見る（Issue #72）。</summary>
