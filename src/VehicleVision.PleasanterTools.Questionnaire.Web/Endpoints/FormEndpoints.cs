@@ -260,6 +260,10 @@ public static class FormEndpoints
                 {
                     OtherText = answer.OtherText,
                     FileNames = answer.FileNames.IsDefault ? [] : answer.FileNames,
+
+                    // **グリッドの回答はここにしか入っていない**（Issue #74）。
+                    // 落とすと、答えたのに未回答として弾かれる
+                    Rows = answer.Rows ?? ImmutableDictionary<string, ImmutableArray<string>>.Empty,
                 })
                 .ToArray();
 

@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
@@ -49,6 +49,10 @@ public sealed record ResponsePayload(
         {
             OtherText = answer.OtherText,
             FileNames = answer.FileNames,
+
+            // **既定へ落とさない。** null を入れると Rows の既定（空）ではなく
+            // 未初期化の辞書になり、読むたびに落ちる
+            Rows = answer.Rows ?? ImmutableDictionary<string, ImmutableArray<string>>.Empty,
         }),
     ];
 
@@ -99,6 +103,9 @@ public sealed record ResponsePayload(
                 Files = filesByQuestion.TryGetValue(answer.QuestionId, out var files)
                     ? files
                     : [],
+
+                // **行を持たない設問では書かない。** 正本 JSON に空の入れ物を並べない
+                Rows = answer.Rows.IsEmpty ? null : answer.Rows,
             }),
         ]);
     }
@@ -111,6 +118,25 @@ public sealed record PayloadAnswer(
     [property: JsonPropertyName("otherText")] string? OtherText = null,
     [property: JsonPropertyName("fileNames")] ImmutableArray<string> FileNames = default)
 {
+    /// <summary>行ごとの回答（Issue #74）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **グリッドで使う。** 行の識別子 → その行で選ばれた値。
+    /// <see cref="Values"/> は使わないので、**ここが落ちると回答が丸ごと消える。**
+    /// </para>
+    /// <para>
+    /// **ランキングはここを使わない。** 並べた順そのものが答えなので
+    /// <see cref="Values"/> に順位の順で入る。
+    /// </para>
+    /// <para>
+    /// **空なら書かない**（<c>WhenWritingDefault</c>）。
+    /// 大多数の設問は行を持たないので、正本 JSON に空の入れ物を並べない。
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("rows")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public ImmutableDictionary<string, ImmutableArray<string>>? Rows { get; init; }
+
     /// <summary>添付ファイルの中身。</summary>
     /// <remarks>
     /// **送信待ちの行にだけ載せる。** Pleasanter へ渡す正本 JSON からは
