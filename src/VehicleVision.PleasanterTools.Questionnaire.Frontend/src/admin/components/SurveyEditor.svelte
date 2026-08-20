@@ -55,6 +55,31 @@
 
   /** プレビューを開いているか。**保存前の下書きをそのまま見る。** */
   let previewing = $state(false);
+
+  $effect(() => {
+    // **開いている間は下敷きを巻き取らせない。**
+    // 重ねて出しているのに背後が動くと、どちらを操作しているのか分からなくなる
+    if (!previewing) {
+      return;
+    }
+
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    // **Esc で閉じられるようにする。** 重ねて出すものの約束
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        previewing = false;
+      }
+    };
+
+    window.addEventListener('keydown', onKey);
+
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener('keydown', onKey);
+    };
+  });
   let mapping = $state<MappingDefinition>({ assignments: [] });
   let revision = $state(0);
 
