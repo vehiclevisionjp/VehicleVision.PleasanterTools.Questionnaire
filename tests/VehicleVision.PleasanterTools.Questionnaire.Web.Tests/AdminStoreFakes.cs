@@ -262,3 +262,52 @@ internal sealed class FakeAdminInvitationStore(TimeProvider timeProvider) : IAdm
         return Task.CompletedTask;
     }
 }
+
+/// <summary>管理者への知らせの代わり（Issue #80）。**立った知らせを覚えておくだけ。**</summary>
+/// <remarks>
+/// <c>Throws</c> を立てると書き込みで例外を投げる。
+/// **知らせに失敗しても本来の処理が変わらないこと**を確かめるために使う。
+/// </remarks>
+internal sealed class FakeAdminNotificationStore : IAdminNotificationStore
+{
+    public List<(int Kind, Guid SurveyId)> Raised { get; } = [];
+
+    public bool Throws { get; set; }
+
+    public Task RaiseAsync(
+        int kind,
+        Guid surveyId,
+        DateTime occurredAt,
+        CancellationToken cancellationToken = default)
+    {
+        if (Throws)
+        {
+            throw new InvalidOperationException("知らせを書けない");
+        }
+
+        Raised.Add((kind, surveyId));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<AdminNotificationView>> ListAsync(
+        AdminNotificationQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<AdminNotificationView>>([]);
+
+    public Task<int> UnreadCountAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Raised.Count);
+
+    public Task<int> MarkAllReadAsync(
+        DateTime readAt,
+        CancellationToken cancellationToken = default)
+    {
+        var count = Raised.Count;
+        Raised.Clear();
+        return Task.FromResult(count);
+    }
+
+    public Task<int> DeleteOlderThanAsync(
+        DateTime threshold,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(0);
+}

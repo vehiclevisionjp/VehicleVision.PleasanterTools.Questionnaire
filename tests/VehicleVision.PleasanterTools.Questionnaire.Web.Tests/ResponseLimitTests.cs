@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Notifications;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -208,6 +209,7 @@ public class ResponseLimitTests
         int status = (int)SurveyStatus.Published,
         int? suspendedReason = null,
         int? backlogPerSurvey = null,
+        IAdminNotificationStore? notifications = null,
         params string[] existingTokens)
     {
         var survey = new SurveyRecord(
@@ -241,7 +243,8 @@ public class ResponseLimitTests
                 Definition(), new MappingDefinition(), 1, "DescriptionA")),
             outbox,
             tokens,
-            backlog: backlog);
+            backlog: backlog,
+            notifications: notifications);
 
         return (intake, surveys, tokens);
     }
@@ -445,5 +448,48 @@ public class ResponseLimitTests
         Assert.Equal(1, surveys.SuspendCalls);
         Assert.Equal(
             (int)SurveySuspendedReason.ResponseLimitReached, surveys.Survey.SuspendedReason);
+    }
+
+    // ---- 管理者への知らせ（Issue #80）---------------------------------------
+
+    [Fact]
+    public async Task 回答数の上限で止めたら知らせを立てる()
+    {
+        // **管理者が気付かないと、次のアンケートを開くまで受付が止まったままになる**
+        var notifications = new FakeAdminNotificationStore();
+        var (intake, _, _) = Intake(
+            responseLimit: 2, notifications: notifications, existingTokens: ["t1"]);
+
+        Assert.True((await SubmitAsync(intake, "t2")).Accepted);
+
+        Assert.Equal(
+            [((int)AdminNotificationKind.ResponseLimitReached, SurveyId)],
+            notifications.Raised);
+    }
+
+    [Fact]
+    public async Task 止まった瞬間だけ知らせを立てる()
+    {
+        // **止め直しに行かない回では立てない。** 断るたびに立てると同じ知らせで埋まる
+        var notifications = new FakeAdminNotificationStore();
+        var (intake, _, _) = Intake(
+            responseLimit: 1, notifications: notifications, existingTokens: ["t1"]);
+
+        await SubmitAsync(intake, "t2");
+        await SubmitAsync(intake, "t3");
+
+        Assert.Single(notifications.Raised);
+    }
+
+    [Fact]
+    public async Task 知らせを書けなくても受付の結果は変わらない()
+    {
+        // ⚠️ **知らせは気付くためのもの。** これが失敗したせいで回答の扱いを変えない
+        var notifications = new FakeAdminNotificationStore { Throws = true };
+        var (intake, surveys, _) = Intake(
+            responseLimit: 2, notifications: notifications, existingTokens: ["t1"]);
+
+        Assert.True((await SubmitAsync(intake, "t2")).Accepted);
+        Assert.Equal((int)SurveyStatus.Suspended, surveys.Survey.Status);
     }
 }

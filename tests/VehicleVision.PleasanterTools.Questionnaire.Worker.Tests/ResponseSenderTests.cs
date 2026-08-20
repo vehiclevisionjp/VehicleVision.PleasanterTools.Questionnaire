@@ -7,6 +7,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Notifications;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
@@ -108,7 +109,8 @@ public class ResponseSenderTests
         StubHandler handler,
         SurveySnapshot? snapshot = null,
         MappingDefinition? mapping = null,
-        ResponseSenderOptions? options = null)
+        ResponseSenderOptions? options = null,
+        IAdminNotificationStore? notifications = null)
     {
         var outbox = new FakeOutbox();
         var tokens = new FakeTokenStore();
@@ -135,7 +137,8 @@ public class ResponseSenderTests
             new PleasanterRecordBuilder(new PleasanterDateTime("Asia/Tokyo")),
             new MappingEvaluator(),
             options ?? new ResponseSenderOptions(),
-            NullLogger<ResponseSender>.Instance);
+            NullLogger<ResponseSender>.Instance,
+            notifications: notifications);
 
         return (sender, outbox, tokens);
     }
@@ -231,6 +234,41 @@ public class ResponseSenderTests
         outbox.Enqueue(Pending());
 
         Assert.Equal(SendOutcome.Rescheduled, await sender.SendOnceAsync());
+    }
+
+    [Fact]
+    public async Task デッドレターと認証失敗は管理者への知らせになる()
+    {
+        // **ログにしか出ていないと、見張っていない運用では誰も気付かない**（Issue #80）
+        var notifications = new FakeAdminNotificationStore();
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.BadRequest, "{\"StatusCode\":400,\"Message\":\"Invalid json data.\"}")
+            .Enqueue(HttpStatusCode.Unauthorized, "{}");
+        var (sender, outbox, _) = Build(handler, notifications: notifications);
+        outbox.Enqueue(Pending());
+        outbox.Enqueue(new PendingResponse($"{Token}-2", SurveyId, 1, Payload(), 0));
+
+        Assert.Equal(SendOutcome.DeadLettered, await sender.SendOnceAsync());
+        Assert.Equal(SendOutcome.Rescheduled, await sender.SendOnceAsync());
+
+        Assert.Equal(
+            [((int)AdminNotificationKind.DeadLettered, SurveyId),
+             ((int)AdminNotificationKind.PleasanterUnauthorized, Guid.Empty)],
+            notifications.Raised);
+    }
+
+    [Fact]
+    public async Task 知らせを書けなくても送信の結果は変わらない()
+    {
+        // ⚠️ **知らせは気付くためのもの。** これが失敗したせいで回答の扱いを変えない
+        var notifications = new FakeAdminNotificationStore { Throws = true };
+        var handler = new StubHandler()
+            .Enqueue(HttpStatusCode.BadRequest, "{\"StatusCode\":400,\"Message\":\"Invalid json data.\"}");
+        var (sender, outbox, _) = Build(handler, notifications: notifications);
+        outbox.Enqueue(Pending());
+
+        Assert.Equal(SendOutcome.DeadLettered, await sender.SendOnceAsync());
+        Assert.Single(outbox.DeadLettered);
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Flow;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Notifications;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Validation;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
@@ -107,7 +108,8 @@ public sealed class ResponseIntake(
     ISurveyAssetStore? assets = null,
     ResponseBacklogGuard? backlog = null,
     IAttachmentRejectionStore? rejections = null,
-    ILogger<ResponseIntake>? logger = null)
+    ILogger<ResponseIntake>? logger = null,
+    IAdminNotificationStore? notifications = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -348,12 +350,51 @@ public sealed class ResponseIntake(
             && accepted is { } before
             && (isNewResponse ? before + 1 : before) >= limit)
         {
-            await surveys
+            var suspended = await surveys
                 .SuspendForResponseLimitAsync(survey.SurveyId, cancellationToken)
+                .ConfigureAwait(false);
+            await NotifySuspendedAsync(survey.SurveyId, suspended, cancellationToken)
                 .ConfigureAwait(false);
         }
 
         return IntakeResult.Ok();
+    }
+
+    /// <summary>回答数の上限に届いたことを管理者へ知らせる（Issue #80）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **止まった瞬間だけ立てる。** 上限に達した後の回答はすべて断られるので、
+    /// 断るたびに立てると同じ知らせが際限なく増える。
+    /// <c>SuspendForResponseLimitAsync</c> は**実際に止めたときだけ true** を返す。
+    /// </para>
+    /// <para>
+    /// ⚠️ **知らせを書けなくても受付の結果を変えない。**
+    /// </para>
+    /// </remarks>
+    private async Task NotifySuspendedAsync(
+        Guid surveyId,
+        bool suspended,
+        CancellationToken cancellationToken)
+    {
+        if (notifications is null || !suspended)
+        {
+            return;
+        }
+
+        try
+        {
+            await notifications
+                .RaiseAsync(
+                    (int)AdminNotificationKind.ResponseLimitReached,
+                    surveyId,
+                    _time.GetUtcNow().UtcDateTime,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "管理者への知らせを書けなかった: 回答数の上限");
+        }
     }
 
     /// <summary>添付を弾いたことを記録する（Issue #39）。</summary>
@@ -481,8 +522,10 @@ public sealed class ResponseIntake(
             return (null, accepted);
         }
 
-        await surveys
+        var suspendedNow = await surveys
             .SuspendForResponseLimitAsync(survey.SurveyId, cancellationToken)
+            .ConfigureAwait(false);
+        await NotifySuspendedAsync(survey.SurveyId, suspendedNow, cancellationToken)
             .ConfigureAwait(false);
 
         // **「受付終了」として返す。** 上限の有無も到達も回答者へは見せない
