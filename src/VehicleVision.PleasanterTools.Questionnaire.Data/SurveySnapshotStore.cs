@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -142,6 +142,14 @@ public interface ISurveyRepository
 /// **切っても送信チケット・最短時間・honeypot は外れない。**
 /// 外れるのは proof-of-work だけ。
 /// </param>
+/// <param name="AllowDraft">
+/// 回答の下書きを端末へ残すか（Issue #59）。
+///
+/// ⚠️ **既定は無効。** 端末は共有され得る（店頭のタブレット、社内の共用 PC）。
+/// **黙って端末へ残すと、次に使う人が前の人の回答を見る。**
+///
+/// **サーバへは送らない。** 下書きは端末の中だけに置く。
+/// </param>
 public sealed record SurveyRecord(
     Guid SurveyId,
     string PublicId,
@@ -156,7 +164,8 @@ public sealed record SurveyRecord(
     bool IsTemplate = false,
     int? SuspendedReason = null,
     DateTime? SuspendedAt = null,
-    bool RequireProofOfWork = true);
+    bool RequireProofOfWork = true,
+    bool AllowDraft = false);
 
 /// <summary>アンケートの状態。</summary>
 public enum SurveyStatus
@@ -222,6 +231,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             + "  [SuspendedReason] = @SuspendedReason, [SuspendedAt] = @SuspendedAt, "
             // **旗も書く**（Issue #66）。管理画面の公開設定はここを通る
             + "  [RequireProofOfWork] = @RequireProofOfWork, "
+            + "  [AllowDraft] = @AllowDraft, "
             + "  [UpdatedAt] = @Now "
             + "WHERE [SurveyId] = @SurveyId",
             new
@@ -239,6 +249,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.SuspendedReason,
                 survey.SuspendedAt,
                 survey.RequireProofOfWork,
+                survey.AllowDraft,
                 Now = now,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -253,12 +264,13 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             + "  ([SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "   [AcceptFrom], [AcceptTo], [ResponseLimit], "
-            + "   [SuspendedReason], [SuspendedAt], [RequireProofOfWork], "
+            + "   [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], "
             + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, @PublishedVersion, "
             + "        @AcceptFrom, @AcceptTo, @ResponseLimit, "
-            + "        @SuspendedReason, @SuspendedAt, @RequireProofOfWork, @Now, @Now)",
+            + "        @SuspendedReason, @SuspendedAt, @RequireProofOfWork, @AllowDraft, "
+            + "        @Now, @Now)",
             new
             {
                 survey.SurveyId,
@@ -274,6 +286,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.SuspendedReason,
                 survey.SuspendedAt,
                 survey.RequireProofOfWork,
+                survey.AllowDraft,
                 Now = now,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -334,7 +347,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate], "
-            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork] "
+            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft] "
             + "FROM [Surveys] WHERE [PublicId] = @PublicId",
             new { PublicId = publicId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -349,7 +362,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate], "
-            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork] "
+            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);

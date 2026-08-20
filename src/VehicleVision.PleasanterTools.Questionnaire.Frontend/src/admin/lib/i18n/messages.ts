@@ -476,6 +476,11 @@ export const ja = {
   'settings.cancel': 'やめる',
   // ---- proof-of-work の要否（Issue #66） ----
   'settings.proofOfWork': '回答の送信に計算課題を課す',
+  'settings.allowDraft': '回答の下書きを端末に保存する',
+  'settings.allowDraftHint':
+    '回答者が書きかけの内容を端末に残し、後から続きを書けるようになります。サーバへは送りません。',
+  'settings.allowDraftWarning':
+    '共有の端末（店頭のタブレット、共用 PC）では、次に使う人が前の人の回答を見られます。再開するかどうかは回答者が選びますが、内容は端末に残ります。',
   'settings.proofOfWorkHint':
     '回答者のブラウザに短い計算をさせて、機械的な大量送信の費用を上げます。'
     + '公開の窓口では有効のままにしてください。'
@@ -960,6 +965,11 @@ export const en: Record<MessageKey, string> = {
   'settings.submit': 'Save',
   'settings.cancel': 'Cancel',
   'settings.proofOfWork': 'Require a computational challenge before submitting',
+  'settings.allowDraft': 'Save unfinished answers on the device',
+  'settings.allowDraftHint':
+    'Respondents can keep what they have written on their device and come back later. Nothing is sent to the server.',
+  'settings.allowDraftWarning':
+    'On a shared device (a showroom tablet, a shared PC) the next person can see the previous answer. They choose whether to resume, but the content stays on the device.',
   'settings.proofOfWorkHint':
     "The respondent's browser solves a short puzzle, which raises the cost of bulk automated "
     + 'submissions. Keep it on for surveys open to the public. You may turn it off for internal '

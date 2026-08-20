@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Data.Common;
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -30,6 +30,9 @@ public sealed record SurveyDraft(
 /// <param name="RequireProofOfWork">
 /// 回答の送信に proof-of-work を課すか（Issue #66）。**既定は有効。**
 /// </param>
+/// <param name="AllowDraft">
+/// 回答の下書きを端末へ残すか（Issue #59）。**既定は無効。**
+/// </param>
 public sealed record SurveySummary(
     Guid SurveyId,
     string PublicId,
@@ -42,7 +45,8 @@ public sealed record SurveySummary(
     DateTime? SuspendedAt = null,
     int? ResponseLimit = null,
     int ResponseCount = 0,
-    bool RequireProofOfWork = true);
+    bool RequireProofOfWork = true,
+    bool AllowDraft = false);
 
 /// <summary>複製で作るアンケートの、**写さない値**（Issue #46）。</summary>
 /// <param name="SurveyId">複製先の内部 ID。</param>
@@ -263,6 +267,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
         public bool RequireProofOfWork { get; set; }
 
+        public bool AllowDraft { get; set; }
+
         public long ResponseCount { get; set; }
 
         public DateTime UpdatedAt { get; set; }
@@ -283,7 +289,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             "SELECT s.[SurveyId], s.[PublicId], s.[Title], s.[PleasanterSiteId], "
             + "       s.[Status], s.[PublishedVersion], s.[UpdatedAt], "
             + "       s.[SuspendedReason], s.[SuspendedAt], s.[ResponseLimit], "
-            + "       s.[RequireProofOfWork], "
+            + "       s.[RequireProofOfWork], s.[AllowDraft], "
             + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
             + "        WHERE t.[SurveyId] = s.[SurveyId]) AS [ResponseCount] "
             + "FROM [Surveys] s WHERE s.[IsTemplate] = @IsTemplate "
@@ -305,7 +311,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 row.SuspendedAt,
                 row.ResponseLimit,
                 (int)row.ResponseCount,
-                row.RequireProofOfWork)),
+                row.RequireProofOfWork,
+                row.AllowDraft)),
         ];
     }
 

@@ -499,6 +499,11 @@ public static class AdminSurveyEndpoints
             // **項目を知らない相手が保存しただけで proof-of-work が黙って外れる**
             var requireProofOfWork = request.RequireProofOfWork ?? record.RequireProofOfWork;
 
+            // **同じ理由で下書きも「指定が無ければ今のまま」**（Issue #59）。
+            // 既定値の false を書き込むと、項目を知らない相手が保存しただけで
+            // 下書きが黙って切れる
+            var allowDraft = request.AllowDraft ?? record.AllowDraft;
+
             // **上限を引き上げても勝手に再開しない**（_documents/データモデル設計.md 2.1）。
             // 再開するかどうかは人が決める
             await surveys
@@ -507,11 +512,13 @@ public static class AdminSurveyEndpoints
                     {
                         ResponseLimit = request.ResponseLimit,
                         RequireProofOfWork = requireProofOfWork,
+                        AllowDraft = allowDraft,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            return Results.Ok(new { responseLimit = request.ResponseLimit, requireProofOfWork });
+            return Results.Ok(
+                new { responseLimit = request.ResponseLimit, requireProofOfWork, allowDraft });
         });
 
         // ---- 停止と再開 ------------------------------------------------------
@@ -651,8 +658,14 @@ public static class AdminSurveyEndpoints
     /// **<c>bool</c> で受けないのは、省略されたときに <c>false</c> になるため。**
     /// 項目を知らない相手が公開設定を保存しただけで、守りが黙って外れてしまう。
     /// </param>
+    /// <param name="AllowDraft">
+    /// 回答の下書きを端末へ残すか（Issue #59）。**<c>null</c> は「変えない」。**
+    ///
+    /// ⚠️ **入れると、回答の途中が端末に残る。** 共有の端末では、
+    /// 次に使う人が前の人の回答を見ることになる。**既定は無効。**
+    /// </param>
     public sealed record SurveySettingsRequest(
-        int? ResponseLimit, bool? RequireProofOfWork = null);
+        int? ResponseLimit, bool? RequireProofOfWork = null, bool? AllowDraft = null);
 
     /// <summary>下書きの保存。</summary>
     /// <param name="Revision">読んだときの版。**これが今の版と違えば拒否する。**</param>
