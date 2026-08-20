@@ -73,7 +73,18 @@ public sealed record IntakeResult(
 /// **画面はこれを見て、要るときだけ解く。**
 /// 受け付ける側は画面の言い分を信じず、必ず DB の旗で判定する。
 /// </param>
-public sealed record PublishedForm(SurveyDefinition Definition, bool RequiresProofOfWork);
+/// <param name="AllowsDraft">
+/// 回答の下書きを端末へ残してよいか（Issue #59）。
+///
+/// **下書きはサーバへ送らない。** 端末の中だけに置くので、
+/// ここで伝えるのは「置いてよいかどうか」だけ。
+///
+/// ⚠️ **既定は無効。** 端末は共有され得る。
+/// </param>
+public sealed record PublishedForm(
+    SurveyDefinition Definition,
+    bool RequiresProofOfWork,
+    bool AllowsDraft = false);
 
 /// <summary>回答を受け付けて送信待ちへ入れる。</summary>
 /// <remarks>
@@ -139,7 +150,10 @@ public sealed class ResponseIntake(
             ? (null, IntakeRejection.NotFound)
             // **旗は版ではなくアンケートの行から取る**（Issue #66）。
             // 運用の設定なので、公開し直さずに切り替えられる
-            : (new PublishedForm(snapshot.Definition, survey.RequireProofOfWork), null);
+            : (
+                new PublishedForm(
+                    snapshot.Definition, survey.RequireProofOfWork, survey.AllowDraft),
+                null);
     }
 
     /// <summary>このアンケートが proof-of-work を要るとしているか（Issue #66）。</summary>

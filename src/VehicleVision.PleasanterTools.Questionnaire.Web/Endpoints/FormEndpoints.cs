@@ -53,8 +53,15 @@ public sealed record TicketResponse(string ResponseToken, string Ticket, object?
 /// **実在をもともと隠していない。** 課題を出す口では出し分けない
 /// （<c>_documents/非機能設計.md</c> 1 章「識別子の秘匿」）。
 /// </param>
+/// <param name="AllowsDraft">
+/// 回答の下書きを端末へ残してよいか（Issue #59）。
+/// **下書きはサーバへ送らない**ので、伝えるのは可否だけ。
+/// </param>
 public sealed record FormResponse(
-    string PublicId, SurveyDefinition Definition, bool RequiresProofOfWork);
+    string PublicId,
+    SurveyDefinition Definition,
+    bool RequiresProofOfWork,
+    bool AllowsDraft = false);
 
 /// <summary>回答画面向けの口。**認証は無い。**</summary>
 public static class FormEndpoints
@@ -85,7 +92,7 @@ public static class FormEndpoints
             return form is null
                 ? ToProblem(rejection)
                 : Results.Ok(new FormResponse(
-                    publicId, form.Definition, form.RequiresProofOfWork));
+                    publicId, form.Definition, form.RequiresProofOfWork, form.AllowsDraft));
         });
 
         // **ヘッダ画像を配る**（Issue #56）。
