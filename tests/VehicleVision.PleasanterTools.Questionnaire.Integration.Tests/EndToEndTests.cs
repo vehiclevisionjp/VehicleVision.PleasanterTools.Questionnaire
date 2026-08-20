@@ -345,6 +345,145 @@ public class EndToEndTests
         Assert.Equal(1, row["NumHash"]?["NumA"]?.GetValue<decimal>());
     }
 
+    // ---- 未回答の日付（Issue #84）--------------------------------------------
+
+    private static SurveyDefinition DateDefinition() => new()
+    {
+        SurveyId = "s-date",
+        Version = 1,
+        Title = LocalizedText.Japanese("未回答の日付の検証"),
+        Pages =
+        [
+            new Page
+            {
+                PageId = "p1",
+                Questions =
+                [
+                    new Question
+                    {
+                        QuestionId = "q1",
+                        Type = QuestionType.Text,
+                        Title = LocalizedText.Japanese("お名前"),
+                        IsRequired = true,
+                    },
+                    new Question
+                    {
+                        QuestionId = "q-date",
+                        Type = QuestionType.Date,
+                        Title = LocalizedText.Japanese("ご希望日（任意）"),
+                        IsRequired = false,
+                    },
+                ],
+            },
+        ],
+    };
+
+    private static MappingDefinition DateMapping() => new()
+    {
+        Assignments =
+        [
+            ColumnAssignment.Direct("ClassA", new MappingSource("q1")),
+            ColumnAssignment.Direct("DateA", new MappingSource("q-date")),
+        ],
+    };
+
+    [Fact]
+    public async Task 未回答の日付は日付列を未設定のままにする()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **`null` を送ると 400 Invalid json data で送信が落ち、
+        // キーごと送らないと編集で消したときに前の値が残る**（Issue #84。実機で確認）
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        var siteId = await CreatePleasanterSiteAsync(
+            http, $"E2E date {Guid.NewGuid():N}", "DateA");
+
+        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
+        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+
+        var surveys = new SurveyRepository(factory);
+        var snapshots = new SurveySnapshotStore(factory);
+        var outbox = new ResponseOutbox(factory);
+        var tokens = new ResponseTokenStore(factory);
+
+        var surveyId = Guid.NewGuid();
+        var publicId = $"pub-{Guid.NewGuid():N}";
+        await surveys.SaveAsync(new SurveyRecord(
+            surveyId, publicId, "未回答の日付の検証", siteId, "DescriptionA",
+            (int)SurveyStatus.Published, null));
+        await surveys.PublishAsync(surveyId, 1, DateDefinition(), DateMapping(), null);
+
+        var intake = new ResponseIntake(surveys, snapshots, outbox, tokens);
+        var pleasanter = new PleasanterApiClient(http, new PleasanterOptions
+        {
+            BaseUrl = PleasanterBaseUrl,
+            ApiKey = ApiKey,
+            ApiKeyUserTimeZoneId = "Asia/Tokyo",
+        });
+
+        var dateTime = new PleasanterDateTime("Asia/Tokyo");
+        var sender = new ResponseSender(
+            outbox,
+            tokens,
+            snapshots,
+            pleasanter,
+            new PleasanterRecordBuilder(dateTime),
+            new MappingEvaluator(),
+            new ResponseSenderOptions(),
+            NullLogger<ResponseSender>.Instance);
+
+        static string? DateOf(JsonNode? row) =>
+            row?["DateHash"]?["DateA"]?.GetValue<string>();
+
+        // --- 日付を答えずに送る ---
+        var token = $"tok-{Guid.NewGuid():N}";
+        var accepted = await intake.SubmitAsync(publicId, token, [Answer.Of("q1", "山田")]);
+        Assert.True(accepted.Accepted);
+
+        // **未回答の日付があっても送信そのものが落ちない**
+        Assert.Equal(SendOutcome.Sent, await sender.SendOnceAsync());
+
+        var found = await pleasanter.FindByResponseTokenAsync(siteId, "DescriptionA", token);
+        var row = found.Body?["Response"]?["Data"]?.AsArray()?.SingleOrDefault();
+
+        Assert.NotNull(row);
+        Assert.Equal("山田", row["ClassHash"]?["ClassA"]?.GetValue<string>());
+
+        // **未設定のまま。** 一覧では 1899-12-30 に見えるが、日付として読めば未設定
+        Assert.Null(dateTime.FromPleasanter(DateOf(row)));
+
+        // **正本 JSON に項目そのものが無いので、さかのぼれば未回答と分かる**
+        var responseJson = row["DescriptionHash"]?["DescriptionA"]?.GetValue<string>();
+        Assert.NotNull(responseJson);
+        Assert.DoesNotContain("q-date", responseJson);
+
+        // --- 日付を答えて編集する ---
+        var edited = await intake.SubmitAsync(
+            publicId, token, [Answer.Of("q1", "山田"), Answer.Of("q-date", "2026-03-01")]);
+        Assert.True(edited.Accepted);
+        Assert.Equal(SendOutcome.Sent, await sender.SendOnceAsync());
+
+        var after = await pleasanter.FindByResponseTokenAsync(siteId, "DescriptionA", token);
+        var updated = Assert.Single(after.Body?["Response"]?["Data"]?.AsArray()!);
+        Assert.Equal(
+            new DateOnly(2026, 3, 1),
+            DateOnly.FromDateTime(dateTime.FromPleasanter(DateOf(updated))!.Value.DateTime));
+
+        // --- 日付の回答を消して編集する ---
+        var cleared = await intake.SubmitAsync(publicId, token, [Answer.Of("q1", "山田")]);
+        Assert.True(cleared.Accepted);
+        Assert.Equal(SendOutcome.Sent, await sender.SendOnceAsync());
+
+        var last = await pleasanter.FindByResponseTokenAsync(siteId, "DescriptionA", token);
+        var lastRow = Assert.Single(last.Body?["Response"]?["Data"]?.AsArray()!);
+
+        // **前の値が残らない。** 未設定へ戻る
+        Assert.Null(dateTime.FromPleasanter(DateOf(lastRow)));
+    }
+
     [Fact]
     public async Task グリッドは行が全部埋まっていないと受け付けない()
     {

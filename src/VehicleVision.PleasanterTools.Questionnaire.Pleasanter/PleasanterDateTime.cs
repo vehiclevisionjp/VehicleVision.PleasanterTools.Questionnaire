@@ -23,6 +23,21 @@ public sealed class PleasanterDateTime
     /// </remarks>
     public static readonly DateTime UnsetDate = new(1899, 12, 30, 0, 0, 0, DateTimeKind.Unspecified);
 
+    /// <summary>未回答の日付として送る値（<see cref="DateTime.MinValue"/>）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **未回答でもキーは送る。** 送らないと編集で回答を消したときに前の値が残り、
+    /// <c>null</c> を送ると <c>400 Invalid json data</c> で送信そのものが落ちる
+    /// （どちらも実機で確認。<c>_documents/実機検証結果.md</c> 9 章）。
+    /// </para>
+    /// <para>
+    /// **この値を送ると Pleasanter 側は <see cref="UnsetDate"/> になる**（実機で確認）。
+    /// 未設定と同じ状態へ戻せるので、消し漏れが起きない。
+    /// </para>
+    /// </remarks>
+    public static readonly string UnansweredDate =
+        DateTime.MinValue.ToString(Format, CultureInfo.InvariantCulture);
+
     /// <summary>Pleasanter がやり取りする日時の書式。</summary>
     private const string Format = "yyyy-MM-ddTHH:mm:ss";
 
