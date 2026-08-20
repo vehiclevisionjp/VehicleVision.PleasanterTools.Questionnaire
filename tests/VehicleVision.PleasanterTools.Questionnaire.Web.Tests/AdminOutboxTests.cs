@@ -1,5 +1,6 @@
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
@@ -28,6 +29,43 @@ public class AdminOutboxTests
             lastError,
             CreatedAt: Unspecified("2026-08-18T01:00:00"),
             UpdatedAt: Unspecified("2026-08-19T02:00:00"));
+
+    // ---- 滞留による受付停止（Issue #72）--------------------------------------
+
+    [Fact]
+    public void 止めていることを応答に載せる()
+    {
+        // **件数からは「止めている」ことが読み取れない。**
+        // 送信待ちが多いのと、そのせいで受付を止めているのは別のこと
+        var response = AdminOutboxEndpoints.ToResponse(
+            new OutboxStatus(50_000, null, 0, null),
+            new BacklogGuardStatus(
+                Enabled: true,
+                Total: 50_000,
+                TotalLimit: 50_000,
+                TotalBlocked: true,
+                PerSurveyLimit: 10_000,
+                BlockedSurveyCount: 2,
+                SampledAt: new DateTimeOffset(2026, 8, 20, 3, 0, 0, TimeSpan.Zero)));
+
+        var backlog = response.Backlog;
+        Assert.NotNull(backlog);
+        Assert.True(backlog.TotalBlocked);
+        Assert.Equal(2, backlog.BlockedSurveyCount);
+        Assert.Equal(DateTimeKind.Utc, backlog.SampledAt!.Value.Kind);
+    }
+
+    [Fact]
+    public void 一度も数えていなければ計測時刻を載せない()
+    {
+        // **null は落として返る**（画面側は省略可で受ける）
+        var response = AdminOutboxEndpoints.ToResponse(
+            new OutboxStatus(0, null, 0, null),
+            new BacklogGuardStatus(true, 0, 50_000, false, 10_000, 0, null));
+
+        Assert.NotNull(response.Backlog);
+        Assert.Null(response.Backlog.SampledAt);
+    }
 
     // ---- 滞留の状況 ---------------------------------------------------------
 

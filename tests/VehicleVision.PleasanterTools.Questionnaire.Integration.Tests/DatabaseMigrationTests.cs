@@ -105,6 +105,11 @@ public class DatabaseMigrationTests
         var token = $"tok-{Guid.NewGuid():N}"[..32];
         var now = DateTime.UtcNow;
 
+        // **先に空にする。** この試験は「最も古い 1 件が取れる」を見るので、
+        // 他の試験が残した行があると、そちらが取れて落ちる。
+        // **落ちる場所とこの試験の中身は無関係**なので、原因を辿るのに時間が掛かる
+        connection.Execute($"DELETE FROM {SqlDialect.Quote(provider, "Responses")}");
+
         connection.Execute(
             $"""
             INSERT INTO {SqlDialect.Quote(provider, "Responses")}

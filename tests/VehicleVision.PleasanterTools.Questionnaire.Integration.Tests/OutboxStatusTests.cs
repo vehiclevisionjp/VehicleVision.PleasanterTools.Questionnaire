@@ -49,6 +49,108 @@ public class OutboxStatusTests
         return token;
     }
 
+    // ---- 滞留の見張りが数える件数（Issue #72）--------------------------------
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 滞留の総数にはデッドレターも入る(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **自然に捌けないデッドレターを除くと、
+        // 「送信待ちは 0 件なのに DB が溢れる」が起きる**
+        var (outbox, _) = await CreateAsync(provider, connectionString).ConfigureAwait(true);
+        var surveyId = Guid.NewGuid();
+
+        await outbox.SaveAsync(NewToken(), surveyId, 1, """{"a":1}""").ConfigureAwait(true);
+        await DeadLetterAsync(outbox, surveyId).ConfigureAwait(true);
+
+        var backlog = await outbox.CountBacklogAsync(1).ConfigureAwait(true);
+
+        Assert.Equal(2, backlog.Total);
+        Assert.Equal(2, backlog.For(surveyId));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 下限に満たないアンケートは返らない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **危ない水準のものだけを返す。** 全アンケートぶん返すと、
+        // 本数に比例して見張りの費用が上がる
+        var (outbox, _) = await CreateAsync(provider, connectionString).ConfigureAwait(true);
+        var many = Guid.NewGuid();
+        var few = Guid.NewGuid();
+
+        for (var i = 0; i < 3; i++)
+        {
+            await outbox.SaveAsync(NewToken(), many, 1, """{"a":1}""").ConfigureAwait(true);
+        }
+
+        await outbox.SaveAsync(NewToken(), few, 1, """{"a":1}""").ConfigureAwait(true);
+
+        var backlog = await outbox.CountBacklogAsync(3).ConfigureAwait(true);
+
+        // **総数は絞り込みの影響を受けない。** 受けると全体の段が効かなくなる
+        Assert.Equal(4, backlog.Total);
+        Assert.Equal(3, backlog.For(many));
+        Assert.Equal(0, backlog.For(few));
+        Assert.False(backlog.BySurvey.ContainsKey(few));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 送信できた分は滞留から消える(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **捌けたら受け付け直せること**を、行の消え方として確かめる
+        var (outbox, _) = await CreateAsync(provider, connectionString).ConfigureAwait(true);
+        var surveyId = Guid.NewGuid();
+        var token = NewToken();
+
+        await outbox.SaveAsync(token, surveyId, 1, """{"a":1}""").ConfigureAwait(true);
+        Assert.Equal(1, (await outbox.CountBacklogAsync(1).ConfigureAwait(true)).Total);
+
+        await outbox.CompleteAsync(token).ConfigureAwait(true);
+
+        Assert.Equal(0, (await outbox.CountBacklogAsync(1).ConfigureAwait(true)).Total);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 滞留が無ければ空で返る(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **空の表で GROUP BY を取ると 0 行。** 例外にしない
+        var (outbox, _) = await CreateAsync(provider, connectionString).ConfigureAwait(true);
+
+        var backlog = await outbox.CountBacklogAsync(1).ConfigureAwait(true);
+
+        Assert.Equal(0, backlog.Total);
+        Assert.Empty(backlog.BySurvey);
+    }
+
     [Theory]
     [MemberData(nameof(Providers))]
     public async Task 何も無ければ零件で時刻は無い(DatabaseProvider provider, string connectionString)

@@ -93,7 +93,8 @@ public sealed class ResponseIntake(
     IResponseTokenStore tokens,
     AttachmentInspector? inspector = null,
     TimeProvider? timeProvider = null,
-    ISurveyAssetStore? assets = null)
+    ISurveyAssetStore? assets = null,
+    ResponseBacklogGuard? backlog = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -110,6 +111,13 @@ public sealed class ResponseIntake(
         if (rejection is not null || survey?.PublishedVersion is null)
         {
             return (null, rejection ?? IntakeRejection.NotFound);
+        }
+
+        // **溜まりすぎているなら、そもそも画面を出さない**（Issue #72）。
+        // ここは覚えている件数を見るだけなので、たいてい DB を叩かない
+        if (await IsBackloggedAsync(survey.SurveyId, cancellationToken).ConfigureAwait(false))
+        {
+            return (null, IntakeRejection.Suspended);
         }
 
         // **上限に達していれば、そもそも画面を出さない。**
@@ -219,6 +227,13 @@ public sealed class ResponseIntake(
             return IntakeResult.Reject(rejection ?? IntakeRejection.NotFound);
         }
 
+        // **溜まりすぎているなら、ここで断る**（Issue #72）。
+        // **回答数の上限より先に見る。** あちらは DB を数えることがある
+        if (await IsBackloggedAsync(survey.SurveyId, cancellationToken).ConfigureAwait(false))
+        {
+            return IntakeResult.Reject(IntakeRejection.Suspended);
+        }
+
         // **検証や添付の検査より前に見る。** 受け付けられないと分かっているものに
         // ウイルススキャンまで走らせない。**数えるのはここの 1 回だけ**
         var (limitRejection, accepted) = await CheckLimitAsync(survey, cancellationToken)
@@ -296,6 +311,11 @@ public sealed class ResponseIntake(
             .SaveAsync(responseToken, survey.SurveyId, version, payload.ToJson(), cancellationToken)
             .ConfigureAwait(false);
 
+        // **書けた後で数える。** 断られた回答を滞留に数えない。
+        // **同じトークンの上書きも 1 件として数えてしまう**が、
+        // 数え直しのたびに実際の件数へ戻るので、多く見えるのは次の計測までに限られる
+        backlog?.OnAccepted(survey.SurveyId);
+
         // **この回答で上限に届いたなら、ここで止める。**
         // 次の人が入力し終えてから断られるのを減らす。
         // **数え直さない。** 受付の前に数えた件数に、今受け付けた 1 件を足せば足りる
@@ -310,6 +330,16 @@ public sealed class ResponseIntake(
 
         return IntakeResult.Ok();
     }
+
+    /// <summary>滞留で受付を止めているかを見る（Issue #72）。</summary>
+    /// <remarks>
+    /// **見張りが居なければ止めない。** 単体試験のように組み立てていない場でも動くようにする。
+    /// </remarks>
+    private async ValueTask<bool> IsBackloggedAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken) =>
+        backlog is not null
+        && await backlog.IsBlockedAsync(surveyId, cancellationToken).ConfigureAwait(false);
 
     /// <summary>回答数の上限に達していないかを見る（Issue #53）。</summary>
     /// <returns>

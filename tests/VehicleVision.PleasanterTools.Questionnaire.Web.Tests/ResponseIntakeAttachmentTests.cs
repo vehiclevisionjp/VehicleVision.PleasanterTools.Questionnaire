@@ -103,6 +103,12 @@ public class ResponseIntakeAttachmentTests
             Guid? surveyId = null, CancellationToken cancellationToken = default) =>
             Task.FromResult(SavedPayload is null ? 0 : 1);
 
+        // **滞留の見張りはここでは動かさない**（Issue #72）。
+        // 見張りを渡していない試験なので呼ばれない
+        public Task<PendingBacklog> CountBacklogAsync(
+            int perSurveyAtLeast, CancellationToken cancellationToken = default) =>
+            Task.FromResult(PendingBacklog.Empty with { Total = SavedPayload is null ? 0 : 1 });
+
         // ---- 管理画面から読む口。**受付の試験では使わない** --------------------
 
         public Task<OutboxStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>

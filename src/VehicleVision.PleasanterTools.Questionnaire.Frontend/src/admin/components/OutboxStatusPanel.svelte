@@ -78,6 +78,17 @@
     await reload(offset);
   }
 
+  /** 滞留で受付を止めているか。**全体でも 1 本でも、止めていれば目立たせる。** */
+  const blockedByBacklog = $derived(
+    status?.backlog?.enabled === true &&
+      (status.backlog.totalBlocked || status.backlog.blockedSurveyCount > 0),
+  );
+
+  /** 止めている間だけ読み上げさせる。**平常時に読み上げると慣れて聞き流される。** */
+  const backlogRole = $derived(status?.backlog?.totalBlocked === true ? 'alert' : undefined);
+
+  const sampledAt = $derived(at(status?.backlog?.sampledAt));
+
   /**
    * 値が届いていれば `Date` にする。
    *
@@ -167,6 +178,48 @@
     {#if status.pendingCount === 0 && status.deadLetterCount === 0}
       <p class="status">{t('outbox.healthy')}</p>
     {/if}
+
+    <!--
+      **止めているかどうかは件数から読み取れない**（Issue #72）。
+      「送信待ちが多い」と「そのせいで受付を止めている」は別のこと
+    -->
+    <section class="backlog" class:bad={blockedByBacklog}>
+      <h2>{t('outbox.backlogTitle')}</h2>
+
+      {#if status.backlog?.enabled !== true}
+        <p class="status">{t('outbox.backlogOff')}</p>
+      {:else}
+        <p class:alarm={status.backlog.totalBlocked} role={backlogRole}>
+          {status.backlog.totalBlocked
+            ? t('outbox.backlogTotalBlocked', {
+                total: status.backlog.total,
+                limit: status.backlog.totalLimit,
+              })
+            : t('outbox.backlogOk', {
+                total: status.backlog.total,
+                limit: status.backlog.totalLimit,
+              })}
+        </p>
+
+        {#if status.backlog.blockedSurveyCount > 0}
+          <p class="alarm">
+            {t('outbox.backlogSurveys', {
+              count: status.backlog.blockedSurveyCount,
+              limit: status.backlog.perSurveyLimit,
+            })}
+          </p>
+        {/if}
+
+        <!-- **手で止めた・回答数の上限とは別物だと明記する。** 取り違えると復旧の手が変わる -->
+        <p class="sub">{t('outbox.backlogAuto')}</p>
+
+        <p class="sub">
+          {sampledAt === null
+            ? t('outbox.backlogNeverSampled')
+            : t('outbox.backlogSampledAt', { at: formatDateTime(sampledAt) })}
+        </p>
+      {/if}
+    </section>
   {/if}
 
   <h2>{t('outbox.deadLetterTitle')}</h2>
@@ -389,6 +442,34 @@
   .range {
     color: var(--muted);
     font-size: 0.85rem;
+  }
+
+  .backlog {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #fff;
+    border: 1px solid var(--border);
+    /* **色だけに頼らない。** 左端の太い線でも状態が分かるようにする */
+    border-left: 4px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .backlog.bad {
+    border-left-color: var(--error);
+  }
+
+  .backlog h2 {
+    margin-top: 0;
+  }
+
+  .backlog p {
+    margin: 0.25rem 0 0;
+    font-size: 0.9rem;
+  }
+
+  .alarm {
+    color: var(--error);
+    font-weight: 600;
   }
 
   .status {

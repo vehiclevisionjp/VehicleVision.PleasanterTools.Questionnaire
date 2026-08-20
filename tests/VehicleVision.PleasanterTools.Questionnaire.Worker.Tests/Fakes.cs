@@ -55,6 +55,12 @@ public sealed class FakeOutbox : IResponseOutbox
         Guid? surveyId = null, CancellationToken cancellationToken = default) =>
         Task.FromResult(_pending.Count);
 
+    // **滞留の見張りはここでは動かさない**（Issue #72）。
+    // 見張りを渡していない試験なので呼ばれない
+    public Task<PendingBacklog> CountBacklogAsync(
+        int perSurveyAtLeast, CancellationToken cancellationToken = default) =>
+        Task.FromResult(PendingBacklog.Empty with { Total = _pending.Count });
+
     public Task SaveAsync(
         string responseToken,
         Guid surveyId,

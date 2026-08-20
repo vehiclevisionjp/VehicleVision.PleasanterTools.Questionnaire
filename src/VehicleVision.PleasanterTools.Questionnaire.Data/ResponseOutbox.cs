@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Data.Common;
 using Dapper;
 
@@ -66,6 +67,33 @@ public sealed record DeadLetterView(
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
+/// <summary>滞留している回答の件数（Issue #72）。</summary>
+/// <remarks>
+/// <para>
+/// **「まだ届いていない回答が何件あるか」**。送信待ちとデッドレターの合計で、
+/// <c>_documents/非機能設計.md</c> 2 章の受付停止はこの数字で決まる。
+/// </para>
+/// <para>
+/// **回答数の上限（Issue #53）とは別物。** あちらは「受け付けた総数」で、
+/// 送信できた分も含む。こちらは**捌けていない分だけ**なので、
+/// 送信が追いついていれば増えない。
+/// </para>
+/// </remarks>
+/// <param name="Total">全アンケートの合計。</param>
+/// <param name="BySurvey">
+/// アンケートごとの件数。**危ない水準のものだけが入る**
+/// （<c>atLeast</c> 未満は問い合わせの時点で捨てている）。
+/// **入っていない＝少ない**であって、0 件とは限らない。
+/// </param>
+public sealed record PendingBacklog(int Total, ImmutableDictionary<Guid, int> BySurvey)
+{
+    public static readonly PendingBacklog Empty =
+        new(0, ImmutableDictionary<Guid, int>.Empty);
+
+    /// <summary>そのアンケートの件数。**閾値未満なら 0 が返る。**</summary>
+    public int For(Guid surveyId) => BySurvey.TryGetValue(surveyId, out var count) ? count : 0;
+}
+
 /// <summary>デッドレターを読むときの絞り込み。</summary>
 public sealed record DeadLetterQuery
 {
@@ -117,6 +145,16 @@ public interface IResponseOutbox
 
     /// <summary>未送信の件数。**溜まっていることに気づけるようにする。**</summary>
     Task<int> CountPendingAsync(Guid? surveyId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>滞留の件数を数える（Issue #72）。</summary>
+    /// <param name="perSurveyAtLeast">
+    /// アンケートごとの件数を返す下限。**これ未満のアンケートは返らない。**
+    /// 全アンケートぶんを返すと、見張りの費用がアンケート数に比例してしまう。
+    /// </param>
+    /// <param name="cancellationToken">中断。</param>
+    Task<PendingBacklog> CountBacklogAsync(
+        int perSurveyAtLeast,
+        CancellationToken cancellationToken = default);
 
     /// <summary>滞留の状況をまとめて読む。</summary>
     /// <remarks>
@@ -327,6 +365,40 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
             $"SELECT COUNT(*) FROM [Responses] WHERE [Status] <> @DeadLetterStatus{filter}",
             new { DeadLetterStatus = (int)ResponseStatus.DeadLetter, SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    /// <summary>アンケートごとの滞留件数を受ける行。</summary>
+    /// <remarks>**<c>COUNT</c> の型が 3 者で違う**（下の <c>OutboxStatusRow</c> と同じ理由）。</remarks>
+    private sealed class BacklogRow
+    {
+        public Guid SurveyId { get; set; }
+
+        public long Count { get; set; }
+    }
+
+    public async Task<PendingBacklog> CountBacklogAsync(
+        int perSurveyAtLeast,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(perSurveyAtLeast);
+
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // **1 本の接続で 2 回問い合わせる。** 複数の結果集合を 1 回で返す書き方は
+        // 3 者で挙動が揃わない。**数えるのは一定間隔に 1 回**なので、
+        // ここを 1 往復に縮めても効かない
+        var total = await connection.ExecuteScalarAsync<int>(Sql(
+            SqlDialect.PendingBacklogTotal,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        var rows = await connection.QueryAsync<BacklogRow>(Sql(
+            SqlDialect.PendingBacklogBySurvey,
+            new { AtLeast = (long)perSurveyAtLeast },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return new PendingBacklog(
+            total,
+            rows.ToImmutableDictionary(row => row.SurveyId, row => (int)row.Count));
     }
 
     /// <summary>集約の結果を受ける行。</summary>

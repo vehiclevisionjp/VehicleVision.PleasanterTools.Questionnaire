@@ -335,6 +335,16 @@ export const ja = {
   'outbox.previous': '前へ',
   'outbox.next': '次へ',
   'outbox.page': '{from}〜{to} 件目',
+  'outbox.backlogTitle': '滞留による受付停止',
+  'outbox.backlogOff': '閾値が設定されていないため、滞留では受付を止めません。',
+  'outbox.backlogOk': '受付は止めていません（滞留 {total} 件／上限 {limit} 件）。',
+  'outbox.backlogTotalBlocked':
+    '滞留が上限に達したため、すべてのアンケートの受付を止めています（{total} 件／上限 {limit} 件）。',
+  'outbox.backlogSurveys': '滞留で受付を止めているアンケート: {count} 本（上限 {limit} 件／本）。',
+  'outbox.backlogAuto':
+    '送信が追いつけば自動で受け付け直します。手で止めたアンケートと回答数の上限は、これとは別です。',
+  'outbox.backlogSampledAt': '最後に数えた時刻: {at}',
+  'outbox.backlogNeverSampled': 'まだ数えていません。',
   // ---- プレビュー（Issue #51） ----
   'preview.open': 'プレビュー',
   'preview.title': 'プレビュー',
@@ -762,6 +772,16 @@ export const en: Record<MessageKey, string> = {
   'outbox.previous': 'Previous',
   'outbox.next': 'Next',
   'outbox.page': 'Showing {from}-{to}',
+  'outbox.backlogTitle': 'Intake paused by backlog',
+  'outbox.backlogOff': 'No threshold is configured, so backlog never pauses intake.',
+  'outbox.backlogOk': 'Intake is open ({total} queued, limit {limit}).',
+  'outbox.backlogTotalBlocked':
+    'The backlog reached its limit, so intake is paused for every survey ({total} queued, limit {limit}).',
+  'outbox.backlogSurveys': 'Surveys paused by backlog: {count} (limit {limit} each).',
+  'outbox.backlogAuto':
+    'Intake resumes on its own once delivery catches up. Manual pauses and response limits are separate.',
+  'outbox.backlogSampledAt': 'Last counted at {at}',
+  'outbox.backlogNeverSampled': 'Not counted yet.',
   // ---- Preview ----
   'preview.open': 'Preview',
   'preview.title': 'Preview',

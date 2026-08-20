@@ -180,6 +180,31 @@ public static partial class SqlDialect
         + "  MIN(CASE WHEN [Status] = @DeadLetterStatus THEN [UpdatedAt] END) AS [OldestDeadLetterAt] "
         + "FROM [Responses]";
 
+    /// <summary>滞留している回答の総件数を数える SQL（Issue #72）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **デッドレターも数える。** 送信待ちと違って**自然に捌けない**ので、
+    /// 溜まった行が DB を圧迫することでは同じ。
+    /// 除くと「送信待ちは 0 件なのに DB が溢れる」が起きる。
+    /// </para>
+    /// <para>
+    /// **受付のたびには呼ばない。** 見張りが一定間隔で 1 回だけ数える。
+    /// </para>
+    /// </remarks>
+    public const string PendingBacklogTotal = "SELECT COUNT(*) FROM [Responses]";
+
+    /// <summary>閾値に近いアンケートだけを数える SQL（Issue #72）。</summary>
+    /// <remarks>
+    /// **<c>HAVING</c> で絞る。** 全アンケートぶんの行を返すと、
+    /// アンケートが増えるほど見張りの費用が上がる。
+    /// **返るのは危ないものだけ**なので、たいていは 0 行で終わる。
+    /// </remarks>
+    public const string PendingBacklogBySurvey =
+        "SELECT [SurveyId] AS [SurveyId], COUNT(*) AS [Count] "
+        + "FROM [Responses] "
+        + "GROUP BY [SurveyId] "
+        + "HAVING COUNT(*) >= @AtLeast";
+
     /// <summary>デッドレターを新しい順に読む SQL。</summary>
     /// <remarks>
     /// <para>
