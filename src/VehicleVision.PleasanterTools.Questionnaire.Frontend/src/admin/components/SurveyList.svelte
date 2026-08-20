@@ -82,6 +82,13 @@
    * **既定は有効**なので、分からないときは有効側に倒す。
    */
   let settingsProofOfWork = $state(true);
+  /**
+   * 下書きを端末へ残すか（Issue #59）。
+   *
+   * **既定は無効**なので、分からないときは無効側に倒す。
+   * 端末は共有され得るため、こちらは「分からないなら残さない」が安全側。
+   */
+  let settingsAllowDraft = $state(false);
   let settingsBusy = $state(false);
 
   $effect(() => {
@@ -212,6 +219,7 @@
     settingsFor = survey;
     settingsLimit = survey.responseLimit == null ? '' : String(survey.responseLimit);
     settingsProofOfWork = survey.requireProofOfWork ?? true;
+    settingsAllowDraft = survey.allowDraft ?? false;
   }
 
   async function saveSettings(event: SubmitEvent) {
@@ -235,7 +243,8 @@
     }
 
     settingsBusy = true;
-    const result = await saveSurveySettings(target.surveyId, limit, settingsProofOfWork);
+    const result = await saveSurveySettings(
+      target.surveyId, limit, settingsProofOfWork, settingsAllowDraft);
     settingsBusy = false;
 
     if (!result.ok) {
@@ -390,6 +399,19 @@
       {t('settings.proofOfWork')}
     </label>
     <p class="hint">{t('settings.proofOfWorkHint')}</p>
+
+    <!--
+      **既定は無効。** 端末は共有され得る（店頭のタブレット、共用 PC）。
+      **入れると何が起きるかを、入れる前に読ませる**
+    -->
+    <label class="check">
+      <input type="checkbox" bind:checked={settingsAllowDraft} />
+      {t('settings.allowDraft')}
+    </label>
+    <p class="hint">{t('settings.allowDraftHint')}</p>
+    {#if settingsAllowDraft}
+      <p class="warn">{t('settings.allowDraftWarning')}</p>
+    {/if}
     <p class="hint">{t('settings.proofOfWorkKeepsOthers')}</p>
     <div class="actions">
       <button type="submit" disabled={settingsBusy}>{t('settings.submit')}</button>

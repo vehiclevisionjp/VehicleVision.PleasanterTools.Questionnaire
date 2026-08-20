@@ -348,6 +348,12 @@ export interface SurveySummary {
    */
   requireProofOfWork?: boolean;
   /**
+   * 回答の下書きを端末へ残すか（Issue #59）。
+   *
+   * **既定は無効**なので、分からないときは無効側に倒す。
+   */
+  allowDraft?: boolean;
+  /**
    * 受け付けた回答の件数。
    *
    * **まだ Pleasanter へ届いていない分も含む。**
