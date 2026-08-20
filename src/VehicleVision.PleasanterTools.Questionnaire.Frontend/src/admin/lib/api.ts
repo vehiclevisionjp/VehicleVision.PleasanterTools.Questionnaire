@@ -1,6 +1,7 @@
 import { acceptLanguageHeader, t } from './i18n/state.svelte';
 import type {
   AdminSession,
+  AttachmentRejectionPage,
   AuditLogFilter,
   AuditLogPage,
   DeadLetterPage,
@@ -310,6 +311,17 @@ export const listDeadLetters = (offset: number, limit: number) => {
   const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
 
   return call<DeadLetterPage>(`/api/admin/outbox/dead-letters?${query}`);
+};
+
+/**
+ * 添付を弾いた記録を読む（Issue #39）。
+ *
+ * **送信元もファイル名も返らない。** サーバ側の型にも入る場所が無い。
+ */
+export const listAttachmentRejections = (offset: number, limit: number) => {
+  const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+
+  return call<AttachmentRejectionPage>(`/api/admin/outbox/attachment-rejections?${query}`);
 };
 
 /**

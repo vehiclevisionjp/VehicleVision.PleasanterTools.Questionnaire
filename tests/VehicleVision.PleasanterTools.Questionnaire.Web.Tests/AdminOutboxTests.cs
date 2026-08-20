@@ -30,6 +30,59 @@ public class AdminOutboxTests
             CreatedAt: Unspecified("2026-08-18T01:00:00"),
             UpdatedAt: Unspecified("2026-08-19T02:00:00"));
 
+    // ---- 添付を弾いた記録（Issue #39）------------------------------------------
+
+    private static AttachmentRejectionView Rejected(
+        string? questionId = "q1",
+        int reason = 0,
+        int fileCount = 1,
+        string? title = "アンケート") =>
+        new(Unspecified("2026-08-20T03:00:00"), Guid.NewGuid(), title, questionId, reason, fileCount);
+
+    [Fact]
+    public void 弾いた記録の時刻はUTCとして返す()
+    {
+        var response = AdminOutboxEndpoints.ToResponse([Rejected()], take: 10, recentCount: 5);
+
+        var entry = Assert.Single(response.Entries);
+        Assert.Equal(DateTimeKind.Utc, entry.OccurredAt.Kind);
+        Assert.Equal(5, response.RecentCount);
+        Assert.False(response.HasMore);
+    }
+
+    [Fact]
+    public void 弾いた記録に送信元もファイル名も入る場所が無い()
+    {
+        // **約束を注意書きではなく型で守る**（回答者は完全匿名）
+        var names = typeof(AttachmentRejectionResponse)
+            .GetProperties()
+            .Select(property => property.Name)
+            .ToArray();
+
+        Assert.DoesNotContain("IpAddress", names);
+        Assert.DoesNotContain("FileName", names);
+    }
+
+    [Fact]
+    public void 一件多く読んだら次のページがあると分かる()
+    {
+        // **総数は数えない**（増え続ける表を毎回数えないため）
+        var response = AdminOutboxEndpoints.ToResponse(
+            [Rejected(), Rejected(), Rejected()], take: 2, recentCount: 3);
+
+        Assert.Equal(2, response.Entries.Count);
+        Assert.True(response.HasMore);
+    }
+
+    [Fact]
+    public void 設問に紐づかない理由は設問を空で返す()
+    {
+        var response = AdminOutboxEndpoints.ToResponse(
+            [Rejected(questionId: null, reason: 4)], take: 10, recentCount: 1);
+
+        Assert.Null(Assert.Single(response.Entries).QuestionId);
+    }
+
     // ---- 滞留による受付停止（Issue #72）--------------------------------------
 
     [Fact]

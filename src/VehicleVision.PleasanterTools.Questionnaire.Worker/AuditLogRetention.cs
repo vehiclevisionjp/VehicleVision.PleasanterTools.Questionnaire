@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
@@ -31,6 +31,28 @@ public sealed class AuditLogRetentionOptions
     /// <remarks>**頻繁に走らせない。** 消す対象は 1 日で大きく変わらない。</remarks>
     public TimeSpan SweepInterval { get; init; } = TimeSpan.FromHours(6);
 
+    /// <summary>添付を弾いた記録を残す日数。**0 以下にすると消さない。**（Issue #39）</summary>
+    /// <remarks>
+    /// <para>
+    /// **管理操作の記録より短くしてある。** あちらは「誰がいつ何を変えたか」を
+    /// 後から辿るためのもので、監査の都合で長く要る。
+    /// **こちらは運用のための数字**（対策が効いているか、設定が厳しすぎないか）で、
+    /// 半年前の値を見ることはまず無い。
+    /// </para>
+    /// <para>
+    /// **別の設定にしてある。** 同じ値で縛ると、監査の要件に引きずられて
+    /// 運用の記録まで長く持つことになる。
+    /// </para>
+    /// </remarks>
+    public int AttachmentRejectionRetentionDays { get; init; } = 90;
+
+    /// <summary>添付を弾いた記録を消す仕組みが働くか。</summary>
+    public bool AttachmentRejectionEnabled => AttachmentRejectionRetentionDays > 0;
+
+    /// <summary>添付を弾いた記録の保持日数の設定名。</summary>
+    public const string AttachmentRejectionRetentionDaysKey =
+        "QUESTIONNAIRE_ATTACHMENT_REJECTION_RETENTION_DAYS";
+
     /// <summary>消す仕組みが働くか。</summary>
     public bool Enabled => RetentionDays > 0;
 
@@ -50,9 +72,37 @@ public sealed class AuditLogRetentionOptions
                 + "0 以下にすると消さない");
         }
 
-        return string.IsNullOrWhiteSpace(raw)
-            ? new AuditLogRetentionOptions()
-            : new AuditLogRetentionOptions { RetentionDays = int.Parse(raw, System.Globalization.CultureInfo.InvariantCulture) };
+        var defaults = new AuditLogRetentionOptions();
+
+        return new AuditLogRetentionOptions
+        {
+            RetentionDays = string.IsNullOrWhiteSpace(raw)
+                ? defaults.RetentionDays
+                : int.Parse(raw, System.Globalization.CultureInfo.InvariantCulture),
+            AttachmentRejectionRetentionDays = ReadDays(
+                configuration,
+                AttachmentRejectionRetentionDaysKey,
+                defaults.AttachmentRejectionRetentionDays),
+        };
+    }
+
+    private static int ReadDays(
+        Microsoft.Extensions.Configuration.IConfiguration configuration,
+        string key,
+        int fallback)
+    {
+        var raw = configuration[key];
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return fallback;
+        }
+
+        // **読めない値を黙って既定へ落とさない**（上と同じ理由）
+        return int.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? value
+            : throw new InvalidOperationException(
+                $"{key} は整数で指定する（今の値: {raw}）。0 以下にすると消さない");
     }
 }
 
@@ -71,7 +121,8 @@ public sealed class AuditLogRetentionService(
     IAuditLogStore store,
     AuditLogRetentionOptions options,
     ILogger<AuditLogRetentionService> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    IAttachmentRejectionStore? rejections = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -85,6 +136,19 @@ public sealed class AuditLogRetentionService(
                 "管理操作の記録を消さない設定で動いている（{Key}={Days}）。表は増え続ける",
                 AuditLogRetentionOptions.RetentionDaysKey,
                 options.RetentionDays);
+        }
+
+        if (rejections is not null && !options.AttachmentRejectionEnabled)
+        {
+            logger.LogWarning(
+                "添付を弾いた記録を消さない設定で動いている（{Key}={Days}）。表は増え続ける",
+                AuditLogRetentionOptions.AttachmentRejectionRetentionDaysKey,
+                options.AttachmentRejectionRetentionDays);
+        }
+
+        // **どちらも消さないなら、常駐する意味が無い**
+        if (!options.Enabled && !(rejections is not null && options.AttachmentRejectionEnabled))
+        {
             return;
         }
 
@@ -100,18 +164,40 @@ public sealed class AuditLogRetentionService(
                 // **先に待つ。** 立ち上がり直後に全インスタンスが一斉に消しに行かないように
                 await Task.Delay(options.SweepInterval, _time, stoppingToken).ConfigureAwait(false);
 
-                var threshold = _time.GetLocalNow().DateTime.AddDays(-options.RetentionDays);
-                var deleted = await store.DeleteOlderThanAsync(threshold, stoppingToken)
-                    .ConfigureAwait(false);
+                var now = _time.GetLocalNow().DateTime;
 
-                if (deleted > 0)
+                if (options.Enabled)
                 {
-                    // **消したことは残す。** 監査ログが減った理由が分からないと、
-                    // 「消えている」と「消した」の区別が付かない
-                    logger.LogInformation(
-                        "期限を過ぎた管理操作の記録を {Count} 件消した（{Threshold} より前）",
-                        deleted,
-                        threshold);
+                    var threshold = now.AddDays(-options.RetentionDays);
+                    var deleted = await store.DeleteOlderThanAsync(threshold, stoppingToken)
+                        .ConfigureAwait(false);
+
+                    if (deleted > 0)
+                    {
+                        // **消したことは残す。** 監査ログが減った理由が分からないと、
+                        // 「消えている」と「消した」の区別が付かない
+                        logger.LogInformation(
+                            "期限を過ぎた管理操作の記録を {Count} 件消した（{Threshold} より前）",
+                            deleted,
+                            threshold);
+                    }
+                }
+
+                // **添付を弾いた記録も同じ周期で掃除する**（Issue #39）。
+                // 常駐する係を 2 つに増やす理由が無い
+                if (rejections is not null && options.AttachmentRejectionEnabled)
+                {
+                    var threshold = now.AddDays(-options.AttachmentRejectionRetentionDays);
+                    var deleted = await rejections.DeleteOlderThanAsync(threshold, stoppingToken)
+                        .ConfigureAwait(false);
+
+                    if (deleted > 0)
+                    {
+                        logger.LogInformation(
+                            "期限を過ぎた添付の記録を {Count} 件消した（{Threshold} より前）",
+                            deleted,
+                            threshold);
+                    }
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

@@ -1,6 +1,12 @@
 <script lang="ts">
-  import { getOutboxStatus, listDeadLetters, requeueDeadLetter } from '../lib/api';
-  import type { DeadLetterEntry, OutboxStatus } from '../lib/types';
+  import {
+    getOutboxStatus,
+    listAttachmentRejections,
+    listDeadLetters,
+    requeueDeadLetter,
+  } from '../lib/api';
+  import type { AttachmentRejectionPage, DeadLetterEntry, OutboxStatus } from '../lib/types';
+  import { attachmentRejectionReasonKey } from '../lib/types';
   import { formatDateTime, formatElapsed, t } from '../lib/i18n/state.svelte';
 
   interface Props {
@@ -23,10 +29,31 @@
   /** 戻している最中の回答。**二重に押させない。** */
   let requeuing = $state('');
 
+  /** 受け付けなかった添付（Issue #39）。**回答とは別の話なので別に読む。** */
+  let rejections = $state<AttachmentRejectionPage>();
+  let rejectionOffset = $state(0);
+
   // **ページを変えたら読み直す。** 読み直しはここと、明示的に呼ぶ所だけ
   $effect(() => {
     void reload(offset);
   });
+
+  // **添付の記録は別のページ送りを持つ。** 回答の一覧を送っても付いてこない
+  $effect(() => {
+    void reloadRejections(rejectionOffset);
+  });
+
+  async function reloadRejections(from: number) {
+    const result = await listAttachmentRejections(from, pageSize);
+
+    if (!result.ok) {
+      // **ここだけで落とさない。** 送信状況が読めていれば画面としては用を成す
+      error = result.message;
+      return;
+    }
+
+    rejections = result.value;
+  }
 
   async function reload(from: number) {
     loading = true;
@@ -117,6 +144,13 @@
    * **アンケートが消えていても「どれか」は分かるようにする。**
    * 識別子は頭だけ出す（並べると表が横に伸びる）。
    */
+  /** 弾いた記録のアンケート名。**消えていても「どれか」は分かるようにする。** */
+  function rejectionSurvey(title: string | null | undefined, surveyId: string): string {
+    return (title ?? '') !== ''
+      ? (title ?? '')
+      : t('outbox.removedSurvey', { id: surveyId.slice(0, 8) });
+  }
+
   function survey(entry: DeadLetterEntry): string {
     const title = entry.surveyTitle ?? '';
     return title !== '' ? title : t('outbox.removedSurvey', { id: entry.surveyId.slice(0, 8) });
@@ -220,6 +254,81 @@
         </p>
       {/if}
     </section>
+  {/if}
+
+  <h2>{t('attachmentRejection.title')}</h2>
+
+  <p class="lead">
+    {t('attachmentRejection.lead')}
+    <!-- **残していないことを画面にも書く。** 型で守っていても、見る人には見えない -->
+    <strong>{t('attachmentRejection.leadStrong')}</strong>
+  </p>
+
+  {#if rejections === undefined}
+    <p class="status">{t('outbox.loading')}</p>
+  {:else if rejections.entries.length === 0}
+    <p class="status">{t('attachmentRejection.none')}</p>
+  {:else}
+    <p class="notice">
+      {t('attachmentRejection.recent', {
+        count: rejections.recentCount,
+        days: rejections.recentDays,
+      })}
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>{t('attachmentRejection.occurredAt')}</th>
+            <th>{t('attachmentRejection.survey')}</th>
+            <th>{t('attachmentRejection.question')}</th>
+            <th>{t('attachmentRejection.reason')}</th>
+            <th>{t('attachmentRejection.count')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- **一意な鍵が無い。** 同じ秒に同じ理由で複数のアンケートが弾かれ得る -->
+          {#each rejections.entries as entry, index (index)}
+            <tr>
+              <td class="nowrap">{formatDateTime(new Date(entry.occurredAt))}</td>
+              <td>{rejectionSurvey(entry.surveyTitle, entry.surveyId)}</td>
+              <!-- 設問に紐づかない理由（合計サイズ超過など）もある -->
+              <td>{entry.questionId ?? t('attachmentRejection.wholeSubmission')}</td>
+              <td>{t(attachmentRejectionReasonKey(entry.reason), { reason: entry.reason })}</td>
+              <td class="nowrap">{t('outbox.count', { count: entry.fileCount })}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="pager">
+      <button
+        type="button"
+        class="secondary"
+        disabled={rejectionOffset === 0}
+        onclick={() => (rejectionOffset = Math.max(rejectionOffset - pageSize, 0))}
+      >
+        {t('outbox.previous')}
+      </button>
+
+      <span class="range">
+        {t('outbox.page', {
+          from: rejectionOffset + 1,
+          to: rejectionOffset + rejections.entries.length,
+        })}
+      </span>
+
+      <button
+        type="button"
+        class="secondary"
+        disabled={!rejections.hasMore}
+        onclick={() => (rejectionOffset = rejectionOffset + pageSize)}
+      >
+        {t('outbox.next')}
+      </button>
+    </nav>
   {/if}
 
   <h2>{t('outbox.deadLetterTitle')}</h2>

@@ -1,4 +1,4 @@
-using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
+﻿using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -189,11 +189,45 @@ public class ResponseIntakeAttachmentTests
             ],
         };
 
-    private static (ResponseIntake Intake, FakeOutbox Outbox) Intake(
+    /// <summary>弾いた記録を覚えるだけの偽物（Issue #39）。</summary>
+    private sealed class FakeRejections : IAttachmentRejectionStore
+    {
+        public List<AttachmentRejectionEntry> Written { get; } = [];
+
+        public Exception? Throws { get; set; }
+
+        public Task WriteAsync(
+            IReadOnlyCollection<AttachmentRejectionEntry> entries,
+            CancellationToken cancellationToken = default)
+        {
+            if (Throws is not null)
+            {
+                return Task.FromException(Throws);
+            }
+
+            Written.AddRange(entries);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<AttachmentRejectionView>> ListAsync(
+            AttachmentRejectionQuery query, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<int> CountSinceAsync(
+            DateTime since, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<int> DeleteOlderThanAsync(
+            DateTime threshold, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private static (ResponseIntake Intake, FakeOutbox Outbox, FakeRejections Rejections) Intake(
         SurveyDefinition? definition = null,
         AttachmentPolicy? policy = null,
         IVirusScanner? scanner = null,
-        bool withInspector = true)
+        bool withInspector = true,
+        FakeRejections? rejections = null)
     {
         var snapshot = new SurveySnapshot(
             definition ?? Definition(), new MappingDefinition(), 1, "DescriptionA");
@@ -201,14 +235,17 @@ public class ResponseIntakeAttachmentTests
         var survey = new SurveyRecord(
             SurveyId, PublicId, "検証用", 1, "DescriptionA", (int)SurveyStatus.Published, 1);
 
+        var store = rejections ?? new FakeRejections();
+
         var intake = new ResponseIntake(
             new FakeSurveys(survey),
             new FakeSnapshots(snapshot),
             outbox,
             new FakeTokens(),
-            withInspector ? new AttachmentInspector(policy ?? Policy(), scanner) : null);
+            withInspector ? new AttachmentInspector(policy ?? Policy(), scanner) : null,
+            rejections: store);
 
-        return (intake, outbox);
+        return (intake, outbox, store);
     }
 
     private static AnsweredAttachment Png(string name = "a.png", int size = 16) =>
@@ -263,7 +300,7 @@ public class ResponseIntakeAttachmentTests
             ],
         };
 
-        var (intake, outbox) = Intake(definition);
+        var (intake, outbox, _) = Intake(definition);
 
         var result = await intake.SubmitAsync(
             PublicId,
@@ -318,7 +355,7 @@ public class ResponseIntakeAttachmentTests
             ],
         };
 
-        var (intake, outbox) = Intake(definition);
+        var (intake, outbox, _) = Intake(definition);
 
         var result = await intake.SubmitAsync(
             PublicId, Token, [Answer.Of("q1", "yes"), Answer.Of("q2", "ある社のもの")], []);
@@ -330,7 +367,7 @@ public class ResponseIntakeAttachmentTests
     [Fact]
     public async Task 添付は検査を通ってから送信待ちへ入る()
     {
-        var (intake, outbox) = Intake();
+        var (intake, outbox, _) = Intake();
 
         var result = await intake.SubmitAsync(PublicId, Token, [Answer.Of("q1", "満足")], [Png()]);
 
@@ -346,7 +383,7 @@ public class ResponseIntakeAttachmentTests
     [Fact]
     public async Task 許可していない拡張子は受け付けず送信待ちにも入れない()
     {
-        var (intake, outbox) = Intake();
+        var (intake, outbox, _) = Intake();
 
         var result = await intake.SubmitAsync(
             PublicId,
@@ -364,7 +401,7 @@ public class ResponseIntakeAttachmentTests
     [Fact]
     public async Task 拡張子を偽った添付は受け付けない()
     {
-        var (intake, _) = Intake();
+        var (intake, _, _) = Intake();
 
         var result = await intake.SubmitAsync(
             PublicId,
@@ -383,7 +420,7 @@ public class ResponseIntakeAttachmentTests
     [Fact]
     public async Task 検出したら回答ごと拒否する()
     {
-        var (intake, outbox) = Intake(policy: Policy(scanEnabled: true), scanner: new InfectedScanner());
+        var (intake, outbox, _) = Intake(policy: Policy(scanEnabled: true), scanner: new InfectedScanner());
 
         var result = await intake.SubmitAsync(PublicId, Token, [Answer.Of("q1", "満足")], [Png()]);
 
@@ -396,7 +433,7 @@ public class ResponseIntakeAttachmentTests
     [Fact]
     public async Task スキャナへ到達できなければ受け付けない()
     {
-        var (intake, outbox) = Intake(
+        var (intake, outbox, _) = Intake(
             policy: Policy(scanEnabled: true), scanner: new UnavailableScanner());
 
         var result = await intake.SubmitAsync(PublicId, Token, [Answer.Of("q1", "満足")], [Png()]);
@@ -410,7 +447,7 @@ public class ResponseIntakeAttachmentTests
     public async Task 検査の口が無いのに添付が来たら受け付けない()
     {
         // **素通しにしない。** 設定漏れで未検査のバイナリが通る方が危ない
-        var (intake, outbox) = Intake(withInspector: false);
+        var (intake, outbox, _) = Intake(withInspector: false);
 
         var result = await intake.SubmitAsync(PublicId, Token, [Answer.Of("q1", "満足")], [Png()]);
 
@@ -421,7 +458,7 @@ public class ResponseIntakeAttachmentTests
     [Fact]
     public async Task 添付を受け付けない設問へは添付できない()
     {
-        var (intake, _) = Intake();
+        var (intake, _, _) = Intake();
 
         var result = await intake.SubmitAsync(
             PublicId,
@@ -436,7 +473,7 @@ public class ResponseIntakeAttachmentTests
     [Fact]
     public async Task 設問ごとの個数上限が効く()
     {
-        var (intake, _) = Intake(Definition(maxFileCount: 1));
+        var (intake, _, _) = Intake(Definition(maxFileCount: 1));
 
         var result = await intake.SubmitAsync(
             PublicId, Token, [Answer.Of("q1", "満足")], [Png("a.png"), Png("b.png")]);
@@ -447,7 +484,7 @@ public class ResponseIntakeAttachmentTests
     [Fact]
     public async Task 添付が必須の設問はファイルが無ければ受け付けない()
     {
-        var (intake, _) = Intake(Definition(fileRequired: true));
+        var (intake, _, _) = Intake(Definition(fileRequired: true));
 
         var result = await intake.SubmitAsync(PublicId, Token, [Answer.Of("q1", "満足")]);
 
@@ -459,7 +496,7 @@ public class ResponseIntakeAttachmentTests
     public async Task 受け取っていないファイル名は回答に残さない()
     {
         // **画面が名乗っただけの名前を信用しない**
-        var (intake, outbox) = Intake();
+        var (intake, outbox, _) = Intake();
 
         var result = await intake.SubmitAsync(
             PublicId,
@@ -469,5 +506,99 @@ public class ResponseIntakeAttachmentTests
         Assert.True(result.Accepted);
         var payload = ResponsePayload.FromJson(outbox.SavedPayload!);
         Assert.Empty(payload!.Answers.Single(answer => answer.QuestionId == "qf").FileNames);
+    }
+
+    // ---- 弾いた記録（Issue #39）------------------------------------------------
+
+    [Fact]
+    public async Task 弾いたら理由と件数を記録する()
+    {
+        // **対策が効いているか、設定が厳しすぎないかは、記録が無いと分からない**
+        var (intake, _, rejections) = Intake();
+
+        await intake.SubmitAsync(
+            PublicId,
+            Token,
+            [Answer.Of("q1", "満足")],
+            [new AnsweredAttachment("qf", new IncomingAttachment("a.exe", Bytes(16)))]);
+
+        var entry = Assert.Single(rejections.Written);
+
+        Assert.Equal(SurveyId, entry.SurveyId);
+        Assert.Equal("qf", entry.QuestionId);
+        Assert.Equal((int)AttachmentRejectionReason.ExtensionNotAllowed, entry.Reason);
+        Assert.Equal(1, entry.FileCount);
+    }
+
+    [Fact]
+    public async Task 同じ理由はまとめて一行にする()
+    {
+        // **1 件ずつ入れると、添付を並べて送るだけで行を好きなだけ増やせる**
+        var (intake, _, rejections) = Intake();
+
+        await intake.SubmitAsync(
+            PublicId,
+            Token,
+            [Answer.Of("q1", "満足")],
+            [
+                new AnsweredAttachment("qf", new IncomingAttachment("a.exe", Bytes(16))),
+                new AnsweredAttachment("qf", new IncomingAttachment("b.exe", Bytes(16))),
+                new AnsweredAttachment("qf", new IncomingAttachment("c.exe", Bytes(16))),
+            ]);
+
+        var entry = Assert.Single(rejections.Written);
+
+        Assert.Equal(3, entry.FileCount);
+    }
+
+    [Fact]
+    public async Task 受け付けたときは記録しない()
+    {
+        var (intake, _, rejections) = Intake();
+
+        var result = await intake.SubmitAsync(
+            PublicId,
+            Token,
+            [Answer.Of("q1", "満足")],
+            [Png()]);
+
+        Assert.True(result.Accepted);
+        Assert.Empty(rejections.Written);
+    }
+
+    [Fact]
+    public async Task 検査の口が無いときも記録する()
+    {
+        // **設定の誤りで全部弾いている状態こそ気付きたい**
+        var (intake, _, rejections) = Intake(withInspector: false);
+
+        await intake.SubmitAsync(
+            PublicId,
+            Token,
+            [Answer.Of("q1", "満足")],
+            [Png()]);
+
+        var entry = Assert.Single(rejections.Written);
+
+        Assert.Equal((int)AttachmentRejectionReason.ScannerUnavailable, entry.Reason);
+        // **設問に紐づかない理由**
+        Assert.Null(entry.QuestionId);
+    }
+
+    [Fact]
+    public async Task 記録に失敗しても受付の結果は変えない()
+    {
+        // **記録は運用のためのもの。** これが落ちたせいで回答者への応答が変わってはいけない
+        var failing = new FakeRejections { Throws = new InvalidOperationException("DB が応えない") };
+        var (intake, outbox, _) = Intake(rejections: failing);
+
+        var result = await intake.SubmitAsync(
+            PublicId,
+            Token,
+            [Answer.Of("q1", "満足")],
+            [new AnsweredAttachment("qf", new IncomingAttachment("a.exe", Bytes(16)))]);
+
+        Assert.Equal(IntakeRejection.AttachmentRejected, result.Rejection);
+        Assert.Null(outbox.SavedPayload);
     }
 }

@@ -576,6 +576,57 @@ export interface BacklogGuard {
 }
 
 /**
+ * 添付を弾いた記録 1 件（Issue #39）。
+ *
+ * **送信元もファイル名も届かない。** 回答者は完全匿名という前提を、
+ * サーバ側の型でも守っている。
+ */
+export interface AttachmentRejectionEntry {
+  occurredAt: string;
+  surveyId: string;
+  /** アンケートの題名。**消えたアンケートでは届かない。** */
+  surveyTitle?: string | null;
+  /** どの設問か。**設問に紐づかない理由では届かない。** */
+  questionId?: string | null;
+  /** 弾いた理由。**文言は画面が持つ**（サーバは番号だけ返す）。 */
+  reason: number;
+  /** その送信で、その理由に当たった件数。 */
+  fileCount: number;
+}
+
+/** 添付を弾いた記録の 1 ページ。 */
+export interface AttachmentRejectionPage {
+  entries: AttachmentRejectionEntry[];
+  hasMore: boolean;
+  /** 直近に弾いた件数。**行数ではなくファイルの数。** */
+  recentCount: number;
+  /** 「直近」が何日か。 */
+  recentDays: number;
+}
+
+/**
+ * 弾いた理由の文言の鍵（Issue #39）。
+ *
+ * **番号は `Core/Attachments/AttachmentRejectionReason` の並び順そのもの。**
+ * 並びを変えると意味がずれるので、あちらへ足すときは末尾に足すこと。
+ */
+export function attachmentRejectionReasonKey(reason: number): MessageKey {
+  const keys: MessageKey[] = [
+    'attachmentRejection.ExtensionNotAllowed',
+    'attachmentRejection.ContentDoesNotMatchExtension',
+    'attachmentRejection.TooLarge',
+    'attachmentRejection.TooMany',
+    'attachmentRejection.TotalTooLarge',
+    'attachmentRejection.InvalidFileName',
+    'attachmentRejection.Infected',
+    'attachmentRejection.ScannerUnavailable',
+  ];
+
+  // **知らない番号でも落とさない。** サーバ側が先に増えることがある
+  return keys[reason] ?? 'attachmentRejection.Unknown';
+}
+
+/**
  * 送信できなかった回答 1 件。
  *
  * **回答本文は届かない。** サーバ側の型にも入る場所が無い。
