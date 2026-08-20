@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectFewSurveys, expectNoAdminYet } from '../lib/fresh';
 import { demoAdmin, prepareSurvey } from '../lib/setup';
 import { findTofu, japaneseSamples } from '../lib/tofu';
 import { totp } from '../lib/totp';
@@ -70,7 +71,9 @@ let secretBase32 = '';
 test.describe('取説用の写し', () => {
 
   test('管理画面：初期設定から 2 要素の登録まで', async ({ page }) => {
-    await page.goto('/admin');
+    // **撮り始める前に前提を確かめる**（Issue #65）。
+    // 汚れた環境では、写しの途中で分からない形で落ちる
+    await expectNoAdminYet(page);
 
     // **まだ誰も登録されていない状態の入口**
     await expect(page.getByRole('heading', { name: '最初の管理者を登録する' })).toBeVisible();
@@ -102,6 +105,11 @@ test.describe('取説用の写し', () => {
     await page.getByRole('button', { name: '管理画面へ進む' }).click();
 
     await expect(page.getByRole('heading', { name: 'アンケート' })).toBeVisible();
+
+    // **残骸が溜まっていないこと**（Issue #65）。
+    // 一覧が長いと、ページ全体の写しが撮れなくなる
+    await expectFewSurveys(page);
+
     await shoot(page, 'admin-04-survey-list-empty');
 
     // **次の試験へログインを渡す**
