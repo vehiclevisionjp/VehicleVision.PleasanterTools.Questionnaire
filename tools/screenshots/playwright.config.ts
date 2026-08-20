@@ -51,7 +51,13 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 900 },
-        // **倍率を固定する。** 取説の図の大きさを揃えるため
+        // **倍率を固定する。** 取説の図の大きさを揃えるため。
+        //
+        // ⚠️ **2 のままでよい。** ここを 1 に下げると
+        // `Unable to capture screenshot` が出なくなるが、**原因はこちらではない**
+        // （Issue #65）。真因は**検証環境に溜まったアンケートの行**で、
+        // 一覧が長くなりすぎてページ全体の写しが撮れなくなる。
+        // **DB を空にすれば 2 のまま通る。** 前提は `lib/fresh.ts` が見ている
         deviceScaleFactor: 2,
       },
     },

@@ -18,6 +18,51 @@ docker compose --profile sqlserver --profile screenshots run --rm screenshots
 
 写しは `tools/screenshots/shots/` に出る。
 
+### ⚠️ 「まっさら」を省くと、分からない形で落ちる（Issue #65）
+
+**`down -v` を省いて撮ると、途中で次のように落ちる。**
+
+```text
+Error: page.screenshot: Protocol error (Page.captureScreenshot):
+  Unable to capture screenshot
+```
+
+**落ちる場所は走らせるたびに変わる**ので、特定の画面の問題にも、
+倍率の問題にも見える。**どちらでもない。**
+
+原因は**溜まった行**。結合テストを何度も走らせた検証環境には
+**アンケートが 1367 件**あり、管理画面の一覧はそれを全部描く。
+ページ全体の写しが巨大になり、Chromium が撮れなくなる。
+**DB を空にすれば、同じ倍率のまま 9 件すべて通る**（実測、2026-08-20）。
+
+**効かなかったもの。** 原因を取り違えないよう記しておく。
+
+| 試したこと | 結果 |
+|---|---|
+| `/dev/shm` を 1 GB へ広げる（既定 64 MB） | **変わらない** |
+| `--disable-dev-shm-usage` | **変わらない** |
+| `--disable-gpu` | **変わらない** |
+| `deviceScaleFactor` を 2 → 1 | 通るが、**原因ではない**（症状を薄めているだけ） |
+
+**今は撮り始める前に前提を確かめて落とす**（`lib/fresh.ts`）。
+「撮れない」より「撮れない理由が分からない」方が高く付く。
+
+### ほかの spec と混ぜて走らせない
+
+**`manual.spec.ts` は最初の管理者を自分で作る。**
+`branching.spec.ts` などを先に走らせると管理者が既に居るので、
+**初期設定の画面がもう出ない**（取説に要る画面）。
+
+まとめて走らせたいときは、**`manual.spec.ts` を別の実行に分ける。**
+
+```bash
+# 写しを撮る（まっさらな環境で、これだけ）
+docker compose --profile sqlserver --profile screenshots run --rm     screenshots npx playwright test specs/manual.spec.ts
+
+# 製品の検証（写しは撮らない）
+docker compose --profile sqlserver --profile screenshots run --rm     screenshots npx playwright test --grep-invert 取説用の写し
+```
+
 ## 豆腐（□）にしないために
 
 **Linux のコンテナには日本語フォントが無いのが普通で、入れ忘れれば確実に豆腐になる。**
@@ -64,6 +109,9 @@ docker compose --profile sqlserver --profile screenshots run --rm screenshots
 | `answer-03-completed` | 送信後 |
 | `answer-04-not-found` | 見つからないとき |
 | `answer-05-mobile` | 回答画面（携帯の幅） |
+| `admin-09-audit-log` | 操作の記録 |
+| `admin-10-outbox` | 送信状況 |
+| `admin-11-preview` | プレビュー |
 
 ## 秘密の値は伏せる
 
