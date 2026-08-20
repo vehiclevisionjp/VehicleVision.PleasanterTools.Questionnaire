@@ -43,7 +43,7 @@ public static class AdminNotificationEndpoints
         group.AddEndpointFilter<AuditLogFilter>();
 
         // ---- 一覧と未読件数 --------------------------------------------------
-        group.MapGet("/", async (
+        group.MapGet("", async (
             IAdminNotificationStore store,
             CancellationToken cancellationToken,
             int? limit = null,

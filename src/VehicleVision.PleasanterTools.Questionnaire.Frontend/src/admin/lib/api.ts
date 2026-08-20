@@ -1,5 +1,6 @@
 import { acceptLanguageHeader, t } from './i18n/state.svelte';
 import type {
+  AdminNotificationPage,
   AdminSession,
   AttachmentRejectionPage,
   AuditLogFilter,
@@ -297,6 +298,27 @@ export const listAuditLogs = (
 
   return call<AuditLogPage>(`/api/admin/audit-logs?${query}`);
 };
+
+// ---- 管理者への知らせ（Issue #80）--------------------------------------------
+
+/**
+ * 溜まっている知らせを読む。
+ *
+ * **未読の件数も同じ応答で返る。** バッジのために別の呼び出しを増やさない。
+ */
+export const listNotifications = (offset: number, limit: number) => {
+  const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+
+  return call<AdminNotificationPage>(`/api/admin/notifications?${query}`);
+};
+
+/**
+ * すべて既読にする。
+ *
+ * **既読は全体で 1 つ。** 誰かが気付いたら全員にとって既読になる。
+ */
+export const markNotificationsRead = () =>
+  call<{ read: number }>('/api/admin/notifications/read', { method: 'POST' });
 
 // ---- 送信状況 ---------------------------------------------------------------
 
