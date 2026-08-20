@@ -20,6 +20,11 @@
 
 name: questionnaire-dev
 
+# **自己署名の証明書（PFX）を守る合言葉。検証環境用の固定値。**
+# 作る側（devcert）と読む側（app）で必ず同じ値を使う。片方だけ直すと
+# 「証明書は在るのに Kestrel が起動しない」になるので、**1 か所に書いて参照する**
+x-devcert-password: &devcert-password "${DEV_HTTPS_CERT_PASSWORD:-Questionnaire#DevCert1}"
+
 # **アプリとマイグレーションで同じ設定を使う。**
 # 二重に書くと、片方だけ直したときに「当てたはずなのに古い」が起きる
 x-app-environment: &app-environment
@@ -127,6 +132,53 @@ services:
       retries: 40
       start_period: 180s
 
+  # ---- 検証環境だけの自己署名証明書 -------------------------------------------
+  # **`crypto.subtle` は安全なコンテキスト（https か localhost）でしか使えない**
+  # （Issue #67）。容器同士を平文の http で繋いでいる限り、端から端まで通す試験では
+  # 自前の SHA-256（控え。`Frontend/src/lib/sha256.ts`）しか通らず、
+  # **本番で実際に使われる経路が一度も試されない。** そこで https でも待ち受ける。
+  #
+  # **鍵をリポジトリへ置かない。** 起動のたびに容器の中で作り、名前付きボリューム
+  # （devcert）だけに置く。作業ツリーにもイメージの層にも残らない。
+  # **イメージへ焼き込まないのは Microsoft の助言でもある**
+  # （「Copying certificates into an image isn't recommended ... There is significant
+  # risk of certificate disclosure」。
+  # https://learn.microsoft.com/aspnet/core/security/docker-https 2026-08-20 参照）。
+  #
+  # **イメージは build 段階で既に引いている SDK を使い回す。** 新しい依存を増やさない。
+  # `dotnet dev-certs https --export-path <pfx> --password <合言葉>` は
+  # Microsoft が案内している作り方（同上）。
+  #
+  # **この証明書は `localhost` などの名前しか持たない**（.NET 10 の SAN は
+  # localhost / *.dev.localhost / *.dev.internal / host.docker.internal /
+  # host.containers.internal / 127.0.0.1 / ::1。
+  # https://learn.microsoft.com/dotnet/core/tools/dotnet-dev-certs 2026-08-20 参照）。
+  # `questionnaire-app` では名前が合わないので、**ブラウザ側で証明書の検査を外す**
+  # （tools/screenshots/playwright.config.ts の ignoreHTTPSErrors）。
+  # **検証環境だけの割り切り。本番へ持ち込まないこと**
+  devcert:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    profiles: ["sqlserver", "postgres", "mysql", "app"]
+    restart: "no"
+    environment:
+      TZ: Asia/Tokyo
+      DEV_HTTPS_CERT_PASSWORD: *devcert-password
+    volumes:
+      - devcert:/https
+    # **毎回作り直す。** 期限切れの証明書が残って「昨日は動いたのに」を作らない。
+    # **アプリは root で動かない**（Dockerfile の `USER $APP_UID`）ので、
+    # 読める権限にしておく。鍵はこのボリュームの外へ出ない。
+    # `$$` は compose に食わせないための書き方（容器の中の sh が展開する）
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        rm -f /https/aspnetapp.pfx
+        dotnet dev-certs https --export-path /https/aspnetapp.pfx --password "$$DEV_HTTPS_CERT_PASSWORD"
+        chmod 0444 /https/aspnetapp.pfx
+        ls -l /https/aspnetapp.pfx
+
   # ---- スキーマを当てる ------------------------------------------------------
   # **アプリ起動時の自動適用はしない**（_documents/データモデル設計.md 5 章。
   # スケールアウト時に同時実行され得る）。**その代わり、起動より前に当てる係を置く。**
@@ -150,12 +202,36 @@ services:
       context: .
       dockerfile: Dockerfile
     profiles: ["sqlserver", "postgres", "mysql", "app"]
-    environment: *app-environment
+    environment:
+      <<: *app-environment
+      # **8080 の平文はそのまま残し、8443 で https も待ち受ける**（Issue #67）。
+      # `HTTP_PORTS` / `HTTPS_PORTS` は「ポート番号だけを指定する」ための設定キーで、
+      # `;` 区切りの一覧。**`ASPNETCORE_URLS` を設定すると上書きされる**ので使わない
+      # （https://learn.microsoft.com/aspnet/core/fundamentals/servers/kestrel/endpoints
+      # 2026-08-20 参照）。8080 は Dockerfile の `ASPNETCORE_HTTP_PORTS` と同じ値。
+      # **対で読めるように、ここでも両方書いておく**
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ASPNETCORE_HTTPS_PORTS: "8443"
+      # **Kestrel の既定の証明書。** `ASPNETCORE_` は前置きなので、設定キーとしては
+      # `Kestrel:Certificates:Default:Path` / `:Password` になる
+      # （https://learn.microsoft.com/aspnet/core/security/docker-https 2026-08-20 参照）。
+      # 実体は devcert が作ってボリュームへ置いたもの
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /https/aspnetapp.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: *devcert-password
     depends_on:
       migrate:
         condition: service_completed_successfully
+      # **証明書が出来てから起こす。** 無いまま HTTPS_PORTS を渡すと Kestrel が落ちる
+      devcert:
+        condition: service_completed_successfully
     ports:
       - "${DEV_APP_PORT:-8081}:8080"
+      # **平文の 8081 は動いたまま。** https は別の番号で足す。
+      # `_documents/開発環境.md`「HTTPS（自己署名）で動かす」
+      - "${DEV_APP_HTTPS_PORT:-8443}:8443"
+    volumes:
+      # **読むだけ。** アプリ側から鍵を書き換えさせない
+      - devcert:/https:ro
     networks:
       default:
         aliases:
@@ -183,6 +259,11 @@ services:
       TZ: Asia/Tokyo
       # コンテナ同士なので、外向けの番号ではなく service 名で繋ぐ
       QUESTIONNAIRE_BASE_URL: http://questionnaire-app:8080
+      # **https 側。** `crypto.subtle` は安全なコンテキストでしか使えないので、
+      # 本番で実際に使われる経路はこちらでしか試せない（Issue #67）。
+      # 平文の経路も残っている（控えの SHA-256）ので、**両方を試す**
+      # （specs/secure-context.spec.ts）
+      QUESTIONNAIRE_HTTPS_BASE_URL: https://questionnaire-app:8443
     volumes:
       # 撮った写しと報告書をホストへ出す
       - ./tools/screenshots/shots:/work/shots
@@ -191,3 +272,6 @@ services:
 volumes:
   postgres-data:
   mysql-data:
+  # **自己署名の証明書の置き場**（devcert が作り、app が読む）。
+  # **`down -v` で消える。** 鍵を長生きさせない
+  devcert:

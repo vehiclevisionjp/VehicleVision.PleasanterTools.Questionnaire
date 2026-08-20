@@ -19,6 +19,13 @@ export default defineConfig({
 
   use: {
     baseURL: process.env['QUESTIONNAIRE_BASE_URL'] ?? 'http://questionnaire-app:8080',
+    // **検証環境の証明書は自己署名。** 名前も `localhost` 側しか持っていないので、
+    // `questionnaire-app` で開くと必ず証明書の検査で弾かれる（compose.yaml の devcert）。
+    // **検査を外すのは検証環境だけ。本番の設定には持ち込まない**（Issue #67）。
+    //
+    // **外しても https のまま。** 「安全なコンテキスト」は生成元の scheme で決まるので、
+    // `crypto.subtle` は使える（specs/secure-context.spec.ts が実際に見張っている）
+    ignoreHTTPSErrors: true,
     // **日本語で撮る。** 既定の言語は ja
     locale: process.env['SHOT_LOCALE'] ?? 'ja-JP',
     timezoneId: 'Asia/Tokyo',
