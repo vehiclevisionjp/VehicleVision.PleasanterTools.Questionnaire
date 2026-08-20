@@ -90,6 +90,12 @@ builder.Services.AddSingleton(_ => new MappingEvaluator());
 builder.Services.AddHttpClient<PleasanterApiClient>(client =>
     client.Timeout = pleasanterOptions.Timeout);
 
+// **溜まりすぎたら受付を止める**（Issue #72、_documents/非機能設計.md 2 章）。
+// **WAF が無い導入先を想定した最後の壁。** 分散した相手にはレート制限が効かない。
+// 攻撃が無くても、Pleasanter が長く落ちれば同じように溜まる
+builder.Services.AddSingleton(BacklogGuardOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<ResponseBacklogGuard>();
+
 builder.Services.AddSingleton<ResponseIntake>();
 
 // **HTTP でやり取りする JSON も定義と同じ設定にする。**

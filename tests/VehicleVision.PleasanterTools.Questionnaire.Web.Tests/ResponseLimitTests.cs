@@ -1,4 +1,6 @@
-﻿using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
+﻿using System.Collections.Immutable;
+using Microsoft.Extensions.Logging.Abstractions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
@@ -78,6 +80,9 @@ public class ResponseLimitTests
     {
         private readonly Dictionary<string, string> _saved = new(StringComparer.Ordinal);
 
+        /// <summary>どのアンケートの回答か。**滞留をアンケートごとに数えるため。**</summary>
+        private readonly Dictionary<string, Guid> _surveys = new(StringComparer.Ordinal);
+
         public Task SaveAsync(
             string responseToken,
             Guid surveyId,
@@ -86,6 +91,7 @@ public class ResponseLimitTests
             CancellationToken cancellationToken = default)
         {
             _saved[responseToken] = payloadJson;
+            _surveys[responseToken] = surveyId;
             return Task.CompletedTask;
         }
 
@@ -116,6 +122,17 @@ public class ResponseLimitTests
         public Task<int> CountPendingAsync(
             Guid? surveyId = null, CancellationToken cancellationToken = default) =>
             Task.FromResult(_saved.Count);
+
+        // **滞留の見張りはここでは動かさない**（Issue #72）。
+        // 見張りを渡していない試験なので呼ばれない
+        public Task<PendingBacklog> CountBacklogAsync(
+            int perSurveyAtLeast, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PendingBacklog(
+                _saved.Count,
+                _surveys.Values
+                    .GroupBy(id => id)
+                    .Where(group => group.Count() >= perSurveyAtLeast)
+                    .ToImmutableDictionary(group => group.Key, group => group.Count())));
 
         public Task<OutboxStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new OutboxStatus(_saved.Count, null, 0, null));
@@ -190,6 +207,7 @@ public class ResponseLimitTests
         int? responseLimit = null,
         int status = (int)SurveyStatus.Published,
         int? suspendedReason = null,
+        int? backlogPerSurvey = null,
         params string[] existingTokens)
     {
         var survey = new SurveyRecord(
@@ -207,18 +225,82 @@ public class ResponseLimitTests
         var tokens = new FakeTokens();
         tokens.Seed(existingTokens);
 
+        // **滞留の見張りは、送信待ちと同じ入れ物を見る**（Issue #72）。
+        // 別々にすると、受け付けたのに滞留が増えない、という有り得ない状態で試すことになる
+        var outbox = new FakeOutbox();
+        var backlog = backlogPerSurvey is not { } perSurvey
+            ? null
+            : new ResponseBacklogGuard(
+                outbox,
+                new BacklogGuardOptions { PerSurveyLimit = perSurvey, TotalLimit = 0 },
+                NullLogger<ResponseBacklogGuard>.Instance);
+
         var intake = new ResponseIntake(
             surveys,
             new FakeSnapshots(new SurveySnapshot(
                 Definition(), new MappingDefinition(), 1, "DescriptionA")),
-            new FakeOutbox(),
-            tokens);
+            outbox,
+            tokens,
+            backlog: backlog);
 
         return (intake, surveys, tokens);
     }
 
     private static Task<IntakeResult> SubmitAsync(ResponseIntake intake, string token) =>
         intake.SubmitAsync(PublicId, token, [Answer.Of("q1", "よかった")]);
+
+    // ---- 滞留による受付停止（Issue #72）--------------------------------------
+
+    [Fact]
+    public async Task 滞留が上限に達したら受け付けない()
+    {
+        // **回答数の上限とは別物。** こちらは「まだ届いていない数」で決まる
+        var (intake, _, _) = Intake(backlogPerSurvey: 1);
+
+        Assert.True((await SubmitAsync(intake, "t1")).Accepted);
+
+        var second = await SubmitAsync(intake, "t2");
+
+        Assert.False(second.Accepted);
+        Assert.Equal(IntakeRejection.Suspended, second.Rejection);
+    }
+
+    [Fact]
+    public async Task 滞留で止めてもアンケートは公開のままにする()
+    {
+        // **弁であって開閉器ではない**（Issue #72）。捌けたら受け付け直すので、
+        // アンケートの状態そのものは書き換えない。**手で止めた印を上書きしない**
+        var (intake, surveys, _) = Intake(backlogPerSurvey: 1);
+
+        await SubmitAsync(intake, "t1");
+        await SubmitAsync(intake, "t2");
+
+        Assert.Equal((int)SurveyStatus.Published, surveys.Survey.Status);
+        Assert.Null(surveys.Survey.SuspendedReason);
+    }
+
+    [Fact]
+    public async Task 滞留で止めている間は画面も出さない()
+    {
+        // **最後まで入力させてから断る方が悪い**（_documents/画面設計.md 1 章）
+        var (intake, _, _) = Intake(backlogPerSurvey: 1);
+
+        await SubmitAsync(intake, "t1");
+
+        var (form, rejection) = await intake.GetPublishedAsync(PublicId);
+
+        Assert.Null(form);
+        Assert.Equal(IntakeRejection.Suspended, rejection);
+    }
+
+    [Fact]
+    public async Task 見張りを組み立てていなければ止まらない()
+    {
+        var (intake, _, _) = Intake();
+
+        Assert.True((await SubmitAsync(intake, "t1")).Accepted);
+        Assert.True((await SubmitAsync(intake, "t2")).Accepted);
+    }
 
     [Fact]
     public async Task 上限に達していなければ受け付ける()
