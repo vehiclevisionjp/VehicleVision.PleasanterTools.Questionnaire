@@ -7,6 +7,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
+using VehicleVision.PleasanterTools.Questionnaire.Scripting;
 using VehicleVision.PleasanterTools.Questionnaire.Web;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
@@ -91,7 +92,14 @@ builder.Services.AddSingleton(serviceProvider => new AltchaGuard(
 builder.Services.AddSingleton(pleasanterOptions);
 builder.Services.AddSingleton(new PleasanterDateTime(pleasanterOptions.ApiKeyUserTimeZoneId));
 builder.Services.AddSingleton<PleasanterRecordBuilder>();
-builder.Services.AddSingleton(_ => new MappingEvaluator());
+// **変換スクリプトは上限付きで走らせる**（Issue #83、_documents/アーキテクチャ方針.md 8 章）。
+// **上限が無いと、書き間違えた `while (true)` 1 つで送信ワーカーが永久に固まる。**
+// 打ち切ったものはマッピングの不備になり、回答はデッドレターへ回る
+builder.Services.AddSingleton(ScriptConverterOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<IScriptConverter>(serviceProvider =>
+    new JintScriptConverter(serviceProvider.GetRequiredService<ScriptConverterOptions>()));
+builder.Services.AddSingleton(serviceProvider =>
+    new MappingEvaluator(serviceProvider.GetRequiredService<IScriptConverter>()));
 builder.Services.AddHttpClient<PleasanterApiClient>(client =>
     client.Timeout = pleasanterOptions.Timeout);
 
