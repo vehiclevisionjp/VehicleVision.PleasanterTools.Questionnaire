@@ -85,6 +85,27 @@ docker compose --profile sqlserver --profile screenshots run --rm screenshots
   cookie を書き出して次へ渡している
 - **送信は最短時間を待つ。** 速すぎる送信は bot 対策で断られる
 
+## 安全なコンテキスト（https）でも試す
+
+**`crypto.subtle` は https か localhost でしか使えない。** 平文だけで試していると、
+proof-of-work は自前の SHA-256（控え）しか通らず、**本番で実際に使われる経路が
+一度も試されない**（Issue #67）。
+
+検証環境のアプリは 8443 で https も待ち受けており（`compose.yaml` の `devcert` と `app`）、
+`specs/secure-context.spec.ts` が両方の経路を、それぞれの向きから見ている。
+
+- https … `crypto.subtle.digest` が**実際に呼ばれ**、その解答がサーバに通ること
+- 平文 … `crypto.subtle` が**無く**、それでも控えの解答がサーバに通ること
+
+**「呼ばれた」は数えて確かめる。** `window.isSecureContext` を見るだけでは、
+画面の側が本当にその道を通ったかは分からない。数える仕掛けは `page.addInitScript` で
+外から包んでおり、**製品のコードには手を入れていない。**
+
+証明書は自己署名で、名前も `questionnaire-app` とは一致しない。
+そのため `ignoreHTTPSErrors: true` で通している（`playwright.config.ts`）。
+**検証環境だけの割り切り。** 手順は
+[`_documents/開発環境.md`](../../_documents/開発環境.md)「HTTPS（自己署名）で動かす」。
+
 ## ライセンス
 
 `@playwright/test` は Apache-2.0。フォントは SIL Open Font License 1.1。
