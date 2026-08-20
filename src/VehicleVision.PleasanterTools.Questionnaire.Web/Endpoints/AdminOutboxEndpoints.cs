@@ -1,4 +1,4 @@
-using VehicleVision.PleasanterTools.Questionnaire.Data;
+﻿using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -30,6 +30,10 @@ public static class AdminOutboxEndpoints
 
     private const int DefaultLimit = 50;
 
+    /// <summary>「直近」として数える日数（Issue #39）。</summary>
+    /// <remarks>**7 日。** 設定を変えた効果が見える程度に短く、週末を跨ぐ程度に長い。</remarks>
+    private const int RecentDays = 7;
+
     /// <summary>監査ログに残す対象の種類。**回答ではなくアンケートで残す。**</summary>
     /// <remarks>
     /// **<c>ResponseToken</c> は監査ログへ入れない**
@@ -60,6 +64,32 @@ public static class AdminOutboxEndpoints
             // 「送信待ちが多い」と「そのせいで受付を止めている」は別のことで、
             // **止めていることは件数からは読み取れない**
             return Results.Ok(ToResponse(status, backlog.GetStatus()));
+        });
+
+        // ---- 添付を弾いた記録（Issue #39）--------------------------------------
+        group.MapGet("/attachment-rejections", async (
+            IAttachmentRejectionStore store,
+            TimeProvider time,
+            CancellationToken cancellationToken,
+            int? limit = null,
+            int? offset = null) =>
+        {
+            var take = Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit);
+
+            var rows = await store.ListAsync(
+                new AttachmentRejectionQuery
+                {
+                    Limit = take + 1,
+                    Offset = Math.Max(offset ?? 0, 0),
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            // **直近の件数も返す。** 一覧を目で追わずに「今どれくらい弾いているか」が分かる
+            var since = time.GetUtcNow().UtcDateTime.AddDays(-RecentDays);
+            var recent = await store.CountSinceAsync(since, cancellationToken)
+                .ConfigureAwait(false);
+
+            return Results.Ok(ToResponse(rows, take, recent));
         });
 
         // ---- デッドレターの一覧 ----------------------------------------------
@@ -187,6 +217,29 @@ public static class AdminOutboxEndpoints
             DbTime.AsUtc(row.UpdatedAt));
     }
 
+    /// <summary>添付を弾いた記録の 1 ページを応答の形にする（Issue #39）。</summary>
+    public static AttachmentRejectionPageResponse ToResponse(
+        IReadOnlyList<AttachmentRejectionView> rows,
+        int take,
+        int recentCount)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+
+        return new AttachmentRejectionPageResponse(
+            [
+                .. rows.Take(take).Select(row => new AttachmentRejectionResponse(
+                    DbTime.AsUtc(row.OccurredAt),
+                    row.SurveyId,
+                    row.SurveyTitle,
+                    row.QuestionId,
+                    row.Reason,
+                    row.FileCount)),
+            ],
+            rows.Count > take,
+            recentCount,
+            RecentDays);
+    }
+
     /// <summary>デッドレターを送信待ちへ戻す要求。</summary>
     public sealed record RequeueRequest(string? ResponseToken);
 }
@@ -224,6 +277,33 @@ public sealed record BacklogGuardResponse(
     int PerSurveyLimit,
     int BlockedSurveyCount,
     DateTime? SampledAt);
+
+/// <summary>添付を弾いた記録 1 件の応答（Issue #39）。</summary>
+/// <remarks>
+/// ⚠️ **送信元もファイル名も入る場所が無い。**
+/// 回答者は完全匿名という前提を、注意書きではなく型で守る。
+/// </remarks>
+/// <param name="Reason">
+/// 弾いた理由（<c>AttachmentRejectionReason</c> の値）。
+/// **文言は画面が持つ。** サーバから訳した文字列を返さない。
+/// </param>
+/// <param name="FileCount">その送信で、その理由に当たった件数。</param>
+public sealed record AttachmentRejectionResponse(
+    DateTime OccurredAt,
+    Guid SurveyId,
+    string? SurveyTitle,
+    string? QuestionId,
+    int Reason,
+    int FileCount);
+
+/// <summary>添付を弾いた記録の 1 ページ。</summary>
+/// <param name="RecentCount">直近に弾いた件数。**行数ではなくファイルの数。**</param>
+/// <param name="RecentDays">「直近」が何日か。</param>
+public sealed record AttachmentRejectionPageResponse(
+    IReadOnlyList<AttachmentRejectionResponse> Entries,
+    bool HasMore,
+    int RecentCount,
+    int RecentDays);
 
 /// <summary>デッドレター 1 件の応答。</summary>
 /// <remarks>
