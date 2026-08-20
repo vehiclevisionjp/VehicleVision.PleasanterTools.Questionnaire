@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
+using VehicleVision.PleasanterTools.Questionnaire.Worker;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
@@ -370,6 +371,36 @@ public class ResponseBacklogGuardTests
 
         Assert.Equal(10_000, options.PerSurveyLimit);
         Assert.Equal(50_000, options.TotalLimit);
+    }
+
+    [Fact]
+    public void 送信の流量も設定から読める()
+    {
+        // **設定を読む係は Worker 側だが、試験はここに置く**（Issue #72）。
+        // `ConfigurationBuilder` を使うために、Worker の試験へ依存を増やしたくない
+        var options = ResponseSenderOptions.FromConfiguration(
+            new ConfigurationBuilder().Build());
+
+        Assert.Equal(600, options.MaxSendsPerMinute);
+    }
+
+    [Fact]
+    public void 読めない流量は黙って既定へ落とさない()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [ResponseSenderOptions.MaxSendsPerMinuteKey] = "ゆっくり",
+            })
+            .Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => ResponseSenderOptions.FromConfiguration(configuration));
+
+        Assert.Contains(
+            ResponseSenderOptions.MaxSendsPerMinuteKey,
+            exception.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]

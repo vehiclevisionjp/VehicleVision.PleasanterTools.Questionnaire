@@ -246,7 +246,7 @@ builder.Services.AddAuthorization(options =>
 
 // **送信ワーカーは .Web に同居させる**（_documents/アプリケーション設計.md 8 章）。
 // Azure App Service では別プロセス常駐の手段が限られるため。**Always On を有効にすること**
-builder.Services.AddSingleton(new ResponseSenderOptions());
+builder.Services.AddSingleton(ResponseSenderOptions.FromConfiguration(builder.Configuration));
 builder.Services.AddSingleton<ResponseSender>();
 builder.Services.AddHostedService<ResponseSenderHostedService>();
 

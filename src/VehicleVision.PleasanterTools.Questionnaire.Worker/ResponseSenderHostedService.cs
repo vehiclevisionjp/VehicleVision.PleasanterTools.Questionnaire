@@ -28,7 +28,16 @@ public sealed class ResponseSenderHostedService(
     {
         logger.LogInformation("送信ワーカーを開始した（{Worker}）", options.WorkerName);
 
+        if (options.MaxSendsPerMinute > 0)
+        {
+            logger.LogInformation(
+                "送信は 1 分あたり {Limit} 件までに抑える（{Interval} ミリ秒ごとに 1 件）",
+                options.MaxSendsPerMinute,
+                (int)options.MinSendInterval.TotalMilliseconds);
+        }
+
         var nextRelease = _time.GetUtcNow();
+        var nextSend = _time.GetUtcNow();
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -45,6 +54,22 @@ public sealed class ResponseSenderHostedService(
                     }
 
                     nextRelease = _time.GetUtcNow().Add(options.ReleaseExpiredLocksInterval);
+                }
+
+                // **流量に上限を掛ける**（Issue #72）。
+                // **復旧直後に溜まった分を一斉送信すると Pleasanter をもう一度落とす**
+                // （_documents/アーキテクチャ方針.md 10 章）
+                if (options.MinSendInterval > TimeSpan.Zero)
+                {
+                    var wait = nextSend - _time.GetUtcNow();
+                    if (wait > TimeSpan.Zero)
+                    {
+                        await Task.Delay(wait, _time, stoppingToken).ConfigureAwait(false);
+                    }
+
+                    // **今の時刻から数える。** 前回の予定時刻に足すと、
+                    // 送信が遅れたぶんを「借り」として溜め込み、後で一気に取り返してしまう
+                    nextSend = _time.GetUtcNow().Add(options.MinSendInterval);
                 }
 
                 var outcome = await sender.SendOnceAsync(stoppingToken).ConfigureAwait(false);

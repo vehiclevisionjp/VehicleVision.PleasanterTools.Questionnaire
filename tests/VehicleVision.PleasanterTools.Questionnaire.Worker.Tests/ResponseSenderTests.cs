@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -350,4 +351,95 @@ public class ResponseSenderTests
         // **一斉送信で Pleasanter を再び落とさないための上限**
         Assert.Equal(now.AddMinutes(30), options.NextAttemptAt(now, 99));
     }
+
+    // ---- 流量の上限（Issue #72）---------------------------------------------
+
+    [Theory]
+    [InlineData(600, 100)]
+    [InlineData(60, 1000)]
+    [InlineData(1, 60_000)]
+    public void 一分あたりの件数から送信の間隔を出す(int perMinute, int expectedMilliseconds)
+    {
+        // **「1 分に N 件」を許すと、分の頭に N 件を一気に投げても条件を満たす。**
+        // 等間隔に均す
+        var options = new ResponseSenderOptions { MaxSendsPerMinute = perMinute };
+
+        Assert.Equal(expectedMilliseconds, (int)options.MinSendInterval.TotalMilliseconds);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void 零以下なら流量を絞らない(int perMinute)
+    {
+        var options = new ResponseSenderOptions { MaxSendsPerMinute = perMinute };
+
+        Assert.Equal(TimeSpan.Zero, options.MinSendInterval);
+    }
+
+    [Fact]
+    public async Task 上限を超えて続けて送らない()
+    {
+        // **復旧直後に溜まった分を一斉に送ると Pleasanter をもう一度落とす**
+        // （_documents/アーキテクチャ方針.md 10 章）。
+        // **時計を進めない限り 1 件しか出ないこと**を、待たずに確かめる
+        var handler = new StubHandler();
+        var options = new ResponseSenderOptions { MaxSendsPerMinute = 60 };
+        var (sender, outbox, _) = Build(handler, options: options);
+
+        for (var i = 0; i < 5; i++)
+        {
+            outbox.Enqueue(new PendingResponse($"{Token}-{i}", SurveyId, 1, Payload(), 0));
+        }
+
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 8, 20, 0, 0, 0, TimeSpan.Zero));
+        var service = new ResponseSenderHostedService(
+            sender, outbox, options, NullLogger<ResponseSenderHostedService>.Instance, time);
+
+        using var stopping = new CancellationTokenSource();
+        await service.StartAsync(stopping.Token);
+
+        // **1 件目は待たずに出る**（開始時刻がそのまま次の送信予定時刻）
+        await WaitForAsync(() => outbox.Completed.Count >= 1);
+        Assert.Single(outbox.Completed);
+
+        // 1 秒ごとに 1 件。**進めた分しか出ない**
+        time.Advance(TimeSpan.FromSeconds(1));
+        await WaitForAsync(() => outbox.Completed.Count >= 2);
+        Assert.Equal(2, outbox.Completed.Count);
+
+        time.Advance(TimeSpan.FromSeconds(1));
+        await WaitForAsync(() => outbox.Completed.Count >= 3);
+        Assert.Equal(3, outbox.Completed.Count);
+
+        await stopping.CancelAsync();
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    /// <summary>条件が満たされるまで待つ。**満たされなければ落とす。**</summary>
+    /// <remarks>
+    /// **偽の時計を使っていても、常駐処理が次の待ちへ入るのは実時間で起きる。**
+    /// 固定の <c>Task.Delay</c> で待つと、遅い環境で揺れる
+    /// （<c>_documents/テスト方針.md</c>）。
+    /// </remarks>
+    private static async Task WaitForAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                Assert.Fail("待っている状態にならなかった");
+            }
+
+            await Task.Delay(10);
+        }
+
+        // **「これ以上出ないこと」も確かめたい**ので、少しだけ様子を見る
+        await Task.Delay(50);
+    }
+
+    private static string Payload() =>
+        ResponsePayload.Create(Token, [Answer.Of("q1", "満足")], []).ToJson();
 }
