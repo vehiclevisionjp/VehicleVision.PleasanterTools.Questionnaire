@@ -27,6 +27,9 @@ public sealed record SurveyDraft(
 /// 受け付けた回答の件数。**まだ Pleasanter へ届いていない分も含む**
 /// （<see cref="IResponseTokenStore.CountAcceptedAsync"/>）。
 /// </param>
+/// <param name="RequireProofOfWork">
+/// 回答の送信に proof-of-work を課すか（Issue #66）。**既定は有効。**
+/// </param>
 public sealed record SurveySummary(
     Guid SurveyId,
     string PublicId,
@@ -38,7 +41,8 @@ public sealed record SurveySummary(
     int? SuspendedReason = null,
     DateTime? SuspendedAt = null,
     int? ResponseLimit = null,
-    int ResponseCount = 0);
+    int ResponseCount = 0,
+    bool RequireProofOfWork = true);
 
 /// <summary>複製で作るアンケートの、**写さない値**（Issue #46）。</summary>
 /// <param name="SurveyId">複製先の内部 ID。</param>
@@ -253,6 +257,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
         public int? ResponseLimit { get; set; }
 
+        public bool RequireProofOfWork { get; set; }
+
         public long ResponseCount { get; set; }
 
         public DateTime UpdatedAt { get; set; }
@@ -273,6 +279,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             "SELECT s.[SurveyId], s.[PublicId], s.[Title], s.[PleasanterSiteId], "
             + "       s.[Status], s.[PublishedVersion], s.[UpdatedAt], "
             + "       s.[SuspendedReason], s.[SuspendedAt], s.[ResponseLimit], "
+            + "       s.[RequireProofOfWork], "
             + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
             + "        WHERE t.[SurveyId] = s.[SurveyId]) AS [ResponseCount] "
             + "FROM [Surveys] s WHERE s.[IsTemplate] = @IsTemplate "
@@ -293,7 +300,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 row.SuspendedReason,
                 row.SuspendedAt,
                 row.ResponseLimit,
-                (int)row.ResponseCount)),
+                (int)row.ResponseCount,
+                row.RequireProofOfWork)),
         ];
     }
 

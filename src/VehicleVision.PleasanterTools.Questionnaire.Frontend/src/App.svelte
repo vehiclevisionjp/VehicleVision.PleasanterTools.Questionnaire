@@ -83,6 +83,16 @@
    * 送信の時に待たせない。
    */
   let altcha = $state('');
+  /**
+   * このアンケートが proof-of-work を要るとしているか（Issue #66）。
+   *
+   * **要らないアンケートでは解かない。** 課題は要否に関わらず届く
+   * （出し分けると公開 ID の実在が漏れる）ので、**解くかどうかはここで決める。**
+   *
+   * **これは待ち時間の話でしかない。** 受け付けるかどうかを決めるのはサーバ側で、
+   * ここを false にしても送信が通るようにはならない。
+   */
+  let requiresProofOfWork = $state(true);
   /** 今どの区切りを見ているか。**ページではなく「区切り」の番号**（1 問 1 ページ表示があるため） */
   let stepIndex = $state(0);
   let answers = $state<Record<string, AnswerState>>({});
@@ -181,6 +191,10 @@
 
     definition = result.form.definition;
 
+    // **サーバが null の項目を落として返す**ので、`?? true` で受ける。
+    // **分からなければ解く側に倒す**（解かずに送って断られる方が重い）
+    requiresProofOfWork = result.form.requiresProofOfWork ?? true;
+
     // **回答トークンと送信チケットをサーバから受け取る。**
     // チケットが無いと送信できないので、ここで失敗したら回答させない
     const issued = await requestTicket(publicId);
@@ -192,8 +206,9 @@
     responseToken = issued.responseToken;
     ticket = issued.ticket;
 
-    // **待たない。** 解けたら入るだけで、入力は先に進められる
-    if (issued.altcha) {
+    // **待たない。** 解けたら入るだけで、入力は先に進められる。
+    // **要らないアンケートでは解かない**（Issue #66）
+    if (requiresProofOfWork && issued.altcha) {
       void solveAltcha(issued.altcha).then((solved) => {
         altcha = solved ?? '';
       });
@@ -337,7 +352,7 @@
 
           // **課題も取り直す。** 使い終えた解答は 2 度通らない
           altcha = '';
-          if (reissued.altcha) {
+          if (requiresProofOfWork && reissued.altcha) {
             altcha = (await solveAltcha(reissued.altcha)) ?? '';
           }
         }

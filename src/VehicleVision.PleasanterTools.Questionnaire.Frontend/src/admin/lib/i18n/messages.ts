@@ -416,6 +416,14 @@ export const ja = {
   'settings.noAutoResume': '上限を引き上げても自動では再開しません。「再開」を押してください。',
   'settings.submit': '保存する',
   'settings.cancel': 'やめる',
+  // ---- proof-of-work の要否（Issue #66） ----
+  'settings.proofOfWork': '回答の送信に計算課題を課す',
+  'settings.proofOfWorkHint':
+    '回答者のブラウザに短い計算をさせて、機械的な大量送信の費用を上げます。'
+    + '公開の窓口では有効のままにしてください。'
+    + '社内向けなど、心当たりのある人しか URL を知らない場合は切っても構いません。',
+  'settings.proofOfWorkKeepsOthers':
+    '切っても、送信チケット・投稿までの最短時間・ハニーポットは効いたままです。',
 } as const;
 
 /** 文言の鍵。**日本語のカタログが一覧そのもの。** */
@@ -835,6 +843,14 @@ export const en: Record<MessageKey, string> = {
     'Raising the limit does not resume the survey. Press Resume when you are ready.',
   'settings.submit': 'Save',
   'settings.cancel': 'Cancel',
+  'settings.proofOfWork': 'Require a computational challenge before submitting',
+  'settings.proofOfWorkHint':
+    "The respondent's browser solves a short puzzle, which raises the cost of bulk automated "
+    + 'submissions. Keep it on for surveys open to the public. You may turn it off for internal '
+    + 'surveys where only the people you told know the URL.',
+  'settings.proofOfWorkKeepsOthers':
+    'Turning it off keeps the submission ticket, the minimum time before submitting, and the '
+    + 'honeypot field in effect.',
 };
 
 const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };

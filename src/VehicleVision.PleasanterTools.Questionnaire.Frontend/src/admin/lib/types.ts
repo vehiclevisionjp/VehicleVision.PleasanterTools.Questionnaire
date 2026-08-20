@@ -267,6 +267,12 @@ export interface SurveySummary {
   /** 受け付ける回答の上限。**「無い」なら上限なし。** */
   responseLimit?: number | null;
   /**
+   * 回答の送信に proof-of-work を課すか（Issue #66）。
+   *
+   * **「無い」なら課す。** 既定は有効で、切るのは明示的に切ったときだけ。
+   */
+  requireProofOfWork?: boolean;
+  /**
    * 受け付けた回答の件数。
    *
    * **まだ Pleasanter へ届いていない分も含む。**

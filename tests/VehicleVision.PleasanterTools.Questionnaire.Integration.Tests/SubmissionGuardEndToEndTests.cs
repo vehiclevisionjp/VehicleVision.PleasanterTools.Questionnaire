@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
@@ -84,6 +84,32 @@ public class SubmissionGuardEndToEndTests
         // **サーバが決めた回答トークン。** 24 バイトを 16 進で書いた 48 文字
         Assert.Equal(48, token.Length);
         Assert.StartsWith("t1.", ticket, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 実在しない公開IDにも計算課題が出る()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **アンケートごとに要否を切り替えられるようにしても、ここでは出し分けない**
+        // （Issue #66）。出し分けるには DB を見るしかなく、見た時点で
+        // **応答の速さから公開 ID の実在が分かる**
+        // （_documents/非機能設計.md 1 章「識別子の秘匿」）。
+        //
+        // **要否は `GET /api/forms/{publicId}` で伝える。**
+        // あちらは存在しない ID に 404 を返す口なので、実在をもともと隠していない
+        using var http = CreateClient();
+
+        using var response = await http.PostAsJsonAsync(
+            $"/api/forms/{NewPublicId()}/ticket", new { responseToken = (string?)null });
+        response.EnsureSuccessStatusCode();
+
+        var body = await ReadAsync(response);
+
+        Assert.NotNull(body!["altcha"]);
     }
 
     [Fact]
