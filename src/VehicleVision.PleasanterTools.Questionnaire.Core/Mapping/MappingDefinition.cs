@@ -36,7 +36,23 @@ public enum QuestionPort
 /// <summary>割り当ての入力 1 つ。</summary>
 /// <param name="QuestionId">設問。</param>
 /// <param name="Port">その設問のどの値を取るか。</param>
-public sealed record MappingSource(string QuestionId, QuestionPort Port = QuestionPort.Value);
+/// <summary>マッピングの入力 1 つ。</summary>
+/// <param name="QuestionId">どの設問から取るか。</param>
+/// <param name="Port">設問のどの口から取るか。</param>
+/// <param name="RowId">
+/// 行（または順位を付ける項目）の識別子（Issue #54）。
+///
+/// **グリッドとランキングでだけ使う。** 指定すると、その行の値だけを取る。
+/// **それ以外の形式で指定してはいけない**（<c>MappingValidator</c> が弾く）。
+///
+/// **1 設問が複数の入力を出せるようにするための軸。**
+/// 行ごとに列へ繋ぐことも、複数の行を選んで <c>join</c> で 1 列へまとめることもできる。
+/// **どちらにするかを決めるのは使う人**であって、こちらではない。
+/// </param>
+public sealed record MappingSource(
+    string QuestionId,
+    QuestionPort Port = QuestionPort.Value,
+    string? RowId = null);
 
 /// <summary>入力を加工する変換。</summary>
 /// <param name="Operation">変換の種別。<see cref="ConverterOperations"/>。</param>

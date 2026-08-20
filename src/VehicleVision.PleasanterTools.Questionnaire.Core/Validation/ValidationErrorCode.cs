@@ -42,4 +42,13 @@ public enum ValidationErrorCode
 
     /// <summary>「その他」を選んでいないのに自由記述が来た。</summary>
     OtherTextNotAllowed,
+
+    /// <summary>グリッドで、答えていない行がある（Issue #54）。</summary>
+    RowRequired,
+
+    /// <summary>その設問に無い行へ答えている。</summary>
+    UnknownRow,
+
+    /// <summary>ランキングで、同じ項目が 2 回出てくる。</summary>
+    DuplicateRank,
 }

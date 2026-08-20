@@ -75,6 +75,87 @@ public class SurveyDraftStoreTests
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public async Task グリッドの行と割り当ても保存して読み直せる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **行は SettingsJson に入るが、割り当ての行は列で持っている**（Issue #54）。
+        // 足し忘れると、行ごとの割り当てが黙って消える
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+
+        var definition = new SurveyDefinition
+        {
+            SurveyId = surveyId.ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("行列の見本"),
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "page-1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q-grid",
+                            Type = QuestionType.Grid,
+                            Title = LocalizedText.Japanese("満足度"),
+                            Choices =
+                            [
+                                new Choice("good", LocalizedText.Japanese("よい")),
+                                new Choice("bad", LocalizedText.Japanese("わるい")),
+                            ],
+                            Settings = new QuestionSettings
+                            {
+                                Rows =
+                                [
+                                    new GridRow("price", LocalizedText.Japanese("価格")),
+                                    new GridRow("quality", LocalizedText.Japanese("品質")),
+                                ],
+                            },
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct(
+                    "ClassA", new MappingSource("q-grid", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct(
+                    "ClassB", new MappingSource("q-grid", QuestionPort.Value, "quality")),
+            ],
+        };
+
+        await drafts.SaveAsync(surveyId, definition, mapping, expectedRevision: 0);
+
+        var loaded = await drafts.LoadAsync(surveyId);
+        Assert.NotNull(loaded);
+
+        var question = loaded.Definition.Pages[0].Questions[0];
+        Assert.Equal(2, question.Settings.Rows.Length);
+        Assert.Equal("price", question.Settings.Rows[0].RowId);
+        Assert.Equal("価格", question.Settings.Rows[0].Label.Get("ja"));
+
+        // **行の識別子が割り当てに残っていること**
+        var assignments = loaded.Mapping.Assignments
+            .ToDictionary(assignment => assignment.TargetColumn, StringComparer.Ordinal);
+
+        Assert.Equal("price", Assert.Single(assignments["ClassA"].Sources).RowId);
+        Assert.Equal("quality", Assert.Single(assignments["ClassB"].Sources).RowId);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public async Task 分岐も保存して読み直せる(DatabaseProvider provider, string connectionString)
     {
         if (!Enabled)

@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Data.Common;
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -217,7 +217,11 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string? ConverterOperation,
         string? ConverterConfigJson);
 
-    private sealed record SourceRow(Guid AssignmentId, string QuestionId, int Port);
+    private sealed record SourceRow(
+        Guid AssignmentId,
+        string QuestionId,
+        int Port,
+        string? RowId);
 
     /// <summary>複製で写すヘッダ画像の 1 行。</summary>
     private sealed record AssetRow(
@@ -380,7 +384,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
 
         var sources = (await connection.QueryAsync<SourceRow>(Sql(
-            "SELECT s.[AssignmentId], s.[QuestionId], s.[Port] "
+            "SELECT s.[AssignmentId], s.[QuestionId], s.[Port], s.[RowId] "
             + "FROM [AssignmentSources] s "
             + "JOIN [ColumnAssignments] a ON a.[AssignmentId] = s.[AssignmentId] "
             + "WHERE a.[SurveyId] = @SurveyId ORDER BY s.[SortOrder]",
@@ -427,7 +431,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             .ToDictionary(
                 group => group.Key,
                 group => group
-                    .Select(source => new MappingSource(source.QuestionId, (QuestionPort)source.Port))
+                    .Select(source => new MappingSource(
+                        source.QuestionId, (QuestionPort)source.Port, source.RowId))
                     .ToImmutableArray());
 
         var definition = new SurveyDefinition
@@ -912,14 +917,16 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
                 await connection.ExecuteAsync(Sql(
                     "INSERT INTO [AssignmentSources] ([SourceId], [AssignmentId], "
-                    + "[QuestionId], [Port], [SortOrder]) "
-                    + "VALUES (@SourceId, @AssignmentId, @QuestionId, @Port, @SortOrder)",
+                    + "[QuestionId], [Port], [RowId], [SortOrder]) "
+                    + "VALUES (@SourceId, @AssignmentId, @QuestionId, @Port, @RowId, "
+                    + "@SortOrder)",
                     new
                     {
                         SourceId = Guid.NewGuid(),
                         AssignmentId = assignmentId,
                         source.QuestionId,
                         Port = (int)source.Port,
+                        source.RowId,
                         SortOrder = sourceIndex,
                     },
                     transaction,

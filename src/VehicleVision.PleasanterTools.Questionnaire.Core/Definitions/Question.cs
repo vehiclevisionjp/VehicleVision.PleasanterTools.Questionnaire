@@ -37,11 +37,44 @@ public sealed record Question
     public bool CanCarryTransitions => Type is QuestionType.Radio or QuestionType.Dropdown;
 
     /// <summary>選択肢を持つ形式か。</summary>
+    /// <remarks>**グリッドとランキングも選択肢を持つ。** グリッドは列、ランキングは並べる項目。</remarks>
     public bool HasChoices =>
-        Type is QuestionType.Radio or QuestionType.Checkbox or QuestionType.Dropdown;
+        Type is QuestionType.Radio or QuestionType.Checkbox or QuestionType.Dropdown
+            or QuestionType.Grid or QuestionType.CheckboxGrid or QuestionType.Ranking;
+
+    /// <summary>行を持つ形式か（Issue #54）。</summary>
+    public bool HasRows => Type is QuestionType.Grid or QuestionType.CheckboxGrid;
+
+    /// <summary>
+    /// マッピングの入力を行ごとに出す形式か。
+    /// </summary>
+    /// <remarks>
+    /// **グリッドは行ごと、ランキングは項目ごと。**
+    /// どちらも「1 設問が複数の入力を出す」点で同じ扱いになる。
+    /// </remarks>
+    public bool HasRowPorts =>
+        Type is QuestionType.Grid or QuestionType.CheckboxGrid or QuestionType.Ranking;
+
+    /// <summary>マッピングの入力になる行（または項目）の識別子。</summary>
+    public IEnumerable<string> RowPortIds =>
+        Type switch
+        {
+            QuestionType.Grid or QuestionType.CheckboxGrid =>
+                Settings.Rows.IsDefaultOrEmpty
+                    ? []
+                    : Settings.Rows.Select(row => row.RowId),
+
+            // **ランキングは選択肢そのものが入力になる。** 値は順位
+            QuestionType.Ranking =>
+                Choices.IsDefaultOrEmpty ? [] : Choices.Select(choice => choice.Value),
+
+            _ => [],
+        };
 
     /// <summary>複数の値を受け取る形式か。</summary>
-    public bool IsMultiValue => Type is QuestionType.Checkbox;
+    /// <remarks>**ランキングは並べた順に全部返る**ので、複数値として扱う。</remarks>
+    public bool IsMultiValue =>
+        Type is QuestionType.Checkbox or QuestionType.CheckboxGrid or QuestionType.Ranking;
 
     /// <summary>回答を持たない表示専用の要素か。</summary>
     /// <remarks>

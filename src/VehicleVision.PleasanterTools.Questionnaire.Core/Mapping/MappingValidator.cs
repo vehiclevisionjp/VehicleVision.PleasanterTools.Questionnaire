@@ -36,6 +36,15 @@ public enum MappingProblemCode
     /// <summary>添付列なのに、添付の口を使っていない。</summary>
     AttachmentColumnNeedsFilePort,
 
+    /// <summary>行を指定しているのに、その設問に行が無い（Issue #54）。</summary>
+    RowNotSupported,
+
+    /// <summary>指定した行が、その設問に存在しない。</summary>
+    RowNotInQuestion,
+
+    /// <summary>行を持つ設問なのに、行を指定していない。</summary>
+    RowRequired,
+
     /// <summary>添付の口なのに、書き込み先が添付列でない。</summary>
     FilePortNeedsAttachmentColumn,
 
@@ -161,9 +170,65 @@ public static class MappingValidator
                         assignment.TargetColumn,
                         source.QuestionId));
                 }
+                else if (source.Port is QuestionPort.Value)
+                {
+                    ValidateRow(source, question, assignment.TargetColumn, problems);
+                }
             }
         }
 
+        return Finish(problems, mapping, definition);
+    }
+
+    /// <summary>行の指定が噛み合っているかを見る（Issue #54）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **グリッドとランキングは 1 設問が複数の入力を出す。**
+    /// どの行を指しているかが合っていないと、**黙って空が入る**。
+    /// </para>
+    /// <para>
+    /// **行を持つ設問で行を指定しないことも咎める。** 指定しないと
+    /// 「行をまたいだ全部の値」が入り、どの行の答えか分からないものが列へ残る。
+    /// </para>
+    /// </remarks>
+    private static void ValidateRow(
+        MappingSource source,
+        Question question,
+        string targetColumn,
+        ImmutableArray<MappingProblem>.Builder problems)
+    {
+        if (source.RowId is null)
+        {
+            if (question.HasRowPorts)
+            {
+                problems.Add(new MappingProblem(
+                    MappingProblemCode.RowRequired, targetColumn, source.QuestionId));
+            }
+
+            return;
+        }
+
+        if (!question.HasRowPorts)
+        {
+            problems.Add(new MappingProblem(
+                MappingProblemCode.RowNotSupported, targetColumn, source.QuestionId));
+            return;
+        }
+
+        if (!question.RowPortIds.Contains(source.RowId, StringComparer.Ordinal))
+        {
+            // **行を消したときの直し忘れがここで見つかる**
+            problems.Add(new MappingProblem(
+                MappingProblemCode.RowNotInQuestion, targetColumn, source.QuestionId));
+        }
+    }
+
+    /// <summary>どこにも割り当てられていない設問を挙げる。</summary>
+    private static ImmutableArray<MappingProblem> Finish(
+        ImmutableArray<MappingProblem>.Builder problems,
+        MappingDefinition mapping,
+        SurveyDefinition definition)
+    {
         var mapped = mapping.Assignments
             .SelectMany(assignment => assignment.Sources)
             .Select(source => source.QuestionId)
