@@ -188,6 +188,23 @@ public interface IResponseOutbox
     Task<Guid?> RequeueDeadLetterAsync(
         string responseToken,
         CancellationToken cancellationToken = default);
+
+    /// <summary>期限を過ぎたデッドレターを消す（Issue #85）。</summary>
+    /// <param name="threshold">この時刻より前に最後に触られたものを消す。</param>
+    /// <returns>消した件数。</returns>
+    /// <remarks>
+    /// <para>
+    /// ⚠️ **中身は回答そのもの。** 消すと二度と戻らず、回答者には受付完了と
+    /// 伝えてある。**既定では消さない**（保持日数の既定は 0）。
+    /// </para>
+    /// <para>
+    /// **デッドレターの行しか消さない**（状態を条件に入れてある）。
+    /// 送信待ちや送信中の行を巻き込むと、まだ届けられる回答を捨てることになる。
+    /// </para>
+    /// </remarks>
+    Task<int> DeleteDeadLettersOlderThanAsync(
+        DateTime threshold,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Dapper を使った実装。</summary>
@@ -527,6 +544,28 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return affected == 0 ? null : key.SurveyId;
+    }
+
+    public async Task<int> DeleteDeadLettersOlderThanAsync(
+        DateTime threshold,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // ⚠️ **状態を条件に入れてある。** 送信待ちや送信中の行を巻き込むと、
+        // まだ届けられる回答を捨てることになる。
+        //
+        // **見るのは UpdatedAt。** デッドレターへ落ちた時刻はここに入っており、
+        // 受け付けた時刻（CreatedAt）で消すと、長く再送を続けた行を早く捨ててしまう
+        return await connection.ExecuteAsync(Sql(
+            "DELETE FROM [Responses] "
+            + "WHERE [Status] = @DeadLetterStatus AND [UpdatedAt] < @Threshold",
+            new
+            {
+                DeadLetterStatus = (int)ResponseStatus.DeadLetter,
+                Threshold = DbTime.ForDb(threshold),
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     /// <summary>失敗の理由は列の桁に収める。**回答本文は入れないこと。**</summary>

@@ -94,6 +94,35 @@ public class AuditLogRetentionTests
         Assert.Equal(enabled, options.NotificationEnabled);
     }
 
+    [Fact]
+    public void デッドレターは既定で消さない()
+    {
+        // ⚠️ **中身は回答そのもの**（Issue #85）。回答者には受付完了と伝えているので、
+        // **日数を決めた導入先だけが消す**
+        var options = AuditLogRetentionOptions.FromConfiguration(Configuration(null));
+
+        Assert.Equal(0, options.DeadLetterRetentionDays);
+        Assert.False(options.DeadLetterEnabled);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("-1", false)]
+    [InlineData("180", true)]
+    public void デッドレターの保持日数を設定から読む(string value, bool enabled)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [AuditLogRetentionOptions.DeadLetterRetentionDaysKey] = value,
+            })
+            .Build();
+
+        var options = AuditLogRetentionOptions.FromConfiguration(configuration);
+
+        Assert.Equal(enabled, options.DeadLetterEnabled);
+    }
+
     [Theory]
     [InlineData("0")]
     [InlineData("-1")]

@@ -170,6 +170,10 @@ public class AnswerDraftSettingTests
             DeadLetterQuery query, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<int> DeleteDeadLettersOlderThanAsync(
+            DateTime threshold, CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
+
         public Task<Guid?> RequeueDeadLetterAsync(
             string responseToken, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

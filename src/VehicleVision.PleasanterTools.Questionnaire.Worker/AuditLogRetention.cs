@@ -67,6 +67,21 @@ public sealed class AuditLogRetentionOptions
     public const string NotificationRetentionDaysKey =
         "QUESTIONNAIRE_NOTIFICATION_RETENTION_DAYS";
 
+    /// <summary>デッドレターを残す日数。**既定は 0 ＝ 消さない。**（Issue #85）</summary>
+    /// <remarks>
+    /// ⚠️ **中身は回答そのもので、消すと二度と戻らない。**
+    /// 回答者には受付完了と伝えている以上、**機械的に捨てない**（2026-08-20 決定）。
+    /// **導入先の規程に合わせて日数を入れてもらう。**
+    /// </remarks>
+    public int DeadLetterRetentionDays { get; init; }
+
+    /// <summary>デッドレターを消す仕組みが働くか。</summary>
+    public bool DeadLetterEnabled => DeadLetterRetentionDays > 0;
+
+    /// <summary>デッドレターの保持日数の設定名。</summary>
+    public const string DeadLetterRetentionDaysKey =
+        "QUESTIONNAIRE_DEADLETTER_RETENTION_DAYS";
+
     /// <summary>消す仕組みが働くか。</summary>
     public bool Enabled => RetentionDays > 0;
 
@@ -101,6 +116,10 @@ public sealed class AuditLogRetentionOptions
                 configuration,
                 NotificationRetentionDaysKey,
                 defaults.NotificationRetentionDays),
+            DeadLetterRetentionDays = ReadDays(
+                configuration,
+                DeadLetterRetentionDaysKey,
+                defaults.DeadLetterRetentionDays),
         };
     }
 
@@ -141,7 +160,8 @@ public sealed class AuditLogRetentionService(
     ILogger<AuditLogRetentionService> logger,
     TimeProvider? timeProvider = null,
     IAttachmentRejectionStore? rejections = null,
-    IAdminNotificationStore? notifications = null)
+    IAdminNotificationStore? notifications = null,
+    IResponseOutbox? outbox = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -168,7 +188,8 @@ public sealed class AuditLogRetentionService(
         // **どちらも消さないなら、常駐する意味が無い**
         if (!options.Enabled
             && !(rejections is not null && options.AttachmentRejectionEnabled)
-            && !(notifications is not null && options.NotificationEnabled))
+            && !(notifications is not null && options.NotificationEnabled)
+            && !(outbox is not null && options.DeadLetterEnabled))
         {
             return;
         }
@@ -177,6 +198,17 @@ public sealed class AuditLogRetentionService(
             "管理操作の記録は {Days} 日残す（{Interval} ごとに掃除する）",
             options.RetentionDays,
             options.SweepInterval);
+
+        // ⚠️ **消す設定にしたときだけ言う。** 既定（消さない）は決めたとおりの姿なので、
+        // 警告にすると全部の導入先で毎回出て、本当の警告が埋もれる
+        if (outbox is not null && options.DeadLetterEnabled)
+        {
+            logger.LogWarning(
+                "デッドレターを {Days} 日で消す設定で動いている（{Key}）。"
+                + "消えるのは回答そのもので、戻せない",
+                options.DeadLetterRetentionDays,
+                AuditLogRetentionOptions.DeadLetterRetentionDaysKey);
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -234,6 +266,26 @@ public sealed class AuditLogRetentionService(
                     {
                         logger.LogInformation(
                             "期限を過ぎた既読の知らせを {Count} 件消した（{Threshold} より前）",
+                            deleted,
+                            threshold);
+                    }
+                }
+                // **デッドレターも同じ周期で掃除する**（Issue #85）。
+                // ⚠️ **既定では消さない**（`DeadLetterRetentionDays` の既定は 0）。
+                // 中身は回答そのもので、消すと二度と戻らない
+                if (outbox is not null && options.DeadLetterEnabled)
+                {
+                    var threshold = now.AddDays(-options.DeadLetterRetentionDays);
+                    var deleted = await outbox
+                        .DeleteDeadLettersOlderThanAsync(threshold, stoppingToken)
+                        .ConfigureAwait(false);
+
+                    if (deleted > 0)
+                    {
+                        // **消したことは必ず残す。** 回答が減った理由が分からないと、
+                        // 「消えている」と「消した」の区別が付かない
+                        logger.LogInformation(
+                            "期限を過ぎたデッドレターを {Count} 件消した（{Threshold} より前）",
                             deleted,
                             threshold);
                     }

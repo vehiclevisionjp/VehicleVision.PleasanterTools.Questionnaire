@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -141,6 +141,10 @@ public class ResponseLimitTests
         public Task<IReadOnlyList<DeadLetterView>> ListDeadLettersAsync(
             DeadLetterQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<DeadLetterView>>([]);
+
+        public Task<int> DeleteDeadLettersOlderThanAsync(
+            DateTime threshold, CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
 
         public Task<Guid?> RequeueDeadLetterAsync(
             string responseToken, CancellationToken cancellationToken = default) =>
