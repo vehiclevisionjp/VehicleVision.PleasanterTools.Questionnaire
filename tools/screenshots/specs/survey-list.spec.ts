@@ -26,8 +26,13 @@ const markedTitles = ['絞り込みの目印 A', '絞り込みの目印 B'];
 /** 公開して「公開中」で絞り込むためのアンケート。**これ 1 本だけ公開する。** */
 const publishedTitle = '公開済みの目印';
 
-/** 検証環境に置くアンケートの総数。 */
-const totalCount = pagedCount + markedTitles.length + 1;
+/**
+ * 検証環境にあるアンケートの総数。
+ *
+ * **数えて求める。** 他の spec が作った分まで数に入れないと、
+ * まとめて走らせたときだけ 1 件ずれて落ちる（実際に踏んだ）。
+ */
+let totalCount = 0;
 
 let authFile = '';
 
@@ -55,8 +60,30 @@ function rowCount(page: import('@playwright/test').Page) {
   return page.locator('table tbody tr').count();
 }
 
+/** いま検証環境にあるアンケートの総数を数える。**上限があるので繰り返し読む。** */
+async function countAll(request: APIRequestContext): Promise<number> {
+  let offset = 0;
+  let counted = 0;
+
+  for (;;) {
+    const response = await request.get(`/api/admin/surveys?offset=${offset}&limit=200`);
+    if (!response.ok()) {
+      throw new Error(`一覧を読めなかった: ${response.status()} ${await response.text()}`);
+    }
+
+    const page = (await response.json()) as { items: unknown[]; hasMore: boolean };
+    counted += page.items.length;
+
+    if (!page.hasMore) {
+      return counted;
+    }
+
+    offset += 200;
+  }
+}
+
 test.describe('アンケート一覧のページ送りと絞り込み', () => {
-  test(`見本を ${totalCount} 件そろえる`, async ({ browser, baseURL }) => {
+  test(`見本を ${pagedCount + markedTitles.length + 1} 件そろえる`, async ({ browser, baseURL }) => {
     const context = await browser.newContext({ baseURL, storageState: authFile });
 
     try {
@@ -119,6 +146,11 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
       // **控えの場所は beforeAll より先に決まらない**ので、いま使うものへ写す
       const context = await browser.newContext({ baseURL, storageState: authFile });
       await context.storageState({ path: 'artifacts/survey-list-auth.json' });
+
+      // **数えるのはここ。** 他の spec が作った分も込みの、いまの総数
+      totalCount = await countAll(context.request);
+      expect(totalCount).toBeGreaterThan(pageSize);
+
       await context.close();
     });
 
@@ -140,12 +172,16 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
 
       await page.getByRole('button', { name: '次へ' }).click();
 
-      const remaining = totalCount - pageSize;
+      // **2 ページ目に何件出るか**。総数が 2 ページに収まらないなら上限まで
+      const remaining = Math.min(totalCount - pageSize, pageSize);
       await expect.poll(() => rowCount(page)).toBe(remaining);
-      await expect(page.getByText(`${pageSize + 1}〜${totalCount} 件目`)).toBeVisible();
+      await expect(page.getByText(`${pageSize + 1}〜${pageSize + remaining} 件目`)).toBeVisible();
 
       // **最後のページでは次へ進めない。** 進めると 0 件の画面が出てしまう
-      await expect(page.getByRole('button', { name: '次へ' })).toBeDisabled();
+      if (totalCount <= pageSize * 2) {
+        await expect(page.getByRole('button', { name: '次へ' })).toBeDisabled();
+      }
+
       await expect(page.getByRole('button', { name: '前へ' })).toBeEnabled();
     });
 
@@ -186,8 +222,15 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
       await page.getByLabel('状態').selectOption({ label: '公開中' });
       await page.getByRole('button', { name: '絞り込む' }).click();
 
-      await expect.poll(() => rowCount(page)).toBe(1);
+      // **件数では見ない。** 他の spec が公開したものが混ざり得る。
+      // **見たいのは「公開中でないものが出ていない」こと**
       await expect(page.getByRole('cell', { name: publishedTitle })).toBeVisible();
+      const statuses = page.locator('table tbody tr td:nth-child(2)');
+      const labels = await statuses.allInnerTexts();
+      expect(labels.length).toBeGreaterThan(0);
+      for (const label of labels) {
+        expect(label).toContain('公開中');
+      }
     });
 
     test('条件に合わないときは、1 件も無いときと言い分ける', async ({ page }) => {
