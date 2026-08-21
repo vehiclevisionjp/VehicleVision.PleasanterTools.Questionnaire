@@ -101,6 +101,12 @@ public static class ServerMessageKeys
     public const string ThemeColorInvalid = "surveys.themeColorInvalid";
 
     /// <summary>
+    /// 埋め込み先が、運用側の許した配信元に入っていない（Issue #104 / #107）。
+    /// **どこを許すかは <c>QUESTIONNAIRE_EMBED_ALLOWEDHOSTS</c> が決める。**
+    /// </summary>
+    public const string EmbedHostNotAllowed = "surveys.embedHostNotAllowed";
+
+    /// <summary>
     /// ヘッダ画像を受け付けられない。
     /// **理由の内訳は文言にしない**（拡張子・中身・大きさのどれで落ちたかは別で返す）。
     /// </summary>

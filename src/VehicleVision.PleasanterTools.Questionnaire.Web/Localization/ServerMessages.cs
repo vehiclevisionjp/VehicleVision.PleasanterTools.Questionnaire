@@ -218,6 +218,11 @@ public static class ServerMessages
             "Specify colors in the #rrggbb form.");
 
         Add(
+            ServerMessageKeys.EmbedHostNotAllowed,
+            "埋め込み先が、許可された配信元に入っていません。管理者へ配信元の追加を依頼してください。",
+            "The embedded URL is not in the allowed sources. Ask an administrator to add it.");
+
+        Add(
             ServerMessageKeys.HeaderImageRejected,
             "この画像は使えません。PNG・JPEG・GIF・WebP の 2 MB 以内の画像を選んでください。",
             "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 2 MB.");
