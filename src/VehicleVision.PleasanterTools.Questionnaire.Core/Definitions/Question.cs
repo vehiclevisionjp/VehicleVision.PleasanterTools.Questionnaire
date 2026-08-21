@@ -82,4 +82,41 @@ public sealed record Question
     /// （<c>_documents/データモデル設計.md</c> 2.2）。
     /// </remarks>
     public bool IsDisplayOnly => Type is QuestionType.Note;
+
+    /// <summary>説明文ブロックの本文を、書式の付いた形にしたもの（Issue #108）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **<see cref="Description"/> を記法として読んだ結果。**
+    /// <see cref="QuestionType.Note"/> 以外では <c>null</c>。
+    /// **持っている値は 1 つ（<c>Description</c>）だけ**で、こちらはそこから作る。
+    /// 原文と構造を別々に保存すると、片方だけ直る事故が起きる。
+    /// </para>
+    /// <para>
+    /// **画面はこれしか見ない。** 記法の解釈は
+    /// <c>NoteMarkup</c> だけが行い、画面側に同じ実装を置かない。
+    /// </para>
+    /// </remarks>
+    public IReadOnlyDictionary<string, ImmutableArray<NoteBlock>>? NoteBlocks
+    {
+        get
+        {
+            if (Type is not QuestionType.Note || Description is null)
+            {
+                return null;
+            }
+
+            var byLanguage = new Dictionary<string, ImmutableArray<NoteBlock>>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var language in Description.Languages)
+            {
+                var blocks = Text.NoteMarkup.Parse(Description.Get(language));
+                if (blocks.Length > 0)
+                {
+                    byLanguage[language] = blocks;
+                }
+            }
+
+            return byLanguage.Count > 0 ? byLanguage : null;
+        }
+    }
 }
