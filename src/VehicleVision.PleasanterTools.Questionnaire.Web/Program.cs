@@ -78,6 +78,11 @@ builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
 // あちらは IpAddress を持つ。**弾いた記録は回答者側の出来事**なので、
 // 同じ表へ入れると「回答者を完全匿名にする」前提と衝突する
 builder.Services.AddSingleton<IAttachmentRejectionStore, AttachmentRejectionStore>();
+
+// **異常はログにしか出ていなかった**（Issue #80）。
+// **Pleasanter を経由せず本アプリの DB へ溜める。**
+// 知らせの多くは「Pleasanter へ届かない」事象そのもので、届け先にはできない
+builder.Services.AddSingleton<IAdminNotificationStore, AdminNotificationStore>();
 builder.Services.AddSingleton<IAltchaChallengeStore, AltchaChallengeStore>();
 
 // **bot 対策の 4 枚目**（Issue #55）。送信チケット・最短時間・honeypot と重ねる。
@@ -385,6 +390,7 @@ app.MapAdminSurveyEndpoints();
 app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
+app.MapAdminNotificationEndpoints();
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
 app.MapGet("/admin", () => Results.File("admin.html", "text/html"));

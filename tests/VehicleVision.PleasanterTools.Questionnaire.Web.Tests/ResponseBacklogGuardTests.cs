@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Notifications;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 using VehicleVision.PleasanterTools.Questionnaire.Worker;
@@ -100,7 +101,7 @@ public class ResponseBacklogGuardTests
     }
 
     private static (ResponseBacklogGuard Guard, CountingOutbox Outbox, FakeTimeProvider Time)
-        Build(BacklogGuardOptions? options = null)
+        Build(BacklogGuardOptions? options = null, IAdminNotificationStore? notifications = null)
     {
         var outbox = new CountingOutbox();
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 8, 20, 0, 0, 0, TimeSpan.Zero));
@@ -109,9 +110,54 @@ public class ResponseBacklogGuardTests
             outbox,
             options ?? new BacklogGuardOptions { PerSurveyLimit = 100, TotalLimit = 500 },
             NullLogger<ResponseBacklogGuard>.Instance,
-            time);
+            time,
+            notifications);
 
         return (guard, outbox, time);
+    }
+
+    // ---- 管理者への知らせ（Issue #80）---------------------------------------
+
+    [Fact]
+    public async Task 止めた瞬間だけ知らせを立てる()
+    {
+        // **断るたびに立てない。** 攻撃で受付が止まっているときこそ、
+        // 知らせが同じ内容で埋まると他の異常が読めなくなる
+        var notifications = new FakeAdminNotificationStore();
+        var (guard, outbox, _) = Build(notifications: notifications);
+        outbox.Set(total: 120, (Watched, 100));
+
+        Assert.True(await guard.IsBlockedAsync(Watched));
+        Assert.True(await guard.IsBlockedAsync(Watched));
+
+        Assert.Equal(
+            [((int)AdminNotificationKind.BacklogBlockedSurvey, Watched)],
+            notifications.Raised);
+    }
+
+    [Fact]
+    public async Task 全体を止めたら紐づかない知らせを立てる()
+    {
+        var notifications = new FakeAdminNotificationStore();
+        var (guard, outbox, _) = Build(notifications: notifications);
+        outbox.Set(total: 500, (Watched, 1));
+
+        Assert.True(await guard.IsBlockedAsync(Watched));
+
+        Assert.Equal(
+            [((int)AdminNotificationKind.BacklogBlockedTotal, Guid.Empty)],
+            notifications.Raised);
+    }
+
+    [Fact]
+    public async Task 知らせを書けなくても受付の判断は変わらない()
+    {
+        // ⚠️ **例外を投げると「知らせに失敗したせいで回答を通す／断る」が起きる**
+        var notifications = new FakeAdminNotificationStore { Throws = true };
+        var (guard, outbox, _) = Build(notifications: notifications);
+        outbox.Set(total: 120, (Watched, 100));
+
+        Assert.True(await guard.IsBlockedAsync(Watched));
     }
 
     // ---- 止める・止めない ---------------------------------------------------

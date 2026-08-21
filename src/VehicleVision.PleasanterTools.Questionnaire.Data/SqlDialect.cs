@@ -248,6 +248,27 @@ public static partial class SqlDialect
         + "ORDER BY a.[OccurredAt] DESC, a.[AttachmentRejectionId] DESC "
         + Page(provider);
 
+    /// <summary>管理者への知らせを新しい順に読む SQL（Issue #80）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **<c>LEFT JOIN</c>。** アンケートが消えていても、
+    /// 知らせが残っていることは見えなければならない。
+    /// **アンケートに紐づかない知らせ（<c>Guid.Empty</c>）でも題名は付かない。**
+    /// </para>
+    /// <para>
+    /// **並びを 2 本の列で決める。** 時刻は秒までしか持たない（<see cref="DbTime"/>）ので、
+    /// 同じ秒の行が複数あるとページ送りで取りこぼす。
+    /// </para>
+    /// </remarks>
+    public static string ListAdminNotifications(DatabaseProvider provider, bool unreadOnly) =>
+        "SELECT n.[AdminNotificationId], n.[Kind], n.[SurveyId], s.[Title] AS [SurveyTitle], "
+        + "       n.[Count], n.[FirstOccurredAt], n.[LastOccurredAt], n.[ReadAt] "
+        + "FROM [AdminNotifications] n "
+        + "LEFT JOIN [Surveys] s ON s.[SurveyId] = n.[SurveyId] "
+        + (unreadOnly ? "WHERE n.[ReadAt] IS NULL " : string.Empty)
+        + "ORDER BY n.[LastOccurredAt] DESC, n.[AdminNotificationId] DESC "
+        + Page(provider);
+
     /// <summary>MySQL で確保した行を読み直す SQL。</summary>
     /// <remarks><see cref="ClaimPendingResponse"/> が <c>RETURNING</c> を使えないため。</remarks>
     public const string ReadClaimedResponseForMySql =

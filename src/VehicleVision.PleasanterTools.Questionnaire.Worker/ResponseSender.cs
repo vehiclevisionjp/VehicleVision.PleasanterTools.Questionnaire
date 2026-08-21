@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Notifications;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
@@ -43,7 +44,8 @@ public sealed class ResponseSender(
     MappingEvaluator mappingEvaluator,
     ResponseSenderOptions options,
     ILogger<ResponseSender> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    IAdminNotificationStore? notifications = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -234,6 +236,9 @@ public sealed class ResponseSender(
     {
         // **キーの失効・設定ミスは人が直す必要がある。** 通知の対象
         logger.LogError("Pleasanter の認証に失敗した。API キーの失効か設定ミスの可能性がある");
+        await NotifyAsync(
+            AdminNotificationKind.PleasanterUnauthorized, Guid.Empty, cancellationToken)
+            .ConfigureAwait(false);
         return await RescheduleAsync(claimed, "Pleasanter の認証に失敗", cancellationToken)
             .ConfigureAwait(false);
     }
@@ -378,6 +383,43 @@ public sealed class ResponseSender(
         logger.LogError("回答をデッドレターへ回した: {Reason}", error);
         await outbox.DeadLetterAsync(claimed.ResponseToken, error, cancellationToken)
             .ConfigureAwait(false);
+        await NotifyAsync(
+            AdminNotificationKind.DeadLettered, claimed.SurveyId, cancellationToken)
+            .ConfigureAwait(false);
         return SendOutcome.DeadLettered;
+    }
+
+    /// <summary>管理者への知らせを 1 件立てる（Issue #80）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **ログだけでは気付けない。** 管理画面を開いたときに未読として目に入るようにする。
+    /// </para>
+    /// <para>
+    /// ⚠️ **知らせを書けなくても送信の結果を変えない。** ここで例外を投げると、
+    /// 「知らせに失敗したせいで回答の扱いが変わる」ことになる。
+    /// **回答本文もトークンも渡していない**（種類とアンケートだけ）。
+    /// </para>
+    /// </remarks>
+    private async Task NotifyAsync(
+        AdminNotificationKind kind,
+        Guid surveyId,
+        CancellationToken cancellationToken)
+    {
+        if (notifications is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await notifications
+                .RaiseAsync(
+                    (int)kind, surveyId, _time.GetUtcNow().UtcDateTime, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "管理者への知らせを書けなかった: {Kind}", kind);
+        }
     }
 }

@@ -1,11 +1,12 @@
 <script lang="ts">
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
+  import NotificationList from './components/NotificationList.svelte';
   import OutboxStatusPanel from './components/OutboxStatusPanel.svelte';
   import SignInPanel from './components/SignInPanel.svelte';
   import SurveyEditor from './components/SurveyEditor.svelte';
   import SurveyList from './components/SurveyList.svelte';
-  import { getSession, logout, saveLanguage } from './lib/api';
+  import { getSession, listNotifications, logout, saveLanguage } from './lib/api';
   import type { AdminSession } from './lib/types';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../lib/i18n/language';
   import { language, resolveLanguage, t } from './lib/i18n/state.svelte';
@@ -23,6 +24,18 @@
   /** 送信状況を開いているか。**これも URL に出す。** */
   let openOutbox = $state(readOutbox());
 
+  /** お知らせを開いているか。**これも URL に出す。**（Issue #80） */
+  let openNotifications = $state(readNotifications());
+
+  /**
+   * 未読の件数。**ヘッダのバッジに出す。**
+   *
+   * **管理画面を開いた時点で数える。** ログを見張っていなくても、
+   * 何かあったことに気付けるようにするための仕組みなので、
+   * お知らせの画面を開くまで分からないのでは意味が無い。
+   */
+  let unreadCount = $state(0);
+
   $effect(() => {
     void refresh();
   });
@@ -38,6 +51,7 @@
       openSurveyId = readSurveyId();
       openAuditLog = readAuditLog();
       openOutbox = readOutbox();
+      openNotifications = readNotifications();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -56,16 +70,22 @@
     return /^\/admin\/outbox\/?$/.test(location.pathname);
   }
 
+  function readNotifications(): boolean {
+    return /^\/admin\/notifications\/?$/.test(location.pathname);
+  }
+
   function open(surveyId: string) {
     openSurveyId = surveyId;
     openAuditLog = false;
     openOutbox = false;
+    openNotifications = false;
     history.pushState(null, '', `/admin/surveys/${surveyId}`);
   }
 
   function openAudit() {
     openSurveyId = null;
     openOutbox = false;
+    openNotifications = false;
     openAuditLog = true;
     history.pushState(null, '', '/admin/audit-logs');
   }
@@ -73,14 +93,24 @@
   function openDelivery() {
     openSurveyId = null;
     openAuditLog = false;
+    openNotifications = false;
     openOutbox = true;
     history.pushState(null, '', '/admin/outbox');
+  }
+
+  function openNotificationList() {
+    openSurveyId = null;
+    openAuditLog = false;
+    openOutbox = false;
+    openNotifications = true;
+    history.pushState(null, '', '/admin/notifications');
   }
 
   function back() {
     openSurveyId = null;
     openAuditLog = false;
     openOutbox = false;
+    openNotifications = false;
     history.pushState(null, '', '/admin');
   }
 
@@ -99,6 +129,13 @@
     // **利用者ごとの設定 → ブラウザの言語設定 → `ja`**
     // （`_documents/多言語対応方針.md` 2 章）
     resolveLanguage(session.language ?? null);
+
+    // **未読の件数だけ先に読む**（Issue #80）。
+    // **失敗しても管理画面は使える。** 気付くための飾りであって、入口ではない
+    if (session.role === 'Administrator') {
+      const notifications = await listNotifications(0, 1);
+      unreadCount = notifications.ok ? notifications.value.unreadCount : 0;
+    }
   }
 
   /**
@@ -117,6 +154,8 @@
     openSurveyId = null;
     openAuditLog = false;
     openOutbox = false;
+    openNotifications = false;
+    unreadCount = 0;
     history.replaceState(null, '', '/admin');
     await refresh();
   }
@@ -152,6 +191,15 @@
    */
   const canSeeOutbox = $derived(session?.role === 'Administrator');
 
+  /**
+   * お知らせを見せてよい相手か（Issue #80）。
+   *
+   * **Administrator だけ。** どのアンケートが詰まっているかは、
+   * Editor へ開く情報ではない。
+   * **サーバ側でも同じ判定をしている**（`AdminNotificationEndpoints`）。
+   */
+  const canSeeNotifications = $derived(session?.role === 'Administrator');
+
   const needsEnrollment = $derived(
     session !== undefined &&
       !session.authenticated &&
@@ -183,6 +231,16 @@
         </select>
       </label>
 
+      {#if canSeeNotifications}
+        <button type="button" class="link" onclick={openNotificationList}>
+          {t('notifications.open')}
+          {#if unreadCount > 0}
+            <!-- **数字も出す。** 印だけだと「1 件」と「300 件」の区別が付かない -->
+            <span class="badge">{unreadCount}</span>
+          {/if}
+        </button>
+      {/if}
+
       {#if canSeeOutbox}
         <button type="button" class="link" onclick={openDelivery}>{t('outbox.open')}</button>
       {/if}
@@ -198,9 +256,15 @@
       **表を出す画面だけ広く使う。** 列が多くて識別子も入るので、
       他の画面と同じ幅だと横に流さないと読めない
     -->
-    <main class:wide={(openAuditLog && canSeeAuditLog) || (openOutbox && canSeeOutbox)}>
+    <main
+      class:wide={(openAuditLog && canSeeAuditLog) ||
+        (openOutbox && canSeeOutbox) ||
+        (openNotifications && canSeeNotifications)}
+    >
       {#if openAuditLog && canSeeAuditLog}
         <AuditLogList onback={back} />
+      {:else if openNotifications && canSeeNotifications}
+        <NotificationList onback={back} onunread={(count) => (unreadCount = count)} />
       {:else if openOutbox && canSeeOutbox}
         <OutboxStatusPanel onback={back} />
       {:else if openSurveyId}
@@ -313,6 +377,19 @@
     color: var(--accent);
     font-size: 0.85rem;
     cursor: pointer;
+  }
+
+  /* **未読の件数。** 色だけに頼らず、数字そのものを出す（Issue #80） */
+  .badge {
+    display: inline-block;
+    min-width: 1.25rem;
+    padding: 0 0.35rem;
+    margin-left: 0.25rem;
+    border-radius: 999px;
+    background: var(--error);
+    color: #fff;
+    font-size: 0.75rem;
+    text-align: center;
   }
 
   main {

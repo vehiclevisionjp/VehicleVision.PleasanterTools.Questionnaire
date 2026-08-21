@@ -534,6 +534,39 @@ export interface AuditLogFilter {
 }
 
 /**
+ * 管理者への知らせ 1 件（Issue #80）。
+ *
+ * **回答の中身も送信元も入っていない。** 出るのは「何が」「どのアンケートで」
+ * 「何回」「いつ」だけ。
+ *
+ * **サーバは null のプロパティを落として返す。**
+ * `?` を外すと、型検査は通るのに画面が真っ白になる。
+ */
+export interface AdminNotification {
+  id: string;
+  /** 種類の名前。**知らない値は `Unknown` で届く。** */
+  kind: string;
+  /** 紐づくアンケート。**全体に関わる知らせでは無い。** */
+  surveyId?: string | null;
+  /** アンケートの題名。**消えたアンケートでは無い。** */
+  surveyTitle?: string | null;
+  count: number;
+  firstOccurredAt: string;
+  lastOccurredAt: string;
+  /** 既読にした日時。**未読では無い。** */
+  readAt?: string | null;
+}
+
+/** 知らせの 1 ページ。 */
+export interface AdminNotificationPage {
+  items: AdminNotification[];
+  /** 次のページがあるか。**総数は数えない。** */
+  hasMore: boolean;
+  /** 未読の合計。**行数ではなく起きた回数。** */
+  unreadCount: number;
+}
+
+/**
  * 送信の滞留の状況。
  *
  * **回答の中身は入っていない**（`_documents/データモデル設計.md` 2.5）。

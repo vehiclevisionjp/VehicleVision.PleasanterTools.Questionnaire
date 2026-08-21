@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Notifications;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
@@ -141,7 +142,8 @@ public sealed class ResponseBacklogGuard(
     IResponseOutbox outbox,
     BacklogGuardOptions options,
     ILogger<ResponseBacklogGuard> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    IAdminNotificationStore? notifications = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -192,6 +194,9 @@ public sealed class ResponseBacklogGuard(
                     total,
                     options.TotalLimit,
                     options.TotalResume);
+                await NotifyAsync(
+                    AdminNotificationKind.BacklogBlockedTotal, Guid.Empty, cancellationToken)
+                    .ConfigureAwait(false);
             }
             else
             {
@@ -220,6 +225,9 @@ public sealed class ResponseBacklogGuard(
                     surveyId,
                     mine,
                     options.PerSurveyLimit);
+                await NotifyAsync(
+                    AdminNotificationKind.BacklogBlockedSurvey, surveyId, cancellationToken)
+                    .ConfigureAwait(false);
             }
             else
             {
@@ -232,6 +240,35 @@ public sealed class ResponseBacklogGuard(
         }
 
         return blocked;
+    }
+
+    /// <summary>管理者への知らせを 1 件立てる（Issue #80）。</summary>
+    /// <remarks>
+    /// ⚠️ **知らせを書けなくても受付の結果を変えない。** 例外を投げると、
+    /// 「知らせに失敗したせいで回答を断る／通す」が起きる。
+    /// **止めた瞬間だけ立てる。** 断るたびに立てると、攻撃で知らせが埋まる。
+    /// </remarks>
+    private async Task NotifyAsync(
+        AdminNotificationKind kind,
+        Guid surveyId,
+        CancellationToken cancellationToken)
+    {
+        if (notifications is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await notifications
+                .RaiseAsync(
+                    (int)kind, surveyId, _time.GetUtcNow().UtcDateTime, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "管理者への知らせを書けなかった: {Kind}", kind);
+        }
     }
 
     /// <summary>1 件受け付けたことを伝える。</summary>
