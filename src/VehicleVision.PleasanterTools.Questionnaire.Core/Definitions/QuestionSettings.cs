@@ -63,6 +63,14 @@ public sealed record QuestionSettings
     /// **1 行が 1 つの入力になる**ので、行を増やすほど使える列が減る。
     /// </remarks>
     public System.Collections.Immutable.ImmutableArray<GridRow> Rows { get; init; } = [];
+
+    /// <summary>埋め込み（Issue #104 / #107）。<see cref="QuestionType.Embed"/> で使う。</summary>
+    /// <remarks>
+    /// **配信元は運用側が許したものだけ**（<see cref="EmbedPolicy"/>）。
+    /// 保存の時点で弾くので、ここへ入っている値は許された配信元のはず。
+    /// **ただし画面へ出す前にもう一度確かめる**（設定は後から狭められる）。
+    /// </remarks>
+    public EmbedSource? Embed { get; init; }
 }
 
 /// <summary>文字列入力の形式検証。</summary>

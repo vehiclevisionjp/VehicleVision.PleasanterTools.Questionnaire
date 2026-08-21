@@ -57,4 +57,12 @@ public enum QuestionType
 
     /// <summary>説明文ブロック。設問ではなく、Pleasanter の列へ写さない。</summary>
     Note,
+
+    /// <summary>埋め込み（画像・動画・外部ページ）。設問ではなく、列へ写さない。</summary>
+    /// <remarks>
+    /// **回答者の情報が第三者へ渡る唯一の要素**（Issue #104 / #107）。
+    /// <c>iframe</c> を出した時点で、回答者の IP・時刻・User-Agent が埋め込み先へ渡る。
+    /// **どこを許すかは運用側が設定で決める**（<c>EmbedPolicy</c>）。
+    /// </remarks>
+    Embed,
 }
