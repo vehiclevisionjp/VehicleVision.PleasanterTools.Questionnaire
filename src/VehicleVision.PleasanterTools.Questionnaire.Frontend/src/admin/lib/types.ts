@@ -19,7 +19,8 @@ export type QuestionType =
   | 'Grid'
   | 'CheckboxGrid'
   | 'Ranking'
-  | 'Note';
+  | 'Note'
+  | 'Embed';
 
 /**
  * 画面に出す並び。**説明文ブロックは最後**（回答を持たないため）
@@ -41,6 +42,7 @@ export const questionTypes: QuestionType[] = [
   'CheckboxGrid',
   'Ranking',
   'Note',
+  'Embed',
 ];
 
 /** 設問の形式の文言の鍵。**形式を足すと鍵が無くなり、型検査で落ちる。** */
@@ -100,7 +102,7 @@ export function rowPorts(question: Question): { rowId: string; label: LocalizedT
 
 /** 回答を持たない表示専用の要素か。 */
 export function isDisplayOnly(type: QuestionType): boolean {
-  return type === 'Note';
+  return type === 'Note' || type === 'Embed';
 }
 
 /**
@@ -213,6 +215,27 @@ export interface QuestionSettings {
    * **1 行が 1 つの入力になる**ので、行を増やすほど Pleasanter の列を食う。
    */
   rows?: GridRow[];
+  /**
+   * 埋め込み（Issue #104 / #107）。**`type === 'Embed'` のときだけ使う。**
+   *
+   * **配信元は運用側の設定でしか増やせない。** 許されていないホストは
+   * 下書きの保存の時点で断られる（`GET /api/admin/surveys/embed-options` で一覧を出す）。
+   */
+  embed?: EmbedSource | null;
+}
+
+/** 埋め込みの出し方（Issue #104 / #107）。 */
+export type EmbedKind = 'Image' | 'Frame';
+
+/** 設問の間へ差し込む埋め込み 1 つ。 */
+export interface EmbedSource {
+  kind: EmbedKind;
+  /** 埋め込み先。**絶対 URL の `https:` のみ。** */
+  url: string;
+  /** 画像では `alt`、外部ページでは `title` に使う。 */
+  alternativeText?: LocalizedText | null;
+  /** 幅に対する高さの比。**外部ページで使う。** */
+  aspectRatio?: number;
 }
 
 /** グリッドの行 1 つ（Issue #74）。 */
