@@ -363,6 +363,17 @@ export interface SurveySummary {
 }
 
 /**
+ * アンケート一覧の 1 ページ（Issue #79）。
+ *
+ * **総数は入っていない。** 増え続ける表なので、サーバは数えない。
+ * 「次があるか」だけを持つ。
+ */
+export interface SurveyPage {
+  items: SurveySummary[];
+  hasMore: boolean;
+}
+
+/**
  * 一度でも公開したことがあるか。
  *
  * **`!== null` では守れない。** サーバは null のプロパティを落として返すので、

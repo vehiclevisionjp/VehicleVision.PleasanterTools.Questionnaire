@@ -391,7 +391,7 @@ public class SurveyDraftStoreTests
         var (drafts, surveys) = Create(provider, connectionString);
         var surveyId = await CreateSurveyAsync(surveys);
 
-        var list = await drafts.ListAsync();
+        var list = await drafts.ListAsync(new SurveyListQuery());
 
         Assert.Contains(list, summary => summary.SurveyId == surveyId);
     }
@@ -610,7 +610,7 @@ public class SurveyDraftStoreTests
         Assert.Equal("ClassA", Assert.Single(template.Mapping.Assignments).TargetColumn);
 
         // **アンケートの一覧には出ない。** 出ると「未公開のアンケート」に見える
-        var listed = await drafts.ListAsync();
+        var listed = await drafts.ListAsync(new SurveyListQuery());
         Assert.DoesNotContain(listed, item => item.SurveyId == target.TemplateId);
 
         // **テンプレートの一覧には出る**

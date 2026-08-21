@@ -130,7 +130,7 @@ public class AllowDraftSettingStoreTests
         var surveyId = Guid.NewGuid();
         await surveys.SaveAsync(Published(surveyId) with { AllowDraft = true });
 
-        var summary = (await drafts.ListAsync())
+        var summary = (await drafts.ListAsync(new SurveyListQuery()))
             .SingleOrDefault(row => row.SurveyId == surveyId);
 
         Assert.NotNull(summary);

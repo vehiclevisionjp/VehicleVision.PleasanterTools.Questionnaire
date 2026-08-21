@@ -25,6 +25,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// </remarks>
 public static class AdminSurveyEndpoints
 {
+    /// <summary>1 度に返す上限。**画面から大きな値を指定されても超えない。**</summary>
+    private const int MaxListLimit = 200;
+
+    private const int DefaultListLimit = 50;
+
     public static IEndpointRouteBuilder MapAdminSurveyEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin/surveys")
@@ -44,8 +49,38 @@ public static class AdminSurveyEndpoints
         });
 
         // ---- 一覧 ------------------------------------------------------------
-        group.MapGet("/", async (ISurveyDraftStore drafts, CancellationToken cancellationToken) =>
-            Results.Ok(await drafts.ListAsync(cancellationToken).ConfigureAwait(false)));
+        // **全件は返さない**（Issue #79）。アンケートは消さずに溜まるので、
+        // 上限が無いと増えるほど画面が重くなり、探すこともできない。
+        // **総数は数えず、1 件多く読んで「次がある」だけを返す**（デッドレターと同じ形）
+        group.MapGet("/", async (
+            ISurveyDraftStore drafts,
+            CancellationToken cancellationToken,
+            int? limit = null,
+            int? offset = null,
+            string? title = null,
+            int? status = null) =>
+        {
+            var take = Math.Clamp(limit ?? DefaultListLimit, 1, MaxListLimit);
+
+            // **知らない状態は絞り込みとして使わない。** 静かに 0 件になると
+            // 「アンケートが消えた」と見える
+            if (status is { } value && !Enum.IsDefined(typeof(SurveyStatus), value))
+            {
+                return Results.BadRequest(new { error = "unknownStatus" });
+            }
+
+            var rows = await drafts.ListAsync(
+                new SurveyListQuery
+                {
+                    Limit = take + 1,
+                    Offset = Math.Max(offset ?? 0, 0),
+                    TitleContains = title,
+                    Status = status is { } known ? (SurveyStatus)known : null,
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            return Results.Ok(ToResponse(rows, take));
+        });
 
         // ---- 作成 ------------------------------------------------------------
         group.MapPost("/", async (
@@ -621,6 +656,16 @@ public static class AdminSurveyEndpoints
         return Results.Ok(new { status = status.ToString() });
     }
 
+    /// <summary>一覧を応答の形にする（Issue #79）。</summary>
+    /// <param name="rows">1 件多く読んだ行。</param>
+    /// <param name="take">実際に返す件数。</param>
+    public static SurveyPageResponse ToResponse(IReadOnlyList<SurveySummary> rows, int take)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+
+        return new SurveyPageResponse([.. rows.Take(take)], rows.Count > take);
+    }
+
     /// <summary>不備を画面に出せる形にする。</summary>
     private static object Describe(MappingProblem problem) => new
     {
@@ -629,6 +674,16 @@ public static class AdminSurveyEndpoints
         detail = problem.Detail,
         isBlocking = problem.IsBlocking,
     };
+
+    /// <summary>一覧の 1 ページ（Issue #79）。</summary>
+    /// <param name="Items">このページに出すアンケート。</param>
+    /// <param name="HasMore">
+    /// 次のページがあるか。**総数は数えていない。**
+    /// 1 件多く読んで、余ったかどうかだけを見ている。
+    /// </param>
+    public sealed record SurveyPageResponse(
+        IReadOnlyList<SurveySummary> Items,
+        bool HasMore);
 
     /// <summary>アンケートを新しく作る。</summary>
     public sealed record CreateSurveyRequest(

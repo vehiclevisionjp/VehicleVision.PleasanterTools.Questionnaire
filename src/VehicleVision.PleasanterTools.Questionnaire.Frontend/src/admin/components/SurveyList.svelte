@@ -43,6 +43,24 @@
   let loading = $state(true);
   let error = $state('');
 
+  /** 1 ページの件数。**サーバ側の上限（200）より小さくしてある。** */
+  const pageSize = 50;
+
+  /** 次のページがあるか。**総数はサーバも数えていない。** */
+  let hasMore = $state(false);
+  let offset = $state(0);
+
+  /**
+   * 絞り込み（Issue #79）。
+   *
+   * **入力欄そのものを条件にしない。** 1 文字打つたびに問い合わせると、
+   * アンケートが多いほど無駄な問い合わせが増える。**押したときだけ確定する。**
+   */
+  let titleInput = $state('');
+  let statusInput = $state('');
+  let titleFilter = $state('');
+  let statusFilter = $state<number | null>(null);
+
   let creating = $state(false);
   let newTitle = $state('');
   let newSiteId = $state('');
@@ -91,13 +109,14 @@
   let settingsAllowDraft = $state(false);
   let settingsBusy = $state(false);
 
+  // **絞り込みとページを変えたら読み直す。** $effect が依存を拾う
   $effect(() => {
-    void reload();
+    void reload(offset, titleFilter, statusFilter);
   });
 
-  async function reload() {
+  async function reload(from: number, title: string, status: number | null) {
     loading = true;
-    const result = await listSurveys();
+    const result = await listSurveys(from, pageSize, title, status);
     loading = false;
 
     if (!result.ok) {
@@ -106,7 +125,29 @@
     }
 
     error = '';
-    surveys = result.value;
+    surveys = result.value.items;
+    hasMore = result.value.hasMore;
+  }
+
+  /**
+   * 絞り込みを確定する。
+   *
+   * **ページ送りは先頭へ戻す。** 3 ページ目のまま絞り込むと、
+   * 条件に合う行があっても「1 件も無い」と見える。
+   */
+  function applyFilter(event: SubmitEvent) {
+    event.preventDefault();
+    titleFilter = titleInput;
+    statusFilter = statusInput === '' ? null : Number(statusInput);
+    offset = 0;
+  }
+
+  function clearFilter() {
+    titleInput = '';
+    statusInput = '';
+    titleFilter = '';
+    statusFilter = null;
+    offset = 0;
   }
 
   async function create(event: SubmitEvent) {
@@ -206,7 +247,7 @@
       return;
     }
 
-    await reload();
+    await reload(offset, titleFilter, statusFilter);
   }
 
   function toggleQr(survey: SurveySummary) {
@@ -253,7 +294,7 @@
     }
 
     settingsFor = null;
-    await reload();
+    await reload(offset, titleFilter, statusFilter);
   }
 
   /** 受付数の表示。**上限があれば「/ 上限」を添える。** */
@@ -294,6 +335,30 @@
     {creating ? t('list.cancel') : t('list.create')}
   </button>
 </header>
+
+<!--
+  **絞り込み**（Issue #79）。アンケートは消さずに溜まるので、
+  一覧を上から眺めて探せるのは最初のうちだけ
+-->
+<form class="filter" onsubmit={applyFilter}>
+  <label class="filter-title">
+    {t('list.filterTitle')}
+    <input type="search" bind:value={titleInput} placeholder={t('list.filterTitlePlaceholder')} />
+  </label>
+  <label class="filter-status">
+    {t('list.filterStatus')}
+    <select bind:value={statusInput}>
+      <option value="">{t('list.filterStatusAll')}</option>
+      <option value="0">{t('status.draft')}</option>
+      <option value="1">{t('status.published')}</option>
+      <option value="2">{t('status.suspended')}</option>
+    </select>
+  </label>
+  <div class="actions">
+    <button type="submit" class="secondary">{t('list.filterApply')}</button>
+    <button type="button" class="secondary" onclick={clearFilter}>{t('list.filterClear')}</button>
+  </div>
+</form>
 
 {#if creating}
   <form class="create" onsubmit={create}>
@@ -427,7 +492,10 @@
 {#if loading}
   <p class="status">{t('app.loading')}</p>
 {:else if surveys.length === 0}
-  <p class="status">{t('list.empty')}</p>
+  <!-- **絞り込んだ結果 0 件なのか、1 件も無いのかを言い分ける** -->
+  <p class="status">
+    {titleFilter !== '' || statusFilter !== null ? t('list.emptyFiltered') : t('list.empty')}
+  </p>
 {:else}
   <table>
     <thead>
@@ -502,6 +570,30 @@
       {/each}
     </tbody>
   </table>
+
+  <nav class="pager">
+    <button
+      type="button"
+      class="secondary"
+      disabled={offset === 0}
+      onclick={() => (offset = Math.max(offset - pageSize, 0))}
+    >
+      {t('list.previous')}
+    </button>
+
+    <span class="range">
+      {t('list.page', { from: offset + 1, to: offset + surveys.length })}
+    </span>
+
+    <button
+      type="button"
+      class="secondary"
+      disabled={!hasMore}
+      onclick={() => (offset = offset + pageSize)}
+    >
+      {t('list.next')}
+    </button>
+  </nav>
 {/if}
 
 <style lang="scss">
@@ -510,6 +602,43 @@
     align-items: center;
     gap: 0.5rem;
     margin-bottom: 1.5rem;
+  }
+
+  /* **絞り込みは 1 行に収める。** 狭い画面では折り返す */
+  .filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .filter-title {
+    flex: 1 1 16rem;
+  }
+
+  .filter-status {
+    flex: 0 0 auto;
+  }
+
+  .filter select {
+    display: block;
+    margin-top: 0.25rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  .pager {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .range {
+    color: var(--muted);
+    font-size: 0.85rem;
   }
 
   h1 {

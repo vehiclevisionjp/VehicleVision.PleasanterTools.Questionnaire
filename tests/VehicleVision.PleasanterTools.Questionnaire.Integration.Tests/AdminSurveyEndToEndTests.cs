@@ -423,7 +423,7 @@ public class AdminSurveyEndToEndTests
         using var list = await http.GetAsync("/api/admin/surveys");
         list.EnsureSuccessStatusCode();
 
-        return (await ReadAsync(list))!.AsArray()
+        return (await ReadAsync(list))!["items"]!.AsArray()
             .Single(row => row!["surveyId"]!.GetValue<string>() == surveyId)!;
     }
 
@@ -676,6 +676,84 @@ public class AdminSurveyEndToEndTests
     }
 
     /// <summary>
+    /// 一覧が**全件を返さない**こと（Issue #79）。増え続ける表なので、
+    /// 上限と絞り込みが無いと開けなくなる。
+    /// </summary>
+    [Fact]
+    public async Task 一覧は件数を絞ってページ送りできる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+
+        for (var index = 0; index < 3; index++)
+        {
+            using var created = await http.PostAsJsonAsync(
+                "/api/admin/surveys",
+                new { title = $"ページ送りの検証 {index}", pleasanterSiteId = 1L });
+            created.EnsureSuccessStatusCode();
+        }
+
+        using (var first = await http.GetAsync("/api/admin/surveys?limit=1"))
+        {
+            first.EnsureSuccessStatusCode();
+            var body = (await ReadAsync(first))!;
+
+            Assert.Single(body["items"]!.AsArray());
+            // **総数は数えていない。** 1 件多く読んで、余ったかどうかだけを見る
+            Assert.True(body["hasMore"]!.GetValue<bool>());
+        }
+
+        // **読み飛ばした先も同じ形で返る**
+        using var second = await http.GetAsync("/api/admin/surveys?limit=1&offset=1");
+        second.EnsureSuccessStatusCode();
+        Assert.Single((await ReadAsync(second))!["items"]!.AsArray());
+    }
+
+    /// <summary>題名と状態で絞り込めること（Issue #79）。</summary>
+    [Fact]
+    public async Task 一覧は題名と状態で絞り込める()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var marker = Guid.NewGuid().ToString("N")[..8];
+
+        using (var created = await http.PostAsJsonAsync(
+            "/api/admin/surveys", new { title = $"絞り込み_{marker}", pleasanterSiteId = 1L }))
+        {
+            created.EnsureSuccessStatusCode();
+        }
+
+        using (var filtered = await http.GetAsync($"/api/admin/surveys?title={marker}"))
+        {
+            filtered.EnsureSuccessStatusCode();
+            var items = (await ReadAsync(filtered))!["items"]!.AsArray();
+
+            Assert.Single(items);
+            Assert.Contains(marker, items[0]!["title"]!.GetValue<string>());
+        }
+
+        // **作ったばかりは下書き。** 公開中で絞れば出てこない
+        using (var published = await http.GetAsync(
+            $"/api/admin/surveys?title={marker}&status=1"))
+        {
+            published.EnsureSuccessStatusCode();
+            Assert.Empty((await ReadAsync(published))!["items"]!.AsArray());
+        }
+
+        // **知らない状態は断る。** 黙って 0 件にすると「消えた」と見える
+        using var unknown = await http.GetAsync("/api/admin/surveys?status=99");
+        Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
+    }
+
+    /// <summary>
     /// 複製が下書きとして作られ、**公開用 ID を使い回さない**こと（Issue #46）。
     /// </summary>
     [Fact]
@@ -696,7 +774,7 @@ public class AdminSurveyEndToEndTests
         }
 
         using var original = await http.GetAsync("/api/admin/surveys");
-        var originalPublicId = (await ReadAsync(original))!.AsArray()
+        var originalPublicId = (await ReadAsync(original))!["items"]!.AsArray()
             .Single(row => row!["surveyId"]!.GetValue<string>() == surveyId)!["publicId"]!
             .GetValue<string>();
 
@@ -726,7 +804,7 @@ public class AdminSurveyEndToEndTests
 
         using (var list = await http.GetAsync("/api/admin/surveys"))
         {
-            var copy = (await ReadAsync(list))!.AsArray()
+            var copy = (await ReadAsync(list))!["items"]!.AsArray()
                 .Single(row => row!["surveyId"]!.GetValue<string>() == copyId)!;
 
             // **公開状態も公開済みの版も写さない**
