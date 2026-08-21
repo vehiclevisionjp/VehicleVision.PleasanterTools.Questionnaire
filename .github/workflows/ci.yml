@@ -123,6 +123,11 @@ jobs:
       - name: 型と Svelte を検査する
         run: npm run check
 
+      - name: 単体テストを実行する
+        # **型検査では捕まらない規則を見る**（Issue #110）。
+        # 分岐の経路探索・回答の検証・下書きの読み書き
+        run: npm run test
+
       - name: ビルドする
         # 成果物は ../{Web}/wwwroot へ出る（vite.config.ts の outDir）
         run: npx vite build
