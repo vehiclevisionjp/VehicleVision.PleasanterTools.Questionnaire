@@ -116,7 +116,7 @@ public class AdminSessionGuardTests
         var (context, auth) = await ValidateAsync(User(), Principal(AdminUserId));
 
         Assert.False(context.ShouldRenew);
-        Assert.Same(context.Principal, context.Principal);
+        Assert.NotNull(context.Principal);
         Assert.Empty(auth.SignedOutSchemes);
     }
 
