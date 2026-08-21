@@ -386,6 +386,15 @@ public static class AnswerValidator
             default:
                 break;
         }
+
+        // **形式の指定と重ねて効く**（Issue #102）。
+        // 「メールの形で、かつ社内のドメイン」のような指定ができる。
+        // ⚠️ **照合は後退戻りしない照合器で行う**（`TextPattern`）
+        if (!string.IsNullOrEmpty(question.Settings.Pattern)
+            && !TextPattern.IsMatch(question.Settings.Pattern, value))
+        {
+            errors.Add(new ValidationError(question.QuestionId, ValidationErrorCode.PatternMismatch));
+        }
     }
 
     private static void ValidateNumber(

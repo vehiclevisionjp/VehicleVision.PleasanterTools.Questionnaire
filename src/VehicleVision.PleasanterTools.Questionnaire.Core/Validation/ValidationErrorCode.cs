@@ -57,4 +57,7 @@ public enum ValidationErrorCode
 
     /// <summary>選んだ数が上限を超えた（Issue #101）。</summary>
     TooManySelections,
+
+    /// <summary>指定された形式（正規表現）に合わない（Issue #102）。</summary>
+    PatternMismatch,
 }

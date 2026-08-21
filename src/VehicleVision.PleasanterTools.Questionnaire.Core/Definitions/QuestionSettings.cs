@@ -36,6 +36,22 @@ public sealed record QuestionSettings
     /// <summary>入力の形式検証。</summary>
     public TextFormat? Format { get; init; }
 
+    /// <summary>入力の形式を正規表現で確かめる（Issue #102）。</summary>
+    /// <remarks>
+    /// **値の全体が合うかを見る**（前後を暗黙に固定する）。部分一致にすると、
+    /// 「数字 4 桁」のつもりの指定が「どこかに数字 4 桁があればよい」になってしまう。
+    /// ⚠️ **後退戻りしない照合器で動かす**（<see cref="Validation.TextPattern"/>）。
+    /// 使えない構文は公開の前に弾く。
+    /// </remarks>
+    public string? Pattern { get; init; }
+
+    /// <summary>正規表現に合わないときに出す文言（Issue #102）。</summary>
+    /// <remarks>
+    /// **正規表現そのものを回答者へ見せない。** <c>^[0-9]{4}$</c> と出しても伝わらない。
+    /// 空なら当たり障りのない既定の文言を使う。
+    /// </remarks>
+    public LocalizedText? PatternMessage { get; init; }
+
     /// <summary>選べる数の下限。複数選べる設問だけ（Issue #101）。</summary>
     /// <remarks>
     /// **未回答には効かない。** 「答えないか、下限まで選ぶか」であり、

@@ -1,6 +1,15 @@
+import type { Language } from './i18n/language';
 import type { Translate } from './i18n/messages';
 import type { AnswerState, Question } from './types';
-import { allowsMultiplePerRow, hasChoices, hasRows, hasSelectionRange, isDisplayOnly, rowValues } from './types';
+import {
+  allowsMultiplePerRow,
+  hasChoices,
+  hasRows,
+  hasSelectionRange,
+  isDisplayOnly,
+  rowValues,
+  text,
+} from './types';
 
 /**
  * 画面側の検証。
@@ -16,6 +25,7 @@ export function validateQuestion(
   question: Question,
   answer: AnswerState | undefined,
   t: Translate,
+  language: Language,
 ): string | null {
   if (isDisplayOnly(question)) return null;
 
@@ -62,7 +72,7 @@ export function validateQuestion(
   if (selectionError) return selectionError;
 
   for (const value of values) {
-    const error = validateValue(question, value, t);
+    const error = validateValue(question, value, t, language);
     if (error) return error;
   }
 
@@ -126,7 +136,12 @@ function validateSelectionCount(
   return null;
 }
 
-function validateValue(question: Question, value: string, t: Translate): string | null {
+function validateValue(
+  question: Question,
+  value: string,
+  t: Translate,
+  language: Language,
+): string | null {
   const settings = question.settings;
 
   switch (question.type) {
@@ -140,6 +155,11 @@ function validateValue(question: Question, value: string, t: Translate): string 
       }
       if (settings.format === 'Url' && !isHttpUrl(value)) {
         return t('validation.url');
+      }
+      // **正規表現は最後に見る**（Issue #102）。
+      // 文字数や形式の方が直し方を伝えやすいので、そちらを先に出す
+      if (settings.pattern !== undefined && !matchesPattern(settings.pattern, value)) {
+        return patternMessage(question, t, language);
       }
       return null;
     }
@@ -185,15 +205,39 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+/**
+ * 正規表現に合うか（Issue #102）。**値の全体で見る。**
+ *
+ * ⚠️ **サーバ側は後退戻りしない照合器で照合する。**
+ * ここは素の `RegExp` なので、**書き方によっては判定が食い違う**
+ * （先読みなどはサーバ側で使えず、公開の前に弾かれる）。
+ * 組み立てられない正規表現は**ここでは通す。** 受け付けるかはサーバ側が決めるので、
+ * 画面側で止めると直しようのないまま先へ進めなくなる。
+ */
+function matchesPattern(pattern: string, value: string): boolean {
+  try {
+    return new RegExp(`^(?:${pattern})$`, 'u').test(value);
+  } catch {
+    return true;
+  }
+}
+
+/** 合わないときの文言。**正規表現そのものは見せない。** */
+function patternMessage(question: Question, t: Translate, language: Language): string {
+  const custom = text(question.settings.patternMessage, language);
+  return custom === '' ? t('validation.pattern') : custom;
+}
+
 /** ページ内の設問をまとめて見る。 */
 export function validatePage(
   questions: Question[],
   answers: Record<string, AnswerState>,
   t: Translate,
+  language: Language,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const question of questions) {
-    const error = validateQuestion(question, answers[question.questionId], t);
+    const error = validateQuestion(question, answers[question.questionId], t, language);
     if (error) errors[question.questionId] = error;
   }
   return errors;

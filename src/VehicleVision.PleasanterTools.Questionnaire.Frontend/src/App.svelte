@@ -317,7 +317,7 @@
    */
   function checkCurrentStep(): boolean {
     if (!currentStep) return true;
-    errors = validatePage(currentStep.questions, answers, t);
+    errors = validatePage(currentStep.questions, answers, t, language);
     return Object.keys(errors).length === 0;
   }
 

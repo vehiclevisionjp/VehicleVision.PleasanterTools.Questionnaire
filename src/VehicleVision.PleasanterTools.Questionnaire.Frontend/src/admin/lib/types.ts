@@ -207,6 +207,16 @@ export interface QuestionSettings {
   minSelections?: number;
   maxSelections?: number;
   /**
+   * 入力の形式を正規表現で確かめる（Issue #102）。
+   *
+   * **値の全体が合うかを見る。** 前後は暗黙に固定される。
+   * ⚠️ **サーバ側は後退戻りしない照合器で照合する**ので、
+   * 先読み・後方参照・原子グループは使えない。**公開の前に弾かれる。**
+   */
+  pattern?: string;
+  /** 合わないときに出す文言。**正規表現そのものは回答者へ見せない。** */
+  patternMessage?: LocalizedText;
+  /**
    * グリッドの行（Issue #74）。
    *
    * **列（選択肢）は `choices` の方。** 行はここ。
