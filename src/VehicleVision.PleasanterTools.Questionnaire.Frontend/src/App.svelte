@@ -661,6 +661,10 @@
     --accent: #175cd3;
     --bg: #f9fafb;
     --text: #101828;
+    /* **釦の文字色と入力欄の地**（Issue #109）。
+       今までは #fff を直に書いていた。既定値は変えていないので見た目は同じ */
+    --accent-text: #fff;
+    --surface: #fff;
     --font: system-ui, sans-serif;
   }
 
@@ -781,10 +785,10 @@
       padding: 0.25rem 0.4rem;
       border: 1px solid var(--border);
       border-radius: 4px;
-      /* **地が白なので文字色もテーマに追随させない。**
-         明るい文字色を選ばれると、白地に白い文字になって読めなくなる */
-      background: #fff;
-      color: #101828;
+      /* **地と文字を対で追随させる**（Issue #109）。
+         片方だけテーマに従わせると、白地に白い文字のような組み合わせが作れてしまう */
+      background: var(--surface);
+      color: var(--text);
     }
   }
 
@@ -794,7 +798,7 @@
     border-radius: 6px;
     border: 1px solid var(--accent);
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-text);
     cursor: pointer;
 
     &:disabled {
@@ -803,7 +807,7 @@
     }
 
     &.secondary {
-      background: #fff;
+      background: var(--surface);
       color: var(--accent);
     }
   }

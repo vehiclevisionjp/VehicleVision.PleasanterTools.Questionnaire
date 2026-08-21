@@ -259,6 +259,9 @@
        **管理画面の `:root` の値をそのまま使わない。** 地の色が別物になる */
     --bg: #fff;
     --text: #101828;
+    /* **釦の文字色と入力欄の地**（Issue #109）。回答画面の `:root` と同じ値 */
+    --accent-text: #fff;
+    --surface: #fff;
     --font: system-ui, sans-serif;
 
     max-width: 40rem;

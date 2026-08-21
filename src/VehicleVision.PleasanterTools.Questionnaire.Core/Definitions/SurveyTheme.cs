@@ -71,6 +71,44 @@ public static partial class ThemeColor
         IsValid(value) ? value!.ToLowerInvariant() : null;
 }
 
+/// <summary>名前の付いた配色（Issue #109）。</summary>
+/// <remarks>
+/// <para>
+/// **色を増やすほど、読めない配色を作れる幅が広がる。**
+/// そこで**組み合わせに名前を付け、そこから選ぶのを既定の導線にする。**
+/// 個別の指定は「詳細」に畳む。
+/// </para>
+/// <para>
+/// **実際の色は画面側（<c>Frontend/src/lib/theme.ts</c>）が持つ。**
+/// ここは「どれを選んだか」だけを持つ。**サーバが色を持つと、
+/// 画面の既定値との写しが 2 か所になり、片方だけ直す事故が起きる。**
+/// </para>
+/// <para>
+/// **選んだ配色より、個別に指定した色が優先される。**
+/// 配色を選んだうえで 1 色だけ変える、が普通の使い方になる。
+/// </para>
+/// </remarks>
+public enum ThemePreset
+{
+    /// <summary>指定しない。**今までと同じ見た目。**</summary>
+    None,
+
+    /// <summary>白地に藍。**既定に一番近い。**</summary>
+    Indigo,
+
+    /// <summary>白地に深緑。</summary>
+    Forest,
+
+    /// <summary>白地に臙脂。</summary>
+    Crimson,
+
+    /// <summary>暖かい灰色の地。**紙に近い印象。**</summary>
+    Sand,
+
+    /// <summary>暗い地に明るい文字。</summary>
+    Midnight,
+}
+
 /// <summary>回答画面の見た目（Issue #56）。</summary>
 /// <remarks>
 /// <para>
@@ -84,8 +122,10 @@ public static partial class ThemeColor
 /// **公開済みのアンケートの色が、下書きを触っただけで変わることはない。**
 /// </para>
 /// <para>
-/// **色は 3 本だけにしてある。** 増やすほど、既定の見た目との組み合わせで
-/// 読めない配色（背景と文字が同系色など）を作れる幅が広がる。
+/// **色を足すときは必ず省略可にすること**（Issue #109）。
+/// 増やすほど読めない配色を作れる幅が広がるので、
+/// **名前の付いた配色（<see cref="Preset"/>）から選ぶのを既定の導線にし、**
+/// 個別の指定は畳んでおく。
 /// </para>
 /// </remarks>
 public sealed record SurveyTheme
@@ -98,6 +138,26 @@ public sealed record SurveyTheme
 
     /// <summary>本文の色。</summary>
     public string? TextColor { get; init; }
+
+    /// <summary>釦の文字色（Issue #109）。</summary>
+    /// <remarks>
+    /// **アクセント色から自動で決めていた**ため、
+    /// **濃い地に濃い文字**になる組み合わせを避けられなかった。
+    /// </remarks>
+    public string? AccentTextColor { get; init; }
+
+    /// <summary>設問枠の地の色（Issue #109）。</summary>
+    /// <remarks>
+    /// **白固定だった**ため、地の色を濃くすると設問枠だけが浮いた。
+    /// </remarks>
+    public string? SurfaceColor { get; init; }
+
+    /// <summary>枠線の色（Issue #109）。</summary>
+    /// <remarks>**省略時は地と文字から導く**（今までと同じ）。</remarks>
+    public string? BorderColor { get; init; }
+
+    /// <summary>名前の付いた配色（Issue #109）。**個別の指定が優先される。**</summary>
+    public ThemePreset Preset { get; init; } = ThemePreset.None;
 
     /// <summary>書体。**既定は端末任せ。**</summary>
     public ThemeFont Font { get; init; } = ThemeFont.System;
@@ -127,6 +187,10 @@ public sealed record SurveyTheme
         AccentColor is null
         && BackgroundColor is null
         && TextColor is null
+        && AccentTextColor is null
+        && SurfaceColor is null
+        && BorderColor is null
+        && Preset is ThemePreset.None
         && Font is ThemeFont.System
         && HeaderImageId is null;
 
@@ -141,6 +205,9 @@ public sealed record SurveyTheme
         Check(nameof(AccentColor), AccentColor);
         Check(nameof(BackgroundColor), BackgroundColor);
         Check(nameof(TextColor), TextColor);
+        Check(nameof(AccentTextColor), AccentTextColor);
+        Check(nameof(SurfaceColor), SurfaceColor);
+        Check(nameof(BorderColor), BorderColor);
 
         return invalid.ToImmutable();
 
@@ -171,6 +238,11 @@ public sealed record SurveyTheme
         AccentColor = ThemeColor.Normalize(AccentColor),
         BackgroundColor = ThemeColor.Normalize(BackgroundColor),
         TextColor = ThemeColor.Normalize(TextColor),
+        AccentTextColor = ThemeColor.Normalize(AccentTextColor),
+        SurfaceColor = ThemeColor.Normalize(SurfaceColor),
+        BorderColor = ThemeColor.Normalize(BorderColor),
+        // **知らない配色は指定なしへ落とす。** 列挙の範囲外の数値が JSON から入り得る
+        Preset = Enum.IsDefined(Preset) ? Preset : ThemePreset.None,
         // **知らない書体は既定へ落とす。** 列挙の範囲外の数値が JSON から入り得る
         Font = Enum.IsDefined(Font) ? Font : ThemeFont.System,
         // **識別子として読めないものは捨てる。** 画像の取得は GUID でしか行わない

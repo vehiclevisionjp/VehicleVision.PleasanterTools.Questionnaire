@@ -483,6 +483,10 @@
     border-radius: 4px;
     font: inherit;
     box-sizing: border-box;
+    /* **入力欄の地と文字もテーマに追随させる**（Issue #109）。
+       ブラウザ既定の白のままだと、地の色を濃くしたときに入力欄だけが浮く */
+    background: var(--surface);
+    color: var(--text);
   }
 
   .other {
