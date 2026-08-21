@@ -84,6 +84,65 @@ public class SurveyThemeTests
     }
 
     [Fact]
+    public void 後から足した色も検査する()
+    {
+        // **項目を足したときに検査へ足し忘れると、CSS へ素通りする**（Issue #109）
+        var theme = new SurveyTheme
+        {
+            AccentTextColor = "red",
+            SurfaceColor = "rgb(1,2,3)",
+            BorderColor = "#fff; }",
+        };
+
+        var invalid = theme.InvalidColors();
+
+        Assert.Equal(3, invalid.Length);
+        Assert.Contains(nameof(SurveyTheme.AccentTextColor), invalid);
+        Assert.Contains(nameof(SurveyTheme.SurfaceColor), invalid);
+        Assert.Contains(nameof(SurveyTheme.BorderColor), invalid);
+    }
+
+    [Fact]
+    public void 後から足した色も捨てて既定へ落とす()
+    {
+        var theme = new SurveyTheme
+        {
+            AccentTextColor = "#FFF",
+            SurfaceColor = "red",
+            BorderColor = "#fff; } body { display: none }",
+        }.Sanitized();
+
+        Assert.Equal("#fff", theme.AccentTextColor);
+        Assert.Null(theme.SurfaceColor);
+        Assert.Null(theme.BorderColor);
+    }
+
+    [Fact]
+    public void 配色だけを選んでも既定ではない()
+    {
+        Assert.False(new SurveyTheme { Preset = ThemePreset.Midnight }.IsDefault);
+    }
+
+    [Fact]
+    public void 列挙の範囲外の配色は指定なしへ落とす()
+    {
+        // JSON から数値で入ってくると、列挙にない値になり得る
+        var theme = new SurveyTheme { Preset = (ThemePreset)999 }.Sanitized();
+
+        Assert.Equal(ThemePreset.None, theme.Preset);
+    }
+
+    [Fact]
+    public void 配色は文字列で書く()
+    {
+        // **数値だと、列挙に値を挿入したときに過去の版の意味が変わる**
+        var json = SurveyJson.Serialize(
+            Definition(new SurveyTheme { Preset = ThemePreset.Forest }));
+
+        Assert.Contains("\"Forest\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void 未指定は不備として挙げない()
     {
         Assert.Empty(new SurveyTheme().InvalidColors());
