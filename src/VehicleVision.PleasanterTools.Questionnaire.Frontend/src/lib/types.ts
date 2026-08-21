@@ -17,7 +17,8 @@ export type QuestionType =
   | 'Grid'
   | 'CheckboxGrid'
   | 'Ranking'
-  | 'Note';
+  | 'Note'
+  | 'Embed';
 
 /** 言語コードをキーにした表示文字列。 */
 export type LocalizedText = Record<string, string>;
@@ -92,6 +93,28 @@ export interface QuestionSettings {
    * **1 行が 1 つの入力になる**ので、行を増やすほど Pleasanter の列を食う。
    */
   rows?: GridRow[];
+  /**
+   * 埋め込み（Issue #104 / #107）。**`type === 'Embed'` のときだけ使う。**
+   *
+   * **配信元は運用側の設定でしか増やせない。** 保存の時点で弾かれるので、
+   * ここに入っている URL は許された配信元のものだけ。
+   * **ただし設定は後から狭められる**ので、出す前にもう一度確かめる。
+   */
+  embed?: EmbedSource | null;
+}
+
+/** 埋め込みの出し方（Issue #104 / #107）。 */
+export type EmbedKind = 'Image' | 'Frame';
+
+/** 設問の間へ差し込む埋め込み 1 つ。 */
+export interface EmbedSource {
+  kind: EmbedKind;
+  /** 埋め込み先。**絶対 URL の `https:` のみ。** */
+  url: string;
+  /** 画像では `alt`、外部ページでは `title` に使う。 */
+  alternativeText?: LocalizedText | null;
+  /** 幅に対する高さの比。**外部ページで使う。** */
+  aspectRatio?: number;
 }
 
 /** グリッドの行 1 つ（Issue #74）。 */
@@ -312,5 +335,5 @@ export function rowValues(answer: AnswerState | undefined, rowId: string): strin
 
 /** 回答を持たない表示専用の要素か。 */
 export function isDisplayOnly(question: Question): boolean {
-  return question.type === 'Note';
+  return question.type === 'Note' || question.type === 'Embed';
 }

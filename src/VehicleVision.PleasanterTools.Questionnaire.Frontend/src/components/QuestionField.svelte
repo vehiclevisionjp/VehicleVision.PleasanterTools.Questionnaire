@@ -5,6 +5,7 @@
   import { translator } from '../lib/i18n/messages';
   import { noteBlocks } from '../lib/note';
   import NoteContent from './NoteContent.svelte';
+  import EmbedBlock from './EmbedBlock.svelte';
 
   interface Props {
     question: Question;
@@ -180,6 +181,8 @@
       <p>{text(question.description, language)}</p>
     {/if}
   </section>
+{:else if question.type === 'Embed'}
+  <EmbedBlock {question} {language} />
 {:else}
   <fieldset class="field" class:has-error={error !== undefined}>
     <legend id={labelId}>
