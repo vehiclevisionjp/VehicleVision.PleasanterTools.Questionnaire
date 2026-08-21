@@ -54,4 +54,15 @@ public class InvitationTokenTests
             InvitationToken.HashOf(InvitationToken.Create()),
             InvitationToken.HashOf(InvitationToken.Create()));
     }
+
+    [Fact]
+    public void 一文字でも改ざんされるとハッシュが合わない()
+    {
+        var token = InvitationToken.Create();
+        var tampered = token[^1] == 'A'
+            ? token[..^1] + "B"
+            : token[..^1] + "A";
+
+        Assert.NotEqual(InvitationToken.HashOf(token), InvitationToken.HashOf(tampered));
+    }
 }
