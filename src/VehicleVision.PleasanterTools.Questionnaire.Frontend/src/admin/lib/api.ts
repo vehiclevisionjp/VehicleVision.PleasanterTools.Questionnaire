@@ -11,7 +11,7 @@ import type {
   MappingProblem,
   SurveyDefinition,
   SurveyDraft,
-  SurveySummary,
+  SurveyPage,
   SurveyTemplateSummary,
 } from './types';
 
@@ -118,7 +118,30 @@ export const saveLanguage = (language: string | null) =>
 
 // ---- アンケート -------------------------------------------------------------
 
-export const listSurveys = () => call<SurveySummary[]>('/api/admin/surveys');
+/**
+ * アンケートの一覧（Issue #79 でページ送りと絞り込みを入れた）。
+ *
+ * **全件は返らない。** 絞り込みは題名の部分一致と状態。
+ * `status` に `null` を渡すと絞り込まない。
+ */
+export const listSurveys = (
+  offset: number,
+  limit: number,
+  title: string,
+  status: number | null,
+) => {
+  const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+
+  if (title.trim() !== '') {
+    query.set('title', title.trim());
+  }
+
+  if (status !== null) {
+    query.set('status', String(status));
+  }
+
+  return call<SurveyPage>(`/api/admin/surveys?${query}`);
+};
 
 export const createSurvey = (title: string, pleasanterSiteId: number, responseJsonColumn?: string) =>
   call<{ surveyId: string; publicId: string }>('/api/admin/surveys', {
