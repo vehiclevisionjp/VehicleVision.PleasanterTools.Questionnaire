@@ -1,4 +1,4 @@
-﻿using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -117,6 +117,10 @@ public class ResponseIntakeAttachmentTests
         public Task<IReadOnlyList<DeadLetterView>> ListDeadLettersAsync(
             DeadLetterQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<DeadLetterView>>([]);
+
+        public Task<int> DeleteDeadLettersOlderThanAsync(
+            DateTime threshold, CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
 
         public Task<Guid?> RequeueDeadLetterAsync(
             string responseToken, CancellationToken cancellationToken = default) =>

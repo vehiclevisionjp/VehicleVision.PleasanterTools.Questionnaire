@@ -164,6 +164,42 @@ public class ResponseOutboxTests
         Assert.Equal(pending, afterDelete);
     }
 
+    /// <summary>
+    /// 期限を過ぎたデッドレターだけを消せること（Issue #85）。
+    /// ⚠️ **送信待ちを巻き込むと、まだ届けられる回答を捨てることになる。**
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 期限を過ぎたデッドレターだけを消す(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (outbox, _) = Create(provider, connectionString);
+
+        var dead = NewToken();
+        await outbox.SaveAsync(dead, Guid.NewGuid(), 1, "{}");
+        await outbox.DeadLetterAsync(dead, "恒久的な失敗");
+
+        var pending = NewToken();
+        await outbox.SaveAsync(pending, Guid.NewGuid(), 1, "{}");
+
+        // **まだ期限が来ていないものは消さない**
+        Assert.Equal(0, await outbox.DeleteDeadLettersOlderThanAsync(DateTime.UtcNow.AddDays(-1)));
+        Assert.NotNull(await outbox.FindPayloadAsync(dead));
+
+        // **期限を過ぎたデッドレターだけ消える**
+        Assert.Equal(1, await outbox.DeleteDeadLettersOlderThanAsync(DateTime.UtcNow.AddDays(1)));
+        Assert.Null(await outbox.FindPayloadAsync(dead));
+
+        // ⚠️ **送信待ちは残る。** 状態を条件に入れてある
+        Assert.NotNull(await outbox.FindPayloadAsync(pending));
+    }
+
     [Theory]
     [MemberData(nameof(Providers))]
     public async Task トークンとReferenceIdの対応を保存できる(
