@@ -166,6 +166,14 @@ export const ja = {
   'question.rowsEmpty': '行がありません。1 行も無いと、この設問には答えられません。',
   'question.scaleMinimum': '下限',
   'question.scaleMaximum': '上限',
+  'question.minSelections': '選ぶ数の下限',
+  'question.maxSelections': '選ぶ数の上限',
+  'question.selectionHint':
+    '空欄なら指定なしです。下限は未回答には効きません（答えないか、下限まで選ぶか）。必ず答えさせたいときは「必須」を立ててください。',
+  'question.selectionNotPositive': '選ぶ数は 1 以上で指定してください。',
+  'question.selectionReversed': '下限が上限を上回っています。この設問には答えられません。',
+  'question.selectionExceedsChoices':
+    '下限が選択肢の数（{choices}）を上回っています。この設問には答えられません。',
 
   // ---- 設問の形式 ---------------------------------------------------------
   'questionType.Text': '短い文章',
@@ -699,6 +707,15 @@ export const en: Record<MessageKey, string> = {
   'question.rowsEmpty': 'No rows yet. Without a row this question cannot be answered.',
   'question.scaleMinimum': 'Minimum',
   'question.scaleMaximum': 'Maximum',
+  'question.minSelections': 'Minimum choices',
+  'question.maxSelections': 'Maximum choices',
+  'question.selectionHint':
+    'Leave blank for no limit. The minimum does not apply to unanswered questions (answer nothing, or choose at least the minimum). Use "Required" when an answer is mandatory.',
+  'question.selectionNotPositive': 'The number of choices must be 1 or more.',
+  'question.selectionReversed':
+    'The minimum is greater than the maximum. No answer can satisfy this question.',
+  'question.selectionExceedsChoices':
+    'The minimum is greater than the number of options ({choices}). No answer can satisfy this question.',
 
   'questionType.Text': 'Short answer',
   'questionType.Paragraph': 'Long answer',

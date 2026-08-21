@@ -89,8 +89,43 @@
   const rules = $derived(question.visibleWhen?.rules ?? []);
   const match = $derived(question.visibleWhen?.match ?? 'All');
 
+  /** 選べる数を指定できる設問か（Issue #101）。**複数選ぶチェックボックスだけ。** */
+  const showSelectionRange = $derived(
+    question.type === 'Checkbox' || question.type === 'CheckboxGrid',
+  );
+
+  /** 選べる数の指定が矛盾していないか。**公開時にサーバ側でも同じことを見る。** */
+  const selectionProblem = $derived.by(() => {
+    if (!showSelectionRange) return null;
+
+    const minimum = question.settings.minSelections;
+    const maximum = question.settings.maxSelections;
+
+    if ((minimum !== undefined && minimum < 1) || (maximum !== undefined && maximum < 1)) {
+      return t('question.selectionNotPositive');
+    }
+    if (minimum !== undefined && maximum !== undefined && minimum > maximum) {
+      return t('question.selectionReversed');
+    }
+    if (minimum !== undefined && minimum > question.choices.length) {
+      return t('question.selectionExceedsChoices', { choices: question.choices.length });
+    }
+    return null;
+  });
+
   function update(patch: Partial<Question>) {
     onchange({ ...question, ...patch });
+  }
+
+  /**
+   * 数の欄を読む（Issue #101）。
+   *
+   * **空欄は「指定なし」。** 0 や NaN を入れると、答えようのない設問になる。
+   */
+  function optionalCount(value: string): number | undefined {
+    if (value.trim() === '') return undefined;
+    const count = Number(value);
+    return Number.isFinite(count) ? count : undefined;
   }
 
   function addChoice() {
@@ -607,6 +642,48 @@
         {t('question.npsPreset')}
       </button>
       <p class="hint">{t('question.npsHint')}</p>
+    {/if}
+  {/if}
+
+  <!-- **選べる数の指定**（Issue #101）。空欄は「指定なし」 -->
+  {#if showSelectionRange}
+    <div class="range">
+      <label>
+        {t('question.minSelections')}
+        <input
+          type="number"
+          min="1"
+          value={question.settings.minSelections ?? ''}
+          oninput={(event) =>
+            update({
+              settings: {
+                ...question.settings,
+                minSelections: optionalCount(event.currentTarget.value),
+              },
+            })}
+        />
+      </label>
+      <label>
+        {t('question.maxSelections')}
+        <input
+          type="number"
+          min="1"
+          value={question.settings.maxSelections ?? ''}
+          oninput={(event) =>
+            update({
+              settings: {
+                ...question.settings,
+                maxSelections: optionalCount(event.currentTarget.value),
+              },
+            })}
+        />
+      </label>
+    </div>
+
+    <!-- **下限は未回答には効かない。** 答えさせたいなら必須の方 -->
+    <p class="hint">{t('question.selectionHint')}</p>
+    {#if selectionProblem !== null}
+      <p class="warn">{selectionProblem}</p>
     {/if}
   {/if}
 

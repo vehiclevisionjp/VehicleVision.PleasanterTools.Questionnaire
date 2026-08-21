@@ -75,6 +75,14 @@ export interface QuestionSettings {
   numberMinimum?: number;
   numberMaximum?: number;
   format?: 'None' | 'Email' | 'Url';
+  /**
+   * 選べる数の下限・上限（Issue #101）。**複数選ぶ設問だけ。**
+   *
+   * **未回答には効かない。**「答えないか、下限まで選ぶか」であり、
+   * 答えさせたいなら `isRequired` を立てる。
+   */
+  minSelections?: number;
+  maxSelections?: number;
   maxFileCount?: number;
   maxFileSizeBytes?: number;
   /**
@@ -249,6 +257,16 @@ export function hasRows(question: Question): boolean {
 /** 1 行に複数選べる形式か。 */
 export function allowsMultiplePerRow(question: Question): boolean {
   return question.type === 'CheckboxGrid';
+}
+
+/**
+ * 選べる数の下限・上限を持てる形式か（Issue #101）。
+ *
+ * **複数選ぶチェックボックスだけ。** ランキングは並べた順が答えで、
+ * 「いくつ選ぶか」とは別の話なので対象にしない。**サーバ側と同じ線引き。**
+ */
+export function hasSelectionRange(question: Question): boolean {
+  return question.type === 'Checkbox' || question.type === 'CheckboxGrid';
 }
 
 /** その行で選ばれている値。**無ければ空。** */

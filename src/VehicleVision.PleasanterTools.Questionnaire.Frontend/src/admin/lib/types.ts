@@ -199,6 +199,14 @@ export interface QuestionSettings {
   maxFileCount?: number;
   maxFileSizeBytes?: number;
   /**
+   * 選べる数の下限・上限（Issue #101）。**複数選ぶ設問だけ。**
+   *
+   * **未回答には効かない。**「答えないか、下限まで選ぶか」であり、
+   * 答えさせたいなら `isRequired` を立てる。
+   */
+  minSelections?: number;
+  maxSelections?: number;
+  /**
    * グリッドの行（Issue #74）。
    *
    * **列（選択肢）は `choices` の方。** 行はここ。

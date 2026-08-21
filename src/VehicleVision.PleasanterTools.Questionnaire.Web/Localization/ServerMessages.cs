@@ -175,6 +175,11 @@ public static class ServerMessages
             "Cannot publish. Fix the problems in the branching first.");
 
         Add(
+            ServerMessageKeys.PublishBlockedBySettings,
+            "公開できません。設問の設定に、答えようのない指定があります。",
+            "Cannot publish. Some questions have settings that no answer can satisfy.");
+
+        Add(
             ServerMessageKeys.NoAnswerableQuestion,
             "回答できる設問がありません。",
             "There is no question that can be answered.");

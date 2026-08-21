@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { AnswerState, Question } from '../lib/types';
-  import { allowsMultiplePerRow, rowValues, text } from '../lib/types';
+  import { allowsMultiplePerRow, hasSelectionRange, rowValues, text } from '../lib/types';
   import type { Language } from '../lib/i18n/language';
   import { translator } from '../lib/i18n/messages';
 
@@ -150,6 +150,19 @@
     }
     return parts.join(' / ');
   });
+  /** 選べる数を文字で出す（Issue #101）。**選んでから弾かれるより先に伝える。** */
+  const selectionLimits = $derived.by(() => {
+    if (!hasSelectionRange(question)) return '';
+
+    const { minSelections: minimum, maxSelections: maximum } = question.settings;
+
+    if (minimum !== undefined && maximum !== undefined) {
+      return t('question.selectionRange', { minimum, maximum });
+    }
+    if (minimum !== undefined) return t('question.selectionMinimum', { minimum });
+    if (maximum !== undefined) return t('question.selectionMaximum', { maximum });
+    return '';
+  });
 </script>
 
 <!-- 説明文ブロックは回答を持たない -->
@@ -169,6 +182,11 @@
 
     {#if question.description}
       <p class="description">{text(question.description, language)}</p>
+    {/if}
+
+    <!-- **選べる数は設問の頭で伝える。** 選び終えてから弾かれると選び直しになる -->
+    {#if selectionLimits !== ''}
+      <p class="description">{selectionLimits}</p>
     {/if}
 
     {#if question.type === 'Text'}
