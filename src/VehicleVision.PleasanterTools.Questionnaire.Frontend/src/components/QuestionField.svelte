@@ -3,6 +3,8 @@
   import { allowsMultiplePerRow, hasSelectionRange, rowValues, text } from '../lib/types';
   import type { Language } from '../lib/i18n/language';
   import { translator } from '../lib/i18n/messages';
+  import { noteBlocks } from '../lib/note';
+  import NoteContent from './NoteContent.svelte';
 
   interface Props {
     question: Question;
@@ -167,9 +169,16 @@
 
 <!-- 説明文ブロックは回答を持たない -->
 {#if question.type === 'Note'}
+  {@const blocks = noteBlocks(question.noteBlocks, language)}
   <section class="note">
     <h3>{text(question.title, language)}</h3>
-    {#if question.description}<p>{text(question.description, language)}</p>{/if}
+    <!-- **書式の付いた本文があればそちらを出す**（Issue #108）。
+         公開済みの古い版には noteBlocks が無いので、平文へ落とす -->
+    {#if blocks.length > 0}
+      <NoteContent {blocks} />
+    {:else if question.description}
+      <p>{text(question.description, language)}</p>
+    {/if}
   </section>
 {:else}
   <fieldset class="field" class:has-error={error !== undefined}>

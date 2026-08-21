@@ -101,6 +101,35 @@ export interface GridRow {
   label: LocalizedText;
 }
 
+/** 説明文ブロックの段落の種類。**知らない値は出さない**（Issue #108）。 */
+export type NoteBlockKind = 'Paragraph' | 'Heading' | 'BulletList' | 'NumberedList';
+
+/** 説明文ブロックの文字装飾の種類。 */
+export type NoteInlineKind = 'Text' | 'Bold' | 'Italic' | 'Link';
+
+/** 説明文ブロックの中の文字列 1 片。 */
+export interface NoteInline {
+  kind: NoteInlineKind;
+  /** 表示する文字列。**平文。記法もタグも含まない。** */
+  text: string;
+  /** リンク先。**サーバが `https:` だけを通している。** */
+  href?: string | null;
+}
+
+/** 箇条書きの項目 1 つ。 */
+export interface NoteListItem {
+  inlines: NoteInline[];
+}
+
+/** 説明文ブロックの段落 1 つ。 */
+export interface NoteBlock {
+  kind: NoteBlockKind;
+  inlines: NoteInline[];
+  items: NoteListItem[];
+  /** 見出しの深さ（2 〜 4）。 */
+  level: number;
+}
+
 export interface Question {
   questionId: string;
   type: QuestionType;
@@ -111,6 +140,13 @@ export interface Question {
   settings: QuestionSettings;
   /** この設問を出す条件。**無ければ常に出す。** */
   visibleWhen?: VisibilityCondition | null;
+  /**
+   * 説明文ブロックの本文を、書式の付いた形にしたもの（Issue #108）。
+   *
+   * **`description` をサーバが記法として読んだ結果。** 言語コードが鍵。
+   * **画面はこちらしか見ない。** 記法の解釈はサーバにしか無い。
+   */
+  noteBlocks?: Record<string, NoteBlock[]> | null;
 }
 
 export interface Page {

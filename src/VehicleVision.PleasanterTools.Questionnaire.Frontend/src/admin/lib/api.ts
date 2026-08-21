@@ -1,4 +1,5 @@
 import { acceptLanguageHeader, t } from './i18n/state.svelte';
+import type { NoteBlock } from '../../lib/types';
 import type {
   AdminNotificationPage,
   AdminSession,
@@ -380,4 +381,24 @@ export const requeueDeadLetter = (responseToken: string) =>
   call<{ requeued: boolean }>('/api/admin/outbox/dead-letters/requeue', {
     method: 'POST',
     json: { responseToken },
+  });
+
+/** 記法 1 件を読んだ結果（Issue #108）。 */
+export interface NotePreviewResult {
+  blocks: NoteBlock[];
+  /** 上限を超えて切り落とされたか。 */
+  truncated: boolean;
+}
+
+/**
+ * 説明文ブロックの記法を読んでもらう（Issue #108）。
+ *
+ * **読むのはサーバだけ。** 画面に同じ実装を置くと、
+ * プレビューで通った書き方が公開後に通らないというずれが起きる。
+ * **渡した順で返る。**
+ */
+export const previewNotes = (markups: (string | null)[]) =>
+  call<{ results: NotePreviewResult[] }>('/api/admin/note/preview', {
+    method: 'POST',
+    json: { markups },
   });

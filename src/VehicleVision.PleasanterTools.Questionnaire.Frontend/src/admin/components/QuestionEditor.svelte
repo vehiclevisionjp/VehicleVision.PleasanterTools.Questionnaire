@@ -28,6 +28,14 @@
   import type { Language } from '../../lib/i18n/language';
   import { t } from '../lib/i18n/state.svelte';
 
+  /**
+   * 説明文ブロックの記法の文字数の上限（Issue #108）。
+   *
+   * **サーバ側の `NoteMarkup.MaximumLength` と揃える。**
+   * 超えた分はサーバが切り落とすので、入力の時点で止める。
+   */
+  const NOTE_MARKUP_MAX_LENGTH = 4000;
+
   interface Props {
     question: Question;
     /** 入力欄が書き込む言語。**管理画面の表示言語とは別。** */
@@ -373,14 +381,29 @@
     </div>
   </div>
 
-  <input
-    class="description"
-    type="text"
-    placeholder={t('question.descriptionPlaceholder')}
-    value={text(question.description, editing)}
-    oninput={(event) =>
-      update({ description: withText(question.description, event.currentTarget.value, editing) })}
-  />
+  {#if displayOnly}
+    <!-- **説明文ブロックの本文は記法で書ける**（Issue #108）。
+         **受け付けるのは記法だけで、HTML は平文として出る** -->
+    <textarea
+      class="description markup"
+      rows="6"
+      maxlength={NOTE_MARKUP_MAX_LENGTH}
+      placeholder={t('question.markupPlaceholder')}
+      value={text(question.description, editing)}
+      oninput={(event) =>
+        update({ description: withText(question.description, event.currentTarget.value, editing) })}
+    ></textarea>
+    <p class="markup-hint">{t('question.markupHint')}</p>
+  {:else}
+    <input
+      class="description"
+      type="text"
+      placeholder={t('question.descriptionPlaceholder')}
+      value={text(question.description, editing)}
+      oninput={(event) =>
+        update({ description: withText(question.description, event.currentTarget.value, editing) })}
+    />
+  {/if}
 
   <div class="meta">
     <code class="id">{question.questionId}</code>
@@ -835,6 +858,20 @@
     width: 100%;
     margin-top: 0.5rem;
     color: var(--muted);
+  }
+
+  .markup {
+    resize: vertical;
+    line-height: 1.6;
+    font-family: inherit;
+  }
+
+  .markup-hint {
+    margin: 0.25rem 0 0;
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.6;
+    white-space: pre-line;
   }
 
   .meta {
