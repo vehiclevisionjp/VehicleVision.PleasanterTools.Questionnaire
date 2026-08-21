@@ -212,7 +212,7 @@ public class ResponseLimitStoreTests
         await tokens.EnsureAsync(NewToken(), surveyId);
         await surveys.SuspendForResponseLimitAsync(surveyId);
 
-        var summary = (await drafts.ListAsync())
+        var summary = (await drafts.ListAsync(new SurveyListQuery()))
             .Single(row => row.SurveyId == surveyId);
 
         // **相関副問い合わせで数えている。** COUNT の型差で落ちないことも同時に見る

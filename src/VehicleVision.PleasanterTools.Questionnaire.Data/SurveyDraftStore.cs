@@ -89,6 +89,27 @@ public sealed record SurveyTemplateTarget(
     Guid TemplateId,
     string PublicId);
 
+/// <summary>一覧の絞り込みとページ送り（Issue #79）。</summary>
+/// <remarks>
+/// **総数は数えない。** アンケートは消さずに溜まる表なので、画面を開くたびに
+/// 全件を数えると行が増えるほど重くなる。
+/// **1 件多く読んで「次がある」だけを判断する**（デッドレターの一覧と同じ形）。
+/// </remarks>
+/// <param name="Limit">読む件数。**呼ぶ側が上限を決めてから渡す。**</param>
+/// <param name="Offset">読み飛ばす件数。</param>
+/// <param name="TitleContains">題名の部分一致。空白だけなら効かせない。</param>
+/// <param name="Status">状態の一致。指定が無ければ全部。</param>
+public sealed record SurveyListQuery
+{
+    public int Limit { get; init; } = 50;
+
+    public int Offset { get; init; }
+
+    public string? TitleContains { get; init; }
+
+    public SurveyStatus? Status { get; init; }
+}
+
 /// <summary>下書きが、読んだ後に他の人に書き換えられていた。</summary>
 /// <remarks>
 /// **黙って上書きしない。** 管理画面で「他の人が更新した」と伝えて読み直させる。
@@ -115,7 +136,11 @@ public sealed class SurveyDraftConflictException(int expected, int actual)
 /// </remarks>
 public interface ISurveyDraftStore
 {
-    Task<IReadOnlyList<SurveySummary>> ListAsync(CancellationToken cancellationToken = default);
+    /// <summary>アンケートの一覧（Issue #79 でページ送りと絞り込みを入れた）。</summary>
+    /// <remarks>**渡された件数ぶんだけ読む。** 全件は返さない。</remarks>
+    Task<IReadOnlyList<SurveySummary>> ListAsync(
+        SurveyListQuery query,
+        CancellationToken cancellationToken = default);
 
     Task<SurveyDraft?> LoadAsync(Guid surveyId, CancellationToken cancellationToken = default);
 
@@ -275,8 +300,33 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
     }
 
     public async Task<IReadOnlyList<SurveySummary>> ListAsync(
+        SurveyListQuery query,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(query.Limit);
+        ArgumentOutOfRangeException.ThrowIfNegative(query.Offset);
+
+        // **組み立てるのは条件の「形」だけで、値は必ず引数で渡す**
+        // （<c>AuditLogStore.ListAsync</c> と同じ書き方）
+        var conditions = new List<string> { "s.[IsTemplate] = @IsTemplate" };
+        var parameters = new DynamicParameters();
+        parameters.Add("IsTemplate", false);
+        parameters.Add("Limit", query.Limit);
+        parameters.Add("Offset", query.Offset);
+
+        if (!string.IsNullOrWhiteSpace(query.TitleContains))
+        {
+            conditions.Add($"s.[Title] LIKE @TitleLike ESCAPE '{SqlDialect.LikeEscape}'");
+            parameters.Add("TitleLike", $"%{SqlDialect.EscapeLike(query.TitleContains.Trim())}%");
+        }
+
+        if (query.Status is { } status)
+        {
+            conditions.Add("s.[Status] = @Status");
+            parameters.Add("Status", (int)status);
+        }
+
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         // **テンプレートは出さない**（Issue #58）。
         // 書き込み先も公開用 URL も持たないので、アンケートの表に並べると
@@ -285,6 +335,12 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         // **受付数は相関副問い合わせで一緒に読む**（Issue #53）。画面を開くたびに
         // アンケートの本数だけ問い合わせを増やさない。
         // **GROUP BY は使わない**（MySQL の ONLY_FULL_GROUP_BY で書き分けが要る）
+        //
+        // ⚠️ **副問い合わせは返す行にだけ効かせる**（Issue #79）。
+        // 並べ替えと件数の絞り込みは外側で済んでおり、数えるのは 1 ページぶん。
+        //
+        // **並びは 2 本の列で決める。** `UpdatedAt` は秒精度で同着し得るので、
+        // 1 本だけではページの境目で行が重複したり抜けたりする
         var rows = await connection.QueryAsync<SummaryRow>(Sql(
             "SELECT s.[SurveyId], s.[PublicId], s.[Title], s.[PleasanterSiteId], "
             + "       s.[Status], s.[PublishedVersion], s.[UpdatedAt], "
@@ -292,9 +348,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "       s.[RequireProofOfWork], s.[AllowDraft], "
             + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
             + "        WHERE t.[SurveyId] = s.[SurveyId]) AS [ResponseCount] "
-            + "FROM [Surveys] s WHERE s.[IsTemplate] = @IsTemplate "
-            + "ORDER BY s.[UpdatedAt] DESC",
-            new { IsTemplate = false },
+            + "FROM [Surveys] s WHERE " + string.Join(" AND ", conditions) + " "
+            + "ORDER BY s.[UpdatedAt] DESC, s.[SurveyId] DESC "
+            + SqlDialect.Page(Provider),
+            parameters,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return

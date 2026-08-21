@@ -133,7 +133,7 @@ public class ProofOfWorkSettingStoreTests
         var surveyId = Guid.NewGuid();
         await surveys.SaveAsync(Published(surveyId) with { RequireProofOfWork = false });
 
-        var summary = (await drafts.ListAsync()).Single(row => row.SurveyId == surveyId);
+        var summary = (await drafts.ListAsync(new SurveyListQuery())).Single(row => row.SurveyId == surveyId);
 
         Assert.False(summary.RequireProofOfWork);
     }
