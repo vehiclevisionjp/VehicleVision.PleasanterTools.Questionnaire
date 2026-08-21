@@ -49,13 +49,38 @@ public class PleasanterRecordBuilderTests
         var record = Builder().Build(Columns(
             ("ClassA", []),
             ("NumA", []),
-            ("CheckA", []),
-            ("DateA", [])));
+            ("CheckA", [])));
 
         Assert.Equal(string.Empty, Hash(record, "Class")["ClassA"]);
         Assert.Null(Hash(record, "Num")["NumA"]);
         Assert.Equal(false, Hash(record, "Check")["CheckA"]);
-        Assert.Null(Hash(record, "Date")["DateA"]);
+    }
+
+    [Fact]
+    public void 未回答の日付はnullではなく最小の日時で送る()
+    {
+        // **`null` を送ると 400 Invalid json data で送信が落ちる。**
+        // `DateTime.MinValue` なら Pleasanter 側は未設定（1899-12-30）へ戻る
+        // （実機で確認。Issue #84）
+        var record = Builder().Build(Columns(
+            ("ClassA", ["満足"]),
+            ("DateA", [])));
+
+        Assert.Equal("0001-01-01T00:00:00", Hash(record, "Date")["DateA"]);
+        Assert.Empty(record.Problems);
+    }
+
+    [Fact]
+    public void 空白だけの日付も未回答として扱う()
+    {
+        var record = Builder().Build(Columns(
+            ("DateA", ["   "]),
+            ("DateB", ["2026-03-01"])));
+
+        var hash = Hash(record, "Date");
+        Assert.Equal(PleasanterDateTime.UnansweredDate, hash["DateA"]);
+        Assert.Equal("2026-03-01T00:00:00", hash["DateB"]);
+        Assert.Empty(record.Problems);
     }
 
     [Fact]

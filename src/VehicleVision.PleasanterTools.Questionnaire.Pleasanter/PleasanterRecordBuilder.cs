@@ -56,6 +56,14 @@ public sealed record PleasanterRecord(
 /// **空の値は「消す」を意味する**（<c>_documents/アーキテクチャ方針.md</c> 8 章）。
 /// 型ごとに、消したことが伝わる値を入れる。
 /// </para>
+/// <para>
+/// **日付は「消すための値」が特殊。** <c>null</c> を送ると
+/// <c>400 Invalid json data</c> になるので、<c>DateTime.MinValue</c> を送る。
+/// Pleasanter 側は未設定（<c>1899-12-30</c>）に戻る
+/// （実機で確認。<c>_documents/実機検証結果.md</c> 9 章）。
+/// ⚠️ **一覧では「1899-12-30 と回答」と見分けが付かない。**
+/// 未回答だったことは回答の正本 JSON（<c>DescriptionA</c> 等）でさかのぼる。
+/// </para>
 /// </remarks>
 public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
 {
@@ -263,7 +271,11 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
             case PleasanterColumnKind.Date:
                 if (string.IsNullOrWhiteSpace(value))
                 {
-                    converted = null;
+                    // **未回答は `DateTime.MinValue` を送る**（Issue #84）。
+                    // `null` を送ると `400 Invalid json data` で送信が落ち、
+                    // キーごと送らないと編集で回答を消したときに前の値が残る
+                    // （どちらも実機で確認。`_documents/実機検証結果.md` 9 章）
+                    converted = PleasanterDateTime.UnansweredDate;
                     return true;
                 }
 
