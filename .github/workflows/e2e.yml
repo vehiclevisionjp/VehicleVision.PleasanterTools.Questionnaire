@@ -1,0 +1,178 @@
+# 端から端まで通す試験（Pleasanter 実機を起動する）。
+#
+# **3 RDBMS 結合テスト（integration.yml）から外してある範囲をここで回す。**
+# 「回答を受け付けてから Pleasanter に載るまで」を通しで確かめる唯一の試験が、
+# 人が思い出したときに手元で回すだけになっていた（Issue #111）。
+#
+# **Pleasanter 本体（AGPL v3）は公式イメージを起動するだけ。**
+# ソースの参照・コピー・リンク・プロジェクト参照はしない。
+# ここで起動するのは「相手方の実機」であって、本製品の一部ではない
+# （_reference/README.md と同じ立て付け）。
+#
+# **PR ごとには回さない。** Pleasanter の起動（CodeDefiner のスキーマ作成を含む）に
+# 数分かかり、PR の待ち時間が延びる。根幹ブランチへ入った後と、日次で回す。
+# 手元で先に確かめたいときは workflow_dispatch から流す。
+#
+# **Pleasanter の版は固定する**（tools/pleasanter-testenv/docker-compose.yml が
+# implem/pleasanter:1.5.7.0 を指す）。最新に追随させると、壊れた原因が
+# 自分の変更か相手の更新かを切り分けられなくなる。
+name: 端から端まで通す試験
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+  schedule:
+    # 毎日 03:00 JST（UTC では前日 18:00）。日本の業務時間から外す
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  # **検証環境用の固定値。** 本番の資格情報ではない。
+  # tests 側の接続文字列に直書きされている値と同じにする必要がある
+  TESTENV_SA_PASSWORD: Questionnaire#Test1
+
+jobs:
+  e2e:
+    name: 端から端まで通す試験
+    runs-on: ubuntu-latest
+    # Pleasanter の起動と試験本体で、既定の 6 時間は要らないが 30 分では足りない恐れがある
+    timeout-minutes: 45
+
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          # **Pleasanter のソースは要らない。** 起動するのは公式イメージ
+          submodules: false
+
+      - name: .NET SDK を用意する
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Pleasanter と本アプリを起動する
+        # **サービスコンテナを使わない。** CodeDefiner は「走り切って終了する」係で、
+        # 常駐を前提とするサービスコンテナには載せられない。compose の
+        # depends_on: service_completed_successfully がその順序を持っている。
+        #
+        # **プロファイルを 2 つとも指定する。** 試験の中身が 2 系統に分かれている。
+        #   - Admin*EndToEndTests は**起動している本アプリ**（8081）へ HTTP で当て、
+        #     同時に SQL Server の Questionnaire を直に覗く → `sqlserver`
+        #   - EndToEndTests は**アプリの処理を試験プロセスの中で直に動かし**、
+        #     PostgreSQL（15432）へ自分でスキーマを当てる → `postgres`
+        #
+        # **本アプリのイメージはここで組む。** 数分かかるが、
+        # 「起動しているアプリへ当てる」試験はこれが無いと成り立たない。
+        run: |
+          set -euo pipefail
+          docker compose --profile sqlserver --profile postgres up -d --wait
+
+      - name: CodeDefiner が成功したか確かめる
+        # **CodeDefiner は失敗しても終了コード 0 を返す**
+        # （tools/pleasanter-testenv/README.md）。
+        # service_completed_successfully は素通りするので、ログを見るしかない。
+        #
+        # **全文検索のエラーだけは通す。** SQL Server のコンテナに全文検索が
+        # 入っていないために必ず出るが、本アプリは全文検索を使わない
+        # （実測。同 README）。**Starter.Main の集計行もこれを数えているだけ**なので
+        # 一緒に除く。除いてなお残る `<ERROR>` があれば本当に壊れている
+        run: |
+          set -euo pipefail
+          docker compose logs codedefiner > /tmp/codedefiner.log
+          tail -n 40 /tmp/codedefiner.log
+
+          if ! grep -q '<SUCCESS> Starter\.' /tmp/codedefiner.log; then
+              echo "::error title=CodeDefiner が完走していない::スキーマの作成が終わっていない。上のログを見ること。"
+              exit 1
+          fi
+
+          if grep '<ERROR>' /tmp/codedefiner.log \
+              | grep -v 'ConfigureFullTextIndexSqlServer' \
+              | grep -v 'Starter\.Main: There were'; then
+              echo "::error title=CodeDefiner が失敗している::全文検索以外のエラーが出ている。上のログを見ること。"
+              exit 1
+          fi
+
+          echo "OK   CodeDefiner は完走した（全文検索のエラーは想定内）"
+
+      - name: 検証用の API キーを設定する
+        # Pleasanter は Users.ApiKey をそのまま比較するので、DB へ直接入れれば通る。
+        # **キャッシュされた利用者情報を捨てるため、入れた後に再起動する**
+        run: |
+          set -euo pipefail
+          docker compose cp tools/pleasanter-testenv/seed/01_apikey.sql db:/tmp/01_apikey.sql
+          docker compose exec -T db /opt/mssql-tools18/bin/sqlcmd \
+              -S localhost -U sa -P "$TESTENV_SA_PASSWORD" -C -b -i /tmp/01_apikey.sql
+          docker compose restart pleasanter
+          docker compose up -d --wait pleasanter
+
+      - name: Pleasanter と本アプリが応答するか確かめる
+        # **待受だけでは足りない。** Kestrel は初期化の途中でも接続を受ける。
+        # 画面が返るまで待たないと、試験の 1 件目だけが落ちる
+        run: |
+          set -euo pipefail
+
+          wait_for() {
+              local label="$1" url="$2"
+              for i in $(seq 1 60); do
+                  if curl -fsS -o /dev/null "$url"; then
+                      echo "OK   $label が応答した（${i} 回目）"
+                      return 0
+                  fi
+                  sleep 5
+              done
+              echo "NG   $label が応答しない" >&2
+              return 1
+          }
+
+          wait_for "Pleasanter" http://localhost:8080/
+          # **Admin*EndToEndTests の当て先**（QUESTIONNAIRE_BASE_URL の既定）
+          wait_for "本アプリ" http://localhost:8081/healthz
+
+      - name: 端から端まで通す試験を実行する
+        env:
+          # **設定しないと何も検証せずに緑になる。** ここがこのワークフローの肝
+          QUESTIONNAIRE_INTEGRATION: "1"
+          # 実行環境の時間帯は既定 UTC。検証環境（compose.yaml）に合わせる
+          TZ: Asia/Tokyo
+        # integration.yml が除外している分だけを回す（裏返しの条件）
+        run: >-
+          dotnet test tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests
+          -c Release
+          --filter "FullyQualifiedName~EndToEndTests|FullyQualifiedName~PleasanterApiClientTests"
+          --logger "trx;LogFileName=e2e.trx"
+          --results-directory "$GITHUB_WORKSPACE/TestResults"
+
+      - name: 失敗したときは容器のログを残す
+        if: failure()
+        run: |
+          echo "===== Pleasanter ====="
+          docker compose logs --no-color pleasanter | tail -n 100
+          echo "===== 本アプリ ====="
+          docker compose logs --no-color app | tail -n 100
+          echo "===== スキーマの適用 ====="
+          docker compose logs --no-color migrate | tail -n 60
+
+      - name: テスト結果を残す
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: 端から端まで通す試験の結果
+          path: TestResults/*.trx
+          if-no-files-found: ignore
+
+      - name: 後片付け
+        if: always()
+        run: docker compose --profile '*' down -v --remove-orphans

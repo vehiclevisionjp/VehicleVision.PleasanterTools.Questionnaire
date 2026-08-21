@@ -5,11 +5,12 @@
 # テストクラスの並列実行を止めてある
 # （tests/.../Integration.Tests/AssemblyInfo.cs の CollectionBehavior）。
 #
-# **CI から外した範囲。** Pleasanter 本体の検証環境（implem/pleasanter ＋ CodeDefiner）と
-# 本アプリのコンテナが要るものは回していない（Issue #2 の但し書きによる）。
+# **ここで回さない範囲。** Pleasanter 本体の検証環境（implem/pleasanter ＋ CodeDefiner）と
+# 本アプリのコンテナが要るものは外してある。
 #   - EndToEndTests / AdminAuthEndToEndTests / PleasanterApiClientTests
+#     → **`.github/workflows/e2e.yml` が回す**（根幹ブランチへの push と日次。Issue #111）
 #   - scripts/smoke.sh（起動しているアプリへ HTTP で当てるもの）
-# これらは手元の `docker compose --profile postgres up -d --wait` で確認する。
+#     → 手元の `docker compose --profile postgres up -d --wait` で確認する。
 #
 # **接続先は tests 側にハードコードされている**（localhost の 11433 / 15432 / 13306、
 # 合言葉は検証用の固定値）。ここでのポート公開はその値に合わせてある。変えると通らない。
