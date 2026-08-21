@@ -216,153 +216,199 @@
     {/if}
   {/if}
 
-  {#each mapping.assignments as assignment, index (index)}
-    {@const attachment = isAttachment(assignment)}
-    <div class="assignment" class:attachment>
-      <div class="row">
-        <label class="target">
-          {t('mapping.targetColumn')}
-          <input
-            type="text"
-            placeholder={attachment
-              ? t('mapping.attachmentColumnPlaceholder')
-              : t('mapping.targetColumnPlaceholder')}
-            value={assignment.targetColumn}
-            oninput={(event) => patch(index, { targetColumn: event.currentTarget.value })}
-          />
-        </label>
+  {#if mapping.assignments.length > 0}
+    <!--
+      **「ソース → 変換 → ターゲット」の 3 列の表**（Issue #86）。
+      出力は必ず 1 本なので、1 行がそのまま 1 列への割り当てになる。
+      **狭い画面では横へ流す**（畳むと 3 列の対応が読めなくなる）
+    -->
+    <div class="table-wrap">
+      <table>
+        <caption class="sr-only">{t('mapping.tableCaption')}</caption>
+        <thead>
+          <tr>
+            <th scope="col" class="col-source">{t('mapping.columnSource')}</th>
+            <th scope="col" class="col-converter">{t('mapping.columnConverter')}</th>
+            <th scope="col" class="col-target">{t('mapping.columnTarget')}</th>
+            <th scope="col" class="col-actions">
+              <span class="sr-only">{t('mapping.columnActions')}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each mapping.assignments as assignment, index (index)}
+            {@const attachment = isAttachment(assignment)}
+            {@const needsSingleSource =
+              !attachment && assignment.converter == null && assignment.sources.length !== 1}
+            {@const noAttachmentColumn = attachment && assignment.targetColumn === ''}
+            <tr class:attachment class:has-notes={needsSingleSource || noAttachmentColumn}>
+              <td class="source">
+                <!--
+                  **入力が複数のときは 1 つの升の中で積み、番号を振る**（Issue #86）。
+                  行を分けて結合すると、変換とターゲットがどの入力群に掛かるのか読めなくなる
+                -->
+                <ol class="sources" class:numbered={assignment.sources.length > 1}>
+                  {#each assignment.sources as source, sourceIndex (sourceIndex)}
+                    <li>
+                      <select
+                        aria-label={t('mapping.selectQuestion')}
+                        value={source.questionId}
+                        onchange={(event) =>
+                          patch(index, {
+                            sources: assignment.sources.map((s, i) =>
+                              i === sourceIndex
+                                ? { ...s, questionId: event.currentTarget.value }
+                                : s,
+                            ),
+                          })}
+                      >
+                        {#each attachment ? fileQuestions : answerable as question (question.questionId)}
+                          <option value={question.questionId}
+                            >{questionLabel(question.questionId)}</option
+                          >
+                        {/each}
+                      </select>
 
-        {#if attachment}
-          <!-- **添付に変換は掛けられない。** 選ばせない -->
-          <span class="fixed">{t('mapping.converterFixed')}</span>
-        {:else}
-          <label class="converter">
-            {t('mapping.converter')}
-            <select
-              value={assignment.converter?.operation ?? ''}
-              onchange={(event) => {
-                const operation = event.currentTarget.value;
-                patch(index, {
-                  converter:
-                    operation === ''
-                      ? null
-                      : { operation, config: assignment.converter?.config ?? {} },
-                });
-              }}
-            >
-              {#each converters as converter (converter.value)}
-                <option value={converter.value}>{t(converter.key)}</option>
-              {/each}
-            </select>
-          </label>
-        {/if}
+                      {#if attachment}
+                        <span class="fixed">{t('mapping.attachmentPort')}</span>
+                      {:else}
+                        <!--
+                          **グリッドとランキングは 1 設問が入力を複数出す**（Issue #74）。
+                          どの行かを選ばないと、行をまたいだ値がまとめて 1 列へ入る
+                        -->
+                        {@const ports2 = rowPortsOf(source.questionId)}
+                        {#if ports2.length > 0}
+                          <select
+                            aria-label={t('mapping.selectRow')}
+                            value={source.rowId ?? ''}
+                            onchange={(event) =>
+                              patch(index, {
+                                sources: assignment.sources.map((s, i) =>
+                                  i === sourceIndex
+                                    ? { ...s, rowId: event.currentTarget.value || undefined }
+                                    : s,
+                                ),
+                              })}
+                          >
+                            <!-- **選ばないままにもできるが、公開時に弾かれる。** 黙って通さない -->
+                            <option value="">{t('mapping.rowUnset')}</option>
+                            {#each ports2 as port (port.rowId)}
+                              <option value={port.rowId}>
+                                {displayText(port.label, editing) || port.rowId}
+                              </option>
+                            {/each}
+                          </select>
+                        {/if}
 
-        <button
-          type="button"
-          class="icon danger"
-          onclick={() => remove(index)}
-          aria-label={t('mapping.removeAssignment')}>×</button
-        >
-      </div>
+                        <select
+                          aria-label={t('mapping.selectPort')}
+                          value={source.port}
+                          onchange={(event) =>
+                            patch(index, {
+                              sources: assignment.sources.map((s, i) =>
+                                i === sourceIndex
+                                  ? { ...s, port: event.currentTarget.value as QuestionPort }
+                                  : s,
+                              ),
+                            })}
+                        >
+                          {#each ports as port (port.value)}
+                            <option value={port.value}>{t(port.key)}</option>
+                          {/each}
+                        </select>
 
-      {#if !attachment && assignment.converter == null && assignment.sources.length !== 1}
-        <p class="warn">{t('mapping.needsSingleSource')}</p>
-      {/if}
-
-      {#if attachment && assignment.targetColumn === ''}
-        <!-- **列は型ごとに 26 本しか無い** -->
-        <p class="warn">{t('mapping.noAttachmentColumnLeft')}</p>
-      {/if}
-
-      <div class="sources">
-        {#each assignment.sources as source, sourceIndex (sourceIndex)}
-          <div class="source">
-            <select
-              value={source.questionId}
-              onchange={(event) =>
-                patch(index, {
-                  sources: assignment.sources.map((s, i) =>
-                    i === sourceIndex ? { ...s, questionId: event.currentTarget.value } : s,
-                  ),
-                })}
-            >
-              {#each attachment ? fileQuestions : answerable as question (question.questionId)}
-                <option value={question.questionId}>{questionLabel(question.questionId)}</option>
-              {/each}
-            </select>
-
-            {#if attachment}
-              <span class="fixed">{t('mapping.attachmentPort')}</span>
-            {:else}
-              <!--
-                **グリッドとランキングは 1 設問が入力を複数出す**（Issue #74）。
-                どの行かを選ばないと、行をまたいだ値がまとめて 1 列へ入る
-              -->
-              {@const ports2 = rowPortsOf(source.questionId)}
-              {#if ports2.length > 0}
-                <select
-                  value={source.rowId ?? ''}
-                  onchange={(event) =>
-                    patch(index, {
-                      sources: assignment.sources.map((s, i) =>
-                        i === sourceIndex
-                          ? { ...s, rowId: event.currentTarget.value || undefined }
-                          : s,
-                      ),
-                    })}
-                >
-                  <!-- **選ばないままにもできるが、公開時に弾かれる。** 黙って通さない -->
-                  <option value="">{t('mapping.rowUnset')}</option>
-                  {#each ports2 as port (port.rowId)}
-                    <option value={port.rowId}>
-                      {displayText(port.label, editing) || port.rowId}
-                    </option>
+                        <button
+                          type="button"
+                          class="icon danger"
+                          onclick={() => removeSource(index, sourceIndex)}
+                          aria-label={t('mapping.removeSource')}>×</button
+                        >
+                      {/if}
+                    </li>
                   {/each}
-                </select>
-              {/if}
+                </ol>
 
-              <select
-                value={source.port}
-                onchange={(event) =>
-                  patch(index, {
-                    sources: assignment.sources.map((s, i) =>
-                      i === sourceIndex
-                        ? { ...s, port: event.currentTarget.value as QuestionPort }
-                        : s,
-                    ),
-                  })}
-              >
-                {#each ports as port (port.value)}
-                  <option value={port.value}>{t(port.key)}</option>
-                {/each}
-              </select>
+                {#if attachment}
+                  <!-- **送り直しは置き換え。** 前の添付は消える -->
+                  <p class="hint">{t('mapping.attachmentReplaceHint')}</p>
+                {:else}
+                  <button type="button" class="secondary small" onclick={() => addSource(index)}>
+                    {t('mapping.addSource')}
+                  </button>
 
-              <button
-                type="button"
-                class="icon danger"
-                onclick={() => removeSource(index, sourceIndex)}
-                aria-label={t('mapping.removeSource')}>×</button
-              >
+                  {#if assignment.sources.length > 1}
+                    <!-- **並び順が変換へ渡す順。** 入れ替えると結果が変わる -->
+                    <p class="hint">{t('mapping.sourceOrderHint')}</p>
+                  {/if}
+                {/if}
+              </td>
+
+              <td class="converter">
+                {#if attachment}
+                  <!-- **添付に変換は掛けられない。** 選ばせない -->
+                  <span class="fixed">{t('mapping.converterFixed')}</span>
+                {:else}
+                  <select
+                    aria-label={t('mapping.selectConverter')}
+                    value={assignment.converter?.operation ?? ''}
+                    onchange={(event) => {
+                      const operation = event.currentTarget.value;
+                      patch(index, {
+                        converter:
+                          operation === ''
+                            ? null
+                            : { operation, config: assignment.converter?.config ?? {} },
+                      });
+                    }}
+                  >
+                    {#each converters as converter (converter.value)}
+                      <option value={converter.value}>{t(converter.key)}</option>
+                    {/each}
+                  </select>
+                {/if}
+              </td>
+
+              <td class="target">
+                <input
+                  type="text"
+                  aria-label={t('mapping.targetColumn')}
+                  placeholder={attachment
+                    ? t('mapping.attachmentColumnPlaceholder')
+                    : t('mapping.targetColumnPlaceholder')}
+                  value={assignment.targetColumn}
+                  oninput={(event) => patch(index, { targetColumn: event.currentTarget.value })}
+                />
+              </td>
+
+              <td class="actions">
+                <button
+                  type="button"
+                  class="icon danger"
+                  onclick={() => remove(index)}
+                  aria-label={t('mapping.removeAssignment')}>×</button
+                >
+              </td>
+            </tr>
+
+            {#if needsSingleSource || noAttachmentColumn}
+              <!-- **不備はその割り当ての直下に出す。** 表の外へ集めると、どの行の話か分からない -->
+              <tr class="notes" class:attachment>
+                <td colspan="4">
+                  {#if needsSingleSource}
+                    <p class="warn">{t('mapping.needsSingleSource')}</p>
+                  {/if}
+                  {#if noAttachmentColumn}
+                    <!-- **列は型ごとに 26 本しか無い** -->
+                    <p class="warn">{t('mapping.noAttachmentColumnLeft')}</p>
+                  {/if}
+                </td>
+              </tr>
             {/if}
-          </div>
-        {/each}
-
-        {#if attachment}
-          <!-- **送り直しは置き換え。** 前の添付は消える -->
-          <p class="hint">{t('mapping.attachmentReplaceHint')}</p>
-        {:else}
-          <button type="button" class="secondary small" onclick={() => addSource(index)}>
-            {t('mapping.addSource')}
-          </button>
-
-          {#if assignment.sources.length > 1}
-            <!-- **並び順が変換へ渡す順。** 入れ替えると結果が変わる -->
-            <p class="hint">{t('mapping.sourceOrderHint')}</p>
-          {/if}
-        {/if}
-      </div>
+          {/each}
+        </tbody>
+      </table>
     </div>
-  {/each}
+  {/if}
 </section>
 
 <style lang="scss">
@@ -407,76 +453,147 @@
     margin: 0 0 1rem;
   }
 
-  .assignment {
-    padding: 0.85rem 1rem;
-    background: #fff;
+  /* **狭い画面では横へ流す。** 3 列の対応が読めなくなるので畳まない */
+  .table-wrap {
+    overflow-x: auto;
     border: 1px solid var(--border);
     border-radius: 6px;
-    margin-bottom: 0.75rem;
+    background: #fff;
+  }
 
-    &.attachment {
-      border-left: 3px solid var(--accent);
+  table {
+    width: 100%;
+    min-width: 44rem;
+    border-collapse: collapse;
+  }
+
+  th {
+    text-align: left;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  /* **矢印で「ソース → 変換 → ターゲット」の向きを見せる。** 文言には入れない */
+  .col-converter::before,
+  .col-target::before {
+    content: '→ ';
+    color: var(--border);
+  }
+
+  .col-source {
+    width: 45%;
+  }
+
+  .col-converter {
+    width: 20%;
+  }
+
+  .col-target {
+    width: 27%;
+  }
+
+  .col-actions {
+    width: 3rem;
+  }
+
+  td {
+    padding: 0.6rem 0.75rem;
+    vertical-align: top;
+    border-top: 1px solid var(--border);
+  }
+
+  /* **不備の行は割り当ての行と地続きに見せる。** 別の行に見えると対応が切れる */
+  tr.has-notes > td {
+    border-bottom: 0;
+  }
+
+  tr.notes > td {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  tr.attachment > td:first-child {
+    border-left: 3px solid var(--accent);
+  }
+
+  td.actions {
+    text-align: right;
+  }
+
+  .sources {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* **番号は入力が複数のときだけ。** 1 つのときに「1.」を出しても読む手掛かりにならない */
+  .sources.numbered {
+    counter-reset: source;
+  }
+
+  .sources.numbered > li::before {
+    counter-increment: source;
+    content: counter(source) '.';
+    flex: none;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sources > li {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    margin-bottom: 0.4rem;
+
+    select {
+      flex: 1;
+      min-width: 6rem;
+      margin-top: 0;
+    }
+
+    /* **設問名は長い。** 口や行の選択より広く取る */
+    select:first-of-type {
+      flex: 2;
+    }
+
+    .fixed {
+      padding-bottom: 0;
     }
   }
 
-  .row {
-    display: flex;
-    gap: 0.75rem;
-    align-items: flex-end;
-  }
-
-  label {
-    font-size: 0.82rem;
-    color: var(--muted);
-  }
-
-  .target {
-    flex: 1;
-  }
-
-  .converter {
-    flex: 1;
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .fixed {
     flex: 1;
     color: var(--muted);
     font-size: 0.82rem;
-    padding-bottom: 0.5rem;
   }
 
   input,
   select {
     display: block;
     width: 100%;
-    margin-top: 0.2rem;
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--border);
     border-radius: 4px;
     font: inherit;
     color: #101828;
     box-sizing: border-box;
-  }
-
-  .sources {
-    margin-top: 0.75rem;
-    padding-top: 0.6rem;
-    border-top: 1px dashed var(--border);
-  }
-
-  .source {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin-bottom: 0.4rem;
-
-    select {
-      margin-top: 0;
-    }
-
-    .fixed {
-      padding-bottom: 0;
-    }
   }
 
   .hint {
@@ -488,7 +605,7 @@
   .warn {
     color: #b54708;
     font-size: 0.82rem;
-    margin: 0.5rem 0 0;
+    margin: 0 0 0.4rem;
   }
 
   .icon {
