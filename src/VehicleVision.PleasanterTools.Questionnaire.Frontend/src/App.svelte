@@ -13,6 +13,7 @@
   import { toSteps, tracePath } from './lib/flow';
   import type { AnswerState, PayloadAnswer, RejectionReason, SurveyDefinition } from './lib/types';
   import { isDisplayOnly, text } from './lib/types';
+  import { embedHost, embedSource } from './lib/embed';
   import { validatePage } from './lib/validation';
   import {
     applyDocumentLanguage,
@@ -140,6 +141,23 @@
   const currentStep = $derived(steps[Math.min(stepIndex, Math.max(steps.length - 1, 0))]);
   const currentPage = $derived(currentStep?.page);
   const isLastStep = $derived(stepIndex >= steps.length - 1);
+
+  /**
+   * この区切りで繋がる第三者のホスト（Issue #107）。
+   *
+   * **今出している設問だけを見る。** 条件で隠れている埋め込みは通信しないので、
+   * 出しても回答者を戸惑わせるだけ。
+   */
+  const embedHosts = $derived(
+    [
+      ...new Set(
+        (currentStep?.questions ?? [])
+          .map((question) => embedSource(question))
+          .filter((embed) => embed !== undefined)
+          .map((embed) => embedHost(embed)),
+      ),
+    ].filter((host) => host !== ''),
+  );
 
   // **進みは経路の長さで測る。** 全ページ数で測ると、飛ばした先で 100% にならない
   const progress = $derived(
@@ -599,6 +617,17 @@
       <p class="lead">{text(currentPage.description, language)}</p>
     {/if}
 
+    <!--
+      **第三者へ通信が出ることを黙って行わない**（Issue #107）。
+      完全匿名を掲げている以上、**IP や User-Agent が別の相手へ渡る**なら
+      回答者に分かる形で伝える。**繋がる先も出す**
+    -->
+    {#if embedHosts.length > 0}
+      <p class="embed-notice" role="note">
+        {t('embed.notice', { hosts: embedHosts.join(', ') })}
+      </p>
+    {/if}
+
     <form onsubmit={(event) => event.preventDefault()}>
       <!-- **出している設問だけを描く。** 条件で隠れているものは経路に含まれない -->
       {#each currentStep?.questions ?? [] as question (question.questionId)}
@@ -695,6 +724,16 @@
   .lead {
     color: var(--muted);
     margin: 0 0 1rem;
+  }
+
+  /* ---- 埋め込みの知らせ（Issue #107）--------------------------------------- */
+
+  .embed-notice {
+    margin: 0 0 1rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid var(--muted);
+    color: var(--muted);
+    font-size: 0.9rem;
   }
 
   /* ---- 下書き（Issue #59）------------------------------------------------- */

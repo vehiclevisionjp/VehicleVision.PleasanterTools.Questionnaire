@@ -68,6 +68,10 @@ export const ja = {
   'question.gridRowHeader': '項目',
   'question.gridRowLabel': '{row}: {choice}',
   'question.rankingLead': '選ぶと順位が付きます。もう一度押すと外れます。',
+  // ---- 埋め込み（Issue #104 / #107） ------------------------------------------
+  'embed.notice':
+    'このページには外部サイトの内容（{hosts}）が含まれます。表示すると、そのサイトへ接続します。',
+  'embed.blocked': 'この埋め込みは表示できません。',
   'question.rankingUnranked': '未選択',
   'question.rankingRank': '{rank} 位',
   'question.rankingUp': '順位を上げる',
@@ -200,6 +204,9 @@ export const en: Record<MessageKey, string> = {
   'question.gridRowHeader': 'Item',
   'question.gridRowLabel': '{row}: {choice}',
   'question.rankingLead': 'Choose items to rank them. Choose again to remove.',
+  'embed.notice':
+    'This page includes content from external sites ({hosts}). Displaying it connects to those sites.',
+  'embed.blocked': 'This embedded content cannot be displayed.',
   'question.rankingUnranked': 'Not ranked',
   'question.rankingRank': 'Rank {rank}',
   'question.rankingUp': 'Move up',

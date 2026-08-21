@@ -60,6 +60,9 @@ x-app-environment: &app-environment
     QUESTIONNAIRE_VIRUSSCAN_ENABLED: ${DEV_VIRUSSCAN_ENABLED:-false}
     QUESTIONNAIRE_VIRUSSCAN_HOST: clamav
     QUESTIONNAIRE_VIRUSSCAN_PORT: "3310"
+    # **埋め込みを許す配信元**（Issue #104 / #107）。**製品の既定は空。**
+    # 検証環境では、許した／許していないの両方を試せるように 2 つだけ入れる
+    QUESTIONNAIRE_EMBED_ALLOWEDHOSTS: ${DEV_EMBED_ALLOWEDHOSTS:-www.example.com,*.example.net}
 
 include:
   - path: tools/pleasanter-testenv/docker-compose.yml

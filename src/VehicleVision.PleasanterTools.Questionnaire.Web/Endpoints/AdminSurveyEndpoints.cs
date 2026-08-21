@@ -49,6 +49,16 @@ public static class AdminSurveyEndpoints
             return await next(context);
         });
 
+        // ---- 埋め込みを許す配信元（Issue #104 / #107） -------------------------
+        // **管理画面に「何が許されているか」を出すため。**
+        // 出さないと、保存して断られるまで分からず、書き直しの繰り返しになる。
+        // **設定そのもの（既に運用側が知っている値）なので、管理者へ見せて困らない**
+        group.MapGet("/embed-options", (EmbedOptions embeds) => Results.Ok(new
+        {
+            enabled = embeds.Enabled,
+            allowedHosts = embeds.AllowedHosts,
+        }));
+
         // ---- 一覧 ------------------------------------------------------------
         // **全件は返さない**（Issue #79）。アンケートは消さずに溜まるので、
         // 上限が無いと増えるほど画面が重くなり、探すこともできない。
@@ -211,6 +221,7 @@ public static class AdminSurveyEndpoints
             SaveDraftRequest request,
             HttpContext context,
             ISurveyDraftStore drafts,
+            EmbedOptions embeds,
             CancellationToken cancellationToken) =>
         {
             if (request.Definition is null || request.Mapping is null)
@@ -235,6 +246,27 @@ public static class AdminSurveyEndpoints
                     message = ServerMessages.Get(
                         ServerMessageKeys.ThemeColorInvalid, RequestLanguage.Of(context)),
                     fields = invalidColors,
+                });
+            }
+
+            // **許していない配信元は保存させない**（Issue #104 / #107）。
+            // **埋め込みは回答者の IP・時刻・User-Agent を第三者へ渡す。**
+            // 完全匿名を掲げている以上、どこへ渡るかを運用側が決められないと成り立たない。
+            // **公開のときではなく保存のときに弾く。** 設問の不備と違い、
+            // これは直せば通る類ではなく、**運用側が許していない相手**なので、
+            // 「保存はできたが公開できない」より、その場で断る方が早く分かる
+            var blockedEmbeds = request.Definition.AllQuestions
+                .Where(question => question.Type == QuestionType.Embed)
+                .Where(question => !embeds.IsAllowed(question.Settings.Embed?.Url))
+                .Select(question => question.QuestionId)
+                .ToArray();
+            if (blockedEmbeds.Length > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.EmbedHostNotAllowed, RequestLanguage.Of(context)),
+                    fields = blockedEmbeds,
                 });
             }
 

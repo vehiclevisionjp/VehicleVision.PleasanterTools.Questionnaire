@@ -16,6 +16,7 @@
     type ConditionOperator,
     type ConditionRule,
     type Question,
+    type EmbedSource,
   } from '../lib/types';
   import {
     canCarryTransitions,
@@ -59,6 +60,13 @@
      * **2 つ目を付けさせないため。** どちらの行き先が勝つのかを利用者が決められない。
      */
     branchTakenBy: string | null;
+    /**
+     * 埋め込みを許す配信元（Issue #104 / #107）。
+     *
+     * **運用側の設定でしか増やせない。** 画面はここに無いホストを書けることを
+     * 知らせるだけで、**弾くのはサーバ。**
+     */
+    allowedEmbedHosts: string[];
     onchange: (question: Question) => void;
     onremove: () => void;
     onmove: (direction: -1 | 1) => void;
@@ -73,6 +81,7 @@
     jumpTargets,
     priorQuestions,
     branchTakenBy,
+    allowedEmbedHosts,
     onchange,
     onremove,
     onmove,
@@ -141,6 +150,65 @@
     }
     return null;
   });
+
+  // ---- 埋め込み（Issue #104 / #107）--------------------------------------------
+
+  /** 編集中の埋め込み。**未設定なら空の画像として扱う。** */
+  const embed = $derived(question.settings.embed ?? null);
+
+  const embedKind = $derived(embed?.kind ?? 'Image');
+  const embedUrl = $derived(embed?.url ?? '');
+  const embedRatio = $derived(embed?.aspectRatio ?? 16 / 9);
+
+  /**
+   * 保存できる埋め込み先か。
+   *
+   * **サーバの `EmbedPolicy` と同じ判断をここでも行う。**
+   * 送ってから断られるより、書いている最中に分かる方が直しやすい。
+   * **ただし決めるのはサーバ。** ここは知らせるだけ
+   */
+  const embedAllowed = $derived.by(() => {
+    if (embedUrl === '') {
+      return true;
+    }
+
+    let host: string;
+    try {
+      const parsed = new URL(embedUrl);
+      if (parsed.protocol !== 'https:' || parsed.username !== '' || parsed.password !== '') {
+        return false;
+      }
+      host = parsed.host;
+    } catch {
+      return false;
+    }
+
+    return allowedEmbedHosts.some((pattern) => {
+      if (!pattern.startsWith('*.')) {
+        return host.toLowerCase() === pattern.toLowerCase();
+      }
+      const suffix = pattern.slice(2);
+      // **`*.example.net` は `example.net` 自体に一致しない**（CSP と同じ）
+      return (
+        suffix !== '' && host.toLowerCase().endsWith('.' + suffix.toLowerCase())
+      );
+    });
+  });
+
+  function updateEmbed(patch: Partial<EmbedSource>) {
+    update({
+      settings: {
+        ...question.settings,
+        embed: {
+          kind: embedKind,
+          url: embedUrl,
+          alternativeText: embed?.alternativeText ?? undefined,
+          aspectRatio: embedRatio,
+          ...patch,
+        },
+      },
+    });
+  }
 
   function update(patch: Partial<Question>) {
     onchange({ ...question, ...patch });
@@ -449,6 +517,79 @@
       <span class="mapped">{t('question.mapped', { columns: mappedColumns.join(' / ') })}</span>
     {/if}
   </div>
+
+  {#if question.type === 'Embed'}
+    <!--
+      **配信元は運用側の設定でしか増やせない**（Issue #104 / #107）。
+      **許されていないホストは保存の時点で断られる**ので、
+      何が許されているかをここに出しておく
+    -->
+    <div class="embed">
+      <p class="section">{t('question.embedTitle')}</p>
+
+      <label>
+        {t('question.embedKind')}
+        <select
+          value={embedKind}
+          onchange={(event) =>
+            updateEmbed({ kind: event.currentTarget.value as EmbedSource['kind'] })}
+        >
+          <option value="Image">{t('question.embedKindImage')}</option>
+          <option value="Frame">{t('question.embedKindFrame')}</option>
+        </select>
+      </label>
+
+      <label>
+        {t('question.embedUrl')}
+        <input
+          type="url"
+          placeholder="https://"
+          value={embedUrl}
+          oninput={(event) => updateEmbed({ url: event.currentTarget.value })}
+        />
+      </label>
+
+      {#if !embedAllowed}
+        <p class="embed-warning">{t('question.embedNotAllowed')}</p>
+      {/if}
+
+      <p class="embed-hosts">
+        {allowedEmbedHosts.length === 0
+          ? t('question.embedNoHosts')
+          : t('question.embedAllowedHosts', { hosts: allowedEmbedHosts.join(', ') })}
+      </p>
+
+      <label>
+        {t('question.embedAlternativeText')}
+        <input
+          type="text"
+          value={text(embed?.alternativeText ?? undefined, editing)}
+          oninput={(event) =>
+            updateEmbed({
+              alternativeText: withText(
+                embed?.alternativeText ?? undefined,
+                event.currentTarget.value,
+                editing,
+              ),
+            })}
+        />
+      </label>
+
+      {#if embedKind === 'Frame'}
+        <label>
+          {t('question.embedAspectRatio')}
+          <input
+            type="number"
+            min="0.2"
+            max="5"
+            step="0.01"
+            value={embedRatio}
+            oninput={(event) => updateEmbed({ aspectRatio: Number(event.currentTarget.value) })}
+          />
+        </label>
+      {/if}
+    </div>
+  {/if}
 
   {#if showRows}
     <!--
@@ -986,6 +1127,32 @@
     margin-top: 0.75rem;
   }
 
+  /* ---- 埋め込み（Issue #104 / #107）---------------------------------------- */
+
+  .embed {
+    margin-top: 0.75rem;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .embed label {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  .embed-hosts {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .embed-warning {
+    margin: 0;
+    color: var(--danger, #b3261e);
+    font-size: 0.85rem;
+  }
+
   .section {
     color: var(--muted);
     font-size: 0.85rem;
@@ -1135,3 +1302,4 @@
     padding: 0.35rem 0.75rem;
   }
 </style>
+

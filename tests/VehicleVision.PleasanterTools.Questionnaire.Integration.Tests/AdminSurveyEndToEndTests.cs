@@ -200,6 +200,142 @@ public class AdminSurveyEndToEndTests
         Assert.Equal(2, (await ReadAsync(afterPublish))!["definition"]!["version"]!.GetValue<int>());
     }
 
+    /// <summary>埋め込みを 1 つ持つ下書き（Issue #104 / #107）。</summary>
+    private static object EmbedDraftBody(string surveyId, int revision, string url) => new
+    {
+        revision,
+        definition = new
+        {
+            surveyId,
+            version = 1,
+            title = new { ja = "埋め込みの検証" },
+            pages = new[]
+            {
+                new
+                {
+                    pageId = "page-1",
+                    questions = new object[]
+                    {
+                        new
+                        {
+                            questionId = "e1",
+                            type = "Embed",
+                            title = new { ja = "会社のロゴ" },
+                            settings = new
+                            {
+                                embed = new { kind = "Image", url },
+                            },
+                        },
+                        new
+                        {
+                            questionId = "q1",
+                            type = "Text",
+                            title = new { ja = "ご意見" },
+                        },
+                    },
+                },
+            },
+        },
+        mapping = new { assignments = Array.Empty<object>() },
+    };
+
+    [Fact]
+    public async Task 許した配信元の埋め込みは保存できる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}",
+            EmbedDraftBody(surveyId, 0, "https://www.example.com/logo.png"));
+
+        save.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task 許していない配信元の埋め込みは保存できない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **管理者が任意のホストを書けると、実質 `frame-src https:` と変わらない。**
+        // **公開のときではなく保存のときに断る**（直しようのある不備ではないため）
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}",
+            EmbedDraftBody(surveyId, 0, "https://evil.test/logo.png"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, save.StatusCode);
+        var body = await ReadAsync(save);
+        Assert.Equal("e1", body!["fields"]![0]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task 許した配信元でもhttpsでなければ保存できない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}",
+            EmbedDraftBody(surveyId, 0, "http://www.example.com/logo.png"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, save.StatusCode);
+    }
+
+    [Fact]
+    public async Task 許した配信元が応答のCSPに載る()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **アンケートごとには出し分けない。**
+        // 出し分けると、存在する公開 ID と存在しない公開 ID でヘッダが変わり、
+        // **実在が漏れる**（`_documents/非機能設計.md` 1 章）
+        using var http = CreateClient();
+
+        using var response = await http.GetAsync("/");
+        var csp = response.Headers.GetValues("Content-Security-Policy").Single();
+
+        Assert.Contains("frame-src https://www.example.com https://*.example.net", csp);
+        Assert.Contains("img-src 'self' data: https://www.example.com https://*.example.net", csp);
+        Assert.Contains("frame-ancestors 'none'", csp);
+    }
+
+    [Fact]
+    public async Task 許した配信元は管理画面から読める()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+
+        using var response = await http.GetAsync("/api/admin/surveys/embed-options");
+        response.EnsureSuccessStatusCode();
+
+        var body = await ReadAsync(response);
+        Assert.True(body!["enabled"]!.GetValue<bool>());
+        Assert.Equal("www.example.com", body["allowedHosts"]![0]!.GetValue<string>());
+    }
+
     [Fact]
     public async Task 割り当てが無ければ公開できるが警告が出る()
     {

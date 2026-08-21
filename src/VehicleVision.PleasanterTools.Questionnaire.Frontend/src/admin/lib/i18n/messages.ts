@@ -148,6 +148,18 @@ export const ja = {
   'question.choiceHint': '左が画面に出る文字列、右が Pleasanter へ保存される値です。',
   'question.defaultChoiceLabel': '選択肢 {number}',
   'question.rowsTitle': '行',
+  // ---- 埋め込み（Issue #104 / #107）--------------------------------------------
+  'question.embedTitle': '埋め込み',
+  'question.embedKind': '種類',
+  'question.embedKindImage': '画像',
+  'question.embedKindFrame': '外部ページ・動画',
+  'question.embedUrl': 'URL（https のみ）',
+  'question.embedAlternativeText': '代替テキスト（読み上げに使います）',
+  'question.embedAspectRatio': '縦横比（幅 ÷ 高さ）',
+  'question.embedAllowedHosts': '許可されている配信元: {hosts}',
+  'question.embedNoHosts':
+    '配信元が 1 つも許可されていません。管理者が QUESTIONNAIRE_EMBED_ALLOWEDHOSTS を設定するまで保存できません。',
+  'question.embedNotAllowed': 'この URL は許可された配信元に入っていないため、保存できません。',
   'question.gridColumnsTitle': '列（選択肢）',
   'question.rankingItemsTitle': '並べる項目',
   'question.rowLabelPlaceholder': '画面に出る行の名前',
@@ -200,6 +212,7 @@ export const ja = {
   'questionType.CheckboxGrid': 'チェックボックスグリッド（行ごとに複数）',
   'questionType.Ranking': 'ランキング（順位付け）',
   'questionType.Note': '説明文（回答なし）',
+  'questionType.Embed': '埋め込み（画像・動画・外部ページ）',
 
   // ---- マッピング ---------------------------------------------------------
   'mapping.title': 'Pleasanter への割り当て',
@@ -717,6 +730,17 @@ export const en: Record<MessageKey, string> = {
   'question.choiceHint': 'The left side is shown on screen; the right side is stored in Pleasanter.',
   'question.defaultChoiceLabel': 'Choice {number}',
   'question.rowsTitle': 'Rows',
+  'question.embedTitle': 'Embedded content',
+  'question.embedKind': 'Kind',
+  'question.embedKindImage': 'Image',
+  'question.embedKindFrame': 'External page or video',
+  'question.embedUrl': 'URL (https only)',
+  'question.embedAlternativeText': 'Alternative text (used by screen readers)',
+  'question.embedAspectRatio': 'Aspect ratio (width / height)',
+  'question.embedAllowedHosts': 'Allowed sources: {hosts}',
+  'question.embedNoHosts':
+    'No sources are allowed. An administrator must set QUESTIONNAIRE_EMBED_ALLOWEDHOSTS before this can be saved.',
+  'question.embedNotAllowed': 'This URL is not in the allowed sources, so it cannot be saved.',
   'question.gridColumnsTitle': 'Columns (choices)',
   'question.rankingItemsTitle': 'Items to rank',
   'question.rowLabelPlaceholder': 'Row label shown on screen',
@@ -770,6 +794,7 @@ export const en: Record<MessageKey, string> = {
   'questionType.CheckboxGrid': 'Checkbox grid (many per row)',
   'questionType.Ranking': 'Ranking',
   'questionType.Note': 'Note (no answer)',
+  'questionType.Embed': 'Embedded content (image, video, external page)',
 
   'mapping.title': 'Assignment to Pleasanter',
   'mapping.addColumn': 'Add a column',

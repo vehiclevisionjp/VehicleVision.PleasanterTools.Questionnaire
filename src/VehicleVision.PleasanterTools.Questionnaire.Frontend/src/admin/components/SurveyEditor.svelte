@@ -1,6 +1,6 @@
 <script lang="ts">
   import SurveyPreview from './SurveyPreview.svelte';
-  import { loadDraft, publish, saveDraft } from '../lib/api';
+  import { loadDraft, loadEmbedOptions, publish, saveDraft } from '../lib/api';
   import {
     displayText,
     problemKey,
@@ -105,6 +105,23 @@
 
   $effect(() => {
     void load(surveyId);
+  });
+
+  /**
+   * 埋め込みを許す配信元（Issue #104 / #107）。
+   *
+   * **運用側の設定なので、アンケートを開くたびに 1 度読めばよい。**
+   * 取れなくても編集は続けられる（保存の時点でサーバが弾く）。
+   */
+  let allowedEmbedHosts = $state<string[]>([]);
+
+  $effect(() => {
+    void (async () => {
+      const result = await loadEmbedOptions();
+      if (result.ok) {
+        allowedEmbedHosts = result.value.allowedHosts;
+      }
+    })();
   });
 
   async function load(id: string) {
@@ -552,6 +569,7 @@
           jumpTargets={targets}
           priorQuestions={priorQuestions(pageIndex, questionIndex)}
           branchTakenBy={branchTakenBy(pageIndex, questionIndex)}
+          {allowedEmbedHosts}
           onchange={(next) => updateQuestion(pageIndex, questionIndex, next)}
           onremove={() => removeQuestion(pageIndex, questionIndex)}
           onmove={(direction) => moveQuestion(pageIndex, questionIndex, direction)}

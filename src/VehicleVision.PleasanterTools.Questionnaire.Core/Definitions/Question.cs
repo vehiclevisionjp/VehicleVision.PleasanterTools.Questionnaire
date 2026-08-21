@@ -14,7 +14,7 @@ public sealed record Question
     public LocalizedText? Description { get; init; }
 
     /// <summary>必須入力か。</summary>
-    /// <remarks><see cref="QuestionType.Note"/> では常に <c>false</c> として扱う。</remarks>
+    /// <remarks>表示専用の要素（<see cref="IsDisplayOnly"/>）では常に <c>false</c> として扱う。</remarks>
     public bool IsRequired { get; init; }
 
     public ImmutableArray<Choice> Choices { get; init; } = [];
@@ -85,10 +85,11 @@ public sealed record Question
 
     /// <summary>回答を持たない表示専用の要素か。</summary>
     /// <remarks>
-    /// <see cref="QuestionType.Note"/> は説明文ブロックで、Pleasanter の列へ写さない
+    /// <see cref="QuestionType.Note"/> は説明文ブロック、
+    /// <see cref="QuestionType.Embed"/> は埋め込みで、どちらも Pleasanter の列へ写さない
     /// （<c>_documents/データモデル設計.md</c> 2.2）。
     /// </remarks>
-    public bool IsDisplayOnly => Type is QuestionType.Note;
+    public bool IsDisplayOnly => Type is QuestionType.Note or QuestionType.Embed;
 
     /// <summary>説明文ブロックの本文を、書式の付いた形にしたもの（Issue #108）。</summary>
     /// <remarks>

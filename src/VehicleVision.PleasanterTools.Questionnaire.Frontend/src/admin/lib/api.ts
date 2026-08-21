@@ -214,6 +214,16 @@ export const deleteTemplate = (templateId: string) =>
 
 export const loadDraft = (surveyId: string) => call<SurveyDraft>(`/api/admin/surveys/${surveyId}`);
 
+/** 埋め込みを許す配信元（Issue #104 / #107）。**運用側の設定なので変わらない。** */
+export interface EmbedOptions {
+  enabled: boolean;
+  /** `www.example.com` か `*.example.net` の形。 */
+  allowedHosts: string[];
+}
+
+export const loadEmbedOptions = () =>
+  call<EmbedOptions>('/api/admin/surveys/embed-options');
+
 export const saveDraft = (
   surveyId: string,
   definition: SurveyDefinition,

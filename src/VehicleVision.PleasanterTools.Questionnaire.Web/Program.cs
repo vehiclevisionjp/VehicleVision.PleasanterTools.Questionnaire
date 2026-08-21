@@ -134,6 +134,10 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var attachmentOptions = AttachmentOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(attachmentOptions);
 
+// **埋め込みを許す配信元**（Issue #104 / #107）。**既定は空＝一切埋め込めない**
+var embedOptions = EmbedOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(embedOptions);
+
 // **添付は multipart で届く。上限を既定値に任せない**（_documents/非機能設計.md 1 章）
 builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = attachmentOptions.MaxRequestBodyBytes);
@@ -348,6 +352,31 @@ if (!string.Equals(
 
 var app = builder.Build();
 
+// **CSP は起動時に 1 度だけ組み立てる**（Issue #104 / #107）。
+//
+// **アンケートごとには出し分けない。** 出し分けるには、回答画面の HTML を返す時点で
+// DB を引くことになり、**ヘッダの違いから公開 ID の実在が分かってしまう**
+// （`_documents/非機能設計.md` 1 章「識別子の秘匿」）。
+//
+// **代わりに、許す配信元を運用側だけが決められる場所（設定）へ置く。**
+// 既定は空なので、設定しなければ従来と同じ CSP になる。
+// **`frame-src https:` のようには絶対に広げない**
+var embedSources = embedOptions.CspSources;
+var contentSecurityPolicy = string.Join("; ",
+[
+    "default-src 'self'",
+    // **画像の埋め込み先も設定で許した配信元だけ**（2 要素の QR は data: URI で描く）
+    "img-src 'self' data:" + Join(embedSources),
+    // **設定が空なら 'none'。** 指定そのものを省くと default-src へ落ちる
+    "frame-src " + (embedSources.IsEmpty ? "'none'" : string.Join(' ', embedSources)),
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "object-src 'none'",
+]);
+
+static string Join(System.Collections.Immutable.ImmutableArray<string> sources) =>
+    sources.IsEmpty ? string.Empty : " " + string.Join(' ', sources);
+
 // **リバースプロキシ配下でも本当の送信元 IP を見る。** レート制限が効かなくなるため
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
@@ -368,9 +397,7 @@ app.Use(async (context, next) =>
     headers["Referrer-Policy"] = "no-referrer";
     headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()";
     // **2 要素の QR は data: URI で描く。** 外部から画像を取りに行かせない
-    headers["Content-Security-Policy"] =
-        "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; "
-        + "base-uri 'self'; object-src 'none'";
+    headers["Content-Security-Policy"] = contentSecurityPolicy;
     await next();
 });
 
