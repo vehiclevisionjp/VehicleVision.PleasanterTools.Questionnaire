@@ -95,6 +95,13 @@ export interface QuestionSettings {
    */
   minSelections?: number;
   maxSelections?: number;
+  /**
+   * 選択肢の順序を回答者ごとに入れ替えるか（Issue #103）。
+   *
+   * **「その他」は入れ替えず、必ず末尾に置く。**
+   * **並び順は 1 回の回答の中で固定する**（戻っても位置が変わらない）。
+   */
+  shuffleChoices?: boolean;
   maxFileCount?: number;
   maxFileSizeBytes?: number;
   /**
@@ -190,6 +197,13 @@ export interface Page {
   questions: Question[];
   /** このページを終えたときの行き先。**無ければ次のページへ。** */
   next?: PageTransition | null;
+  /**
+   * ページの中の設問の順序を回答者ごとに入れ替えるか（Issue #103）。
+   *
+   * ⚠️ **出し分けの条件を持つ設問があるページでは指定できない**（公開時に弾かれる）。
+   * **説明文ブロックは動かさない。**
+   */
+  shuffleQuestions?: boolean;
 }
 
 export interface SurveyDefinition {

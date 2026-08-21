@@ -11,6 +11,7 @@
   import type { Attachment } from './lib/api';
   import { solveAltcha } from './lib/altcha';
   import { toSteps, tracePath } from './lib/flow';
+  import { applyShuffle, createShuffleSeed } from './lib/shuffle';
   import type { AnswerState, PayloadAnswer, RejectionReason, SurveyDefinition } from './lib/types';
   import { isDisplayOnly, text } from './lib/types';
   import { embedHost, embedSource } from './lib/embed';
@@ -143,6 +144,19 @@
   const isLastStep = $derived(stepIndex >= steps.length - 1);
 
   /**
+   * この回答ぶんの並べ替えの種（Issue #103）。
+   *
+   * **1 回の回答の中で変えない。** `$state` に置いて初期化を 1 度きりにしているのは、
+   * 都度引き直すと再描画のたびに並びが変わり、**選ぼうとした選択肢が動く**ため。
+   */
+  let shuffleSeed = $state(createShuffleSeed());
+
+  /** 並べ替えを掛けた設問。**指定が無ければ元のまま。** */
+  const currentQuestions = $derived(
+    currentStep ? applyShuffle(currentStep.page, currentStep.questions, shuffleSeed) : [],
+  );
+
+  /**
    * この区切りで繋がる第三者のホスト（Issue #107）。
    *
    * **今出している設問だけを見る。** 条件で隠れている埋め込みは通信しないので、
@@ -151,7 +165,7 @@
   const embedHosts = $derived(
     [
       ...new Set(
-        (currentStep?.questions ?? [])
+        currentQuestions
           .map((question) => embedSource(question))
           .filter((embed) => embed !== undefined)
           .map((embed) => embedHost(embed)),
@@ -630,7 +644,7 @@
 
     <form onsubmit={(event) => event.preventDefault()}>
       <!-- **出している設問だけを描く。** 条件で隠れているものは経路に含まれない -->
-      {#each currentStep?.questions ?? [] as question (question.questionId)}
+      {#each currentQuestions as question (question.questionId)}
         <QuestionField
           {question}
           {language}

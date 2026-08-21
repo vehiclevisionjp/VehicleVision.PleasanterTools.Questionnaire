@@ -536,6 +536,7 @@
   {#each definition.pages as page, pageIndex (page.pageId)}
     {@const targets = jumpTargets(pageIndex)}
     {@const stale = staleTargetId(page.next, targets.map((target) => target.pageId))}
+    {@const hasVisibility = page.questions.some((question) => question.visibleWhen)}
     <section class="page">
       <div class="page-head">
         <!-- **ページの区切りがそのまま改ページになる** -->
@@ -607,6 +608,27 @@
         {#if targets.length === 0}
           <span class="hint">{t('branching.noLaterPage')}</span>
         {/if}
+      </div>
+
+      <!-- **設問の順序を回答者ごとに入れ替える**（Issue #103） -->
+      <div class="page-shuffle">
+        <label class="inline">
+          <input
+            type="checkbox"
+            checked={page.shuffleQuestions ?? false}
+            disabled={hasVisibility}
+            onchange={(event) =>
+              updatePage(pageIndex, {
+                shuffleQuestions: event.currentTarget.checked ? true : undefined,
+              })}
+          />
+          {t('editor.shuffleQuestions')}
+        </label>
+        <!-- **出し分けの条件と併用できない。** 条件が参照できるのは自分より前の設問だけで、
+             入れ替えると参照先が後ろへ回って成立しなくなる -->
+        <span class="hint">
+          {hasVisibility ? t('editor.shuffleBlockedByVisibility') : t('editor.shuffleQuestionsHint')}
+        </span>
       </div>
     </section>
   {/each}
@@ -849,6 +871,20 @@
       background: #fff;
       color: #101828;
     }
+
+    .hint {
+      color: var(--muted);
+    }
+  }
+
+  .page-shuffle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--muted);
 
     .hint {
       color: var(--muted);

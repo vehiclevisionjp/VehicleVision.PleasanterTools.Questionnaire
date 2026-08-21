@@ -63,6 +63,23 @@ public sealed record QuestionSettings
     /// <summary>選べる数の上限。複数選べる設問だけ（Issue #101）。</summary>
     public int? MaxSelections { get; init; }
 
+    /// <summary>選択肢の順序を回答者ごとに入れ替えるか（Issue #103）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **先に出た選択肢ほど選ばれやすい**（順序効果）。それを均すための機能。
+    /// **選択肢を持つ形式にしか効かない。**
+    /// </para>
+    /// <para>
+    /// ⚠️ **「その他」は入れ替えの対象から外し、必ず末尾に置く。**
+    /// 途中に混ざると、自由記述の欄が並びの真ん中に現れて読みにくい。
+    /// </para>
+    /// <para>
+    /// ⚠️ **並び順は 1 回の回答の中で固定する。** 都度並べ替えると、
+    /// 前のページへ戻っただけで選択肢の位置が変わり、選び直しを誘発する。
+    /// </para>
+    /// </remarks>
+    public bool ShuffleChoices { get; init; }
+
     /// <summary>添付できる個数の上限。<see cref="QuestionType.File"/>。</summary>
     public int? MaxFileCount { get; init; }
 
