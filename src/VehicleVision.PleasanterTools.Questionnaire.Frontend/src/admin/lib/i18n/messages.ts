@@ -170,14 +170,20 @@ export const ja = {
   'question.rowsEmpty': '行がありません。1 行も無いと、この設問には答えられません。',
   'question.scaleMinimum': '下限',
   'question.scaleMaximum': '上限',
-  'question.minSelections': '選ぶ数の下限',
-  'question.maxSelections': '選ぶ数の上限',
+  'question.minSelections': '選ぶ数の下限',  'question.maxSelections': '選ぶ数の上限',
   'question.selectionHint':
     '空欄なら指定なしです。下限は未回答には効きません（答えないか、下限まで選ぶか）。必ず答えさせたいときは「必須」を立ててください。',
   'question.selectionNotPositive': '選ぶ数は 1 以上で指定してください。',
   'question.selectionReversed': '下限が上限を上回っています。この設問には答えられません。',
   'question.selectionExceedsChoices':
     '下限が選択肢の数（{choices}）を上回っています。この設問には答えられません。',
+  'question.pattern': '入力の形（正規表現）',
+  'question.patternPlaceholder': '例: [0-9]{3}-[0-9]{4}',
+  'question.patternMessage': '合わないときに出す文言',
+  'question.patternMessagePlaceholder': '例: 郵便番号を 123-4567 の形で入力してください',
+  'question.patternHint':
+    '入力の全体が合うかを見ます（前後は自動で固定されます）。回答者には正規表現ではなく上の文言が出ます。⚠️ 先読み・後方参照・原子グループは使えません。安全に照合するため、後退戻りしない照合器で動かしているためです。使えない書き方は公開時に弾かれます。',
+  'question.patternInvalid': '正規表現として組み立てられません。',
 
   // ---- 設問の形式 ---------------------------------------------------------
   'questionType.Text': '短い文章',
@@ -742,6 +748,13 @@ export const en: Record<MessageKey, string> = {
     'The minimum is greater than the maximum. No answer can satisfy this question.',
   'question.selectionExceedsChoices':
     'The minimum is greater than the number of options ({choices}). No answer can satisfy this question.',
+  'question.pattern': 'Input format (regular expression)',
+  'question.patternPlaceholder': 'e.g. [0-9]{3}-[0-9]{4}',
+  'question.patternMessage': 'Message shown when the value does not match',
+  'question.patternMessagePlaceholder': 'e.g. Enter the postal code as 123-4567',
+  'question.patternHint':
+    'The whole value must match (the start and end are anchored automatically). Respondents see the message above, never the expression itself. Lookaround, backreferences and atomic groups are not available: matching runs on a non-backtracking engine so that a single answer cannot stall the form. Unsupported expressions are rejected when you publish.',
+  'question.patternInvalid': 'This is not a valid regular expression.',
 
   'questionType.Text': 'Short answer',
   'questionType.Paragraph': 'Long answer',

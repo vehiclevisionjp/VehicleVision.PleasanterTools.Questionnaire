@@ -194,7 +194,7 @@
 
   function goNext() {
     if (currentStep) {
-      errors = validatePage(currentStep.questions, answers, formText);
+      errors = validatePage(currentStep.questions, answers, formText, language);
       if (Object.keys(errors).length > 0) {
         return;
       }

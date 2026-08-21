@@ -14,6 +14,9 @@ public enum SettingsProblemCode
 
     /// <summary>選べる数の下限・上限が 1 未満。</summary>
     SelectionRangeNotPositive,
+
+    /// <summary>正規表現が組み立てられない、または使えない構文を含む（Issue #102）。</summary>
+    PatternNotSupported,
 }
 
 /// <summary>設問の設定の不備 1 件。</summary>
@@ -37,6 +40,16 @@ public static class QuestionSettingsValidator
         ArgumentNullException.ThrowIfNull(definition);
 
         var problems = ImmutableArray.CreateBuilder<SettingsProblem>();
+
+        // **組み立てられない正規表現は、何を書いても通らない検証になる**（Issue #102）。
+        // 使えない構文（先読み・後方参照・原子グループ）もここで落ちる
+        foreach (var question in definition.AllQuestions
+            .Where(question => !string.IsNullOrEmpty(question.Settings.Pattern))
+            .Where(question => !TextPattern.IsSupported(question.Settings.Pattern)))
+        {
+            problems.Add(new SettingsProblem(
+                SettingsProblemCode.PatternNotSupported, question.QuestionId));
+        }
 
         foreach (var question in definition.AllQuestions.Where(question => question.HasSelectionRange))
         {

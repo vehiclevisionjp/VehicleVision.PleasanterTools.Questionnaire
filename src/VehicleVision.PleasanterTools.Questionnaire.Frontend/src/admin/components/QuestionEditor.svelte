@@ -97,8 +97,29 @@
   const rules = $derived(question.visibleWhen?.rules ?? []);
   const match = $derived(question.visibleWhen?.match ?? 'All');
 
-  /** 選べる数を指定できる設問か（Issue #101）。**複数選ぶチェックボックスだけ。** */
-  const showSelectionRange = $derived(
+  /** 正規表現を指定できる設問か（Issue #102）。**自由入力だけ。** */
+  const showPattern = $derived(question.type === 'Text' || question.type === 'Paragraph');
+
+  /**
+   * 正規表現が組み立てられるか。
+   *
+   * ⚠️ **ここで通っても、サーバ側で弾かれることがある。**
+   * サーバ側は後退戻りしない照合器で照合するので、先読み・後方参照・原子グループが使えない。
+   * ここ（ブラウザ）の `RegExp` にはその制限が無い。
+   */
+  const patternProblem = $derived.by(() => {
+    const pattern = question.settings.pattern;
+    if (!showPattern || pattern === undefined || pattern === '') return null;
+
+    try {
+      new RegExp(`^(?:${pattern})$`, 'u');
+      return null;
+    } catch {
+      return t('question.patternInvalid');
+    }
+  });
+
+  /** 選べる数を指定できる設問か（Issue #101）。**複数選ぶチェックボックスだけ。** */  const showSelectionRange = $derived(
     question.type === 'Checkbox' || question.type === 'CheckboxGrid',
   );
 
@@ -665,6 +686,53 @@
         {t('question.npsPreset')}
       </button>
       <p class="hint">{t('question.npsHint')}</p>
+    {/if}
+  {/if}
+
+  <!-- **入力の形を正規表現で指定する**（Issue #102）。空欄は指定なし -->
+  {#if showPattern}
+    <label>
+      {t('question.pattern')}
+      <input
+        type="text"
+        placeholder={t('question.patternPlaceholder')}
+        value={question.settings.pattern ?? ''}
+        oninput={(event) =>
+          update({
+            settings: {
+              ...question.settings,
+              pattern: event.currentTarget.value === '' ? undefined : event.currentTarget.value,
+            },
+          })}
+      />
+    </label>
+
+    {#if question.settings.pattern}
+      <!-- **正規表現そのものを回答者へ見せない。** ^[0-9]{4}$ と出しても伝わらない -->
+      <label>
+        {t('question.patternMessage')}
+        <input
+          type="text"
+          placeholder={t('question.patternMessagePlaceholder')}
+          value={text(question.settings.patternMessage, editing)}
+          oninput={(event) =>
+            update({
+              settings: {
+                ...question.settings,
+                patternMessage: withText(
+                  question.settings.patternMessage,
+                  event.currentTarget.value,
+                  editing,
+                ),
+              },
+            })}
+        />
+      </label>
+    {/if}
+
+    <p class="hint">{t('question.patternHint')}</p>
+    {#if patternProblem !== null}
+      <p class="warn">{patternProblem}</p>
     {/if}
   {/if}
 
