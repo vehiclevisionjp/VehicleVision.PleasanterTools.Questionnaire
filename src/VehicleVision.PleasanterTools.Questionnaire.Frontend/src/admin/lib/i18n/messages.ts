@@ -129,6 +129,10 @@ export const ja = {
   // ---- 設問 ---------------------------------------------------------------
   'question.titlePlaceholder': '設問の文言',
   'question.descriptionPlaceholder': '補足（任意）',
+  'question.markupPlaceholder':
+    '本文（任意）。空行で段落が分かれます\n例: **太字** *斜体* [表示する文字](https://example.com/)',
+  'question.markupHint':
+    '使える書き方: **太字** / *斜体* / [文字](https://…) / 行頭の「- 」で箇条書き / 行頭の「1. 」で番号付き / 行頭の「## 」で見出し。\nHTML は書けません（そのままの文字として出ます）。リンクは https のみです。',
   'question.moveUp': '上へ',
   'question.moveDown': '下へ',
   'question.remove': '削除',
@@ -662,6 +666,10 @@ export const en: Record<MessageKey, string> = {
 
   'question.titlePlaceholder': 'Question text',
   'question.descriptionPlaceholder': 'Note (optional)',
+  'question.markupPlaceholder':
+    'Body (optional). A blank line starts a new paragraph\ne.g. **bold** *italic* [link text](https://example.com/)',
+  'question.markupHint':
+    'Supported: **bold** / *italic* / [text](https://…) / "- " for bullets / "1. " for numbers / "## " for headings.\nHTML is not supported (it appears as plain text). Links must use https.',
   'question.moveUp': 'Move up',
   'question.moveDown': 'Move down',
   'question.remove': 'Remove',

@@ -3,12 +3,19 @@
   import { toSteps, tracePath } from '../../lib/flow';
   import { translator } from '../../lib/i18n/messages';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../../lib/i18n/language';
-  import type { AnswerState, SurveyDefinition as AnswerDefinition } from '../../lib/types';
+  import type { AnswerState, NoteBlock, SurveyDefinition as AnswerDefinition } from '../../lib/types';
   import { text } from '../../lib/types';
   import { validatePage } from '../../lib/validation';
   import type { SurveyDefinition } from '../lib/types';
   import { language as adminLanguage, t } from '../lib/i18n/state.svelte';
   import { applyTheme } from '../../lib/theme';
+  import { previewNotes } from '../lib/api';
+
+  /** 1 度に読んでもらう記法の上限。**サーバ側の上限と揃える。** */
+  const MAX_NOTE_PREVIEWS = 100;
+
+  /** 打鍵が止まるのを待つ時間（ミリ秒）。 */
+  const NOTE_PREVIEW_DELAY_MS = 300;
 
   /**
    * 公開する前に、回答画面と同じ描き方で確かめる。
@@ -65,6 +72,70 @@
   let errors = $state<Record<string, string>>({});
 
   /**
+   * 説明文ブロックの記法を読んだ結果（Issue #108）。
+   *
+   * **設問 ID → 言語 → 段落の並び。** サーバから受け取ったものだけを入れる。
+   */
+  let parsedNotes = $state<Record<string, Record<string, NoteBlock[]>>>({});
+
+  /** 読んでもらう記法の一覧。**言語ごとに 1 件。** */
+  const noteSources = $derived(
+    definition.pages.flatMap((page) =>
+      page.questions
+        .filter((question) => question.type === 'Note')
+        .flatMap((question) =>
+          Object.entries(question.description ?? {})
+            .filter(([, markup]) => markup !== '')
+            .map(([lang, markup]) => ({
+              questionId: question.questionId,
+              language: lang,
+              markup,
+            })),
+        ),
+    ),
+  );
+
+  let lastRequested = '';
+
+  $effect(() => {
+    // **同じ内容なら投げ直さない。** 編集のたびに往復すると打鍵が重くなる
+    const sources = noteSources.slice(0, MAX_NOTE_PREVIEWS);
+    const key = JSON.stringify(sources);
+    if (key === lastRequested) {
+      return;
+    }
+
+    if (sources.length === 0) {
+      lastRequested = key;
+      parsedNotes = {};
+      return;
+    }
+
+    // **打ち終わるのを少し待つ。** 1 文字ごとに投げない
+    const timer = setTimeout(async () => {
+      lastRequested = key;
+      const result = await previewNotes(sources.map((source) => source.markup));
+      if (!result.ok) {
+        // **読めなかったら書式を付けない。** 平文へ落ちるだけで、プレビューは開ける
+        return;
+      }
+
+      const next: Record<string, Record<string, NoteBlock[]>> = {};
+      sources.forEach((source, index) => {
+        const blocks = result.value.results[index]?.blocks;
+        if (!blocks || blocks.length === 0) {
+          return;
+        }
+
+        (next[source.questionId] ??= {})[source.language] = blocks;
+      });
+      parsedNotes = next;
+    }, NOTE_PREVIEW_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  });
+
+  /**
    * 回答画面の型として見る。
    *
    * **管理画面と回答画面で同じ形の型を別に持っている**（束を分けているため。
@@ -107,6 +178,18 @@
   function ensure(questionId: string): AnswerState {
     answers[questionId] ??= { values: [], otherText: '' };
     return answers[questionId];
+  }
+
+  /**
+   * 説明文ブロックに、サーバへ読んでもらった書式を添える（Issue #108）。
+   *
+   * **記法を読むのはサーバだけ。** ここで同じ実装を持つと、
+   * プレビューでは付いた書式が公開後に付かない、という食い違いが起きる。
+   */
+  function withNoteBlocks(question: { questionId: string; type: string }) {
+    return question.type === 'Note'
+      ? { ...question, noteBlocks: parsedNotes[question.questionId] ?? null }
+      : question;
   }
 
   function goNext() {
@@ -193,7 +276,7 @@
 
       {#each currentStep?.questions ?? [] as question (question.questionId)}
         <QuestionField
-          question={question as never}
+          question={withNoteBlocks(question) as never}
           {language}
           bind:answer={
             () => ensure(question.questionId), (value) => (answers[question.questionId] = value)
