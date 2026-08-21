@@ -36,6 +36,17 @@ public sealed record QuestionSettings
     /// <summary>入力の形式検証。</summary>
     public TextFormat? Format { get; init; }
 
+    /// <summary>選べる数の下限。複数選べる設問だけ（Issue #101）。</summary>
+    /// <remarks>
+    /// **未回答には効かない。** 「答えないか、下限まで選ぶか」であり、
+    /// 答えさせたいなら <see cref="Question.IsRequired"/> を立てること。
+    /// 両方を立てると「必須で、かつ下限まで」になる。
+    /// </remarks>
+    public int? MinSelections { get; init; }
+
+    /// <summary>選べる数の上限。複数選べる設問だけ（Issue #101）。</summary>
+    public int? MaxSelections { get; init; }
+
     /// <summary>添付できる個数の上限。<see cref="QuestionType.File"/>。</summary>
     public int? MaxFileCount { get; init; }
 

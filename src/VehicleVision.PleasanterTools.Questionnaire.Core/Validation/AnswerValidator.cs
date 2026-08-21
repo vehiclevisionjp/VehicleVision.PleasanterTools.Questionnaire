@@ -202,6 +202,45 @@ public static class AnswerValidator
                 errors.Add(new ValidationError(
                     question.QuestionId, ValidationErrorCode.UnknownChoice, value));
             }
+
+            // **行ごとに数える**（Issue #101）。1 行が 1 つの入力なので、
+            // 設問全体で数えると行数ぶん緩くなってしまう
+            ValidateSelectionCount(question, row.Count, rowId, errors);
+        }
+    }
+
+    /// <summary>選んだ数が下限・上限に収まっているかを見る（Issue #101）。</summary>
+    /// <remarks>
+    /// **未回答には効かない。** 呼ぶ側が空を先に落としている。
+    /// 「答えないか、下限まで選ぶか」であり、答えさせたいのは必須の役目。
+    /// </remarks>
+    private static void ValidateSelectionCount(
+        Question question,
+        int count,
+        string? detail,
+        ImmutableArray<ValidationError>.Builder errors)
+    {
+        if (!question.HasSelectionRange)
+        {
+            return;
+        }
+
+        var settings = question.Settings;
+
+        if (settings.MinSelections is { } minimum && count < minimum)
+        {
+            errors.Add(new ValidationError(
+                question.QuestionId,
+                ValidationErrorCode.TooFewSelections,
+                detail ?? minimum.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        if (settings.MaxSelections is { } maximum && count > maximum)
+        {
+            errors.Add(new ValidationError(
+                question.QuestionId,
+                ValidationErrorCode.TooManySelections,
+                detail ?? maximum.ToString(CultureInfo.InvariantCulture)));
         }
     }
 
@@ -262,6 +301,13 @@ public static class AnswerValidator
         {
             errors.Add(new ValidationError(question.QuestionId, ValidationErrorCode.OtherTextNotAllowed));
         }
+
+        // **数えるのは空でない値だけ**（Issue #101）
+        ValidateSelectionCount(
+            question,
+            answer.Values.Count(value => !string.IsNullOrWhiteSpace(value)),
+            detail: null,
+            errors);
     }
 
     private static void ValidateScalar(

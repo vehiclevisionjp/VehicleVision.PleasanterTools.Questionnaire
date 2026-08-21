@@ -4,6 +4,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Flow;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Validation;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
@@ -438,6 +439,24 @@ public static class AdminSurveyEndpoints
                     {
                         code = problem.Code.ToString(),
                         pageId = problem.PageId,
+                        questionId = problem.QuestionId,
+                        detail = problem.Detail,
+                    }),
+                });
+            }
+
+            // **答えようのない設問のまま公開しない**（Issue #101）。
+            // 「5 つの選択肢から 7 つ選べ」は回答者が何をしても通らない
+            var settingsProblems = QuestionSettingsValidator.Validate(draft.Definition);
+            if (settingsProblems.Length > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PublishBlockedBySettings, RequestLanguage.Of(context)),
+                    settings = settingsProblems.Select(problem => new
+                    {
+                        code = problem.Code.ToString(),
                         questionId = problem.QuestionId,
                         detail = problem.Detail,
                     }),

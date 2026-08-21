@@ -1,6 +1,6 @@
 import type { Translate } from './i18n/messages';
 import type { AnswerState, Question } from './types';
-import { allowsMultiplePerRow, hasChoices, hasRows, isDisplayOnly, rowValues } from './types';
+import { allowsMultiplePerRow, hasChoices, hasRows, hasSelectionRange, isDisplayOnly, rowValues } from './types';
 
 /**
  * 画面側の検証。
@@ -58,6 +58,9 @@ export function validateQuestion(
     return t('validation.singleValueOnly');
   }
 
+  const selectionError = validateSelectionCount(question, values.length, t);
+  if (selectionError) return selectionError;
+
   for (const value of values) {
     const error = validateValue(question, value, t);
     if (error) return error;
@@ -89,6 +92,35 @@ function validateGrid(
     if (!allowsMultiplePerRow(question) && values.length > 1) {
       return t('validation.singleValueOnly');
     }
+
+    // **行ごとに数える**（Issue #101）。1 行が 1 つの入力
+    const selectionError = validateSelectionCount(question, values.length, t);
+    if (selectionError) return selectionError;
+  }
+
+  return null;
+}
+
+/**
+ * 選んだ数が下限・上限に収まっているかを見る（Issue #101）。
+ *
+ * **未回答には効かない。** 呼ぶ側が空を先に落としている。
+ * 「答えないか、下限まで選ぶか」であり、答えさせたいのは必須の役目。
+ */
+function validateSelectionCount(
+  question: Question,
+  count: number,
+  t: Translate,
+): string | null {
+  if (!hasSelectionRange(question)) return null;
+
+  const { minSelections, maxSelections } = question.settings;
+
+  if (minSelections !== undefined && count < minSelections) {
+    return t('validation.tooFewSelections', { minimum: minSelections });
+  }
+  if (maxSelections !== undefined && count > maxSelections) {
+    return t('validation.tooManySelections', { maximum: maxSelections });
   }
 
   return null;

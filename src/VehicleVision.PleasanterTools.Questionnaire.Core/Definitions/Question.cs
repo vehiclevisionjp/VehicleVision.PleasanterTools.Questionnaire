@@ -76,6 +76,13 @@ public sealed record Question
     public bool IsMultiValue =>
         Type is QuestionType.Checkbox or QuestionType.CheckboxGrid or QuestionType.Ranking;
 
+    /// <summary>選べる数の下限・上限を持てる形式か（Issue #101）。</summary>
+    /// <remarks>
+    /// **複数選ぶチェックボックスだけ。** ランキングは並べた順が答えで、
+    /// 「いくつ選ぶか」とは別の話なので対象にしない。
+    /// </remarks>
+    public bool HasSelectionRange => Type is QuestionType.Checkbox or QuestionType.CheckboxGrid;
+
     /// <summary>回答を持たない表示専用の要素か。</summary>
     /// <remarks>
     /// <see cref="QuestionType.Note"/> は説明文ブロックで、Pleasanter の列へ写さない

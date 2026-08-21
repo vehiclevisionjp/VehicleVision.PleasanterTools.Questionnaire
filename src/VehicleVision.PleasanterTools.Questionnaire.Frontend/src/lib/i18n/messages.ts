@@ -77,6 +77,9 @@ export const ja = {
   'question.fileCountLimit': '{count} 件まで',
   'question.fileSizeLimitMegabytes': '1 件 {megabytes} MB まで',
   'question.fileSizeLimitBytes': '1 件 {bytes} バイトまで',
+  'question.selectionRange': '{minimum} 個以上 {maximum} 個以下で選んでください',
+  'question.selectionMinimum': '{minimum} 個以上選んでください',
+  'question.selectionMaximum': '{maximum} 個まで選べます',
 
   // ---- 送信できなかった -----------------------------------------------------
   'submit.tooManyRequests': '送信が混み合っています。少し時間を置いてもう一度お試しください。',
@@ -103,6 +106,8 @@ export const ja = {
   'validation.singleValueOnly': '回答は 1 つだけ選んでください',
   'validation.rowRequired': 'すべての行に回答してください',
   'validation.duplicateRank': '同じ項目に 2 つ以上の順位が付いています',
+  'validation.tooFewSelections': '{minimum} 個以上選んでください',
+  'validation.tooManySelections': '{maximum} 個までしか選べません',
   'validation.tooLong': '{max} 文字以内で入力してください',
   'validation.email': 'メールアドレスの形式で入力してください',
   'validation.url': 'http:// または https:// で始まる URL を入力してください',
@@ -126,6 +131,8 @@ export const ja = {
   'serverValidation.UnknownQuestion': 'この設問は受け付けられません',
   'serverValidation.AnswerNotAllowed': 'この項目は回答できません',
   'serverValidation.OtherTextNotAllowed': '「その他」を選んでいないため自由記述は送れません',
+  'serverValidation.TooFewSelections': '選んだ数が足りません',
+  'serverValidation.TooManySelections': '選べる数を超えています',
   'serverValidation.TooLarge': '送信内容が大きすぎます',
   'serverValidation.ScannerUnavailable': '添付ファイルの検査ができないため、いま受け付けられません',
   'serverValidation.unknown': '入力をご確認ください',
@@ -200,6 +207,9 @@ export const en: Record<MessageKey, string> = {
   'question.fileCountLimit': 'Up to {count} files',
   'question.fileSizeLimitMegabytes': 'Up to {megabytes} MB per file',
   'question.fileSizeLimitBytes': 'Up to {bytes} bytes per file',
+  'question.selectionRange': 'Choose between {minimum} and {maximum} options',
+  'question.selectionMinimum': 'Choose at least {minimum} options',
+  'question.selectionMaximum': 'Choose up to {maximum} options',
 
   'submit.tooManyRequests': 'The service is busy. Please wait a moment and submit again.',
   'submit.rejected': 'Your response was not accepted. Please press "Submit" again.',
@@ -224,6 +234,8 @@ export const en: Record<MessageKey, string> = {
   'validation.singleValueOnly': 'Please choose only one answer',
   'validation.rowRequired': 'Please answer every row',
   'validation.duplicateRank': 'The same item has more than one rank',
+  'validation.tooFewSelections': 'Choose at least {minimum} options',
+  'validation.tooManySelections': 'Choose at most {maximum} options',
   'validation.tooLong': 'Use at most {max} characters',
   'validation.email': 'Enter a valid email address',
   'validation.url': 'Enter a URL starting with http:// or https://',
@@ -246,6 +258,8 @@ export const en: Record<MessageKey, string> = {
   'serverValidation.OtherTextNotAllowed':
     'You can only add free text when "Other" is selected',
   'serverValidation.TooLarge': 'What you sent is too large',
+  'serverValidation.TooFewSelections': 'You have not chosen enough options',
+  'serverValidation.TooManySelections': 'You have chosen too many options',
   'serverValidation.ScannerUnavailable':
     'Attachments cannot be checked right now, so we cannot accept this yet',
   'serverValidation.unknown': 'Please check what you entered',

@@ -51,4 +51,10 @@ public enum ValidationErrorCode
 
     /// <summary>ランキングで、同じ項目が 2 回出てくる。</summary>
     DuplicateRank,
+
+    /// <summary>選んだ数が下限に足りない（Issue #101）。</summary>
+    TooFewSelections,
+
+    /// <summary>選んだ数が上限を超えた（Issue #101）。</summary>
+    TooManySelections,
 }
