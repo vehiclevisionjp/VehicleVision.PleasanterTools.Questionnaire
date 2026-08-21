@@ -68,6 +68,39 @@ services:
   # ---- 3 RDBMS -------------------------------------------------------------
   # SQL Server は include 先の `db` を使う（profile: sqlserver で起動する）
 
+  # **SQL Server だけ、本アプリの DB を作る係が要る**（Issue #97）。
+  # PostgreSQL と MySQL は公式イメージの `POSTGRES_DB` / `MYSQL_DATABASE` が
+  # 起動時に作るが、**SQL Server のイメージにはその仕掛けが無い。**
+  # 接続文字列に書いても作られないし、**スキーマの適用（FluentMigrator）も
+  # データベース自体は作らない。** 誰も作らないと `migrate` が
+  # 「Cannot open database "Questionnaire"」で必ず落ちる。
+  # CI も同じことをしている（.github/workflows/integration.yml）。
+  #
+  # **`db` と同じくプロファイルを持たせない。** `migrate` は 3 つのプロファイルで
+  # 共用しており、SQL Server 専用にすると
+  # 「service "migrate" depends on undefined service "db-init"」で
+  # PostgreSQL / MySQL 側が壊れる（実測）。`db` 自体が常に起動する作りなので、
+  # この係も常に走らせて構わない。**空のデータベースを 1 つ作るだけ。**
+  #
+  # **同じイメージを使い回す。** sqlcmd のためだけに別のイメージを増やさない
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2025-CU8-ubuntu-24.04
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Tokyo
+      MSSQL_SA_PASSWORD: ${TESTENV_SA_PASSWORD:-Questionnaire#Test1}
+    # **何度実行しても同じ結果にする。** 既にあれば作らない
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -eu
+        /opt/mssql-tools18/bin/sqlcmd -S db -U sa -P "$$MSSQL_SA_PASSWORD" -C -b \
+          -Q "IF DB_ID('Questionnaire') IS NULL CREATE DATABASE [Questionnaire];"
+
   db-postgres:
     # タグはレジストリで確認して固定する（2026-08-18 時点の最新メジャー）
     image: postgres:18-alpine
@@ -193,6 +226,12 @@ services:
       dockerfile: Dockerfile
     profiles: ["sqlserver", "postgres", "mysql", "app"]
     environment: *app-environment
+    depends_on:
+      # **SQL Server のときだけ DB を作る係を待つ**（Issue #97）。
+      # **PostgreSQL / MySQL へは漏れない。** プロファイルが合わない依存は
+      # compose が黙って外す（`docker compose --profile postgres config` で確認済み）
+      db-init:
+        condition: service_completed_successfully
     command: ["--migrate", "--wait-for-db=180"]
     restart: "no"
 
