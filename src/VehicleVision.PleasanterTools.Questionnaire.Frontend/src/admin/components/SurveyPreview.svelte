@@ -1,6 +1,7 @@
 <script lang="ts">
   import QuestionField from '../../components/QuestionField.svelte';
   import { toSteps, tracePath } from '../../lib/flow';
+  import { applyShuffle, createShuffleSeed } from '../../lib/shuffle';
   import { translator } from '../../lib/i18n/messages';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../../lib/i18n/language';
   import type { AnswerState, NoteBlock, SurveyDefinition as AnswerDefinition } from '../../lib/types';
@@ -149,6 +150,17 @@
   const currentStep = $derived(steps[Math.min(stepIndex, Math.max(steps.length - 1, 0))]);
   const isLastStep = $derived(stepIndex >= steps.length - 1);
 
+  /**
+   * 下見でも並べ替えを掛ける（Issue #103）。**回答者が見るとおりに見せるため。**
+   *
+   * **種は下見を開いている間ずっと同じ。** 押すたびに並びが変わると確かめようがない。
+   */
+  const previewSeed = createShuffleSeed();
+
+  const currentQuestions = $derived(
+    currentStep ? applyShuffle(currentStep.page, currentStep.questions, previewSeed) : [],
+  );
+
   const progress = $derived(
     steps.length === 0
       ? 0
@@ -274,7 +286,7 @@
         <p class="lead">{text(currentStep.page.description, language)}</p>
       {/if}
 
-      {#each currentStep?.questions ?? [] as question (question.questionId)}
+      {#each currentQuestions as question (question.questionId)}
         <QuestionField
           question={withNoteBlocks(question) as never}
           {language}

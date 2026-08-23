@@ -121,6 +121,11 @@ export const ja = {
   'editor.removePage': 'ページを削除',
   'editor.addQuestion': '設問を足す',
   'editor.addPage': 'ページを足す（改ページ）',
+  'editor.shuffleQuestions': 'このページの設問の順序を回答者ごとに入れ替える',
+  'editor.shuffleQuestionsHint':
+    '説明文ブロックは動かさず、その間だけを入れ替えます。並び順は 1 回の回答の中で固定されます。',
+  'editor.shuffleBlockedByVisibility':
+    '表示条件を持つ設問があるため指定できません。条件が見に行けるのは自分より前の設問だけで、入れ替えると参照先が後ろへ回って条件が成立しなくなります。',
   'editor.editingLanguage': '編集する言語',
   'editor.editingLanguageHint':
     '入力した文言はこの言語に入ります。他の言語の文言はそのまま残ります。',
@@ -196,6 +201,9 @@ export const ja = {
   'question.patternHint':
     '入力の全体が合うかを見ます（前後は自動で固定されます）。回答者には正規表現ではなく上の文言が出ます。⚠️ 先読み・後方参照・原子グループは使えません。安全に照合するため、後退戻りしない照合器で動かしているためです。使えない書き方は公開時に弾かれます。',
   'question.patternInvalid': '正規表現として組み立てられません。',
+  'question.shuffleChoices': '選択肢の順序を回答者ごとに入れ替える',
+  'question.shuffleChoicesHint':
+    '先に出た選択肢ほど選ばれやすいのを均します。「その他」は入れ替えず、必ず末尾に置きます。並び順は 1 回の回答の中で固定されるので、前のページへ戻っても位置は変わりません。',
 
   // ---- 設問の形式 ---------------------------------------------------------
   'questionType.Text': '短い文章',
@@ -703,6 +711,11 @@ export const en: Record<MessageKey, string> = {
   'editor.removePage': 'Remove this page',
   'editor.addQuestion': 'Add a question',
   'editor.addPage': 'Add a page (page break)',
+  'editor.shuffleQuestions': 'Shuffle the questions on this page for each respondent',
+  'editor.shuffleQuestionsHint':
+    'Note blocks stay where they are; only the questions between them are shuffled. The order is fixed for the whole response.',
+  'editor.shuffleBlockedByVisibility':
+    'Not available because a question on this page has a display condition. A condition may only refer to questions before it, so shuffling would move the referenced question after it and the condition would never hold.',
   'editor.editingLanguage': 'Language being edited',
   'editor.editingLanguageHint':
     'What you type goes into this language. Text in other languages is kept as it is.',
@@ -779,6 +792,9 @@ export const en: Record<MessageKey, string> = {
   'question.patternHint':
     'The whole value must match (the start and end are anchored automatically). Respondents see the message above, never the expression itself. Lookaround, backreferences and atomic groups are not available: matching runs on a non-backtracking engine so that a single answer cannot stall the form. Unsupported expressions are rejected when you publish.',
   'question.patternInvalid': 'This is not a valid regular expression.',
+  'question.shuffleChoices': 'Shuffle the options for each respondent',
+  'question.shuffleChoicesHint':
+    'Evens out the tendency to pick whichever option comes first. An "other" option is never moved and always stays last. The order is fixed for the whole response, so going back to an earlier page will not move anything.',
 
   'questionType.Text': 'Short answer',
   'questionType.Paragraph': 'Long answer',

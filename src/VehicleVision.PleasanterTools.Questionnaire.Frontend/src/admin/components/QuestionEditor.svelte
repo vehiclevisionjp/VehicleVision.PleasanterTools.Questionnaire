@@ -128,7 +128,8 @@
     }
   });
 
-  /** 選べる数を指定できる設問か（Issue #101）。**複数選ぶチェックボックスだけ。** */  const showSelectionRange = $derived(
+  /** 選べる数を指定できる設問か（Issue #101）。**複数選ぶチェックボックスだけ。** */
+  const showSelectionRange = $derived(
     question.type === 'Checkbox' || question.type === 'CheckboxGrid',
   );
 
@@ -917,6 +918,26 @@
     {#if selectionProblem !== null}
       <p class="warn">{selectionProblem}</p>
     {/if}
+  {/if}
+
+  <!-- **選択肢の順序を回答者ごとに入れ替える**（Issue #103） -->
+  {#if showChoices}
+    <label class="inline">
+      <input
+        type="checkbox"
+        checked={question.settings.shuffleChoices ?? false}
+        onchange={(event) =>
+          update({
+            settings: {
+              ...question.settings,
+              shuffleChoices: event.currentTarget.checked ? true : undefined,
+            },
+          })}
+      />
+      {t('question.shuffleChoices')}
+    </label>
+    <!-- **「その他」は動かさず末尾に置く。** 途中に混ざると自由記述の欄が読みにくい -->
+    <p class="hint">{t('question.shuffleChoicesHint')}</p>
   {/if}
 
   <!-- **同じページの中で出し分けるのがこちら。** ページを飛ばすのはジャンプ。
