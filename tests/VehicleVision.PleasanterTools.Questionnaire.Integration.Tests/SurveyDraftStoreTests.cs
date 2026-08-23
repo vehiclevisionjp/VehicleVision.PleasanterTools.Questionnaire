@@ -234,6 +234,73 @@ public class SurveyDraftStoreTests
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public async Task 並べ替えの指定も保存して読み直せる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **下書きは列で持っている。** 設問の並べ替えはページが持つので
+        // `SettingsJson` に紛れ込ませられず、列を足さないと**黙って消える**。
+        // 実際に消えていた（Issue #103 の実装が保存側を通していなかった）
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+
+        var definition = new SurveyDefinition
+        {
+            SurveyId = surveyId.ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("並べ替えの見本"),
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "page-1",
+                    ShuffleQuestions = true,
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = QuestionType.Radio,
+                            Title = LocalizedText.Japanese("好きな色"),
+                            Choices =
+                            [
+                                new Choice("red", LocalizedText.Japanese("赤")),
+                                new Choice("blue", LocalizedText.Japanese("青")),
+                            ],
+                            // **選択肢の並べ替えは設問が持つ**ので SettingsJson に入る
+                            Settings = new QuestionSettings { ShuffleChoices = true },
+                        },
+                        new Question
+                        {
+                            QuestionId = "q2",
+                            Type = QuestionType.Text,
+                            Title = LocalizedText.Japanese("ひとこと"),
+                        },
+                    ],
+                },
+                // **指定していないページは false のまま。** 既定で入れ替えない
+                new Page { PageId = "page-2", Questions = [] },
+            ],
+        };
+
+        await drafts.SaveAsync(surveyId, definition, new MappingDefinition(), expectedRevision: 0);
+
+        var loaded = await drafts.LoadAsync(surveyId);
+        Assert.NotNull(loaded);
+
+        Assert.True(loaded.Definition.Pages[0].ShuffleQuestions);
+        Assert.False(loaded.Definition.Pages[1].ShuffleQuestions);
+        Assert.True(loaded.Definition.Pages[0].Questions[0].Settings.ShuffleChoices);
+        Assert.False(loaded.Definition.Pages[0].Questions[1].Settings.ShuffleChoices);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public async Task 保存して読み直すと同じ定義になる(DatabaseProvider provider, string connectionString)
     {
         if (!Enabled)

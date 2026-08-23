@@ -225,7 +225,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string PageId,
         string? TitleJson,
         string? DescriptionJson,
-        string? NextJson);
+        string? NextJson,
+        bool ShuffleQuestions);
 
     private sealed record QuestionRow(
         string QuestionId,
@@ -424,7 +425,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         }
 
         var pages = (await connection.QueryAsync<PageRow>(Sql(
-            "SELECT [PageId], [TitleJson], [DescriptionJson], [NextJson] FROM [Pages] "
+            "SELECT [PageId], [TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions] "
+            + "FROM [Pages] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
             transaction,
@@ -529,6 +531,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     Description = ReadText(page.DescriptionJson),
                     Questions = questionsByPage.GetValueOrDefault(page.PageId, []),
                     Next = Read<PageTransition>(page.NextJson),
+                    ShuffleQuestions = page.ShuffleQuestions,
                 })
                 .ToImmutableArray(),
         };
@@ -890,9 +893,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
             await connection.ExecuteAsync(Sql(
                 "INSERT INTO [Pages] ([PageId], [SurveyId], [SortOrder], "
-                + "[TitleJson], [DescriptionJson], [NextJson]) "
+                + "[TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions]) "
                 + "VALUES (@PageId, @SurveyId, @SortOrder, @TitleJson, @DescriptionJson, "
-                + "@NextJson)",
+                + "@NextJson, @ShuffleQuestions)",
                 new
                 {
                     page.PageId,
@@ -901,6 +904,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     TitleJson = WriteText(page.Title),
                     DescriptionJson = WriteText(page.Description),
                     NextJson = Write(page.Next),
+                    page.ShuffleQuestions,
                 },
                 transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
