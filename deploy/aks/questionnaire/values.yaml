@@ -1,0 +1,56 @@
+replicaCount: 2
+
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# 資格情報を Helm の values / release history に保存しないため、既存 Secret を参照します。
+existingSecret: ""
+
+config:
+  dbProvider: SqlServer
+  pleasanterUrl: ""
+  timezone: Asia/Tokyo
+  forwardedNetworks: []
+
+serviceAccount:
+  annotations: {}
+
+service:
+  port: 80
+
+ingress:
+  enabled: false
+  className: webapprouting.kubernetes.azure.com
+  annotations: {}
+  host: ""
+  tlsSecretName: ""
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+dataProtection:
+  storageClassName: azurefile-csi-premium
+  size: 1Gi
+  mountPath: /var/lib/questionnaire/data-protection
+
+migration:
+  waitSeconds: 180
+  activeDeadlineSeconds: 300
+  backoffLimit: 2

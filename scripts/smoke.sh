@@ -49,6 +49,7 @@ check_header() {
 
 echo "== 配信 =="
 check_status "/healthz" 200 "生存確認"
+check_status "/ready" 200 "DBを含む受付準備"
 check_status "/" 200 "回答画面の入口"
 # **画面側で解釈するので、サーバは同じ入口を返す**
 check_status "/f/pub-any" 200 "SPA のフォールバック"

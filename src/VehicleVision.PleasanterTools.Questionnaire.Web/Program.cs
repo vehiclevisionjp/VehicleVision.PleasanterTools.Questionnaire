@@ -1,5 +1,6 @@
 ﻿using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
@@ -22,6 +23,21 @@ if (args.Contains("--generate-secret-key"))
 }
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ---- 複数インスタンスの認証 --------------------------------------------------
+// 管理画面の Cookie は ASP.NET Core Data Protection で保護される。AKS で複数 Pod にすると、
+// 鍵束を共有しない限り「別 Pod へ振られた途端にログアウト」になる。
+// App Service／IIS の既定動作は変えず、共有先を明示した環境だけ永続化する。
+var dataProtectionKeysPath = builder.Configuration[DataProtectionKeys.PathSetting];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    var keysDirectory = new DirectoryInfo(Path.GetFullPath(dataProtectionKeysPath));
+    Directory.CreateDirectory(keysDirectory.FullName);
+    builder.Services
+        .AddDataProtection()
+        .SetApplicationName(DataProtectionKeys.ApplicationName)
+        .PersistKeysToFileSystem(keysDirectory);
+}
 
 // ---- 設定 ------------------------------------------------------------------
 // **資格情報の実値は設定ファイルへ書かない。** 環境変数か Key Vault から読む
@@ -377,16 +393,28 @@ var contentSecurityPolicy = string.Join("; ",
 static string Join(System.Collections.Immutable.ImmutableArray<string> sources) =>
     sources.IsEmpty ? string.Empty : " " + string.Join(' ', sources);
 
-// **リバースプロキシ配下でも本当の送信元 IP を見る。** レート制限が効かなくなるため
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+// **リバースプロキシ配下でも本当の送信元 IP を見る。** レート制限が効かなくなるため。
+// 転送ヘッダを無条件には信じず、運用者が指定した Ingress の CIDR だけを追加する。
+var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-});
+};
+foreach (var network in ForwardedProxyNetworks.Parse(
+             builder.Configuration[ForwardedProxyNetworks.Setting]))
+{
+    forwardedHeadersOptions.KnownIPNetworks.Add(network);
+}
+app.UseForwardedHeaders(forwardedHeadersOptions);
 
 if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
-    app.UseHttpsRedirection();
+    // Kubelet の HTTP probe は 3xx も成功と扱う。probe をリダイレクトすると、
+    // DB 障害時の /ready=503 を見ずに 307 を成功扱いするため、この2経路だけ除外する。
+    app.UseWhen(
+        context => !string.Equals(context.Request.Path.Value, "/healthz", StringComparison.Ordinal)
+            && !string.Equals(context.Request.Path.Value, "/ready", StringComparison.Ordinal),
+        branch => branch.UseHttpsRedirection());
 }
 
 // **セキュリティヘッダを一式付ける**（_documents/非機能設計.md 1 章）
@@ -441,6 +469,22 @@ app.MapFallbackToFile("/f/{**path}", "index.html");
 
 // 生存確認。**アンケートの情報を出さない**
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+
+// 受付可能かの確認。Pleasanter が止まっても回答は DB に積んで再送できるため、
+// **ここで見る依存先は本アプリの DB だけ。** 例外の中身は接続先や資格情報を
+// 含み得るので応答へ出さない。
+app.MapGet("/ready", async (CancellationToken cancellationToken) =>
+{
+    var failure = await DatabaseMigrator.WaitForDatabaseAsync(
+        provider,
+        connectionString,
+        TimeSpan.Zero,
+        cancellationToken);
+
+    return failure is null
+        ? Results.Ok(new { status = "ready" })
+        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+});
 
 app.Run();
 

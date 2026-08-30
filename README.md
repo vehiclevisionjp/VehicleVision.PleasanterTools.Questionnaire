@@ -143,6 +143,7 @@ QUESTIONNAIRE_INTEGRATION=1 dotnet test tests/VehicleVision.PleasanterTools.Ques
 | [`_documents/非機能設計.md`](_documents/非機能設計.md) | セキュリティ・障害時・テスト・運用 |
 | [`_documents/ブランチ運用方針.md`](_documents/ブランチ運用方針.md) | ブランチ・保護ルール |
 | [`_documents/リリース手順書.md`](_documents/リリース手順書.md) | バージョンの付け方・リリース手順 |
+| [`_documents/AKS-導入更新運用手順書.md`](_documents/AKS-導入更新運用手順書.md) | AKS への導入・ACR 発行・更新・ロールバック |
 | [`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md) | Azure Web App／オンプレミス IIS への導入・DB作成・更新 |
 | [`_documents/添付ファイル検査-運用手順書.md`](_documents/添付ファイル検査-運用手順書.md) | ウイルススキャンの構成と運用 |
 | [`_documents/管理者の棚卸し-運用手順書.md`](_documents/管理者の棚卸し-運用手順書.md) | 管理者アカウントの定期見直し |
