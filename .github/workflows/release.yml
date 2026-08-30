@@ -16,6 +16,7 @@
 #   | license-check.sh が通る       | 実行する                                       |
 #   | NOTICE の依存一覧が一致する   | notice-check.sh を実行する                     |
 #   | 破壊的変更でメジャーを上げた  | 人が判断する（機械で確かめられない）           |
+#   | 配置用 ZIP が揃っている         | 発行し、中身と SHA-256 を検査する              |
 #   | マイグレーション手順を書いた  | 人が判断する。Release 本文へ追記すること       |
 #
 # **3 RDBMS 結合テストをここで回さない理由。** リリースタグは master 上のコミットへ
@@ -40,6 +41,9 @@
 #     https://cli.github.com/manual/gh_release_create
 #   - actions/checkout v7 / actions/setup-dotnet v6 / actions/setup-node v7 は
 #     .github/workflows/ci.yml と同じ版に揃えた（勝手に上げない）
+#   - 配置用 ZIP のジョブ間受け渡し（2026-08-30 参照）
+#     https://github.com/actions/upload-artifact （v7）
+#     https://github.com/actions/download-artifact （v8）
 name: Release
 
 on:
@@ -118,10 +122,19 @@ jobs:
                   fi
                   tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
                   if [ -z "$tag" ]; then
-                      echo "NG: 既存の v* タグが 1 つも無い。dry-run でも release_tag を指定すること" >&2
-                      exit 1
+                      # **初回 Release の前にも dry-run できること。** タグがまだ無い段階で
+                      # 検証できなければ、最初のタグを付けてから壊れていると分かる。
+                      prefix="$(sed -nE 's@.*<VersionPrefix>([^<]+)</VersionPrefix>.*@\1@p' \
+                          Directory.Build.props | head -n 1)"
+                      if [ -z "$prefix" ]; then
+                          echo "NG: VersionPrefix から初回 Release の版を決められない" >&2
+                          exit 1
+                      fi
+                      tag="v$prefix"
+                      echo "既存タグが無いため、初回 Release の候補 $tag で検証する"
+                  else
+                      echo "release_tag の指定が無いため、既存の最新タグ $tag で検証する"
                   fi
-                  echo "release_tag の指定が無いため、既存の最新タグ $tag で検証する"
               fi
           fi
 
@@ -162,10 +175,18 @@ jobs:
       - name: タグが master に含まれることを確認する
         env:
           TAG: ${{ steps.resolve.outputs.tag }}
+          DRY_RUN: ${{ steps.resolve.outputs.dry_run }}
         # **タグは master にだけ付ける**（_documents/リリース手順書.md）。
         # develop のコミットへ付けると、リリース確定状態と中身が食い違う
         run: |
           set -euo pipefail
+
+          # dry-run は作業ブランチの Release 経路をタグを付ける前に試すもの。
+          # 実在タグと master の関係は、本番のタグ push でだけ強制する。
+          if [ "$DRY_RUN" = "true" ]; then
+              echo "dry-run のため、タグと master の包含関係は検査しない"
+              exit 0
+          fi
 
           git fetch --no-tags origin master:refs/remotes/origin/master
           if git merge-base --is-ancestor "$TAG^{commit}" refs/remotes/origin/master; then
@@ -254,6 +275,60 @@ jobs:
       - name: NOTICE の依存一覧を実物と突き合わせる
         run: bash ./scripts/notice-check.sh
 
+      - name: Azure Web App／IIS 用の配置物を作る
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          publish_dir="$RUNNER_TEMP/questionnaire-publish"
+          package_name="VehicleVision.PleasanterTools.Questionnaire-$VERSION.zip"
+          package_path="$RUNNER_TEMP/$package_name"
+
+          dotnet publish src/VehicleVision.PleasanterTools.Questionnaire.Web \
+            --no-restore -c Release -o "$publish_dir"
+
+          # Dockerfile と同じ構成にする。資格情報の実値は含めず、設定の説明と
+          # ライセンスだけを足す。ZIP の直下がそのまま wwwroot になる形にする。
+          cp -a App_Data "$publish_dir/App_Data"
+          cp LICENSE LICENSING.md LICENSE-COMMERCIAL.md NOTICE "$publish_dir/"
+
+          # 発行コマンドが成功しても、フロントエンドを先に作り忘れると画面が無い
+          # ZIP ができる。利用者が配置してから気付かないよう、Release 前に止める。
+          required=(
+            VehicleVision.PleasanterTools.Questionnaire.Web.dll
+            web.config
+            wwwroot/index.html
+            wwwroot/admin.html
+            App_Data/Parameters/README.md
+            LICENSE
+            LICENSING.md
+            LICENSE-COMMERCIAL.md
+            NOTICE
+          )
+          for path in "${required[@]}"; do
+            test -f "$publish_dir/$path" || {
+              echo "NG: 配置用 ZIP に必要なファイルが無い: $path" >&2
+              exit 1
+            }
+          done
+
+          (cd "$publish_dir" && zip -q -r "$package_path" .)
+          (cd "$RUNNER_TEMP" && sha256sum "$package_name" > "$package_name.sha256")
+
+          echo "OK   配置用 ZIP: $package_name"
+          du -h "$package_path"
+
+      - name: 配置用 ZIP をジョブ間で受け渡す
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-package
+          path: |
+            ${{ runner.temp }}/VehicleVision.PleasanterTools.Questionnaire-${{ steps.version.outputs.version }}.zip
+            ${{ runner.temp }}/VehicleVision.PleasanterTools.Questionnaire-${{ steps.version.outputs.version }}.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
+
       - name: 検証結果をまとめる
         env:
           TAG: ${{ steps.resolve.outputs.tag }}
@@ -296,6 +371,16 @@ jobs:
           fetch-depth: 0
           submodules: false
 
+      - name: 配置用 ZIP を取得する
+        uses: actions/download-artifact@v8
+        with:
+          name: deployment-package
+          path: ${{ runner.temp }}/deployment-package
+
+      - name: 配置用 ZIP の SHA-256 を検査する
+        working-directory: ${{ runner.temp }}/deployment-package
+        run: sha256sum --check *.zip.sha256
+
       - name: Release 本文を組み立てる
         id: notes
         env:
@@ -334,6 +419,7 @@ jobs:
               echo "## 添付"
               echo
               echo "- ソース一式は GitHub が自動で付けます"
+              echo "- Azure Web App／IIS 共用の配置用 ZIP と SHA-256"
               echo "- \`LICENSE\` / \`LICENSING.md\` / \`LICENSE-COMMERCIAL.md\` / \`NOTICE\`"
               echo
               if [ -n "$previous" ]; then
@@ -356,6 +442,8 @@ jobs:
           BODY_FILE: ${{ steps.notes.outputs.body_file }}
           REPOSITORY: ${{ github.repository }}
           SERVER_URL: ${{ github.server_url }}
+          DEPLOYMENT_ZIP: ${{ runner.temp }}/deployment-package/VehicleVision.PleasanterTools.Questionnaire-${{ needs.verify.outputs.version }}.zip
+          DEPLOYMENT_SHA256: ${{ runner.temp }}/deployment-package/VehicleVision.PleasanterTools.Questionnaire-${{ needs.verify.outputs.version }}.zip.sha256
         run: |
           set -euo pipefail
 
@@ -373,7 +461,9 @@ jobs:
               LICENSE \
               LICENSING.md \
               LICENSE-COMMERCIAL.md \
-              NOTICE
+              NOTICE \
+              "$DEPLOYMENT_ZIP" \
+              "$DEPLOYMENT_SHA256"
 
           {
               echo "## GitHub Release を作成した"

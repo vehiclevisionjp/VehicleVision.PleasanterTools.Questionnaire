@@ -33,7 +33,7 @@ flowchart LR
 Pleasanter 本体（`Pleasanter_1.5.7.0`）に揃えている。
 
 | 層 | 採用 |
-|---|---|
+| --- | --- |
 | ランタイム | .NET 10（`net10.0`）／SDK `10.0.100` |
 | サーバ | C# / ASP.NET Core |
 | フロントエンド | TypeScript + Vite + Svelte + SCSS |
@@ -43,6 +43,15 @@ Pleasanter 本体（`Pleasanter_1.5.7.0`）に揃えている。
 
 **貢献の前に [`CLA.md`](CLA.md) への署名が要ります**（デュアルライセンスのため）。
 手順は [`CONTRIBUTING.md`](CONTRIBUTING.md) を見てください。
+
+## 導入する
+
+GitHub Release には、Azure App Service（Windows Web App）とオンプレミス IIS で共用できる
+配置用 ZIP と SHA-256 を添付する。**Pleasanter の DB とは別に本アプリ専用 DB を作り、
+アプリの通常起動前にマイグレーションを明示的に適用する。**
+
+初回導入、設定、DB作成、更新、ロールバックは
+[`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md)を参照する。
 
 ## 開発をはじめる
 
@@ -69,7 +78,7 @@ docker compose --profile "*" down -v              # 後片付け
 ```
 
 | 到達先 | URL |
-|---|---|
+| --- | --- |
 | 本アプリ | <http://localhost:8081> |
 | Pleasanter | <http://localhost:8080>（`Administrator` / `pleasanter`） |
 
@@ -86,7 +95,6 @@ docker compose --profile "*" down -v              # 後片付け
 cd src/VehicleVision.PleasanterTools.Questionnaire.Frontend
 npm ci && npm run build   # 成果物は .Web/wwwroot へ出る
 ```
-
 
 ```bash
 dotnet build
@@ -125,7 +133,7 @@ QUESTIONNAIRE_INTEGRATION=1 dotnet test tests/VehicleVision.PleasanterTools.Ques
 ## リポジトリ構成
 
 | パス | 内容 |
-|---|---|
+| --- | --- |
 | [`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) | 構成方針・決定事項・未確定事項 |
 | [`_documents/機能一覧.md`](_documents/機能一覧.md) | Forms 相当のどこまで作るか |
 | [`_documents/実機検証結果.md`](_documents/実機検証結果.md) | 実機で確定した Pleasanter の挙動 |
@@ -135,6 +143,7 @@ QUESTIONNAIRE_INTEGRATION=1 dotnet test tests/VehicleVision.PleasanterTools.Ques
 | [`_documents/非機能設計.md`](_documents/非機能設計.md) | セキュリティ・障害時・テスト・運用 |
 | [`_documents/ブランチ運用方針.md`](_documents/ブランチ運用方針.md) | ブランチ・保護ルール |
 | [`_documents/リリース手順書.md`](_documents/リリース手順書.md) | バージョンの付け方・リリース手順 |
+| [`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md) | Azure Web App／オンプレミス IIS への導入・DB作成・更新 |
 | [`_documents/添付ファイル検査-運用手順書.md`](_documents/添付ファイル検査-運用手順書.md) | ウイルススキャンの構成と運用 |
 | [`_documents/管理者の棚卸し-運用手順書.md`](_documents/管理者の棚卸し-運用手順書.md) | 管理者アカウントの定期見直し |
 | [`tools/pleasanter-testenv/`](tools/pleasanter-testenv/README.md) | 検証環境（Docker） |
@@ -156,7 +165,7 @@ Claude Code は [`CLAUDE.md`](CLAUDE.md)、その他のエージェントは [`A
 **デュアルライセンス**で提供します。詳細は [`LICENSING.md`](LICENSING.md)。
 
 | | ライセンス | 想定する利用 |
-|---|---|---|
+| --- | --- | --- |
 | A | [GNU AGPL v3 以降](LICENSE) | オープンソースとして利用・改変・再配布する場合 |
 | B | [PMC 商用ライセンス](LICENSE-COMMERCIAL.md) | AGPL の義務を負わずに利用したい場合（個別契約） |
 
