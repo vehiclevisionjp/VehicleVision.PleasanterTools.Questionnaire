@@ -29,22 +29,22 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.Configuration.Abstractions 10.0.11 / MIT
   Microsoft.Extensions.Hosting.Abstractions 10.0.11 / MIT
   Microsoft.Extensions.Logging.Abstractions 10.0.11 / MIT
-  Jint 4.16.0 / BSD-2-Clause / https://github.com/sebastienros/jint
+  Jint 4.16.1 / BSD-2-Clause / https://github.com/sebastienros/jint
     （変換スクリプトの実行エンジン。Acornima などを推移的に伴う）
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
   nClam 9.0.0 / Apache-2.0 / https://github.com/tekmaven/nClam
   Ixnas.AltchaNet 1.2.1 / BSD-2-Clause / https://github.com/ixnas/altcha-dotnet
-  Azure.Storage.Blobs 12.29.1 / MIT / https://github.com/Azure/azure-sdk-for-net
+  Azure.Storage.Blobs 12.29.2 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
 
 フロントエンド（**成果物へ含まれるのは svelte のランタイムと qrcode のみ。** 残りはビルド時だけ使う）
 
-  svelte 5.56.9 / MIT / https://www.npmjs.com/package/svelte
-  vite 8.2.1 / MIT / https://www.npmjs.com/package/vite
+  svelte 5.57.0 / MIT / https://www.npmjs.com/package/svelte
+  vite 8.2.2 / MIT / https://www.npmjs.com/package/vite
   @sveltejs/vite-plugin-svelte 7.3.0 / MIT
   svelte-check 4.7.6 / MIT
   vitest 4.1.11 / MIT / https://www.npmjs.com/package/vitest
-  sass 1.102.0 / MIT
+  sass 1.103.1 / MIT
   typescript 6.0.3 / Apache-2.0
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
   @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://github.com/DefinitelyTyped/DefinitelyTyped
