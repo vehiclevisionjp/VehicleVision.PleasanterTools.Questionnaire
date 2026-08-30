@@ -122,10 +122,19 @@ jobs:
                   fi
                   tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
                   if [ -z "$tag" ]; then
-                      echo "NG: 既存の v* タグが 1 つも無い。dry-run でも release_tag を指定すること" >&2
-                      exit 1
+                      # **初回 Release の前にも dry-run できること。** タグがまだ無い段階で
+                      # 検証できなければ、最初のタグを付けてから壊れていると分かる。
+                      prefix="$(sed -nE 's@.*<VersionPrefix>([^<]+)</VersionPrefix>.*@\1@p' \
+                          Directory.Build.props | head -n 1)"
+                      if [ -z "$prefix" ]; then
+                          echo "NG: VersionPrefix から初回 Release の版を決められない" >&2
+                          exit 1
+                      fi
+                      tag="v$prefix"
+                      echo "既存タグが無いため、初回 Release の候補 $tag で検証する"
+                  else
+                      echo "release_tag の指定が無いため、既存の最新タグ $tag で検証する"
                   fi
-                  echo "release_tag の指定が無いため、既存の最新タグ $tag で検証する"
               fi
           fi
 
@@ -166,10 +175,18 @@ jobs:
       - name: タグが master に含まれることを確認する
         env:
           TAG: ${{ steps.resolve.outputs.tag }}
+          DRY_RUN: ${{ steps.resolve.outputs.dry_run }}
         # **タグは master にだけ付ける**（_documents/リリース手順書.md）。
         # develop のコミットへ付けると、リリース確定状態と中身が食い違う
         run: |
           set -euo pipefail
+
+          # dry-run は作業ブランチの Release 経路をタグを付ける前に試すもの。
+          # 実在タグと master の関係は、本番のタグ push でだけ強制する。
+          if [ "$DRY_RUN" = "true" ]; then
+              echo "dry-run のため、タグと master の包含関係は検査しない"
+              exit 0
+          fi
 
           git fetch --no-tags origin master:refs/remotes/origin/master
           if git merge-base --is-ancestor "$TAG^{commit}" refs/remotes/origin/master; then
