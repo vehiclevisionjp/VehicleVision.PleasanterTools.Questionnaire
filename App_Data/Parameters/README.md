@@ -32,6 +32,8 @@
 | `QUESTIONNAIRE_PLEASANTER_APIKEY` | Pleasanter の API キー |
 | `QUESTIONNAIRE_PLEASANTER_TIMEZONE` | API キーに紐づくユーザのタイムゾーン |
 | `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト）。**送信チケットの署名鍵もここから派生させる** |
+| `QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` | 複数インスタンスで管理画面の Cookie を共有する鍵束ディレクトリ。AKS では ReadWriteMany の永続ボリュームを指定する |
+| `QUESTIONNAIRE_FORWARDED_NETWORKS` | `X-Forwarded-*` を信頼するリバースプロキシの CIDR。複数はカンマ区切り。Ingress の送信元範囲だけを指定する |
 | `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |
@@ -63,10 +65,11 @@ dotnet run --project src/VehicleVision.PleasanterTools.Questionnaire.Web -- --ge
 
 または任意の手段で 32 バイトの乱数を Base64 にする。
 
-**Data Protection の鍵束は使っていない。**
-App Service では鍵の保存先が既定で一時領域になり、
-**再起動で鍵を失うと 2 要素が全部使えなくなる**ため、
-運用者が持つ 1 本の鍵を設定から受け取る形にしている。
+**この鍵と ASP.NET Core Data Protection の鍵束は役割が異なる。**
+`QUESTIONNAIRE_SECRET_KEY` は 2 要素の共有鍵と送信チケットに使い、運用者が保管する。
+Data Protection は管理画面の Cookie に使う。AKS の複数 Pod では
+`QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` を ReadWriteMany の永続ボリュームへ向け、
+Pod 間で鍵束を共有する。
 
 ## タイムゾーンに注意
 
