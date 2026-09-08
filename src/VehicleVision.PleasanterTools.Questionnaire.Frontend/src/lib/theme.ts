@@ -142,20 +142,19 @@ export function safeColor(value: string | null | undefined): string | null {
  * **利用者が書いた文字列は 1 文字も入らない。** 選ばれた列挙で引くだけ。
  *
  * **外部から Web フォントを読み込まない**（`_documents/非機能設計.md` 1 章）。
- * ただし **`Sans` と `Monospace` はアプリに同梱している**（Issue #152）。
+ * ただし **4 書体すべてをアプリに同梱している**（Issue #152）。
  * 自前配信なので第三者へ要求は出ず、**インターネットへ出られないイントラでも同じ見た目**になる。
  *
- * ⚠️ **`Serif` と `Rounded` は同梱していない。** 端末が持っている書体を並べるだけなので、
- * 無ければ後ろへ落ちる。
+ * **後ろに端末の書体も並べたままにする。** 配信に失敗しても文字が出なくならないため。
  */
 const FONT_STACKS: Record<ThemeFont, string | null> = {
   // **既定は指定しない。** `:root` に書いてある今までの指定がそのまま効く
   System: null,
   // **同梱した可変フォントを先頭に置く**（無い環境でも端末の書体へ落ちる）
   Sans: '"Noto Sans JP Variable", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif',
-  Serif: '"Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "MS PMincho", serif',
+  Serif: '"Noto Serif JP Variable", "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif',
   Rounded:
-    '"Hiragino Maru Gothic ProN", "M PLUS Rounded 1c", "Quicksand", "Hiragino Sans", sans-serif',
+    '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Quicksand", "Hiragino Sans", sans-serif',
   // **日本語も等幅**にしたいので M PLUS 1 Code を同梱している
   Monospace: '"M PLUS 1 Code Variable", ui-monospace, SFMono-Regular, Consolas, monospace',
 };

@@ -323,9 +323,15 @@
   }
 
   /*
-    **アイコンの下地**（Issue #152）。同梱した Material Icons を使うための最小限。
-    使うときは <span class="material-icons" aria-hidden="true">save</span> のように書く。
-    **意味は文字で書くこと。** アイコンだけの釦は読み上げで何も伝わらない
+    **アイコンの下地**（Issue #152）。同梱した Material Icons を使う。
+
+      <span class="material-icons" aria-hidden="true">save</span>
+
+    中身は**アイコンの名前**（リガチャで字形へ置き換わる）。
+    **意味は文字でも書くこと。** アイコンだけの釦は読み上げで何も伝わらない。
+    **`aria-hidden="true"` を必ず付ける。** 付けないと 'save' という英単語が読み上げられる。
+
+    **表の中で使うときは `fixed` を足す**（下記）。桁が揃う
   */
   :global(.material-icons) {
     font-family: 'Material Icons';
@@ -338,6 +344,17 @@
     vertical-align: -0.15em;
     font-feature-settings: 'liga';
     -webkit-font-smoothing: antialiased;
+  }
+
+  /*
+    **表の中で桁を揃えるための指定。**
+    アイコンの字形は幅が同じでも、**名前が短い字形は詰まって見える**ことがある。
+    箱の幅を決めて中央へ置けば、行ごとにずれない
+  */
+  :global(.material-icons.fixed) {
+    display: inline-block;
+    width: 1.5em;
+    text-align: center;
   }
 
   :global(button:disabled) {

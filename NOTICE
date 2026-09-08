@@ -54,6 +54,10 @@ Copyright (C) PMC Co.,Ltd.
 
   @fontsource-variable/noto-sans-jp 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-sans-jp
     （Noto Sans JP Variable。unicode-range で分割された woff2）
+  @fontsource-variable/noto-serif-jp 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-serif-jp
+    （Noto Serif JP Variable。テーマの「明朝体」）
+  @fontsource/m-plus-rounded-1c 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/m-plus-rounded-1c
+    （M PLUS Rounded 1c。テーマの「丸ゴシック体」。**可変フォントが無いので 400 と 700 だけ持つ**）
   @fontsource-variable/m-plus-1-code 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/m-plus-1-code
     （M PLUS 1 Code Variable。日本語も等幅になる）
   @fontsource/material-icons 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/material-icons
