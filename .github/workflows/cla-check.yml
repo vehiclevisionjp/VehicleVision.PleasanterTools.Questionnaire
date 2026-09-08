@@ -13,6 +13,11 @@
 #
 # ■ PR のコードは実行しない
 #   見るのは PR の作者と、base 側にある署名の一覧だけ。
+#
+# ■ bot は対象外
+#   Dependabot などが出す PR には、許諾する著作者が居ない。
+#   **加えて Dependabot が起点の pull_request_target では GITHUB_TOKEN が
+#   読み取り専用に落とされる**ため、未署名の案内コメントはそもそも投げられない。
 
 name: CLA の確認
 
@@ -59,6 +64,23 @@ jobs:
           fi
 
           echo "PR の作者: $AUTHOR"
+
+          # **bot の PR は CLA の対象外。**
+          # CLA が要るのは他人の著作物を商用ライセンスで再頒布する権利を貰うためであり
+          # （CLA.md）、機械が出す版上げに許諾する著作者は居ない。
+          #
+          # **ジョブごと skip にはしない。** 必須ステータスチェックにしたときの
+          # skipped の扱いに依存させず、成功として報告させる。
+          #
+          # ⚠️ **パターンは必ずクォートすること。** 素の dependabot[bot] は glob の
+          # 文字クラスと解釈され、dependabott などにも当たる
+          case "$AUTHOR" in
+            'dependabot[bot]' | 'github-actions[bot]')
+              echo 'signed=true' >> "$GITHUB_OUTPUT"
+              echo "$AUTHOR は bot なので CLA の確認を省きます。"
+              exit 0
+              ;;
+          esac
 
           # **login の行だけを見る。** 余計な解釈をしない
           if grep -Eq "^[[:space:]]*-[[:space:]]*login:[[:space:]]*${AUTHOR}[[:space:]]*$" "$list"; then
