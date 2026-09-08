@@ -17,10 +17,15 @@
 
 ## ファイル
 
-| ファイル | 内容 |
-|---|---|
-| `Service.json` | アプリ名・既定タイムゾーン |
-| `Pleasanter.json` | 接続先 Pleasanter の URL・API キー・タイムアウト |
+| ファイル | 内容 | 読まれているか |
+|---|---|---|
+| `Service.json` | アプリ名・既定タイムゾーン | ⚠️ **読まれていない**（Issue #158） |
+| `Pleasanter.json` | 接続先 Pleasanter の URL・API キー・タイムアウト | ⚠️ **読まれていない**（同上。実際に効くのは環境変数） |
+| `Security.json` | **管理者のパスワードに求める条件**（Issue #157） | **読まれている** |
+
+> ⚠️ **`Service.json` と `Pleasanter.json` は、いまのところ読み込まれていない。**
+> 設定はすべて環境変数（`QUESTIONNAIRE_*`）から読んでいる。
+> どちらへ寄せるかは Issue #158 で決める。
 
 ## 環境変数
 
@@ -34,6 +39,8 @@
 | `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト）。**送信チケットの署名鍵もここから派生させる** |
 | `QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` | 複数インスタンスで管理画面の Cookie を共有する鍵束ディレクトリ。AKS では ReadWriteMany の永続ボリュームを指定する |
 | `QUESTIONNAIRE_FORWARDED_NETWORKS` | `X-Forwarded-*` を信頼するリバースプロキシの CIDR。複数はカンマ区切り。Ingress の送信元範囲だけを指定する |
+| `PasswordMinimumLength` | パスワードの最低の長さ（既定 12）。`Security.json` にも書ける（Issue #157） |
+| `PasswordAllowSameAsLoginId` | ログイン ID と同じパスワードを許すか（既定 `false`）。同上 |
 | `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |

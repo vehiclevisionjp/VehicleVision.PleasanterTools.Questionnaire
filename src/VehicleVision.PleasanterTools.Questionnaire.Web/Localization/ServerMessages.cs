@@ -90,6 +90,16 @@ public static class ServerMessages
             "パスワードは {0} 文字以上にしてください。",
             "Use a password of at least {0} characters.");
 
+        Add(
+            ServerMessageKeys.PasswordSameAsLoginId,
+            "パスワードにログイン ID と同じ文字列は使えません。",
+            "The password cannot be the same as the sign-in ID.");
+
+        Add(
+            ServerMessageKeys.PasswordPolicyMismatch,
+            "パスワードが決められた条件を満たしていません。",
+            "The password does not meet the required conditions.");
+
         // ---- 管理者の管理 ---------------------------------------------------
         Add(
             ServerMessageKeys.RoleMustBeEditorOrAdministrator,

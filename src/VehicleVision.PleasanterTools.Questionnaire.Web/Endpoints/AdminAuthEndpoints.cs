@@ -100,6 +100,7 @@ public static class AdminAuthEndpoints
             AdminCredentialRequest request,
             HttpContext context,
             AdminAuthenticator authenticator,
+            AdminPasswordPolicy policy,
             CancellationToken cancellationToken) =>
         {
             // **誰が狙われているかは、記録に残っていないと分からない。**
@@ -115,15 +116,17 @@ public static class AdminAuthEndpoints
                 });
             }
 
-            // **短すぎるパスワードを通さない。** 最初の 1 人こそ全権を持つ
-            if (!AdminPasswordPolicy.IsAcceptable(request.Password))
+            // **弱いパスワードを通さない。** 最初の 1 人こそ全権を持つ。
+            // **ログイン ID と同じ値も、設定しだいで断る**（Issue #157）
+            var loginId = request.LoginId.Trim();
+            if (policy.Check(request.Password, loginId, RequestLanguage.Of(context))
+                is { } passwordProblem)
             {
-                return Results.BadRequest(
-                    new { message = AdminPasswordPolicy.Message(RequestLanguage.Of(context)) });
+                return Results.BadRequest(new { message = passwordProblem });
             }
 
             var created = await authenticator
-                .TryCreateFirstAdministratorAsync(request.LoginId.Trim(), request.Password, cancellationToken)
+                .TryCreateFirstAdministratorAsync(loginId, request.Password, cancellationToken)
                 .ConfigureAwait(false);
 
             if (created is null)
