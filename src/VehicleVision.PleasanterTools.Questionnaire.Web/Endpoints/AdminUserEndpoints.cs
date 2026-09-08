@@ -160,7 +160,8 @@ public static class AdminUserEndpoints
         {
             var language = RequestLanguage.Of(context);
 
-            // **自分自身は対象にしない。** 自分の分は /me/totp（パスワードの再確認つき）で行う
+            // **自分自身は対象にしない。**
+            // 自分の分は /me/totp/disable（パスワードの再確認つき）で行う
             if (adminUserId == ActorId(principal))
             {
                 return Results.BadRequest(new
@@ -285,7 +286,12 @@ public static class AdminUserEndpoints
         //
         // **必須のときは通さない。** 通すと設定を無視して保護を外せる。
         // **無効のときは通す。** 登録済みの人が自分で外せる唯一の口になる。
-        me.MapDelete("/totp", async (
+        //
+        // ⚠️ **DELETE にしないこと**（Issue #170）。パスワードを本文で受け取るが、
+        // **最小 API は DELETE の本文を推論しない**ため、
+        // 経路を組み立てる時点で例外になり**アプリ全体が起動できなくなる。**
+        // 本文を積んだ DELETE は中継で落ちることもあるので、POST で受ける。
+        me.MapPost("/totp/disable", async (
             AdminPasswordRequest request,
             HttpContext context,
             ClaimsPrincipal principal,
