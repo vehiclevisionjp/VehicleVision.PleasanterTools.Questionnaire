@@ -525,7 +525,7 @@
   }
 
   .mono {
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 0.8rem;
   }
 

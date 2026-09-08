@@ -527,7 +527,8 @@ export const ja = {
   'theme.useDefault': '既定に戻す',
   'theme.notSet': '未設定',
   'theme.font': '書体',
-  'theme.fontHint': '回答者の端末にある書体から選びます。外部から書体を読み込まないため、端末に無い場合は近い書体で表示されます。',
+  'theme.fontHint':
+    'ゴシック体と等幅はアプリに同梱しているため、端末に無くても同じ見た目になります。明朝体と丸ゴシック体は端末の書体を使うので、無い場合は近い書体で表示されます。',
   'theme.headerImage': 'ヘッダ画像',
   'theme.headerImageHint': 'PNG・JPEG・GIF・WebP の 2 MB 以内。回答画面の題名の上に表示されます。外部の URL は指定できません。',
   'theme.headerImagePreview': '設定中のヘッダ画像',
@@ -1120,7 +1121,7 @@ export const en: Record<MessageKey, string> = {
   'theme.notSet': 'Using the default',
   'theme.font': 'Typeface',
   'theme.fontHint':
-    'Chosen from typefaces the respondent already has. No web font is fetched, so a similar one is used when it is missing.',
+    'Sans and monospace ship with the app, so they look the same on every device. Serif and rounded use device fonts and fall back to something close.',
   'theme.headerImage': 'Header image',
   'theme.headerImageHint':
     'PNG, JPEG, GIF or WebP, up to 2 MB. Shown above the title on the answer screen. External URLs cannot be used.',

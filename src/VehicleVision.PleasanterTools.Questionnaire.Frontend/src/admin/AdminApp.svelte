@@ -299,12 +299,15 @@
     --error: #b42318;
     --accent: #175cd3;
     --bg: #f9fafb;
+    /* **書体は同梱している**（Issue #152）。等幅は日本語も等幅になる */
+    --font-mono: 'M PLUS 1 Code Variable', ui-monospace, Consolas, monospace;
   }
 
   :global(body) {
     margin: 0;
     background: var(--bg);
-    font-family: system-ui, sans-serif;
+    /* **同梱した書体を使う**（Issue #152）。端末の書体に依存させない */
+    font-family: 'Noto Sans JP Variable', system-ui, sans-serif;
     color: #101828;
     line-height: 1.6;
   }
@@ -317,6 +320,24 @@
     background: var(--accent);
     color: #fff;
     cursor: pointer;
+  }
+
+  /*
+    **アイコンの下地**（Issue #152）。同梱した Material Icons を使うための最小限。
+    使うときは <span class="material-icons" aria-hidden="true">save</span> のように書く。
+    **意味は文字で書くこと。** アイコンだけの釦は読み上げで何も伝わらない
+  */
+  :global(.material-icons) {
+    font-family: 'Material Icons';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 1.25em;
+    line-height: 1;
+    letter-spacing: normal;
+    white-space: nowrap;
+    vertical-align: -0.15em;
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
   }
 
   :global(button:disabled) {

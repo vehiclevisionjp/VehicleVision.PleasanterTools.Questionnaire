@@ -198,7 +198,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.35rem;
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-mono);
     letter-spacing: 0.05em;
   }
 

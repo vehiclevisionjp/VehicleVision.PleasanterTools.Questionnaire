@@ -1194,7 +1194,7 @@
 
   .row-id {
     flex: 1 1 8rem;
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 0.85rem;
   }
 
@@ -1266,7 +1266,7 @@
 
   .choice-value {
     flex: 1;
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 0.85rem;
   }
 
