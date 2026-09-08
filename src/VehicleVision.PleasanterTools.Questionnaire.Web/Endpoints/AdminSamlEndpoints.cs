@@ -27,6 +27,10 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// **失敗の理由は URL の印だけで返す。** 画面には決まった文言を出し、
 /// 詳しい理由はサーバのログと操作の記録に残す。
 /// </para>
+/// <para>
+/// **この入口は、SAML を有効にしたときだけ生える**（<c>Program.cs</c>）。
+/// ここで「無効なら 404」と書き分けていない。**経路そのものを作らない方が強い。**
+/// </para>
 /// </remarks>
 public static class AdminSamlEndpoints
 {
@@ -62,11 +66,6 @@ public static class AdminSamlEndpoints
         // 手で書き写すと、EntityID や受け口の URL の食い違いに気付けない
         group.MapGet("/metadata", (HttpContext context, SamlOptions options) =>
         {
-            if (!options.Enabled)
-            {
-                return Results.NotFound();
-            }
-
             var descriptor = new EntityDescriptor(options.ToSaml2Configuration())
             {
                 ValidUntil = 365,
@@ -100,11 +99,6 @@ public static class AdminSamlEndpoints
             IDataProtectionProvider protectionProvider,
             string? returnUrl) =>
         {
-            if (!options.Enabled)
-            {
-                return Results.NotFound();
-            }
-
             var configuration = options.ToSaml2Configuration();
             var request = new Saml2AuthnRequest(configuration)
             {
@@ -136,11 +130,6 @@ public static class AdminSamlEndpoints
             ILogger<SamlAuthenticator> logger,
             CancellationToken cancellationToken) =>
         {
-            if (!options.Enabled)
-            {
-                return Results.NotFound();
-            }
-
             var relay = ReadRelay(context, protectionProvider);
             ClearRelay(context);
 

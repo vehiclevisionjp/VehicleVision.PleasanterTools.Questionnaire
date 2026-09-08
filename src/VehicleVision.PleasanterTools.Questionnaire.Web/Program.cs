@@ -214,7 +214,8 @@ builder.Services.AddSingleton<AdminAuthenticator>();
 
 // **SAML は既定で無効**（Issue #166）。有効なのに設定が足りなければ、
 // ここで例外になって起動しない。**「有効にしたつもり」で動き続けさせない**
-builder.Services.AddSingleton(SamlOptions.FromConfiguration(builder.Configuration));
+var samlOptions = SamlOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(samlOptions);
 builder.Services.AddSingleton<SamlAuthenticator>();
 builder.Services.AddSingleton<AdminUserService>();
 
@@ -445,7 +446,13 @@ app.UseStaticFiles();
 
 app.MapFormEndpoints();
 app.MapAdminAuthEndpoints();
-app.MapAdminSamlEndpoints();
+// **SAML を使うときだけ受け口を生やす**（Issue #166）。
+// 使わない構成で認証の外の口を開けたままにしない（添付の検査の受け口と同じ考え方）。
+// **中で「無効なら 404」と書くより強い。** 無効なら経路そのものが無い
+if (samlOptions.Enabled)
+{
+    app.MapAdminSamlEndpoints();
+}
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();
