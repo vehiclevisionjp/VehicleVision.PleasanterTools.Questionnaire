@@ -31,12 +31,27 @@ public static class ServerMessageKeys
 
     public const string TotpCodeMismatch = "auth.totpCodeMismatch";
 
+    /// <summary>2 要素認証を無効にしているため、登録できない。</summary>
+    public const string TwoFactorDisabled = "auth.twoFactorDisabled";
+
+    /// <summary>2 要素認証が必須なので、自分では解除できない。</summary>
+    public const string TwoFactorRequired = "auth.twoFactorRequired";
+
+    /// <summary>2 要素認証を登録していない。</summary>
+    public const string TwoFactorNotEnrolled = "auth.twoFactorNotEnrolled";
+
     /// <summary>パスワードが短い。**最低の長さを差し込む**（`{0}`）。</summary>
     public const string PasswordTooShort = "auth.passwordTooShort";
 
+    /// <summary>パスワードがログイン ID と同じ。</summary>
+    public const string PasswordSameAsLoginId = "auth.passwordSameAsLoginId";
+
+    /// <summary>設定された条件に合わない。**文言を書いていない条件のときに使う。**</summary>
+    public const string PasswordPolicyMismatch = "auth.passwordPolicyMismatch";
+
     // ---- 管理者の管理 -------------------------------------------------------
 
-    public const string RoleMustBeEditorOrAdministrator = "users.roleMustBeEditorOrAdministrator";
+    public const string RoleNotSupported = "users.roleNotSupported";
 
     public const string AdminUserNotFound = "users.notFound";
 

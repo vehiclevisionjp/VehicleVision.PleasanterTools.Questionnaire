@@ -37,7 +37,8 @@ Copyright (C) PMC Co.,Ltd.
   Azure.Storage.Blobs 12.29.2 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
 
-フロントエンド（**成果物へ含まれるのは svelte のランタイムと qrcode のみ。** 残りはビルド時だけ使う）
+フロントエンド（**成果物へ含まれるのは svelte のランタイム・qrcode・同梱した書体のみ。**
+残りはビルド時だけ使う）
 
   svelte 5.57.0 / MIT / https://www.npmjs.com/package/svelte
   vite 8.2.2 / MIT / https://www.npmjs.com/package/vite
@@ -49,13 +50,27 @@ Copyright (C) PMC Co.,Ltd.
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
   @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://github.com/DefinitelyTyped/DefinitelyTyped
 
+同梱する書体とアイコン（**成果物に含まれる。** 自前配信なので外部へ要求は出ない）
+
+  @fontsource-variable/noto-sans-jp 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-sans-jp
+    （Noto Sans JP Variable。unicode-range で分割された woff2）
+  @fontsource-variable/noto-serif-jp 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-serif-jp
+    （Noto Serif JP Variable。テーマの「明朝体」）
+  @fontsource/m-plus-rounded-1c 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/m-plus-rounded-1c
+    （M PLUS Rounded 1c。テーマの「丸ゴシック体」。**可変フォントが無いので 400 と 700 だけ持つ**）
+  @fontsource-variable/m-plus-1-code 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/m-plus-1-code
+    （M PLUS 1 Code Variable。日本語も等幅になる）
+  @fontsource/material-icons 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/material-icons
+    （Material Icons。**上流（google/material-design-icons）は Apache-2.0** だが、
+      npm パッケージは OFL-1.1 を宣言している）
+
 テスト時のみ使用するもの
 
   xunit 2.9.3 / Apache-2.0
   xunit.runner.visualstudio 4.0.0 / Apache-2.0
   Microsoft.NET.Test.Sdk 18.9.0 / MIT
   @playwright/test 1.62.1 / Apache-2.0 / https://github.com/microsoft/playwright
-  Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物にのみ同梱。成果物には含まれない）
+  Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。成果物へ入るのは上記の書体）
   coverlet.collector 10.0.1 / MIT
   Microsoft.Extensions.TimeProvider.Testing 10.9.0 / MIT
 

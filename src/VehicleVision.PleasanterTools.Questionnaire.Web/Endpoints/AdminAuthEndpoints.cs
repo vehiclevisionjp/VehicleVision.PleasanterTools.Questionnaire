@@ -42,6 +42,7 @@ public static class AdminAuthEndpoints
         group.MapGet("/session", async (
             HttpContext context,
             IAdminUserStore store,
+            AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
@@ -52,21 +53,31 @@ public static class AdminAuthEndpoints
                 // **利用者ごとの言語は画面の初期値。** 未設定なら null を返し、
                 // 画面はブラウザの言語設定へ落とす（_documents/多言語対応方針.md 2 章）
                 string? language = null;
+                var hasTotp = false;
                 if (session.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) is { } sessionId
                     && Guid.TryParse(sessionId, out var sessionUserId))
                 {
                     var user = await store.FindByIdAsync(sessionUserId, cancellationToken)
                         .ConfigureAwait(false);
                     language = SupportedLanguages.Normalize(user?.Language);
+                    hasTotp = user?.HasTotp ?? false;
                 }
+
+                var role = session.Principal?.FindFirstValue(ClaimTypes.Role);
 
                 return Results.Ok(new
                 {
                     authenticated = true,
                     setupRequired,
                     loginId = session.Principal?.Identity?.Name,
-                    role = session.Principal?.FindFirstValue(ClaimTypes.Role),
+                    role,
+                    // **画面は権限で出し分ける**（Issue #160）。
+                    // 「Administrator かどうか」で分けると、役割を増やすたびに画面を直すことになる
+                    permissions = AdminPermissions.Of(role),
                     language,
+                    // **画面で「登録する／解除する」を出し分けるために要る**（Issue #154）
+                    twoFactor = options.TwoFactor.ToString(),
+                    hasTotp,
                 });
             }
 
@@ -100,6 +111,8 @@ public static class AdminAuthEndpoints
             AdminCredentialRequest request,
             HttpContext context,
             AdminAuthenticator authenticator,
+            AdminPasswordPolicy policy,
+            AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
             // **誰が狙われているかは、記録に残っていないと分からない。**
@@ -115,15 +128,17 @@ public static class AdminAuthEndpoints
                 });
             }
 
-            // **短すぎるパスワードを通さない。** 最初の 1 人こそ全権を持つ
-            if (!AdminPasswordPolicy.IsAcceptable(request.Password))
+            // **弱いパスワードを通さない。** 最初の 1 人こそ全権を持つ。
+            // **ログイン ID と同じ値も、設定しだいで断る**（Issue #157）
+            var loginId = request.LoginId.Trim();
+            if (policy.Check(request.Password, loginId, RequestLanguage.Of(context))
+                is { } passwordProblem)
             {
-                return Results.BadRequest(
-                    new { message = AdminPasswordPolicy.Message(RequestLanguage.Of(context)) });
+                return Results.BadRequest(new { message = passwordProblem });
             }
 
             var created = await authenticator
-                .TryCreateFirstAdministratorAsync(request.LoginId.Trim(), request.Password, cancellationToken)
+                .TryCreateFirstAdministratorAsync(loginId, request.Password, cancellationToken)
                 .ConfigureAwait(false);
 
             if (created is null)
@@ -134,6 +149,16 @@ public static class AdminAuthEndpoints
                     message = ServerMessages.Get(
                         ServerMessageKeys.AdministratorAlreadyExists, RequestLanguage.Of(context)),
                 });
+            }
+
+            // **2 要素が必須でなければ、登録を挟まずに入れる**（Issue #154）
+            if (options.TwoFactor is not TwoFactorPolicy.Required)
+            {
+                await authenticator
+                    .RecordSignInAsync(created.AdminUserId, cancellationToken)
+                    .ConfigureAwait(false);
+                await SignInSessionAsync(context, created).ConfigureAwait(false);
+                return Results.Ok(new { next = "done" });
             }
 
             await SignInPendingAsync(context, created, secret: null).ConfigureAwait(false);
@@ -172,6 +197,14 @@ public static class AdminAuthEndpoints
                     await SignInPendingAsync(context, result.User!, secret: null).ConfigureAwait(false);
                     return Results.Ok(new { next = "enroll" });
 
+                case PasswordOutcome.SignedIn:
+                    // **2 要素を求めない設定で、未登録の相手。** そのまま入れる（Issue #154）
+                    await authenticator
+                        .RecordSignInAsync(result.User!.AdminUserId, cancellationToken)
+                        .ConfigureAwait(false);
+                    await SignInSessionAsync(context, result.User!).ConfigureAwait(false);
+                    return Results.Ok(new { next = "done" });
+
                 case PasswordOutcome.LockedOut:
                     return Results.Json(
                         new
@@ -192,12 +225,23 @@ public static class AdminAuthEndpoints
         // ---- 2 要素の登録 ----------------------------------------------------
         group.MapPost("/enroll/begin", async (
             HttpContext context,
-            AdminAuthenticator authenticator) =>
+            AdminAuthenticator authenticator,
+            AdminAuthOptions options) =>
         {
             var pending = await context.AuthenticateAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
             if (!pending.Succeeded || pending.Principal?.Identity?.Name is not { } loginId)
             {
                 return Results.Unauthorized();
+            }
+
+            if (options.TwoFactor is TwoFactorPolicy.Disabled)
+            {
+                // **画面から隠すだけでは足りない。** API を直接叩かれても通さない
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.TwoFactorDisabled, RequestLanguage.Of(context)),
+                });
             }
 
             var enrollment = authenticator.BeginTotpEnrollment(loginId);
@@ -213,6 +257,7 @@ public static class AdminAuthEndpoints
             AdminCodeRequest request,
             HttpContext context,
             AdminAuthenticator authenticator,
+            AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
             var pending = await context.AuthenticateAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
@@ -228,6 +273,15 @@ public static class AdminAuthEndpoints
                 {
                     message = ServerMessages.Get(
                         ServerMessageKeys.EnrollmentRestartRequired, RequestLanguage.Of(context)),
+                });
+            }
+
+            if (options.TwoFactor is TwoFactorPolicy.Disabled)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.TwoFactorDisabled, RequestLanguage.Of(context)),
                 });
             }
 

@@ -47,8 +47,10 @@ public static class AdminUserEndpoints
     // ---- 他人を触る（Administrator だけ） ------------------------------------
     private static void MapUsers(RouteGroupBuilder parent)
     {
+        // **閲覧と書き込みを分ける**（Issue #160）。
+        // 群には弱い方（閲覧）を掛け、書き込む口へ個別に強い方を掛ける
         var users = parent.MapGroup("/users")
-            .RequireAuthorization(AdminAuthSchemes.AdministratorPolicy);
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersRead));
 
         // ---- 一覧 ------------------------------------------------------------
         users.MapGet("", async (AdminUserService service, CancellationToken cancellationToken) =>
@@ -91,7 +93,7 @@ public static class AdminUserEndpoints
                 return Results.BadRequest(new
                 {
                     message = ServerMessages.Get(
-                        ServerMessageKeys.RoleMustBeEditorOrAdministrator, language),
+                        ServerMessageKeys.RoleNotSupported, language),
                 });
             }
 
@@ -102,7 +104,8 @@ public static class AdminUserEndpoints
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(InvitationBody(invitation!))
                 : Failure(outcome, language);
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
 
         // ---- 招待の出し直し --------------------------------------------------
         users.MapPost("/{adminUserId:guid}/invitation", async (
@@ -119,7 +122,8 @@ public static class AdminUserEndpoints
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(InvitationBody(invitation!))
                 : Failure(outcome, RequestLanguage.Of(context));
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
 
         // ---- 無効化・有効化 --------------------------------------------------
         users.MapPost("/{adminUserId:guid}/disable", (
@@ -129,7 +133,8 @@ public static class AdminUserEndpoints
             AdminUserService service,
             CancellationToken cancellationToken) =>
             SetDisabledAsync(
-                adminUserId, context, principal, service, isDisabled: true, cancellationToken));
+                adminUserId, context, principal, service, isDisabled: true, cancellationToken))
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
 
         users.MapPost("/{adminUserId:guid}/enable", (
             Guid adminUserId,
@@ -138,7 +143,56 @@ public static class AdminUserEndpoints
             AdminUserService service,
             CancellationToken cancellationToken) =>
             SetDisabledAsync(
-                adminUserId, context, principal, service, isDisabled: false, cancellationToken));
+                adminUserId, context, principal, service, isDisabled: false, cancellationToken))
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
+
+        // ---- 他人の 2 要素を解除する（Issue #154）-----------------------------
+        //
+        // **端末を失った人の救済。** 復旧コードを使い切った場合、他に手が無い。
+        // ⚠️ **保護を外す操作なので、誰が誰に対して行ったかを必ず記録に残す。**
+        users.MapPost("/{adminUserId:guid}/totp/reset", async (
+            Guid adminUserId,
+            HttpContext context,
+            ClaimsPrincipal principal,
+            AdminAuthenticator authenticator,
+            IAdminUserStore store,
+            CancellationToken cancellationToken) =>
+        {
+            var language = RequestLanguage.Of(context);
+
+            // **自分自身は対象にしない。** 自分の分は /me/totp（パスワードの再確認つき）で行う
+            if (adminUserId == ActorId(principal))
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.SelfNotAllowed, language),
+                });
+            }
+
+            var user = await store.FindByIdAsync(adminUserId, cancellationToken).ConfigureAwait(false);
+            if (user is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.AdminUserNotFound, language),
+                });
+            }
+
+            AuditNotes.Add(context, "target", user.LoginId);
+
+            if (!user.HasTotp)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.TwoFactorNotEnrolled, language),
+                });
+            }
+
+            await authenticator.DisableTotpAsync(adminUserId, cancellationToken).ConfigureAwait(false);
+
+            // **必須の設定なら、この人は次回ログイン時に登録へ回る**（未登録になるため）
+            return Results.Ok(new { reset = true });
+        });
 
         // ---- 役割の変更 ------------------------------------------------------
         users.MapPost("/{adminUserId:guid}/role", async (
@@ -159,7 +213,7 @@ public static class AdminUserEndpoints
                 return Results.BadRequest(new
                 {
                     message = ServerMessages.Get(
-                        ServerMessageKeys.RoleMustBeEditorOrAdministrator, language),
+                        ServerMessageKeys.RoleNotSupported, language),
                 });
             }
 
@@ -170,7 +224,8 @@ public static class AdminUserEndpoints
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(new { role = role.ToString() })
                 : Failure(outcome, language);
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
     }
 
     // ---- 自分を触る（役割を問わない） ----------------------------------------
@@ -226,6 +281,55 @@ public static class AdminUserEndpoints
             return Results.Ok(new { language });
         });
 
+        // ---- 自分の 2 要素を解除する（Issue #154）----------------------------
+        //
+        // **必須のときは通さない。** 通すと設定を無視して保護を外せる。
+        // **無効のときは通す。** 登録済みの人が自分で外せる唯一の口になる。
+        me.MapDelete("/totp", async (
+            AdminPasswordRequest request,
+            HttpContext context,
+            ClaimsPrincipal principal,
+            AdminUserService service,
+            AdminAuthenticator authenticator,
+            IAdminUserStore store,
+            AdminAuthOptions options,
+            CancellationToken cancellationToken) =>
+        {
+            var language = RequestLanguage.Of(context);
+            if (options.TwoFactor is TwoFactorPolicy.Required)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.TwoFactorRequired, language),
+                });
+            }
+
+            var actorId = ActorId(principal);
+
+            // **登録のときと同じくパスワードをもう一度求める。**
+            // 離席で奪われた画面から保護を外されては意味が無い
+            var outcome = await service
+                .ConfirmOwnPasswordAsync(actorId, request.Password, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (outcome is not AdminUserOutcome.Succeeded)
+            {
+                return Failure(outcome, language);
+            }
+
+            var user = await store.FindByIdAsync(actorId, cancellationToken).ConfigureAwait(false);
+            if (user is null || !user.HasTotp)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.TwoFactorNotEnrolled, language),
+                });
+            }
+
+            await authenticator.DisableTotpAsync(actorId, cancellationToken).ConfigureAwait(false);
+            return Results.Ok(new { removed = true });
+        }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
         // ---- 2 要素の登録し直し（端末を替えたとき） --------------------------
         me.MapPost("/totp/begin", async (
             AdminPasswordRequest request,
@@ -233,6 +337,7 @@ public static class AdminUserEndpoints
             ClaimsPrincipal principal,
             AdminUserService service,
             AdminAuthenticator authenticator,
+            AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
             var actorId = ActorId(principal);
@@ -246,6 +351,16 @@ public static class AdminUserEndpoints
             if (outcome is not AdminUserOutcome.Succeeded)
             {
                 return Failure(outcome, RequestLanguage.Of(context));
+            }
+
+            if (options.TwoFactor is TwoFactorPolicy.Disabled)
+            {
+                // **画面から隠すだけでは足りない。** API を直接叩かれても通さない（Issue #154）
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.TwoFactorDisabled, RequestLanguage.Of(context)),
+                });
             }
 
             var loginId = principal.Identity?.Name ?? string.Empty;
@@ -313,13 +428,18 @@ public static class AdminUserEndpoints
             AdminUserService service,
             CancellationToken cancellationToken) =>
         {
-            var (outcome, user) = await service
-                .AcceptInvitationAsync(request.Token, request.Password, cancellationToken)
+            var (outcome, user, passwordProblem) = await service
+                .AcceptInvitationAsync(
+                    request.Token, request.Password, RequestLanguage.Of(context), cancellationToken)
                 .ConfigureAwait(false);
 
             if (outcome is not AdminUserOutcome.Succeeded)
             {
-                return Failure(outcome, RequestLanguage.Of(context));
+                // **条件に合わない理由は、そのまま返す**（Issue #157）。
+                // パスワードを決める画面なので、何が足りないか分からないと直せない
+                return passwordProblem is null
+                    ? Failure(outcome, RequestLanguage.Of(context))
+                    : Results.BadRequest(new { message = passwordProblem });
             }
 
             // **パスワードを決めただけでは入れない。** 2 要素まで通って初めてログインとする
@@ -364,8 +484,10 @@ public static class AdminUserEndpoints
             AdminUserOutcome.InvalidInput =>
                 Results.BadRequest(new { message = Message(ServerMessageKeys.InvalidInput) }),
 
+            // **どの条件で落ちたかはここでは分からない。**
+            // 具体的な理由は、パスワードを受け取る口（setup / invitations/accept）が返す
             AdminUserOutcome.WeakPassword =>
-                Results.BadRequest(new { message = AdminPasswordPolicy.Message(language) }),
+                Results.BadRequest(new { message = Message(ServerMessageKeys.PasswordPolicyMismatch) }),
 
             AdminUserOutcome.SelfNotAllowed =>
                 Results.Conflict(new { message = Message(ServerMessageKeys.SelfNotAllowed) }),
@@ -409,12 +531,15 @@ public static class AdminUserEndpoints
     private static DateTime AsUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
 
     /// <summary>役割を読む。**数字や未知の名前は受け付けない。**</summary>
-    private static AdminRole? ParseRole(string? value) => value switch
-    {
-        nameof(AdminRole.Editor) => AdminRole.Editor,
-        nameof(AdminRole.Administrator) => AdminRole.Administrator,
-        _ => null,
-    };
+    /// <summary>役割の名前を読む。**定義されている役割だけを受け付ける。**</summary>
+    /// <remarks>
+    /// **知らない名前は断る**（Issue #160）。数値では受け取らない。
+    /// 数値を通すと、まだ無い役割の値を書き込まれる。
+    /// </remarks>
+    private static AdminRole? ParseRole(string? value) =>
+        Enum.TryParse<AdminRole>(value, ignoreCase: false, out var role) && Enum.IsDefined(role)
+            ? role
+            : null;
 
     private static Guid ActorId(ClaimsPrincipal principal) =>
         Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);

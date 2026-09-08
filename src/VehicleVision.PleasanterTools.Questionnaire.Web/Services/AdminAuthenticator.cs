@@ -2,9 +2,38 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
+/// <summary>2 要素認証をどこまで求めるか。</summary>
+/// <remarks>
+/// **導入先で要件が違う。** 社内利用では重く、規程がある導入先では必須にしたい。
+/// **設定はアプリ全体で 1 つ**（<c>QUESTIONNAIRE_ADMIN_TWOFACTOR</c>）。
+/// </remarks>
+public enum TwoFactorPolicy
+{
+    /// <summary>必須。**未登録なら、次回ログイン時に登録させてから通す。**</summary>
+    Required,
+
+    /// <summary>任意（既定）。**管理者ごとに、自分で登録するかを決められる。**</summary>
+    Optional,
+
+    /// <summary>
+    /// 無効。**新しい登録を受け付けない。**
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ **すでに登録している人からは外さない。** 設定 1 つで既存の保護が消えるのは危ない。
+    /// 外したい人は自分で解除する。
+    /// </remarks>
+    Disabled,
+}
+
 /// <summary>管理者の認証の設定。</summary>
 public sealed record AdminAuthOptions
 {
+    /// <summary>設定の名前。**知らない値は起動時に落とす**（Program.cs）。</summary>
+    public const string TwoFactorSetting = "QUESTIONNAIRE_ADMIN_TWOFACTOR";
+
+    /// <summary>2 要素認証をどこまで求めるか。**既定は任意。**</summary>
+    public TwoFactorPolicy TwoFactor { get; init; } = TwoFactorPolicy.Optional;
+
     /// <summary>締め出すまでの失敗回数。</summary>
     public int MaxFailedAttempts { get; init; } = 5;
 
@@ -30,6 +59,14 @@ public enum PasswordOutcome
 {
     /// <summary>合っていた。**次は 2 要素へ進む。**</summary>
     NeedsSecondFactor,
+
+    /// <summary>
+    /// 合っていて、**2 要素は求めない**。そのままログインさせる。
+    /// </summary>
+    /// <remarks>
+    /// 2 要素が未登録で、かつ設定が <see cref="TwoFactorPolicy.Required"/> でないとき。
+    /// </remarks>
+    SignedIn,
 
     /// <summary>合っていたが 2 要素がまだ登録されていない。**登録させてから通す。**</summary>
     NeedsTotpEnrollment,
@@ -130,9 +167,22 @@ public sealed class AdminAuthenticator(
         }
 
         // **パスワードが通っただけでは記録しない。** 2 要素まで通って初めてログインとする
-        return new PasswordResult(
-            user.HasTotp ? PasswordOutcome.NeedsSecondFactor : PasswordOutcome.NeedsTotpEnrollment,
-            user);
+        //
+        // **登録済みなら、設定が無効でも 2 要素を求める。**
+        // 設定 1 つで既存の保護が消えるのは危ない（TwoFactorPolicy.Disabled の但し書き）。
+        // 未登録のときだけ、設定で分かれる。
+        //
+        // ⚠️ **ここでログインを記録しないこと。** この照合は
+        // 「パスワードの再確認」（2 要素の登録し直しなど）にも使われるので、
+        // 記録するとログインしていないのにログイン扱いになる。
+        // **記録はセッションを張る側で行う**（<see cref="RecordSignInAsync"/>）。
+        var outcome = user.HasTotp
+            ? PasswordOutcome.NeedsSecondFactor
+            : options.TwoFactor is TwoFactorPolicy.Required
+                ? PasswordOutcome.NeedsTotpEnrollment
+                : PasswordOutcome.SignedIn;
+
+        return new PasswordResult(outcome, user);
     }
 
     /// <summary>使い捨てパスワードを照合する。</summary>
@@ -257,8 +307,11 @@ public sealed class AdminAuthenticator(
     /// **読み込みに失敗していた場合に本人が入れなくなる。**
     /// 一度打ってもらってから <see cref="CompleteTotpEnrollmentAsync"/> で確定する。
     /// </remarks>
+    /// <exception cref="InvalidOperationException">2 要素を無効にしている場合。</exception>
     public TotpEnrollment BeginTotpEnrollment(string loginId)
     {
+        EnsureEnrollmentAllowed();
+
         var secret = totp.GenerateSecret();
         return new TotpEnrollment(secret, TotpService.BuildUri(options.Issuer, loginId, secret));
     }
@@ -274,6 +327,8 @@ public sealed class AdminAuthenticator(
         string code,
         CancellationToken cancellationToken = default)
     {
+        EnsureEnrollmentAllowed();
+
         var (verified, timeStep) = totp.Verify(secretBase32, code);
         if (!verified)
         {
@@ -299,6 +354,42 @@ public sealed class AdminAuthenticator(
             cancellationToken).ConfigureAwait(false);
 
         return codes;
+    }
+
+    /// <summary>ログインできたことを記録する。</summary>
+    /// <remarks>
+    /// **2 要素を通らずに入る経路（<see cref="PasswordOutcome.SignedIn"/>）で使う。**
+    /// 2 要素を通る経路では、その照合の側で記録している。
+    /// 記録しないと、**入れているのに「一度も入っていない」ように見える**
+    /// （最後の管理者を止めさせない判定がこれを見る）。
+    /// </remarks>
+    public Task RecordSignInAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
+        store.RecordSuccessAsync(adminUserId, cancellationToken);
+
+    /// <summary>2 要素の登録を受け付けるかを確かめる。</summary>
+    /// <remarks>
+    /// **無効にしている導入先では、登録の口そのものを閉じる。**
+    /// 画面から隠すだけでは、API を直接叩かれたときに通ってしまう。
+    /// </remarks>
+    private void EnsureEnrollmentAllowed()
+    {
+        if (options.TwoFactor is TwoFactorPolicy.Disabled)
+        {
+            throw new InvalidOperationException("2 要素認証を無効にしているため、登録できない");
+        }
+    }
+
+    /// <summary>2 要素の登録を解除する。**復旧コードも消える。**</summary>
+    /// <remarks>
+    /// 端末を失った人の救済に使う。**誰が誰の登録を解除したかは監査ログへ残すこと**
+    /// （呼び出し側の責任）。
+    /// </remarks>
+    public async Task DisableTotpAsync(Guid adminUserId, CancellationToken cancellationToken = default)
+    {
+        await store.DisableTotpAsync(adminUserId, cancellationToken).ConfigureAwait(false);
+
+        // **復旧コードだけ残っても意味が無い。** 2 要素を外したら一緒に消す
+        await store.ReplaceRecoveryCodesAsync(adminUserId, [], cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>最初の管理者を作る。**まだ 1 人も居ないときだけ通す。**</summary>
