@@ -32,7 +32,10 @@ public class AdminAuthenticationTests
         SecretProtector Protector,
         FakeTimeProvider Time);
 
-    private static Harness Create(DatabaseProvider provider, string connectionString)
+    private static Harness Create(
+        DatabaseProvider provider,
+        string connectionString,
+        TwoFactorPolicy twoFactor = TwoFactorPolicy.Optional)
     {
         DatabaseMigrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
@@ -60,7 +63,7 @@ public class AdminAuthenticationTests
             hasher,
             totp,
             protector,
-            new AdminAuthOptions(),
+            new AdminAuthOptions { TwoFactor = twoFactor },
             time,
             NullLogger<AdminAuthenticator>.Instance);
 
@@ -100,20 +103,42 @@ public class AdminAuthenticationTests
 
     [Theory]
     [MemberData(nameof(Providers))]
-    public async Task パスワードが通っても二要素の登録を求める(DatabaseProvider provider, string connectionString)
+    public async Task 必須ならパスワードが通っても二要素の登録を求める(
+        DatabaseProvider provider,
+        string connectionString)
     {
         if (!Enabled)
         {
             return;
         }
 
+        var harness = Create(provider, connectionString, TwoFactorPolicy.Required);
+        await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
+
+        var result = await harness.Authenticator.CheckPasswordAsync("admin", "long-enough-password");
+
+        // **必須にしている間は、パスワードだけでは通さない**
+        Assert.Equal(PasswordOutcome.NeedsTotpEnrollment, result.Outcome);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 任意なら二要素を登録していなくても通る(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **既定は任意**（Issue #154）。登録していない利用者はそのまま通る
         var harness = Create(provider, connectionString);
         await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
 
         var result = await harness.Authenticator.CheckPasswordAsync("admin", "long-enough-password");
 
-        // **パスワードだけでは通さない**
-        Assert.Equal(PasswordOutcome.NeedsTotpEnrollment, result.Outcome);
+        Assert.Equal(PasswordOutcome.SignedIn, result.Outcome);
     }
 
     [Theory]
@@ -301,7 +326,7 @@ public class AdminAuthenticationTests
         // **恒久的には締め出さない。** 時間が経てば通る
         harness.Time.Advance(options.LockoutDuration + TimeSpan.FromMinutes(1));
         var afterWait = await harness.Authenticator.CheckPasswordAsync("admin", "long-enough-password");
-        Assert.Equal(PasswordOutcome.NeedsTotpEnrollment, afterWait.Outcome);
+        Assert.Equal(PasswordOutcome.SignedIn, afterWait.Outcome);
     }
 
     [Theory]
