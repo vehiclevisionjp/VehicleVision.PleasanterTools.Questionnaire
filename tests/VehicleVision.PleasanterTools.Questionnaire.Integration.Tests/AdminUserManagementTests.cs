@@ -74,6 +74,7 @@ public class AdminUserManagementTests
             authenticator,
             hasher,
             options,
+            new AdminPasswordPolicy(new AdminPasswordPolicyOptions()),
             time,
             NullLogger<AdminUserService>.Instance);
 

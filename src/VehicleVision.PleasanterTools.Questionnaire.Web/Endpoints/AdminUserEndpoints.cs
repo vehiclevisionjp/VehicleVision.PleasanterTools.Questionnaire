@@ -421,13 +421,18 @@ public static class AdminUserEndpoints
             AdminUserService service,
             CancellationToken cancellationToken) =>
         {
-            var (outcome, user) = await service
-                .AcceptInvitationAsync(request.Token, request.Password, cancellationToken)
+            var (outcome, user, passwordProblem) = await service
+                .AcceptInvitationAsync(
+                    request.Token, request.Password, RequestLanguage.Of(context), cancellationToken)
                 .ConfigureAwait(false);
 
             if (outcome is not AdminUserOutcome.Succeeded)
             {
-                return Failure(outcome, RequestLanguage.Of(context));
+                // **条件に合わない理由は、そのまま返す**（Issue #157）。
+                // パスワードを決める画面なので、何が足りないか分からないと直せない
+                return passwordProblem is null
+                    ? Failure(outcome, RequestLanguage.Of(context))
+                    : Results.BadRequest(new { message = passwordProblem });
             }
 
             // **パスワードを決めただけでは入れない。** 2 要素まで通って初めてログインとする
@@ -472,8 +477,10 @@ public static class AdminUserEndpoints
             AdminUserOutcome.InvalidInput =>
                 Results.BadRequest(new { message = Message(ServerMessageKeys.InvalidInput) }),
 
+            // **どの条件で落ちたかはここでは分からない。**
+            // 具体的な理由は、パスワードを受け取る口（setup / invitations/accept）が返す
             AdminUserOutcome.WeakPassword =>
-                Results.BadRequest(new { message = AdminPasswordPolicy.Message(language) }),
+                Results.BadRequest(new { message = Message(ServerMessageKeys.PasswordPolicyMismatch) }),
 
             AdminUserOutcome.SelfNotAllowed =>
                 Results.Conflict(new { message = Message(ServerMessageKeys.SelfNotAllowed) }),

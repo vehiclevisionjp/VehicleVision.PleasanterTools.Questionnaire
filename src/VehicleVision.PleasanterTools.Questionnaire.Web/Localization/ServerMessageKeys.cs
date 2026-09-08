@@ -43,6 +43,12 @@ public static class ServerMessageKeys
     /// <summary>パスワードが短い。**最低の長さを差し込む**（`{0}`）。</summary>
     public const string PasswordTooShort = "auth.passwordTooShort";
 
+    /// <summary>パスワードがログイン ID と同じ。</summary>
+    public const string PasswordSameAsLoginId = "auth.passwordSameAsLoginId";
+
+    /// <summary>設定された条件に合わない。**文言を書いていない条件のときに使う。**</summary>
+    public const string PasswordPolicyMismatch = "auth.passwordPolicyMismatch";
+
     // ---- 管理者の管理 -------------------------------------------------------
 
     public const string RoleMustBeEditorOrAdministrator = "users.roleMustBeEditorOrAdministrator";
