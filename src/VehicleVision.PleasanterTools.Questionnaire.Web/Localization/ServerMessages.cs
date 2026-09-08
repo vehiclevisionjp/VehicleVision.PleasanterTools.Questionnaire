@@ -67,7 +67,7 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.AdministratorAlreadyExists,
-            "管理者は既に登録されています。",
+            "管理者はすでに登録されています。",
             "An administrator has already been registered.");
 
         Add(
@@ -82,7 +82,7 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.TotpCodeMismatch,
-            "数字が合いません。認証アプリの表示をご確認ください。",
+            "コードが一致しません。認証アプリの表示をご確認ください。",
             "That code does not match. Check the number shown in your authenticator app.");
 
         Add(
@@ -103,7 +103,7 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.DuplicateLoginId,
-            "そのログイン ID は既に使われています。",
+            "そのログイン ID はすでに使われています。",
             "That sign-in ID is already taken.");
 
         Add(
@@ -113,12 +113,12 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.SelfNotAllowed,
-            "自分自身には行えません。別の管理者に依頼してください。",
+            "自分自身に対しては実行できません。別の管理者に依頼してください。",
             "You cannot do this to your own account. Ask another administrator.");
 
         Add(
             ServerMessageKeys.LastAdministrator,
-            "他にログインできる管理者が居ません。"
+            "他にログインできる管理者がいません。"
             + "先に別の管理者を追加し、その管理者がログインできることを確かめてください。",
             "No other administrator can sign in. Add another administrator first "
             + "and confirm that they can sign in.");
@@ -130,7 +130,7 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.InvitationInvalid,
-            "招待が使えません。招待をやり直してください。",
+            "招待が使用できません。招待をやり直してください。",
             "That invitation cannot be used. Ask for a new invitation.");
 
         Add(
@@ -156,27 +156,27 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.DefinitionAndMappingRequired,
-            "定義とマッピングの両方が要ります。",
+            "定義と割り当ての両方が必要です。",
             "Both the definition and the mapping are required.");
 
         Add(
             ServerMessageKeys.SurveyUpdatedByOther,
-            "他の人がこのアンケートを更新しました。読み直してください。",
+            "他の人がこのアンケートを更新しました。再読み込みしてください。",
             "Someone else updated this survey. Reload it.");
 
         Add(
             ServerMessageKeys.PublishBlockedByMapping,
-            "公開できません。マッピングの不備を直してください。",
+            "公開できません。割り当ての不備を修正してください。",
             "Cannot publish. Fix the problems in the mapping first.");
 
         Add(
             ServerMessageKeys.PublishBlockedByFlow,
-            "公開できません。分岐の不備を直してください。",
+            "公開できません。分岐の不備を修正してください。",
             "Cannot publish. Fix the problems in the branching first.");
 
         Add(
             ServerMessageKeys.PublishBlockedBySettings,
-            "公開できません。設問の設定に、答えようのない指定があります。",
+            "公開できません。設問の設定に、回答できない指定があります。",
             "Cannot publish. Some questions have settings that no answer can satisfy.");
 
         Add(
@@ -191,7 +191,7 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.VersionAlreadyPublished,
-            "この版は既に公開されています。読み直してからもう一度お試しください。",
+            "この版はすでに公開されています。再読み込みしてから、もう一度お試しください。",
             "This version has already been published. Reload and try again.");
 
         Add(
@@ -202,7 +202,7 @@ public static class ServerMessages
         Add(
             ServerMessageKeys.SurveyIsTemplate,
             "これはテンプレートです。テンプレートは公開できません。"
-                + "テンプレートからアンケートを作ってください。",
+                + "テンプレートからアンケートを作成してください。",
             "This is a template. Templates cannot be published. Create a survey from it first.");
 
         // ---- テンプレート ---------------------------------------------------
@@ -214,7 +214,7 @@ public static class ServerMessages
         // ---- テーマ ---------------------------------------------------------
         Add(
             ServerMessageKeys.ThemeColorInvalid,
-            "色は #rrggbb の形で指定してください。",
+            "色は #rrggbb の形式で指定してください。",
             "Specify colors in the #rrggbb form.");
 
         Add(
@@ -224,7 +224,7 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.HeaderImageRejected,
-            "この画像は使えません。PNG・JPEG・GIF・WebP の 2 MB 以内の画像を選んでください。",
+            "この画像は使用できません。PNG・JPEG・GIF・WebP の 2 MB 以内の画像を選んでください。",
             "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 2 MB.");
 
         // ---- 回答数の上限 ---------------------------------------------------
@@ -248,7 +248,7 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.DeadLetterNotFound,
-            "その回答は見つかりません。既に送信待ちへ戻されたか、送信できた可能性があります。",
+            "その回答は見つかりません。すでに送信待ちに戻されたか、送信が完了した可能性があります。",
             "That response was not found. It may have already been put back, or it may have been sent.");
 
         return catalog.ToFrozenDictionary(StringComparer.Ordinal);
