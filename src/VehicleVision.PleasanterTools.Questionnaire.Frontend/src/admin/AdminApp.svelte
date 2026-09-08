@@ -7,7 +7,7 @@
   import SurveyEditor from './components/SurveyEditor.svelte';
   import SurveyList from './components/SurveyList.svelte';
   import { getSession, listNotifications, logout, saveLanguage } from './lib/api';
-  import type { AdminSession } from './lib/types';
+  import type { AdminPermission, AdminSession } from './lib/types';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../lib/i18n/language';
   import { language, resolveLanguage, t } from './lib/i18n/state.svelte';
 
@@ -132,7 +132,7 @@
 
     // **未読の件数だけ先に読む**（Issue #80）。
     // **失敗しても管理画面は使える。** 気付くための飾りであって、入口ではない
-    if (session.role === 'Administrator') {
+    if (session.permissions?.includes('notifications.read') ?? false) {
       const notifications = await listNotifications(0, 1);
       unreadCount = notifications.ok ? notifications.value.unreadCount : 0;
     }
@@ -172,33 +172,33 @@
    * **入口を隠すだけでは守りにならない**ので、サーバ側でも同じ判定をしている。
    * ここで隠すのは、押せない釦を出さないため。
    */
-  const isAdministrator = $derived(session?.role === 'Administrator');
+  function can(permission: AdminPermission): boolean {
+    return session?.permissions?.includes(permission) ?? false;
+  }
 
   /**
    * 操作の記録を見せてよい相手か。
    *
-   * **Administrator だけ。** 誰が何をしたかは Editor へ見せる情報ではない
-   * （`AdminAuditLogEndpoints`）。
+   * **`audit.read` を持つ相手だけ**（`AdminAuditLogEndpoints` と同じ権限）。
    */
-  const canSeeAuditLog = $derived(isAdministrator);
+  const canSeeAuditLog = $derived(can('audit.read'));
 
   /**
    * 送信状況を見せてよい相手か。
    *
-   * **Administrator だけ。** 届いていない回答があることも、
-   * 送り直すという操作も、Editor へ開く情報ではない。
-   * **サーバ側でも同じ判定をしている**（`AdminOutboxEndpoints`）。
+   * **`outbox.read` を持つ相手だけ。** 届いていない回答があることも、
+   * 送り直すという操作も、誰にでも開く情報ではない。
+   * **サーバ側でも同じ権限で判定している**（`AdminOutboxEndpoints`）。
    */
-  const canSeeOutbox = $derived(session?.role === 'Administrator');
+  const canSeeOutbox = $derived(can('outbox.read'));
 
   /**
    * お知らせを見せてよい相手か（Issue #80）。
    *
-   * **Administrator だけ。** どのアンケートが詰まっているかは、
-   * Editor へ開く情報ではない。
-   * **サーバ側でも同じ判定をしている**（`AdminNotificationEndpoints`）。
+   * **`notifications.read` を持つ相手だけ。**
+   * **サーバ側でも同じ権限で判定している**（`AdminNotificationEndpoints`）。
    */
-  const canSeeNotifications = $derived(session?.role === 'Administrator');
+  const canSeeNotifications = $derived(can('notifications.read'));
 
   const needsEnrollment = $derived(
     session !== undefined &&
@@ -280,8 +280,8 @@
         -->
         <SurveyList
           onopen={open}
-          canDuplicate={isAdministrator}
-          canUseTemplates={isAdministrator}
+          canDuplicate={can('surveys.publish')}
+          canUseTemplates={can('templates.read')}
         />
       {/if}
     </main>
@@ -299,12 +299,15 @@
     --error: #b42318;
     --accent: #175cd3;
     --bg: #f9fafb;
+    /* **書体は同梱している**（Issue #152）。等幅は日本語も等幅になる */
+    --font-mono: 'M PLUS 1 Code Variable', ui-monospace, Consolas, monospace;
   }
 
   :global(body) {
     margin: 0;
     background: var(--bg);
-    font-family: system-ui, sans-serif;
+    /* **同梱した書体を使う**（Issue #152）。端末の書体に依存させない */
+    font-family: 'Noto Sans JP Variable', system-ui, sans-serif;
     color: #101828;
     line-height: 1.6;
   }
@@ -317,6 +320,41 @@
     background: var(--accent);
     color: #fff;
     cursor: pointer;
+  }
+
+  /*
+    **アイコンの下地**（Issue #152）。同梱した Material Icons を使う。
+
+      <span class="material-icons" aria-hidden="true">save</span>
+
+    中身は**アイコンの名前**（リガチャで字形へ置き換わる）。
+    **意味は文字でも書くこと。** アイコンだけの釦は読み上げで何も伝わらない。
+    **`aria-hidden="true"` を必ず付ける。** 付けないと 'save' という英単語が読み上げられる。
+
+    **表の中で使うときは `fixed` を足す**（下記）。桁が揃う
+  */
+  :global(.material-icons) {
+    font-family: 'Material Icons';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 1.25em;
+    line-height: 1;
+    letter-spacing: normal;
+    white-space: nowrap;
+    vertical-align: -0.15em;
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /*
+    **表の中で桁を揃えるための指定。**
+    アイコンの字形は幅が同じでも、**名前が短い字形は詰まって見える**ことがある。
+    箱の幅を決めて中央へ置けば、行ごとにずれない
+  */
+  :global(.material-icons.fixed) {
+    display: inline-block;
+    width: 1.5em;
+    text-align: center;
   }
 
   :global(button:disabled) {

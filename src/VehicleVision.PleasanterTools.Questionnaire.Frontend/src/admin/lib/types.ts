@@ -502,11 +502,34 @@ export function problemKey(code: string): MessageKey | null {
   return key in ja ? (key as MessageKey) : null;
 }
 
+/**
+ * 管理画面でできることの単位（Issue #160）。
+ *
+ * **画面はこれで出し分ける。**「Administrator かどうか」で分けると、
+ * 役割を増やすたびに画面を直すことになる。
+ * **サーバ側でも同じ権限で判定している**ので、隠すのは押せない釦を出さないため。
+ */
+export type AdminPermission =
+  | 'surveys.read'
+  | 'surveys.write'
+  | 'surveys.publish'
+  | 'templates.read'
+  | 'templates.write'
+  | 'outbox.read'
+  | 'outbox.requeue'
+  | 'notifications.read'
+  | 'audit.read'
+  | 'users.read'
+  | 'users.write'
+  | 'users.resetTwoFactor';
+
 export interface AdminSession {
   authenticated: boolean;
   setupRequired: boolean;
   loginId?: string | null;
   role?: string | null;
+  /** その役割が持つ権限。**古いサーバでは来ない**ので、無い場合も扱えるようにしておく */
+  permissions?: AdminPermission[];
   pending?: boolean;
   pendingLoginId?: string | null;
   /** **途中状態のときだけ意味がある。** 2 要素をまだ登録していない */

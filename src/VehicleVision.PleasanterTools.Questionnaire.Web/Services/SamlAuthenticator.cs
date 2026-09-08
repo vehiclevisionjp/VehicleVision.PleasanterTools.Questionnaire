@@ -11,6 +11,12 @@ public enum SamlSignInOutcome
     /// <summary>本アプリ側で 2 要素を登録している。**先に 2 要素を通す。**</summary>
     NeedsSecondFactor,
 
+    /// <summary>
+    /// 2 要素が未登録で、かつ設定が <see cref="TwoFactorPolicy.Required"/>。
+    /// **登録させてから通す。**
+    /// </summary>
+    NeedsTotpEnrollment,
+
     /// <summary>本アプリに居ないので通さない（<see cref="SamlUnknownUserPolicy.Reject"/>）。</summary>
     Unknown,
 
@@ -41,11 +47,17 @@ public sealed record SamlSignInResult(
 /// IdP の多要素に任せきりにすると、「2 要素を登録済み」の相手が
 /// IdP 経由なら 1 要素で入れることになり、**設定した保護が弱くなる。**
 /// </para>
+/// <para>
+/// ⚠️ **2 要素を必須にしているときは、SAML で来た人にも登録させる**（Issue #154）。
+/// ここを抜け道にできると、**IdP から入る限り必須の設定が効かない。**
+/// パスワードのログインと同じ判断にしてある。
+/// </para>
 /// </remarks>
 public sealed class SamlAuthenticator(
     IAdminUserStore store,
     PasswordHasher hasher,
     SamlOptions options,
+    AdminAuthOptions authOptions,
     ILogger<SamlAuthenticator> logger)
 {
     /// <summary>ログイン ID から管理者を決める。居なければ設定に従って作るか断る。</summary>
@@ -86,8 +98,15 @@ public sealed class SamlAuthenticator(
 
         if (user.HasTotp)
         {
-            // **登録済みの 2 要素は、IdP 経由でも省かせない**
+            // **登録済みの 2 要素は、IdP 経由でも省かせない。**
+            // ⚠️ 方針が Disabled でも省かない（設定 1 つで保護が消えるのは危ない）
             return new SamlSignInResult(SamlSignInOutcome.NeedsSecondFactor, user, registered);
+        }
+
+        if (authOptions.TwoFactor is TwoFactorPolicy.Required)
+        {
+            // **必須なら、SAML で来た人にも登録させる**（Issue #154）
+            return new SamlSignInResult(SamlSignInOutcome.NeedsTotpEnrollment, user, registered);
         }
 
         await store.RecordSuccessAsync(user.AdminUserId, cancellationToken).ConfigureAwait(false);

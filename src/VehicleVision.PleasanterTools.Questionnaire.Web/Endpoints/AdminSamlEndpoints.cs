@@ -205,7 +205,9 @@ public static class AdminSamlEndpoints
                     return Results.Redirect(relay.ReturnUrl);
 
                 case SamlSignInOutcome.NeedsSecondFactor:
-                    // **本アプリ側で 2 要素を登録している人は、続けて 2 要素を通す**
+                case SamlSignInOutcome.NeedsTotpEnrollment:
+                    // **2 要素を登録済みなら通し、必須なら登録させる**（Issue #154）。
+                    // どちらも「途中状態」で管理画面へ戻し、画面が続きを出す
                     await AdminAuthEndpoints.SignInPendingAsync(context, result.User!, secret: null)
                         .ConfigureAwait(false);
                     return Results.Redirect(relay.ReturnUrl);

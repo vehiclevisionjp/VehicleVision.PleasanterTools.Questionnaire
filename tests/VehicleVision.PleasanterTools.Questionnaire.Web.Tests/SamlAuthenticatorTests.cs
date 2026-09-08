@@ -18,7 +18,9 @@ public class SamlAuthenticatorTests
         PasswordHasher Hasher,
         SamlAuthenticator Authenticator);
 
-    private static Harness Create(SamlOptions options)
+    private static Harness Create(
+        SamlOptions options,
+        TwoFactorPolicy twoFactor = TwoFactorPolicy.Optional)
     {
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-09-09T00:00:00Z"));
         var store = new FakeAdminUserStore(time);
@@ -27,7 +29,12 @@ public class SamlAuthenticatorTests
         return new Harness(
             store,
             hasher,
-            new SamlAuthenticator(store, hasher, options, NullLogger<SamlAuthenticator>.Instance));
+            new SamlAuthenticator(
+                store,
+                hasher,
+                options,
+                new AdminAuthOptions { TwoFactor = twoFactor },
+                NullLogger<SamlAuthenticator>.Instance));
     }
 
     private static SamlOptions Options(
@@ -165,6 +172,35 @@ public class SamlAuthenticatorTests
         var result = await harness.Authenticator.SignInAsync(LoginId);
 
         Assert.Equal(SamlSignInOutcome.Disabled, result.Outcome);
+    }
+
+    [Fact]
+    public async Task 必須なら二要素の登録を求める()
+    {
+        // ⚠️ **SAML を抜け道にできると、必須の設定が効かない**（Issue #154）
+        var harness = Create(Options(), TwoFactorPolicy.Required);
+        var user = await AddAsync(harness);
+
+        var result = await harness.Authenticator.SignInAsync(LoginId);
+
+        Assert.Equal(SamlSignInOutcome.NeedsTotpEnrollment, result.Outcome);
+
+        // **まだ通していないので、ログインは記録しない**
+        var stored = await harness.Store.FindByIdAsync(user.AdminUserId);
+        Assert.Null(stored!.LastLoginAt);
+    }
+
+    [Fact]
+    public async Task 無効でも登録済みの二要素は省かない()
+    {
+        // **設定 1 つで既存の保護が消えるのは危ない**（Issue #154 の但し書き）
+        var harness = Create(Options(), TwoFactorPolicy.Disabled);
+        var user = await AddAsync(harness);
+        await harness.Store.EnableTotpAsync(user.AdminUserId, "encrypted-secret");
+
+        var result = await harness.Authenticator.SignInAsync(LoginId);
+
+        Assert.Equal(SamlSignInOutcome.NeedsSecondFactor, result.Outcome);
     }
 
     [Fact]
