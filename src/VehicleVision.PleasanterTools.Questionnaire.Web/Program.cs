@@ -1,4 +1,5 @@
 ﻿using System.Threading.RateLimiting;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
@@ -275,11 +276,24 @@ builder.Services.AddAuthorization(options =>
         .AddAuthenticationSchemes(AdminAuthSchemes.Session)
         .RequireAuthenticatedUser());
 
-    // **他人に触れるのは Administrator だけ**（_documents/非機能設計.md 1 章）
+    // **他人に触れるのは特権管理者だけ**（_documents/非機能設計.md 1 章）
     options.AddPolicy(AdminAuthSchemes.AdministratorPolicy, policy => policy
         .AddAuthenticationSchemes(AdminAuthSchemes.Session)
         .RequireAuthenticatedUser()
         .RequireRole(nameof(AdminRole.Administrator)));
+
+    // **操作は権限で要求する**（Issue #160）。
+    //
+    // **権限は cookie へ焼かない。** 役割の claim から、その都度対応表を引く。
+    // 焼くと、役割を変えても再ログインまで効かない。
+    foreach (var permission in AdminPermissions.All)
+    {
+        options.AddPolicy(AdminPermissions.PolicyOf(permission), policy => policy
+            .AddAuthenticationSchemes(AdminAuthSchemes.Session)
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context =>
+                AdminPermissions.Has(context.User.FindFirstValue(ClaimTypes.Role), permission)));
+    }
 });
 
 // **送信ワーカーは .Web に同居させる**（_documents/アプリケーション設計.md 8 章）。

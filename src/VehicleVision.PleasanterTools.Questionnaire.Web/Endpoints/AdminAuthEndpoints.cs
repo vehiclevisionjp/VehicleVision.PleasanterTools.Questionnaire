@@ -60,12 +60,17 @@ public static class AdminAuthEndpoints
                     language = SupportedLanguages.Normalize(user?.Language);
                 }
 
+                var role = session.Principal?.FindFirstValue(ClaimTypes.Role);
+
                 return Results.Ok(new
                 {
                     authenticated = true,
                     setupRequired,
                     loginId = session.Principal?.Identity?.Name,
-                    role = session.Principal?.FindFirstValue(ClaimTypes.Role),
+                    role,
+                    // **画面は権限で出し分ける**（Issue #160）。
+                    // 「Administrator かどうか」で分けると、役割を増やすたびに画面を直すことになる
+                    permissions = AdminPermissions.Of(role),
                     language,
                 });
             }

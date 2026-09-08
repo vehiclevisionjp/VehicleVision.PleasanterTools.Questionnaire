@@ -35,7 +35,7 @@ public static class AdminNotificationEndpoints
         this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin/notifications")
-            .RequireAuthorization(AdminAuthSchemes.AdministratorPolicy);
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.NotificationsRead));
 
         AdminAuthSchemes.AddNoStore(group);
 

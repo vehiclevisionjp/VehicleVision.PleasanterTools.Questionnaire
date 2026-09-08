@@ -36,7 +36,7 @@ public static class ServerMessageKeys
 
     // ---- 管理者の管理 -------------------------------------------------------
 
-    public const string RoleMustBeEditorOrAdministrator = "users.roleMustBeEditorOrAdministrator";
+    public const string RoleNotSupported = "users.roleNotSupported";
 
     public const string AdminUserNotFound = "users.notFound";
 

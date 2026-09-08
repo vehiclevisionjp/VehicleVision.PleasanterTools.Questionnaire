@@ -47,8 +47,10 @@ public static class AdminUserEndpoints
     // ---- 他人を触る（Administrator だけ） ------------------------------------
     private static void MapUsers(RouteGroupBuilder parent)
     {
+        // **閲覧と書き込みを分ける**（Issue #160）。
+        // 群には弱い方（閲覧）を掛け、書き込む口へ個別に強い方を掛ける
         var users = parent.MapGroup("/users")
-            .RequireAuthorization(AdminAuthSchemes.AdministratorPolicy);
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersRead));
 
         // ---- 一覧 ------------------------------------------------------------
         users.MapGet("", async (AdminUserService service, CancellationToken cancellationToken) =>
@@ -91,7 +93,7 @@ public static class AdminUserEndpoints
                 return Results.BadRequest(new
                 {
                     message = ServerMessages.Get(
-                        ServerMessageKeys.RoleMustBeEditorOrAdministrator, language),
+                        ServerMessageKeys.RoleNotSupported, language),
                 });
             }
 
@@ -102,7 +104,8 @@ public static class AdminUserEndpoints
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(InvitationBody(invitation!))
                 : Failure(outcome, language);
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
 
         // ---- 招待の出し直し --------------------------------------------------
         users.MapPost("/{adminUserId:guid}/invitation", async (
@@ -119,7 +122,8 @@ public static class AdminUserEndpoints
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(InvitationBody(invitation!))
                 : Failure(outcome, RequestLanguage.Of(context));
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
 
         // ---- 無効化・有効化 --------------------------------------------------
         users.MapPost("/{adminUserId:guid}/disable", (
@@ -129,7 +133,8 @@ public static class AdminUserEndpoints
             AdminUserService service,
             CancellationToken cancellationToken) =>
             SetDisabledAsync(
-                adminUserId, context, principal, service, isDisabled: true, cancellationToken));
+                adminUserId, context, principal, service, isDisabled: true, cancellationToken))
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
 
         users.MapPost("/{adminUserId:guid}/enable", (
             Guid adminUserId,
@@ -138,7 +143,8 @@ public static class AdminUserEndpoints
             AdminUserService service,
             CancellationToken cancellationToken) =>
             SetDisabledAsync(
-                adminUserId, context, principal, service, isDisabled: false, cancellationToken));
+                adminUserId, context, principal, service, isDisabled: false, cancellationToken))
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
 
         // ---- 役割の変更 ------------------------------------------------------
         users.MapPost("/{adminUserId:guid}/role", async (
@@ -159,7 +165,7 @@ public static class AdminUserEndpoints
                 return Results.BadRequest(new
                 {
                     message = ServerMessages.Get(
-                        ServerMessageKeys.RoleMustBeEditorOrAdministrator, language),
+                        ServerMessageKeys.RoleNotSupported, language),
                 });
             }
 
@@ -170,7 +176,8 @@ public static class AdminUserEndpoints
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(new { role = role.ToString() })
                 : Failure(outcome, language);
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
     }
 
     // ---- 自分を触る（役割を問わない） ----------------------------------------
@@ -409,12 +416,15 @@ public static class AdminUserEndpoints
     private static DateTime AsUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
 
     /// <summary>役割を読む。**数字や未知の名前は受け付けない。**</summary>
-    private static AdminRole? ParseRole(string? value) => value switch
-    {
-        nameof(AdminRole.Editor) => AdminRole.Editor,
-        nameof(AdminRole.Administrator) => AdminRole.Administrator,
-        _ => null,
-    };
+    /// <summary>役割の名前を読む。**定義されている役割だけを受け付ける。**</summary>
+    /// <remarks>
+    /// **知らない名前は断る**（Issue #160）。数値では受け取らない。
+    /// 数値を通すと、まだ無い役割の値を書き込まれる。
+    /// </remarks>
+    private static AdminRole? ParseRole(string? value) =>
+        Enum.TryParse<AdminRole>(value, ignoreCase: false, out var role) && Enum.IsDefined(role)
+            ? role
+            : null;
 
     private static Guid ActorId(ClaimsPrincipal principal) =>
         Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);

@@ -92,9 +92,9 @@ public static class ServerMessages
 
         // ---- 管理者の管理 ---------------------------------------------------
         Add(
-            ServerMessageKeys.RoleMustBeEditorOrAdministrator,
-            "役割は Editor か Administrator を指定してください。",
-            "The role must be either Editor or Administrator.");
+            ServerMessageKeys.RoleNotSupported,
+            "役割は Administrator / SurveyAdministrator / UserAdministrator / Editor / Auditor のいずれかを指定してください。",
+            "The role must be one of Administrator, SurveyAdministrator, UserAdministrator, Editor or Auditor.");
 
         Add(
             ServerMessageKeys.AdminUserNotFound,
