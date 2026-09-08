@@ -120,8 +120,8 @@ public class AdminUserServiceTests
 
         var result = await harness.Authenticator.CheckPasswordAsync("editor", AnotherPassword);
 
-        // パスワードは通り、次は 2 要素の登録を求められる
-        Assert.Equal(PasswordOutcome.NeedsTotpEnrollment, result.Outcome);
+        // **パスワードは通る。** 既定の設定（2 要素は任意）ではそのまま入れる
+        Assert.Equal(PasswordOutcome.SignedIn, result.Outcome);
     }
 
     [Fact]
@@ -397,7 +397,7 @@ public class AdminUserServiceTests
 
         Assert.Equal(AdminUserOutcome.Succeeded, outcome);
         Assert.Equal(
-            PasswordOutcome.NeedsTotpEnrollment,
+            PasswordOutcome.SignedIn,
             (await harness.Authenticator.CheckPasswordAsync("admin", AnotherPassword)).Outcome);
         Assert.Equal(
             PasswordOutcome.Invalid,
@@ -415,7 +415,7 @@ public class AdminUserServiceTests
 
         Assert.Equal(AdminUserOutcome.PasswordRejected, outcome);
         Assert.Equal(
-            PasswordOutcome.NeedsTotpEnrollment,
+            PasswordOutcome.SignedIn,
             (await harness.Authenticator.CheckPasswordAsync("admin", Password)).Outcome);
     }
 

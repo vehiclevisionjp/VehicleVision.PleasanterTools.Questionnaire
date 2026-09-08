@@ -414,7 +414,11 @@ public sealed class AdminUserService(
 
         return result.Outcome switch
         {
-            PasswordOutcome.NeedsSecondFactor or PasswordOutcome.NeedsTotpEnrollment =>
+            // **2 要素を求めない設定では SignedIn が返る。** ここでは「パスワードが合っていた」
+            // ことだけを見たいので、3 つとも「通った」として扱う（Issue #154）
+            PasswordOutcome.NeedsSecondFactor
+                or PasswordOutcome.NeedsTotpEnrollment
+                or PasswordOutcome.SignedIn =>
                 AdminUserOutcome.Succeeded,
             PasswordOutcome.LockedOut => AdminUserOutcome.LockedOut,
             _ => AdminUserOutcome.PasswordRejected,
