@@ -94,7 +94,7 @@ test.describe('取説用の写し', () => {
 
     await shoot(page, 'admin-02-enroll');
 
-    await page.getByLabel('認証アプリに出た 6 桁の数字').fill(totp(secret));
+    await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret));
     await page.getByRole('button', { name: '登録する' }).click();
 
     // **復旧コードはここでしか出せない**
@@ -220,7 +220,7 @@ test.describe('取説用の写し（ログイン済み）', () => {
     await page.getByLabel('パスワード', { exact: true }).fill(demoAdmin.password);
     await page.getByRole('button', { name: '次へ' }).click();
 
-    await expect(page.getByRole('heading', { name: '認証アプリの数字を入力' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '認証コードを入力' })).toBeVisible();
     await shoot(page, 'admin-08-totp');
   });
 });

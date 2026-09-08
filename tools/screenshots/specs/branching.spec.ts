@@ -35,7 +35,7 @@ test.describe('分岐（下ごしらえ）', () => {
     await expect(page.getByRole('heading', { name: '2 要素認証を登録する' })).toBeVisible();
     const secret = (await page.locator('.secret code').innerText()).replace(/\s/g, '');
 
-    await page.getByLabel('認証アプリに出た 6 桁の数字').fill(totp(secret));
+    await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret));
     await page.getByRole('button', { name: '登録する' }).click();
 
     await expect(page.getByRole('heading', { name: '復旧コードを控えてください' })).toBeVisible();
@@ -162,7 +162,7 @@ test.describe('分岐', () => {
     await expect(sheet).toBeVisible();
 
     // **保存されないことが画面に出ている**
-    await expect(sheet.getByText('保存も送信もされません')).toBeVisible();
+    await expect(sheet.getByText('保存・送信はされません')).toBeVisible();
 
     // 条件つきの設問が出し分けられる
     await expect(sheet.getByText('サービス名')).toBeHidden();
@@ -178,7 +178,7 @@ test.describe('分岐', () => {
 
     // **送信の釦は出さない。** 押せる釦があると、押した人は送れたと思う
     await expect(sheet.getByRole('button', { name: '送信する' })).toBeHidden();
-    await expect(sheet.getByText('ここが最後です')).toBeVisible();
+    await expect(sheet.getByText('ここが最後のページです')).toBeVisible();
 
     // **下敷きは巻き取らない。** どちらを操作しているのか分からなくなる
     await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');

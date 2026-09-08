@@ -140,7 +140,7 @@ test.describe('proof-of-work の経路', () => {
   // **下ごしらえはここだけに置く。** 上の 2 件（安全なコンテキストの確認）は
   // 管理画面もアンケートも要らない。**下ごしらえで転んでも、そちらは答えを出せる**
   test.beforeAll(async ({ browser }) => {
-    // **アンケートを作るのは平文側の管理画面から。**
+    // **アンケートを作成のは平文側の管理画面から。**
     // 確かめたいのは回答画面の計算であって、管理画面の経路ではない
     const authFile = await ensureAdminStorageState(browser, httpBaseUrl);
     const context = await browser.newContext({ baseURL: httpBaseUrl, storageState: authFile });

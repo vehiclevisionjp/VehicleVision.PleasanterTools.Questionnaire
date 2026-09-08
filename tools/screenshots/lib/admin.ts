@@ -71,7 +71,7 @@ export async function ensureAdminStorageState(
     await page.getByRole('heading', { name: '2 要素認証を登録する' }).waitFor();
     const secret = (await page.locator('.secret code').innerText()).replace(/\s/g, '');
 
-    await page.getByLabel('認証アプリに出た 6 桁の数字').fill(totp(secret));
+    await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret));
     await page.getByRole('button', { name: '登録する' }).click();
 
     await page.getByRole('heading', { name: '復旧コードを控えてください' }).waitFor();

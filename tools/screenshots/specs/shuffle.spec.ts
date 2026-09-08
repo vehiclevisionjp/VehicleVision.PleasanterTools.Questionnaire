@@ -25,7 +25,7 @@ const baseUrl = process.env['QUESTIONNAIRE_BASE_URL'] ?? 'http://questionnaire-a
 const demoSiteId = Number(process.env['SHOT_SITE_ID'] ?? '1');
 
 /**
- * 読み直す回数。
+ * 再読み込み回数。
  *
  * ⚠️ **1 回では確かめられない。** 並べ替えた結果がたまたま元と同じになることはある。
  * 選択肢は 8 つ（40320 通り）あるので、**6 回読み直して全部同じなら、
@@ -85,7 +85,7 @@ test.describe('並べ替え', () => {
     const seen = new Set<string>();
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
-      // **読み直すたびに新しい種を引く。** 回答者が変わったのと同じ状態
+      // **再読み込みたびに新しい種を引く。** 回答者が変わったのと同じ状態
       await page.goto(`/f/${shuffledId}`);
       await expect(page.getByText('好きな色')).toBeVisible();
 

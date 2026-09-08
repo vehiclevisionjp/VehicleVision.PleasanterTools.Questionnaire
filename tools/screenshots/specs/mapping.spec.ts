@@ -187,7 +187,7 @@ test.describe('マッピングの編集画面', () => {
 
       const notes = page.locator('table tbody tr.notes');
       await expect(notes).toHaveCount(1);
-      await expect(notes).toContainText('変換が無いときは入力をちょうど 1 つにしてください。');
+      await expect(notes).toContainText('変換を使わない場合は、入力を 1 つだけにしてください。');
 
       // **直前の行が、その不備の持ち主**であること
       const owner = notes.locator('xpath=preceding-sibling::tr[1]');

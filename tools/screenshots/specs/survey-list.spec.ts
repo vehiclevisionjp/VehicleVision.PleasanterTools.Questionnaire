@@ -189,7 +189,7 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
       await page.goto('/admin');
       await expect.poll(() => rowCount(page)).toBe(pageSize);
 
-      await page.getByLabel('題名で探す').fill('絞り込みの目印');
+      await page.getByLabel('題名で検索').fill('絞り込みの目印');
       await page.getByRole('button', { name: '絞り込む' }).click();
 
       await expect.poll(() => rowCount(page)).toBe(markedTitles.length);
@@ -207,7 +207,7 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
       await page.getByRole('button', { name: '次へ' }).click();
       await expect(page.getByRole('button', { name: '前へ' })).toBeEnabled();
 
-      await page.getByLabel('題名で探す').fill('絞り込みの目印');
+      await page.getByLabel('題名で検索').fill('絞り込みの目印');
       await page.getByRole('button', { name: '絞り込む' }).click();
 
       await expect.poll(() => rowCount(page)).toBe(markedTitles.length);
@@ -237,7 +237,7 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
       await page.goto('/admin');
       await expect.poll(() => rowCount(page)).toBe(pageSize);
 
-      await page.getByLabel('題名で探す').fill('どこにも無い題名');
+      await page.getByLabel('題名で検索').fill('どこにも無い題名');
       await page.getByRole('button', { name: '絞り込む' }).click();
 
       // **「まだアンケートがありません」と出してはいけない。**
@@ -246,18 +246,18 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
       await expect(page.getByText('まだアンケートがありません。')).toHaveCount(0);
     });
 
-    test('条件を消すと元へ戻る', async ({ page }) => {
+    test('条件をクリアと元へ戻る', async ({ page }) => {
       await page.goto('/admin');
       await expect.poll(() => rowCount(page)).toBe(pageSize);
 
-      await page.getByLabel('題名で探す').fill('絞り込みの目印');
+      await page.getByLabel('題名で検索').fill('絞り込みの目印');
       await page.getByRole('button', { name: '絞り込む' }).click();
       await expect.poll(() => rowCount(page)).toBe(markedTitles.length);
 
-      await page.getByRole('button', { name: '条件を消す' }).click();
+      await page.getByRole('button', { name: '条件をクリア' }).click();
 
       await expect.poll(() => rowCount(page)).toBe(pageSize);
-      await expect(page.getByLabel('題名で探す')).toHaveValue('');
+      await expect(page.getByLabel('題名で検索')).toHaveValue('');
     });
   });
 });
