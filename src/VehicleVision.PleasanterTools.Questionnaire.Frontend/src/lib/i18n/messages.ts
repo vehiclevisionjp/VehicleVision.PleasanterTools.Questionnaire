@@ -30,7 +30,7 @@ export const ja = {
   // ---- 既に回答済み ---------------------------------------------------------
   'answered.title': 'この端末では回答済みです',
   'answered.canEdit': '前回の回答を編集できます。',
-  'answered.cannotRead': '前回の回答内容は読み出せませんでした。',
+  'answered.cannotRead': '前回の回答内容を読み込めませんでした。',
   'answered.editingNotAllowed': 'このアンケートは回答の編集を受け付けていません。',
   'answered.answerAgain': '新しい回答として送信する',
   'answered.answerAgainNote':
@@ -63,11 +63,11 @@ export const ja = {
   'question.required': '必須',
   'question.selectPlaceholder': '選択してください',
   'question.otherText': 'その他の内容',
-  'question.unsupported': 'この設問形式にはまだ対応していません（{type}）',
+  'question.unsupported': 'この設問形式には対応していません（{type}）',
   'question.ratingLabel': '{value} / {max}',
   'question.gridRowHeader': '項目',
   'question.gridRowLabel': '{row}: {choice}',
-  'question.rankingLead': '選ぶと順位が付きます。もう一度押すと外れます。',
+  'question.rankingLead': '選択すると順位が付きます。もう一度押すと解除されます。',
   // ---- 埋め込み（Issue #104 / #107） ------------------------------------------
   'embed.notice':
     'このページには外部サイトの内容（{hosts}）が含まれます。表示すると、そのサイトへ接続します。',

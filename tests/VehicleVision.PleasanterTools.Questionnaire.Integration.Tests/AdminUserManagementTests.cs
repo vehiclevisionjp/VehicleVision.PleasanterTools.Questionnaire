@@ -338,7 +338,7 @@ public class AdminUserManagementTests
 
     [Theory]
     [MemberData(nameof(Providers))]
-    public async Task 招待を受け取ると自分で決めた合言葉で通る(
+    public async Task 招待を受け取ると自分で決めたパスワードで通る(
         DatabaseProvider provider,
         string connectionString)
     {

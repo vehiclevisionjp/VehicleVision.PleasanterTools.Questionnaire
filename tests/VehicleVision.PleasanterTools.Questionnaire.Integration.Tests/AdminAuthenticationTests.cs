@@ -100,7 +100,7 @@ public class AdminAuthenticationTests
 
     [Theory]
     [MemberData(nameof(Providers))]
-    public async Task 合言葉が通っても二要素の登録を求める(DatabaseProvider provider, string connectionString)
+    public async Task パスワードが通っても二要素の登録を求める(DatabaseProvider provider, string connectionString)
     {
         if (!Enabled)
         {
@@ -112,7 +112,7 @@ public class AdminAuthenticationTests
 
         var result = await harness.Authenticator.CheckPasswordAsync("admin", "long-enough-password");
 
-        // **合言葉だけでは通さない**
+        // **パスワードだけでは通さない**
         Assert.Equal(PasswordOutcome.NeedsTotpEnrollment, result.Outcome);
     }
 
@@ -294,7 +294,7 @@ public class AdminAuthenticationTests
             Assert.Equal(PasswordOutcome.Invalid, failed.Outcome);
         }
 
-        // **正しい合言葉でも通らない**
+        // **正しいパスワードでも通らない**
         var locked = await harness.Authenticator.CheckPasswordAsync("admin", "long-enough-password");
         Assert.Equal(PasswordOutcome.LockedOut, locked.Outcome);
 
@@ -324,7 +324,7 @@ public class AdminAuthenticationTests
 
     [Theory]
     [MemberData(nameof(Providers))]
-    public async Task 居ない利用者は合言葉が違うのと同じ扱いになる(
+    public async Task 居ない利用者はパスワードが違うのと同じ扱いになる(
         DatabaseProvider provider,
         string connectionString)
     {

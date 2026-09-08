@@ -151,7 +151,7 @@ public class AdminUserEndToEndTests
     }
 
     [Fact]
-    public async Task 招待を受け取ると自分で決めた合言葉で入れる()
+    public async Task 招待を受け取ると自分で決めたパスワードで入れる()
     {
         if (!Enabled)
         {
@@ -238,7 +238,7 @@ public class AdminUserEndToEndTests
     }
 
     [Fact]
-    public async Task Editorも自分の合言葉は変えられる()
+    public async Task Editorも自分のパスワードは変えられる()
     {
         if (!Enabled)
         {
@@ -347,7 +347,7 @@ public class AdminUserEndToEndTests
     }
 
     [Fact]
-    public async Task 短い合言葉では招待を受け取れない()
+    public async Task 短いパスワードでは招待を受け取れない()
     {
         if (!Enabled)
         {

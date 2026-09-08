@@ -187,22 +187,22 @@ test.describe('マッピングの編集画面', () => {
 
       const notes = page.locator('table tbody tr.notes');
       await expect(notes).toHaveCount(1);
-      await expect(notes).toContainText('変換が無いときは入力をちょうど 1 つにしてください。');
+      await expect(notes).toContainText('変換を使わない場合は、入力を 1 つだけにしてください。');
 
       // **直前の行が、その不備の持ち主**であること
       const owner = notes.locator('xpath=preceding-sibling::tr[1]');
       await expect(owner.locator('td.target input')).toHaveValue('ClassC');
     });
 
-    test('列を足すと行が増える', async ({ page }) => {
+    test('列を追加すると行が増える', async ({ page }) => {
       test.skip(surveyId === '', '先の試験でアンケートを作れていない');
 
       await page.goto(`/admin/surveys/${surveyId}`);
       const rows = page.locator('table tbody tr:not(.notes)');
       await expect.poll(() => rows.count()).toBe(3);
 
-      // **`exact` を付ける。** 「添付の列を足す」にも当たってしまう
-      await page.getByRole('button', { name: '列を足す', exact: true }).click();
+      // **`exact` を付ける。** 「添付の列を追加」にも当たってしまう
+      await page.getByRole('button', { name: '列を追加', exact: true }).click();
 
       await expect.poll(() => rows.count()).toBe(4);
       await expect(rows.nth(3).locator('td.source select').first()).toBeVisible();

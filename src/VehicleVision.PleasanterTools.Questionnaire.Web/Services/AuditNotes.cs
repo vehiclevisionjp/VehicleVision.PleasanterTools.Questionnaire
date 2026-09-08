@@ -3,14 +3,14 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// <summary>監査ログへ添える補足を、入口の側から預ける。</summary>
 /// <remarks>
 /// <para>
-/// **<see cref="AuditLogFilter"/> は要求本文に触らない。** 触れば合言葉が入り得るからで、
+/// **<see cref="AuditLogFilter"/> は要求本文に触らない。** 触ればパスワードが入り得るからで、
 /// その約束は「書ける場所を絞る」ことで守っている。
 /// **本文の中に残したい値があるときだけ、入口が明示して預ける。**
 /// </para>
 /// <para>
 /// **預けてよいのは、漏れても困らない値だけ。**
 /// ログイン ID は残す（どの利用者が狙われているか分からないと対処できない）。
-/// 合言葉・2 要素の共有鍵・招待の合言葉・回答本文は預けない。
+/// パスワード・2 要素の共有鍵・招待のパスワード・回答本文は預けない。
 /// </para>
 /// </remarks>
 public static class AuditNotes

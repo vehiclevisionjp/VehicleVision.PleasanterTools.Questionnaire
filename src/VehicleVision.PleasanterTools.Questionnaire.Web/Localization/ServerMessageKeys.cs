@@ -31,7 +31,7 @@ public static class ServerMessageKeys
 
     public const string TotpCodeMismatch = "auth.totpCodeMismatch";
 
-    /// <summary>合言葉が短い。**最低の長さを差し込む**（`{0}`）。</summary>
+    /// <summary>パスワードが短い。**最低の長さを差し込む**（`{0}`）。</summary>
     public const string PasswordTooShort = "auth.passwordTooShort";
 
     // ---- 管理者の管理 -------------------------------------------------------

@@ -54,7 +54,7 @@ public interface IAdminInvitationStore
         CancellationToken cancellationToken = default);
 
     /// <summary>未使用の招待を取り消す。</summary>
-    /// <remarks>**止めた利用者宛ての招待は消す。** 止めたのに合言葉を決められては困る。</remarks>
+    /// <remarks>**止めた利用者宛ての招待は消す。** 止めたのにパスワードを決められては困る。</remarks>
     Task RevokeUnusedAsync(Guid adminUserId, CancellationToken cancellationToken = default);
 }
 

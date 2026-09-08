@@ -10,7 +10,7 @@
   import { t } from '../lib/i18n/state.svelte';
 
   /**
-   * 合言葉の最低の長さ。
+   * パスワードの最低の長さ。
    *
    * **サーバ側（`Web/Services/AdminPasswordPolicy.cs`）と揃えること。**
    * ここで通してもサーバが断る。画面側は打ち直しを減らすためだけのもの。
@@ -27,7 +27,7 @@
 
   type Step = 'password' | 'totp' | 'recovery';
 
-  // **途中状態から始めることがある。** 合言葉だけ通してページを再読み込みした場合。
+  // **途中状態から始めることがある。** パスワードだけ通してページを再読み込みした場合。
   // **最初の 1 回だけ見る。** 以降は画面の側が持ち主になる
   let step = $state<Step>(untrack(() => (session.pending === true ? 'totp' : 'password')));
   let loginId = $state(untrack(() => session.pendingLoginId ?? ''));
@@ -65,12 +65,12 @@
       return;
     }
 
-    // **合言葉が通っただけ。** ここから 2 要素へ進む
+    // **パスワードが通っただけ。** ここから 2 要素へ進む
     password = '';
     confirmation = '';
 
     // **自分で段階を進める。** 状態を読み直しても、この部品は作り直されないので
-    // step は残ったままになる（合言葉の欄が出続ける）。
+    // step は残ったままになる（パスワードの欄が出続ける）。
     // 2 要素の登録が要る場合は、親が別の画面へ差し替える
     if (result.value.next === 'totp') {
       step = 'totp';
@@ -103,7 +103,7 @@
     <h1>{isSetup ? t('signIn.setupTitle') : t('signIn.title')}</h1>
 
     {#if isSetup}
-      <!-- **既定の合言葉を仕込まない。** 変え忘れた既定値が残らないようにしている -->
+      <!-- **既定のパスワードを仕込まない。** 変え忘れた既定値が残らないようにしている -->
       <p class="lead">
         {t('signIn.setupLead')}
         <strong>{t('signIn.setupLeadStrong')}</strong>

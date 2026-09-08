@@ -16,7 +16,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// <remarks>
 /// <para>
 /// **すべて <see cref="AdminAuthSchemes.Session"/> が要る。**
-/// 合言葉だけ通した途中状態では操作させない。
+/// パスワードだけ通した途中状態では操作させない。
 /// </para>
 /// <para>
 /// **編集は公開へ影響しない。** 下書きを保存しても回答画面は変わらず、

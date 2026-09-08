@@ -200,11 +200,11 @@ public class ConnectionSecurityTests
     {
         var problems = ConnectionSecurity.Inspect(
             DatabaseProvider.SqlServer,
-            "Server=db;Database=Q;UID=sa;PWD=秘密の合言葉;Encrypt=False");
+            "Server=db;Database=Q;UID=sa;PWD=秘密のパスワード;Encrypt=False");
 
         // **資格情報をログや例外へ流さない**
         Assert.All(
             problems,
-            problem => Assert.DoesNotContain("秘密の合言葉", problem.Reason, StringComparison.Ordinal));
+            problem => Assert.DoesNotContain("秘密のパスワード", problem.Reason, StringComparison.Ordinal));
     }
 }

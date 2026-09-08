@@ -35,7 +35,7 @@ public class AuditLogEndToEndTests
     private sealed record LogRow(string Action, int? StatusCode, Guid? AdminUserId, string? DetailJson);
 
     [Fact]
-    public async Task 合言葉が違うログインも記録に残る()
+    public async Task パスワードが違うログインも記録に残る()
     {
         if (!Enabled)
         {
@@ -60,7 +60,7 @@ public class AuditLogEndToEndTests
         // **どの利用者が狙われているかが分からないと対処できない**
         Assert.Contains("居ない人", entry.DetailJson ?? string.Empty, StringComparison.Ordinal);
 
-        // **合言葉は入らない**
+        // **パスワードは入らない**
         Assert.DoesNotContain("でたらめ", entry.DetailJson ?? string.Empty, StringComparison.Ordinal);
     }
 

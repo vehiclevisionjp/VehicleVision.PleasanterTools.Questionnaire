@@ -40,7 +40,7 @@ public class DefenderForStorageVirusScannerTests
         Enabled = true,
         Provider = VirusScanProvider.DefenderForStorage,
         DefenderResultTimeout = TimeSpan.FromSeconds(timeoutSeconds),
-        EventGridKey = "合言葉",
+        EventGridKey = "パスワード",
     };
 
     /// <summary>判定が届く様子を模す。**置かれた blob 名へ後から結果を配る。**</summary>

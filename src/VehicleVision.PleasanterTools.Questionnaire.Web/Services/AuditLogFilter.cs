@@ -9,7 +9,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// <remarks>
 /// <para>
 /// **要求の本文には触らない。** 記録するのは宛先・結果・経路の値だけ。
-/// 触らない限り、合言葉も招待の合言葉も 2 要素の共有鍵も入りようがない
+/// 触らない限り、パスワードも招待のパスワードも 2 要素の共有鍵も入りようがない
 /// （<c>_documents/データモデル設計.md</c> 2.6「回答本文を入れない」）。
 /// **入れない約束を、書ける場所を絞ることで守る。**
 /// </para>
@@ -192,7 +192,7 @@ public sealed partial class AuditLogFilter(
     /// <summary>補足。**経路の値だけ**を入れる。</summary>
     /// <remarks>
     /// **要求本文と問い合わせ文字列は入れない。**
-    /// 本文には合言葉が、問い合わせ文字列には招待の合言葉が載り得る。
+    /// 本文にはパスワードが、問い合わせ文字列には招待のパスワードが載り得る。
     /// 経路の値は URL の一部で、識別子しか入らない。
     /// </remarks>
     private static string? DetailOf(HttpContext http)

@@ -20,7 +20,7 @@
 
 name: questionnaire-dev
 
-# **自己署名の証明書（PFX）を守る合言葉。検証環境用の固定値。**
+# **自己署名の証明書（PFX）を守るパスワード。検証環境用の固定値。**
 # 作る側（devcert）と読む側（app）で必ず同じ値を使う。片方だけ直すと
 # 「証明書は在るのに Kestrel が起動しない」になるので、**1 か所に書いて参照する**
 x-devcert-password: &devcert-password "${DEV_HTTPS_CERT_PASSWORD:-Questionnaire#DevCert1}"
@@ -182,7 +182,7 @@ services:
   # https://learn.microsoft.com/aspnet/core/security/docker-https 2026-08-20 参照）。
   #
   # **イメージは build 段階で既に引いている SDK を使い回す。** 新しい依存を増やさない。
-  # `dotnet dev-certs https --export-path <pfx> --password <合言葉>` は
+  # `dotnet dev-certs https --export-path <pfx> --password <パスワード>` は
   # Microsoft が案内している作り方（同上）。
   #
   # **この証明書は `localhost` などの名前しか持たない**（.NET 10 の SAN は

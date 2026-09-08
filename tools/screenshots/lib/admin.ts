@@ -63,15 +63,15 @@ export async function ensureAdminStorageState(
     }
 
     await page.getByLabel('ログイン ID').fill(demoAdmin.loginId);
-    await page.getByLabel('合言葉', { exact: true }).fill(demoAdmin.password);
-    await page.getByLabel('合言葉（確認）').fill(demoAdmin.password);
+    await page.getByLabel('パスワード', { exact: true }).fill(demoAdmin.password);
+    await page.getByLabel('パスワード（確認）').fill(demoAdmin.password);
     await page.getByRole('button', { name: '登録する' }).click();
 
     // **2 要素の登録まで通さないと管理画面へ入れない**
     await page.getByRole('heading', { name: '2 要素認証を登録する' }).waitFor();
     const secret = (await page.locator('.secret code').innerText()).replace(/\s/g, '');
 
-    await page.getByLabel('認証アプリに出た 6 桁の数字').fill(totp(secret));
+    await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret));
     await page.getByRole('button', { name: '登録する' }).click();
 
     await page.getByRole('heading', { name: '復旧コードを控えてください' }).waitFor();

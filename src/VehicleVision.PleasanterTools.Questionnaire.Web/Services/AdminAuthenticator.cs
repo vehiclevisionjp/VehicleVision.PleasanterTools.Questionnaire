@@ -25,7 +25,7 @@ public sealed record AdminAuthOptions
     public TimeSpan InvitationLifetime { get; init; } = TimeSpan.FromHours(48);
 }
 
-/// <summary>合言葉の照合の結果。</summary>
+/// <summary>パスワードの照合の結果。</summary>
 public enum PasswordOutcome
 {
     /// <summary>合っていた。**次は 2 要素へ進む。**</summary>
@@ -44,7 +44,7 @@ public enum PasswordOutcome
     Disabled,
 }
 
-/// <summary>合言葉の照合の結果。</summary>
+/// <summary>パスワードの照合の結果。</summary>
 public sealed record PasswordResult(PasswordOutcome Outcome, AdminUser? User = null, DateTime? LockedUntil = null);
 
 /// <summary>2 要素の照合の結果。</summary>
@@ -65,13 +65,13 @@ public sealed record TotpEnrollment(string SecretBase32, string OtpAuthUri);
 /// <summary>管理者の認証。</summary>
 /// <remarks>
 /// <para>
-/// **合言葉だけでは通さない**（<c>_documents/非機能設計.md</c> 2 章）。
+/// **パスワードだけでは通さない**（<c>_documents/非機能設計.md</c> 2 章）。
 /// 管理画面は全アンケートの回答に触れるため、
 /// 2 要素を**任意ではなく必須**にする。
 /// </para>
 /// <para>
 /// **どの段階で外れたかを外へ伝えない。** 「その利用者は居ない」と
-/// 「合言葉が違う」を区別して返すと、利用者名の総当たりに使える。
+/// 「パスワードが違う」を区別して返すと、利用者名の総当たりに使える。
 /// </para>
 /// </remarks>
 public sealed class AdminAuthenticator(
@@ -89,7 +89,7 @@ public sealed class AdminAuthenticator(
     /// </summary>
     private readonly string decoyHash = hasher.Hash(Guid.NewGuid().ToString());
 
-    /// <summary>合言葉を照合する。</summary>
+    /// <summary>パスワードを照合する。</summary>
     public async Task<PasswordResult> CheckPasswordAsync(
         string loginId,
         string password,
@@ -129,7 +129,7 @@ public sealed class AdminAuthenticator(
                 .ConfigureAwait(false);
         }
 
-        // **合言葉が通っただけでは記録しない。** 2 要素まで通って初めてログインとする
+        // **パスワードが通っただけでは記録しない。** 2 要素まで通って初めてログインとする
         return new PasswordResult(
             user.HasTotp ? PasswordOutcome.NeedsSecondFactor : PasswordOutcome.NeedsTotpEnrollment,
             user);
@@ -288,7 +288,7 @@ public sealed class AdminAuthenticator(
             .ConfigureAwait(false);
 
         // **ここまで来たらログインが 1 回通ったのと同じ。**
-        // 合言葉と使い捨てパスワードの両方が揃っており、この後 `Admin.Session` になる。
+        // パスワードと使い捨てパスワードの両方が揃っており、この後 `Admin.Session` になる。
         // 記録しないと、**入れているのに「一度も入っていない」ように見える**
         await store.RecordSuccessAsync(adminUserId, cancellationToken).ConfigureAwait(false);
 
@@ -303,7 +303,7 @@ public sealed class AdminAuthenticator(
 
     /// <summary>最初の管理者を作る。**まだ 1 人も居ないときだけ通す。**</summary>
     /// <remarks>
-    /// 既定の合言葉を仕込むより、**空の状態から利用者に作らせる**方が安全。
+    /// 既定のパスワードを仕込むより、**空の状態から利用者に作らせる**方が安全。
     /// 変え忘れた既定値が残らない。
     /// </remarks>
     public async Task<AdminUser?> TryCreateFirstAdministratorAsync(

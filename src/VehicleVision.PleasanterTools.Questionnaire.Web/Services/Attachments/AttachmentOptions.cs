@@ -61,9 +61,9 @@ public sealed class VirusScanOptions
     /// </remarks>
     public TimeSpan DefenderResultTimeout { get; init; } = TimeSpan.FromMinutes(5);
 
-    /// <summary>Event Grid の受け口を守る合言葉。</summary>
+    /// <summary>Event Grid の受け口を守るパスワード。</summary>
     /// <remarks>
-    /// **この受け口は認証の外に置かれる。** 合言葉が無いと、誰でも「検出なし」を
+    /// **この受け口は認証の外に置かれる。** パスワードが無いと、誰でも「検出なし」を
     /// 送り込めてしまう。<see cref="VirusScanProvider.DefenderForStorage"/> では必須。
     /// </remarks>
     public string? EventGridKey { get; init; }
