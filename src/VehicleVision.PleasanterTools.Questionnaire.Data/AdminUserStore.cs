@@ -88,6 +88,9 @@ public interface IAdminUserStore
 
     Task SetDisabledAsync(Guid adminUserId, bool isDisabled, CancellationToken cancellationToken = default);
 
+    /// <summary>2 要素を無効にする。**共有鍵を消す**ので、同じ認証アプリでは通らなくなる。</summary>
+    Task DisableTotpAsync(Guid adminUserId, CancellationToken cancellationToken = default);
+
     /// <summary>管理画面を出す言語を決める。<c>null</c> で「選んでいない」に戻す。</summary>
     Task SetLanguageAsync(
         Guid adminUserId,
@@ -243,6 +246,16 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
             + "[TotpEnabledAt] = @Now, [UpdatedAt] = @Now "
             + "WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId, Secret = secretEncrypted, Now = DbTime.UtcNowTruncated() },
+            cancellationToken);
+
+    public Task DisableTotpAsync(
+        Guid adminUserId,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(
+            "UPDATE [AdminUsers] SET [TotpSecretEncrypted] = NULL, "
+            + "[TotpEnabledAt] = NULL, [UpdatedAt] = @Now "
+            + "WHERE [AdminUserId] = @AdminUserId",
+            new { AdminUserId = adminUserId, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
 
     public Task SetDisabledAsync(

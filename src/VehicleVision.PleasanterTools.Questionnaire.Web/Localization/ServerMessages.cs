@@ -86,6 +86,21 @@ public static class ServerMessages
             "That code does not match. Check the number shown in your authenticator app.");
 
         Add(
+            ServerMessageKeys.TwoFactorDisabled,
+            "2 要素認証は無効に設定されています。登録するには、管理者に設定の変更を依頼してください。",
+            "Two-factor authentication is turned off. Ask your operator to change the setting first.");
+
+        Add(
+            ServerMessageKeys.TwoFactorRequired,
+            "2 要素認証が必須に設定されているため、解除できません。",
+            "Two-factor authentication is required, so it cannot be removed.");
+
+        Add(
+            ServerMessageKeys.TwoFactorNotEnrolled,
+            "2 要素認証は登録されていません。",
+            "Two-factor authentication is not set up.");
+
+        Add(
             ServerMessageKeys.PasswordTooShort,
             "パスワードは {0} 文字以上にしてください。",
             "Use a password of at least {0} characters.");
