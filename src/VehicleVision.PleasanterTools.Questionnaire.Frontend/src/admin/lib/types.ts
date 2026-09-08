@@ -512,6 +512,12 @@ export interface AdminSession {
   /** **途中状態のときだけ意味がある。** 2 要素をまだ登録していない */
   needsEnrollment?: boolean;
 
+  /** SAML でのログインが使えるか（Issue #166）。**既定は無効** */
+  samlEnabled?: boolean;
+
+  /** SAML の釦に出す文字。`null` なら決まった文言を使う */
+  samlLabel?: string | null;
+
   /**
    * 利用者ごとの表示言語。`null` は「まだ選んでいない」。
    *

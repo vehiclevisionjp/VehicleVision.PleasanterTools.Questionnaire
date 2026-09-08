@@ -211,6 +211,11 @@ builder.Services.AddSingleton(new SecretProtector(secretKey));
 builder.Services.AddSingleton(new AdminAuthOptions());
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
+
+// **SAML は既定で無効**（Issue #166）。有効なのに設定が足りなければ、
+// ここで例外になって起動しない。**「有効にしたつもり」で動き続けさせない**
+builder.Services.AddSingleton(SamlOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<SamlAuthenticator>();
 builder.Services.AddSingleton<AdminUserService>();
 
 // ---- bot 対策 --------------------------------------------------------------
@@ -440,6 +445,7 @@ app.UseStaticFiles();
 
 app.MapFormEndpoints();
 app.MapAdminAuthEndpoints();
+app.MapAdminSamlEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();

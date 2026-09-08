@@ -37,6 +37,36 @@
   let error = $state('');
   let busy = $state(false);
 
+  /**
+   * SAML の受け口が失敗したときの印（Issue #166）。
+   *
+   * **理由は URL の印だけで返ってくる。** サーバは詳しい理由をログへ残し、
+   * 画面には決まった文言を出す。
+   */
+  const samlError = untrack(() => {
+    const failure = new URLSearchParams(window.location.search).get('samlError');
+    switch (failure) {
+      case 'unknown-user':
+        return t('signIn.samlError.unknownUser');
+      case 'disabled':
+        return t('signIn.samlError.disabled');
+      case null:
+        return '';
+      default:
+        return t('signIn.samlError.invalid');
+    }
+  });
+
+  /**
+   * SAML のログインへ送り出す。
+   *
+   * **fetch では始められない。** IdP へは画面ごと移る必要があるので、
+   * 場所を書き換える。
+   */
+  function startSaml() {
+    window.location.assign('/api/admin/saml/login?returnUrl=/admin');
+  }
+
   const isSetup = $derived(session.setupRequired);
 
   async function submitPassword(event: SubmitEvent) {
@@ -140,6 +170,18 @@
         {busy ? t('signIn.checking') : isSetup ? t('signIn.register') : t('signIn.next')}
       </button>
     </form>
+
+    {#if session.samlEnabled && !isSetup}
+      <!-- **最初の管理者を作る画面には出さない。** IdP から来た人を
+           最初の管理者にすると、誰でも全権を取れる -->
+      <div class="or"><span>{t('signIn.samlOr')}</span></div>
+
+      {#if samlError}<p class="error" role="alert">{samlError}</p>{/if}
+
+      <button type="button" class="saml" onclick={startSaml}>
+        {session.samlLabel ?? t('signIn.samlButton')}
+      </button>
+    {/if}
   {:else}
     <h1>{step === 'totp' ? t('signIn.totpTitle') : t('signIn.recoveryTitle')}</h1>
     <p class="lead">
@@ -225,6 +267,39 @@
     border-radius: 4px;
     font: inherit;
     box-sizing: border-box;
+  }
+
+  /* **区切りは線と文字で出す**（Issue #166） */
+  .or {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1.25rem 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .or::before,
+  .or::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--border);
+  }
+
+  .saml {
+    display: block;
+    width: 100%;
+    padding: 0.6rem;
+    background: #fff;
+    color: inherit;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .saml:hover {
+    background: var(--surface, #f5f5f5);
   }
 
   button[type='submit'] {

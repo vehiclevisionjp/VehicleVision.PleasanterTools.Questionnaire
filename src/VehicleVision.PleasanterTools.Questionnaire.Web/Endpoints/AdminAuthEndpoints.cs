@@ -42,9 +42,15 @@ public static class AdminAuthEndpoints
         group.MapGet("/session", async (
             HttpContext context,
             IAdminUserStore store,
+            SamlOptions saml,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
+
+            // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。
+            // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
+            var samlEnabled = saml.Enabled;
+            var samlLabel = saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null;
 
             var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             if (session.Succeeded)
@@ -67,6 +73,8 @@ public static class AdminAuthEndpoints
                     loginId = session.Principal?.Identity?.Name,
                     role = session.Principal?.FindFirstValue(ClaimTypes.Role),
                     language,
+                    samlEnabled,
+                    samlLabel,
                 });
             }
 
@@ -92,6 +100,8 @@ public static class AdminAuthEndpoints
                 pending = pending.Succeeded,
                 pendingLoginId = pending.Succeeded ? pending.Principal?.Identity?.Name : null,
                 needsEnrollment,
+                samlEnabled,
+                samlLabel,
             });
         });
 
@@ -365,7 +375,9 @@ public static class AdminAuthEndpoints
         return context.SignInAsync(AdminAuthSchemes.Pending, new ClaimsPrincipal(identity));
     }
 
-    private static async Task SignInSessionAsync(HttpContext context, AdminUser user)
+    /// <summary>2 要素まで通った状態にする。</summary>
+    /// <remarks>**SAML の受け口からも同じ形で入る**（<c>AdminSamlEndpoints</c>）。</remarks>
+    internal static async Task SignInSessionAsync(HttpContext context, AdminUser user)
     {
         // **途中状態は必ず消す。** 共有鍵の claim を残さない
         await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
