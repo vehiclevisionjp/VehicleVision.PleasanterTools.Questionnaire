@@ -45,7 +45,7 @@ public static class AdminOutboxEndpoints
     public static IEndpointRouteBuilder MapAdminOutboxEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin/outbox")
-            .RequireAuthorization(AdminAuthSchemes.AdministratorPolicy);
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.OutboxRead));
 
         AdminAuthSchemes.AddNoStore(group);
 
@@ -114,6 +114,7 @@ public static class AdminOutboxEndpoints
         });
 
         // ---- 送信待ちへ戻す --------------------------------------------------
+        // **戻すのは「見る」より強い操作。** 権限を分ける（Issue #160）
         group.MapPost("/dead-letters/requeue", async (
             RequeueRequest request,
             HttpContext context,
@@ -150,7 +151,8 @@ public static class AdminOutboxEndpoints
             AuditNotes.SetTarget(context, AuditTargetType, surveyId.Value.ToString());
 
             return Results.Ok(new { requeued = true });
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.OutboxRequeue));
 
         return builder;
     }

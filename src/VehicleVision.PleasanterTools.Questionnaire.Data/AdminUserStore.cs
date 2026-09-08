@@ -6,12 +6,33 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// <summary>管理者の役割。</summary>
 public enum AdminRole
 {
-    /// <summary>アンケートの作成と編集ができる。</summary>
+    /// <summary>アンケートの作成と編集ができる。**公開はできない**（Issue #160）。</summary>
     Editor = 0,
 
-    /// <summary>加えて管理者の追加・削除ができる。</summary>
+    /// <summary>**特権管理者。** すべてができる。</summary>
     Administrator = 1,
+
+    /// <summary>
+    /// **アンケート管理者。** アンケートの作成・編集・公開と、送信状況まで。
+    /// **人には触れない。**
+    /// </summary>
+    SurveyAdministrator = 2,
+
+    /// <summary>
+    /// **ユーザ管理者。** 管理者の追加・招待・役割変更・停止と、操作の記録まで。
+    /// **アンケートには触れない。**
+    /// </summary>
+    UserAdministrator = 3,
+
+    /// <summary>**監査担当。** 操作の記録・お知らせ・送信状況を**見るだけ**。</summary>
+    Auditor = 4,
 }
+
+/// <remarks>
+/// ⚠️ **値は変えないこと。** DB へ数値で入っているので、
+/// 入れ替えると既存の管理者の役割が別のものになる。
+/// **足すときは末尾へ足し、<c>AdminPermissions</c> の対応表にも書く。**
+/// </remarks>
 
 /// <summary>管理者 1 人分。</summary>
 /// <remarks>

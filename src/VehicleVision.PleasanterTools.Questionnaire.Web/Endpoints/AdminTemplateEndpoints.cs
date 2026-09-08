@@ -29,7 +29,7 @@ public static class AdminTemplateEndpoints
     public static IEndpointRouteBuilder MapAdminTemplateEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin/templates")
-            .RequireAuthorization(AdminAuthSchemes.AdministratorPolicy);
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.TemplatesRead));
 
         AdminAuthSchemes.AddNoStore(group);
 
@@ -72,7 +72,8 @@ public static class AdminTemplateEndpoints
                     $"/api/admin/templates/{target.TemplateId}",
                     new { templateId = target.TemplateId })
                 : Results.NotFound();
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.TemplatesWrite));
 
         // ---- テンプレートからアンケートを作る --------------------------------
         group.MapPost("/{templateId:guid}/surveys", async (
@@ -113,7 +114,8 @@ public static class AdminTemplateEndpoints
                     $"/api/admin/surveys/{target.SurveyId}",
                     new { surveyId = target.SurveyId, target.PublicId })
                 : Results.NotFound();
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
         // ---- テンプレートを消す ----------------------------------------------
         // **消せるのはテンプレートだけ。** アンケートには回答が紐づいており、
@@ -127,7 +129,8 @@ public static class AdminTemplateEndpoints
                 .ConfigureAwait(false);
 
             return deleted ? Results.NoContent() : Results.NotFound();
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.TemplatesWrite));
 
         return builder;
     }

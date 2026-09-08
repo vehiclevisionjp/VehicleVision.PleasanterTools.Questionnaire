@@ -1,4 +1,5 @@
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 
@@ -26,7 +27,7 @@ public static class AdminAuditLogEndpoints
     public static IEndpointRouteBuilder MapAdminAuditLogEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin/audit-logs")
-            .RequireAuthorization(AdminAuthSchemes.AdministratorPolicy);
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.AuditRead));
 
         AdminAuthSchemes.AddNoStore(group);
 

@@ -33,9 +33,9 @@ public static class AdminSurveyEndpoints
 
     public static IEndpointRouteBuilder MapAdminSurveyEndpoints(this IEndpointRouteBuilder builder)
     {
+        // **群には「閲覧」を掛ける**（Issue #160）。書き込み・公開は口ごとに足す
         var group = builder.MapGroup("/api/admin/surveys")
-            .RequireAuthorization(policy => policy.AddAuthenticationSchemes(AdminAuthSchemes.Session)
-                .RequireAuthenticatedUser());
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysRead));
 
         // **管理操作を残す**（Issue #19）。読み取りは残さない
         group.AddEndpointFilter<AuditLogFilter>();
@@ -131,7 +131,8 @@ public static class AdminSurveyEndpoints
             await surveys.SaveAsync(record, cancellationToken).ConfigureAwait(false);
 
             return Results.Created($"/api/admin/surveys/{surveyId}", new { surveyId, record.PublicId });
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
         // ---- 複製（Administrator だけ） --------------------------------------
         // **設問・選択肢・ページ・分岐・マッピングを写し、下書きとして作る**（Issue #46）。
@@ -203,7 +204,7 @@ public static class AdminSurveyEndpoints
                     $"/api/admin/surveys/{target.SurveyId}",
                     new { surveyId = target.SurveyId, target.PublicId })
                 : Results.NotFound();
-        }).RequireAuthorization(AdminAuthSchemes.AdministratorPolicy);
+        }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
         // ---- 下書きを読む ----------------------------------------------------
         group.MapGet("/{surveyId:guid}", async (
@@ -290,7 +291,8 @@ public static class AdminSurveyEndpoints
                     actualRevision = exception.Actual,
                 });
             }
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
         // ---- ヘッダ画像（Issue #56） ------------------------------------------
         // **回答の添付と同じ道を通す**（拡張子・先頭バイト・大きさ）。
@@ -377,7 +379,8 @@ public static class AdminSurveyEndpoints
             // **下書きへは書かない。** 定義の保存は下書きの版と照合して行う決まりなので、
             // ここで書くと版が合わずに黙った上書きになる。**画面が定義へ入れて保存する**
             return Results.Ok(new { assetId });
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
         // **編集中の画像を管理画面へ返す。** 公開前の画像は回答画面の口からは出ない
         group.MapGet("/{surveyId:guid}/assets/{assetId:guid}", async (
@@ -546,7 +549,8 @@ public static class AdminSurveyEndpoints
                 // **未割り当ては拒否しないが、公開後も伝える**
                 warnings = problems.Where(problem => !problem.IsBlocking).Select(Describe),
             });
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
         // ---- 公開設定 --------------------------------------------------------
         // **回答数の上限を編集できるようにする**（Issue #53）。
@@ -605,7 +609,8 @@ public static class AdminSurveyEndpoints
 
             return Results.Ok(
                 new { responseLimit = request.ResponseLimit, requireProofOfWork, allowDraft });
-        });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
         // ---- 停止と再開 ------------------------------------------------------
         group.MapPost("/{surveyId:guid}/suspend", (
@@ -615,7 +620,8 @@ public static class AdminSurveyEndpoints
             IResponseTokenStore tokens,
             CancellationToken cancellationToken) =>
             ChangeStatusAsync(
-                surveyId, SurveyStatus.Suspended, context, surveys, tokens, cancellationToken));
+                surveyId, SurveyStatus.Suspended, context, surveys, tokens, cancellationToken))
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
         group.MapPost("/{surveyId:guid}/resume", (
             Guid surveyId,
@@ -624,7 +630,8 @@ public static class AdminSurveyEndpoints
             IResponseTokenStore tokens,
             CancellationToken cancellationToken) =>
             ChangeStatusAsync(
-                surveyId, SurveyStatus.Published, context, surveys, tokens, cancellationToken));
+                surveyId, SurveyStatus.Published, context, surveys, tokens, cancellationToken))
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
         return builder;
     }
