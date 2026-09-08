@@ -9,6 +9,12 @@
     submitAnswers,
   } from './lib/api';
   import type { Attachment } from './lib/api';
+  import {
+    DISABLED_ANALYTICS,
+    fetchAnalyticsSettings,
+    installAnalytics,
+    type AnalyticsSettings,
+  } from './lib/analytics';
   import { solveAltcha } from './lib/altcha';
   import { toSteps, tracePath } from './lib/flow';
   import { applyShuffle, createShuffleSeed } from './lib/shuffle';
@@ -47,6 +53,22 @@
   $effect(() => {
     // **読み上げの声と行折り返しが変わる。** `<html lang>` を合わせておく
     applyDocumentLanguage(language);
+  });
+
+  /**
+   * アクセス解析の設定（Issue #162）。
+   *
+   * **既定では何も読み込まない。** 運用側が設定したときだけタグを差し込む。
+   * **失敗しても回答画面は動かす**（解析は飾りであって、回答の入口ではない）。
+   */
+  let analytics = $state<AnalyticsSettings>(DISABLED_ANALYTICS);
+
+  $effect(() => {
+    void (async () => {
+      const settings = await fetchAnalyticsSettings();
+      installAnalytics(settings);
+      analytics = settings;
+    })();
   });
 
   $effect(() => {
@@ -692,6 +714,13 @@
       </nav>
     </form>
   {/if}
+
+  {#if analytics.showNotice}
+    <!-- **外部へ送っていることを伏せない**（Issue #162） -->
+    <p class="analytics-notice">
+      {t('analytics.notice', { provider: analytics.provider })}
+    </p>
+  {/if}
 </main>
 
 <style lang="scss">
@@ -873,6 +902,13 @@
     color: var(--muted);
     font-size: 0.85rem;
     margin-top: 0.75rem;
+  }
+
+  /* **告知は小さく、でも読める大きさで**（Issue #162） */
+  .analytics-notice {
+    margin: 2rem 0 0;
+    color: var(--muted);
+    font-size: 0.8rem;
   }
 
   /* **ハニーポットを画面から外す。** `display: none` にしないのは、

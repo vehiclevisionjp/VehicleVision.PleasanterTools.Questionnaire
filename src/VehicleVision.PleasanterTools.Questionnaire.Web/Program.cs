@@ -196,6 +196,19 @@ if (attachmentOptions.VirusScan.Enabled)
 builder.Services.AddSingleton(serviceProvider => new AttachmentInspector(
     attachmentOptions.ToPolicy(), serviceProvider.GetService<IVirusScanner>()));
 
+// ---- アクセス解析（Issue #162）----------------------------------------------
+// **既定は無効。** 設定しなければ、回答者の端末から第三者への要求は 1 つも出ない。
+//
+// **優先順位は Analytics.local.json ＞ 環境変数 ＞ Analytics.json**
+// （App_Data/Parameters/README.md）。JSON を先に積んでから環境変数を積み直す。
+builder.Configuration
+    .AddJsonFile("App_Data/Parameters/Analytics.json", optional: true, reloadOnChange: false)
+    .AddEnvironmentVariables()
+    .AddJsonFile("App_Data/Parameters/Analytics.local.json", optional: true, reloadOnChange: false);
+
+var analyticsOptions = AnalyticsOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(analyticsOptions);
+
 // ---- 管理者の認証 ----------------------------------------------------------
 // **共有鍵を復号するための鍵。** 失うと登録済みの 2 要素が全て使えなくなるので、
 // **App Service の設定か Key Vault に置き、控えを取っておくこと**
@@ -378,16 +391,31 @@ var app = builder.Build();
 // 既定は空なので、設定しなければ従来と同じ CSP になる。
 // **`frame-src https:` のようには絶対に広げない**
 var embedSources = embedOptions.CspSources;
+
+// **アクセス解析を有効にしたときだけ広げる**（Issue #162）。
+// 既定では 1 つも足さないので、今までと同じ CSP になる。
+//
+// ⚠️ **`https:` のようには広げない。** 許すのは選んだサービスの配信元だけ。
+// **inline script は許さない。** タグは同梱した JS から DOM へ差し込む
+var analyticsSources = analyticsOptions.CspSources;
 var contentSecurityPolicy = string.Join("; ",
 [
     "default-src 'self'",
-    // **画像の埋め込み先も設定で許した配信元だけ**（2 要素の QR は data: URI で描く）
-    "img-src 'self' data:" + Join(embedSources),
+    // **画像の埋め込み先も設定で許した配信元だけ**（2 要素の QR は data: URI で描く）。
+    // 解析は計測を画像で送ることがあるので、有効なときはその送信先も許す
+    "img-src 'self' data:" + Join(embedSources) + Join(analyticsSources),
     // **設定が空なら 'none'。** 指定そのものを省くと default-src へ落ちる
     "frame-src " + (embedSources.IsEmpty ? "'none'" : string.Join(' ', embedSources)),
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "object-src 'none'",
+    .. analyticsSources.IsEmpty
+        ? Array.Empty<string>()
+        :
+        [
+            "script-src 'self'" + Join(analyticsSources),
+            "connect-src 'self'" + Join(analyticsSources),
+        ],
 ]);
 
 static string Join(System.Collections.Immutable.ImmutableArray<string> sources) =>
@@ -439,6 +467,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapFormEndpoints();
+app.MapAnalyticsEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
