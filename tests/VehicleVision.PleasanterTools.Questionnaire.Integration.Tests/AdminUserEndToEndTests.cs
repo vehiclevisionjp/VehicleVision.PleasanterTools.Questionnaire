@@ -65,22 +65,13 @@ public class AdminUserEndToEndTests
     private static Task<HttpResponseMessage> PostAsync(HttpClient http, string path, object? body = null) =>
         http.PostAsJsonAsync(path, body ?? new { });
 
-    /// <summary>2 要素まで登録して、ログイン済みにする。</summary>
-    private static async Task EnrollTotpAsync(HttpClient http)
-    {
-        string secret;
-        using (var begin = await PostAsync(http, "/api/admin/enroll/begin"))
-        {
-            begin.EnsureSuccessStatusCode();
-            secret = (await ReadAsync(begin))!["secret"]!.GetValue<string>();
-        }
-
-        using var complete = await PostAsync(
-            http, "/api/admin/enroll/complete", new { code = Code(secret) });
-        complete.EnsureSuccessStatusCode();
-    }
-
     /// <summary>最初の管理者を作り、ログイン済みの client を返す。</summary>
+    /// <remarks>
+    /// **2 要素は登録しない。** 既定は「任意」なので
+    /// <c>/setup</c> を通った時点でログイン済みになる（Issue #154 / #169）。
+    /// ここで見たいのは利用者の管理なので、2 要素の登録は挟まない。
+    /// **ログインの枠を無駄に使わない**という利点もある。
+    /// </remarks>
     private static async Task<HttpClient> SignedInAdministratorAsync()
     {
         await ClearAdministratorsAsync();
@@ -90,9 +81,9 @@ public class AdminUserEndToEndTests
             http, "/api/admin/setup", new { loginId = "admin", password = Password }))
         {
             setup.EnsureSuccessStatusCode();
+            Assert.Equal("done", (await ReadAsync(setup))!["next"]!.GetValue<string>());
         }
 
-        await EnrollTotpAsync(http);
         return http;
     }
 
@@ -112,7 +103,11 @@ public class AdminUserEndToEndTests
             body["invitationToken"]!.GetValue<string>());
     }
 
-    /// <summary>招待を受け取り、2 要素まで登録してログイン済みにする。</summary>
+    /// <summary>招待を受け取り、ログイン済みの client を返す。</summary>
+    /// <remarks>
+    /// **2 要素が任意なら、受け取った時点で入れる**（Issue #169）。
+    /// 必須にしている場合だけ、その場で登録させられる。
+    /// </remarks>
     private static async Task<HttpClient> AcceptAsync(string token, string password)
     {
         var http = CreateClient();
@@ -120,10 +115,9 @@ public class AdminUserEndToEndTests
             http, "/api/admin/invitations/accept", new { token, password }))
         {
             accept.EnsureSuccessStatusCode();
-            Assert.Equal("enroll", (await ReadAsync(accept))!["next"]!.GetValue<string>());
+            Assert.Equal("done", (await ReadAsync(accept))!["next"]!.GetValue<string>());
         }
 
-        await EnrollTotpAsync(http);
         return http;
     }
 

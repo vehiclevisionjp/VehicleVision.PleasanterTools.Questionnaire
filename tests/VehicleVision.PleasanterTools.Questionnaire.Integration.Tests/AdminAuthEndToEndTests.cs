@@ -76,6 +76,13 @@ public class AdminAuthEndToEndTests
         http.PostAsJsonAsync(path, body ?? new { });
 
     /// <summary>最初の管理者を作り、2 要素まで登録してログイン済みにする。</summary>
+    /// <remarks>
+    /// **2 要素の既定は「任意」**（Issue #154）なので、
+    /// <c>/setup</c> を通った時点で既にログイン済みになる（<c>next</c> は <c>done</c>）。
+    /// **登録は「ログイン済みの人が自分で登録する」道を使う**
+    /// （<c>/api/admin/me/totp/begin</c>。Issue #169）。
+    /// <c>/api/admin/enroll/begin</c> は**必須のときの途中状態専用**で、ここからは通らない。
+    /// </remarks>
     private static async Task<(string Secret, string[] RecoveryCodes)> EnrollAsync(
         HttpClient http,
         string loginId)
@@ -83,17 +90,19 @@ public class AdminAuthEndToEndTests
         using (var setup = await PostAsync(http, "/api/admin/setup", new { loginId, password = Password }))
         {
             setup.EnsureSuccessStatusCode();
+            Assert.Equal("done", (await ReadAsync(setup))!["next"]!.GetValue<string>());
         }
 
         string secret;
-        using (var begin = await PostAsync(http, "/api/admin/enroll/begin"))
+        using (var begin = await PostAsync(
+            http, "/api/admin/me/totp/begin", new { password = Password }))
         {
             begin.EnsureSuccessStatusCode();
             secret = (await ReadAsync(begin))!["secret"]!.GetValue<string>();
         }
 
         using var complete = await PostAsync(
-            http, "/api/admin/enroll/complete", new { code = Code(secret) });
+            http, "/api/admin/me/totp/complete", new { code = Code(secret) });
         complete.EnsureSuccessStatusCode();
 
         var codes = (await ReadAsync(complete))!["recoveryCodes"]!

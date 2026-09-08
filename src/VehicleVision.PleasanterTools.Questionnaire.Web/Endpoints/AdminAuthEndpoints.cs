@@ -419,7 +419,11 @@ public static class AdminAuthEndpoints
         return context.SignInAsync(AdminAuthSchemes.Pending, new ClaimsPrincipal(identity));
     }
 
-    private static async Task SignInSessionAsync(HttpContext context, AdminUser user)
+    /// <summary>2 要素まで通った状態にする。</summary>
+    /// <remarks>
+    /// **招待の受け取りからも同じ形で入る**（<c>AdminUserEndpoints</c>。Issue #169）。
+    /// </remarks>
+    internal static async Task SignInSessionAsync(HttpContext context, AdminUser user)
     {
         // **途中状態は必ず消す。** 共有鍵の claim を残さない
         await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);

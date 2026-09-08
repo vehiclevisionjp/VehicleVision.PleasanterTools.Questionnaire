@@ -432,6 +432,8 @@ public static class AdminUserEndpoints
             AdminInvitationAcceptRequest request,
             HttpContext context,
             AdminUserService service,
+            AdminAuthenticator authenticator,
+            AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
             var (outcome, user, passwordProblem) = await service
@@ -448,9 +450,30 @@ public static class AdminUserEndpoints
                     : Results.BadRequest(new { message = passwordProblem });
             }
 
-            // **パスワードを決めただけでは入れない。** 2 要素まで通って初めてログインとする
-            await AdminAuthEndpoints.SignInPendingAsync(context, user!, secret: null).ConfigureAwait(false);
-            return Results.Ok(new { next = user!.HasTotp ? "totp" : "enroll" });
+            // **2 要素を登録している人は、まず 2 要素を通す**
+            if (user!.HasTotp)
+            {
+                await AdminAuthEndpoints.SignInPendingAsync(context, user, secret: null)
+                    .ConfigureAwait(false);
+                return Results.Ok(new { next = "totp" });
+            }
+
+            // **必須のときだけ、その場で登録させる**（Issue #169）。
+            // ここが setup / login と食い違っていて、
+            // **任意や無効にしていても招待された人だけ登録を強いられていた。**
+            if (options.TwoFactor is TwoFactorPolicy.Required)
+            {
+                await AdminAuthEndpoints.SignInPendingAsync(context, user, secret: null)
+                    .ConfigureAwait(false);
+                return Results.Ok(new { next = "enroll" });
+            }
+
+            // **任意・無効なら、そのまま入れる。**
+            // 後から自分で登録できる（POST /api/admin/me/totp/begin）
+            await authenticator.RecordSignInAsync(user.AdminUserId, cancellationToken)
+                .ConfigureAwait(false);
+            await AdminAuthEndpoints.SignInSessionAsync(context, user).ConfigureAwait(false);
+            return Results.Ok(new { next = "done" });
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
     private static async Task<IResult> SetDisabledAsync(
