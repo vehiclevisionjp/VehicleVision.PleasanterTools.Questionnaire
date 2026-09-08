@@ -198,8 +198,11 @@ jobs:
           export QUESTIONNAIRE_SECRET_KEY
 
           dotnet build src/VehicleVision.PleasanterTools.Questionnaire.Web -c Release
+          # ⚠️ **--no-launch-profile を付ける。** Properties/launchSettings.json が
+          # ASPNETCORE_URLS と環境を上書きしてしまい、待ち受け先が変わる（実際に踏んだ）
           dotnet run --project src/VehicleVision.PleasanterTools.Questionnaire.Web \
-              -c Release --no-build > "$GITHUB_WORKSPACE/startup.log" 2>&1 &
+              -c Release --no-build --no-launch-profile \
+              > "$GITHUB_WORKSPACE/startup.log" 2>&1 &
           app_pid=$!
 
           # **落ちたらすぐ分かるように、待つ側で生存も見る**
