@@ -793,7 +793,9 @@
        今までは #fff を直に書いていた。既定値は変えていないので見た目は同じ */
     --accent-text: #fff;
     --surface: #fff;
-    --font: system-ui, sans-serif;
+    /* **同梱した書体を既定にする**（Issue #152）。テーマで変えられる */
+    --font: 'Noto Sans JP Variable', system-ui, sans-serif;
+    --font-mono: 'M PLUS 1 Code Variable', ui-monospace, Consolas, monospace;
   }
 
   :global(body) {

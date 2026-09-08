@@ -1,4 +1,5 @@
 ﻿using System.Threading.RateLimiting;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
@@ -196,16 +197,25 @@ if (attachmentOptions.VirusScan.Enabled)
 builder.Services.AddSingleton(serviceProvider => new AttachmentInspector(
     attachmentOptions.ToPolicy(), serviceProvider.GetService<IVirusScanner>()));
 
-// ---- アクセス解析（Issue #162）----------------------------------------------
-// **既定は無効。** 設定しなければ、回答者の端末から第三者への要求は 1 つも出ない。
+// ---- App_Data/Parameters の設定ファイル --------------------------------------
+// **優先順位は {名前}.local.json ＞ 環境変数 ＞ {名前}.json**
+// （App_Data/Parameters/README.md）。既定の並びは環境変数が後ろなので、
+// **JSON を先に積み、環境変数を積み直し、最後に .local.json を積む。**
 //
-// **優先順位は Analytics.local.json ＞ 環境変数 ＞ Analytics.json**
-// （App_Data/Parameters/README.md）。JSON を先に積んでから環境変数を積み直す。
+// **1 か所にまとめてある。** 設定ごとに「JSON → 環境変数」を繰り返すと、
+// 後から積んだ環境変数が**前の .local.json を追い越す**（実際に踏んだ）。
+//
+// ⚠️ **Service.json と Pleasanter.json はここに無い。** 環境変数から読む作りのままで、
+// そちらの読み込みは別課題（Issue #158）
 builder.Configuration
+    .AddJsonFile("App_Data/Parameters/Security.json", optional: true, reloadOnChange: false)
     .AddJsonFile("App_Data/Parameters/Analytics.json", optional: true, reloadOnChange: false)
     .AddEnvironmentVariables()
+    .AddJsonFile("App_Data/Parameters/Security.local.json", optional: true, reloadOnChange: false)
     .AddJsonFile("App_Data/Parameters/Analytics.local.json", optional: true, reloadOnChange: false);
 
+// ---- アクセス解析（Issue #162）----------------------------------------------
+// **既定は無効。** 設定しなければ、回答者の端末から第三者への要求は 1 つも出ない。
 var analyticsOptions = AnalyticsOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(analyticsOptions);
 
@@ -232,10 +242,42 @@ var secretKey = builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
 
 builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
 builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
+// **パスワードの条件は設定で決める**（Issue #157）。
+// 実値は App_Data/Parameters/Security.json（Pleasanter 本体と同じ書き方）。
+// **積む場所は上の 1 か所にまとめてある。**
+var passwordPolicyOptions = new AdminPasswordPolicyOptions
+{
+    MinimumLength = int.TryParse(builder.Configuration["PasswordMinimumLength"], out var minimumLength)
+        ? minimumLength
+        : new AdminPasswordPolicyOptions().MinimumLength,
+    AllowSameAsLoginId =
+        bool.TryParse(builder.Configuration["PasswordAllowSameAsLoginId"], out var allowSameAsLoginId)
+        && allowSameAsLoginId,
+    Policies = builder.Configuration.GetSection("PasswordPolicies").Get<List<AdminPasswordRule>>() ?? [],
+};
+
+// **組み立てられない正規表現は、ここで落ちる。** 起動前に気付ける
+builder.Services.AddSingleton(new AdminPasswordPolicy(passwordPolicyOptions));
+
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton(new SecretProtector(secretKey));
-builder.Services.AddSingleton(new AdminAuthOptions());
+// **2 要素認証をどこまで求めるか**（Issue #154）。**既定は任意。**
+//
+// **知らない値は落とす。** 黙って既定へ落ちると、必須にしたつもりで任意のまま動く。
+var twoFactorPolicy = TwoFactorPolicy.Optional;
+if (builder.Configuration[AdminAuthOptions.TwoFactorSetting] is { Length: > 0 } twoFactorSetting)
+{
+    if (!Enum.TryParse(twoFactorSetting, ignoreCase: true, out twoFactorPolicy)
+        || !Enum.IsDefined(twoFactorPolicy))
+    {
+        throw new InvalidOperationException(
+            $"{AdminAuthOptions.TwoFactorSetting} は required / optional / disabled のいずれかにする"
+            + $"（今の値: {twoFactorSetting}）");
+    }
+}
+
+builder.Services.AddSingleton(new AdminAuthOptions { TwoFactor = twoFactorPolicy });
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
 builder.Services.AddSingleton<AdminUserService>();
@@ -302,11 +344,24 @@ builder.Services.AddAuthorization(options =>
         .AddAuthenticationSchemes(AdminAuthSchemes.Session)
         .RequireAuthenticatedUser());
 
-    // **他人に触れるのは Administrator だけ**（_documents/非機能設計.md 1 章）
+    // **他人に触れるのは特権管理者だけ**（_documents/非機能設計.md 1 章）
     options.AddPolicy(AdminAuthSchemes.AdministratorPolicy, policy => policy
         .AddAuthenticationSchemes(AdminAuthSchemes.Session)
         .RequireAuthenticatedUser()
         .RequireRole(nameof(AdminRole.Administrator)));
+
+    // **操作は権限で要求する**（Issue #160）。
+    //
+    // **権限は cookie へ焼かない。** 役割の claim から、その都度対応表を引く。
+    // 焼くと、役割を変えても再ログインまで効かない。
+    foreach (var permission in AdminPermissions.All)
+    {
+        options.AddPolicy(AdminPermissions.PolicyOf(permission), policy => policy
+            .AddAuthenticationSchemes(AdminAuthSchemes.Session)
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context =>
+                AdminPermissions.Has(context.User.FindFirstValue(ClaimTypes.Role), permission)));
+    }
 });
 
 // **送信ワーカーは .Web に同居させる**（_documents/アプリケーション設計.md 8 章）。

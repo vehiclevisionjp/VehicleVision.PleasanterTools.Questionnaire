@@ -87,6 +87,7 @@ public sealed class AdminUserService(
     AdminAuthenticator authenticator,
     PasswordHasher hasher,
     AdminAuthOptions options,
+    AdminPasswordPolicy policy,
     TimeProvider timeProvider,
     ILogger<AdminUserService> logger)
 {
@@ -187,48 +188,55 @@ public sealed class AdminUserService(
     /// <remarks>
     /// **ここは認証を通っていない相手が叩く。** 無い・期限切れ・使用済みを区別して返さない。
     /// </remarks>
-    public async Task<(AdminUserOutcome Outcome, AdminUser? User)> AcceptInvitationAsync(
+    /// <param name="language">
+    /// 文言の言語。**条件に合わないときの理由を、この言語で返す。**
+    /// </param>
+    public async Task<(AdminUserOutcome Outcome, AdminUser? User, string? PasswordProblem)> AcceptInvitationAsync(
         string? token,
         string? password,
+        string? language = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
-            return (AdminUserOutcome.InvitationInvalid, null);
+            return (AdminUserOutcome.InvitationInvalid, null, null);
         }
 
-        if (!AdminPasswordPolicy.IsAcceptable(password))
-        {
-            return (AdminUserOutcome.WeakPassword, null);
-        }
-
+        // **招待を先に引く。** 条件の判定に**その人のログイン ID**が要る（Issue #157）
         var invitation = await invitations
             .FindByTokenHashAsync(InvitationToken.HashOf(token), cancellationToken).ConfigureAwait(false);
 
         if (invitation is null || invitation.UsedAt is not null || invitation.ExpiresAt <= Now)
         {
-            return (AdminUserOutcome.InvitationInvalid, null);
+            return (AdminUserOutcome.InvitationInvalid, null, null);
         }
 
         var user = await store.FindByIdAsync(invitation.AdminUserId, cancellationToken)
             .ConfigureAwait(false);
         if (user is null || user.IsDisabled)
         {
-            return (AdminUserOutcome.InvitationInvalid, null);
+            return (AdminUserOutcome.InvitationInvalid, null, null);
+        }
+
+        // **条件を満たさないパスワードは、招待を使い切る前に断る**（Issue #157）。
+        // 使い切ってから断ると、招待が死んで受け取れなくなる
+        if (policy.Check(password, user.LoginId, language) is { } passwordProblem)
+        {
+            return (AdminUserOutcome.WeakPassword, null, passwordProblem);
         }
 
         // **先に使い切る。** パスワードを入れてから印を付けると、同時に来た 2 つが両方通る
         if (!await invitations.TryConsumeAsync(invitation.InvitationId, cancellationToken)
                 .ConfigureAwait(false))
         {
-            return (AdminUserOutcome.InvitationInvalid, null);
+            return (AdminUserOutcome.InvitationInvalid, null, null);
         }
 
         await store.UpdatePasswordHashAsync(user.AdminUserId, hasher.Hash(password!), cancellationToken)
             .ConfigureAwait(false);
 
         logger.LogInformation("招待からパスワードを決めた（AdminUserId={AdminUserId}）", user.AdminUserId);
-        return (AdminUserOutcome.Succeeded, user);
+        return (AdminUserOutcome.Succeeded, user, null);
     }
 
     /// <summary>自分のパスワードを変える。</summary>
@@ -245,7 +253,7 @@ public sealed class AdminUserService(
             return AdminUserOutcome.NotFound;
         }
 
-        if (!AdminPasswordPolicy.IsAcceptable(newPassword))
+        if (!policy.IsAcceptable(newPassword, user.LoginId))
         {
             return AdminUserOutcome.WeakPassword;
         }
@@ -414,7 +422,11 @@ public sealed class AdminUserService(
 
         return result.Outcome switch
         {
-            PasswordOutcome.NeedsSecondFactor or PasswordOutcome.NeedsTotpEnrollment =>
+            // **2 要素を求めない設定では SignedIn が返る。** ここでは「パスワードが合っていた」
+            // ことだけを見たいので、3 つとも「通った」として扱う（Issue #154）
+            PasswordOutcome.NeedsSecondFactor
+                or PasswordOutcome.NeedsTotpEnrollment
+                or PasswordOutcome.SignedIn =>
                 AdminUserOutcome.Succeeded,
             PasswordOutcome.LockedOut => AdminUserOutcome.LockedOut,
             _ => AdminUserOutcome.PasswordRejected,

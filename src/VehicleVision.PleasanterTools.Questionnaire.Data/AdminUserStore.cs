@@ -6,12 +6,33 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// <summary>管理者の役割。</summary>
 public enum AdminRole
 {
-    /// <summary>アンケートの作成と編集ができる。</summary>
+    /// <summary>アンケートの作成と編集ができる。**公開はできない**（Issue #160）。</summary>
     Editor = 0,
 
-    /// <summary>加えて管理者の追加・削除ができる。</summary>
+    /// <summary>**特権管理者。** すべてができる。</summary>
     Administrator = 1,
+
+    /// <summary>
+    /// **アンケート管理者。** アンケートの作成・編集・公開と、送信状況まで。
+    /// **人には触れない。**
+    /// </summary>
+    SurveyAdministrator = 2,
+
+    /// <summary>
+    /// **ユーザ管理者。** 管理者の追加・招待・役割変更・停止と、操作の記録まで。
+    /// **アンケートには触れない。**
+    /// </summary>
+    UserAdministrator = 3,
+
+    /// <summary>**監査担当。** 操作の記録・お知らせ・送信状況を**見るだけ**。</summary>
+    Auditor = 4,
 }
+
+/// <remarks>
+/// ⚠️ **値は変えないこと。** DB へ数値で入っているので、
+/// 入れ替えると既存の管理者の役割が別のものになる。
+/// **足すときは末尾へ足し、<c>AdminPermissions</c> の対応表にも書く。**
+/// </remarks>
 
 /// <summary>管理者 1 人分。</summary>
 /// <remarks>
@@ -87,6 +108,9 @@ public interface IAdminUserStore
         CancellationToken cancellationToken = default);
 
     Task SetDisabledAsync(Guid adminUserId, bool isDisabled, CancellationToken cancellationToken = default);
+
+    /// <summary>2 要素を無効にする。**共有鍵を消す**ので、同じ認証アプリでは通らなくなる。</summary>
+    Task DisableTotpAsync(Guid adminUserId, CancellationToken cancellationToken = default);
 
     /// <summary>管理画面を出す言語を決める。<c>null</c> で「選んでいない」に戻す。</summary>
     Task SetLanguageAsync(
@@ -243,6 +267,16 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
             + "[TotpEnabledAt] = @Now, [UpdatedAt] = @Now "
             + "WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId, Secret = secretEncrypted, Now = DbTime.UtcNowTruncated() },
+            cancellationToken);
+
+    public Task DisableTotpAsync(
+        Guid adminUserId,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(
+            "UPDATE [AdminUsers] SET [TotpSecretEncrypted] = NULL, "
+            + "[TotpEnabledAt] = NULL, [UpdatedAt] = @Now "
+            + "WHERE [AdminUserId] = @AdminUserId",
+            new { AdminUserId = adminUserId, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
 
     public Task SetDisabledAsync(
