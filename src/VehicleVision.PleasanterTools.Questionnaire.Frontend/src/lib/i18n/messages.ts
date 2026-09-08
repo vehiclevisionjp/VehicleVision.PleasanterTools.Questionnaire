@@ -54,6 +54,9 @@ export const ja = {
   // ---- アクセス解析の告知（Issue #162）----------------------------------------
   // **伏せない。** 外部サービスへ送っていることは、送っている画面で伝える
   'analytics.notice': 'このページでは、利用状況の計測に外部サービス（{provider}）を使用しています。',
+  // ---- 外部の CAPTCHA（Issue #164）--------------------------------------------
+  'captcha.notice': 'このページでは、機械的な送信を防ぐために外部サービス（{provider}）を使用しています。',
+  'captcha.required': '「私はロボットではありません」の確認を済ませてください。',
   'draft.found': '前回の続きがこの端末に残っています。',
   'draft.foundNote':
     'この端末を他の人と共有している場合は、内容を確かめてから再開してください。残さない場合は「破棄する」を押してください。',
@@ -192,6 +195,8 @@ export const en: Record<MessageKey, string> = {
   'form.languageLabel': 'Language',
   'form.trapLabel': 'Leave this field empty',
   'analytics.notice': 'This page uses an external service ({provider}) to measure usage.',
+  'captcha.notice': 'This page uses an external service ({provider}) to block automated submissions.',
+  'captcha.required': 'Complete the verification before submitting.',
   'draft.found': 'An unfinished answer is saved on this device.',
   'draft.foundNote':
     'If you share this device, check the content before resuming. Choose Discard to remove it.',

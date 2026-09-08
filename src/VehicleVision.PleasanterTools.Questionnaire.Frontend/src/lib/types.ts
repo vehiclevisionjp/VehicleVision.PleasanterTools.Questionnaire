@@ -265,6 +265,12 @@ export interface Ticket {
   responseToken: string;
   /** 送信時にそのまま返す署名付きのチケット。 */
   ticket: string;
+  /** 課す課題の種類（Issue #164）。`Altcha` なら自前設置。 */
+  captchaProvider?: string | null;
+  /** 外部の CAPTCHA のサイトキー。**秘密鍵は来ない。** */
+  captchaSiteKey?: string | null;
+  /** 外部の CAPTCHA のスクリプトの URL。 */
+  captchaScriptUrl?: string | null;
   /**
    * proof-of-work の課題（Issue #55）。
    *

@@ -209,6 +209,20 @@ builder.Configuration
 var analyticsOptions = AnalyticsOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(analyticsOptions);
 
+// ---- 外部の CAPTCHA（Issue #164）--------------------------------------------
+// **既定は自前設置の ALTCHA。** 何も設定しなければ外部通信は出ない
+// （インターネットへ出られないイントラでも動く）。
+//
+// ⚠️ **秘密鍵は設定ファイルへ書かせない。** 環境変数か Key Vault から読む
+var captchaOptions = CaptchaOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(captchaOptions);
+
+// **検証の待ち時間に上限を持たせる。** 外部が遅いだけで送信が固まらないように。
+// ⚠️ **到達できないときは通さない**（CaptchaVerifier の但し書き）
+builder.Services
+    .AddHttpClient(CaptchaVerifier.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(5));
+builder.Services.AddSingleton<CaptchaVerifier>();
+
 // ---- 管理者の認証 ----------------------------------------------------------
 // **共有鍵を復号するための鍵。** 失うと登録済みの 2 要素が全て使えなくなるので、
 // **App Service の設定か Key Vault に置き、控えを取っておくこと**
@@ -398,23 +412,32 @@ var embedSources = embedOptions.CspSources;
 // ⚠️ **`https:` のようには広げない。** 許すのは選んだサービスの配信元だけ。
 // **inline script は許さない。** タグは同梱した JS から DOM へ差し込む
 var analyticsSources = analyticsOptions.CspSources;
+
+// **CAPTCHA も、外部を選んだときだけ広げる**（Issue #164）。
+// どのサービスも iframe で課題を出すので、script-src と frame-src の両方に要る
+var captchaSources = captchaOptions.CspSources;
+var externalScriptSources = analyticsSources.AddRange(captchaSources);
 var contentSecurityPolicy = string.Join("; ",
 [
     "default-src 'self'",
     // **画像の埋め込み先も設定で許した配信元だけ**（2 要素の QR は data: URI で描く）。
     // 解析は計測を画像で送ることがあるので、有効なときはその送信先も許す
-    "img-src 'self' data:" + Join(embedSources) + Join(analyticsSources),
+    "img-src 'self' data:" + Join(embedSources) + Join(analyticsSources) + Join(captchaSources),
     // **設定が空なら 'none'。** 指定そのものを省くと default-src へ落ちる
-    "frame-src " + (embedSources.IsEmpty ? "'none'" : string.Join(' ', embedSources)),
+    // **CAPTCHA は iframe で出る。** 埋め込みの許可と同じ枠へ足す
+    "frame-src "
+        + (embedSources.IsEmpty && captchaSources.IsEmpty
+            ? "'none'"
+            : string.Join(' ', embedSources.AddRange(captchaSources))),
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "object-src 'none'",
-    .. analyticsSources.IsEmpty
+    .. externalScriptSources.IsEmpty
         ? Array.Empty<string>()
         :
         [
-            "script-src 'self'" + Join(analyticsSources),
-            "connect-src 'self'" + Join(analyticsSources),
+            "script-src 'self'" + Join(externalScriptSources),
+            "connect-src 'self'" + Join(externalScriptSources),
         ],
 ]);
 
