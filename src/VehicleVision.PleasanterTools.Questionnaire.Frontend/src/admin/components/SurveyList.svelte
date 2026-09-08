@@ -543,6 +543,7 @@
           </td>
           <td class="muted">{formatDate(survey.updatedAt)}</td>
           <td class="row-actions">
+            <div class="row-actions-inner">
             {#if isPublished(survey)}
               <button type="button" class="secondary" onclick={() => toggle(survey)}>
                 {survey.status === 1 ? t('list.suspend') : t('list.resume')}
@@ -565,6 +566,7 @@
                 {t('template.save')}
               </button>
             {/if}
+            </div>
           </td>
         </tr>
       {/each}
@@ -669,11 +671,14 @@
   }
 
   /*
-    停止と複製が並ぶ。**`td` は `display: flex` にしない**（表の桁が崩れる）ので、
-    釦どうしの間だけを空ける
+    停止と複製が並ぶ。**td は display: flex にしない**（表の桁が崩れる）ので、
+    中に入れ物を 1 枚はさんでそこを flex にする。
+    **横だけに余白を付けると、折り返した先の行が詰まる**（Issue #150）
   */
-  .row-actions button + button {
-    margin-left: 0.5rem;
+  .row-actions-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
   }
 
   label {

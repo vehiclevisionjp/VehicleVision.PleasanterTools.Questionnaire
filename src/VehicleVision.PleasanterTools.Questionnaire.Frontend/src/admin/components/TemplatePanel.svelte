@@ -164,6 +164,7 @@
             <td>{template.title}</td>
             <td class="muted">{formatDate(template.updatedAt)}</td>
             <td class="row-actions">
+              <div class="row-actions-inner">
               <button type="button" onclick={() => openUse(template)}>
                 {t('template.use')}
               </button>
@@ -180,6 +181,7 @@
                   {t('template.delete')}
                 </button>
               {/if}
+              </div>
             </td>
           </tr>
         {/each}
@@ -261,9 +263,15 @@
     border-bottom: none;
   }
 
-  /* **`td` は `display: flex` にしない**（表の桁が崩れる） */
-  .row-actions button + button {
-    margin-left: 0.5rem;
+  /*
+    停止と複製が並ぶ。**td は display: flex にしない**（表の桁が崩れる）ので、
+    中に入れ物を 1 枚はさんでそこを flex にする。
+    **横だけに余白を付けると、折り返した先の行が詰まる**（Issue #150）
+  */
+  .row-actions-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
   }
 
   .muted {
