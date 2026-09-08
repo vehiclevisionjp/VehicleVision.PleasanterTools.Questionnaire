@@ -6,6 +6,9 @@
     <!-- TOTP（RFC 6238）。MIT。**自前で書かない** -->
     <!-- bot 対策の proof-of-work（Issue #55）。BSD-2-Clause -->
     <PackageReference Include="Ixnas.AltchaNet" Version="1.2.1" />
+    <!-- 管理画面の SAML 2.0 ログイン（Issue #166）。BSD-3-Clause -->
+    <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.20.1" />
+    <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.20.1" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageReference Include="nClam" Version="9.0.0" />
     <PackageReference Include="Otp.NET" Version="1.4.1" />
