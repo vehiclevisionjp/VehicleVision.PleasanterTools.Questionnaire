@@ -63,8 +63,8 @@ export async function ensureAdminStorageState(
     }
 
     await page.getByLabel('ログイン ID').fill(demoAdmin.loginId);
-    await page.getByLabel('合言葉', { exact: true }).fill(demoAdmin.password);
-    await page.getByLabel('合言葉（確認）').fill(demoAdmin.password);
+    await page.getByLabel('パスワード', { exact: true }).fill(demoAdmin.password);
+    await page.getByLabel('パスワード（確認）').fill(demoAdmin.password);
     await page.getByRole('button', { name: '登録する' }).click();
 
     // **2 要素の登録まで通さないと管理画面へ入れない**

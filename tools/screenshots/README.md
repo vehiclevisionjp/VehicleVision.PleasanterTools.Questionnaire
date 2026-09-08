@@ -102,7 +102,7 @@ docker compose --profile sqlserver --profile screenshots run --rm     screenshot
 | `admin-04-survey-list-empty` | アンケート一覧（空） |
 | `admin-05-survey-list` | アンケート一覧 |
 | `admin-06-survey-editor` | 設問エディタ |
-| `admin-07-login` | ログイン（合言葉） |
+| `admin-07-login` | ログイン（パスワード） |
 | `admin-08-totp` | ログイン（使い捨てパスワード） |
 | `answer-01-form` | 回答画面 |
 | `answer-02-filled` | 入力した状態 |

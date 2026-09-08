@@ -99,7 +99,7 @@ public class AuditLogStoreTests
 
         var store = new AuditLogStore(factory);
 
-        // **合言葉が違えば誰なのか分からない。** それでも試みは残す
+        // **パスワードが違えば誰なのか分からない。** それでも試みは残す
         await store.WriteAsync(new AuditEntry(
             DateTime.Now,
             AdminUserId: null,

@@ -7,7 +7,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// <para>
 /// **管理者は名前が分かっている相手なので、設定を人に紐づけてよい**
 /// （<c>_documents/多言語対応方針.md</c> 2 章）。
-/// 端末を変えても付いてくる方が、毎回 URL や合言葉と一緒に言語を選ぶより楽。
+/// 端末を変えても付いてくる方が、毎回 URL やパスワードと一緒に言語を選ぶより楽。
 /// </para>
 /// <para>
 /// **回答者側には同じものを作らない。** 回答者は完全匿名で、

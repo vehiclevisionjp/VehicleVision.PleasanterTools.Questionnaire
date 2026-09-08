@@ -194,15 +194,15 @@ test.describe('マッピングの編集画面', () => {
       await expect(owner.locator('td.target input')).toHaveValue('ClassC');
     });
 
-    test('列を足すと行が増える', async ({ page }) => {
+    test('列を追加すると行が増える', async ({ page }) => {
       test.skip(surveyId === '', '先の試験でアンケートを作れていない');
 
       await page.goto(`/admin/surveys/${surveyId}`);
       const rows = page.locator('table tbody tr:not(.notes)');
       await expect.poll(() => rows.count()).toBe(3);
 
-      // **`exact` を付ける。** 「添付の列を足す」にも当たってしまう
-      await page.getByRole('button', { name: '列を足す', exact: true }).click();
+      // **`exact` を付ける。** 「添付の列を追加」にも当たってしまう
+      await page.getByRole('button', { name: '列を追加', exact: true }).click();
 
       await expect.poll(() => rows.count()).toBe(4);
       await expect(rows.nth(3).locator('td.source select').first()).toBeVisible();

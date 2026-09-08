@@ -196,7 +196,7 @@ public class AuditLogFilterTests
     [Fact]
     public async Task 認証を通っていない試みも残す()
     {
-        // **合言葉が違えば誰なのか分からない。** それでも試みは残す
+        // **パスワードが違えば誰なのか分からない。** それでも試みは残す
         var store = await RunAsync(
             Request("POST", "/api/admin/login"),
             Results.Json(new { }, statusCode: StatusCodes.Status401Unauthorized));
@@ -299,7 +299,7 @@ public class AuditLogFilterTests
     [Fact]
     public async Task 要求本文には触らない()
     {
-        // **触らない限り、合言葉は入りようがない。**
+        // **触らない限り、パスワードは入りようがない。**
         // 本文を読んでいれば、読み取り位置が動く
         var context = Request("POST", "/api/admin/login");
         context.Request.Body = new MemoryStream(

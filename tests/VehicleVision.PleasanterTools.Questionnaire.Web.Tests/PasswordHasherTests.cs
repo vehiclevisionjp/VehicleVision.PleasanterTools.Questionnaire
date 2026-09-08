@@ -7,17 +7,17 @@ public class PasswordHasherTests
     private readonly PasswordHasher hasher = new();
 
     [Fact]
-    public void 同じ合言葉でも毎回違うハッシュになる()
+    public void 同じパスワードでも毎回違うハッシュになる()
     {
         var first = hasher.Hash("correct horse battery staple");
         var second = hasher.Hash("correct horse battery staple");
 
-        // **塩が毎回変わる。** 同じになると、同じ合言葉の利用者が見分けられる
+        // **塩が毎回変わる。** 同じになると、同じパスワードの利用者が見分けられる
         Assert.NotEqual(first, second);
     }
 
     [Fact]
-    public void 保存した形に合言葉そのものが残らない()
+    public void 保存した形にパスワードそのものが残らない()
     {
         var stored = hasher.Hash("mypassword-12345");
 
@@ -25,7 +25,7 @@ public class PasswordHasherTests
     }
 
     [Fact]
-    public void 正しい合言葉なら通る()
+    public void 正しいパスワードなら通る()
     {
         var stored = hasher.Hash("correct horse battery staple");
 
@@ -36,7 +36,7 @@ public class PasswordHasherTests
     }
 
     [Fact]
-    public void 違う合言葉は通らない()
+    public void 違うパスワードは通らない()
     {
         var stored = hasher.Hash("correct horse battery staple");
 

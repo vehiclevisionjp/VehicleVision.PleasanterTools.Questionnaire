@@ -2,12 +2,12 @@ using FluentMigrator;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
-/// <summary>管理者の招待。**2 人目以降を既定の合言葉なしで迎えるための表。**</summary>
+/// <summary>管理者の招待。**2 人目以降を既定のパスワードなしで迎えるための表。**</summary>
 /// <remarks>
 /// <para>
-/// **追加した管理者に既定の合言葉を配らない**（<c>_documents/非機能設計.md</c> 1 章）。
+/// **追加した管理者に既定のパスワードを配らない**（<c>_documents/非機能設計.md</c> 1 章）。
 /// 配ると、変え忘れがそのまま残る。代わりに**期限付きで 1 回しか使えない招待**を渡し、
-/// 合言葉は本人に決めさせる。
+/// パスワードは本人に決めさせる。
 /// </para>
 /// <para>
 /// **トークンはハッシュのみを置く。** 表を読めた人がそのまま招待を使えては意味が無い。

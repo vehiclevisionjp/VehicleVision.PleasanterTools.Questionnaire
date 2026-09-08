@@ -91,7 +91,7 @@ public class AdminUserServiceTests
     // ---- 招待 --------------------------------------------------------------
 
     [Fact]
-    public async Task 追加した管理者に既定の合言葉を配らない()
+    public async Task 追加した管理者に既定のパスワードを配らない()
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
@@ -112,7 +112,7 @@ public class AdminUserServiceTests
     }
 
     [Fact]
-    public async Task 招待を受け取ると自分で決めた合言葉で通る()
+    public async Task 招待を受け取ると自分で決めたパスワードで通る()
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
@@ -120,7 +120,7 @@ public class AdminUserServiceTests
 
         var result = await harness.Authenticator.CheckPasswordAsync("editor", AnotherPassword);
 
-        // 合言葉は通り、次は 2 要素の登録を求められる
+        // パスワードは通り、次は 2 要素の登録を求められる
         Assert.Equal(PasswordOutcome.NeedsTotpEnrollment, result.Outcome);
     }
 
@@ -136,7 +136,7 @@ public class AdminUserServiceTests
             AdminUserOutcome.Succeeded,
             (await harness.Service.AcceptInvitationAsync(invitation!.Token, Password)).Outcome);
 
-        // **二度目は通さない。** 拾われた招待でもう一度合言葉を決められては困る
+        // **二度目は通さない。** 拾われた招待でもう一度パスワードを決められては困る
         Assert.Equal(
             AdminUserOutcome.InvitationInvalid,
             (await harness.Service.AcceptInvitationAsync(invitation.Token, AnotherPassword)).Outcome);
@@ -192,14 +192,14 @@ public class AdminUserServiceTests
             await harness.Service.SetDisabledAsync(
                 admin.AdminUserId, invitation!.AdminUserId, isDisabled: true));
 
-        // **止めたのに合言葉を決められては困る**
+        // **止めたのにパスワードを決められては困る**
         Assert.Equal(
             AdminUserOutcome.InvitationInvalid,
             (await harness.Service.AcceptInvitationAsync(invitation.Token, Password)).Outcome);
     }
 
     [Fact]
-    public async Task 短い合言葉では招待を受け取れない()
+    public async Task 短いパスワードでは招待を受け取れない()
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
@@ -384,10 +384,10 @@ public class AdminUserServiceTests
         Assert.NotNull(accepted.LastLoginAt);
     }
 
-    // ---- 自分の合言葉 ------------------------------------------------------
+    // ---- 自分のパスワード ------------------------------------------------------
 
     [Fact]
-    public async Task 合言葉を変えると新しい方で通る()
+    public async Task パスワードを変えると新しい方で通る()
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
@@ -405,7 +405,7 @@ public class AdminUserServiceTests
     }
 
     [Fact]
-    public async Task 今の合言葉が違えば変えられない()
+    public async Task 今のパスワードが違えば変えられない()
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
@@ -420,7 +420,7 @@ public class AdminUserServiceTests
     }
 
     [Fact]
-    public async Task 短い合言葉には変えられない()
+    public async Task 短いパスワードには変えられない()
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
@@ -431,7 +431,7 @@ public class AdminUserServiceTests
     }
 
     [Fact]
-    public async Task 今と同じ合言葉には変えられない()
+    public async Task 今と同じパスワードには変えられない()
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
@@ -442,7 +442,7 @@ public class AdminUserServiceTests
     }
 
     [Fact]
-    public async Task 合言葉の変更でも失敗が続けば締め出す()
+    public async Task パスワードの変更でも失敗が続けば締め出す()
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
@@ -462,7 +462,7 @@ public class AdminUserServiceTests
     }
 
     [Fact]
-    public async Task 二要素を登録し直す前に合言葉を確かめる()
+    public async Task 二要素を登録し直す前にパスワードを確かめる()
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);

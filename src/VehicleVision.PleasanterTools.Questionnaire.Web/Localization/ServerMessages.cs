@@ -62,8 +62,8 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.LoginIdAndPasswordRequired,
-            "ログイン ID と合言葉を入力してください。",
-            "Enter your sign-in ID and passphrase.");
+            "ログイン ID とパスワードを入力してください。",
+            "Enter your sign-in ID and password.");
 
         Add(
             ServerMessageKeys.AdministratorAlreadyExists,
@@ -87,8 +87,8 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.PasswordTooShort,
-            "合言葉は {0} 文字以上にしてください。",
-            "Use a passphrase of at least {0} characters.");
+            "パスワードは {0} 文字以上にしてください。",
+            "Use a password of at least {0} characters.");
 
         // ---- 管理者の管理 ---------------------------------------------------
         Add(
@@ -135,8 +135,8 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.CurrentPasswordRejected,
-            "今の合言葉が正しくありません。",
-            "Your current passphrase is not correct.");
+            "今のパスワードが正しくありません。",
+            "Your current password is not correct.");
 
         Add(
             ServerMessageKeys.UnsupportedLanguage,

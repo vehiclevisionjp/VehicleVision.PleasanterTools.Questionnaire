@@ -4,7 +4,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
-/// <summary>管理者の合言葉の下限。</summary>
+/// <summary>管理者のパスワードの下限。</summary>
 public class AdminPasswordPolicyTests
 {
     [Theory]

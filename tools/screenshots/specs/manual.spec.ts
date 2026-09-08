@@ -80,8 +80,8 @@ test.describe('取説用の写し', () => {
     await shoot(page, 'admin-01-setup');
 
     await page.getByLabel('ログイン ID').fill(demoAdmin.loginId);
-    await page.getByLabel('合言葉', { exact: true }).fill(demoAdmin.password);
-    await page.getByLabel('合言葉（確認）').fill(demoAdmin.password);
+    await page.getByLabel('パスワード', { exact: true }).fill(demoAdmin.password);
+    await page.getByLabel('パスワード（確認）').fill(demoAdmin.password);
     await page.getByRole('button', { name: '登録する' }).click();
 
     // **QR と手入力用の文字列が出る画面**
@@ -217,7 +217,7 @@ test.describe('取説用の写し（ログイン済み）', () => {
     await shoot(page, 'admin-07-login');
 
     await page.getByLabel('ログイン ID').fill(demoAdmin.loginId);
-    await page.getByLabel('合言葉', { exact: true }).fill(demoAdmin.password);
+    await page.getByLabel('パスワード', { exact: true }).fill(demoAdmin.password);
     await page.getByRole('button', { name: '次へ' }).click();
 
     await expect(page.getByRole('heading', { name: '認証アプリの数字を入力' })).toBeVisible();

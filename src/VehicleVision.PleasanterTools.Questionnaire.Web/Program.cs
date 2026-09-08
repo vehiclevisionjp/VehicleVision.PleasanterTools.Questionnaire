@@ -460,7 +460,7 @@ if (attachmentOptions.VirusScan is
     app.MapMalwareScanEndpoints(defenderOptions.EventGridKey
         ?? throw new InvalidOperationException(
             "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_EVENTGRIDKEY が設定されていない"
-            + "（判定の受け口を守る合言葉。無いと誰でも『検出なし』を送り込める）"));
+            + "（判定の受け口を守るパスワード。無いと誰でも『検出なし』を送り込める）"));
 }
 
 // **`/f/{publicId}` は画面側で解釈する。** サーバは同じ入口を返すだけ。

@@ -17,7 +17,7 @@ public enum AdminUserOutcome
     /// <summary>入力が足りない。</summary>
     InvalidInput,
 
-    /// <summary>合言葉が条件を満たしていない。</summary>
+    /// <summary>パスワードが条件を満たしていない。</summary>
     WeakPassword,
 
     /// <summary>自分自身には行えない操作。</summary>
@@ -32,7 +32,7 @@ public enum AdminUserOutcome
     /// <summary>招待が無い・期限切れ・使用済み。**理由は区別して返さない。**</summary>
     InvitationInvalid,
 
-    /// <summary>今の合言葉が違う。</summary>
+    /// <summary>今のパスワードが違う。</summary>
     PasswordRejected,
 
     /// <summary>締め出し中。</summary>
@@ -74,7 +74,7 @@ public sealed record IssuedInvitation(Guid AdminUserId, string Token, DateTime E
 ///     **一度もログインしていない管理者は頭数に入れない**（招待しただけの相手を当てにしない）
 ///   </item>
 ///   <item>**自分自身を止めさせない・自分の役割を変えさせない。** 手が滑ったときに戻せない</item>
-///   <item>**既定の合言葉を配らない。** 期限付きで 1 回しか使えない招待を渡す</item>
+///   <item>**既定のパスワードを配らない。** 期限付きで 1 回しか使えない招待を渡す</item>
 /// </list>
 /// <para>
 /// **他人に触れるのは <see cref="AdminRole.Administrator"/> だけ**という切り分けは、
@@ -113,7 +113,7 @@ public sealed class AdminUserService(
 
     /// <summary>管理者を追加し、招待を発行する。</summary>
     /// <remarks>
-    /// **合言葉は決めない。** 誰も知らない値でハッシュを埋めておき、
+    /// **パスワードは決めない。** 誰も知らない値でハッシュを埋めておき、
     /// 招待を受け取るまでは**どんな入力でもログインできない**状態にする。
     /// </remarks>
     public async Task<(AdminUserOutcome Outcome, IssuedInvitation? Invitation)> InviteAsync(
@@ -138,7 +138,7 @@ public sealed class AdminUserService(
         {
             AdminUserId = Guid.NewGuid(),
             LoginId = normalized,
-            // **誰も知らない値。** 既定の合言葉を配らないための埋め草であって、資格情報ではない
+            // **誰も知らない値。** 既定のパスワードを配らないための埋め草であって、資格情報ではない
             PasswordHash = hasher.Hash(Guid.NewGuid().ToString()),
             Role = role,
         };
@@ -157,7 +157,7 @@ public sealed class AdminUserService(
 
     /// <summary>招待を出し直す。**前の招待は使えなくなる。**</summary>
     /// <remarks>
-    /// 招待の紙を無くしたときと、**合言葉を忘れたとき**の両方に使う。
+    /// 招待の紙を無くしたときと、**パスワードを忘れたとき**の両方に使う。
     /// 2 要素は消さないので、これだけで乗っ取られることはない。
     /// </remarks>
     public async Task<(AdminUserOutcome Outcome, IssuedInvitation? Invitation)> ReissueInvitationAsync(
@@ -182,7 +182,7 @@ public sealed class AdminUserService(
         return (AdminUserOutcome.Succeeded, invitation);
     }
 
-    /// <summary>招待を受け取り、合言葉を自分で決める。</summary>
+    /// <summary>招待を受け取り、パスワードを自分で決める。</summary>
     /// <returns>通ったときは、その管理者。</returns>
     /// <remarks>
     /// **ここは認証を通っていない相手が叩く。** 無い・期限切れ・使用済みを区別して返さない。
@@ -217,7 +217,7 @@ public sealed class AdminUserService(
             return (AdminUserOutcome.InvitationInvalid, null);
         }
 
-        // **先に使い切る。** 合言葉を入れてから印を付けると、同時に来た 2 つが両方通る
+        // **先に使い切る。** パスワードを入れてから印を付けると、同時に来た 2 つが両方通る
         if (!await invitations.TryConsumeAsync(invitation.InvitationId, cancellationToken)
                 .ConfigureAwait(false))
         {
@@ -227,12 +227,12 @@ public sealed class AdminUserService(
         await store.UpdatePasswordHashAsync(user.AdminUserId, hasher.Hash(password!), cancellationToken)
             .ConfigureAwait(false);
 
-        logger.LogInformation("招待から合言葉を決めた（AdminUserId={AdminUserId}）", user.AdminUserId);
+        logger.LogInformation("招待からパスワードを決めた（AdminUserId={AdminUserId}）", user.AdminUserId);
         return (AdminUserOutcome.Succeeded, user);
     }
 
-    /// <summary>自分の合言葉を変える。</summary>
-    /// <remarks>**今の合言葉を必ず確かめる。** 乗っ取られた画面から締め出されないため。</remarks>
+    /// <summary>自分のパスワードを変える。</summary>
+    /// <remarks>**今のパスワードを必ず確かめる。** 乗っ取られた画面から締め出されないため。</remarks>
     public async Task<AdminUserOutcome> ChangeOwnPasswordAsync(
         Guid actorId,
         string? currentPassword,
@@ -265,16 +265,16 @@ public sealed class AdminUserService(
         await store.UpdatePasswordHashAsync(actorId, hasher.Hash(newPassword!), cancellationToken)
             .ConfigureAwait(false);
 
-        logger.LogInformation("合言葉を変えた（AdminUserId={AdminUserId}）", actorId);
+        logger.LogInformation("パスワードを変えた（AdminUserId={AdminUserId}）", actorId);
         return AdminUserOutcome.Succeeded;
     }
 
     /// <summary>
-    /// 今の合言葉を確かめる。**2 要素を登録し直す前に通す関門。**
+    /// 今のパスワードを確かめる。**2 要素を登録し直す前に通す関門。**
     /// </summary>
     /// <remarks>
     /// ログイン済みの画面から 2 要素を差し替えられると、
-    /// **画面を奪われただけで乗っ取りが完成する。** 合言葉をもう一度求めて止める。
+    /// **画面を奪われただけで乗っ取りが完成する。** パスワードをもう一度求めて止める。
     /// </remarks>
     public async Task<AdminUserOutcome> ConfirmOwnPasswordAsync(
         Guid actorId,
@@ -325,7 +325,7 @@ public sealed class AdminUserService(
             return AdminUserOutcome.LastAdministrator;
         }
 
-        // **止めた相手宛ての招待は取り消す。** 止めたのに合言葉を決められては困る
+        // **止めた相手宛ての招待は取り消す。** 止めたのにパスワードを決められては困る
         await invitations.RevokeUnusedAsync(targetId, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation(
@@ -394,7 +394,7 @@ public sealed class AdminUserService(
         return new IssuedInvitation(targetId, token, expiresAt);
     }
 
-    /// <summary>本人の合言葉を照合する。</summary>
+    /// <summary>本人のパスワードを照合する。</summary>
     /// <remarks>
     /// **ログインと同じ道を通す。** 失敗の数え上げと締め出しをここだけ免れると、
     /// **総当たりの抜け道になる。**

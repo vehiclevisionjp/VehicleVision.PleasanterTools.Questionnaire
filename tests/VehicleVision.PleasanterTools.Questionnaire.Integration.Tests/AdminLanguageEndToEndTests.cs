@@ -192,7 +192,7 @@ public class AdminLanguageEndToEndTests
 
         using var http = CreateClient();
 
-        // **合言葉が短いので断られる。** その文言が要求の言語で返ることを見る
+        // **パスワードが短いので断られる。** その文言が要求の言語で返ることを見る
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/setup")
         {
             Content = JsonContent.Create(new { loginId = "admin", password = "short" }),
@@ -223,6 +223,6 @@ public class AdminLanguageEndToEndTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var message = (await ReadAsync(response))!["message"]!.GetValue<string>();
-        Assert.Contains("合言葉", message, StringComparison.Ordinal);
+        Assert.Contains("パスワード", message, StringComparison.Ordinal);
     }
 }

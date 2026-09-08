@@ -289,7 +289,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
     /// <remarks>
     /// <para>
     /// **一度もログインしていない管理者を当てにしない**（<c>LastLoginAt IS NULL</c> は数えない）。
-    /// 招待しただけの管理者は**誰も知らない合言葉**しか持たないので、
+    /// 招待しただけの管理者は**誰も知らないパスワード**しか持たないので、
     /// 頭数に入れると「招いたが受け取っていない相手」を頼りに
     /// 最後の 1 人を止められてしまう。**それは締め出しそのもの。**
     /// </para>

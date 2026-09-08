@@ -11,7 +11,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// <remarks>
 /// <para>
 /// **他人に触れるのは <see cref="AdminRole.Administrator"/> だけ。**
-/// <see cref="AdminRole.Editor"/> にできるのは、自分の合言葉と自分の 2 要素だけ
+/// <see cref="AdminRole.Editor"/> にできるのは、自分のパスワードと自分の 2 要素だけ
 /// （<c>_documents/非機能設計.md</c> 1 章）。
 /// </para>
 /// <para>
@@ -20,7 +20,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// </para>
 /// <para>
 /// **招待だけは認証を通っていない相手が叩く**（<c>/api/admin/invitations/accept</c>）。
-/// 既定の合言葉を配らないための道なので、
+/// 既定のパスワードを配らないための道なので、
 /// **期限付き・1 回限り**で、レート制限もログインと同じ枠に入れる。
 /// </para>
 /// </remarks>
@@ -178,7 +178,7 @@ public static class AdminUserEndpoints
     {
         var me = parent.MapGroup("/me").RequireAuthorization(AdminAuthSchemes.SessionPolicy);
 
-        // ---- 合言葉の変更 ----------------------------------------------------
+        // ---- パスワードの変更 ----------------------------------------------------
         me.MapPost("/password", async (
             AdminPasswordChangeRequest request,
             HttpContext context,
@@ -237,7 +237,7 @@ public static class AdminUserEndpoints
         {
             var actorId = ActorId(principal);
 
-            // **合言葉をもう一度求める。** 画面を離席で奪われただけで
+            // **パスワードをもう一度求める。** 画面を離席で奪われただけで
             // 2 要素を差し替えられては、乗っ取りが完成してしまう
             var outcome = await service
                 .ConfirmOwnPasswordAsync(actorId, request.Password, cancellationToken)
@@ -322,7 +322,7 @@ public static class AdminUserEndpoints
                 return Failure(outcome, RequestLanguage.Of(context));
             }
 
-            // **合言葉を決めただけでは入れない。** 2 要素まで通って初めてログインとする
+            // **パスワードを決めただけでは入れない。** 2 要素まで通って初めてログインとする
             await AdminAuthEndpoints.SignInPendingAsync(context, user!, secret: null).ConfigureAwait(false);
             return Results.Ok(new { next = user!.HasTotp ? "totp" : "enroll" });
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
@@ -436,16 +436,16 @@ public static class AdminUserEndpoints
         return context.SignInAsync(AdminAuthSchemes.Reenroll, new ClaimsPrincipal(identity));
     }
 
-    /// <summary>追加する管理者。**合言葉は受け取らない**（招待で本人が決める）。</summary>
+    /// <summary>追加する管理者。**パスワードは受け取らない**（招待で本人が決める）。</summary>
     public sealed record AdminUserCreateRequest(string? LoginId, string? Role);
 
     /// <summary>変更後の役割。</summary>
     public sealed record AdminRoleRequest(string? Role);
 
-    /// <summary>今の合言葉と、新しい合言葉。</summary>
+    /// <summary>今のパスワードと、新しいパスワード。</summary>
     public sealed record AdminPasswordChangeRequest(string? CurrentPassword, string? NewPassword);
 
-    /// <summary>今の合言葉。</summary>
+    /// <summary>今のパスワード。</summary>
     public sealed record AdminPasswordRequest(string? Password);
 
     /// <summary>管理画面を出す言語。**空なら「選んでいない」に戻す。**</summary>
@@ -454,6 +454,6 @@ public static class AdminUserEndpoints
     /// <summary>使い捨てパスワード。</summary>
     public sealed record AdminCodeRequest(string? Code);
 
-    /// <summary>招待と、本人が決めた合言葉。</summary>
+    /// <summary>招待と、本人が決めたパスワード。</summary>
     public sealed record AdminInvitationAcceptRequest(string? Token, string? Password);
 }

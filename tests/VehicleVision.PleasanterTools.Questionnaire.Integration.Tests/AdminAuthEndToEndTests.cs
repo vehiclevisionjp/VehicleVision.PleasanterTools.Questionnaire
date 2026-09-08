@@ -153,7 +153,7 @@ public class AdminAuthEndToEndTests
     }
 
     [Fact]
-    public async Task 合言葉だけでは認証済みにならない()
+    public async Task パスワードだけでは認証済みにならない()
     {
         if (!Enabled)
         {
@@ -262,7 +262,7 @@ public class AdminAuthEndToEndTests
         using var setupClient = CreateClient();
         var (secret, _) = await EnrollAsync(setupClient, "admin");
 
-        // **合言葉を通していない相手**
+        // **パスワードを通していない相手**
         using var http = CreateClient();
 
         using (var totp = await PostAsync(http, "/api/admin/login/totp", new { code = Code(secret) }))
@@ -305,7 +305,7 @@ public class AdminAuthEndToEndTests
     }
 
     [Fact]
-    public async Task 合言葉が違えば通らず段階も区別されない()
+    public async Task パスワードが違えば通らず段階も区別されない()
     {
         if (!Enabled)
         {

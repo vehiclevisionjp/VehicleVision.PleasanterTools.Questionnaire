@@ -11,14 +11,14 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// <summary>管理画面の認証の入口。</summary>
 /// <remarks>
 /// <para>
-/// **2 段階で通す。** 合言葉が通った時点では
+/// **2 段階で通す。** パスワードが通った時点では
 /// <see cref="AdminAuthSchemes.Pending"/> の途中状態にしかならず、
 /// 使い捨てパスワードか復旧コードが通って初めて
 /// <see cref="AdminAuthSchemes.Session"/> になる。
 /// </para>
 /// <para>
 /// **外へ返す文言で段階を区別しない。** 「その利用者は居ない」と
-/// 「合言葉が違う」を区別すると、利用者名の総当たりに使える。
+/// 「パスワードが違う」を区別すると、利用者名の総当たりに使える。
 /// </para>
 /// </remarks>
 public static class AdminAuthEndpoints
@@ -103,7 +103,7 @@ public static class AdminAuthEndpoints
             CancellationToken cancellationToken) =>
         {
             // **誰が狙われているかは、記録に残っていないと分からない。**
-            // 合言葉は預けない（AuditNotes の但し書き）
+            // パスワードは預けない（AuditNotes の但し書き）
             AuditNotes.Add(context, "loginId", request.LoginId);
 
             if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
@@ -115,7 +115,7 @@ public static class AdminAuthEndpoints
                 });
             }
 
-            // **短すぎる合言葉を通さない。** 最初の 1 人こそ全権を持つ
+            // **短すぎるパスワードを通さない。** 最初の 1 人こそ全権を持つ
             if (!AdminPasswordPolicy.IsAcceptable(request.Password))
             {
                 return Results.BadRequest(
@@ -140,7 +140,7 @@ public static class AdminAuthEndpoints
             return Results.Ok(new { next = "enroll" });
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
-        // ---- 合言葉 ----------------------------------------------------------
+        // ---- パスワード ----------------------------------------------------------
         group.MapPost("/login", async (
             AdminCredentialRequest request,
             HttpContext context,
@@ -148,7 +148,7 @@ public static class AdminAuthEndpoints
             CancellationToken cancellationToken) =>
         {
             // **誰が狙われているかは、記録に残っていないと分からない。**
-            // 合言葉は預けない（AuditNotes の但し書き）
+            // パスワードは預けない（AuditNotes の但し書き）
             AuditNotes.Add(context, "loginId", request.LoginId);
 
             if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
@@ -334,7 +334,7 @@ public static class AdminAuthEndpoints
 
     /// <summary>途中状態の claim から利用者を組み立てる。</summary>
     /// <remarks>
-    /// **照合に要る値だけを持つ。** 合言葉のハッシュなどは cookie に入れない。
+    /// **照合に要る値だけを持つ。** パスワードのハッシュなどは cookie に入れない。
     /// </remarks>
     private static AdminUser ReadPending(ClaimsPrincipal principal) => new()
     {
@@ -346,7 +346,7 @@ public static class AdminAuthEndpoints
             : AdminRole.Editor,
     };
 
-    /// <summary>合言葉まで通った状態にする。**ここでは何も操作させない。**</summary>
+    /// <summary>パスワードまで通った状態にする。**ここでは何も操作させない。**</summary>
     internal static Task SignInPendingAsync(HttpContext context, AdminUser user, string? secret)
     {
         var claims = new List<Claim>
@@ -384,7 +384,7 @@ public static class AdminAuthEndpoints
             new AuthenticationProperties { IsPersistent = false }).ConfigureAwait(false);
     }
 
-    /// <summary>ログイン ID と合言葉。</summary>
+    /// <summary>ログイン ID とパスワード。</summary>
     public sealed record AdminCredentialRequest(string? LoginId, string? Password);
 
     /// <summary>使い捨てパスワードか復旧コード。</summary>
@@ -397,7 +397,7 @@ public static class AdminAuthSchemes
     /// <summary>2 要素まで通った状態。</summary>
     public const string Session = "Admin.Session";
 
-    /// <summary>合言葉だけ通った途中の状態。**ここでは何も操作させない。**</summary>
+    /// <summary>パスワードだけ通った途中の状態。**ここでは何も操作させない。**</summary>
     public const string Pending = "Admin.Pending";
 
     /// <summary>

@@ -28,8 +28,8 @@ test.describe('分岐（下ごしらえ）', () => {
     await expect(page.getByRole('heading', { name: '最初の管理者を登録する' })).toBeVisible();
 
     await page.getByLabel('ログイン ID').fill(demoAdmin.loginId);
-    await page.getByLabel('合言葉', { exact: true }).fill(demoAdmin.password);
-    await page.getByLabel('合言葉（確認）').fill(demoAdmin.password);
+    await page.getByLabel('パスワード', { exact: true }).fill(demoAdmin.password);
+    await page.getByLabel('パスワード（確認）').fill(demoAdmin.password);
     await page.getByRole('button', { name: '登録する' }).click();
 
     await expect(page.getByRole('heading', { name: '2 要素認証を登録する' })).toBeVisible();
