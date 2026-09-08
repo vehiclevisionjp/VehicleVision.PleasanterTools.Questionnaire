@@ -64,6 +64,15 @@ internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUser
             TotpEnabledAt = Now,
         });
 
+    public Task DisableTotpAsync(
+        Guid adminUserId,
+        CancellationToken cancellationToken = default) =>
+        UpdateAsync(adminUserId, user => user with
+        {
+            TotpSecretEncrypted = null,
+            TotpEnabledAt = null,
+        });
+
     public Task SetDisabledAsync(
         Guid adminUserId,
         bool isDisabled,

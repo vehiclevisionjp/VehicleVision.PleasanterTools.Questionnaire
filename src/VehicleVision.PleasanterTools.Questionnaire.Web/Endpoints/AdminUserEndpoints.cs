@@ -140,6 +140,54 @@ public static class AdminUserEndpoints
             SetDisabledAsync(
                 adminUserId, context, principal, service, isDisabled: false, cancellationToken));
 
+        // ---- 他人の 2 要素を解除する（Issue #154）-----------------------------
+        //
+        // **端末を失った人の救済。** 復旧コードを使い切った場合、他に手が無い。
+        // ⚠️ **保護を外す操作なので、誰が誰に対して行ったかを必ず記録に残す。**
+        users.MapPost("/{adminUserId:guid}/totp/reset", async (
+            Guid adminUserId,
+            HttpContext context,
+            ClaimsPrincipal principal,
+            AdminAuthenticator authenticator,
+            IAdminUserStore store,
+            CancellationToken cancellationToken) =>
+        {
+            var language = RequestLanguage.Of(context);
+
+            // **自分自身は対象にしない。** 自分の分は /me/totp（パスワードの再確認つき）で行う
+            if (adminUserId == ActorId(principal))
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.SelfNotAllowed, language),
+                });
+            }
+
+            var user = await store.FindByIdAsync(adminUserId, cancellationToken).ConfigureAwait(false);
+            if (user is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.AdminUserNotFound, language),
+                });
+            }
+
+            AuditNotes.Add(context, "target", user.LoginId);
+
+            if (!user.HasTotp)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.TwoFactorNotEnrolled, language),
+                });
+            }
+
+            await authenticator.DisableTotpAsync(adminUserId, cancellationToken).ConfigureAwait(false);
+
+            // **必須の設定なら、この人は次回ログイン時に登録へ回る**（未登録になるため）
+            return Results.Ok(new { reset = true });
+        });
+
         // ---- 役割の変更 ------------------------------------------------------
         users.MapPost("/{adminUserId:guid}/role", async (
             Guid adminUserId,
@@ -226,6 +274,55 @@ public static class AdminUserEndpoints
             return Results.Ok(new { language });
         });
 
+        // ---- 自分の 2 要素を解除する（Issue #154）----------------------------
+        //
+        // **必須のときは通さない。** 通すと設定を無視して保護を外せる。
+        // **無効のときは通す。** 登録済みの人が自分で外せる唯一の口になる。
+        me.MapDelete("/totp", async (
+            AdminPasswordRequest request,
+            HttpContext context,
+            ClaimsPrincipal principal,
+            AdminUserService service,
+            AdminAuthenticator authenticator,
+            IAdminUserStore store,
+            AdminAuthOptions options,
+            CancellationToken cancellationToken) =>
+        {
+            var language = RequestLanguage.Of(context);
+            if (options.TwoFactor is TwoFactorPolicy.Required)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.TwoFactorRequired, language),
+                });
+            }
+
+            var actorId = ActorId(principal);
+
+            // **登録のときと同じくパスワードをもう一度求める。**
+            // 離席で奪われた画面から保護を外されては意味が無い
+            var outcome = await service
+                .ConfirmOwnPasswordAsync(actorId, request.Password, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (outcome is not AdminUserOutcome.Succeeded)
+            {
+                return Failure(outcome, language);
+            }
+
+            var user = await store.FindByIdAsync(actorId, cancellationToken).ConfigureAwait(false);
+            if (user is null || !user.HasTotp)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.TwoFactorNotEnrolled, language),
+                });
+            }
+
+            await authenticator.DisableTotpAsync(actorId, cancellationToken).ConfigureAwait(false);
+            return Results.Ok(new { removed = true });
+        }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
         // ---- 2 要素の登録し直し（端末を替えたとき） --------------------------
         me.MapPost("/totp/begin", async (
             AdminPasswordRequest request,
@@ -233,6 +330,7 @@ public static class AdminUserEndpoints
             ClaimsPrincipal principal,
             AdminUserService service,
             AdminAuthenticator authenticator,
+            AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
             var actorId = ActorId(principal);
@@ -246,6 +344,16 @@ public static class AdminUserEndpoints
             if (outcome is not AdminUserOutcome.Succeeded)
             {
                 return Failure(outcome, RequestLanguage.Of(context));
+            }
+
+            if (options.TwoFactor is TwoFactorPolicy.Disabled)
+            {
+                // **画面から隠すだけでは足りない。** API を直接叩かれても通さない（Issue #154）
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.TwoFactorDisabled, RequestLanguage.Of(context)),
+                });
             }
 
             var loginId = principal.Identity?.Name ?? string.Empty;

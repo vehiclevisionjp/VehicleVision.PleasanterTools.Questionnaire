@@ -236,7 +236,22 @@ builder.Services.AddSingleton(new AdminPasswordPolicy(passwordPolicyOptions));
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton(new SecretProtector(secretKey));
-builder.Services.AddSingleton(new AdminAuthOptions());
+// **2 要素認証をどこまで求めるか**（Issue #154）。**既定は任意。**
+//
+// **知らない値は落とす。** 黙って既定へ落ちると、必須にしたつもりで任意のまま動く。
+var twoFactorPolicy = TwoFactorPolicy.Optional;
+if (builder.Configuration[AdminAuthOptions.TwoFactorSetting] is { Length: > 0 } twoFactorSetting)
+{
+    if (!Enum.TryParse(twoFactorSetting, ignoreCase: true, out twoFactorPolicy)
+        || !Enum.IsDefined(twoFactorPolicy))
+    {
+        throw new InvalidOperationException(
+            $"{AdminAuthOptions.TwoFactorSetting} は required / optional / disabled のいずれかにする"
+            + $"（今の値: {twoFactorSetting}）");
+    }
+}
+
+builder.Services.AddSingleton(new AdminAuthOptions { TwoFactor = twoFactorPolicy });
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
 builder.Services.AddSingleton<AdminUserService>();

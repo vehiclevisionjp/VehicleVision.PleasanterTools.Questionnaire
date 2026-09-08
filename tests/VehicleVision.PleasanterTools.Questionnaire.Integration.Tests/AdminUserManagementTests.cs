@@ -353,6 +353,8 @@ public class AdminUserManagementTests
         await InviteAndAcceptAsync(harness, admin.AdminUserId, "editor", AdminRole.Editor);
 
         var result = await harness.Authenticator.CheckPasswordAsync("editor", Password);
-        Assert.Equal(PasswordOutcome.NeedsTotpEnrollment, result.Outcome);
+
+        // **既定は 2 要素を任意**にしたので、招待を受けた本人はそのまま通る（Issue #154）
+        Assert.Equal(PasswordOutcome.SignedIn, result.Outcome);
     }
 }
