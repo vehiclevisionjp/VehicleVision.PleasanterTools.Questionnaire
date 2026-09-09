@@ -1,6 +1,8 @@
 <script lang="ts">
+  import AdminUserList from './components/AdminUserList.svelte';
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
+  import MyAccountPanel from './components/MyAccountPanel.svelte';
   import NotificationList from './components/NotificationList.svelte';
   import OutboxStatusPanel from './components/OutboxStatusPanel.svelte';
   import SignInPanel from './components/SignInPanel.svelte';
@@ -27,6 +29,12 @@
   /** お知らせを開いているか。**これも URL に出す。**（Issue #80） */
   let openNotifications = $state(readNotifications());
 
+  /** 管理者の管理を開いているか。**これも URL に出す。**（Issue #156） */
+  let openUsers = $state(readUsers());
+
+  /** 自分のアカウントを開いているか。**これも URL に出す。**（Issue #156） */
+  let openAccount = $state(readAccount());
+
   /**
    * 未読の件数。**ヘッダのバッジに出す。**
    *
@@ -52,6 +60,8 @@
       openAuditLog = readAuditLog();
       openOutbox = readOutbox();
       openNotifications = readNotifications();
+      openUsers = readUsers();
+      openAccount = readAccount();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -74,44 +84,55 @@
     return /^\/admin\/notifications\/?$/.test(location.pathname);
   }
 
-  function open(surveyId: string) {
-    openSurveyId = surveyId;
+  function readUsers(): boolean {
+    return /^\/admin\/users\/?$/.test(location.pathname);
+  }
+
+  function readAccount(): boolean {
+    return /^\/admin\/me\/?$/.test(location.pathname);
+  }
+
+  /** 画面を 1 つだけ開く。**出し分けの取りこぼしを防ぐ。** */
+  function only(path: string, flags: Partial<Record<string, boolean>> = {}) {
+    openSurveyId = null;
     openAuditLog = false;
     openOutbox = false;
     openNotifications = false;
-    history.pushState(null, '', `/admin/surveys/${surveyId}`);
+    openUsers = flags.users ?? false;
+    openAccount = flags.account ?? false;
+    history.pushState(null, '', path);
+  }
+
+  function openUserList() {
+    only('/admin/users', { users: true });
+  }
+
+  function openMyAccount() {
+    only('/admin/me', { account: true });
+  }
+
+  function open(surveyId: string) {
+    only(`/admin/surveys/${surveyId}`);
+    openSurveyId = surveyId;
   }
 
   function openAudit() {
-    openSurveyId = null;
-    openOutbox = false;
-    openNotifications = false;
+    only('/admin/audit-logs');
     openAuditLog = true;
-    history.pushState(null, '', '/admin/audit-logs');
   }
 
   function openDelivery() {
-    openSurveyId = null;
-    openAuditLog = false;
-    openNotifications = false;
+    only('/admin/outbox');
     openOutbox = true;
-    history.pushState(null, '', '/admin/outbox');
   }
 
   function openNotificationList() {
-    openSurveyId = null;
-    openAuditLog = false;
-    openOutbox = false;
+    only('/admin/notifications');
     openNotifications = true;
-    history.pushState(null, '', '/admin/notifications');
   }
 
   function back() {
-    openSurveyId = null;
-    openAuditLog = false;
-    openOutbox = false;
-    openNotifications = false;
-    history.pushState(null, '', '/admin');
+    only('/admin');
   }
 
   async function refresh() {
@@ -155,6 +176,8 @@
     openAuditLog = false;
     openOutbox = false;
     openNotifications = false;
+    openUsers = false;
+    openAccount = false;
     unreadCount = 0;
     history.replaceState(null, '', '/admin');
     await refresh();
@@ -199,6 +222,15 @@
    * **サーバ側でも同じ権限で判定している**（`AdminNotificationEndpoints`）。
    */
   const canSeeNotifications = $derived(can('notifications.read'));
+
+  /**
+   * 管理者の管理を見せてよい相手か（Issue #156）。
+   *
+   * **`users.read` を持つ相手だけ。** 追加・役割変更・停止は `users.write`、
+   * 2 要素の解除は `users.resetTwoFactor` で更に絞る。
+   * **サーバ側でも同じ権限で判定している**（`AdminUserEndpoints`）。
+   */
+  const canSeeUsers = $derived(can('users.read'));
 
   const needsEnrollment = $derived(
     session !== undefined &&
@@ -249,6 +281,13 @@
         <button type="button" class="link" onclick={openAudit}>{t('audit.open')}</button>
       {/if}
 
+      {#if canSeeUsers}
+        <button type="button" class="link" onclick={openUserList}>{t('users.open')}</button>
+      {/if}
+
+      <!-- **自分の設定は誰でも開ける。** 役割を問わない -->
+      <button type="button" class="link" onclick={openMyAccount}>{t('account.open')}</button>
+
       <button type="button" class="link" onclick={signOut}>{t('app.signOut')}</button>
     </header>
 
@@ -259,9 +298,19 @@
     <main
       class:wide={(openAuditLog && canSeeAuditLog) ||
         (openOutbox && canSeeOutbox) ||
-        (openNotifications && canSeeNotifications)}
+        (openNotifications && canSeeNotifications) ||
+        (openUsers && canSeeUsers)}
     >
-      {#if openAuditLog && canSeeAuditLog}
+      {#if openUsers && canSeeUsers}
+        <AdminUserList
+          ownAdminUserId={session.adminUserId ?? ''}
+          canWrite={can('users.write')}
+          canReset={can('users.resetTwoFactor')}
+          onback={back}
+        />
+      {:else if openAccount}
+        <MyAccountPanel {session} onchanged={refresh} onback={back} />
+      {:else if openAuditLog && canSeeAuditLog}
         <AuditLogList onback={back} />
       {:else if openNotifications && canSeeNotifications}
         <NotificationList onback={back} onunread={(count) => (unreadCount = count)} />

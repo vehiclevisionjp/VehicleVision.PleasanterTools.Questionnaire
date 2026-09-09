@@ -3,6 +3,8 @@ import type { NoteBlock } from '../../lib/types';
 import type {
   AdminNotificationPage,
   AdminSession,
+  AdminUserRow,
+  IssuedInvitation,
   AttachmentRejectionPage,
   AuditLogFilter,
   AuditLogPage,
@@ -102,6 +104,81 @@ export const completeEnrollment = (code: string) =>
   call<{ recoveryCodes: string[] }>('/api/admin/enroll/complete', {
     method: 'POST',
     json: { code },
+  });
+
+// ---- 管理者の管理（Issue #156）------------------------------------------------
+// **入口を隠すだけでは守りにならない。** 権限はサーバ側で見ている
+// （`users.read` / `users.write` / `users.resetTwoFactor`）
+
+export const listAdminUsers = () =>
+  call<{ users: AdminUserRow[] }>('/api/admin/users');
+
+/** 管理者を追加し、招待を 1 通出す。**トークンはこの応答にしか出ない。** */
+export const inviteAdminUser = (loginId: string, role: string) =>
+  call<IssuedInvitation>('/api/admin/users', { method: 'POST', json: { loginId, role } });
+
+/** 招待を出し直す。**前の招待は使えなくなる。** */
+export const reissueInvitation = (adminUserId: string) =>
+  call<IssuedInvitation>(`/api/admin/users/${adminUserId}/invitation`, {
+    method: 'POST',
+    json: {},
+  });
+
+export const setAdminUserRole = (adminUserId: string, role: string) =>
+  call<{ role: string }>(`/api/admin/users/${adminUserId}/role`, {
+    method: 'POST',
+    json: { role },
+  });
+
+export const setAdminUserDisabled = (adminUserId: string, isDisabled: boolean) =>
+  call<{ isDisabled: boolean }>(
+    `/api/admin/users/${adminUserId}/${isDisabled ? 'disable' : 'enable'}`,
+    { method: 'POST', json: {} },
+  );
+
+/**
+ * 他人の 2 要素を解除する（端末を失ったときの救済）。
+ *
+ * ⚠️ **保護を外す操作。** 操作の記録に残る。
+ * **次に入るときは登録し直しになる**（方針が必須のとき）。
+ */
+export const resetAdminUserTwoFactor = (adminUserId: string) =>
+  call<{ reset: boolean }>(`/api/admin/users/${adminUserId}/totp/reset`, {
+    method: 'POST',
+    json: {},
+  });
+
+// ---- 自分のアカウント（Issue #156）--------------------------------------------
+
+export const changeOwnPassword = (currentPassword: string, newPassword: string) =>
+  call<{ changed: boolean }>('/api/admin/me/password', {
+    method: 'POST',
+    json: { currentPassword, newPassword },
+  });
+
+/** 自分の 2 要素を登録し直す（端末を替えたとき）。**パスワードの再確認つき。** */
+export const beginOwnTotp = (password: string) =>
+  call<{ secret: string; uri: string }>('/api/admin/me/totp/begin', {
+    method: 'POST',
+    json: { password },
+  });
+
+export const completeOwnTotp = (code: string) =>
+  call<{ recoveryCodes: string[] }>('/api/admin/me/totp/complete', {
+    method: 'POST',
+    json: { code },
+  });
+
+/**
+ * 自分の 2 要素を解除する。**パスワードの再確認つき。**
+ *
+ * ⚠️ **必須にしている間は断られる**（設定を無視して保護を外せないため）。
+ * **口は DELETE ではなく POST**（Issue #170。最小 API は DELETE の本文を推論しない）。
+ */
+export const disableOwnTotp = (password: string) =>
+  call<{ removed: boolean }>('/api/admin/me/totp/disable', {
+    method: 'POST',
+    json: { password },
   });
 
 export const logout = () => call<{ signedOut: boolean }>('/api/admin/logout', { method: 'POST', json: {} });
