@@ -22,6 +22,7 @@
 | `Service.json` | アプリ名・既定タイムゾーン | ⚠️ **読まれていない**（Issue #158） |
 | `Pleasanter.json` | 接続先 Pleasanter の URL・API キー・タイムアウト | ⚠️ **読まれていない**（同上。実際に効くのは環境変数） |
 | `Security.json` | **管理者のパスワードに求める条件**（Issue #157） | **読まれている** |
+| `Analytics.json` | **回答画面のアクセス解析**（Issue #162） | **読まれている** |
 
 > ⚠️ **`Service.json` と `Pleasanter.json` は、いまのところ読み込まれていない。**
 > 設定はすべて環境変数（`QUESTIONNAIRE_*`）から読んでいる。
@@ -42,6 +43,13 @@
 | `QUESTIONNAIRE_ADMIN_TWOFACTOR` | 管理者の 2 要素認証。`required` / `optional`（既定） / `disabled`。**知らない値は起動時に落ちる。** ⚠️ `disabled` にしても、登録済みの管理者からは 2 要素を外さない |
 | `PasswordMinimumLength` | パスワードの最低の長さ（既定 12）。`Security.json` にも書ける（Issue #157） |
 | `PasswordAllowSameAsLoginId` | ログイン ID と同じパスワードを許すか（既定 `false`）。同上 |
+| `AnalyticsProvider` | アクセス解析のサービス。`None`（既定）/ `Ga4` / `Gtm` / `Matomo` / `Plausible`。`Analytics.json` にも書ける |
+| `AnalyticsSiteId` | 測定 ID・コンテナ ID・サイト ID・ドメイン（サービスで意味が変わる） |
+| `AnalyticsScriptOrigin` | 自前設置の配信元。**Matomo は必須** |
+| `AnalyticsShowNotice` | 回答者へ告知を出すか（既定 `true`） |
+| `CaptchaProvider` | 課す課題。`Altcha`（既定・自前設置）/ `Recaptcha` / `Turnstile` / `Hcaptcha`。**知らない値は既定へ落とす** |
+| `CaptchaSiteKey` | 外部の CAPTCHA のサイトキー（画面へ渡る） |
+| `CaptchaSecretKey` | 外部の CAPTCHA の秘密鍵。**このフォルダのファイルへ書かないこと。** 環境変数か Key Vault から |
 | `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |

@@ -197,6 +197,42 @@ if (attachmentOptions.VirusScan.Enabled)
 builder.Services.AddSingleton(serviceProvider => new AttachmentInspector(
     attachmentOptions.ToPolicy(), serviceProvider.GetService<IVirusScanner>()));
 
+// ---- App_Data/Parameters の設定ファイル --------------------------------------
+// **優先順位は {名前}.local.json ＞ 環境変数 ＞ {名前}.json**
+// （App_Data/Parameters/README.md）。既定の並びは環境変数が後ろなので、
+// **JSON を先に積み、環境変数を積み直し、最後に .local.json を積む。**
+//
+// **1 か所にまとめてある。** 設定ごとに「JSON → 環境変数」を繰り返すと、
+// 後から積んだ環境変数が**前の .local.json を追い越す**（実際に踏んだ）。
+//
+// ⚠️ **Service.json と Pleasanter.json はここに無い。** 環境変数から読む作りのままで、
+// そちらの読み込みは別課題（Issue #158）
+builder.Configuration
+    .AddJsonFile("App_Data/Parameters/Security.json", optional: true, reloadOnChange: false)
+    .AddJsonFile("App_Data/Parameters/Analytics.json", optional: true, reloadOnChange: false)
+    .AddEnvironmentVariables()
+    .AddJsonFile("App_Data/Parameters/Security.local.json", optional: true, reloadOnChange: false)
+    .AddJsonFile("App_Data/Parameters/Analytics.local.json", optional: true, reloadOnChange: false);
+
+// ---- アクセス解析（Issue #162）----------------------------------------------
+// **既定は無効。** 設定しなければ、回答者の端末から第三者への要求は 1 つも出ない。
+var analyticsOptions = AnalyticsOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(analyticsOptions);
+
+// ---- 外部の CAPTCHA（Issue #164）--------------------------------------------
+// **既定は自前設置の ALTCHA。** 何も設定しなければ外部通信は出ない
+// （インターネットへ出られないイントラでも動く）。
+//
+// ⚠️ **秘密鍵は設定ファイルへ書かせない。** 環境変数か Key Vault から読む
+var captchaOptions = CaptchaOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(captchaOptions);
+
+// **検証の待ち時間に上限を持たせる。** 外部が遅いだけで送信が固まらないように。
+// ⚠️ **到達できないときは通さない**（CaptchaVerifier の但し書き）
+builder.Services
+    .AddHttpClient(CaptchaVerifier.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(5));
+builder.Services.AddSingleton<CaptchaVerifier>();
+
 // ---- 管理者の認証 ----------------------------------------------------------
 // **共有鍵を復号するための鍵。** 失うと登録済みの 2 要素が全て使えなくなるので、
 // **App Service の設定か Key Vault に置き、控えを取っておくこと**
@@ -208,18 +244,7 @@ builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
 builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
 // **パスワードの条件は設定で決める**（Issue #157）。
 // 実値は App_Data/Parameters/Security.json（Pleasanter 本体と同じ書き方）。
-//
-// **優先順位は Security.local.json ＞ 環境変数 ＞ Security.json**
-// （App_Data/Parameters/README.md）。既定の並びは環境変数が後ろなので、
-// **JSON を先に積んでから環境変数を積み直す。**
-//
-// ⚠️ **ここだけ JSON を読んでいる。** Service.json と Pleasanter.json は
-// 環境変数から読む作りのままで、そちらの読み込みは別課題（Issue #158）
-builder.Configuration
-    .AddJsonFile("App_Data/Parameters/Security.json", optional: true, reloadOnChange: false)
-    .AddEnvironmentVariables()
-    .AddJsonFile("App_Data/Parameters/Security.local.json", optional: true, reloadOnChange: false);
-
+// **積む場所は上の 1 か所にまとめてある。**
 var passwordPolicyOptions = new AdminPasswordPolicyOptions
 {
     MinimumLength = int.TryParse(builder.Configuration["PasswordMinimumLength"], out var minimumLength)
@@ -435,16 +460,40 @@ var app = builder.Build();
 // 既定は空なので、設定しなければ従来と同じ CSP になる。
 // **`frame-src https:` のようには絶対に広げない**
 var embedSources = embedOptions.CspSources;
+
+// **アクセス解析を有効にしたときだけ広げる**（Issue #162）。
+// 既定では 1 つも足さないので、今までと同じ CSP になる。
+//
+// ⚠️ **`https:` のようには広げない。** 許すのは選んだサービスの配信元だけ。
+// **inline script は許さない。** タグは同梱した JS から DOM へ差し込む
+var analyticsSources = analyticsOptions.CspSources;
+
+// **CAPTCHA も、外部を選んだときだけ広げる**（Issue #164）。
+// どのサービスも iframe で課題を出すので、script-src と frame-src の両方に要る
+var captchaSources = captchaOptions.CspSources;
+var externalScriptSources = analyticsSources.AddRange(captchaSources);
 var contentSecurityPolicy = string.Join("; ",
 [
     "default-src 'self'",
-    // **画像の埋め込み先も設定で許した配信元だけ**（2 要素の QR は data: URI で描く）
-    "img-src 'self' data:" + Join(embedSources),
+    // **画像の埋め込み先も設定で許した配信元だけ**（2 要素の QR は data: URI で描く）。
+    // 解析は計測を画像で送ることがあるので、有効なときはその送信先も許す
+    "img-src 'self' data:" + Join(embedSources) + Join(analyticsSources) + Join(captchaSources),
     // **設定が空なら 'none'。** 指定そのものを省くと default-src へ落ちる
-    "frame-src " + (embedSources.IsEmpty ? "'none'" : string.Join(' ', embedSources)),
+    // **CAPTCHA は iframe で出る。** 埋め込みの許可と同じ枠へ足す
+    "frame-src "
+        + (embedSources.IsEmpty && captchaSources.IsEmpty
+            ? "'none'"
+            : string.Join(' ', embedSources.AddRange(captchaSources))),
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "object-src 'none'",
+    .. externalScriptSources.IsEmpty
+        ? Array.Empty<string>()
+        :
+        [
+            "script-src 'self'" + Join(externalScriptSources),
+            "connect-src 'self'" + Join(externalScriptSources),
+        ],
 ]);
 
 static string Join(System.Collections.Immutable.ImmutableArray<string> sources) =>
@@ -496,6 +545,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapFormEndpoints();
+app.MapAnalyticsEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
