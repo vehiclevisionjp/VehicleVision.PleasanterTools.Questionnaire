@@ -240,14 +240,17 @@ public class AuditLogEndToEndTests
             Assert.NotEqual(Guid.Empty, invitedId);
 
             using var editor = CreateClient();
+            string editorNext;
             using (var accept = await editor.PostAsJsonAsync(
                 "/api/admin/invitations/accept",
                 new { token, password = "editor-long-password" }).ConfigureAwait(true))
             {
                 accept.EnsureSuccessStatusCode();
+                editorNext = await AdminTwoFactorE2E.NextOfAsync(accept).ConfigureAwait(true);
             }
 
-            await EnrollTotpAsync(editor).ConfigureAwait(true);
+            // ⚠️ **2 要素の設定を決め打ちにしない**（Issue #174）
+            await AdminTwoFactorE2E.CompleteIfRequiredAsync(editor, editorNext).ConfigureAwait(true);
 
             // **誰が何をしたかは、Editor へ見せる情報ではない。**
             // 画面から入口を隠すだけでは守りにならないので、サーバでも断る
@@ -273,13 +276,16 @@ public class AuditLogEndToEndTests
         await ClearAdministratorsAsync().ConfigureAwait(false);
 
         var http = CreateClient();
+        string next;
         using (var setup = await http.PostAsJsonAsync(
             "/api/admin/setup", new { loginId = "admin", password = Password }).ConfigureAwait(false))
         {
             setup.EnsureSuccessStatusCode();
+            next = await AdminTwoFactorE2E.NextOfAsync(setup).ConfigureAwait(false);
         }
 
-        await EnrollTotpAsync(http).ConfigureAwait(false);
+        // ⚠️ **2 要素の設定を決め打ちにしない**（Issue #174）
+        await AdminTwoFactorE2E.CompleteIfRequiredAsync(http, next).ConfigureAwait(false);
 
         await using var connection = Connect();
         await connection.OpenAsync().ConfigureAwait(false);
@@ -291,27 +297,6 @@ public class AuditLogEndToEndTests
 
     private static System.Data.Common.DbConnection Connect() =>
         new DbConnectionFactory(DatabaseProvider.SqlServer, ConnectionString).Create();
-
-    /// <summary>2 要素を登録してログイン済みにする。</summary>
-    private static async Task EnrollTotpAsync(HttpClient http)
-    {
-        string secret;
-        using (var begin = await http.PostAsJsonAsync(
-            "/api/admin/enroll/begin", new { }).ConfigureAwait(false))
-        {
-            begin.EnsureSuccessStatusCode();
-            secret = JsonNode.Parse(
-                await begin.Content.ReadAsStringAsync().ConfigureAwait(false))!["secret"]!
-                .GetValue<string>();
-        }
-
-        using var complete = await http.PostAsJsonAsync(
-            "/api/admin/enroll/complete",
-            new { code = new Totp(Base32Encoding.ToBytes(secret)).ComputeTotp() })
-            .ConfigureAwait(false);
-
-        complete.EnsureSuccessStatusCode();
-    }
 
     private static async Task ClearAsync()
     {

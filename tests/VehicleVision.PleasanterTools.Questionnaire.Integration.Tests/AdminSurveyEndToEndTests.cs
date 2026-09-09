@@ -56,24 +56,16 @@ public class AdminSurveyEndToEndTests
 
         var http = CreateClient();
 
+        string next;
         using (var setup = await http.PostAsJsonAsync(
             "/api/admin/setup", new { loginId = "admin", password = Password }))
         {
             setup.EnsureSuccessStatusCode();
+            next = await AdminTwoFactorE2E.NextOfAsync(setup);
         }
 
-        string secret;
-        using (var begin = await http.PostAsJsonAsync("/api/admin/enroll/begin", new { }))
-        {
-            begin.EnsureSuccessStatusCode();
-            secret = (await ReadAsync(begin))!["secret"]!.GetValue<string>();
-        }
-
-        var code = new Totp(Base32Encoding.ToBytes(secret)).ComputeTotp();
-        using (var complete = await http.PostAsJsonAsync("/api/admin/enroll/complete", new { code }))
-        {
-            complete.EnsureSuccessStatusCode();
-        }
+        // ⚠️ **2 要素の設定を決め打ちにしない**（Issue #174）
+        await AdminTwoFactorE2E.CompleteIfRequiredAsync(http, next);
 
         return http;
     }

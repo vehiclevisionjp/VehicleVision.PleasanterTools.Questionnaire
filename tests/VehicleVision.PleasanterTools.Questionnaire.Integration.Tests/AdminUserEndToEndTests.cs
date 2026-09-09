@@ -67,23 +67,23 @@ public class AdminUserEndToEndTests
 
     /// <summary>最初の管理者を作り、ログイン済みの client を返す。</summary>
     /// <remarks>
-    /// **2 要素は登録しない。** 既定は「任意」なので
-    /// <c>/setup</c> を通った時点でログイン済みになる（Issue #154 / #169）。
-    /// ここで見たいのは利用者の管理なので、2 要素の登録は挟まない。
-    /// **ログインの枠を無駄に使わない**という利点もある。
+    /// ⚠️ **2 要素の設定を決め打ちにしない**（Issue #174）。
+    /// 必須のときだけ登録を挟む。任意・無効なら初期設定を通った時点でログイン済み。
     /// </remarks>
     private static async Task<HttpClient> SignedInAdministratorAsync()
     {
         await ClearAdministratorsAsync();
 
         var http = CreateClient();
+        string next;
         using (var setup = await PostAsync(
             http, "/api/admin/setup", new { loginId = "admin", password = Password }))
         {
             setup.EnsureSuccessStatusCode();
-            Assert.Equal("done", (await ReadAsync(setup))!["next"]!.GetValue<string>());
+            next = await AdminTwoFactorE2E.NextOfAsync(setup);
         }
 
+        await AdminTwoFactorE2E.CompleteIfRequiredAsync(http, next);
         return http;
     }
 
@@ -106,18 +106,20 @@ public class AdminUserEndToEndTests
     /// <summary>招待を受け取り、ログイン済みの client を返す。</summary>
     /// <remarks>
     /// **2 要素が任意なら、受け取った時点で入れる**（Issue #169）。
-    /// 必須にしている場合だけ、その場で登録させられる。
+    /// 必須にしている場合だけ、その場で登録させられる（Issue #174）。
     /// </remarks>
     private static async Task<HttpClient> AcceptAsync(string token, string password)
     {
         var http = CreateClient();
+        string next;
         using (var accept = await PostAsync(
             http, "/api/admin/invitations/accept", new { token, password }))
         {
             accept.EnsureSuccessStatusCode();
-            Assert.Equal("done", (await ReadAsync(accept))!["next"]!.GetValue<string>());
+            next = await AdminTwoFactorE2E.NextOfAsync(accept);
         }
 
+        await AdminTwoFactorE2E.CompleteIfRequiredAsync(http, next);
         return http;
     }
 
