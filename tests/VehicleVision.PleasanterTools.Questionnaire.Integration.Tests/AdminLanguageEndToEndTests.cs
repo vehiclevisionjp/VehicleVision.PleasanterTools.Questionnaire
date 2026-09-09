@@ -64,24 +64,16 @@ public class AdminLanguageEndToEndTests
         await ClearAdministratorsAsync();
 
         var http = CreateClient();
+        string next;
         using (var setup = await PostAsync(
             http, "/api/admin/setup", new { loginId = "admin", password = Password }))
         {
             setup.EnsureSuccessStatusCode();
+            next = await AdminTwoFactorE2E.NextOfAsync(setup);
         }
 
-        string secret;
-        using (var begin = await PostAsync(http, "/api/admin/enroll/begin"))
-        {
-            begin.EnsureSuccessStatusCode();
-            secret = (await ReadAsync(begin))!["secret"]!.GetValue<string>();
-        }
-
-        using (var complete = await PostAsync(
-            http, "/api/admin/enroll/complete", new { code = Code(secret) }))
-        {
-            complete.EnsureSuccessStatusCode();
-        }
+        // ⚠️ **2 要素の設定を決め打ちにしない**（Issue #174）
+        await AdminTwoFactorE2E.CompleteIfRequiredAsync(http, next);
 
         return http;
     }
