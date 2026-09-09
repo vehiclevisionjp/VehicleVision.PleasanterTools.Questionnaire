@@ -523,8 +523,38 @@ export type AdminPermission =
   | 'users.write'
   | 'users.resetTwoFactor';
 
+/**
+ * 管理者の一覧の 1 行（Issue #156）。
+ *
+ * **秘密は入らない。** パスワードのハッシュも 2 要素の共有鍵も返らず、
+ * 「登録済みか」だけが分かる。
+ */
+export interface AdminUserRow {
+  adminUserId: string;
+  loginId: string;
+  /** `Administrator` / `Editor` / `SurveyAdministrator` / `UserAdministrator` / `Auditor` */
+  role: string;
+  isDisabled: boolean;
+  /** 2 要素を登録しているか。**共有鍵そのものは返らない** */
+  hasTotp: boolean;
+  /** まだ招待を受け取っていない（＝一度も入っていない） */
+  invitationPending: boolean;
+  /** **止め忘れを見つける唯一の手掛かり。** 一度も入っていなければ `null` */
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+/** 出した招待。**トークンを受け取れるのはこの時だけ。** */
+export interface IssuedInvitation {
+  adminUserId: string;
+  invitationToken: string;
+  expiresAt: string;
+}
+
 export interface AdminSession {
   authenticated: boolean;
+  /** 自分の管理者 ID（Issue #156）。**自分自身への操作を止めるために要る** */
+  adminUserId?: string | null;
   setupRequired: boolean;
   loginId?: string | null;
   role?: string | null;
@@ -534,6 +564,16 @@ export interface AdminSession {
   pendingLoginId?: string | null;
   /** **途中状態のときだけ意味がある。** 2 要素をまだ登録していない */
   needsEnrollment?: boolean;
+
+  /**
+   * 2 要素認証の方針（Issue #154）。`Required` / `Optional` / `Disabled`。
+   *
+   * **画面で「登録する／解除する」を出し分けるために要る。**
+   */
+  twoFactor?: string;
+
+  /** 自分が 2 要素を登録しているか（Issue #154）。 */
+  hasTotp?: boolean;
 
   /** SAML でのログインが使えるか（Issue #166）。**既定は無効** */
   samlEnabled?: boolean;

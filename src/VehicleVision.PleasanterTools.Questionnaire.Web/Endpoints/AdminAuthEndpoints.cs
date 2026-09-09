@@ -75,6 +75,11 @@ public static class AdminAuthEndpoints
                 {
                     authenticated = true,
                     setupRequired,
+
+                    // **自分の管理者 ID を返す**（Issue #156）。
+                    // 画面が「自分自身への操作」を止めるために要る。
+                    // ⚠️ **秘密ではない**（一覧にも同じ ID が出る）
+                    adminUserId = session.Principal?.FindFirstValue(ClaimTypes.NameIdentifier),
                     loginId = session.Principal?.Identity?.Name,
                     role,
                     // **画面は権限で出し分ける**（Issue #160）。
