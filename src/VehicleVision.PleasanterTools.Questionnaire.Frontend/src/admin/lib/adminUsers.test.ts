@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canChangeRole,
+  hasLoggedIn,
   canDisable,
   canReissueInvitation,
   canResetTwoFactor,
@@ -49,6 +50,23 @@ describe('入れる Administrator の数え方', () => {
 
   it('入れる人が居れば数える', () => {
     expect(hasOtherUsableAdministrator([me, other], 'me')).toBe(true);
+  });
+});
+
+describe('一度も入っていない人の見分け方', () => {
+  it('項目が来ないときも「入っていない」とみなす', () => {
+    // ⚠️ **サーバの JSON は null を省く**（DefaultIgnoreCondition = WhenWritingNull）。
+    // null だけを見ていると undefined を取りこぼし、
+    // **招待を出しただけの人を「入れる管理者」と数えてしまう**（実際に踏んだ）
+    const invited = row({ adminUserId: 'invited', invitationPending: true });
+    delete (invited as { lastLoginAt?: string | null }).lastLoginAt;
+
+    expect(hasLoggedIn(invited)).toBe(false);
+    expect(hasOtherUsableAdministrator([me, invited], 'me')).toBe(false);
+  });
+
+  it('日時が入っていれば「入っている」', () => {
+    expect(hasLoggedIn(other)).toBe(true);
   });
 });
 

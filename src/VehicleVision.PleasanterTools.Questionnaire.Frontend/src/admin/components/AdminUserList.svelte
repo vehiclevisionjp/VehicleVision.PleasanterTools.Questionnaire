@@ -111,9 +111,15 @@
     return users.find((user) => user.adminUserId === adminUserId)?.loginId ?? '';
   }
 
-  /** 日時を読める形にする。**一度も入っていなければ「—」。** */
-  function when(value: string | null): string {
-    return value === null ? '—' : new Date(value).toLocaleString();
+  /**
+   * 日時を読める形にする。**一度も入っていなければ「—」。**
+   *
+   * ⚠️ **`undefined` も「無い」として扱う。** サーバの JSON は `null` を省くので、
+   * 一度も入っていない人では項目そのものが来ない。
+   * `null` だけを見ていると `Invalid Date` と出た（写しで見つけた）。
+   */
+  function when(value: string | null | undefined): string {
+    return value === null || value === undefined ? '—' : new Date(value).toLocaleString();
   }
 </script>
 
