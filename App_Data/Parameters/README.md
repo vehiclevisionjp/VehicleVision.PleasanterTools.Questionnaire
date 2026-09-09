@@ -19,14 +19,36 @@
 
 | ファイル | 内容 | 読まれているか |
 |---|---|---|
-| `Service.json` | アプリ名・既定タイムゾーン | ⚠️ **読まれていない**（Issue #158） |
-| `Pleasanter.json` | 接続先 Pleasanter の URL・API キー・タイムアウト | ⚠️ **読まれていない**（同上。実際に効くのは環境変数） |
+| `Service.json` | 既定タイムゾーン | **読まれている** |
+| `Pleasanter.json` | 接続先 Pleasanter の URL・API キー・版・タイムアウト | **読まれている** |
 | `Security.json` | **管理者のパスワードに求める条件**（Issue #157） | **読まれている** |
 | `Analytics.json` | **回答画面のアクセス解析**（Issue #162） | **読まれている** |
 
-> ⚠️ **`Service.json` と `Pleasanter.json` は、いまのところ読み込まれていない。**
-> 設定はすべて環境変数（`QUESTIONNAIRE_*`）から読んでいる。
-> どちらへ寄せるかは Issue #158 で決める。
+**読み込みは 1 か所**（`Web/Services/ParameterFiles.cs`）。アプリの一番先で積むので、
+DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれを見る。
+
+> ⚠️ **`Service.json` の `Name` と `Description` はどこからも読んでいない。**
+> 表示名を出す画面が無いため。消してはいないが、変えても何も変わらない。
+
+### ファイルのキーと環境変数の対応
+
+**`Pleasanter.json` と `Service.json` は、キーの名前が環境変数と違う**
+（Pleasanter 本体に合わせた短い名前を使っているため）。
+**読み込み時に下表のとおり写している**ので、どちらで書いても効く。
+
+| ファイルのキー | 環境変数 |
+|---|---|
+| `Service.json` の `TimeZoneDefault` | `QUESTIONNAIRE_TIMEZONE_DEFAULT` |
+| `Pleasanter.json` の `BaseUrl` | `QUESTIONNAIRE_PLEASANTER_BASEURL` |
+| `Pleasanter.json` の `ApiKey` | `QUESTIONNAIRE_PLEASANTER_APIKEY` |
+| `Pleasanter.json` の `ApiVersion` | `QUESTIONNAIRE_PLEASANTER_APIVERSION` |
+| `Pleasanter.json` の `TimeoutSeconds` | `QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS` |
+| `Pleasanter.json` の `ApiKeyUserTimeZoneId` | `QUESTIONNAIRE_PLEASANTER_TIMEZONE` |
+
+`Security.json` と `Analytics.json` は環境変数と同じ名前なので、写していない。
+
+> ⚠️ **値が `null` や空のキーは無視する。** `Pleasanter.json` の `ApiKey` は既定で `null`
+> （ここへ書かせないため）なので、写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
 
 ## 環境変数
 
@@ -36,7 +58,10 @@
 | `QUESTIONNAIRE_DB_CONNECTIONSTRING` | 本アプリの DB への接続文字列 |
 | `QUESTIONNAIRE_PLEASANTER_BASEURL` | 接続先 Pleasanter の URL |
 | `QUESTIONNAIRE_PLEASANTER_APIKEY` | Pleasanter の API キー |
-| `QUESTIONNAIRE_PLEASANTER_TIMEZONE` | API キーに紐づくユーザのタイムゾーン |
+| `QUESTIONNAIRE_PLEASANTER_APIVERSION` | Pleasanter の API バージョン（既定 1.1）。**読めない値は既定へ落とす** |
+| `QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS` | Pleasanter API 呼び出しのタイムアウト（秒・既定 30） |
+| `QUESTIONNAIRE_PLEASANTER_TIMEZONE` | API キーに紐づくユーザのタイムゾーン。**未設定なら `QUESTIONNAIRE_TIMEZONE_DEFAULT`** |
+| `QUESTIONNAIRE_TIMEZONE_DEFAULT` | 本アプリの既定タイムゾーン（既定 `Asia/Tokyo`）。`Service.json` の `TimeZoneDefault` と同じ |
 | `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト）。**送信チケットの署名鍵もここから派生させる** |
 | `QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` | 複数インスタンスで管理画面の Cookie を共有する鍵束ディレクトリ。AKS では ReadWriteMany の永続ボリュームを指定する |
 | `QUESTIONNAIRE_FORWARDED_NETWORKS` | `X-Forwarded-*` を信頼するリバースプロキシの CIDR。複数はカンマ区切り。Ingress の送信元範囲だけを指定する |
