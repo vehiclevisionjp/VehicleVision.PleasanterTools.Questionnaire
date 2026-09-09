@@ -47,6 +47,9 @@
 | `AnalyticsSiteId` | 測定 ID・コンテナ ID・サイト ID・ドメイン（サービスで意味が変わる） |
 | `AnalyticsScriptOrigin` | 自前設置の配信元。**Matomo は必須** |
 | `AnalyticsShowNotice` | 回答者へ告知を出すか（既定 `true`） |
+| `CaptchaProvider` | 課す課題。`Altcha`（既定・自前設置）/ `Recaptcha` / `Turnstile` / `Hcaptcha`。**知らない値は既定へ落とす** |
+| `CaptchaSiteKey` | 外部の CAPTCHA のサイトキー（画面へ渡る） |
+| `CaptchaSecretKey` | 外部の CAPTCHA の秘密鍵。**このフォルダのファイルへ書かないこと。** 環境変数か Key Vault から |
 | `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |

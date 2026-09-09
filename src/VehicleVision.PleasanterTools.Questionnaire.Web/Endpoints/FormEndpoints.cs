@@ -24,7 +24,16 @@ public sealed record SubmitRequest(
     string? Ticket = null,
     string? Trap = null,
     /// <summary>proof-of-work の解答（Issue #55）。**base64 の JSON。**</summary>
-    string? Altcha = null);
+    string? Altcha = null,
+
+    /// <summary>
+    /// 外部の CAPTCHA の解答（Issue #164）。
+    /// </summary>
+    /// <remarks>
+    /// **外部を選んでいる導入先だけ使う。** 既定（自前設置）では見ない。
+    /// ⚠️ **画面から「通った」と言われただけでは通さない。** サーバ側で確かめる
+    /// </remarks>
+    string? Captcha = null);
 
 /// <summary>送信チケットの要求。</summary>
 /// <param name="ResponseToken">
@@ -39,7 +48,19 @@ public sealed record TicketRequest(string? ResponseToken = null);
 /// proof-of-work の課題（Issue #55）。**切っているときは <c>null</c>。**
 /// 画面はこれを解いて、送信時に解答を添える。
 /// </param>
-public sealed record TicketResponse(string ResponseToken, string Ticket, object? Altcha = null);
+public sealed record TicketResponse(
+    string ResponseToken,
+    string Ticket,
+    object? Altcha = null,
+
+    /// <summary>課す課題の種類（Issue #164）。<c>Altcha</c> なら自前設置。</summary>
+    string? CaptchaProvider = null,
+
+    /// <summary>外部の CAPTCHA のサイトキー。**秘密鍵は返さない。**</summary>
+    string? CaptchaSiteKey = null,
+
+    /// <summary>外部の CAPTCHA のスクリプトの URL。</summary>
+    string? CaptchaScriptUrl = null);
 
 /// <summary>回答画面へ返す定義。</summary>
 /// <remarks>
@@ -131,7 +152,8 @@ public static class FormEndpoints
             string publicId,
             TicketRequest request,
             SubmissionGuard guard,
-            AltchaGuard altcha) =>
+            AltchaGuard altcha,
+            CaptchaOptions captcha) =>
         {
             // **端末が持っていない・書式が壊れていれば、こちらで作る。**
             // 回答トークンは推測不能でなければならない値なので、
@@ -146,10 +168,19 @@ public static class FormEndpoints
             // **アンケートごとの要否では出し分けない**（Issue #66）。
             // 出し分けるには DB を見るしかなく、見た時点で応答の速さから
             // 公開 ID の実在が分かる。**要否は `GET /api/forms/{publicId}` で伝える**
+            // **外部の CAPTCHA を選んでいるなら、自前の課題は出さない**（Issue #164）。
+            // 課すのは 1 つだけ。両方出すと、回答者に二重の手間をかける
+            var usesExternalCaptcha = captcha.IsExternalReady;
+
             return Results.Ok(new TicketResponse(
                 responseToken,
                 guard.Issue(publicId, responseToken),
-                altcha.Options.Enabled ? altcha.Issue() : null));
+                !usesExternalCaptcha && altcha.Options.Enabled ? altcha.Issue() : null,
+                captcha.Provider.ToString(),
+
+                // **秘密鍵は返さない。** 画面へ渡すのはサイトキーだけ
+                usesExternalCaptcha ? captcha.SiteKey : null,
+                usesExternalCaptcha ? captcha.ScriptUrl : null));
         });
 
         forms.MapGet("/{publicId}/responses/{responseToken}", async (
@@ -175,6 +206,8 @@ public static class FormEndpoints
             ResponseIntake intake,
             SubmissionGuard guard,
             AltchaGuard altcha,
+            CaptchaOptions captchaOptions,
+            CaptchaVerifier captchaVerifier,
             ILogger<SubmissionGuard> logger,
             AttachmentOptions attachmentOptions,
             ILoggerFactory loggerFactory,
@@ -250,10 +283,31 @@ public static class FormEndpoints
             //
             // **アンケートが無いときも「要る」**として扱う（`RequiresProofOfWorkAsync`）。
             // ここで「無いから要らない」にすると、公開 ID の実在が応答から分かる
-            var requiresProofOfWork = altcha.Options.Enabled
-                && await intake.RequiresProofOfWorkAsync(publicId, cancellationToken);
+            //
+            // **外部の CAPTCHA を選んでいる導入先では、そちらを課す**（Issue #164）。
+            // 要否の旗は共通で、**何を課すかだけが変わる**（設定を増やさない）
+            var requiresChallenge = await intake.RequiresProofOfWorkAsync(publicId, cancellationToken);
 
-            if (requiresProofOfWork
+            if (requiresChallenge && captchaOptions.IsExternalReady)
+            {
+                // ⚠️ **画面から「通った」と言われただけでは通さない。**
+                // 解答はサービス側でしか確かめられない
+                var outcome = await captchaVerifier
+                    .VerifyAsync(request.Captcha, context.Connection.RemoteIpAddress?.ToString(), cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (outcome is not CaptchaOutcome.Succeeded)
+                {
+                    // **理由は外へ返さない**（上と同じ）。
+                    // ⚠️ **到達できないときも断る**（fail closed）。
+                    // 通すと、外部が落ちている間だけ bot が素通りする
+                    logger.LogWarning("回答の送信を CAPTCHA で断った。理由: {Reason}", outcome);
+                    return Results.Json(
+                        new { reason = "rejected" }, statusCode: StatusCodes.Status403Forbidden);
+                }
+            }
+            else if (requiresChallenge
+                && altcha.Options.Enabled
                 && await altcha.CheckAsync(request.Altcha, cancellationToken) is { } altchaReason)
             {
                 // **理由は外へ返さない**（上と同じ）

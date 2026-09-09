@@ -16,6 +16,12 @@
     type AnalyticsSettings,
   } from './lib/analytics';
   import { solveAltcha } from './lib/altcha';
+  import {
+    renderCaptcha,
+    usesExternalCaptcha,
+    type CaptchaChallenge,
+    type CaptchaWidget,
+  } from './lib/captcha';
   import { toSteps, tracePath } from './lib/flow';
   import { applyShuffle, createShuffleSeed } from './lib/shuffle';
   import type { AnswerState, PayloadAnswer, RejectionReason, SurveyDefinition } from './lib/types';
@@ -118,6 +124,33 @@
    * ここを false にしても送信が通るようにはならない。
    */
   let requiresProofOfWork = $state(true);
+
+  /**
+   * 外部の CAPTCHA（Issue #164）。
+   *
+   * **既定では使わない。** 運用側が選んだときだけ部品を描く。
+   * ⚠️ **解答を持っているだけでは通らない。** サーバが検証先へ問い合わせて確かめる。
+   */
+  let captchaChallenge = $state<CaptchaChallenge | null>(null);
+  let captchaToken = $state('');
+  let captchaContainer = $state<HTMLElement | null>(null);
+  let captchaWidget: CaptchaWidget | null = null;
+
+  const usesCaptcha = $derived(requiresProofOfWork && usesExternalCaptcha(captchaChallenge));
+
+  $effect(() => {
+    // **描く場所が出てから描く。** 送信の直前に置いてあるので、最後の頁で現れる
+    if (!usesCaptcha || captchaContainer === null || captchaWidget !== null) {
+      return;
+    }
+
+    void (async () => {
+      captchaWidget = await renderCaptcha(captchaChallenge!, captchaContainer!, (response) => {
+        captchaToken = response;
+      });
+    })();
+  });
+
   /**
    * 下書きを端末へ残してよいか（Issue #59）。
    *
@@ -274,6 +307,13 @@
 
     responseToken = issued.responseToken;
     ticket = issued.ticket;
+
+    // **どの課題を課されているかは、チケットの応答で分かる**（Issue #164）
+    captchaChallenge = {
+      provider: issued.captchaProvider ?? 'Altcha',
+      siteKey: issued.captchaSiteKey ?? null,
+      scriptUrl: issued.captchaScriptUrl ?? null,
+    };
 
     // **待たない。** 解けたら入るだけで、入力は先に進められる。
     // **要らないアンケートでは解かない**（Issue #66）
@@ -468,7 +508,7 @@
         publicId,
         responseToken,
         toPayload(),
-        { ticket, trap, altcha },
+        { ticket, trap, altcha, captcha: captchaToken },
         toAttachments(),
       );
       if (result.accepted) {
@@ -498,6 +538,12 @@
           altcha = '';
           if (requiresProofOfWork && reissued.altcha) {
             altcha = (await solveAltcha(reissued.altcha)) ?? '';
+          }
+
+          // **外部の CAPTCHA も描き直す**（Issue #164）。同じ解答は 2 度通らない
+          if (usesCaptcha) {
+            captchaToken = '';
+            captchaWidget?.reset();
           }
         }
         return;
@@ -689,6 +735,16 @@
           bind:value={trap}
         />
       </div>
+
+      {#if usesCaptcha}
+        <!-- **送信の直前に置く**（Issue #164）。ここまで書いてから確認させる -->
+        <div class="captcha">
+          <div bind:this={captchaContainer}></div>
+          <p class="captcha-notice">
+            {t('captcha.notice', { provider: captchaChallenge?.provider ?? '' })}
+          </p>
+        </div>
+      {/if}
 
       {#if attachmentMessages.length > 0}
         <ul class="error" role="alert">
@@ -904,6 +960,17 @@
     color: var(--muted);
     font-size: 0.85rem;
     margin-top: 0.75rem;
+  }
+
+  /* **CAPTCHA は送信の直前に置く**（Issue #164） */
+  .captcha {
+    margin: 1.5rem 0 0;
+  }
+
+  .captcha-notice {
+    margin: 0.5rem 0 0;
+    color: var(--muted);
+    font-size: 0.8rem;
   }
 
   /* **告知は小さく、でも読める大きさで**（Issue #162） */
