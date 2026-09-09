@@ -55,6 +55,21 @@ x-app-environment: &app-environment
     # 取説（_documents/アンケート作成-運用手順書.md）はこの状態の図で説明している。
     # 任意・無効の振る舞いを手元で見たいときは DEV_ADMIN_TWOFACTOR で切り替える
     QUESTIONNAIRE_ADMIN_TWOFACTOR: ${DEV_ADMIN_TWOFACTOR:-required}
+    # ---- SAML（Issue #166）--------------------------------------------------
+    # **既定は無効。** saml profile の IdP と合わせて使うときだけ有効にする
+    #
+    #   DEV_SAML_ENABLED=true docker compose --profile sqlserver --profile saml up -d --wait
+    #
+    # ⚠️ **SAML は HTTPS でしか動かない**（途中を預ける cookie が SameSite=None; Secure）。
+    # 手元では https://localhost:8443 を使うこと
+    QUESTIONNAIRE_SAML_ENABLED: ${DEV_SAML_ENABLED:-false}
+    QUESTIONNAIRE_SAML_ENTITYID: ${DEV_SAML_ENTITYID:-https://localhost:8443/questionnaire}
+    QUESTIONNAIRE_SAML_IDPENTITYID: ${DEV_SAML_IDPENTITYID:-https://localhost:8543/realms/questionnaire}
+    QUESTIONNAIRE_SAML_SINGLESIGNONURL: ${DEV_SAML_SSOURL:-https://localhost:8543/realms/questionnaire/protocol/saml}
+    # **realm へ焼き込んだ検証用の証明書**（tools/saml-idp/realm-questionnaire.json と同じもの）
+    QUESTIONNAIRE_SAML_IDPCERTIFICATE: ${DEV_SAML_IDPCERTIFICATE:-MIIDIzCCAgugAwIBAgIUHy3DB8BizZXAJOsyFseVAeZnRj0wDQYJKoZIhvcNAQELBQAwITEfMB0GA1UEAwwWcXVlc3Rpb25uYWlyZS10ZXN0LWlkcDAeFw0yNjA5MDkwMTQ1MjhaFw0zNjA5MDYwMTQ1MjhaMCExHzAdBgNVBAMMFnF1ZXN0aW9ubmFpcmUtdGVzdC1pZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFaF2Bk88oso/N3K1wzCwP966u+DaEdtCVLvnrMd69o/O4ACN629JVV/RyQbB4ur0cbbWoM2q8S8MB50cwAWX+VT6g4qR9o0X6OFaqBrXylTeIs72IzNcb6t+wiXGcOH9qYLvsVH7ISAZDcUwY4bxc/9Xl9yfFCKnCFh1DU/1IBIwiGRlSlqcIvGo6scdf+dyAfbAdy2baMLNTIrkHY1BWVviD/jjLOSQOUj9p6IE6rE4+nD9z1AcLDoMcwU1y4PncjwNRczV6xQWxHg/0ho/H2CXvGhhiC6mFuYdP2oaw6xhurBPhdc19k6FYwhTFaJieHwxG9Y0XfZXjTu0Hj+ftAgMBAAGjUzBRMB0GA1UdDgQWBBRCA/z/eFTDiZzm1jN6SaPJxau2OjAfBgNVHSMEGDAWgBRCA/z/eFTDiZzm1jN6SaPJxau2OjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBAWlKIbpNJEwOYHnvZthwm86wJWFBLaxX3TffpAjhxxGoixlFK28UjomkukSf8JJiyts/BXI/n8OsXHXSlqOqRvnxPufMwbm6NDlo8q2sPNYwk7acF97o7kPkq+9MqR1CHmeJDpDTh138dh/FKaQFi7GPUXzvIXyO6KHZKlnMapIOo3sS4L6xr13ViobgRX1XFq9tIob5rW8aRptKcW3BIWqTknd0zJbTi4QNIjWq6MO0QmDkhDqdM1gtw4AO+EuMNVLkBLdGiUnKkiEaXLHVdkppUW6nHg0PKpOhgAiQmzrU4BOiFJCj712FrfotJhKQdhD9TsCyaokoZudUhXNwF}
+    QUESTIONNAIRE_SAML_UNKNOWNUSER: ${DEV_SAML_UNKNOWNUSER:-Reject}
+    QUESTIONNAIRE_SAML_BUTTONLABEL: ${DEV_SAML_BUTTONLABEL:-検証用 IdP でログイン}
     QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN: ${DEV_LOGIN_ATTEMPTS:-2000}
     QUESTIONNAIRE_REQUESTS_PER_MIN: ${DEV_REQUESTS_PER_MIN:-6000}
     # **proof-of-work は検証環境でも効かせたままにする**（Issue #55）。
@@ -153,6 +168,50 @@ services:
       start_period: 20s
     volumes:
       - mysql-data:/var/lib/mysql
+
+  # ---- 検証用の IdP（オプション。Issue #166）---------------------------------
+  # **SAML のログインを手元で通すためだけの IdP。** 既定では起動しない。
+  #
+  #   docker compose --profile sqlserver --profile saml up -d --wait
+  #
+  # **Keycloak は Apache-2.0。** 本アプリのイメージへ同梱せず、別プロセスとして立てる。
+  # ⚠️ **realm に検証用の鍵と利用者を焼き込んである。** 本番へ持ち込まないこと
+  # （tools/saml-idp/realm-questionnaire.json）。
+  #
+  # **署名鍵を realm へ固定している理由**は、SP 側の設定（証明書）を
+  # 起動のたびに書き換えずに済ませるため。Keycloak は既定だと起動時に鍵を作る
+  saml-idp:
+    image: quay.io/keycloak/keycloak:26.7.3
+    profiles: ["saml"]
+    # ⚠️ **HTTPS で立てる。** Keycloak のログインの途中を保つ cookie は
+    # `Secure` 付きで発行されるため、**http だと戻ってこず cookie_not_found になる**
+    # （実際に踏んだ）。TLS の材料は tools/saml-idp/tls（**検証用の自己署名**）
+    command:
+      - start-dev
+      - --import-realm
+      - --https-certificate-file=/opt/keycloak/conf/tls/cert.pem
+      - --https-certificate-key-file=/opt/keycloak/conf/tls/key.pem
+    environment:
+      TZ: Asia/Tokyo
+      # 検証環境用の固定値。**本番の資格情報ではない**
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: idp-test-admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${DEV_SAML_IDP_PORT:-8543}:8443"
+    volumes:
+      - ./tools/saml-idp/realm:/opt/keycloak/data/import:ro
+      - ./tools/saml-idp/tls:/opt/keycloak/conf/tls:ro
+    healthcheck:
+      # **TLS を有効にすると管理ポート（9000）も https になり、
+      # イメージに curl も openssl も無いので health を叩けない。**
+      # そこで**待ち受けているかだけ**を見る。Keycloak は起動の最後に
+      # ポートを開くので（ログの "Listening on" が最終行）、これで足りる
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8443"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
 
   # ---- ウイルススキャン（オプション） ---------------------------------------
   # **既定は無効。** profile を付けたときだけ起動する。

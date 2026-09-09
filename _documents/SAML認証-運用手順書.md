@@ -9,9 +9,13 @@
 - 使っているライブラリ: [ITfoxtec.Identity.Saml2](https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2)
   4.20.1（BSD-3-Clause。2026-09-09 参照）
 
-> **⚠️ 実際の IdP との突き合わせは未検証です。**
-> 手元に IdP を用意できていないため、署名の検証まで通した確認は行えていません。
-> 本番へ入れる前に、検証環境で 1 回通してください。
+> **手元の IdP（Keycloak）で往復を通してあります**（2026-09-09）。
+> 起こし方と確かめ方は [`tools/saml-idp/README.md`](../tools/saml-idp/README.md)。
+>
+> ⚠️ **ただし Google Workspace そのものでは未検証です。**
+> プロトコルの往復（署名の検証・`InResponseTo`・NameID の読み取り）は確かめましたが、
+> **実際の IdP が属性をどう出すかは製品ごとに違います。**
+> 本番へ入れる前に、その IdP で 1 回通してください。
 
 ## 1. できること
 
@@ -185,9 +189,32 @@ GET https://{本アプリのホスト}/api/admin/saml/metadata
 ⚠️ **証明書を入れ替えるときは、新旧 2 枚を並べて設定してから IdP を切り替えること。**
 1 枚ずつ入れ替えると、切り替えの瞬間に誰も入れなくなる。
 
-## 7. まだやっていないこと
+## 7. 手元で試す
+
+`compose.yaml` の `saml` プロファイルに**検証用の IdP（Keycloak）**を入れてある。
+
+```bash
+DEV_SAML_ENABLED=true docker compose --profile sqlserver --profile saml up -d --wait
+python tools/saml-idp/roundtrip.py admin@example.jp idp-test-password
+```
+
+**確かめた振る舞い**（2026-09-09）。
+
+| 試したこと | 結果 |
+|---|---|
+| 本アプリに居る利用者 | 入れる（`role` と `permissions` が返る） |
+| 本アプリに居ない利用者（`Reject`） | 入れない（`/admin?samlError=unknown-user`） |
+| 本アプリに居ない利用者（`Register`） | `Editor` として作られて入れる |
+| 2 要素が `required` | **入れない。** 途中状態になり登録を求められる |
+| 送り付けられた応答（IdP 起動） | 断る（`samlError=invalid`） |
+| 改ざんした応答（署名が合わない） | 断る（`samlError=invalid`） |
+
+詳しくは [`tools/saml-idp/README.md`](../tools/saml-idp/README.md)。
+
+## 8. まだやっていないこと
 
 - **単一ログアウト（SLO）** — 本アプリのログアウトは本アプリの cookie だけを消す
 - **IdP 起動のログイン** — 受け取らない（上記の決めごと）
 - **`AuthnRequest` への署名** — こちらの署名用証明書を持たせていない
-- **実機の IdP での確認** — 未実施
+- **Google Workspace そのものでの確認** — 未実施
+  （プロトコルの往復は検証用の IdP で確認済み）
