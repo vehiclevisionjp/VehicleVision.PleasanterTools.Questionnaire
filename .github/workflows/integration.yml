@@ -169,6 +169,70 @@ jobs:
           --logger "trx;LogFileName=integration.trx"
           --results-directory "$GITHUB_WORKSPACE/TestResults"
 
+      - name: 起動できるかを確かめる
+        # **経路の組み立ては、アプリを本当に起こさないと確かめられない**（Issue #170）。
+        # 最小 API は GET / DELETE の本文を推論しないため、
+        # 1 本でも本文つきの DELETE があると**経路の組み立てで例外**になり、
+        # アプリ全体が起動しない。単体テストも結合テストも経路を組み立てないので、
+        # **ここを通さないとマージ後の E2E で初めて分かる。**
+        #
+        # **結合テストの後に置く。** スキーマが当たっていないと起動時に止まるので、
+        # マイグレーションを当てる検証（DatabaseMigrationTests）より後で回す。
+        #
+        # Pleasanter は要らない（URL とキーは形だけ渡す）。DB は上で起こしたものを使う。
+        env:
+          QUESTIONNAIRE_DB_PROVIDER: PostgreSql
+          QUESTIONNAIRE_DB_CONNECTIONSTRING: >-
+            Host=localhost;Port=15432;Database=questionnaire;Username=postgres;Password=Questionnaire#Test1
+          # **検証用の DB なので暗号化を求めない。** 本番では外さないこと
+          QUESTIONNAIRE_DB_ALLOW_INSECURE: "true"
+          QUESTIONNAIRE_PLEASANTER_BASEURL: http://127.0.0.1:9
+          QUESTIONNAIRE_PLEASANTER_APIKEY: dummy-api-key
+          ASPNETCORE_URLS: http://127.0.0.1:5080
+          ASPNETCORE_ENVIRONMENT: Production
+        run: |
+          set -euo pipefail
+
+          # **共有鍵は使い捨て。** ここで作った鍵は誰にも渡らない
+          QUESTIONNAIRE_SECRET_KEY="$(openssl rand -base64 32)"
+          export QUESTIONNAIRE_SECRET_KEY
+
+          dotnet build src/VehicleVision.PleasanterTools.Questionnaire.Web -c Release
+          # ⚠️ **--no-launch-profile を付ける。** Properties/launchSettings.json が
+          # ASPNETCORE_URLS と環境を上書きしてしまい、待ち受け先が変わる（実際に踏んだ）
+          dotnet run --project src/VehicleVision.PleasanterTools.Questionnaire.Web \
+              -c Release --no-build --no-launch-profile \
+              > "$GITHUB_WORKSPACE/startup.log" 2>&1 &
+          app_pid=$!
+
+          # **落ちたらすぐ分かるように、待つ側で生存も見る**
+          for i in $(seq 1 30); do
+              if ! kill -0 "$app_pid" 2>/dev/null; then
+                  echo "NG   アプリが起動せずに終了した" >&2
+                  cat "$GITHUB_WORKSPACE/startup.log" >&2
+                  exit 1
+              fi
+              if curl -fsS http://127.0.0.1:5080/healthz >/dev/null 2>&1; then
+                  echo "OK   起動して /healthz が応答した（${i} 回目）"
+                  kill "$app_pid"
+                  exit 0
+              fi
+              sleep 2
+          done
+
+          echo "NG   /healthz が応答しない" >&2
+          cat "$GITHUB_WORKSPACE/startup.log" >&2
+          kill "$app_pid" || true
+          exit 1
+
+      - name: 起動時のログを残す
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: 起動ログ
+          path: startup.log
+          if-no-files-found: ignore
+
       - name: テスト結果を残す
         if: always()
         uses: actions/upload-artifact@v7

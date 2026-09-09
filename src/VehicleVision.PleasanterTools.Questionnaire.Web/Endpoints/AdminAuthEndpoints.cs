@@ -430,7 +430,10 @@ public static class AdminAuthEndpoints
     }
 
     /// <summary>2 要素まで通った状態にする。</summary>
-    /// <remarks>**SAML の受け口からも同じ形で入る**（<c>AdminSamlEndpoints</c>）。</remarks>
+    /// <remarks>
+    /// **招待の受け取り**（<c>AdminUserEndpoints</c>。Issue #169）と
+    /// **SAML の受け口**（<c>AdminSamlEndpoints</c>。Issue #166）からも同じ形で入る。
+    /// </remarks>
     internal static async Task SignInSessionAsync(HttpContext context, AdminUser user)
     {
         // **途中状態は必ず消す。** 共有鍵の claim を残さない

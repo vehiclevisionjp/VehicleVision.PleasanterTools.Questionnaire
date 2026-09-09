@@ -160,7 +160,8 @@ public static class AdminUserEndpoints
         {
             var language = RequestLanguage.Of(context);
 
-            // **自分自身は対象にしない。** 自分の分は /me/totp（パスワードの再確認つき）で行う
+            // **自分自身は対象にしない。**
+            // 自分の分は /me/totp/disable（パスワードの再確認つき）で行う
             if (adminUserId == ActorId(principal))
             {
                 return Results.BadRequest(new
@@ -285,7 +286,12 @@ public static class AdminUserEndpoints
         //
         // **必須のときは通さない。** 通すと設定を無視して保護を外せる。
         // **無効のときは通す。** 登録済みの人が自分で外せる唯一の口になる。
-        me.MapDelete("/totp", async (
+        //
+        // ⚠️ **DELETE にしないこと**（Issue #170）。パスワードを本文で受け取るが、
+        // **最小 API は DELETE の本文を推論しない**ため、
+        // 経路を組み立てる時点で例外になり**アプリ全体が起動できなくなる。**
+        // 本文を積んだ DELETE は中継で落ちることもあるので、POST で受ける。
+        me.MapPost("/totp/disable", async (
             AdminPasswordRequest request,
             HttpContext context,
             ClaimsPrincipal principal,
@@ -426,6 +432,8 @@ public static class AdminUserEndpoints
             AdminInvitationAcceptRequest request,
             HttpContext context,
             AdminUserService service,
+            AdminAuthenticator authenticator,
+            AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
             var (outcome, user, passwordProblem) = await service
@@ -442,9 +450,30 @@ public static class AdminUserEndpoints
                     : Results.BadRequest(new { message = passwordProblem });
             }
 
-            // **パスワードを決めただけでは入れない。** 2 要素まで通って初めてログインとする
-            await AdminAuthEndpoints.SignInPendingAsync(context, user!, secret: null).ConfigureAwait(false);
-            return Results.Ok(new { next = user!.HasTotp ? "totp" : "enroll" });
+            // **2 要素を登録している人は、まず 2 要素を通す**
+            if (user!.HasTotp)
+            {
+                await AdminAuthEndpoints.SignInPendingAsync(context, user, secret: null)
+                    .ConfigureAwait(false);
+                return Results.Ok(new { next = "totp" });
+            }
+
+            // **必須のときだけ、その場で登録させる**（Issue #169）。
+            // ここが setup / login と食い違っていて、
+            // **任意や無効にしていても招待された人だけ登録を強いられていた。**
+            if (options.TwoFactor is TwoFactorPolicy.Required)
+            {
+                await AdminAuthEndpoints.SignInPendingAsync(context, user, secret: null)
+                    .ConfigureAwait(false);
+                return Results.Ok(new { next = "enroll" });
+            }
+
+            // **任意・無効なら、そのまま入れる。**
+            // 後から自分で登録できる（POST /api/admin/me/totp/begin）
+            await authenticator.RecordSignInAsync(user.AdminUserId, cancellationToken)
+                .ConfigureAwait(false);
+            await AdminAuthEndpoints.SignInSessionAsync(context, user).ConfigureAwait(false);
+            return Results.Ok(new { next = "done" });
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
     private static async Task<IResult> SetDisabledAsync(

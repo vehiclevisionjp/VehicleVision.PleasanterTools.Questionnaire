@@ -174,6 +174,12 @@ export interface SubmitContext {
    * 解けるまで送信を止めて待たせるより分かりやすい。
    */
   altcha?: string;
+  /**
+   * 外部の CAPTCHA の解答（Issue #164）。
+   *
+   * ⚠️ **持っているだけでは通らない。** サーバが検証先へ問い合わせて確かめる。
+   */
+  captcha?: string;
 }
 
 /** 添付 1 件を受け付けなかった理由。 */
@@ -219,6 +225,7 @@ export async function submitAnswers(
         ticket: context.ticket,
         trap: context.trap,
         altcha: context.altcha,
+        captcha: context.captcha,
       }),
     };
   } else {
@@ -230,6 +237,7 @@ export async function submitAnswers(
         ticket: context.ticket,
         trap: context.trap,
         altcha: context.altcha,
+        captcha: context.captcha,
       }),
     );
     for (const attachment of attachments) {

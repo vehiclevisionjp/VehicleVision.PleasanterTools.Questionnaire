@@ -49,6 +49,12 @@ x-app-environment: &app-environment
     # **本番では設定しないこと**
     # **端から端まで通す試験は 1 件ごとに管理者を作り直す**（setup ＋ 2 要素の登録）。
     # 試験が増えるほど枠を食うので、検証環境では大きめに取る。**本番では設定しないこと**
+    # **検証環境では 2 要素を必須にする**（Issue #172）。
+    # 製品の既定は「任意」（Issue #154）だが、ここを任意にすると
+    # **初期設定の直後に管理画面へ入ってしまい、2 要素の画面を写しに撮れない。**
+    # 取説（_documents/アンケート作成-運用手順書.md）はこの状態の図で説明している。
+    # 任意・無効の振る舞いを手元で見たいときは DEV_ADMIN_TWOFACTOR で切り替える
+    QUESTIONNAIRE_ADMIN_TWOFACTOR: ${DEV_ADMIN_TWOFACTOR:-required}
     QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN: ${DEV_LOGIN_ATTEMPTS:-2000}
     QUESTIONNAIRE_REQUESTS_PER_MIN: ${DEV_REQUESTS_PER_MIN:-6000}
     # **proof-of-work は検証環境でも効かせたままにする**（Issue #55）。
