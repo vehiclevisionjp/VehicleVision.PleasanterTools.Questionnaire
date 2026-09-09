@@ -13,11 +13,17 @@ public sealed class PleasanterOptions
     /// <summary>API キー。**サーバ側だけが持つ。ブラウザへ渡さない。**</summary>
     public required string ApiKey { get; init; }
 
+    /// <summary>API のバージョンの既定。**書き間違いはここへ落とす**（Issue #158）。</summary>
+    public const decimal DefaultApiVersion = 1.1m;
+
+    /// <summary>1 回の呼び出しの上限の既定。</summary>
+    public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+
     /// <summary>API のバージョン。リクエストボディの <c>ApiVersion</c> に載せる。</summary>
-    public decimal ApiVersion { get; init; } = 1.1m;
+    public decimal ApiVersion { get; init; } = DefaultApiVersion;
 
     /// <summary>1 回の呼び出しの上限。</summary>
-    public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
+    public TimeSpan Timeout { get; init; } = DefaultTimeout;
 
     /// <summary>API キーに紐づく Pleasanter 利用者のタイムゾーン ID。</summary>
     /// <remarks>

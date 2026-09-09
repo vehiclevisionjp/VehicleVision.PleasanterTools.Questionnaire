@@ -25,6 +25,12 @@ if (args.Contains("--generate-secret-key"))
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ---- App_Data/Parameters の設定ファイル --------------------------------------
+// **一番先に積む。** 以降の読み取り（DB・Pleasanter・管理者の認証・アクセス解析…）が
+// すべてこれを見る。**優先順位は {名前}.local.json ＞ 環境変数 ＞ {名前}.json**
+// （App_Data/Parameters/README.md。Issue #158）
+builder.Configuration.AddParameterFiles();
+
 // ---- 複数インスタンスの認証 --------------------------------------------------
 // 管理画面の Cookie は ASP.NET Core Data Protection で保護される。AKS で複数 Pod にすると、
 // 鍵束を共有しない限り「別 Pod へ振られた途端にログアウト」になる。
@@ -69,14 +75,37 @@ if (MigrationCommand.IsRequested(args))
     return;
 }
 
+// **設定ファイルのキーは正式な名前へ写してある**（ParameterFiles）。
+// ここは 1 つの名前だけを見る
+var timeZoneDefault =
+    builder.Configuration[ParameterFiles.TimeZoneDefaultKey] ?? "Asia/Tokyo";
+
 var pleasanterOptions = new PleasanterOptions
 {
     BaseUrl = builder.Configuration["QUESTIONNAIRE_PLEASANTER_BASEURL"]
         ?? throw new InvalidOperationException("QUESTIONNAIRE_PLEASANTER_BASEURL が設定されていない"),
     ApiKey = builder.Configuration["QUESTIONNAIRE_PLEASANTER_APIKEY"]
         ?? throw new InvalidOperationException("QUESTIONNAIRE_PLEASANTER_APIKEY が設定されていない"),
+
+    // **書き間違いは既定へ落とす。** ここで止めると、
+    // 版やタイムアウトの打ち間違いでアプリが上がらなくなる
+    ApiVersion = decimal.TryParse(
+        builder.Configuration["QUESTIONNAIRE_PLEASANTER_APIVERSION"],
+        System.Globalization.NumberStyles.Number,
+        System.Globalization.CultureInfo.InvariantCulture,
+        out var apiVersion) && apiVersion > 0
+        ? apiVersion
+        : PleasanterOptions.DefaultApiVersion,
+    Timeout = int.TryParse(
+        builder.Configuration["QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS"], out var timeoutSeconds)
+        && timeoutSeconds > 0
+        ? TimeSpan.FromSeconds(timeoutSeconds)
+        : PleasanterOptions.DefaultTimeout,
+
+    // **API キー側の指定が無ければ、アプリの既定タイムゾーンを使う**
+    // （Pleasanter.json の ApiKeyUserTimeZoneId の但し書きと同じ）
     ApiKeyUserTimeZoneId =
-        builder.Configuration["QUESTIONNAIRE_PLEASANTER_TIMEZONE"] ?? "Asia/Tokyo",
+        builder.Configuration["QUESTIONNAIRE_PLEASANTER_TIMEZONE"] ?? timeZoneDefault,
 };
 
 // ---- サービス --------------------------------------------------------------
@@ -196,23 +225,6 @@ if (attachmentOptions.VirusScan.Enabled)
 // 「有効なのにスキャナが無い」場合は検査側が添付を拒否する（素通しにしない）
 builder.Services.AddSingleton(serviceProvider => new AttachmentInspector(
     attachmentOptions.ToPolicy(), serviceProvider.GetService<IVirusScanner>()));
-
-// ---- App_Data/Parameters の設定ファイル --------------------------------------
-// **優先順位は {名前}.local.json ＞ 環境変数 ＞ {名前}.json**
-// （App_Data/Parameters/README.md）。既定の並びは環境変数が後ろなので、
-// **JSON を先に積み、環境変数を積み直し、最後に .local.json を積む。**
-//
-// **1 か所にまとめてある。** 設定ごとに「JSON → 環境変数」を繰り返すと、
-// 後から積んだ環境変数が**前の .local.json を追い越す**（実際に踏んだ）。
-//
-// ⚠️ **Service.json と Pleasanter.json はここに無い。** 環境変数から読む作りのままで、
-// そちらの読み込みは別課題（Issue #158）
-builder.Configuration
-    .AddJsonFile("App_Data/Parameters/Security.json", optional: true, reloadOnChange: false)
-    .AddJsonFile("App_Data/Parameters/Analytics.json", optional: true, reloadOnChange: false)
-    .AddEnvironmentVariables()
-    .AddJsonFile("App_Data/Parameters/Security.local.json", optional: true, reloadOnChange: false)
-    .AddJsonFile("App_Data/Parameters/Analytics.local.json", optional: true, reloadOnChange: false);
 
 // ---- アクセス解析（Issue #162）----------------------------------------------
 // **既定は無効。** 設定しなければ、回答者の端末から第三者への要求は 1 つも出ない。
@@ -375,6 +387,13 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddSingleton(ResponseSenderOptions.FromConfiguration(builder.Configuration));
 builder.Services.AddSingleton<ResponseSender>();
 builder.Services.AddHostedService<ResponseSenderHostedService>();
+
+// **どの設定ファイルを読んだかを記録に残す**（Issue #158）。
+// **optional なので、置き場を間違えても黙って既定で動いてしまう。**
+// 「読めているつもりで読めていない」を起動時に見せる
+builder.Services.AddHostedService(serviceProvider => new ParameterFilesReport(
+    serviceProvider.GetRequiredService<IConfiguration>(),
+    serviceProvider.GetRequiredService<ILogger<ParameterFilesReport>>()));
 
 // **管理操作の記録は放っておくと増え続ける**（_documents/データモデル設計.md）。
 // 期限を過ぎた分を消す係を常駐させる。**既定は 365 日残す**
