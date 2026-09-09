@@ -539,8 +539,14 @@ export interface AdminUserRow {
   hasTotp: boolean;
   /** まだ招待を受け取っていない（＝一度も入っていない） */
   invitationPending: boolean;
-  /** **止め忘れを見つける唯一の手掛かり。** 一度も入っていなければ `null` */
-  lastLoginAt: string | null;
+  /**
+   * **止め忘れを見つける唯一の手掛かり。**
+   *
+   * ⚠️ **一度も入っていない人では、この項目そのものが来ない。**
+   * サーバの JSON は `null` を省く設定（`DefaultIgnoreCondition = WhenWritingNull`）。
+   * `null` だけを見ていると `undefined` を取りこぼす（実際に踏んだ）。
+   */
+  lastLoginAt?: string | null;
   createdAt: string;
 }
 

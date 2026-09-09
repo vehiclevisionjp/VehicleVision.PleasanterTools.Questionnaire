@@ -39,6 +39,14 @@ async function mask(page: import('@playwright/test').Page): Promise<void> {
     document.querySelectorAll('.codes li').forEach((item, index) => {
       item.textContent = `XXXXX-${String(index + 1).padStart(5, '0')}`;
     });
+
+    // ⚠️ **招待のトークンも伏せる**（Issue #179）。
+    // 1 度しか出ない値で、図に載せると「載せてよいもの」という誤解を招く
+    const invitation = document.querySelector('.url code');
+    if (invitation !== null) {
+      invitation.textContent =
+        'https://questionnaire.example.jp/admin/invitations/accept?token=XXXXXXXXXXXX';
+    }
   });
 }
 
@@ -205,6 +213,39 @@ test.describe('取説用の写し（ログイン済み）', () => {
 
     // **滞留が無くても「無い」と読めること。** 空の画面こそ取説に要る
     await shoot(page, 'admin-10-outbox');
+  });
+
+  test('管理画面：管理者の管理', async ({ page }) => {
+    await page.goto('/admin/users');
+
+    await expect(page.getByRole('heading', { name: '管理者の管理' })).toBeVisible();
+
+    // **自分が 1 行目に出ている状態**（利用中・2 要素は登録済み）
+    await expect(page.getByRole('cell', { name: demoAdmin.loginId, exact: false })).toBeVisible();
+    await shoot(page, 'admin-12-users');
+
+    // **招待を出したところまで撮る。** 取説で一番間違えやすいのが
+    // 「URL は 1 度だけ出る」という所
+    // **追加の欄は form の中を指す。** 「役割」は表の見出しにもあり、
+    // 名前で引くと取り違える
+    const invite = page.locator('form.invite');
+    await invite.getByRole('textbox').fill('sato');
+    await invite.getByRole('combobox').selectOption('Editor');
+    await page.getByRole('button', { name: '追加して招待する' }).click();
+
+    await expect(page.locator('.issued')).toBeVisible();
+    await shoot(page, 'admin-13-invitation');
+  });
+
+  test('管理画面：自分のアカウント', async ({ page }) => {
+    await page.goto('/admin/me');
+
+    await expect(page.getByRole('heading', { name: '自分のアカウント' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'パスワードの変更' })).toBeVisible();
+
+    // ⚠️ **検証環境は 2 要素が必須**（Issue #172）なので、
+    // 「解除する」の釦は出ない状態の図になる。取説にその旨を書いてある
+    await shoot(page, 'admin-14-my-account');
   });
 
   test('管理画面：ログイン', async ({ page }) => {

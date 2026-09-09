@@ -62,6 +62,16 @@ export function twoFactorPolicyLabel(policy: string): string {
   }
 }
 
+/**
+ * 一度でもログインしたことがあるか。
+ *
+ * ⚠️ **`null` だけを見ない。** サーバの JSON は `null` を省くので、
+ * 一度も入っていない人では**項目そのものが来ない**（`undefined`）。
+ */
+export function hasLoggedIn(user: AdminUserRow): boolean {
+  return user.lastLoginAt !== null && user.lastLoginAt !== undefined;
+}
+
 /** 招待を受け取る URL。**この形はサーバ側の経路と揃える。** */
 export function invitationUrl(token: string, origin: string): string {
   return `${origin}/admin/invitations/accept?token=${encodeURIComponent(token)}`;
@@ -83,7 +93,7 @@ export function hasOtherUsableAdministrator(
       user.adminUserId !== adminUserId &&
       user.role === 'Administrator' &&
       !user.isDisabled &&
-      user.lastLoginAt !== null,
+      hasLoggedIn(user),
   );
 }
 
