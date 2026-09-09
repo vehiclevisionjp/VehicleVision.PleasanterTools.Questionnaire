@@ -50,6 +50,16 @@
 | `CaptchaProvider` | 課す課題。`Altcha`（既定・自前設置）/ `Recaptcha` / `Turnstile` / `Hcaptcha`。**知らない値は既定へ落とす** |
 | `CaptchaSiteKey` | 外部の CAPTCHA のサイトキー（画面へ渡る） |
 | `CaptchaSecretKey` | 外部の CAPTCHA の秘密鍵。**このフォルダのファイルへ書かないこと。** 環境変数か Key Vault から |
+| `QUESTIONNAIRE_SAML_ENABLED` | `true` で SAML のログインを使う。**既定は無効** |
+| `QUESTIONNAIRE_SAML_ENTITYID` | 本アプリ（SP）の EntityID。IdP へ登録する値と同じにする |
+| `QUESTIONNAIRE_SAML_IDPENTITYID` | IdP の EntityID。**これ以外が発行した応答は受け取らない** |
+| `QUESTIONNAIRE_SAML_SINGLESIGNONURL` | IdP のログインの窓口（`AuthnRequest` の宛先） |
+| `QUESTIONNAIRE_SAML_IDPCERTIFICATE` | IdP の署名証明書（PEM か、DER の base64）。**入れ替えの最中は改行かカンマで 2 枚並べられる** |
+| `QUESTIONNAIRE_SAML_UNKNOWNUSER` | 本アプリに居ない利用者の扱い。`Reject`（既定・通さない）/ `Register`（その場で作る） |
+| `QUESTIONNAIRE_SAML_REGISTERROLE` | `Register` で作る利用者の役割。`Editor`（既定）/ `Administrator`。**⚠️ Administrator にすると IdP に居る全員が全権を持つ** |
+| `QUESTIONNAIRE_SAML_LOGINIDSOURCE` | ログイン ID の取り出し先。`NameId`（既定）/ `Claim` |
+| `QUESTIONNAIRE_SAML_LOGINIDCLAIM` | `LOGINIDSOURCE=Claim` のときに読む属性名 |
+| `QUESTIONNAIRE_SAML_BUTTONLABEL` | ログイン画面の釦に出す文字（省略時は「シングルサインオンでログイン」） |
 | `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |

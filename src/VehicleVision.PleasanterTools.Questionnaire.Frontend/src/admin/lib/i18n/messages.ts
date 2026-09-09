@@ -45,6 +45,13 @@ export const ja = {
   'signIn.recoveryLabel': '復旧コード',
   'signIn.useRecovery': '認証アプリが使えない場合（復旧コードでログイン）',
   'signIn.useTotp': '認証アプリでログイン',
+  // ---- SAML（Issue #166）------------------------------------------------------
+  'signIn.samlOr': 'または',
+  'signIn.samlButton': 'シングルサインオンでログイン',
+  'signIn.samlError.invalid': 'シングルサインオンでのログインを完了できませんでした。もう一度お試しください。',
+  'signIn.samlError.unknownUser':
+    'このアカウントは管理画面に登録されていません。管理者に追加を依頼してください。',
+  'signIn.samlError.disabled': 'このアカウントは利用を停止されています。管理者にお問い合わせください。',
 
   // ---- 2 要素の登録 -------------------------------------------------------
   'enroll.title': '2 要素認証を登録する',
@@ -605,6 +612,12 @@ export const en: Record<MessageKey, string> = {
   'signIn.recoveryLabel': 'Recovery code',
   'signIn.useRecovery': 'I cannot use my authenticator (use a recovery code)',
   'signIn.useTotp': 'Use my authenticator',
+  'signIn.samlOr': 'or',
+  'signIn.samlButton': 'Sign in with single sign-on',
+  'signIn.samlError.invalid': 'Could not complete single sign-on. Please try again.',
+  'signIn.samlError.unknownUser':
+    'This account is not registered in administration. Ask an administrator to add it.',
+  'signIn.samlError.disabled': 'This account is disabled. Contact an administrator.',
 
   'enroll.title': 'Register two-factor authentication',
   'enroll.lead': 'Administration reaches every survey definition and every response.',

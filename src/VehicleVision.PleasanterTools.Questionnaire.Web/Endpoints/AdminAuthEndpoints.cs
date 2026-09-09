@@ -42,10 +42,16 @@ public static class AdminAuthEndpoints
         group.MapGet("/session", async (
             HttpContext context,
             IAdminUserStore store,
+            SamlOptions saml,
             AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
+
+            // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。
+            // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
+            var samlEnabled = saml.Enabled;
+            var samlLabel = saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null;
 
             var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             if (session.Succeeded)
@@ -78,6 +84,8 @@ public static class AdminAuthEndpoints
                     // **画面で「登録する／解除する」を出し分けるために要る**（Issue #154）
                     twoFactor = options.TwoFactor.ToString(),
                     hasTotp,
+                    samlEnabled,
+                    samlLabel,
                 });
             }
 
@@ -103,6 +111,8 @@ public static class AdminAuthEndpoints
                 pending = pending.Succeeded,
                 pendingLoginId = pending.Succeeded ? pending.Principal?.Identity?.Name : null,
                 needsEnrollment,
+                samlEnabled,
+                samlLabel,
             });
         });
 
@@ -421,7 +431,8 @@ public static class AdminAuthEndpoints
 
     /// <summary>2 要素まで通った状態にする。</summary>
     /// <remarks>
-    /// **招待の受け取りからも同じ形で入る**（<c>AdminUserEndpoints</c>。Issue #169）。
+    /// **招待の受け取り**（<c>AdminUserEndpoints</c>。Issue #169）と
+    /// **SAML の受け口**（<c>AdminSamlEndpoints</c>。Issue #166）からも同じ形で入る。
     /// </remarks>
     internal static async Task SignInSessionAsync(HttpContext context, AdminUser user)
     {

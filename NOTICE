@@ -34,6 +34,9 @@ Copyright (C) PMC Co.,Ltd.
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
   nClam 9.0.0 / Apache-2.0 / https://github.com/tekmaven/nClam
   Ixnas.AltchaNet 1.2.1 / BSD-2-Clause / https://github.com/ixnas/altcha-dotnet
+  ITfoxtec.Identity.Saml2 4.20.1 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+  ITfoxtec.Identity.Saml2.MvcCore 4.20.1 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+    （Microsoft.IdentityModel.* と Newtonsoft.Json を推移的に伴う。いずれも MIT）
   Azure.Storage.Blobs 12.29.2 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
 
@@ -71,8 +74,14 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.NET.Test.Sdk 18.9.0 / MIT
   @playwright/test 1.62.1 / Apache-2.0 / https://github.com/microsoft/playwright
   Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。成果物へ入るのは上記の書体）
+  Keycloak 26.7.3 / Apache-2.0 / https://github.com/keycloak/keycloak
+    （SAML の検証用 IdP。**別のコンテナとして立てるだけで、成果物には含まれない**）
   coverlet.collector 10.0.1 / MIT
   Microsoft.Extensions.TimeProvider.Testing 10.9.0 / MIT
+  System.Security.Cryptography.Xml 10.0.11 / MIT / https://github.com/dotnet/runtime
+    （ITfoxtec.Identity.Saml2 が推移的に伴う版に既知の脆弱性があるため、
+      テストプロジェクトでは修正済みの版を明示して固定している。
+      アプリ側は net10.0 の共有フレームワークが提供するため参照しない＝NU1510）
 
 **依存を追加したら、ここへ追記してからコミットすること。**
 
