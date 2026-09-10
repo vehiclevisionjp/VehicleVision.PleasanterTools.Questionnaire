@@ -4,7 +4,7 @@
 配置したもの。固定コミットで参照する。
 
 - リポジトリ: <https://github.com/Implem/Implem.Pleasanter>
-- 固定位置: `Pleasanter_1.5.7.0`（`870a56ae` / 2026-08-12 時点の upstream 最新タグ）
+- 固定位置: `Pleasanter_1.5.8.1`（`626a173e` / 2026-09-10 時点の upstream 最新タグ）
 
 ## 厳守事項
 
@@ -30,7 +30,7 @@ git submodule update --init --recursive
 
 ## この submodule で確認できること
 
-`Pleasanter_1.5.7.0` の公開リポジトリには **Web アプリ本体のソースが含まれている**（実際に確認済み）。
+`Pleasanter_1.5.8.1` の公開リポジトリには **Web アプリ本体のソースが含まれている**（実際に確認済み）。
 
 | 対象 | 確認できること |
 |---|---|
@@ -44,7 +44,7 @@ git submodule update --init --recursive
 
 > 参考: `EizoGiken.PleasanterTools.McpServer` の `_reference/README.md` には
 > 「公開リポジトリに Web アプリ本体のソースが含まれていない」とあるが、
-> **`1.5.7.0` では含まれている。** 同リポジトリの記述は古い可能性がある。
+> **`1.5.8.1` では含まれている。** 同リポジトリの記述は古い可能性がある。
 
 ## 確認できないこと
 

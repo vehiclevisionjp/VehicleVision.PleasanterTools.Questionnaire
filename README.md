@@ -30,7 +30,7 @@ flowchart LR
 
 ## 技術スタック
 
-Pleasanter 本体（`Pleasanter_1.5.7.0`）に揃えている。
+Pleasanter 本体（`Pleasanter_1.5.8.1`）に揃えている。
 
 | 層 | 採用 |
 | --- | --- |
