@@ -14,16 +14,19 @@
 #   プレリリース（`v1.0.0-rc.1`）は発行しない。必要になったら手でタグを付ける
 #   （`release.yml` は rc を扱える）。
 #
-# ■ ⚠️ **`RELEASE_TOKEN` が要る。`GITHUB_TOKEN` では動かない**
+# ■ ⚠️ **`my-repo-automation-bot` のトークンで動く。`GITHUB_TOKEN` では動かない**
 #   `master-protection` は PR 必須＋必須ステータスチェック 6 本で、bypass は
 #   Admin ロールのみ。**`GITHUB_TOKEN` の push / PR 作成では CI が起動しない**ため
 #   （ワークフローの連鎖を防ぐ仕様）、必須チェックが永久に pending になり
-#   マージできない。書き込み権のあるトークンを `RELEASE_TOKEN` へ入れること。
+#   マージできない。GitHub App の installation token を発行して使う。
 #
-#     - ファイングレイン PAT をこのリポジトリだけに絞り、
-#       Contents: Read and write / Pull requests: Read and write を与える
-#     - **長期の資格情報である。** GitHub App の installation token を使えば
-#       短命にできる（App を用意する手間と引き換え）
+#   **Dealer と同じ立て付けにしてある**（VehicleVision.Dealer の
+#   `create-release-tag.yml` / `create-release-pr.yml`）。長期の PAT を置かずに済む。
+#
+#     - Repository Variables: `MY_REPO_AUTOMATION_BOT_CLIENT_ID`（App の Client ID）
+#     - Secrets: `MY_REPO_AUTOMATION_BOT_PRIVATE_KEY`（App の秘密鍵 PEM）
+#     - ⚠️ **App 側の権限が Contents / Pull requests とも
+#       Read and write になっていること。** 既定は Read-only のことがある
 #
 # ■ ⚠️ **タグは付け直せない**
 #   一気通貫にすると、人の確認点（破壊的変更でメジャーを上げたか、
@@ -44,6 +47,9 @@
 #   - gh pr merge --auto / gh pr create
 #     https://cli.github.com/manual/gh_pr_merge
 #     https://cli.github.com/manual/gh_pr_create
+#   - actions/create-github-app-token v3（client-id / private-key / permission-*）
+#     https://github.com/actions/create-github-app-token
+#     **`app-id` ではなく `client-id` が推奨。** Dealer も client-id で揃えている
 #   - actions/checkout v7 は .github/workflows/ci.yml と同じ版に揃えた（勝手に上げない）
 name: リリース実行
 
@@ -154,7 +160,10 @@ jobs:
         if: ${{ !inputs.dry_run }}
         env:
           ACKNOWLEDGE: ${{ inputs.acknowledge }}
-          HAS_TOKEN: ${{ secrets.RELEASE_TOKEN != '' }}
+          # **`secrets` / `vars` は `if` から参照できない。** env へ写して判定する
+          # （Dealer の ci.yml と同じ理由）
+          HAS_CLIENT_ID: ${{ vars.MY_REPO_AUTOMATION_BOT_CLIENT_ID != '' }}
+          HAS_PRIVATE_KEY: ${{ secrets.MY_REPO_AUTOMATION_BOT_PRIVATE_KEY != '' }}
         run: |
           set -euo pipefail
 
@@ -165,10 +174,15 @@ jobs:
               echo "    （_documents/リリース手順書.md「リリース前の確認」の「人」の欄）" >&2
               ng=1
           fi
-          if [ "$HAS_TOKEN" != "true" ]; then
-              echo "NG: シークレット RELEASE_TOKEN が設定されていない" >&2
-              echo "    GITHUB_TOKEN では PR に CI が回らず、必須チェックが通らない" >&2
-              echo "    Contents / Pull requests に書き込み権のあるトークンを入れること" >&2
+          if [ "$HAS_CLIENT_ID" != "true" ]; then
+              echo "NG: Repository Variable MY_REPO_AUTOMATION_BOT_CLIENT_ID が未設定" >&2
+              echo "    App の Settings > General にある Client ID（Iv23li… の形）を入れること" >&2
+              echo "    **App ID でも Object ID でもない**" >&2
+              ng=1
+          fi
+          if [ "$HAS_PRIVATE_KEY" != "true" ]; then
+              echo "NG: シークレット MY_REPO_AUTOMATION_BOT_PRIVATE_KEY が未設定" >&2
+              echo "    App の秘密鍵（PEM）を入れること" >&2
               ng=1
           fi
           [ "$ng" -eq 0 ] || exit 1
@@ -218,19 +232,32 @@ jobs:
     # PR の必須チェック（3 RDBMS 結合テストを含む）の通過を 2 本待つ
     timeout-minutes: 90
     steps:
+      - name: my-repo-automation-bot のトークンを作る
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.MY_REPO_AUTOMATION_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.MY_REPO_AUTOMATION_BOT_PRIVATE_KEY }}
+          # ブランチとタグの push に contents、PR の作成と auto-merge の予約に
+          # pull-requests が要る。**それ以外は与えない**
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: ソースを取得する
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: false
-          # **RELEASE_TOKEN で取得する。** ここで入れたトークンが push にも使われ、
+          # **App のトークンで取得する。** ここで入れたトークンが push にも使われ、
           # push を契機に CI が起動する。GITHUB_TOKEN のままでは起動しない
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
 
       - name: 版を上げてマージし、タグを push する
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # コミットの作者を bot 名義に揃えるのに使う（Dealer と同じ）
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           NEXT_VERSION: ${{ needs.plan.outputs.next_version }}
           NEXT_TAG: ${{ needs.plan.outputs.next_tag }}
           NEEDS_VERSION_BUMP: ${{ needs.plan.outputs.needs_version_bump }}

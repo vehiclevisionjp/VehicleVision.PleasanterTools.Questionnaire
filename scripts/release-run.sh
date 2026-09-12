@@ -11,8 +11,8 @@
 #
 # ⚠️ **`GITHUB_TOKEN` では動かない。** `GITHUB_TOKEN` の push / PR 作成では
 #    ワークフローの連鎖を防ぐ仕様で CI が起動せず、**必須ステータスチェックが
-#    永久に pending になってマージできない**。書き込み権のある `RELEASE_TOKEN`
-#    （ファイングレイン PAT または GitHub App のトークン）を渡すこと。
+#    永久に pending になってマージできない**。`my-repo-automation-bot`
+#    （GitHub App）の installation token を渡すこと。
 #
 # ⚠️ **マージの待ちは GitHub の auto-merge に任せる。** こちらでチェックの
 #    合否を判定して `gh pr merge` を叩くと、ruleset の判定を二重に実装することに
@@ -27,7 +27,8 @@
 #    再実行しても、既にある PR とブランチは作り直さず引き継ぐ。
 #
 # 要る環境変数
-#   GH_TOKEN             書き込み権のあるトークン
+#   GH_TOKEN             GitHub App の installation token
+#   APP_SLUG             その App の slug（コミットの作者名に使う）
 #   NEXT_VERSION         出す版（X.Y.Z）
 #   NEXT_TAG             出すタグ（vX.Y.Z）
 #   NEEDS_VERSION_BUMP   VersionPrefix を上げる PR が要るなら true
@@ -62,21 +63,20 @@ summary() {
     fi
 }
 
-# **コミットの作者はトークンの持ち主にする。** master-protection の
+# **コミットの作者を App の bot 名義へ揃える。** master-protection の
 # require_extra_approval_for_unattributed_changes が有効で、
-# push した人と結び付かないコミットは追加の承認を要求される。
+# **push した主体と結び付かないコミットは追加の承認を要求される。**
 #
-# ⚠️ **GitHub App の installation token では `gh api user` が引けない。**
-#    その場合は bot の名義に落とすが、追加の承認を要求されうる旨を警告に残す
-if login="$(gh api user --jq '.login' 2>/dev/null)" && [[ -n "$login" ]]; then
-    user_id="$(gh api user --jq '.id')"
-    git config user.name "$login"
-    git config user.email "${user_id}+${login}@users.noreply.github.com"
-    echo "コミットの作者: $login"
+# ⚠️ **installation token では `gh api user` が引けない。** App の slug から
+#    `<slug>[bot]` のユーザを引いて id を得る（Dealer の create-release-tag.yml と同じ）。
+if [[ -n "${APP_SLUG:-}" ]]; then
+    bot_user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq '.id')"
+    git config user.name "${APP_SLUG}[bot]"
+    git config user.email "${bot_user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+    echo "コミットの作者: ${APP_SLUG}[bot]"
 else
-    echo "::warning::トークンの持ち主を引けなかった。github-actions[bot] 名義でコミットする。master-protection の require_extra_approval_for_unattributed_changes により追加の承認を要求される可能性がある"
-    git config user.name "github-actions[bot]"
-    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    echo "NG: APP_SLUG が渡っていない。GitHub App のトークンで実行すること" >&2
+    exit 1
 fi
 
 # PR を探し、無ければ作る。**再実行で二重に作らない**
