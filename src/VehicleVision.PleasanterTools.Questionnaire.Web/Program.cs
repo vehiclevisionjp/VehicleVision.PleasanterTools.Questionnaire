@@ -8,6 +8,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Scripting;
 using VehicleVision.PleasanterTools.Questionnaire.Web;
@@ -387,6 +388,24 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddSingleton(ResponseSenderOptions.FromConfiguration(builder.Configuration));
 builder.Services.AddSingleton<ResponseSender>();
 builder.Services.AddHostedService<ResponseSenderHostedService>();
+
+// **メールの送信ワーカー**（Issue #189）。**既定は無効で、設定したときだけ常駐する。**
+// 回答の送信ワーカーとは別に動く。**メールが詰まっても回答は送られ、
+// 回答が詰まってもメールは出る。** どちらかの不調がもう一方を止めない
+var mailOptions = MailOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(mailOptions);
+builder.Services.AddSingleton<IMailOutbox, MailOutbox>();
+// ⚠️ **宛先も本文も暗号化して置く。** 完全匿名の前提で、個人を指す値が
+// DB に載る唯一の場所（Issue #189）
+builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
+
+if (mailOptions.IsReady)
+{
+    builder.Services.AddSingleton<IMailTransport, SmtpMailTransport>();
+    builder.Services.AddSingleton(MailSenderOptions.FromConfiguration(builder.Configuration));
+    builder.Services.AddSingleton<MailSender>();
+    builder.Services.AddHostedService<MailSenderHostedService>();
+}
 
 // **どの設定ファイルを読んだかを記録に残す**（Issue #158）。
 // **optional なので、置き場を間違えても黙って既定で動いてしまう。**

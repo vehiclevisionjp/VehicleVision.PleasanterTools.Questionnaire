@@ -31,4 +31,12 @@ public enum AdminNotificationKind
 
     /// <summary>回答数の上限に達して、アンケートを自動で停止した（Issue #53）。</summary>
     ResponseLimitReached = 5,
+
+    /// <summary>再送しても通らず、メールをデッドレターへ分離した（Issue #189）。</summary>
+    /// <remarks>
+    /// **回答の分離（<see cref="DeadLettered"/>）と分ける。**
+    /// 回答は届いていないが、メールは届かなかっただけで**回答は Pleasanter に入っている。**
+    /// 同じ知らせにすると、慌てて回答を探しに行くことになる。
+    /// </remarks>
+    MailDeadLettered = 6,
 }
