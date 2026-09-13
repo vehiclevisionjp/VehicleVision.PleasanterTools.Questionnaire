@@ -61,6 +61,8 @@ export const ja = {
   'users.inviting': '追加しています…',
   'users.invitationIssued': '{loginId} の招待 URL です。この画面を閉じると再表示できません。',
   'users.invitationNote': '有効期限は {expiresAt} です。期限が切れたら「招待を出し直す」を押してください。',
+  'users.invitationMailSent': '招待メールを本人宛に送りました。届かないときは、下の URL を渡してください。',
+  'users.invitationMailNotSent': '招待メールは送っていません。下の URL を本人へ渡してください。',
   'users.column.loginId': 'ログイン ID',
   'users.column.role': '役割',
   'users.column.state': '状態',
@@ -731,6 +733,9 @@ export const en: Record<MessageKey, string> = {
   'users.inviting': 'Adding\u2026',
   'users.invitationIssued': 'Invitation URL for {loginId}. It cannot be shown again once you leave.',
   'users.invitationNote': 'Valid until {expiresAt}. Use "Reissue invitation" after it expires.',
+  'users.invitationMailSent':
+    'An invitation mail was sent to them. Pass on the URL below if it does not arrive.',
+  'users.invitationMailNotSent': 'No invitation mail was sent. Pass the URL below to them.',
   'users.column.loginId': 'Sign-in ID',
   'users.column.role': 'Role',
   'users.column.state': 'State',

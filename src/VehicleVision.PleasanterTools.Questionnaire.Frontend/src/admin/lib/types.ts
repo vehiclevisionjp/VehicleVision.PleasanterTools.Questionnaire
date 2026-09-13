@@ -589,6 +589,13 @@ export interface IssuedInvitation {
   adminUserId: string;
   invitationToken: string;
   expiresAt: string;
+  /**
+   * 招待のメールを積めたか（Issue #189）。
+   *
+   * **送れていなければ、下に出ている URL を手で渡す必要がある。**
+   * メールの設定が無い・ログイン ID がメールアドレスでない場合は送られない。
+   */
+  mailSent?: boolean;
 }
 
 export interface AdminSession {

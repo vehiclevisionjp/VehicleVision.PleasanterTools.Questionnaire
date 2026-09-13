@@ -80,6 +80,7 @@ public static class AdminUserEndpoints
             HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
+            AdminInvitationMailer mailer,
             CancellationToken cancellationToken) =>
         {
             var language = RequestLanguage.Of(context);
@@ -101,9 +102,19 @@ public static class AdminUserEndpoints
                 .InviteAsync(ActorId(principal), request.LoginId, role, cancellationToken)
                 .ConfigureAwait(false);
 
-            return outcome is AdminUserOutcome.Succeeded
-                ? Results.Ok(InvitationBody(invitation!))
-                : Failure(outcome, language);
+            if (outcome is not AdminUserOutcome.Succeeded)
+            {
+                return Failure(outcome, language);
+            }
+
+            // **本人へ直接送る**（Issue #189）。手渡しの途中で漏れる経路を減らす。
+            // ⚠️ **画面の URL も今までどおり返す。** 送れない構成でも招待は出せること
+            var mailSent = await mailer
+                .TryEnqueueAsync(
+                    request.LoginId!, invitation!.Token, invitation.ExpiresAt, language, cancellationToken)
+                .ConfigureAwait(false);
+
+            return Results.Ok(InvitationBody(invitation, mailSent));
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
 
@@ -113,15 +124,32 @@ public static class AdminUserEndpoints
             HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
+            IAdminUserStore store,
+            AdminInvitationMailer mailer,
             CancellationToken cancellationToken) =>
         {
+            var language = RequestLanguage.Of(context);
+
             var (outcome, invitation) = await service
                 .ReissueInvitationAsync(ActorId(principal), adminUserId, cancellationToken)
                 .ConfigureAwait(false);
 
-            return outcome is AdminUserOutcome.Succeeded
-                ? Results.Ok(InvitationBody(invitation!))
-                : Failure(outcome, RequestLanguage.Of(context));
+            if (outcome is not AdminUserOutcome.Succeeded)
+            {
+                return Failure(outcome, language);
+            }
+
+            // **宛先は相手のログイン ID。** 出し直しでは本文に無いので読み直す
+            var user = await store.FindByIdAsync(adminUserId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var mailSent = user?.LoginId is { } loginId
+                && await mailer
+                    .TryEnqueueAsync(
+                        loginId, invitation!.Token, invitation.ExpiresAt, language, cancellationToken)
+                    .ConfigureAwait(false);
+
+            return Results.Ok(InvitationBody(invitation!, mailSent));
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
 
@@ -540,12 +568,15 @@ public static class AdminUserEndpoints
         };
     }
 
-    private static object InvitationBody(IssuedInvitation invitation) => new
+    private static object InvitationBody(IssuedInvitation invitation, bool mailSent) => new
     {
         adminUserId = invitation.AdminUserId,
         // **返せるのはこの時だけ。** 保存しているのはハッシュのみ
         invitationToken = invitation.Token,
         expiresAt = AsUtc(invitation.ExpiresAt),
+        // **メールを積めたか**（Issue #189）。
+        // **送れていなければ、画面の URL を手で渡してもらう必要がある**
+        mailSent,
     };
 
     /// <summary>DB の時刻を UTC と分かる形にする。</summary>

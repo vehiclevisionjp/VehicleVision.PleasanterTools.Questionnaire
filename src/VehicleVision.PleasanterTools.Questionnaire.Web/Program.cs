@@ -402,6 +402,9 @@ builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
 // **自動返信は、メールが無効でも組み立てられる形にしておく。**
 // 有効になっていなければ積まずに記録だけ残す（設定だけ済ませて気付かない事故を防ぐ）
 builder.Services.AddSingleton<AutoReplyDispatcher>();
+// **招待を本人へ直接送る**（Issue #189）。手渡しの途中で漏れる経路を減らす。
+// **送れない構成でも招待は出せる**（画面の URL は今までどおり返る）
+builder.Services.AddSingleton<AdminInvitationMailer>();
 
 if (mailOptions.IsReady)
 {

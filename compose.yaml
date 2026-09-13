@@ -85,6 +85,10 @@ x-app-environment: &app-environment
     QUESTIONNAIRE_MAIL_SMTP_SECURITY: ${DEV_MAIL_SECURITY:-None}
     QUESTIONNAIRE_MAIL_FROM_ADDRESS: ${DEV_MAIL_FROM:-noreply@questionnaire.test}
     QUESTIONNAIRE_MAIL_FROM_NAME: ${DEV_MAIL_FROM_NAME:-アンケート}
+    # **メールに載せる URL の起点**（招待メール）。
+    # ⚠️ **要求の Host ヘッダから組み立てない**（host header injection）。
+    # 設定が無ければ、リンクを載せるメールは送らない
+    QUESTIONNAIRE_MAIL_BASEURL: ${DEV_MAIL_BASEURL:-https://localhost:8443}
     QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN: ${DEV_LOGIN_ATTEMPTS:-2000}
     QUESTIONNAIRE_REQUESTS_PER_MIN: ${DEV_REQUESTS_PER_MIN:-6000}
     # **proof-of-work は検証環境でも効かせたままにする**（Issue #55）。

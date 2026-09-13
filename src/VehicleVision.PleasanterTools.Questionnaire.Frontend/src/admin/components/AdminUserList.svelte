@@ -158,6 +158,10 @@
         <p>
           <strong>{t('users.invitationIssued', { loginId: loginIdOf(issued.adminUserId) })}</strong>
         </p>
+        <!-- **送れたかどうかを必ず出す。** 送れていなければ URL を手で渡す必要がある -->
+        <p class="note">
+          {issued.mailSent ? t('users.invitationMailSent') : t('users.invitationMailNotSent')}
+        </p>
         <p class="url"><code>{invitationUrl(issued.invitationToken, location.origin)}</code></p>
         <p class="note">
           {t('users.invitationNote', { expiresAt: when(issued.expiresAt) })}

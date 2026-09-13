@@ -204,6 +204,26 @@ public static class ServerMessages
             "公開できません。設問の設定に、回答できない指定があります。",
             "Cannot publish. Some questions have settings that no answer can satisfy.");
 
+        // ---- 招待メール（Issue #189）----------------------------------------
+        // **平文で送る。** 書式は持たない（OutgoingMail が text/plain）
+        Add(
+            ServerMessageKeys.InvitationMailSubject,
+            "アンケート管理画面への招待",
+            "You have been invited to the questionnaire admin");
+
+        Add(
+            ServerMessageKeys.InvitationMailBody,
+            "アンケートの管理画面への招待が届いています。\n\n"
+            + "次の URL を開き、パスワードを決めてください。\n"
+            + "{0}\n\n"
+            + "期限: {1} (UTC)\n\n"
+            + "このメールに心当たりが無ければ、URL を開かずに破棄してください。",
+            "You have been invited to the questionnaire admin screen.\n\n"
+            + "Open the following URL and choose your password.\n"
+            + "{0}\n\n"
+            + "Expires: {1} (UTC)\n\n"
+            + "If you were not expecting this, discard this message without opening the URL.");
+
         Add(
             ServerMessageKeys.PublishBlockedByAutoReply,
             "公開できません。自動返信メールの設定では、メールを送れません。",

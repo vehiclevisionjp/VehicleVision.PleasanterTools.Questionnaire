@@ -72,6 +72,24 @@ public sealed record MailOptions
     /// <summary>1 通あたりの待ち時間の上限。</summary>
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>メールに載せる URL の起点（例: <c>https://survey.example.jp</c>）。</summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠️ **要求の <c>Host</c> ヘッダから組み立てない。** 受け取った名前で URL を作ると、
+    /// **偽の宛先を載せたメールを、こちらの名前で送らせられる**
+    /// （host header injection）。設定に無ければ**リンクを載せるメールを送らない。**
+    /// </para>
+    /// <para>
+    /// **末尾の <c>/</c> は落として持つ**（<see cref="Link"/>）。
+    /// </para>
+    /// </remarks>
+    public string? BaseUrl { get; init; }
+
+    /// <summary>起点からの絶対 URL を作る。**起点が無ければ <c>null</c>。**</summary>
+    /// <param name="path">先頭に <c>/</c> を付けた経路。</param>
+    public string? Link(string path) =>
+        string.IsNullOrWhiteSpace(BaseUrl) ? null : BaseUrl.TrimEnd('/') + path;
+
     /// <summary>送れる形になっているか。</summary>
     /// <remarks>**半端な設定で送り始めない。** 有効なのに欠けていれば、起動時に落とす。</remarks>
     public bool IsReady =>
@@ -110,6 +128,7 @@ public sealed record MailOptions
             FromAddress = configuration[Prefix + "FROM_ADDRESS"] ?? string.Empty,
             FromName = configuration[Prefix + "FROM_NAME"],
             ReplyToAddress = configuration[Prefix + "REPLYTO_ADDRESS"],
+            BaseUrl = configuration[Prefix + "BASEURL"],
             Timeout = TimeSpan.FromSeconds(ReadInt(configuration, Prefix + "TIMEOUT_SECONDS", 30)),
         };
 
@@ -135,6 +154,16 @@ public sealed record MailOptions
         {
             throw new InvalidOperationException(
                 $"{Prefix}TIMEOUT_SECONDS は 1 以上で指定する");
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.BaseUrl)
+            && (!Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var baseUri)
+                || baseUri.Scheme is not ("http" or "https")))
+        {
+            // **半端な値でリンクを作らない。** 起動時に気付ける方がよい
+            throw new InvalidOperationException(
+                $"{Prefix}BASEURL は http:// か https:// から始まる絶対 URL で指定する"
+                + $"（今の値: {options.BaseUrl}）");
         }
 
         return options;
