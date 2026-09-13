@@ -84,6 +84,9 @@ Copyright (C) PMC Co.,Ltd.
   Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。成果物へ入るのは上記の書体）
   Keycloak 26.7.3 / Apache-2.0 / https://github.com/keycloak/keycloak
     （SAML の検証用 IdP。**別のコンテナとして立てるだけで、成果物には含まれない**）
+  Mailpit 1.31.1 / MIT / https://github.com/axllent/mailpit
+    （メールの検証用の受け。SMTP を受けて溜めるだけで外へは出さない。
+      **別のコンテナとして立てるだけで、成果物には含まれない**）
   coverlet.collector 10.0.1 / MIT
   Microsoft.Extensions.Configuration 10.0.11 / MIT
     （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
