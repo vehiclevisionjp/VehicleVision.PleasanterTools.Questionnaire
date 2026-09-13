@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -44,6 +45,7 @@ public static class AdminAuthEndpoints
             IAdminUserStore store,
             SamlOptions saml,
             AdminAuthOptions options,
+            MailOptions mail,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
@@ -91,6 +93,12 @@ public static class AdminAuthEndpoints
                     hasTotp,
                     samlEnabled,
                     samlLabel,
+
+                    // **メールを送れる状態かを画面へ返す**（Issue #189）。
+                    // 自動返信を設定しただけで「送っているつもり」にさせない。
+                    // ⚠️ **接続先も資格情報も返さない**（送れるか否かだけ）。
+                    // **認証済みの相手にだけ返す**（構成の情報を未認証へ出さない）
+                    mailEnabled = mail.IsReady,
                 });
             }
 

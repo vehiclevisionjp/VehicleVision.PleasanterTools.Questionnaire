@@ -480,6 +480,24 @@ public static class AdminSurveyEndpoints
                 });
             }
 
+            // **送れない自動返信のまま公開しない**（Issue #189）。
+            // 有効にしたのに宛先が無い・件名が空だと、**送ったつもりで 1 通も出ない。**
+            // 気付くのは回答者から問い合わせが来たときになる
+            var autoReplyProblems = AutoReplyValidator.Validate(draft.Definition);
+            if (autoReplyProblems.Length > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PublishBlockedByAutoReply, RequestLanguage.Of(context)),
+                    autoReply = autoReplyProblems.Select(problem => new
+                    {
+                        code = problem.Code.ToString(),
+                        detail = problem.Detail,
+                    }),
+                });
+            }
+
             // **答えようのない設問のまま公開しない**（Issue #101）。
             // 「5 つの選択肢から 7 つ選べ」は回答者が何をしても通らない
             var settingsProblems = QuestionSettingsValidator.Validate(draft.Definition);

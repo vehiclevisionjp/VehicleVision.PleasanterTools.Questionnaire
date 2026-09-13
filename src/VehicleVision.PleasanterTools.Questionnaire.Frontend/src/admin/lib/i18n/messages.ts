@@ -581,6 +581,36 @@ export const ja = {
   'template.saveDescription': '設問・選択肢・分岐・割り当てをコピーします。保存先のサイトと回答用 URL はコピーしません。',
   'template.saveSubmit': 'テンプレートにする',
   'template.saved': 'テンプレートとして保存しました。',
+  'question.format': '入力の形式',
+  'question.formatNone': '指定しない',
+  'question.formatEmail': 'メールアドレス',
+  'question.formatUrl': 'URL',
+  'question.formatHint':
+    'メールアドレスにすると、その設問を自動返信メールの宛先に選べます。',
+  // ---- 自動返信メール（Issue #189） ----
+  'autoReply.title': '自動返信メール',
+  'autoReply.lead':
+    '回答者へ、受け付けたことをメールで知らせます。既定では送りません。公開すると反映されます。',
+  'autoReply.enabled': '自動返信メールを送る',
+  'autoReply.toQuestion': '宛先にする設問',
+  'autoReply.toQuestionHint':
+    'メールアドレス形式の記述式（1 行）だけを選べます。未回答の人には送りません。',
+  'autoReply.noEmailQuestion':
+    '宛先にできる設問がありません。記述式（1 行）の設問を足し、形式を「メールアドレス」にしてください。',
+  'autoReply.subject': '件名',
+  'autoReply.body': '本文',
+  'autoReply.bodyHint': '書式は付けられません。文字だけが送られます。',
+  'autoReply.includeAnswers': '本文のあとに回答の写しを付ける',
+  'autoReply.includeAnswersHint':
+    '回答の中身がメールとして外へ出ます。受け取るのは回答者本人ですが、経路が暗号化されているとは限りません。',
+  'autoReply.serverDisabled':
+    'メールの送信がサーバ側で有効になっていません。この設定は保存できますが、有効にするまで 1 通も送られません。',
+  'autoReply.problem.ToQuestionMissing': '宛先にする設問が選ばれていません。',
+  'autoReply.problem.ToQuestionNotFound': '宛先にする設問が見つかりません（消された可能性があります）。',
+  'autoReply.problem.ToQuestionNotEmail': '宛先にする設問が、メールアドレス形式ではありません。',
+  'autoReply.problem.SubjectMissing': '件名が空です。',
+  'autoReply.problem.BodyMissing': '本文が空です。',
+  'autoReply.publishBlocked': '公開できません。自動返信メールの設定を直してください。',
   // ---- テーマ（Issue #56） ----
   'theme.title': '回答画面の見た目',
   'theme.lead': '色・書体・ヘッダ画像を設定できます。未設定の場合は既定の見た目になります。公開すると反映されます。',
@@ -1248,6 +1278,36 @@ export const en: Record<MessageKey, string> = {
     'Questions, choices, branching and mapping are copied. The target site and the public URL are not.',
   'template.saveSubmit': 'Save as template',
   'template.saved': 'Saved as a template.',
+  'question.format': 'Input format',
+  'question.formatNone': 'Not specified',
+  'question.formatEmail': 'Email address',
+  'question.formatUrl': 'URL',
+  'question.formatHint':
+    'Choosing email address lets you use this question as the auto-reply address.',
+  // ---- Auto-reply mail ----
+  'autoReply.title': 'Auto-reply mail',
+  'autoReply.lead':
+    'Tell respondents by email that their response was received. Nothing is sent by default. Changes take effect when you publish.',
+  'autoReply.enabled': 'Send an auto-reply mail',
+  'autoReply.toQuestion': 'Question to take the address from',
+  'autoReply.toQuestionHint':
+    'Only short answer questions validated as an email address can be used. Nothing is sent to people who leave it blank.',
+  'autoReply.noEmailQuestion':
+    'No question can be used as the address. Add a short answer question and set its format to email address.',
+  'autoReply.subject': 'Subject',
+  'autoReply.body': 'Body',
+  'autoReply.bodyHint': 'No formatting. Plain text only.',
+  'autoReply.includeAnswers': 'Append a copy of the answers',
+  'autoReply.includeAnswersHint':
+    'The answers leave the system as email. Only the respondent receives it, but the route is not necessarily encrypted.',
+  'autoReply.serverDisabled':
+    'Mail sending is not enabled on the server. These settings can be saved, but nothing will be sent until it is.',
+  'autoReply.problem.ToQuestionMissing': 'No question is selected for the address.',
+  'autoReply.problem.ToQuestionNotFound': 'The selected question no longer exists.',
+  'autoReply.problem.ToQuestionNotEmail': 'The selected question is not validated as an email address.',
+  'autoReply.problem.SubjectMissing': 'The subject is empty.',
+  'autoReply.problem.BodyMissing': 'The body is empty.',
+  'autoReply.publishBlocked': 'Cannot publish. Fix the auto-reply settings first.',
   // ---- Theme ----
   'theme.title': 'Look of the answer screen',
   'theme.lead':

@@ -205,6 +205,11 @@ public static class ServerMessages
             "Cannot publish. Some questions have settings that no answer can satisfy.");
 
         Add(
+            ServerMessageKeys.PublishBlockedByAutoReply,
+            "公開できません。自動返信メールの設定では、メールを送れません。",
+            "Cannot publish. The auto-reply settings cannot send an email.");
+
+        Add(
             ServerMessageKeys.NoAnswerableQuestion,
             "回答できる設問がありません。",
             "There is no question that can be answered.");
