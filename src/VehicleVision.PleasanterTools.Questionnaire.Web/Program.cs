@@ -399,6 +399,10 @@ builder.Services.AddSingleton<IMailOutbox, MailOutbox>();
 // DB に載る唯一の場所（Issue #189）
 builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
 
+// **自動返信は、メールが無効でも組み立てられる形にしておく。**
+// 有効になっていなければ積まずに記録だけ残す（設定だけ済ませて気付かない事故を防ぐ）
+builder.Services.AddSingleton<AutoReplyDispatcher>();
+
 if (mailOptions.IsReady)
 {
     builder.Services.AddSingleton<IMailTransport, SmtpMailTransport>();
