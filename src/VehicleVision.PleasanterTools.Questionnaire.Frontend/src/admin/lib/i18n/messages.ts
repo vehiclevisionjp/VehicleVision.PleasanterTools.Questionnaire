@@ -597,6 +597,8 @@ export const ja = {
     'メールアドレス形式の記述式（1 行）だけを選べます。未回答の人には送りません。',
   'autoReply.noEmailQuestion':
     '宛先にできる設問がありません。記述式（1 行）の設問を足し、形式を「メールアドレス」にしてください。',
+  'autoReply.needsEmailQuestion':
+    'メールアドレスの欄があるアンケートでだけ設定できます。記述式（1 行）の設問を足し、入力の形式を「メールアドレス」にしてください。',
   'autoReply.subject': '件名',
   'autoReply.body': '本文',
   'autoReply.bodyHint': '書式は付けられません。文字だけが送られます。',
@@ -1294,6 +1296,8 @@ export const en: Record<MessageKey, string> = {
     'Only short answer questions validated as an email address can be used. Nothing is sent to people who leave it blank.',
   'autoReply.noEmailQuestion':
     'No question can be used as the address. Add a short answer question and set its format to email address.',
+  'autoReply.needsEmailQuestion':
+    'Available only when the form asks for an email address. Add a short answer question and set its input format to email address.',
   'autoReply.subject': 'Subject',
   'autoReply.body': 'Body',
   'autoReply.bodyHint': 'No formatting. Plain text only.',

@@ -42,6 +42,18 @@
   const enabled = $derived(autoReply?.enabled ?? false);
 
   /**
+   * 自動返信を有効にできるか。
+   *
+   * ⚠️ **メールアドレスの欄があるアンケートでだけ有効にできる**（Issue #189）。
+   * 宛先は回答からしか採らないので、欄が無ければ**有効にしても 1 通も出ない。**
+   * 「設定したのに届かない」を作らないため、そもそも入れさせない。
+   *
+   * **既に有効なら触らせ続ける。** 有効にしたあとで欄を消した場合、
+   * 釦を塞ぐと直すことも止めることもできなくなる。
+   */
+  const canEnable = $derived(addressQuestions.length > 0 || enabled);
+
+  /**
    * 設定を書き換える。
    *
    * **無効に戻したら `null` にする。** 空の設定を持たせると、
@@ -58,14 +70,21 @@
   <h2>{t('autoReply.title')}</h2>
   <p class="hint">{t('autoReply.lead')}</p>
 
-  <label class="toggle">
+  <label class="toggle" class:unavailable={!canEnable}>
     <input
       type="checkbox"
       checked={enabled}
+      disabled={!canEnable}
       onchange={(event) => update({ enabled: event.currentTarget.checked })}
     />
     {t('autoReply.enabled')}
   </label>
+
+  <!-- ⚠️ **メールアドレスの欄が無ければ有効にできない。**
+       宛先は回答からしか採らないので、欄が無ければ 1 通も出ない -->
+  {#if !canEnable}
+    <p class="hint">{t('autoReply.needsEmailQuestion')}</p>
+  {/if}
 
   {#if enabled}
     <!-- **送れない状態を黙って隠さない。** 設定だけ済ませて「送っているつもり」に
@@ -75,6 +94,7 @@
     {/if}
 
     {#if addressQuestions.length === 0}
+      <!-- **有効にしたあとで欄を消した。** 直すか止めるかができる状態は保つ -->
       <p class="warning">{t('autoReply.noEmailQuestion')}</p>
     {:else}
       <label>
@@ -149,6 +169,10 @@
       display: flex;
       gap: 0.5rem;
       align-items: center;
+    }
+
+    &.unavailable {
+      color: var(--muted);
     }
   }
 
