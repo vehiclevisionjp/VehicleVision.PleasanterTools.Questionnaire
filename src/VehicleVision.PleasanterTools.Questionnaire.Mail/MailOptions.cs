@@ -16,6 +16,37 @@ public enum SmtpSecurity
     None,
 }
 
+/// <summary>メールの送信経路（Issue #198）。</summary>
+/// <remarks>
+/// <para>
+/// **どれでも同じ 1 通が出る。** 違うのは**資格情報をどこに置くか**だけ。
+/// </para>
+/// <list type="table">
+///   <item>
+///     <term><see cref="Smtp"/></term>
+///     <description>**既定。** どの送信元にも届く代わりに、**パスワードを 1 つ保管する**</description>
+///   </item>
+///   <item>
+///     <term><see cref="AmazonSes"/></term>
+///     <description>IAM ロール（マネージド ID）で通る。**保管する秘密は 0**</description>
+///   </item>
+///   <item>
+///     <term><see cref="AzureCommunicationServices"/></term>
+///     <description>Entra ID のマネージド ID で通る。**保管する秘密は 0**</description>
+///   </item>
+/// </list>
+public enum MailTransportKind
+{
+    /// <summary>認証付き SMTP リレー。**既定。**</summary>
+    Smtp,
+
+    /// <summary>Amazon SES（HTTPS）。**IAM ロールで通る。**</summary>
+    AmazonSes,
+
+    /// <summary>Azure Communication Services（HTTPS）。**マネージド ID で通る。**</summary>
+    AzureCommunicationServices,
+}
+
 /// <summary>メール送信の設定（Issue #189）。</summary>
 /// <remarks>
 /// <para>
@@ -37,6 +68,24 @@ public sealed record MailOptions
 {
     /// <summary>メールを送るか。**既定は無効。**</summary>
     public bool Enabled { get; init; }
+
+    /// <summary>使う送信経路（Issue #198）。**既定は SMTP。**</summary>
+    public MailTransportKind Transport { get; init; } = MailTransportKind.Smtp;
+
+    /// <summary>Amazon SES の地域（例 <c>ap-northeast-1</c>）。</summary>
+    /// <remarks>
+    /// ⚠️ **資格情報は設定に書かない。** AWS SDK の既定の探索順
+    /// （App Service のマネージド ID → IAM ロール → 環境変数）に任せる。
+    /// **鍵を設定へ書けるようにしない**のが、この経路を足した理由そのもの。
+    /// </remarks>
+    public string? SesRegion { get; init; }
+
+    /// <summary>Azure Communication Services の窓口（例 <c>https://xxx.communication.azure.com</c>）。</summary>
+    /// <remarks>
+    /// ⚠️ **接続文字列を受け取らない。** Entra ID のマネージド ID
+    /// （<c>DefaultAzureCredential</c>）だけを使う。**鍵を置ける口を作らない。**
+    /// </remarks>
+    public Uri? AcsEndpoint { get; init; }
 
     /// <summary>SMTP サーバ。</summary>
     public string Host { get; init; } = string.Empty;
@@ -94,9 +143,15 @@ public sealed record MailOptions
     /// <remarks>**半端な設定で送り始めない。** 有効なのに欠けていれば、起動時に落とす。</remarks>
     public bool IsReady =>
         Enabled
-        && !string.IsNullOrWhiteSpace(Host)
         && !string.IsNullOrWhiteSpace(FromAddress)
-        && Port is > 0 and <= 65535;
+        && Transport switch
+        {
+            MailTransportKind.Smtp =>
+                !string.IsNullOrWhiteSpace(Host) && Port is > 0 and <= 65535,
+            MailTransportKind.AmazonSes => !string.IsNullOrWhiteSpace(SesRegion),
+            MailTransportKind.AzureCommunicationServices => AcsEndpoint is not null,
+            _ => false,
+        };
 
     /// <summary>設定の接頭辞。</summary>
     public const string Prefix = "QUESTIONNAIRE_MAIL_";
@@ -117,9 +172,14 @@ public sealed record MailOptions
             return new MailOptions();
         }
 
+        var transport = ReadTransport(configuration, Prefix + "TRANSPORT");
+
         var options = new MailOptions
         {
             Enabled = true,
+            Transport = transport,
+            SesRegion = configuration[Prefix + "SES_REGION"],
+            AcsEndpoint = ReadUri(configuration, Prefix + "ACS_ENDPOINT"),
             Host = configuration[Prefix + "SMTP_HOST"] ?? string.Empty,
             Port = ReadInt(configuration, Prefix + "SMTP_PORT", 587),
             Security = ReadSecurity(configuration, Prefix + "SMTP_SECURITY"),
@@ -132,10 +192,27 @@ public sealed record MailOptions
             Timeout = TimeSpan.FromSeconds(ReadInt(configuration, Prefix + "TIMEOUT_SECONDS", 30)),
         };
 
-        if (string.IsNullOrWhiteSpace(options.Host))
+        if (options.Transport is MailTransportKind.Smtp
+            && string.IsNullOrWhiteSpace(options.Host))
         {
             throw new InvalidOperationException(
                 $"{Prefix}ENABLED が有効なのに {Prefix}SMTP_HOST が設定されていない");
+        }
+
+        if (options.Transport is MailTransportKind.AmazonSes
+            && string.IsNullOrWhiteSpace(options.SesRegion))
+        {
+            throw new InvalidOperationException(
+                $"{Prefix}TRANSPORT=AmazonSes のときは {Prefix}SES_REGION が要る"
+                + "（例: ap-northeast-1）");
+        }
+
+        if (options.Transport is MailTransportKind.AzureCommunicationServices
+            && options.AcsEndpoint is null)
+        {
+            throw new InvalidOperationException(
+                $"{Prefix}TRANSPORT=AzureCommunicationServices のときは "
+                + $"{Prefix}ACS_ENDPOINT が要る（例: https://xxx.communication.azure.com）");
         }
 
         if (string.IsNullOrWhiteSpace(options.FromAddress))
@@ -194,6 +271,36 @@ public sealed record MailOptions
         return int.TryParse(raw, CultureInfo.InvariantCulture, out var value)
             ? value
             : throw new InvalidOperationException($"{key} は整数で指定する（今の値: {raw}）");
+    }
+
+    private static MailTransportKind ReadTransport(IConfiguration configuration, string key)
+    {
+        var raw = configuration[key];
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return MailTransportKind.Smtp;
+        }
+
+        return Enum.TryParse<MailTransportKind>(raw, ignoreCase: true, out var value)
+            ? value
+            : throw new InvalidOperationException(
+                $"{key} は Smtp / AmazonSes / AzureCommunicationServices "
+                + $"のいずれかで指定する（今の値: {raw}）");
+    }
+
+    private static Uri? ReadUri(IConfiguration configuration, string key)
+    {
+        var raw = configuration[key];
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        return Uri.TryCreate(raw, UriKind.Absolute, out var uri)
+            && uri.Scheme == Uri.UriSchemeHttps
+            ? uri
+            : throw new InvalidOperationException(
+                $"{key} は https の絶対 URL で指定する（今の値: {raw}）");
     }
 
     private static SmtpSecurity ReadSecurity(IConfiguration configuration, string key)

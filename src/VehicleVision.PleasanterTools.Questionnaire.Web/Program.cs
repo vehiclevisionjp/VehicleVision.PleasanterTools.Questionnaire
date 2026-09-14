@@ -411,7 +411,24 @@ builder.Services.AddSingleton<AdminInvitationMailer>();
 
 if (mailOptions.IsReady)
 {
-    builder.Services.AddSingleton<IMailTransport, SmtpMailTransport>();
+    // **送信経路は設定で選ぶ**（Issue #198）。
+    // ⚠️ **SES と ACS はマネージド ID で通るので、保管する秘密が 0 になる。**
+    // SMTP は必ずパスワードを 1 つ持つことになる
+    switch (mailOptions.Transport)
+    {
+        case MailTransportKind.AmazonSes:
+            builder.Services.AddSingleton<IMailTransport, SesMailTransport>();
+            break;
+
+        case MailTransportKind.AzureCommunicationServices:
+            builder.Services.AddSingleton<IMailTransport, AcsMailTransport>();
+            break;
+
+        default:
+            builder.Services.AddSingleton<IMailTransport, SmtpMailTransport>();
+            break;
+    }
+
     builder.Services.AddSingleton(MailSenderOptions.FromConfiguration(builder.Configuration));
     builder.Services.AddSingleton<MailSender>();
     builder.Services.AddHostedService<MailSenderHostedService>();
