@@ -18,8 +18,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// **メールのリンク検査（Defender 等）が先に開いた時点で本人が使えなくなる。**
 /// </para>
 /// </remarks>
-[Migration(18, "回答の再編集リンクのトークン")]
-public sealed class M0018_ResponseEditTokens : Migration
+[Migration(19, "回答の再編集リンクのトークン")]
+public sealed class M0019_ResponseEditTokens : Migration
 {
     public override void Up()
     {
