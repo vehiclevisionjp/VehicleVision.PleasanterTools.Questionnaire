@@ -44,7 +44,7 @@ Copyright (C) PMC Co.,Ltd.
 残りはビルド時だけ使う）
 
   svelte 5.57.0 / MIT / https://www.npmjs.com/package/svelte
-  vite 8.2.2 / MIT / https://www.npmjs.com/package/vite
+  vite 8.3.0 / MIT / https://www.npmjs.com/package/vite
   @sveltejs/vite-plugin-svelte 7.3.0 / MIT
   svelte-check 4.7.6 / MIT
   vitest 5.0.0 / MIT / https://www.npmjs.com/package/vitest
