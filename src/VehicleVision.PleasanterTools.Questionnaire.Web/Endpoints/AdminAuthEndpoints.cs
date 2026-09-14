@@ -73,6 +73,12 @@ public static class AdminAuthEndpoints
 
                 var role = session.Principal?.FindFirstValue(ClaimTypes.Role);
 
+            // **この人が SAML で入ったか**（Issue #191）。
+            // **IdP へログアウトを頼めるのは、SAML で入った人だけ。**
+            // ⚠️ **NameID そのものは返さない。** 画面には要らない値
+            var samlSingleLogout = saml.SingleLogoutEnabled
+                && session.Principal?.FindFirstValue(AdminAuthSchemes.SamlNameIdClaim) is { Length: > 0 };
+
                 return Results.Ok(new
                 {
                     authenticated = true,
@@ -93,6 +99,10 @@ public static class AdminAuthEndpoints
                     hasTotp,
                     samlEnabled,
                     samlLabel,
+
+                    // **IdP へログアウトを頼めるか**（Issue #191）。
+                    // 画面はこれを見て、ログアウトの行き先を決める
+                    samlSingleLogout,
 
                     // **メールを送れる状態かを画面へ返す**（Issue #189）。
                     // 自動返信を設定しただけで「送っているつもり」にさせない。
@@ -447,18 +457,36 @@ public static class AdminAuthEndpoints
     /// **招待の受け取り**（<c>AdminUserEndpoints</c>。Issue #169）と
     /// **SAML の受け口**（<c>AdminSamlEndpoints</c>。Issue #166）からも同じ形で入る。
     /// </remarks>
-    internal static async Task SignInSessionAsync(HttpContext context, AdminUser user)
+    /// <param name="samlSession">
+    /// SAML で入ったときの <c>NameID</c> と <c>SessionIndex</c>（Issue #191）。
+    /// **単一ログアウトの要求に載せるのに要る。** それ以外の入り方では <c>null</c>。
+    /// </param>
+    internal static async Task SignInSessionAsync(
+        HttpContext context, AdminUser user, SamlSessionKeys? samlSession = null)
     {
         // **途中状態は必ず消す。** 共有鍵の claim を残さない
         await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
 
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, user.AdminUserId.ToString()),
-                new Claim(ClaimTypes.Name, user.LoginId),
-                new Claim(ClaimTypes.Role, user.Role.ToString()),
-            ],
-            AdminAuthSchemes.Session);
+        List<Claim> claims =
+        [
+            new Claim(ClaimTypes.NameIdentifier, user.AdminUserId.ToString()),
+            new Claim(ClaimTypes.Name, user.LoginId),
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+        ];
+
+        // **IdP へログアウトを頼むのに要る値だけを持つ**（Issue #191）。
+        // ⚠️ **アサーション全体は残さない。** 要らないものを cookie へ入れない
+        if (samlSession is not null)
+        {
+            claims.Add(new Claim(AdminAuthSchemes.SamlNameIdClaim, samlSession.NameId));
+
+            if (!string.IsNullOrEmpty(samlSession.SessionIndex))
+            {
+                claims.Add(new Claim(AdminAuthSchemes.SamlSessionIndexClaim, samlSession.SessionIndex));
+            }
+        }
+
+        var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Session);
 
         await context.SignInAsync(
             AdminAuthSchemes.Session,
@@ -491,6 +519,20 @@ public static class AdminAuthSchemes
     /// **登録し直しの途中の cookie がログインの途中として使えないようにする**ため。
     /// </remarks>
     public const string Reenroll = "Admin.Reenroll";
+
+    /// <summary>SAML で入ったときの <c>NameID</c>（Issue #191）。</summary>
+    /// <remarks>
+    /// **単一ログアウトの要求に載せる。** IdP 側はこれで「誰を落とすか」を決める。
+    /// ⚠️ **ログイン ID と同じとは限らない**（属性から取る設定があるため）。
+    /// </remarks>
+    public const string SamlNameIdClaim = "q.saml.nameid";
+
+    /// <summary>SAML で入ったときの <c>SessionIndex</c>（Issue #191）。</summary>
+    /// <remarks>
+    /// **IdP 側の「どのログイン」かを指す。** 同じ人が複数の端末で入っているとき、
+    /// **この端末のぶんだけを落とす**のに要る。
+    /// </remarks>
+    public const string SamlSessionIndexClaim = "q.saml.sessionindex";
 
     /// <summary>ログインの試行に掛けるレート制限の名前。</summary>
     public const string LoginRateLimitPolicy = "admin-login";

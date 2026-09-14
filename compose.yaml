@@ -68,6 +68,9 @@ x-app-environment: &app-environment
     QUESTIONNAIRE_SAML_SINGLESIGNONURL: ${DEV_SAML_SSOURL:-https://localhost:8543/realms/questionnaire/protocol/saml}
     # **realm へ焼き込んだ検証用の証明書**（tools/saml-idp/realm-questionnaire.json と同じもの）
     QUESTIONNAIRE_SAML_IDPCERTIFICATE: ${DEV_SAML_IDPCERTIFICATE:-MIIDIzCCAgugAwIBAgIUHy3DB8BizZXAJOsyFseVAeZnRj0wDQYJKoZIhvcNAQELBQAwITEfMB0GA1UEAwwWcXVlc3Rpb25uYWlyZS10ZXN0LWlkcDAeFw0yNjA5MDkwMTQ1MjhaFw0zNjA5MDYwMTQ1MjhaMCExHzAdBgNVBAMMFnF1ZXN0aW9ubmFpcmUtdGVzdC1pZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFaF2Bk88oso/N3K1wzCwP966u+DaEdtCVLvnrMd69o/O4ACN629JVV/RyQbB4ur0cbbWoM2q8S8MB50cwAWX+VT6g4qR9o0X6OFaqBrXylTeIs72IzNcb6t+wiXGcOH9qYLvsVH7ISAZDcUwY4bxc/9Xl9yfFCKnCFh1DU/1IBIwiGRlSlqcIvGo6scdf+dyAfbAdy2baMLNTIrkHY1BWVviD/jjLOSQOUj9p6IE6rE4+nD9z1AcLDoMcwU1y4PncjwNRczV6xQWxHg/0ho/H2CXvGhhiC6mFuYdP2oaw6xhurBPhdc19k6FYwhTFaJieHwxG9Y0XfZXjTu0Hj+ftAgMBAAGjUzBRMB0GA1UdDgQWBBRCA/z/eFTDiZzm1jN6SaPJxau2OjAfBgNVHSMEGDAWgBRCA/z/eFTDiZzm1jN6SaPJxau2OjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBAWlKIbpNJEwOYHnvZthwm86wJWFBLaxX3TffpAjhxxGoixlFK28UjomkukSf8JJiyts/BXI/n8OsXHXSlqOqRvnxPufMwbm6NDlo8q2sPNYwk7acF97o7kPkq+9MqR1CHmeJDpDTh138dh/FKaQFi7GPUXzvIXyO6KHZKlnMapIOo3sS4L6xr13ViobgRX1XFq9tIob5rW8aRptKcW3BIWqTknd0zJbTi4QNIjWq6MO0QmDkhDqdM1gtw4AO+EuMNVLkBLdGiUnKkiEaXLHVdkppUW6nHg0PKpOhgAiQmzrU4BOiFJCj712FrfotJhKQdhD9TsCyaokoZudUhXNwF}
+    # **単一ログアウトの窓口**（Issue #191）。Keycloak は SSO と同じ URL で受ける。
+    # **未設定なら SLO を使わない**（対応していない IdP でも動くこと）
+    QUESTIONNAIRE_SAML_SINGLELOGOUTURL: ${DEV_SAML_SLOURL:-https://localhost:8543/realms/questionnaire/protocol/saml}
     QUESTIONNAIRE_SAML_UNKNOWNUSER: ${DEV_SAML_UNKNOWNUSER:-Reject}
     QUESTIONNAIRE_SAML_BUTTONLABEL: ${DEV_SAML_BUTTONLABEL:-検証用 IdP でログイン}
     # ---- メール（Issue #189）------------------------------------------------

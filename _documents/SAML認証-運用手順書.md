@@ -36,7 +36,7 @@
 | 応答の受け方 | HTTP POST Binding（`/api/admin/saml/acs`） |
 | 利用者の突き合わせ | **ログイン ID**（既定は `NameID`。属性からも取れる） |
 | 未登録の利用者 | **拒絶**（既定）か **その場で登録**（JIT）を選べる |
-| 単一ログアウト | **未対応**（本アプリのログアウトは本アプリの cookie だけを消す） |
+| 単一ログアウト | **対応**（Issue #191）。`QUESTIONNAIRE_SAML_SINGLELOGOUTURL` を設定したときだけ使う。SP 起点・IdP 起点の両方を受ける |
 
 ### やり取りの流れ
 
@@ -99,6 +99,8 @@ QUESTIONNAIRE_SAML_SINGLESIGNONURL=https://accounts.google.com/o/saml2/idp?idpid
 QUESTIONNAIRE_SAML_IDPCERTIFICATE="-----BEGIN CERTIFICATE-----
 MIID...（IdP から落とした証明書をそのまま）
 -----END CERTIFICATE-----"
+# 単一ログアウト（任意）。**設定しなければ、これまでどおり本アプリの cookie を消すだけ**
+QUESTIONNAIRE_SAML_SINGLELOGOUTURL=https://accounts.google.com/o/saml2/idp?idpid=XXXXXXXX
 QUESTIONNAIRE_SAML_UNKNOWNUSER=Reject
 QUESTIONNAIRE_SAML_BUTTONLABEL=会社アカウントでログイン
 ```
@@ -223,7 +225,9 @@ python tools/saml-idp/roundtrip.py admin@example.jp idp-test-password
 
 ## 8. まだやっていないこと
 
-- **単一ログアウト（SLO）** — 本アプリのログアウトは本アプリの cookie だけを消す
+- ~~**単一ログアウト（SLO）**~~ — **対応した**（Issue #191）。
+  ⚠️ **こちらからの要求に署名は付けない。** 署名を求める IdP と繋ぐには
+  SP の秘密鍵が要るので、**その IdP では使えない**（設定しなければ従来どおり動く）
 - **IdP 起動のログイン** — 受け取らない（上記の決めごと）
 - **`AuthnRequest` への署名** — こちらの署名用証明書を持たせていない
 - **Google Workspace そのものでの確認** — 未実施

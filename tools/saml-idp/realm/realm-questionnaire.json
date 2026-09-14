@@ -46,7 +46,8 @@
       "standardFlowEnabled": true,
       "frontchannelLogout": true,
       "redirectUris": [
-        "https://localhost:8443/api/admin/saml/acs"
+        "https://localhost:8443/api/admin/saml/acs",
+        "https://localhost:8443/api/admin/saml/slo"
       ],
       "adminUrl": "https://localhost:8443/api/admin/saml/acs",
       "baseUrl": "https://localhost:8443/admin",
@@ -58,7 +59,9 @@
         "saml.authnstatement": "true",
         "saml.force.post.binding": "true",
         "saml_name_id_format": "email",
-        "saml_force_name_id_format": "true"
+        "saml_force_name_id_format": "true",
+        "saml_single_logout_service_url_redirect": "https://localhost:8443/api/admin/saml/slo",
+        "saml_single_logout_service_url_post": "https://localhost:8443/api/admin/saml/slo"
       }
     }
   ],

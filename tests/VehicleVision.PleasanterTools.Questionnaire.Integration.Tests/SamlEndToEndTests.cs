@@ -182,6 +182,23 @@ public partial class SamlEndToEndTests
         return (assertion.Headers.Location?.ToString() ?? string.Empty, cookies);
     }
 
+    /// <summary>2 要素が要るなら出しておく。</summary>
+    /// <remarks>**必須でない構成なら何もしない。**</remarks>
+    private static async Task CompleteSecondFactorIfNeededAsync(
+        CookieContainer cookies, string secret)
+    {
+        var session = await SessionAsync(cookies);
+        if (session!["authenticated"]!.GetValue<bool>() || secret.Length == 0)
+        {
+            return;
+        }
+
+        using var http = CreateClient(cookies, followRedirects: true);
+        using var totp = await http.PostAsJsonAsync(
+            "/api/admin/login/totp", new { code = await NextCodeAsync(secret) });
+        totp.EnsureSuccessStatusCode();
+    }
+
     /// <summary>前に使ったものとは違う 2 要素のコードを待つ。</summary>
     /// <remarks>
     /// ⚠️ **同じコードは使い回せない**（30 秒の枠が変わるまで同じ値になる）。
@@ -325,6 +342,73 @@ public partial class SamlEndToEndTests
         var saml = cookies.GetAllCookies().Cast<Cookie>().Single(cookie => cookie.Name == SamlCookieName);
         Assert.True(saml.Secure, "途中を預ける cookie に Secure が付いていない");
         Assert.True(saml.HttpOnly, "途中を預ける cookie に HttpOnly が付いていない");
+    }
+
+    [Fact]
+    public async Task 単一ログアウトでIdP側も落とす()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // ⚠️ **こちらの cookie だけ消すと、IdP のセッションが残る。**
+        // 釦を押し直すだけで入り直せてしまい、共用の端末では
+        // **ログアウトしたつもりで座席を明け渡す**ことになる（Issue #191）
+        var secret = await ResetAdminAsync(KnownUser);
+        var (_, cookies) = await RoundTripAsync(KnownUser, IdpPassword);
+        await CompleteSecondFactorIfNeededAsync(cookies, secret);
+
+        // **入れていることを確かめてから落とす**
+        var before = await SessionAsync(cookies);
+        Assert.True(before!["authenticated"]!.GetValue<bool>());
+
+        using (var http = CreateClient(cookies, followRedirects: true))
+        {
+            // **SP 起点の単一ログアウト。** IdP まで往復して戻ってくる
+            using var loggedOut = await http.GetAsync("/api/admin/saml/logout");
+            loggedOut.EnsureSuccessStatusCode();
+        }
+
+        // **こちらは落ちている**
+        var after = await SessionAsync(cookies);
+        Assert.False(after!["authenticated"]!.GetValue<bool>());
+
+        // **IdP 側も落ちている。** 落ちていなければ、ログインを頼んだ時点で
+        // 画面を出さずにそのまま通してしまう（＝ログイン画面が出る＝落ちている）
+        using var stopper = CreateClient(cookies, followRedirects: false);
+        using var again = await stopper.GetAsync("/api/admin/saml/login?returnUrl=/admin");
+        var idpUrl = again.Headers.Location!.ToString();
+
+        using var idp = CreateClient(new CookieContainer(), followRedirects: true);
+        var html = await idp.GetStringAsync(idpUrl);
+
+        Assert.True(
+            LoginFormAction().IsMatch(html),
+            "IdP 側のセッションが残っていて、ログイン画面が出なかった");
+    }
+
+    [Fact]
+    public async Task 単一ログアウトの受け口は署名のない要求を通さない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **落とされること自体は害が小さい**（入られるより軽い）が、
+        // **IdP のふりをした要求に「成功」を返さない**こと
+        var cookies = new CookieContainer();
+        using var http = CreateClient(cookies, followRedirects: false);
+
+        using var response = await http.GetAsync("/api/admin/saml/slo?SAMLRequest=" + "not-a-request");
+
+        // **管理画面へ戻すだけ。** IdP へ応答を返さない
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.DoesNotContain(
+            "SAMLResponse",
+            response.Headers.Location?.ToString() ?? string.Empty,
+            StringComparison.Ordinal);
     }
 
     [Fact]
