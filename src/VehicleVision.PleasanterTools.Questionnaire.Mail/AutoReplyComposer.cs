@@ -21,10 +21,15 @@ public static class AutoReplyComposer
     /// <param name="definition">公開済みの定義。</param>
     /// <param name="payload">受け付けた回答。</param>
     /// <param name="language">回答者が使っていた言語。</param>
+    /// <param name="submittedAt">
+    /// 受け付けた日時（Issue #209）。**表示する時間帯へ直したものを渡すこと。**
+    /// 差し込み <c>{{submittedAt}}</c> に使う。**省くと現在時刻**。
+    /// </param>
     public static OutgoingMail? Compose(
         SurveyDefinition definition,
         ResponsePayload payload,
-        string? language)
+        string? language,
+        DateTimeOffset? submittedAt = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(payload);
@@ -42,7 +47,12 @@ public static class AutoReplyComposer
             return null;
         }
 
-        var subject = settings.Subject?.Get(language) ?? string.Empty;
+        // **差し込みは件名にも効かせる。** 「{{title}} へのご回答」と書けること
+        var title = definition.Title.Get(language);
+        var filledAt = submittedAt ?? DateTimeOffset.UtcNow;
+
+        var subject = MailPlaceholders.Fill(
+            settings.Subject?.Get(language) ?? string.Empty, title, filledAt);
         if (string.IsNullOrWhiteSpace(subject))
         {
             // **公開のときに弾いているはず**（AutoReplyValidator）。
@@ -50,7 +60,8 @@ public static class AutoReplyComposer
             return null;
         }
 
-        var body = new StringBuilder(settings.Body?.Get(language) ?? string.Empty);
+        var body = new StringBuilder(MailPlaceholders.Fill(
+            settings.Body?.Get(language) ?? string.Empty, title, filledAt));
 
         if (settings.IncludeAnswers)
         {
