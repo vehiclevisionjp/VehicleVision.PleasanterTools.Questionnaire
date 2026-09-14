@@ -21,6 +21,7 @@
     validateFlow,
     type FlowProblem,
   } from '../lib/flow';
+  import { autoReplyKey, validateAutoReply } from '../lib/autoReply';
   import {
     DEFAULT_LANGUAGE,
     LANGUAGE_NAMES,
@@ -30,15 +31,18 @@
   import { language, t } from '../lib/i18n/state.svelte';
   import MappingEditor from './MappingEditor.svelte';
   import QuestionEditor from './QuestionEditor.svelte';
+  import AutoReplyEditor from './AutoReplyEditor.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
   import { adminAssetUrl } from '../lib/api';
 
   interface Props {
     surveyId: string;
+    /** サーバ側でメールを送れる状態か（Issue #189）。**自動返信の欄で知らせる。** */
+    mailEnabled: boolean;
     onback: () => void;
   }
 
-  let { surveyId, onback }: Props = $props();
+  let { surveyId, mailEnabled, onback }: Props = $props();
 
   /**
     * 入力欄が書き込む言語。
@@ -102,6 +106,9 @@
    * **サーバ側の検査を緩める代わりではない。** 公開の口が改めて同じことを見る。
    */
   const flowProblems = $derived(definition ? validateFlow(definition) : []);
+
+  /** 自動返信の不備（Issue #189）。**公開して初めて弾かれると作り直しになる。** */
+  const autoReplyProblems = $derived(definition ? validateAutoReply(definition) : []);
 
   $effect(() => {
     void load(surveyId);
@@ -421,6 +428,20 @@
   </section>
 {/if}
 
+<!-- **自動返信も公開の前に出す**（Issue #189）。
+     有効にしたのに送れない設定のままだと、送ったつもりで 1 通も出ない -->
+{#if autoReplyProblems.length > 0}
+  <section class="flow-problems" role="alert">
+    <p><strong>{t('autoReply.title')}</strong> {t('autoReply.publishBlocked')}</p>
+    <ul>
+      {#each autoReplyProblems as problem, index (index)}
+        {@const key = autoReplyKey(problem.code)}
+        <li>{key ? t(key) : problem.code}</li>
+      {/each}
+    </ul>
+  </section>
+{/if}
+
 <!-- **最後に判定するのはサーバ。** 断られた理由をそのまま出す -->
 {#if publishFlow.length > 0}
   <section class="flow-problems from-server" role="alert">
@@ -531,6 +552,16 @@
     {surveyId}
     theme={definition.theme}
     onchange={(next) => (definition = { ...definition!, theme: next })}
+  />
+
+  <!-- **自動返信も定義の一部**（Issue #189）。件名と本文は公開した版で固定される。
+       ⚠️ **既定は送らない。** 明示的に有効にしたときだけ 1 通出る -->
+  <AutoReplyEditor
+    autoReply={definition.autoReply}
+    questions={definition.pages.flatMap((page) => page.questions)}
+    {editing}
+    {mailEnabled}
+    onchange={(next) => (definition = { ...definition!, autoReply: next })}
   />
 
   {#each definition.pages as page, pageIndex (page.pageId)}

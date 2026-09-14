@@ -218,6 +218,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         bool ShowProgress,
         bool AllowEditingAfterSubmit,
         string? ThemeJson,
+        string? AutoReplyJson,
         int? PublishedVersion,
         int DraftRevision);
 
@@ -412,7 +413,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         var survey = await connection.QueryFirstOrDefaultAsync<SurveyRow>(Sql(
             "SELECT [SurveyId], [TitleJson], [DescriptionJson], "
             + "       [ConfirmationMessageJson], [DisplayMode], [ShowProgress], "
-            + "       [AllowEditingAfterSubmit], [ThemeJson], [PublishedVersion], "
+            + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], "
+            + "       [PublishedVersion], "
             + "       [DraftRevision] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
@@ -523,6 +525,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             // **読んだ時点で形を検査する**（Issue #56）。DB を直接書き換えられた行や、
             // 検査を足す前に保存された行を、そのまま画面へ流さない
             Theme = ReadTheme(survey.ThemeJson),
+            // ⚠️ **列が無いと黙って落ちる。** 定義に項目を足したら、ここも足すこと
+            // （端から端まで通す試験で見つかった。Issue #189）
+            AutoReply = ReadAutoReply(survey.AutoReplyJson),
             Pages = pages
                 .Select(page => new Page
                 {
@@ -574,7 +579,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "  [ConfirmationMessageJson] = @ConfirmationMessageJson, "
             + "  [DisplayMode] = @DisplayMode, [ShowProgress] = @ShowProgress, "
             + "  [AllowEditingAfterSubmit] = @AllowEditingAfterSubmit, "
-            + "  [ThemeJson] = @ThemeJson, "
+            + "  [ThemeJson] = @ThemeJson, [AutoReplyJson] = @AutoReplyJson, "
             + "  [Title] = @Title, [UpdatedAt] = @Now "
             + "WHERE [SurveyId] = @SurveyId AND [DraftRevision] = @ExpectedRevision",
             new
@@ -588,6 +593,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 definition.ShowProgress,
                 definition.AllowEditingAfterSubmit,
                 ThemeJson = WriteTheme(definition.Theme),
+                AutoReplyJson = WriteAutoReply(definition.AutoReply),
                 // 一覧に出す用の平文。**多言語の正本は TitleJson**
                 Title = Shorten(definition.Title.Get(LocalizedText.DefaultLanguage), 512),
                 Now = DbTime.UtcNowTruncated(),
@@ -800,13 +806,14 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "   [DraftRevision], [DisplayMode], [ShowProgress], "
             + "   [AllowEditingAfterSubmit], [TitleJson], [DescriptionJson], "
-            + "   [ConfirmationMessageJson], [IsTemplate], [ThemeJson], "
+            + "   [ConfirmationMessageJson], [IsTemplate], [ThemeJson], [AutoReplyJson], "
             + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, NULL, "
             + "        0, @DisplayMode, @ShowProgress, "
             + "        @AllowEditingAfterSubmit, @TitleJson, @DescriptionJson, "
-            + "        @ConfirmationMessageJson, @IsTemplate, @ThemeJson, @Now, @Now)",
+            + "        @ConfirmationMessageJson, @IsTemplate, @ThemeJson, @AutoReplyJson, "
+            + "        @Now, @Now)",
             new
             {
                 target.SurveyId,
@@ -822,6 +829,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 DescriptionJson = WriteText(definition.Description),
                 ConfirmationMessageJson = WriteText(definition.ConfirmationMessage),
                 ThemeJson = WriteTheme(definition.Theme),
+                // **自動返信も複製に付いてくる**（文面はテンプレートの一部）
+                AutoReplyJson = WriteAutoReply(definition.AutoReply),
                 // 一覧に出す用の平文。**多言語の正本は TitleJson**
                 Title = Shorten(definition.Title.Get(LocalizedText.DefaultLanguage), 512),
                 Now = now,
@@ -1094,6 +1103,18 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         var sanitized = theme?.Sanitized();
         return sanitized is null || sanitized.IsDefault ? null : SurveyJson.Serialize(sanitized);
     }
+
+    /// <summary>自動返信を読む。**無ければ送らない。**</summary>
+    private static AutoReplySettings? ReadAutoReply(string? json) =>
+        string.IsNullOrWhiteSpace(json) ? null : SurveyJson.Deserialize<AutoReplySettings>(json);
+
+    /// <summary>自動返信を書く。**送らないなら NULL。**</summary>
+    /// <remarks>
+    /// **空の設定を持たせない**（テーマと同じ理由）。
+    /// 触っていないアンケートの版の JSON に <c>autoReply</c> が載らないようにする。
+    /// </remarks>
+    private static string? WriteAutoReply(AutoReplySettings? autoReply) =>
+        autoReply is null || !autoReply.Enabled ? null : SurveyJson.Serialize(autoReply);
 
     private static LocalizedText? ReadText(string? json) =>
         json is null ? null : SurveyJson.Deserialize<LocalizedText>(json);

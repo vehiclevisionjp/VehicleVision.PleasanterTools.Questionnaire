@@ -77,7 +77,8 @@ jobs:
         # 「起動しているアプリへ当てる」試験はこれが無いと成り立たない。
         run: |
           set -euo pipefail
-          docker compose --profile sqlserver --profile postgres up -d --wait
+          # **mail プロファイルも起こす**（Issue #189）。自動返信の通しを確かめるため
+          DEV_MAIL_ENABLED=true docker compose --profile sqlserver --profile postgres --profile mail up -d --wait
 
       - name: CodeDefiner が成功したか確かめる
         # **CodeDefiner は失敗しても終了コード 0 を返す**
@@ -145,6 +146,9 @@ jobs:
         env:
           # **設定しないと何も検証せずに緑になる。** ここがこのワークフローの肝
           QUESTIONNAIRE_INTEGRATION: "1"
+          # **自動返信メールの通しも確かめる**（Issue #189）。
+          # mail プロファイルの Mailpit が受ける。**これも設定しないと素通りする**
+          QUESTIONNAIRE_MAIL_INTEGRATION: "1"
           # 実行環境の時間帯は既定 UTC。検証環境（compose.yaml）に合わせる
           TZ: Asia/Tokyo
         # integration.yml が除外している分だけを回す（裏返しの条件）

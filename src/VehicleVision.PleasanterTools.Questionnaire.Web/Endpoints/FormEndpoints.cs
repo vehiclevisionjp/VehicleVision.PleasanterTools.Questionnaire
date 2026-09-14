@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.Features;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
 
@@ -328,8 +329,15 @@ public static class FormEndpoints
                 })
                 .ToArray();
 
+            // **回答者の言語を渡す**（Issue #189）。自動返信の文言をその言語で作る。
+            // **回答そのものには残さない**（正本 JSON は言語を持たない）
             var result = await intake.SubmitAsync(
-                publicId, responseToken, answers, attachments, cancellationToken);
+                publicId,
+                responseToken,
+                answers,
+                attachments,
+                RequestLanguage.Of(context),
+                cancellationToken);
 
             if (result.Accepted)
             {

@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/VehicleVision.PleasanterTools.Questionnaire.Core/VehicleVision.PleasanterTools.Questionnaire.Core.csproj" />
     <Project Path="src/VehicleVision.PleasanterTools.Questionnaire.Data/VehicleVision.PleasanterTools.Questionnaire.Data.csproj" />
+    <Project Path="src/VehicleVision.PleasanterTools.Questionnaire.Mail/VehicleVision.PleasanterTools.Questionnaire.Mail.csproj" />
     <Project Path="src/VehicleVision.PleasanterTools.Questionnaire.Pleasanter/VehicleVision.PleasanterTools.Questionnaire.Pleasanter.csproj" />
     <Project Path="src/VehicleVision.PleasanterTools.Questionnaire.Scripting/VehicleVision.PleasanterTools.Questionnaire.Scripting.csproj" />
     <Project Path="src/VehicleVision.PleasanterTools.Questionnaire.Web/VehicleVision.PleasanterTools.Questionnaire.Web.csproj" />
@@ -10,6 +11,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/VehicleVision.PleasanterTools.Questionnaire.Core.Tests/VehicleVision.PleasanterTools.Questionnaire.Core.Tests.csproj" />
     <Project Path="tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests.csproj" />
+    <Project Path="tests/VehicleVision.PleasanterTools.Questionnaire.Mail.Tests/VehicleVision.PleasanterTools.Questionnaire.Mail.Tests.csproj" />
     <Project Path="tests/VehicleVision.PleasanterTools.Questionnaire.Pleasanter.Tests/VehicleVision.PleasanterTools.Questionnaire.Pleasanter.Tests.csproj" />
     <Project Path="tests/VehicleVision.PleasanterTools.Questionnaire.Scripting.Tests/VehicleVision.PleasanterTools.Questionnaire.Scripting.Tests.csproj" />
     <Project Path="tests/VehicleVision.PleasanterTools.Questionnaire.Web.Tests/VehicleVision.PleasanterTools.Questionnaire.Web.Tests.csproj" />

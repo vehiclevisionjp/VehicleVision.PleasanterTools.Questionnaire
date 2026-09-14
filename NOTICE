@@ -39,6 +39,14 @@ Copyright (C) PMC Co.,Ltd.
     （Microsoft.IdentityModel.* と Newtonsoft.Json を推移的に伴う。いずれも MIT）
   Azure.Storage.Blobs 12.29.2 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
+  MailKit 4.17.0 / MIT / https://github.com/jstedfast/MailKit
+    （メールの送信。**認証付きリレーの 587 番は Azure でブロックされない**ので、
+      これ 1 本で SendGrid・Amazon SES・Azure Communication Services・
+      Microsoft 365 へ送れる。**送信先ごとの純正 SDK は足さない**）
+  MimeKit 4.17.0 / MIT / https://github.com/jstedfast/MimeKit
+    （MailKit が推移的に伴う。メールの組み立て）
+  BouncyCastle.Cryptography 2.6.2 / MIT / https://github.com/bcgit/bc-csharp
+    （MimeKit が推移的に伴う）
 
 フロントエンド（**成果物へ含まれるのは svelte のランタイム・qrcode・同梱した書体のみ。**
 残りはビルド時だけ使う）
@@ -76,7 +84,12 @@ Copyright (C) PMC Co.,Ltd.
   Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。成果物へ入るのは上記の書体）
   Keycloak 26.7.3 / Apache-2.0 / https://github.com/keycloak/keycloak
     （SAML の検証用 IdP。**別のコンテナとして立てるだけで、成果物には含まれない**）
+  Mailpit 1.31.1 / MIT / https://github.com/axllent/mailpit
+    （メールの検証用の受け。SMTP を受けて溜めるだけで外へは出さない。
+      **別のコンテナとして立てるだけで、成果物には含まれない**）
   coverlet.collector 10.0.1 / MIT
+  Microsoft.Extensions.Configuration 10.0.11 / MIT
+    （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
   Microsoft.Extensions.TimeProvider.Testing 10.9.0 / MIT
   System.Security.Cryptography.Xml 10.0.11 / MIT / https://github.com/dotnet/runtime
     （ITfoxtec.Identity.Saml2 が推移的に伴う版に既知の脆弱性があるため、

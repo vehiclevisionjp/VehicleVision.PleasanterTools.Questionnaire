@@ -831,6 +831,32 @@
     {/if}
   {/if}
 
+  <!-- **決まった形式の検証**（メールアドレス・URL）。
+       ⚠️ **`Email` にした記述式（1 行）だけが、自動返信の宛先に選べる**（Issue #189） -->
+  {#if showPattern}
+    <label>
+      {t('question.format')}
+      <select
+        value={question.settings.format ?? 'None'}
+        onchange={(event) =>
+          update({
+            settings: {
+              ...question.settings,
+              format:
+                event.currentTarget.value === 'None'
+                  ? undefined
+                  : (event.currentTarget.value as 'Email' | 'Url'),
+            },
+          })}
+      >
+        <option value="None">{t('question.formatNone')}</option>
+        <option value="Email">{t('question.formatEmail')}</option>
+        <option value="Url">{t('question.formatUrl')}</option>
+      </select>
+    </label>
+    <p class="hint">{t('question.formatHint')}</p>
+  {/if}
+
   <!-- **入力の形を正規表現で指定する**（Issue #102）。空欄は指定なし -->
   {#if showPattern}
     <label>

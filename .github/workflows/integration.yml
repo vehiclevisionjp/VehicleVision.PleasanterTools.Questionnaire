@@ -94,6 +94,19 @@ jobs:
         ports:
           - 13306:3306
 
+      # ---- メールの受け（Issue #189）----------------------------------------
+      # **SMTP を受けて溜めるだけの行き止まり。** 外へは 1 通も出ない。
+      # 受け取ったメールは HTTP API で読めるので、**「送れたつもり」ではなく
+      # 実際に届いた中身で確かめられる**（compose.yaml の mail プロファイルと同じ）
+      mailpit:
+        image: axllent/mailpit:v1.31.1
+        env:
+          TZ: Asia/Tokyo
+          MP_MAX_MESSAGES: "500"
+        ports:
+          - 1025:1025
+          - 8025:8025
+
     steps:
       - name: ソースを取得する
         uses: actions/checkout@v7
@@ -158,6 +171,9 @@ jobs:
         env:
           # **設定しないと何も検証せずに緑になる。** ここが本ワークフローの肝
           QUESTIONNAIRE_INTEGRATION: "1"
+          # **メールも実際に送って確かめる**（Issue #189）。上の mailpit が受ける。
+          # **これも設定しないと素通りする**
+          QUESTIONNAIRE_MAIL_INTEGRATION: "1"
           # 実行環境の時間帯は既定 UTC。検証環境（compose.yaml）に合わせる
           TZ: Asia/Tokyo
         # Pleasanter 本体・本アプリのコンテナが要るものは除く。

@@ -317,7 +317,11 @@
       {:else if openOutbox && canSeeOutbox}
         <OutboxStatusPanel onback={back} />
       {:else if openSurveyId}
-        <SurveyEditor surveyId={openSurveyId} onback={back} />
+        <SurveyEditor
+          surveyId={openSurveyId}
+          mailEnabled={session?.mailEnabled ?? false}
+          onback={back}
+        />
       {:else}
         <!--
           **複製は Administrator だけ**（Issue #46）。

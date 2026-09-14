@@ -70,6 +70,25 @@ x-app-environment: &app-environment
     QUESTIONNAIRE_SAML_IDPCERTIFICATE: ${DEV_SAML_IDPCERTIFICATE:-MIIDIzCCAgugAwIBAgIUHy3DB8BizZXAJOsyFseVAeZnRj0wDQYJKoZIhvcNAQELBQAwITEfMB0GA1UEAwwWcXVlc3Rpb25uYWlyZS10ZXN0LWlkcDAeFw0yNjA5MDkwMTQ1MjhaFw0zNjA5MDYwMTQ1MjhaMCExHzAdBgNVBAMMFnF1ZXN0aW9ubmFpcmUtdGVzdC1pZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFaF2Bk88oso/N3K1wzCwP966u+DaEdtCVLvnrMd69o/O4ACN629JVV/RyQbB4ur0cbbWoM2q8S8MB50cwAWX+VT6g4qR9o0X6OFaqBrXylTeIs72IzNcb6t+wiXGcOH9qYLvsVH7ISAZDcUwY4bxc/9Xl9yfFCKnCFh1DU/1IBIwiGRlSlqcIvGo6scdf+dyAfbAdy2baMLNTIrkHY1BWVviD/jjLOSQOUj9p6IE6rE4+nD9z1AcLDoMcwU1y4PncjwNRczV6xQWxHg/0ho/H2CXvGhhiC6mFuYdP2oaw6xhurBPhdc19k6FYwhTFaJieHwxG9Y0XfZXjTu0Hj+ftAgMBAAGjUzBRMB0GA1UdDgQWBBRCA/z/eFTDiZzm1jN6SaPJxau2OjAfBgNVHSMEGDAWgBRCA/z/eFTDiZzm1jN6SaPJxau2OjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBAWlKIbpNJEwOYHnvZthwm86wJWFBLaxX3TffpAjhxxGoixlFK28UjomkukSf8JJiyts/BXI/n8OsXHXSlqOqRvnxPufMwbm6NDlo8q2sPNYwk7acF97o7kPkq+9MqR1CHmeJDpDTh138dh/FKaQFi7GPUXzvIXyO6KHZKlnMapIOo3sS4L6xr13ViobgRX1XFq9tIob5rW8aRptKcW3BIWqTknd0zJbTi4QNIjWq6MO0QmDkhDqdM1gtw4AO+EuMNVLkBLdGiUnKkiEaXLHVdkppUW6nHg0PKpOhgAiQmzrU4BOiFJCj712FrfotJhKQdhD9TsCyaokoZudUhXNwF}
     QUESTIONNAIRE_SAML_UNKNOWNUSER: ${DEV_SAML_UNKNOWNUSER:-Reject}
     QUESTIONNAIRE_SAML_BUTTONLABEL: ${DEV_SAML_BUTTONLABEL:-検証用 IdP でログイン}
+    # ---- メール（Issue #189）------------------------------------------------
+    # **既定は無効。** mail profile の Mailpit と合わせて使うときだけ有効にする
+    #
+    #   DEV_MAIL_ENABLED=true docker compose --profile sqlserver --profile mail up -d --wait
+    #
+    # **Mailpit は受け取るだけで、外へは 1 通も出さない**（検証用の行き止まり）。
+    # 受け取ったメールは http://localhost:8025 と、その HTTP API で読める。
+    # ⚠️ **暗号化も認証もしない設定。** 手元の容器同士だからで、本番では必ず
+    # StartTls ＋ 認証を使うこと
+    QUESTIONNAIRE_MAIL_ENABLED: ${DEV_MAIL_ENABLED:-false}
+    QUESTIONNAIRE_MAIL_SMTP_HOST: ${DEV_MAIL_HOST:-mailpit}
+    QUESTIONNAIRE_MAIL_SMTP_PORT: ${DEV_MAIL_PORT:-1025}
+    QUESTIONNAIRE_MAIL_SMTP_SECURITY: ${DEV_MAIL_SECURITY:-None}
+    QUESTIONNAIRE_MAIL_FROM_ADDRESS: ${DEV_MAIL_FROM:-noreply@questionnaire.test}
+    QUESTIONNAIRE_MAIL_FROM_NAME: ${DEV_MAIL_FROM_NAME:-アンケート}
+    # **メールに載せる URL の起点**（招待メール）。
+    # ⚠️ **要求の Host ヘッダから組み立てない**（host header injection）。
+    # 設定が無ければ、リンクを載せるメールは送らない
+    QUESTIONNAIRE_MAIL_BASEURL: ${DEV_MAIL_BASEURL:-https://localhost:8443}
     QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN: ${DEV_LOGIN_ATTEMPTS:-2000}
     QUESTIONNAIRE_REQUESTS_PER_MIN: ${DEV_REQUESTS_PER_MIN:-6000}
     # **proof-of-work は検証環境でも効かせたままにする**（Issue #55）。
@@ -215,6 +234,37 @@ services:
 
   # ---- ウイルススキャン（オプション） ---------------------------------------
   # **既定は無効。** profile を付けたときだけ起動する。
+  # ---- 検証用のメール受け（Issue #189）---------------------------------------
+  # **SMTP を受けて溜めるだけの行き止まり。** 外へは 1 通も出ないので、
+  # 実在するアドレスを宛先にしても誰にも届かない。
+  #
+  #   DEV_MAIL_ENABLED=true docker compose --profile sqlserver --profile mail up -d --wait
+  #
+  # | 役割 | URL |
+  # | --- | --- |
+  # | 受け取ったメールを見る | http://localhost:8025 |
+  # | 試験から読む HTTP API | http://localhost:8025/api/v1/messages |
+  #
+  # **Mailpit は MIT。別のコンテナとして立てるだけで、成果物には含まれない**
+  # （Keycloak と同じ扱い。NOTICE に計上してある）
+  mailpit:
+    image: axllent/mailpit:v1.31.1
+    profiles: ["mail"]
+    environment:
+      TZ: Asia/Tokyo
+      # **溜めっぱなしにしない。** 試験を回すほど溜まる
+      MP_MAX_MESSAGES: "500"
+    ports:
+      - "${DEV_MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${DEV_MAILPIT_UI_PORT:-8025}:8025"
+    healthcheck:
+      # **Mailpit 自身が持っている検査を使う**（容器に curl が無い）
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   # Azure App Service では**サイドカーコンテナ**として同じ形で動かす
   # （_documents/添付ファイル検査-運用手順書.md）。
   # **ClamAV は GPL-2.0。本アプリのイメージへ同梱しない**（別プロセスとして接続する）

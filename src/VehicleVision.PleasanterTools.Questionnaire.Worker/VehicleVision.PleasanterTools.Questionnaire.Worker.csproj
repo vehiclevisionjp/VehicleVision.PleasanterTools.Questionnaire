@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Core\VehicleVision.PleasanterTools.Questionnaire.Core.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Data\VehicleVision.PleasanterTools.Questionnaire.Data.csproj" />
+    <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Mail\VehicleVision.PleasanterTools.Questionnaire.Mail.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Pleasanter\VehicleVision.PleasanterTools.Questionnaire.Pleasanter.csproj" />
   </ItemGroup>
 

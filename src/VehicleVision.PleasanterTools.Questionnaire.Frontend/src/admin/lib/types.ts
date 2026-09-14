@@ -209,6 +209,14 @@ export interface QuestionSettings {
   minSelections?: number;
   maxSelections?: number;
   /**
+   * 入力の形式（記述式・段落だけ）。
+   *
+   * **サーバ側と回答画面には元からあったが、管理画面から設定できなかった**
+   * （Issue #189 で気付いて足した）。
+   * **`Email` にした記述式（1 行）だけが、自動返信の宛先に選べる。**
+   */
+  format?: 'None' | 'Email' | 'Url';
+  /**
    * 入力の形式を正規表現で確かめる（Issue #102）。
    *
    * **値の全体が合うかを見る。** 前後は暗黙に固定される。
@@ -298,6 +306,26 @@ export interface Page {
   shuffleQuestions?: boolean;
 }
 
+/**
+ * 回答者への自動返信メール（Issue #189）。
+ *
+ * ⚠️ **既定は送らない。** 完全匿名が前提のアプリで、回答者のメールアドレスを扱う
+ * 唯一の機能なので、明示的に有効にしたときだけ送る。
+ *
+ * **宛先はメールアドレス形式の設問への回答から採る。**
+ * アンケートに宛先を書く欄が無ければ送りようが無く、勝手に集める経路も作らない。
+ */
+export interface AutoReplySettings {
+  enabled: boolean;
+  /** 宛先にする設問。**メールアドレス形式の記述式（1 行）に限る。** */
+  toQuestionId?: string | null;
+  subject?: LocalizedText;
+  /** 本文。**平文。** 書式は持たない。 */
+  body?: LocalizedText;
+  /** 本文のあとに回答の写しを付けるか。**既定は付けない。** */
+  includeAnswers?: boolean;
+}
+
 export interface SurveyDefinition {
   surveyId: string;
   version: number;
@@ -314,6 +342,12 @@ export interface SurveyDefinition {
    * （`lib/theme.ts`）。2 か所に持つと片方だけ緩んでも気付けない。
    */
   theme?: SurveyTheme | null;
+  /**
+   * 回答者への自動返信メール（Issue #189）。
+   *
+   * **無ければ送らない。** 件名と本文は定義の一部なので、**公開した版で固定される。**
+   */
+  autoReply?: AutoReplySettings | null;
   pages: Page[];
 }
 
@@ -555,6 +589,13 @@ export interface IssuedInvitation {
   adminUserId: string;
   invitationToken: string;
   expiresAt: string;
+  /**
+   * 招待のメールを積めたか（Issue #189）。
+   *
+   * **送れていなければ、下に出ている URL を手で渡す必要がある。**
+   * メールの設定が無い・ログイン ID がメールアドレスでない場合は送られない。
+   */
+  mailSent?: boolean;
 }
 
 export interface AdminSession {
@@ -586,6 +627,14 @@ export interface AdminSession {
 
   /** SAML の釦に出す文字。`null` なら決まった文言を使う */
   samlLabel?: string | null;
+
+  /**
+   * サーバ側でメールを送れる状態か（Issue #189）。
+   *
+   * **自動返信を設定しただけで「送っているつもり」にさせないためのもの。**
+   * 接続先も資格情報も返らない。**認証済みのときだけ載る。**
+   */
+  mailEnabled?: boolean;
 
   /**
    * 利用者ごとの表示言語。`null` は「まだ選んでいない」。

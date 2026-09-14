@@ -92,6 +92,15 @@ public static class ServerMessageKeys
     /// <summary>設問の設定が矛盾していて公開できない（Issue #101）。</summary>
     public const string PublishBlockedBySettings = "surveys.publishBlockedBySettings";
 
+    /// <summary>招待メールの件名（Issue #189）。</summary>
+    public const string InvitationMailSubject = "invitation.mail.subject";
+
+    /// <summary>招待メールの本文（Issue #189）。**{0} が URL、{1} が期限。**</summary>
+    public const string InvitationMailBody = "invitation.mail.body";
+
+    /// <summary>自動返信の設定が送れる形になっていなくて公開できない（Issue #189）。</summary>
+    public const string PublishBlockedByAutoReply = "surveys.publishBlockedByAutoReply";
+
     public const string NotPublishedYet = "surveys.notPublishedYet";
 
     /// <summary>その版は既にある。**同時に 2 人が公開を押した場合など。**</summary>

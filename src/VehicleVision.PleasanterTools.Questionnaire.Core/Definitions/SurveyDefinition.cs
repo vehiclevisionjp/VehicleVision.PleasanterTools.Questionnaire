@@ -46,6 +46,14 @@ public sealed record SurveyDefinition
     /// </remarks>
     public SurveyTheme? Theme { get; init; }
 
+    /// <summary>回答者への自動返信メール（Issue #189）。**<c>null</c> なら送らない。**</summary>
+    /// <remarks>
+    /// **<c>null</c> を「送らない」の意味で残す**（<see cref="Theme"/> と同じ理由）。
+    /// 空の <see cref="AutoReplySettings"/> を既定にすると、一度も触っていない定義の
+    /// JSON にも <c>autoReply</c> が載り、**公開済みの版の JSON が版ごとに変わる。**
+    /// </remarks>
+    public AutoReplySettings? AutoReply { get; init; }
+
     /// <summary>全ページの設問を順に返す。</summary>
     public IEnumerable<Question> AllQuestions => Pages.SelectMany(page => page.Questions);
 

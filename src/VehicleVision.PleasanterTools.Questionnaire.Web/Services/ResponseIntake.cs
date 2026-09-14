@@ -109,7 +109,8 @@ public sealed class ResponseIntake(
     ResponseBacklogGuard? backlog = null,
     IAttachmentRejectionStore? rejections = null,
     ILogger<ResponseIntake>? logger = null,
-    IAdminNotificationStore? notifications = null)
+    IAdminNotificationStore? notifications = null,
+    AutoReplyDispatcher? autoReply = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -228,12 +229,17 @@ public sealed class ResponseIntake(
     /// （<c>_documents/添付ファイル検査-運用手順書.md</c> 7 章）。
     /// 保存してからでは未検査のバイナリが DB に載る。
     /// </param>
+    /// <param name="language">
+    /// 回答者が使っていた言語。**自動返信メールの文言を選ぶのに使う**（Issue #189）。
+    /// **回答そのものには残さない**（正本 JSON は言語を持たない）。
+    /// </param>
     /// <param name="cancellationToken">中断。</param>
     public async Task<IntakeResult> SubmitAsync(
         string publicId,
         string responseToken,
         IReadOnlyCollection<Answer> answers,
         IReadOnlyList<AnsweredAttachment>? attachments = null,
+        string? language = null,
         CancellationToken cancellationToken = default)
     {
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
@@ -337,6 +343,19 @@ public sealed class ResponseIntake(
         await outbox
             .SaveAsync(responseToken, survey.SurveyId, version, payload.ToJson(), cancellationToken)
             .ConfigureAwait(false);
+
+        // **自動返信は、受付が確定してから積む**（Issue #189）。
+        // ⚠️ **ここで失敗しても受付の結果を変えない。** 回答は既に送信待ちへ入っており、
+        // 知らせを積めなかったことを理由に「送れませんでした」と返してはいけない。
+        //
+        // **新規の回答だけ。** 編集のたびに送ると、直すたびに同じ知らせが届く
+        if (isNewResponse && autoReply is not null)
+        {
+            await autoReply
+                .TryEnqueueAsync(
+                    survey.SurveyId, snapshot.Definition, payload, language, cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         // **書けた後で数える。** 断られた回答を滞留に数えない。
         // **同じトークンの上書きも 1 件として数えてしまう**が、
