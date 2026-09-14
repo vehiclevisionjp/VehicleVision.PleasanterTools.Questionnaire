@@ -9,8 +9,18 @@
 - 使っているライブラリ: [ITfoxtec.Identity.Saml2](https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2)
   4.20.1（BSD-3-Clause。2026-09-09 参照）
 
-> **手元の IdP（Keycloak）で往復を通してあります**（2026-09-09）。
-> 起こし方と確かめ方は [`tools/saml-idp/README.md`](../tools/saml-idp/README.md)。
+> **往復は CI で毎回確かめています**（Issue #190）。検証用の IdP（Keycloak）を
+> `compose.yaml` の `saml` プロファイルで起こし、`SamlEndToEndTests` が
+> **SP → IdP → SP の往復を通します。** 手元で確かめる手順は
+> [`tools/saml-idp/README.md`](../tools/saml-idp/README.md)。
+>
+> **機械で押さえているのは 5 つ。**
+>
+> - 本アプリに居る人が IdP 経由で入れる
+> - **本アプリに居ない人は拒絶される**（既定の `Reject`）
+> - ⚠️ **2 要素が必須なら、SAML で来ても省略しない**
+> - 途中を預ける cookie に `Secure` と `HttpOnly` が付く
+> - 応答が無い要求では入れない
 >
 > ⚠️ **ただし Google Workspace そのものでは未検証です。**
 > プロトコルの往復（署名の検証・`InResponseTo`・NameID の読み取り）は確かめましたが、

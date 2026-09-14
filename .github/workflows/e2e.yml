@@ -78,7 +78,8 @@ jobs:
         run: |
           set -euo pipefail
           # **mail プロファイルも起こす**（Issue #189）。自動返信の通しを確かめるため
-          DEV_MAIL_ENABLED=true docker compose --profile sqlserver --profile postgres --profile mail up -d --wait
+          # **saml プロファイルも起こす**（Issue #190）。SAML の往復を確かめるため
+          DEV_MAIL_ENABLED=true DEV_SAML_ENABLED=true docker compose --profile sqlserver --profile postgres --profile mail --profile saml up -d --wait
 
       - name: CodeDefiner が成功したか確かめる
         # **CodeDefiner は失敗しても終了コード 0 を返す**
@@ -149,6 +150,9 @@ jobs:
           # **自動返信メールの通しも確かめる**（Issue #189）。
           # mail プロファイルの Mailpit が受ける。**これも設定しないと素通りする**
           QUESTIONNAIRE_MAIL_INTEGRATION: "1"
+          # **SAML の往復も確かめる**（Issue #190）。saml プロファイルの Keycloak が相手。
+          # **これも設定しないと素通りする**
+          QUESTIONNAIRE_SAML_INTEGRATION: "1"
           # 実行環境の時間帯は既定 UTC。検証環境（compose.yaml）に合わせる
           TZ: Asia/Tokyo
         # integration.yml が除外している分だけを回す（裏返しの条件）
