@@ -638,6 +638,14 @@ export interface AdminSession {
   samlLabel?: string | null;
 
   /**
+   * IdP へログアウトを頼めるか（Issue #191）。
+   *
+   * **SAML で入った人で、かつ IdP の単一ログアウトが設定されているときだけ真。**
+   * 真なら、ログアウトは `/api/admin/saml/logout` へ行く（IdP 側も落とす）。
+   */
+  samlSingleLogout?: boolean;
+
+  /**
    * サーバ側でメールを送れる状態か（Issue #189）。
    *
    * **自動返信を設定しただけで「送っているつもり」にさせないためのもの。**

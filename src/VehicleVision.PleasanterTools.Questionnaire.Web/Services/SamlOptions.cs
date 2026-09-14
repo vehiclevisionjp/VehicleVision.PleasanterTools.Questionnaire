@@ -58,6 +58,9 @@ public sealed class SamlOptions
     public const string LoginIdClaimKey = "QUESTIONNAIRE_SAML_LOGINIDCLAIM";
     public const string ButtonLabelKey = "QUESTIONNAIRE_SAML_BUTTONLABEL";
 
+    /// <summary>IdP の単一ログアウトの窓口（Issue #191）。**未設定なら SLO は使わない。**</summary>
+    public const string SingleLogoutUrlKey = "QUESTIONNAIRE_SAML_SINGLELOGOUTURL";
+
     /// <summary>SAML でのログインを使うか。**既定は使わない。**</summary>
     public bool Enabled { get; init; }
 
@@ -72,6 +75,24 @@ public sealed class SamlOptions
 
     /// <summary>IdP の署名証明書。**入れ替えの最中は 2 枚とも並べられる。**</summary>
     public ImmutableArray<X509Certificate2> IdpCertificates { get; init; } = [];
+
+    /// <summary>IdP の単一ログアウトの窓口（Issue #191）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **未設定なら単一ログアウトを使わない。** ログアウトは本アプリの cookie を
+    /// 消すだけになる（これまでどおり）。**SLO に対応していない IdP でも動くこと。**
+    /// </para>
+    /// <para>
+    /// ⚠️ **こちらからの要求に署名は付けない。** 署名を求める IdP と繋ぐには
+    /// SP の秘密鍵を持つ必要があり、**鍵をもう 1 本増やすかどうかは別の判断**
+    /// （検証用の Keycloak は <c>saml.client.signature = false</c> で求めていない）。
+    /// **IdP から来る要求と応答の署名は必ず確かめる。**
+    /// </para>
+    /// </remarks>
+    public Uri? SingleLogoutUrl { get; init; }
+
+    /// <summary>単一ログアウトを使うか。</summary>
+    public bool SingleLogoutEnabled => Enabled && SingleLogoutUrl is not null;
 
     /// <summary>本アプリに居ない利用者の扱い。**既定は通さない。**</summary>
     public SamlUnknownUserPolicy UnknownUser { get; init; } = SamlUnknownUserPolicy.Reject;
@@ -133,6 +154,18 @@ public sealed class SamlOptions
                 $"{SingleSignOnUrlKey} は http(s) の絶対 URL で書いてください: {singleSignOnUrl}");
         }
 
+        // **単一ログアウトは任意**（Issue #191）。**未設定でも SAML は使える**
+        var singleLogoutUrl = Trim(configuration[SingleLogoutUrlKey]);
+        Uri? sloUri = null;
+
+        if (singleLogoutUrl.Length > 0
+            && (!Uri.TryCreate(singleLogoutUrl, UriKind.Absolute, out sloUri)
+                || (sloUri.Scheme != Uri.UriSchemeHttps && sloUri.Scheme != Uri.UriSchemeHttp)))
+        {
+            throw new InvalidOperationException(
+                $"{SingleLogoutUrlKey} は http(s) の絶対 URL で書いてください: {singleLogoutUrl}");
+        }
+
         var loginIdSource = ParseEnum<SamlLoginIdSource>(configuration[LoginIdSourceKey], LoginIdSourceKey)
             ?? SamlLoginIdSource.NameId;
         var loginIdClaim = Trim(configuration[LoginIdClaimKey]);
@@ -149,6 +182,7 @@ public sealed class SamlOptions
             EntityId = entityId,
             IdpEntityId = idpEntityId,
             SingleSignOnUrl = ssoUri,
+            SingleLogoutUrl = sloUri,
             IdpCertificates = certificates,
             UnknownUser = ParseEnum<SamlUnknownUserPolicy>(configuration[UnknownUserKey], UnknownUserKey)
                 ?? SamlUnknownUserPolicy.Reject,
@@ -180,6 +214,9 @@ public sealed class SamlOptions
         {
             Issuer = EntityId,
             SingleSignOnDestination = SingleSignOnUrl,
+
+            // **単一ログアウトの宛先**（Issue #191）。未設定なら null のまま
+            SingleLogoutDestination = SingleLogoutUrl,
 
             // **発行者を固定する。** 別の IdP が署名した応答を受け取らない
             AllowedIssuer = IdpEntityId,

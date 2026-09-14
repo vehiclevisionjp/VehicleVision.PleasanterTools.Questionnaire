@@ -170,7 +170,21 @@
     await saveLanguage(next);
   }
 
+  /**
+   * ログアウトする。
+   *
+   * ⚠️ **SAML で入った人は、IdP 側も落とす**（Issue #191）。
+   * こちらの cookie だけ消すと、**IdP のセッションが残っているので釦を押し直すだけで
+   * 入り直せてしまう。** 共用の端末だとログアウトしたつもりで座席を明け渡すことになる。
+   *
+   * **行き先はサーバが決める**（`samlSingleLogout`）。画面は行くだけ。
+   */
   async function signOut() {
+    if (session?.samlSingleLogout) {
+      window.location.href = '/api/admin/saml/logout';
+      return;
+    }
+
     await logout();
     openSurveyId = null;
     openAuditLog = false;

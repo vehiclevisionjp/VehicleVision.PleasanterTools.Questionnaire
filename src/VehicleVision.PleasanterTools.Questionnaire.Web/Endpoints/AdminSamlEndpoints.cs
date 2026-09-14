@@ -1,10 +1,12 @@
 using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens.Saml2;
 using ITfoxtec.Identity.Saml2;
 using ITfoxtec.Identity.Saml2.Claims;
 using ITfoxtec.Identity.Saml2.Cryptography;
 using ITfoxtec.Identity.Saml2.MvcCore;
 using ITfoxtec.Identity.Saml2.Schemas;
 using ITfoxtec.Identity.Saml2.Schemas.Metadata;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -200,7 +202,9 @@ public static class AdminSamlEndpoints
             switch (result.Outcome)
             {
                 case SamlSignInOutcome.SignedIn:
-                    await AdminAuthEndpoints.SignInSessionAsync(context, result.User!)
+                    // **単一ログアウトに要る手掛かりだけを預ける**（Issue #191）
+                    await AdminAuthEndpoints.SignInSessionAsync(
+                        context, result.User!, ReadSessionKeys(response.ClaimsIdentity))
                         .ConfigureAwait(false);
                     return Results.Redirect(relay.ReturnUrl);
 
@@ -220,7 +224,190 @@ public static class AdminSamlEndpoints
             }
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
+        MapSingleLogout(group);
+
         return builder;
+    }
+
+    /// <summary>単一ログアウト（Issue #191）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **SP 起点と IdP 起点の両方を受ける。** 受け口は 1 つで、
+    /// 来たものが要求（<c>SAMLRequest</c>）か応答（<c>SAMLResponse</c>）かで分ける。
+    /// </para>
+    /// <para>
+    /// ⚠️ **本アプリの cookie は必ず先に消す。** IdP との往復が途中で切れても、
+    /// **こちら側が入れたままになるのが一番まずい。**
+    /// </para>
+    /// <para>
+    /// **SLO を設定していなければ、頼む相手が居ないだけ。**
+    /// 対応していない IdP では、これまでどおり cookie を消して終わる。
+    /// </para>
+    /// </remarks>
+    private static void MapSingleLogout(RouteGroupBuilder group)
+    {
+        // ---- SP 起点：IdP へログアウトを頼む ---------------------------------
+        group.MapGet("/logout", async (
+            HttpContext context,
+            SamlOptions options,
+            IDataProtectionProvider protectionProvider,
+            ILogger<SamlAuthenticator> logger) =>
+        {
+            var keys = ReadSessionKeys(context.User.Identity as ClaimsIdentity);
+
+            // ⚠️ **先に落とす。** IdP へ行けなくても、こちらは確実にログアウトする
+            await context.SignOutAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
+            await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+
+            if (!options.SingleLogoutEnabled || keys is null)
+            {
+                // **SAML で入った人でなければ、頼む相手が居ない**
+                return Results.Redirect(DefaultReturnUrl);
+            }
+
+            var configuration = options.ToSaml2Configuration();
+            var request = new Saml2LogoutRequest(configuration)
+            {
+                Destination = options.SingleLogoutUrl,
+                NameId = new Saml2NameIdentifier(keys.NameId),
+                SessionIndex = keys.SessionIndex,
+            };
+
+            var binding = new Saml2RedirectBinding();
+            binding.Bind(request);
+
+            // **出した要求の id を預ける。** 戻ってきた応答と突き合わせる
+            SaveRelay(context, protectionProvider, request.IdAsString, DefaultReturnUrl);
+
+            logger.LogInformation("IdP へ単一ログアウトを頼みました。");
+
+            return Results.Redirect(binding.RedirectLocation.OriginalString);
+        }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+
+        // ---- IdP 起点と、頼んだぶんの返事 ------------------------------------
+        var slo = async (
+            HttpContext context,
+            SamlOptions options,
+            IDataProtectionProvider protectionProvider,
+            ILogger<SamlAuthenticator> logger) =>
+        {
+            // ⚠️ **署名を確かめる前に落とす。** 偽の要求で落とされても
+            // 「ログアウトさせられる」だけで、入られるより軽い
+            await context.SignOutAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
+            await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+
+            if (!options.SingleLogoutEnabled)
+            {
+                return Results.NotFound();
+            }
+
+            var configuration = options.ToSaml2Configuration();
+            var httpRequest = context.Request.ToGenericHttpRequest(validate: true);
+
+            if (IsLogoutResponse(context))
+            {
+                var relay = ReadRelay(context, protectionProvider);
+                ClearRelay(context);
+
+                try
+                {
+                    var response = new Saml2LogoutResponse(configuration);
+                    httpRequest.Binding.Unbind(httpRequest, response);
+
+                    // **こちらが出した要求への応答であることを確かめる**
+                    if (relay is null
+                        || !string.Equals(
+                            response.InResponseToAsString, relay.RequestId, StringComparison.Ordinal))
+                    {
+                        logger.LogWarning(
+                            "単一ログアウトの応答が、こちらの出した要求のものではありませんでした。");
+                    }
+                }
+                catch (Exception exception) when (IsSamlFailure(exception))
+                {
+                    logger.LogWarning(exception, "単一ログアウトの応答を受け取れませんでした。");
+                }
+
+                // **どちらにせよ、こちらは落ちている**
+                return Results.Redirect(DefaultReturnUrl);
+            }
+
+            try
+            {
+                var request = new Saml2LogoutRequest(configuration);
+
+                // **署名・発行者を確かめるのはここ**
+                httpRequest.Binding.Unbind(httpRequest, request);
+
+                var response = new Saml2LogoutResponse(configuration)
+                {
+                    InResponseTo = request.Id,
+                    Status = Saml2StatusCodes.Success,
+                    Destination = options.SingleLogoutUrl,
+                };
+
+                var binding = new Saml2RedirectBinding();
+                binding.Bind(response);
+
+                logger.LogInformation("IdP からの単一ログアウトを受け取りました。");
+
+                return Results.Redirect(binding.RedirectLocation.OriginalString);
+            }
+            catch (Exception exception) when (IsSamlFailure(exception))
+            {
+                // **理由は外へ返さない**（ログインの受け口と同じ）
+                logger.LogWarning(exception, "単一ログアウトの要求を受け取れませんでした。");
+                return Results.Redirect(DefaultReturnUrl);
+            }
+        };
+
+        group.MapGet("/slo", slo).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+        group.MapPost("/slo", slo).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+    }
+
+    /// <summary>来たものが「頼んだぶんの返事」か。</summary>
+    private static bool IsLogoutResponse(HttpContext context)
+    {
+        if (context.Request.Query.ContainsKey("SAMLResponse"))
+        {
+            return true;
+        }
+
+        return context.Request.HasFormContentType
+            && context.Request.Form.ContainsKey("SAMLResponse");
+    }
+
+    /// <summary>SAML のやり取りで「受け取れなかった」を表す失敗か。</summary>
+    private static bool IsSamlFailure(Exception exception) =>
+        exception is Saml2RequestException
+            or Saml2BindingException
+            or InvalidSignatureException
+            or InvalidOperationException
+            or ArgumentException
+            or FormatException;
+
+    /// <summary>単一ログアウトに要る手掛かりを取り出す（Issue #191）。</summary>
+    /// <remarks>**<c>NameID</c> が無ければ頼めない。** その場合は <c>null</c>。</remarks>
+    private static SamlSessionKeys? ReadSessionKeys(ClaimsIdentity? identity)
+    {
+        if (identity is null)
+        {
+            return null;
+        }
+
+        var nameId = identity.FindFirst(AdminAuthSchemes.SamlNameIdClaim)?.Value
+            ?? identity.FindFirst(Saml2ClaimTypes.NameId)?.Value
+            ?? identity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrWhiteSpace(nameId))
+        {
+            return null;
+        }
+
+        var sessionIndex = identity.FindFirst(AdminAuthSchemes.SamlSessionIndexClaim)?.Value
+            ?? identity.FindFirst(Saml2ClaimTypes.SessionIndex)?.Value;
+
+        return new SamlSessionKeys(nameId, sessionIndex);
     }
 
     /// <summary>失敗の印を付けて管理画面へ戻す。</summary>
