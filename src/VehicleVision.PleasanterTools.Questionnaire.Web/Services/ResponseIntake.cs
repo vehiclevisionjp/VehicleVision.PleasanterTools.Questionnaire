@@ -353,7 +353,15 @@ public sealed class ResponseIntake(
         {
             await autoReply
                 .TryEnqueueAsync(
-                    survey.SurveyId, snapshot.Definition, payload, language, cancellationToken)
+                    survey.SurveyId,
+                    snapshot.Definition,
+                    payload,
+                    language,
+                    cancellationToken,
+                    // **再編集リンクの URL と期限に要る**（Issue #202）。
+                    // **期限は受付の終了を超えない**
+                    publicId: survey.PublicId,
+                    acceptTo: survey.AcceptTo)
                 .ConfigureAwait(false);
         }
 

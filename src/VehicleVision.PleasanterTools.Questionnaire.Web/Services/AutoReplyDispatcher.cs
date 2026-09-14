@@ -6,6 +6,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -32,6 +33,7 @@ public sealed class AutoReplyDispatcher(
     MailOptions options,
     ILogger<AutoReplyDispatcher> logger,
     PleasanterOptions? pleasanter = null,
+    IResponseEditTokenStore? editTokens = null,
     TimeProvider? timeProvider = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -71,12 +73,20 @@ public sealed class AutoReplyDispatcher(
     /// <param name="payload">受け付けた回答。</param>
     /// <param name="language">回答者が使っていた言語。</param>
     /// <param name="cancellationToken">中断。</param>
+    /// <param name="publicId">
+    /// アンケートの公開 ID（Issue #202）。**再編集リンクの URL に要る。**
+    /// </param>
+    /// <param name="acceptTo">
+    /// 受付の終了日時（Issue #202）。**リンクの期限はこれを超えない。**
+    /// </param>
     public async Task<bool> TryEnqueueAsync(
         Guid surveyId,
         SurveyDefinition definition,
         ResponsePayload payload,
         string? language,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? publicId = null,
+        DateTime? acceptTo = null)
     {
         if (definition.AutoReply?.Enabled is not true)
         {
@@ -102,6 +112,11 @@ public sealed class AutoReplyDispatcher(
                 return false;
             }
 
+            // **再編集リンクを付ける**（Issue #202）。
+            // ⚠️ **回答本体のトークンは載せない。** 専用のトークンを 1 本発行する
+            mail = await WithEditLinkAsync(mail, definition, payload, publicId, surveyId, acceptTo, language, cancellationToken)
+                .ConfigureAwait(false);
+
             // ⚠️ **ここで初めて暗号化する。** 平文のまま DB へ渡る経路を作らない
             return await outbox.EnqueueAsync(
                 MailIdOf(payload.Token),
@@ -116,6 +131,73 @@ public sealed class AutoReplyDispatcher(
             logger.LogError(exception, "自動返信メールを積めなかった。受付の結果は変えない");
             return false;
         }
+    }
+
+    /// <summary>本文の後ろへ再編集リンクを足す（Issue #202）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **付けられないなら、黙って付けずに送る。** リンクが無いだけで、
+    /// 「受け付けた」という知らせそのものは届けたい。
+    /// </para>
+    /// <para>
+    /// ⚠️ **期限は受付の終了を超えない。** 受け付けていない期間に開いても直せないので、
+    /// **開けるのに直せないリンク**を送らない。
+    /// </para>
+    /// </remarks>
+    private async Task<OutgoingMail> WithEditLinkAsync(
+        OutgoingMail mail,
+        SurveyDefinition definition,
+        ResponsePayload payload,
+        string? publicId,
+        Guid surveyId,
+        DateTime? acceptTo,
+        string? language,
+        CancellationToken cancellationToken)
+    {
+        if (definition.AutoReply?.IncludeEditLink is not true
+            || !definition.AllowEditingAfterSubmit
+            || editTokens is null
+            || string.IsNullOrWhiteSpace(publicId))
+        {
+            return mail;
+        }
+
+        if (options.BaseUrl is not { Length: > 0 } baseUrl)
+        {
+            // ⚠️ **要求の Host からは作らない**（host header injection。Issue #189）
+            logger.LogWarning(
+                "再編集リンクを付けられない（{Key}BASEURL が未設定）", MailOptions.Prefix);
+            return mail;
+        }
+
+        var expiresAt = _time.GetUtcNow().UtcDateTime.AddDays(definition.AutoReply.EditLinkDays);
+
+        // **受付の終了を超えない**
+        if (acceptTo is { } until && until < expiresAt)
+        {
+            expiresAt = until;
+        }
+
+        if (expiresAt <= _time.GetUtcNow().UtcDateTime)
+        {
+            // 既に受付が終わっている。**開いても直せないので付けない**
+            return mail;
+        }
+
+        var token = ResponseEditLink.Create();
+        await editTokens
+            .SaveAsync(
+                ResponseEditLink.HashOf(token), payload.Token, surveyId, expiresAt, cancellationToken)
+            .ConfigureAwait(false);
+
+        var url = ResponseEditLink.UrlOf(baseUrl, publicId, token);
+
+        var label = ServerMessages.Get(
+            ServerMessageKeys.EditLinkMailNote,
+            language,
+            expiresAt.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture));
+
+        return mail with { Body = mail.Body + Environment.NewLine + Environment.NewLine + label + Environment.NewLine + url };
     }
 
     /// <summary>回答トークンから、送信待ちの識別子を決める。</summary>

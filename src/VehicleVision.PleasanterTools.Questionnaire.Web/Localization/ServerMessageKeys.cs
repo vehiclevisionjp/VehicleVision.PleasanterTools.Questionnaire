@@ -92,6 +92,9 @@ public static class ServerMessageKeys
     /// <summary>設問の設定が矛盾していて公開できない（Issue #101）。</summary>
     public const string PublishBlockedBySettings = "surveys.publishBlockedBySettings";
 
+    /// <summary>再編集リンクの添え書き（Issue #202）。**{0} が期限。**</summary>
+    public const string EditLinkMailNote = "editLink.mail.note";
+
     /// <summary>招待メールの件名（Issue #189）。</summary>
     public const string InvitationMailSubject = "invitation.mail.subject";
 

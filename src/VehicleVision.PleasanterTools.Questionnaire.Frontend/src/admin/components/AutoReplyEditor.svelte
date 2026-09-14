@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { revokeEditLinks } from '../lib/api';
   import { t } from '../lib/i18n/state.svelte';
   import { text, withText, type AutoReplySettings, type Question } from '../lib/types';
   import type { Language } from '../../lib/i18n/language';
@@ -15,6 +16,10 @@
    * **保存は編集画面がまとめて行う。** ここは定義の `autoReply` を書き換えるだけ。
    */
   interface Props {
+    /** このアンケート。**再編集リンクの一括失効に要る**（Issue #202）。 */
+    surveyId: string;
+    /** 回答の編集を許しているか。**許していなければ再編集リンクは付けられない。** */
+    allowEditing: boolean;
     /** 今の設定。**無ければ送らない。** */
     autoReply: AutoReplySettings | null | undefined;
     /** 全ページの設問。**宛先に選べるものを絞るのに使う。** */
@@ -26,7 +31,21 @@
     onchange: (next: AutoReplySettings | null) => void;
   }
 
-  let { autoReply, questions, editing, mailEnabled, onchange }: Props = $props();
+  let { surveyId, allowEditing, autoReply, questions, editing, mailEnabled, onchange }: Props =
+    $props();
+
+  /** 一括失効の結果。**押したことが分かるように出す。** */
+  let revoked = $state('');
+  let revoking = $state(false);
+
+  async function revoke() {
+    revoking = true;
+    const result = await revokeEditLinks(surveyId);
+    revoking = false;
+    revoked = result.ok
+      ? t('autoReply.revokeEditLinksDone', { count: result.value.revoked })
+      : result.message;
+  }
 
   /**
    * 宛先に選べる設問。
@@ -173,6 +192,44 @@
     </label>
     <!-- ⚠️ **回答の中身がメールとして外へ出る。** 押す前に読めるところへ置く -->
     <p class="hint">{t('autoReply.includeAnswersHint')}</p>
+
+    <!-- **回答を直すためのリンク**（Issue #202）。
+         ⚠️ **リンクを持つ人は書き換えられる。** 転送・共有メールボックスは割り切り -->
+    <label class="toggle">
+      <input
+        type="checkbox"
+        checked={autoReply?.includeEditLink ?? false}
+        onchange={(event) => update({ includeEditLink: event.currentTarget.checked })}
+      />
+      {t('autoReply.includeEditLink')}
+    </label>
+    <p class="hint">{t('autoReply.includeEditLinkHint')}</p>
+
+    {#if autoReply?.includeEditLink}
+      {#if !allowEditing}
+        <!-- **開いても直せないリンクを送らせない**（公開のときにも弾かれる） -->
+        <p class="warning">{t('autoReply.editLinkNeedsEditing')}</p>
+      {/if}
+
+      <label>
+        {t('autoReply.editLinkDays')}
+        <input
+          type="number"
+          min="1"
+          max="365"
+          value={autoReply?.editLinkDays ?? 7}
+          oninput={(event) => update({ editLinkDays: Number(event.currentTarget.value) || 7 })}
+        />
+      </label>
+      <p class="hint">{t('autoReply.editLinkDaysHint')}</p>
+
+      <!-- **漏れたときに、調べずに止められること** -->
+      <button type="button" class="secondary" disabled={revoking} onclick={revoke}>
+        {t('autoReply.revokeEditLinks')}
+      </button>
+      <p class="hint">{t('autoReply.revokeEditLinksHint')}</p>
+      {#if revoked}<p class="hint">{revoked}</p>{/if}
+    {/if}
   {/if}
 </section>
 

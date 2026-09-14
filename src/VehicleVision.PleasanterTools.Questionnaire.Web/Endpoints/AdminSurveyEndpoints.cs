@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using System.Globalization;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http.Features;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -569,6 +570,25 @@ public static class AdminSurveyEndpoints
             });
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+
+        // ---- 再編集リンクの一括失効（Issue #202）------------------------------
+        // **漏れたと分かったときに、調べずに止められること。**
+        // ⚠️ **個別の回答を特定して止めるのは、完全匿名の前提ではどのみちできない**
+        group.MapPost("/{surveyId:guid}/edit-links/revoke", async (
+            Guid surveyId,
+            HttpContext context,
+            IResponseEditTokenStore editTokens,
+            CancellationToken cancellationToken) =>
+        {
+            var revoked = await editTokens.RevokeBySurveyAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+
+            // **何件止めたかを記録に残す**（管理操作なので監査ログの対象）
+            AuditNotes.Add(context, "revoked", revoked.ToString(CultureInfo.InvariantCulture));
+
+            return Results.Ok(new { revoked });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
         // ---- 公開設定 --------------------------------------------------------
         // **回答数の上限を編集できるようにする**（Issue #53）。

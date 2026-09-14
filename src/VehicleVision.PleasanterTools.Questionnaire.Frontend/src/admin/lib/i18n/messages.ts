@@ -614,6 +614,21 @@ export const ja = {
     '回答の中身がメールとして外へ出ます。受け取るのは回答者本人ですが、経路が暗号化されているとは限りません。',
   'autoReply.serverDisabled':
     'メールの送信がサーバ側で有効になっていません。この設定は保存できますが、有効にするまで 1 通も送られません。',
+  'autoReply.includeEditLink': '本文のあとに、回答を直すためのリンクを付ける',
+  'autoReply.includeEditLinkHint':
+    'このリンクを知っている人は、その回答を書き換えられます。転送や共有メールボックスでは他人でも直せます。',
+  'autoReply.editLinkDays': 'リンクの有効日数',
+  'autoReply.editLinkDaysHint':
+    '受付期間の終了は超えません。受付を停止すると、その時点で使えなくなります。',
+  'autoReply.editLinkNeedsEditing':
+    '「回答の編集を許可する」が入っていないため、リンクを付けても開いた人は直せません。',
+  'autoReply.revokeEditLinks': '再編集リンクをすべて無効にする',
+  'autoReply.revokeEditLinksHint':
+    '漏れたときに使います。押すと、これまでに送ったリンクはすべて開けなくなります（回答そのものは消えません）。',
+  'autoReply.revokeEditLinksDone': '{count} 件のリンクを無効にしました。',
+  'autoReply.problem.EditLinkNotEditable':
+    '回答の編集を許可していないのに、再編集リンクを付けようとしています。',
+  'autoReply.problem.EditLinkDaysInvalid': 'リンクの有効日数は 1〜365 で指定してください。',
   'autoReply.problem.ToQuestionMissing': '宛先にする設問が選ばれていません。',
   'autoReply.problem.ToQuestionNotFound': '宛先にする設問が見つかりません（消された可能性があります）。',
   'autoReply.problem.ToQuestionNotEmail': '宛先にする設問が、メールアドレス形式ではありません。',
@@ -1321,6 +1336,21 @@ export const en: Record<MessageKey, string> = {
     'The answers leave the system as email. Only the respondent receives it, but the route is not necessarily encrypted.',
   'autoReply.serverDisabled':
     'Mail sending is not enabled on the server. These settings can be saved, but nothing will be sent until it is.',
+  'autoReply.includeEditLink': 'Append a link for changing the response',
+  'autoReply.includeEditLinkHint':
+    'Anyone who knows this link can change that response. Forwarded mail and shared mailboxes let others change it too.',
+  'autoReply.editLinkDays': 'Days the link stays valid',
+  'autoReply.editLinkDaysHint':
+    'It never outlives the closing date. Suspending the survey makes it unusable straight away.',
+  'autoReply.editLinkNeedsEditing':
+    'Editing after submission is turned off, so people opening the link would not be able to change anything.',
+  'autoReply.revokeEditLinks': 'Revoke every response-editing link',
+  'autoReply.revokeEditLinksHint':
+    'Use this if a link leaks. Every link sent so far stops working (the responses themselves are kept).',
+  'autoReply.revokeEditLinksDone': 'Revoked {count} links.',
+  'autoReply.problem.EditLinkNotEditable':
+    'A response-editing link is set, but editing after submission is turned off.',
+  'autoReply.problem.EditLinkDaysInvalid': 'The link must stay valid for 1 to 365 days.',
   'autoReply.problem.ToQuestionMissing': 'No question is selected for the address.',
   'autoReply.problem.ToQuestionNotFound': 'The selected question no longer exists.',
   'autoReply.problem.ToQuestionNotEmail': 'The selected question is not validated as an email address.',

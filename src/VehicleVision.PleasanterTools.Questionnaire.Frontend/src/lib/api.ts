@@ -78,6 +78,47 @@ export function readResponseToken(publicId: string): string | null {
  * （渡さないと、編集のたびに別の回答になる）。
  * **トークンは本文で送る。** URL に載せると経路のログへ残る。
  */
+/**
+ * メールの再編集リンクを引き換える（Issue #202）。
+ *
+ * **トークンは URL の断片（`#` の後ろ）に入っている。**
+ * ⚠️ **断片はサーバへ送られない**ので、Web サーバのアクセスログにも監査ログにも残らない。
+ * ここで読み取り、**本文に入れて**引き換える。
+ *
+ * 引き換えたら、この端末の回答トークンとして保存する。
+ * 以降は今までどおり（`requestTicket` がこれを拾う）。
+ *
+ * **断片はすぐ消す。** 履歴と `Referer` に残さないため。
+ *
+ * @returns 引き換えたら `true`。断片が無い・使えないトークンなら `false`。
+ */
+export async function redeemEditLink(publicId: string): Promise<boolean> {
+  const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+  const editToken = new URLSearchParams(hash).get('e');
+
+  // **断片は、使えるかどうかに関わらず消す。** 失敗しても履歴へ残さない
+  if (editToken) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+
+  if (!editToken) return false;
+
+  const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}/edit-link`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ editToken }),
+  });
+
+  // ⚠️ **理由は返ってこない。** 期限切れ・失効済み・無いトークンを区別しない
+  if (!response.ok) return false;
+
+  const redeemed = (await response.json()) as { responseToken?: string };
+  if (!redeemed.responseToken) return false;
+
+  writeStorage(TOKEN_STORAGE_PREFIX + publicId, redeemed.responseToken);
+  return true;
+}
+
 export async function requestTicket(publicId: string): Promise<Ticket | null> {
   const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}/ticket`, {
     method: 'POST',

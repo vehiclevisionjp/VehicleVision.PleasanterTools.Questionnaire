@@ -51,6 +51,19 @@ export function validateAutoReply(definition: SurveyDefinition): AutoReplyProble
   if (isBlank(settings.subject)) problems.push({ code: 'SubjectMissing' });
   if (isBlank(settings.body)) problems.push({ code: 'BodyMissing' });
 
+  if (settings.includeEditLink) {
+    // **開いても直せないリンクを送らない**（Issue #202）
+    if (!definition.allowEditingAfterSubmit) {
+      problems.push({ code: 'EditLinkNotEditable' });
+    }
+
+    // **永久に生きるリンクを作らせない**
+    const days = settings.editLinkDays ?? 7;
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      problems.push({ code: 'EditLinkDaysInvalid', detail: String(days) });
+    }
+  }
+
   return problems;
 }
 

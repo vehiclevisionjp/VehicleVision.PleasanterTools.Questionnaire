@@ -557,6 +557,8 @@
   <!-- **自動返信も定義の一部**（Issue #189）。件名と本文は公開した版で固定される。
        ⚠️ **既定は送らない。** 明示的に有効にしたときだけ 1 通出る -->
   <AutoReplyEditor
+    {surveyId}
+    allowEditing={definition.allowEditingAfterSubmit}
     autoReply={definition.autoReply}
     questions={definition.pages.flatMap((page) => page.questions)}
     {editing}

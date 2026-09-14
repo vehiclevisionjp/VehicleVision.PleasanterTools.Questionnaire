@@ -143,6 +143,55 @@ public class AutoReplyValidatorTests
     }
 
     [Fact]
+    public void 編集を許していなければ再編集リンクを止める()
+    {
+        // **開いても直せないリンクを送らない**（Issue #202）
+        var definition = new SurveyDefinition
+        {
+            SurveyId = "s1",
+            Version = 1,
+            Title = LocalizedText.Japanese("検証用"),
+            Pages = [new Page { PageId = "p1", Questions = [Email()] }],
+            AllowEditingAfterSubmit = false,
+            AutoReply = Valid with { IncludeEditLink = true },
+        };
+
+        Assert.Equal(
+            [AutoReplyProblemCode.EditLinkNotEditable],
+            Codes(AutoReplyValidator.Validate(definition)));
+    }
+
+    [Fact]
+    public void 編集を許していれば再編集リンクは通る()
+    {
+        var settings = Valid with { IncludeEditLink = true };
+
+        Assert.Empty(AutoReplyValidator.Validate(Definition(settings, Email())));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(366)]
+    public void 範囲外の有効日数は止める(int days)
+    {
+        // **永久に生きるリンクを作らせない**
+        var settings = Valid with { IncludeEditLink = true, EditLinkDays = days };
+
+        Assert.Equal(
+            [AutoReplyProblemCode.EditLinkDaysInvalid],
+            Codes(AutoReplyValidator.Validate(Definition(settings, Email()))));
+    }
+
+    [Fact]
+    public void リンクを付けないなら有効日数は見ない()
+    {
+        var settings = Valid with { EditLinkDays = 0 };
+
+        Assert.Empty(AutoReplyValidator.Validate(Definition(settings, Email())));
+    }
+
+    [Fact]
     public void 不備の補足に宛先そのものを入れない()
     {
         // ⚠️ **補足は画面に出る。** 設問の識別子までにとどめる

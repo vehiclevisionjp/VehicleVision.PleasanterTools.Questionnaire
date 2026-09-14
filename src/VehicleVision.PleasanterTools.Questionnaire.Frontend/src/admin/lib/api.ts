@@ -113,6 +113,17 @@ export const completeEnrollment = (code: string) =>
 export const listAdminUsers = () =>
   call<{ users: AdminUserRow[] }>('/api/admin/users');
 
+/**
+ * そのアンケートの再編集リンクをすべて無効にする（Issue #202）。
+ *
+ * **漏れたときの止め方。** 回答そのものは消えない。
+ */
+export const revokeEditLinks = (surveyId: string) =>
+  call<{ revoked: number }>(`/api/admin/surveys/${surveyId}/edit-links/revoke`, {
+    method: 'POST',
+    json: {},
+  });
+
 /** 管理者を追加し、招待を 1 通出す。**トークンはこの応答にしか出ない。** */
 export const inviteAdminUser = (loginId: string, role: string) =>
   call<IssuedInvitation>('/api/admin/users', { method: 'POST', json: { loginId, role } });
