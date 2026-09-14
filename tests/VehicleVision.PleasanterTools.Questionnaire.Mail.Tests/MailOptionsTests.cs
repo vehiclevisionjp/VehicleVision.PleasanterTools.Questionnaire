@@ -87,6 +87,66 @@ public class MailOptionsTests
     }
 
     [Fact]
+    public void 既定の送信経路はSMTP()
+    {
+        Assert.Equal(MailTransportKind.Smtp, Read(Minimum).Transport);
+    }
+
+    [Fact]
+    public void SESは地域が要る()
+    {
+        // **資格情報は設定に書かない。** 地域だけを受け取る
+        var exception = Assert.Throws<InvalidOperationException>(() => Read(
+            ("QUESTIONNAIRE_MAIL_ENABLED", "true"),
+            ("QUESTIONNAIRE_MAIL_TRANSPORT", "AmazonSes"),
+            ("QUESTIONNAIRE_MAIL_FROM_ADDRESS", "noreply@example.test")));
+
+        Assert.Contains("SES_REGION", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SESはSMTPの設定が無くても使える()
+    {
+        var options = Read(
+            ("QUESTIONNAIRE_MAIL_ENABLED", "true"),
+            ("QUESTIONNAIRE_MAIL_TRANSPORT", "AmazonSes"),
+            ("QUESTIONNAIRE_MAIL_SES_REGION", "ap-northeast-1"),
+            ("QUESTIONNAIRE_MAIL_FROM_ADDRESS", "noreply@example.test"));
+
+        Assert.True(options.IsReady);
+        Assert.Equal(MailTransportKind.AmazonSes, options.Transport);
+    }
+
+    [Fact]
+    public void ACSは窓口が要る()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => Read(
+            ("QUESTIONNAIRE_MAIL_ENABLED", "true"),
+            ("QUESTIONNAIRE_MAIL_TRANSPORT", "AzureCommunicationServices"),
+            ("QUESTIONNAIRE_MAIL_FROM_ADDRESS", "noreply@example.test")));
+
+        Assert.Contains("ACS_ENDPOINT", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ACSの窓口は平文のURLを受け取らない()
+    {
+        // ⚠️ **資格情報を載せて通る口なので、https 以外は通さない**
+        Assert.Throws<InvalidOperationException>(() => Read(
+            ("QUESTIONNAIRE_MAIL_ENABLED", "true"),
+            ("QUESTIONNAIRE_MAIL_TRANSPORT", "AzureCommunicationServices"),
+            ("QUESTIONNAIRE_MAIL_ACS_ENDPOINT", "http://xxx.communication.azure.com"),
+            ("QUESTIONNAIRE_MAIL_FROM_ADDRESS", "noreply@example.test")));
+    }
+
+    [Fact]
+    public void 知らない送信経路は落とす()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            Read([.. Minimum, ("QUESTIONNAIRE_MAIL_TRANSPORT", "SendGridApi")]));
+    }
+
+    [Fact]
     public void 暗号化の指定は大文字小文字を問わない()
     {
         Assert.Equal(
