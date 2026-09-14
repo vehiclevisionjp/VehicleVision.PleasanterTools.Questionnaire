@@ -47,12 +47,18 @@ public static class ServerMessages
     {
         var catalog = new Dictionary<string, LocalizedText>(StringComparer.Ordinal);
 
+        // **言語ごとの辞書で受ける。** 3 言語目を足すときに、
+        // この関数だけを直せば済むようにしておく（Issue #195）
+        void AddAll(string key, IReadOnlyDictionary<string, string> byLanguage) =>
+            catalog.Add(key, new LocalizedText(byLanguage));
+
+        // **2 言語ぶんの書き方は残す。** 既存の 46 件を書き換えない
         void Add(string key, string ja, string en) =>
-            catalog.Add(key, new LocalizedText(new Dictionary<string, string>
+            AddAll(key, new Dictionary<string, string>
             {
                 [SupportedLanguages.Default] = ja,
                 ["en"] = en,
-            }));
+            });
 
         // ---- 認証 -----------------------------------------------------------
         Add(
