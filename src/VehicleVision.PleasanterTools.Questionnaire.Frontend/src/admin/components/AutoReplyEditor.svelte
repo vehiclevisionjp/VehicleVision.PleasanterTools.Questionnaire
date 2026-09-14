@@ -64,6 +64,32 @@
     const next: AutoReplySettings = { enabled: false, ...(autoReply ?? {}), ...patch };
     onchange(next.enabled ? next : null);
   }
+
+  /**
+   * 有効にしたときに、文面の雛形を入れる（Issue #209）。
+   *
+   * **一度書いたものを上書きしない。** 空の言語にだけ入れる。
+   * **編集中の言語にだけ入れる**（`_documents/多言語対応方針.md` 5 章）。
+   * 他の言語の文言は触らない。
+   */
+  function toggle(enabled: boolean) {
+    if (!enabled) {
+      update({ enabled: false });
+      return;
+    }
+
+    const patch: Partial<AutoReplySettings> = { enabled: true };
+
+    if (text(autoReply?.subject, editing) === '') {
+      patch.subject = withText(autoReply?.subject, t('autoReply.defaultSubject'), editing);
+    }
+
+    if (text(autoReply?.body, editing) === '') {
+      patch.body = withText(autoReply?.body, t('autoReply.defaultBody'), editing);
+    }
+
+    update(patch);
+  }
 </script>
 
 <section class="auto-reply">
@@ -75,7 +101,7 @@
       type="checkbox"
       checked={enabled}
       disabled={!canEnable}
-      onchange={(event) => update({ enabled: event.currentTarget.checked })}
+      onchange={(event) => toggle(event.currentTarget.checked)}
     />
     {t('autoReply.enabled')}
   </label>
@@ -134,6 +160,8 @@
       ></textarea>
     </label>
     <p class="hint">{t('autoReply.bodyHint')}</p>
+    <!-- **書き間違いはそのまま残る。** 消すと文面の一部が黙って欠けるため -->
+    <p class="hint">{t('autoReply.placeholders')}</p>
 
     <label class="toggle">
       <input

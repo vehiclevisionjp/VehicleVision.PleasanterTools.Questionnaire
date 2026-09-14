@@ -191,6 +191,59 @@ public class AutoReplyComposerTests
     }
 
     [Fact]
+    public void 件名と本文に題名を差し込む()
+    {
+        // **複製しても題名が古いまま残らない**（Issue #209）
+        var settings = Enabled with
+        {
+            Subject = LocalizedText.Japanese("{{title}} へのご回答"),
+            Body = LocalizedText.Japanese("{{title}} にご協力ありがとうございました。"),
+        };
+
+        var mail = Compose(settings, Payload(Answer("mail", "a@example.test")));
+
+        Assert.NotNull(mail);
+        Assert.Equal("検証用 へのご回答", mail.Subject);
+        Assert.Equal("検証用 にご協力ありがとうございました。", mail.Body);
+    }
+
+    [Fact]
+    public void 受付日時は渡したものを差し込む()
+    {
+        var settings = Enabled with { Body = LocalizedText.Japanese("受付: {{submittedAt}}") };
+        var submittedAt = new DateTimeOffset(2026, 9, 14, 15, 4, 0, TimeSpan.FromHours(9));
+
+        var mail = AutoReplyComposer.Compose(
+            Definition(settings), Payload(Answer("mail", "a@example.test")), "ja", submittedAt);
+
+        Assert.NotNull(mail);
+        Assert.Equal("受付: 2026-09-14 15:04", mail.Body);
+    }
+
+    [Fact]
+    public void 差し込みは回答者の言語の題名を使う()
+    {
+        var definition = new SurveyDefinition
+        {
+            SurveyId = "s1",
+            Version = 1,
+            Title = new LocalizedText(new Dictionary<string, string>
+            {
+                ["ja"] = "満足度調査",
+                ["en"] = "Satisfaction survey",
+            }),
+            Pages = [new Page { PageId = "p1", Questions = [Note(), Email(), Opinion()] }],
+            AutoReply = Enabled with { Subject = LocalizedText.Japanese("{{title}}") },
+        };
+
+        var mail = AutoReplyComposer.Compose(
+            definition, Payload(Answer("mail", "a@example.test")), "en");
+
+        Assert.NotNull(mail);
+        Assert.Equal("Satisfaction survey", mail.Subject);
+    }
+
+    [Fact]
     public void 件名が空なら送らない()
     {
         // **公開のときに弾いている。** ここへ来るのは定義を直接書き換えた場合だけ

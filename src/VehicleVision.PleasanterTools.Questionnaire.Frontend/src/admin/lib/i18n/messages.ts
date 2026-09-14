@@ -604,6 +604,11 @@ export const ja = {
   'autoReply.subject': '件名',
   'autoReply.body': '本文',
   'autoReply.bodyHint': '書式は付けられません。文字だけが送られます。',
+  'autoReply.placeholders':
+    '差し込みを書けます。{{title}} はアンケートの題名、{{submittedAt}} は受付日時になります。知らない差し込みはそのまま残ります。',
+  'autoReply.defaultSubject': '{{title}} へのご回答ありがとうございました',
+  'autoReply.defaultBody':
+    '{{title}} へご回答いただき、ありがとうございました。\n\n受付日時: {{submittedAt}}\n\nこのメールは自動で送信しています。',
   'autoReply.includeAnswers': '本文のあとに回答の写しを付ける',
   'autoReply.includeAnswersHint':
     '回答の中身がメールとして外へ出ます。受け取るのは回答者本人ですが、経路が暗号化されているとは限りません。',
@@ -1306,6 +1311,11 @@ export const en: Record<MessageKey, string> = {
   'autoReply.subject': 'Subject',
   'autoReply.body': 'Body',
   'autoReply.bodyHint': 'No formatting. Plain text only.',
+  'autoReply.placeholders':
+    'You can use placeholders. {{title}} is the survey title and {{submittedAt}} is the time it was received. Unknown placeholders are left as they are.',
+  'autoReply.defaultSubject': 'Thank you for responding to {{title}}',
+  'autoReply.defaultBody':
+    'Thank you for responding to {{title}}.\n\nReceived: {{submittedAt}}\n\nThis message was sent automatically.',
   'autoReply.includeAnswers': 'Append a copy of the answers',
   'autoReply.includeAnswersHint':
     'The answers leave the system as email. Only the respondent receives it, but the route is not necessarily encrypted.',

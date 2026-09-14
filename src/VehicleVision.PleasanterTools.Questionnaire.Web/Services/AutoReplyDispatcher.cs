@@ -5,6 +5,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Mail;
+using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -29,8 +30,41 @@ public sealed class AutoReplyDispatcher(
     IMailOutbox outbox,
     IMailPayloadProtector protector,
     MailOptions options,
-    ILogger<AutoReplyDispatcher> logger)
+    ILogger<AutoReplyDispatcher> logger,
+    PleasanterOptions? pleasanter = null,
+    TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
+    /// <summary>差し込みの日時を出す時間帯（Issue #209）。</summary>
+    /// <remarks>
+    /// **運用側の時間帯（<c>QUESTIONNAIRE_PLEASANTER_TIMEZONE</c>）に合わせる。**
+    /// 回答者がどこに居るかは分からないので、**Pleasanter に溜まる回答と同じ読み方**に揃える。
+    /// 設定が無ければ UTC。
+    /// </remarks>
+    private TimeZoneInfo DisplayTimeZone
+    {
+        get
+        {
+            if (pleasanter?.ApiKeyUserTimeZoneId is not { Length: > 0 } id)
+            {
+                return TimeZoneInfo.Utc;
+            }
+
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(id);
+            }
+            catch (Exception exception)
+                when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
+            {
+                // **起動は止めない。** 送れないより、UTC で送れる方がまし
+                logger.LogWarning("時間帯 {TimeZone} を解決できないので UTC で差し込む", id);
+                return TimeZoneInfo.Utc;
+            }
+        }
+    }
+
     /// <summary>必要なら 1 通積む。**積んだら <c>true</c>。**</summary>
     /// <param name="surveyId">アンケート。**知らせを分けるために持たせる。**</param>
     /// <param name="definition">受け付けた版の定義。</param>
@@ -60,7 +94,8 @@ public sealed class AutoReplyDispatcher(
 
         try
         {
-            var mail = AutoReplyComposer.Compose(definition, payload, language);
+            var submittedAt = TimeZoneInfo.ConvertTime(_time.GetUtcNow(), DisplayTimeZone);
+            var mail = AutoReplyComposer.Compose(definition, payload, language, submittedAt);
             if (mail is null)
             {
                 // **宛先の設問に答えていないだけ。** 異常ではない
