@@ -4,6 +4,7 @@
     forgetSubmission,
     hasSubmitted,
     loadForm,
+    redeemEditLink,
     loadPendingAnswers,
     requestTicket,
     submitAnswers,
@@ -296,6 +297,10 @@
 
     // **分からなければ残さない側へ倒す**（Issue #59）
     allowsDraft = result.form.allowsDraft ?? false;
+
+    // **メールの再編集リンクから来たなら、先に引き換える**（Issue #202）。
+    // ここで端末の回答トークンを差し替えてから、いつもの流れへ入る
+    await redeemEditLink(publicId);
 
     // **回答トークンと送信チケットをサーバから受け取る。**
     // チケットが無いと送信できないので、ここで失敗したら回答させない

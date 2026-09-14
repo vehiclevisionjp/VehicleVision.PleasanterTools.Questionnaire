@@ -94,6 +94,33 @@ describe('validateAutoReply', () => {
   });
 });
 
+describe('再編集リンク（Issue #202）', () => {
+  it('編集を許していなければ止める', () => {
+    // **開いても直せないリンクを送らない**
+    const settings = { ...valid, includeEditLink: true };
+    const survey = { ...definition(settings, email), allowEditingAfterSubmit: false };
+
+    expect(validateAutoReply(survey).map((problem) => problem.code)).toEqual([
+      'EditLinkNotEditable',
+    ]);
+  });
+
+  it('編集を許していれば通る', () => {
+    expect(codes(definition({ ...valid, includeEditLink: true }, email))).toEqual([]);
+  });
+
+  it('範囲外の日数は止める', () => {
+    // **永久に生きるリンクを作らせない**
+    const settings = { ...valid, includeEditLink: true, editLinkDays: 0 };
+
+    expect(codes(definition(settings, email))).toEqual(['EditLinkDaysInvalid']);
+  });
+
+  it('リンクを付けないなら日数は見ない', () => {
+    expect(codes(definition({ ...valid, editLinkDays: 0 }, email))).toEqual([]);
+  });
+});
+
 describe('autoReplyKey', () => {
   it('知っている符号は文言の鍵になる', () => {
     expect(autoReplyKey('SubjectMissing')).toBe('autoReply.problem.SubjectMissing');

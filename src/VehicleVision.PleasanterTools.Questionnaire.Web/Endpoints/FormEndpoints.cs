@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.Features;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
@@ -184,6 +185,42 @@ public static class FormEndpoints
                 usesExternalCaptcha ? captcha.ScriptUrl : null));
         });
 
+        // ---- 再編集リンクの引き換え（Issue #202）-------------------------------
+        // ⚠️ **トークンは本文で受ける。** 経路（URL）へ載せると、Web サーバの
+        // アクセスログにも、経路の値を丸ごと書く監査ログにも残る。
+        // **リンクでは URL の断片（`#` の後ろ）に置く**ので、そもそもサーバへ送られない
+        forms.MapPost("/{publicId}/edit-link", async (
+            string publicId,
+            EditLinkRedeemRequest request,
+            ResponseIntake intake,
+            IResponseEditTokenStore editTokens,
+            TimeProvider timeProvider,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.EditToken))
+            {
+                return Results.NotFound();
+            }
+
+            // **受け付けられる状態かを先に見る。** 受付を止めたら即失効
+            var (form, rejection) = await intake.GetPublishedAsync(publicId, cancellationToken);
+            if (form is null || rejection is not null)
+            {
+                return Results.NotFound();
+            }
+
+            var responseToken = await editTokens.RedeemAsync(
+                ResponseEditLink.HashOf(request.EditToken),
+                timeProvider.GetUtcNow().UtcDateTime,
+                cancellationToken);
+
+            // ⚠️ **理由を区別して返さない。** 期限切れ・失効済み・無いトークンを
+            // 見分けられると、総当たりで実在が分かってしまう
+            return responseToken is null
+                ? Results.NotFound()
+                : Results.Ok(new { responseToken });
+        }).RequireRateLimiting(SubmitRateLimitPolicy);
+
         forms.MapGet("/{publicId}/responses/{responseToken}", async (
             string publicId,
             string responseToken,
@@ -356,6 +393,10 @@ public static class FormEndpoints
 
         return app;
     }
+
+    /// <summary>再編集リンクの引き換えで受け取る中身（Issue #202）。</summary>
+    /// <remarks>⚠️ **経路ではなく本文で受け取る。** ログへ載せないため。</remarks>
+    public sealed record EditLinkRedeemRequest(string? EditToken);
 
     /// <summary>回答トークンを作る。**暗号論的乱数から作る。**</summary>
     /// <remarks>

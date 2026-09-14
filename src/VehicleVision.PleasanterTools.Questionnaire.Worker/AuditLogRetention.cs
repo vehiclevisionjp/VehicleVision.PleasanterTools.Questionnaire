@@ -161,7 +161,8 @@ public sealed class AuditLogRetentionService(
     TimeProvider? timeProvider = null,
     IAttachmentRejectionStore? rejections = null,
     IAdminNotificationStore? notifications = null,
-    IResponseOutbox? outbox = null)
+    IResponseOutbox? outbox = null,
+    IResponseEditTokenStore? editTokens = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -185,11 +186,14 @@ public sealed class AuditLogRetentionService(
                 options.AttachmentRejectionRetentionDays);
         }
 
-        // **どちらも消さないなら、常駐する意味が無い**
+        // **どれも消さないなら、常駐する意味が無い**
+        // ⚠️ **再編集リンクの掃除は設定を持たない**（期限そのものが保持期間）ので、
+        // 口が渡っていれば常に走らせる
         if (!options.Enabled
             && !(rejections is not null && options.AttachmentRejectionEnabled)
             && !(notifications is not null && options.NotificationEnabled)
-            && !(outbox is not null && options.DeadLetterEnabled))
+            && !(outbox is not null && options.DeadLetterEnabled)
+            && editTokens is null)
         {
             return;
         }
@@ -218,6 +222,20 @@ public sealed class AuditLogRetentionService(
                 await Task.Delay(options.SweepInterval, _time, stoppingToken).ConfigureAwait(false);
 
                 var now = _time.GetLocalNow().DateTime;
+
+                // **期限切れの再編集リンクを消す**（Issue #202）。
+                // **保持期間の設定を持たない。** 期限を過ぎた行は、もう誰も使えない
+                if (editTokens is not null)
+                {
+                    var expired = await editTokens
+                        .DeleteExpiredAsync(_time.GetUtcNow().UtcDateTime, stoppingToken)
+                        .ConfigureAwait(false);
+
+                    if (expired > 0)
+                    {
+                        logger.LogInformation("期限切れの再編集リンクを {Count} 件消した", expired);
+                    }
+                }
 
                 if (options.Enabled)
                 {

@@ -23,6 +23,15 @@ public enum AutoReplyProblemCode
 
     /// <summary>本文が空。</summary>
     BodyMissing,
+
+    /// <summary>
+    /// 回答の編集を許していないのに、再編集リンクを付けようとしている（Issue #202）。
+    /// **開いても直せないリンクを送ることになる。**
+    /// </summary>
+    EditLinkNotEditable,
+
+    /// <summary>再編集リンクの有効日数が範囲外（Issue #202）。</summary>
+    EditLinkDaysInvalid,
 }
 
 /// <summary>自動返信の設定の不備 1 件。</summary>
@@ -86,6 +95,23 @@ public static class AutoReplyValidator
         if (IsBlank(settings.Body))
         {
             problems.Add(new AutoReplyProblem(AutoReplyProblemCode.BodyMissing));
+        }
+
+        if (settings.IncludeEditLink)
+        {
+            // **開いても直せないリンクを送らない**（Issue #202）
+            if (!definition.AllowEditingAfterSubmit)
+            {
+                problems.Add(new AutoReplyProblem(AutoReplyProblemCode.EditLinkNotEditable));
+            }
+
+            // **永久に生きるリンクを作らせない**
+            if (settings.EditLinkDays is < 1 or > AutoReplySettings.MaxEditLinkDays)
+            {
+                problems.Add(new AutoReplyProblem(
+                    AutoReplyProblemCode.EditLinkDaysInvalid,
+                    settings.EditLinkDays.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
         }
 
         return problems.ToImmutable();

@@ -38,6 +38,32 @@ public sealed record AutoReplySettings
     /// </remarks>
     public LocalizedText? Body { get; init; }
 
+    /// <summary>本文のあとに、回答を直すためのリンクを付けるか（Issue #202）。</summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠️ **このリンクを持つ人は、その回答を書き換えられる。**
+    /// 転送・共有メールボックスでは他人でも直せる。**割り切って受け入れる**
+    /// （2026-09-14 決定。完全匿名の公開フォームで、それ以上の本人確認をする前提が無い）。
+    /// </para>
+    /// <para>
+    /// **回答の編集を許していないアンケートでは付けられない**
+    /// （<see cref="SurveyDefinition.AllowEditingAfterSubmit"/>。公開のときに弾く）。
+    /// </para>
+    /// </remarks>
+    public bool IncludeEditLink { get; init; }
+
+    /// <summary>再編集リンクの有効日数。**既定は 7 日。**</summary>
+    /// <remarks>
+    /// **受付期間の終了を超えない。受付を止めたら即失効する**（送る側・引き換える側で担保）。
+    /// </remarks>
+    public int EditLinkDays { get; init; } = DefaultEditLinkDays;
+
+    /// <summary>再編集リンクの既定の有効日数。</summary>
+    public const int DefaultEditLinkDays = 7;
+
+    /// <summary>指定できる有効日数の上限。**永久に生きるリンクを作らせない。**</summary>
+    public const int MaxEditLinkDays = 365;
+
     /// <summary>本文のあとに回答の写しを付けるか。</summary>
     /// <remarks>
     /// ⚠️ **付けると、回答の中身がメールとして外へ出る。**
