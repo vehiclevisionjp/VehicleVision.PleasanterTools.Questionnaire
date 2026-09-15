@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "questionnaire.fullname" . }}
+  labels:
+    {{- include "questionnaire.labels" . | nindent 4 }}
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  ASPNETCORE_URLS: http://+:8080
+  QUESTIONNAIRE_DB_PROVIDER: {{ .Values.config.dbProvider | quote }}
+  QUESTIONNAIRE_PLEASANTER_BASEURL: {{ .Values.config.pleasanterUrl | quote }}
+  QUESTIONNAIRE_PLEASANTER_TIMEZONE: {{ .Values.config.timezone | quote }}
+  QUESTIONNAIRE_FORWARDED_NETWORKS: {{ join "," .Values.config.forwardedNetworks | quote }}
+  TZ: {{ .Values.config.timezone | quote }}
+  QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH: {{ .Values.dataProtection.mountPath | quote }}

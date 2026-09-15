@@ -17,10 +17,110 @@
 
 ## ファイル
 
-| ファイル | 内容 |
+| ファイル | 内容 | 読まれているか |
+|---|---|---|
+| `Service.json` | 既定タイムゾーン | **読まれている** |
+| `Pleasanter.json` | 接続先 Pleasanter の URL・API キー・版・タイムアウト | **読まれている** |
+| `Security.json` | **管理者のパスワードに求める条件**（Issue #157） | **読まれている** |
+| `Analytics.json` | **回答画面のアクセス解析**（Issue #162） | **読まれている** |
+
+**読み込みは 1 か所**（`Web/Services/ParameterFiles.cs`）。アプリの一番先で積むので、
+DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれを見る。
+
+> ⚠️ **`Service.json` の `Name` と `Description` はどこからも読んでいない。**
+> 表示名を出す画面が無いため。消してはいないが、変えても何も変わらない。
+
+### ファイルのキーと環境変数の対応
+
+**`Pleasanter.json` と `Service.json` は、キーの名前が環境変数と違う**
+（Pleasanter 本体に合わせた短い名前を使っているため）。
+**読み込み時に下表のとおり写している**ので、どちらで書いても効く。
+
+| ファイルのキー | 環境変数 |
 |---|---|
-| `Service.json` | アプリ名・既定タイムゾーン |
-| `Pleasanter.json` | 接続先 Pleasanter の URL・API キー・タイムアウト |
+| `Service.json` の `TimeZoneDefault` | `QUESTIONNAIRE_TIMEZONE_DEFAULT` |
+| `Pleasanter.json` の `BaseUrl` | `QUESTIONNAIRE_PLEASANTER_BASEURL` |
+| `Pleasanter.json` の `ApiKey` | `QUESTIONNAIRE_PLEASANTER_APIKEY` |
+| `Pleasanter.json` の `ApiVersion` | `QUESTIONNAIRE_PLEASANTER_APIVERSION` |
+| `Pleasanter.json` の `TimeoutSeconds` | `QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS` |
+| `Pleasanter.json` の `ApiKeyUserTimeZoneId` | `QUESTIONNAIRE_PLEASANTER_TIMEZONE` |
+
+`Security.json` と `Analytics.json` は環境変数と同じ名前なので、写していない。
+
+> ⚠️ **値が `null` や空のキーは無視する。** `Pleasanter.json` の `ApiKey` は既定で `null`
+> （ここへ書かせないため）なので、写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
+
+## 環境変数
+
+| 変数 | 内容 |
+|---|---|
+| `QUESTIONNAIRE_DB_PROVIDER` | `SqlServer` / `PostgreSql` / `MySql` |
+| `QUESTIONNAIRE_DB_CONNECTIONSTRING` | 本アプリの DB への接続文字列 |
+| `QUESTIONNAIRE_PLEASANTER_BASEURL` | 接続先 Pleasanter の URL |
+| `QUESTIONNAIRE_PLEASANTER_APIKEY` | Pleasanter の API キー |
+| `QUESTIONNAIRE_PLEASANTER_APIVERSION` | Pleasanter の API バージョン（既定 1.1）。**読めない値は既定へ落とす** |
+| `QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS` | Pleasanter API 呼び出しのタイムアウト（秒・既定 30） |
+| `QUESTIONNAIRE_PLEASANTER_TIMEZONE` | API キーに紐づくユーザのタイムゾーン。**未設定なら `QUESTIONNAIRE_TIMEZONE_DEFAULT`** |
+| `QUESTIONNAIRE_TIMEZONE_DEFAULT` | 本アプリの既定タイムゾーン（既定 `Asia/Tokyo`）。`Service.json` の `TimeZoneDefault` と同じ |
+| `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト）。**送信チケットの署名鍵もここから派生させる** |
+| `QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` | 複数インスタンスで管理画面の Cookie を共有する鍵束ディレクトリ。AKS では ReadWriteMany の永続ボリュームを指定する |
+| `QUESTIONNAIRE_FORWARDED_NETWORKS` | `X-Forwarded-*` を信頼するリバースプロキシの CIDR。複数はカンマ区切り。Ingress の送信元範囲だけを指定する |
+| `QUESTIONNAIRE_ADMIN_TWOFACTOR` | 管理者の 2 要素認証。`required` / `optional`（既定） / `disabled`。**知らない値は起動時に落ちる。** ⚠️ `disabled` にしても、登録済みの管理者からは 2 要素を外さない |
+| `PasswordMinimumLength` | パスワードの最低の長さ（既定 12）。`Security.json` にも書ける（Issue #157） |
+| `PasswordAllowSameAsLoginId` | ログイン ID と同じパスワードを許すか（既定 `false`）。同上 |
+| `AnalyticsProvider` | アクセス解析のサービス。`None`（既定）/ `Ga4` / `Gtm` / `Matomo` / `Plausible`。`Analytics.json` にも書ける |
+| `AnalyticsSiteId` | 測定 ID・コンテナ ID・サイト ID・ドメイン（サービスで意味が変わる） |
+| `AnalyticsScriptOrigin` | 自前設置の配信元。**Matomo は必須** |
+| `AnalyticsShowNotice` | 回答者へ告知を出すか（既定 `true`） |
+| `CaptchaProvider` | 課す課題。`Altcha`（既定・自前設置）/ `Recaptcha` / `Turnstile` / `Hcaptcha`。**知らない値は既定へ落とす** |
+| `CaptchaSiteKey` | 外部の CAPTCHA のサイトキー（画面へ渡る） |
+| `CaptchaSecretKey` | 外部の CAPTCHA の秘密鍵。**このフォルダのファイルへ書かないこと。** 環境変数か Key Vault から |
+| `QUESTIONNAIRE_SAML_ENABLED` | `true` で SAML のログインを使う。**既定は無効** |
+| `QUESTIONNAIRE_SAML_ENTITYID` | 本アプリ（SP）の EntityID。IdP へ登録する値と同じにする |
+| `QUESTIONNAIRE_SAML_IDPENTITYID` | IdP の EntityID。**これ以外が発行した応答は受け取らない** |
+| `QUESTIONNAIRE_SAML_SINGLESIGNONURL` | IdP のログインの窓口（`AuthnRequest` の宛先） |
+| `QUESTIONNAIRE_SAML_IDPCERTIFICATE` | IdP の署名証明書（PEM か、DER の base64）。**入れ替えの最中は改行かカンマで 2 枚並べられる** |
+| `QUESTIONNAIRE_SAML_UNKNOWNUSER` | 本アプリに居ない利用者の扱い。`Reject`（既定・通さない）/ `Register`（その場で作る） |
+| `QUESTIONNAIRE_SAML_REGISTERROLE` | `Register` で作る利用者の役割。`Editor`（既定）/ `Administrator`。**⚠️ Administrator にすると IdP に居る全員が全権を持つ** |
+| `QUESTIONNAIRE_SAML_LOGINIDSOURCE` | ログイン ID の取り出し先。`NameId`（既定）/ `Claim` |
+| `QUESTIONNAIRE_SAML_LOGINIDCLAIM` | `LOGINIDSOURCE=Claim` のときに読む属性名 |
+| `QUESTIONNAIRE_SAML_BUTTONLABEL` | ログイン画面の釦に出す文字（省略時は「シングルサインオンでログイン」） |
+| `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
+| `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
+| `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |
+| `QUESTIONNAIRE_SUBMITS_PER_MIN` | 送信元 IP ごとの回答送信の上限（1 分あたり・既定 20） |
+| `QUESTIONNAIRE_ALTCHA_ENABLED` | `false` で proof-of-work を切る。**アプリ全体。検証環境のためだけ** |
+| `QUESTIONNAIRE_ALTCHA_MIN_NUMBER` | 探させる数の下限（既定 50000）。**大きいほど回答者の待ち時間も伸びる** |
+| `QUESTIONNAIRE_ALTCHA_MAX_NUMBER` | 探させる数の上限（既定 150000） |
+| `QUESTIONNAIRE_ATTACHMENT_*` | 添付の許可拡張子・サイズ・個数の上限 |
+| `QUESTIONNAIRE_VIRUSSCAN_*` | ウイルススキャン（**既定は無効**） |
+
+**proof-of-work の要否はアンケートごとにも切り替えられる**（管理画面の公開設定。Issue #66）。
+**どちらも有効なときだけ課す**ので、ここで切るとアンケート側の設定に関わらず課さない。
+
+添付とウイルススキャンの項目は
+[`_documents/添付ファイル検査-運用手順書.md`](../../_documents/添付ファイル検査-運用手順書.md)
+5 章に一覧がある。**ここへ書き写さないこと。**
+
+### `QUESTIONNAIRE_SECRET_KEY` について
+
+**失うと、登録済みの 2 要素が全て使えなくなる。**
+管理者は復旧コードで入り、2 要素を登録し直すことになる。
+
+- **Key Vault に置き、控えを取っておくこと**
+- 値は次で作れる
+
+```
+dotnet run --project src/VehicleVision.PleasanterTools.Questionnaire.Web -- --generate-secret-key
+```
+
+または任意の手段で 32 バイトの乱数を Base64 にする。
+
+**この鍵と ASP.NET Core Data Protection の鍵束は役割が異なる。**
+`QUESTIONNAIRE_SECRET_KEY` は 2 要素の共有鍵と送信チケットに使い、運用者が保管する。
+Data Protection は管理画面の Cookie に使う。AKS の複数 Pod では
+`QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` を ReadWriteMany の永続ボリュームへ向け、
+Pod 間で鍵束を共有する。
 
 ## タイムゾーンに注意
 

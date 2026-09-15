@@ -1,0 +1,220 @@
+using System.Security.Cryptography;
+using System.Text;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Mail;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Mail;
+using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
+
+namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
+
+/// <summary>受け付けた回答から、自動返信メールを送信待ちへ積む（Issue #189）。</summary>
+/// <remarks>
+/// <para>
+/// ⚠️ **回答の受付を絶対に落とさない。** ここで起きた失敗は、
+/// **記録して飲み込む。** メールは「受け付けたことの知らせ」であって、
+/// 回答そのものではない。**知らせを積めなかったせいで、
+/// 回答者に「送れませんでした」と返してはいけない。**
+/// </para>
+/// <para>
+/// **送るのは新規の回答だけ。** 編集のたびに送ると、
+/// 直すたびに同じ知らせが届く（<c>ResponseIntake</c> が判断して呼ぶ）。
+/// </para>
+/// <para>
+/// **識別子は回答トークンから決める。** 同じ回答で二重に積まない
+/// （<see cref="IMailOutbox.EnqueueAsync"/> が衝突で <c>false</c> を返す）。
+/// </para>
+/// </remarks>
+public sealed class AutoReplyDispatcher(
+    IMailOutbox outbox,
+    IMailPayloadProtector protector,
+    MailOptions options,
+    ILogger<AutoReplyDispatcher> logger,
+    PleasanterOptions? pleasanter = null,
+    IResponseEditTokenStore? editTokens = null,
+    TimeProvider? timeProvider = null)
+{
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
+    /// <summary>差し込みの日時を出す時間帯（Issue #209）。</summary>
+    /// <remarks>
+    /// **運用側の時間帯（<c>QUESTIONNAIRE_PLEASANTER_TIMEZONE</c>）に合わせる。**
+    /// 回答者がどこに居るかは分からないので、**Pleasanter に溜まる回答と同じ読み方**に揃える。
+    /// 設定が無ければ UTC。
+    /// </remarks>
+    private TimeZoneInfo DisplayTimeZone
+    {
+        get
+        {
+            if (pleasanter?.ApiKeyUserTimeZoneId is not { Length: > 0 } id)
+            {
+                return TimeZoneInfo.Utc;
+            }
+
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(id);
+            }
+            catch (Exception exception)
+                when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
+            {
+                // **起動は止めない。** 送れないより、UTC で送れる方がまし
+                logger.LogWarning("時間帯 {TimeZone} を解決できないので UTC で差し込む", id);
+                return TimeZoneInfo.Utc;
+            }
+        }
+    }
+
+    /// <summary>必要なら 1 通積む。**積んだら <c>true</c>。**</summary>
+    /// <param name="surveyId">アンケート。**知らせを分けるために持たせる。**</param>
+    /// <param name="definition">受け付けた版の定義。</param>
+    /// <param name="payload">受け付けた回答。</param>
+    /// <param name="language">回答者が使っていた言語。</param>
+    /// <param name="cancellationToken">中断。</param>
+    /// <param name="publicId">
+    /// アンケートの公開 ID（Issue #202）。**再編集リンクの URL に要る。**
+    /// </param>
+    /// <param name="acceptTo">
+    /// 受付の終了日時（Issue #202）。**リンクの期限はこれを超えない。**
+    /// </param>
+    public async Task<bool> TryEnqueueAsync(
+        Guid surveyId,
+        SurveyDefinition definition,
+        ResponsePayload payload,
+        string? language,
+        CancellationToken cancellationToken = default,
+        string? publicId = null,
+        DateTime? acceptTo = null)
+    {
+        if (definition.AutoReply?.Enabled is not true)
+        {
+            return false;
+        }
+
+        if (!options.IsReady)
+        {
+            // **設定だけ有効で、送る口が無い。** 積むと送れないまま溜まる
+            // （管理画面にも「サーバ側で無効」と出している）
+            logger.LogWarning(
+                "自動返信が有効だが、メールの送信が設定されていないので積まない（QUESTIONNAIRE_MAIL_*）");
+            return false;
+        }
+
+        try
+        {
+            var submittedAt = TimeZoneInfo.ConvertTime(_time.GetUtcNow(), DisplayTimeZone);
+            var mail = AutoReplyComposer.Compose(definition, payload, language, submittedAt);
+            if (mail is null)
+            {
+                // **宛先の設問に答えていないだけ。** 異常ではない
+                return false;
+            }
+
+            // **再編集リンクを付ける**（Issue #202）。
+            // ⚠️ **回答本体のトークンは載せない。** 専用のトークンを 1 本発行する
+            mail = await WithEditLinkAsync(mail, definition, payload, publicId, surveyId, acceptTo, language, cancellationToken)
+                .ConfigureAwait(false);
+
+            // ⚠️ **ここで初めて暗号化する。** 平文のまま DB へ渡る経路を作らない
+            return await outbox.EnqueueAsync(
+                MailIdOf(payload.Token),
+                (int)MailKind.AutoReply,
+                surveyId,
+                protector.Protect(mail),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // ⚠️ **受付の結果を変えない。** 回答は既に送信待ちへ入っている
+            logger.LogError(exception, "自動返信メールを積めなかった。受付の結果は変えない");
+            return false;
+        }
+    }
+
+    /// <summary>本文の後ろへ再編集リンクを足す（Issue #202）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **付けられないなら、黙って付けずに送る。** リンクが無いだけで、
+    /// 「受け付けた」という知らせそのものは届けたい。
+    /// </para>
+    /// <para>
+    /// ⚠️ **期限は受付の終了を超えない。** 受け付けていない期間に開いても直せないので、
+    /// **開けるのに直せないリンク**を送らない。
+    /// </para>
+    /// </remarks>
+    private async Task<OutgoingMail> WithEditLinkAsync(
+        OutgoingMail mail,
+        SurveyDefinition definition,
+        ResponsePayload payload,
+        string? publicId,
+        Guid surveyId,
+        DateTime? acceptTo,
+        string? language,
+        CancellationToken cancellationToken)
+    {
+        if (definition.AutoReply?.IncludeEditLink is not true
+            || !definition.AllowEditingAfterSubmit
+            || editTokens is null
+            || string.IsNullOrWhiteSpace(publicId))
+        {
+            return mail;
+        }
+
+        if (options.BaseUrl is not { Length: > 0 } baseUrl)
+        {
+            // ⚠️ **要求の Host からは作らない**（host header injection。Issue #189）
+            logger.LogWarning(
+                "再編集リンクを付けられない（{Key}BASEURL が未設定）", MailOptions.Prefix);
+            return mail;
+        }
+
+        var expiresAt = _time.GetUtcNow().UtcDateTime.AddDays(definition.AutoReply.EditLinkDays);
+
+        // **受付の終了を超えない**
+        if (acceptTo is { } until && until < expiresAt)
+        {
+            expiresAt = until;
+        }
+
+        if (expiresAt <= _time.GetUtcNow().UtcDateTime)
+        {
+            // 既に受付が終わっている。**開いても直せないので付けない**
+            return mail;
+        }
+
+        var token = ResponseEditLink.Create();
+        await editTokens
+            .SaveAsync(
+                ResponseEditLink.HashOf(token), payload.Token, surveyId, expiresAt, cancellationToken)
+            .ConfigureAwait(false);
+
+        var url = ResponseEditLink.UrlOf(baseUrl, publicId, token);
+
+        var label = ServerMessages.Get(
+            ServerMessageKeys.EditLinkMailNote,
+            language,
+            expiresAt.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture));
+
+        return mail with { Body = mail.Body + Environment.NewLine + Environment.NewLine + label + Environment.NewLine + url };
+    }
+
+    /// <summary>回答トークンから、送信待ちの識別子を決める。</summary>
+    /// <remarks>
+    /// <para>
+    /// **同じ回答なら必ず同じ識別子。** 二重に積まないために要る。
+    /// </para>
+    /// <para>
+    /// ⚠️ **トークンそのものを識別子にしない。** 送信待ちの行は管理画面から
+    /// 件数として見えるところにあり、**回答トークンは回答を読み書きできる値**
+    /// （<c>_documents/アーキテクチャ方針.md</c> 9 章）。
+    /// 一方向に潰してから使う。
+    /// </para>
+    /// </remarks>
+    public static Guid MailIdOf(string responseToken)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes("autoreply:" + responseToken));
+        return new Guid(hash.AsSpan(0, 16));
+    }
+}

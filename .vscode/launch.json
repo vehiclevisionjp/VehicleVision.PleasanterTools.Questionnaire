@@ -1,0 +1,128 @@
+{
+  // デバッグの設定。
+  //
+  // **資格情報の実値をここへ書かないこと。** 入っているのは検証環境用の固定値だけで、
+  // 本番の値は環境変数か Key Vault から与える（App_Data/Parameters/README.md）。
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // **先に「検証環境を起動（SQL Server）」を実行しておくこと。**
+      // DB と Pleasanter は Docker 側のものへ繋ぐ
+      "name": "アプリ（SQL Server の検証環境へ繋ぐ）",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "ビルド",
+      "program": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
+      "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web",
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5067",
+        // **実行環境の時間帯を明示する。** Azure は既定 UTC で、
+        // 明示しないと回答日時が 9 時間ずれる（_documents/実機検証結果.md 4 章）
+        "TZ": "Asia/Tokyo",
+        "QUESTIONNAIRE_DB_PROVIDER": "SqlServer",
+        "QUESTIONNAIRE_DB_CONNECTIONSTRING": "Server=localhost,11433;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True",
+        "QUESTIONNAIRE_PLEASANTER_BASEURL": "http://localhost:8080",
+        "QUESTIONNAIRE_PLEASANTER_APIKEY": "6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6",
+        "QUESTIONNAIRE_PLEASANTER_TIMEZONE": "Asia/Tokyo",
+        // 検証環境用の固定値。**本番では必ず作り直すこと**
+        "QUESTIONNAIRE_SECRET_KEY": "4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=",
+        // **枠を緩めてある。** 手で触っていると既定（1 分 60 回）はすぐ尽きる
+        "QUESTIONNAIRE_REQUESTS_PER_MIN": "6000",
+        "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN": "2000"
+      },
+      "sourceFileMap": { "/Views": "${workspaceFolder}/Views" }
+    },
+    {
+      "name": "アプリ（PostgreSQL の検証環境へ繋ぐ）",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "ビルド",
+      "program": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
+      "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5067",
+        "TZ": "Asia/Tokyo",
+        "QUESTIONNAIRE_DB_PROVIDER": "PostgreSql",
+        "QUESTIONNAIRE_DB_CONNECTIONSTRING": "Host=localhost;Port=15432;Database=questionnaire;Username=postgres;Password=Questionnaire#Test1",
+        "QUESTIONNAIRE_PLEASANTER_BASEURL": "http://localhost:8080",
+        "QUESTIONNAIRE_PLEASANTER_APIKEY": "6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6",
+        "QUESTIONNAIRE_PLEASANTER_TIMEZONE": "Asia/Tokyo",
+        "QUESTIONNAIRE_SECRET_KEY": "4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=",
+        "QUESTIONNAIRE_REQUESTS_PER_MIN": "6000",
+        "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN": "2000"
+      }
+    },
+    {
+      "name": "アプリ（MySQL の検証環境へ繋ぐ）",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "ビルド",
+      "program": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
+      "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5067",
+        "TZ": "Asia/Tokyo",
+        "QUESTIONNAIRE_DB_PROVIDER": "MySql",
+        "QUESTIONNAIRE_DB_CONNECTIONSTRING": "Server=localhost;Port=13306;Database=questionnaire;Uid=root;Pwd=Questionnaire#Test1",
+        "QUESTIONNAIRE_PLEASANTER_BASEURL": "http://localhost:8080",
+        "QUESTIONNAIRE_PLEASANTER_APIKEY": "6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6",
+        "QUESTIONNAIRE_PLEASANTER_TIMEZONE": "Asia/Tokyo",
+        "QUESTIONNAIRE_SECRET_KEY": "4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=",
+        "QUESTIONNAIRE_REQUESTS_PER_MIN": "6000",
+        "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN": "2000"
+      }
+    },
+    {
+      // **結合テストは既定で走らない。** ここから起こすときだけ環境変数を渡す
+      "name": "結合テストをデバッグ",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "ビルド",
+      "program": "${env:USERPROFILE}/.dotnet/dotnet.exe",
+      "args": [
+        "test",
+        "${workspaceFolder}/tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "QUESTIONNAIRE_INTEGRATION": "1",
+        "VSTEST_HOST_DEBUG": "1"
+      }
+    },
+    {
+      // **テストの中で止めたいとき。** VSTEST_HOST_DEBUG=1 で待つプロセスへ繋ぐ
+      "name": "実行中のプロセスへ接続",
+      "type": "coreclr",
+      "request": "attach"
+    },
+    {
+      "name": "回答画面（ブラウザ）",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8081",
+      "webRoot": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Frontend"
+    },
+    {
+      "name": "管理画面（ブラウザ）",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8081/admin",
+      "webRoot": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Frontend"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "アプリ ＋ 管理画面",
+      "configurations": ["アプリ（SQL Server の検証環境へ繋ぐ）", "管理画面（ブラウザ）"],
+      "stopAll": true
+    }
+  ]
+}

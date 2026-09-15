@@ -14,7 +14,109 @@ Copyright (C) PMC Co.,Ltd.
 
 依存を追加したら、このファイルへ「名称 / バージョン / ライセンス / 入手元」を追記すること。
 
-（未記入。依存パッケージの追加に合わせて維持する）
+名称 / バージョン / ライセンス / 入手元
+
+  Dapper 2.1.86 / Apache-2.0 / https://www.nuget.org/packages/Dapper
+  FluentMigrator 8.0.1 / Apache-2.0 / https://www.nuget.org/packages/FluentMigrator
+  FluentMigrator.Runner 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.SqlServer 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.Postgres 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.MySql 8.0.1 / Apache-2.0
+  Microsoft.Data.SqlClient 7.0.3 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
+  Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
+  MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
+  Microsoft.Extensions.DependencyInjection 10.0.12 / MIT
+  Microsoft.Extensions.Configuration.Abstractions 10.0.11 / MIT
+  Microsoft.Extensions.Hosting.Abstractions 10.0.11 / MIT
+  Microsoft.Extensions.Logging.Abstractions 10.0.11 / MIT
+  Jint 4.16.2 / BSD-2-Clause / https://github.com/sebastienros/jint
+    （変換スクリプトの実行エンジン。Acornima などを推移的に伴う）
+  Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
+  nClam 9.0.0 / Apache-2.0 / https://github.com/tekmaven/nClam
+  Ixnas.AltchaNet 1.2.1 / BSD-2-Clause / https://github.com/ixnas/altcha-dotnet
+  ITfoxtec.Identity.Saml2 4.20.1 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+  ITfoxtec.Identity.Saml2.MvcCore 4.20.1 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+    （Microsoft.IdentityModel.* と Newtonsoft.Json を推移的に伴う。いずれも MIT）
+  Azure.Storage.Blobs 12.29.2 / MIT / https://github.com/Azure/azure-sdk-for-net
+    （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
+  AWSSDK.SimpleEmailV2 4.0.104.2 / Apache-2.0 / https://github.com/aws/aws-sdk-net
+    （Amazon SES の送信経路。**IAM ロールで通るので、保管する秘密が 0 になる**。Issue #198）
+  Azure.Communication.Email 1.1.0 / MIT / https://github.com/Azure/azure-sdk-for-net
+    （Azure Communication Services の送信経路。**マネージド ID で通る**。Issue #198）
+  Azure.Identity 1.21.0 / MIT / https://github.com/Azure/azure-sdk-for-net
+    （マネージド ID から資格情報を取る。Azure.Core などを推移的に伴う）
+  MailKit 4.17.0 / MIT / https://github.com/jstedfast/MailKit
+    （メールの送信。**認証付きリレーの 587 番は Azure でブロックされない**ので、
+      これ 1 本で SendGrid・Amazon SES・Azure Communication Services・
+      Microsoft 365 へ送れる。**送信先ごとの純正 SDK は足さない**）
+  MimeKit 4.17.0 / MIT / https://github.com/jstedfast/MimeKit
+    （MailKit が推移的に伴う。メールの組み立て）
+  BouncyCastle.Cryptography 2.6.2 / MIT / https://github.com/bcgit/bc-csharp
+    （MimeKit が推移的に伴う）
+
+フロントエンド（**成果物へ含まれるのは svelte のランタイム・qrcode・同梱した書体のみ。**
+残りはビルド時だけ使う）
+
+  svelte 5.57.0 / MIT / https://www.npmjs.com/package/svelte
+  vite 8.3.0 / MIT / https://www.npmjs.com/package/vite
+  @sveltejs/vite-plugin-svelte 7.3.0 / MIT
+  svelte-check 4.7.6 / MIT
+  vitest 5.0.0 / MIT / https://www.npmjs.com/package/vitest
+  sass 1.104.0 / MIT
+  typescript 6.0.3 / Apache-2.0
+  qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
+  @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://github.com/DefinitelyTyped/DefinitelyTyped
+
+同梱する書体とアイコン（**成果物に含まれる。** 自前配信なので外部へ要求は出ない）
+
+  @fontsource-variable/noto-sans-jp 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-sans-jp
+    （Noto Sans JP Variable。unicode-range で分割された woff2）
+  @fontsource-variable/noto-serif-jp 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-serif-jp
+    （Noto Serif JP Variable。テーマの「明朝体」）
+  @fontsource/m-plus-rounded-1c 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/m-plus-rounded-1c
+    （M PLUS Rounded 1c。テーマの「丸ゴシック体」。**可変フォントが無いので 400 と 700 だけ持つ**）
+  @fontsource-variable/m-plus-1-code 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/m-plus-1-code
+    （M PLUS 1 Code Variable。日本語も等幅になる）
+  @fontsource/material-icons 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/material-icons
+    （Material Icons。**上流（google/material-design-icons）は Apache-2.0** だが、
+      npm パッケージは OFL-1.1 を宣言している）
+
+テスト時のみ使用するもの
+
+  xunit 2.9.3 / Apache-2.0
+  xunit.runner.visualstudio 4.0.0 / Apache-2.0
+  Microsoft.NET.Test.Sdk 18.10.0 / MIT
+  @playwright/test 1.62.1 / Apache-2.0 / https://github.com/microsoft/playwright
+  Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。成果物へ入るのは上記の書体）
+  Keycloak 26.7.3 / Apache-2.0 / https://github.com/keycloak/keycloak
+    （SAML の検証用 IdP。**別のコンテナとして立てるだけで、成果物には含まれない**）
+  Mailpit 1.31.1 / MIT / https://github.com/axllent/mailpit
+    （メールの検証用の受け。SMTP を受けて溜めるだけで外へは出さない。
+      **別のコンテナとして立てるだけで、成果物には含まれない**）
+  coverlet.collector 10.0.1 / MIT
+  Microsoft.Extensions.Configuration 10.0.11 / MIT
+    （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
+  Microsoft.Extensions.TimeProvider.Testing 10.9.0 / MIT
+  System.Security.Cryptography.Xml 10.0.11 / MIT / https://github.com/dotnet/runtime
+    （ITfoxtec.Identity.Saml2 が推移的に伴う版に既知の脆弱性があるため、
+      テストプロジェクトでは修正済みの版を明示して固定している。
+      アプリ側は net10.0 の共有フレームワークが提供するため参照しない＝NU1510）
+
+**依存を追加したら、ここへ追記してからコミットすること。**
+
+--------------------------------------------------------------------------------
+ClamAV について
+--------------------------------------------------------------------------------
+
+ウイルススキャンを有効にした場合、本ソフトウェアは ClamAV（Cisco Systems, Inc.,
+GNU GPL-2.0）の clamd へ TCP 越しに問い合わせます。
+
+  https://www.clamav.net/
+
+**ClamAV 本体は配布物に含めず、リンクもしません。** 導入先が別プロセス
+（サイドカーコンテナ等）として動かすものとして扱い、本ソフトウェアは接続先を
+設定で受け取るだけです。問い合わせに使う nClam（Apache-2.0）のみを依存に持ちます。
+構成と運用は _documents/添付ファイル検査-運用手順書.md を参照してください。
 
 --------------------------------------------------------------------------------
 Pleasanter について

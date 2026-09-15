@@ -1,0 +1,66 @@
+{
+    "//": "管理者のパスワードに求める条件。**Pleasanter 本体の Security.json と同じ書き方**にしてある（_reference/Implem.Pleasanter/Implem.ParameterAccessor/Parts/PasswordPolicy.cs）。実値を変えるときは Security.local.json（git 管理外）か環境変数で上書きする",
+
+    "//PasswordMinimumLength": "パスワードの最低の長さ。文字種の縛りではなく長さで担保する（記号を混ぜさせると短く単純な値に寄る）",
+    "PasswordMinimumLength": 12,
+
+    "//PasswordAllowSameAsLoginId": "ログイン ID と同じパスワードを許すか。大文字小文字は区別しない。既定は許さない（ログイン ID は総当たりの起点になるため）",
+    "PasswordAllowSameAsLoginId": false,
+
+    "//PasswordPolicies": "正規表現の条件。**上から順に見て、最初に合わなかったものの Languages の文言を返す。** 判定は部分一致（本体と同じ）で、全体一致にしたいときは ^…$ を書く。⚠️ 先読み・後方参照・原子グループは使えない（後退戻りしない照合器で動かすため）。使えない書き方や組み立てられない書き方は、**起動時に落ちる**",
+    "PasswordPolicies": [
+        {
+            "//": "既定では 1 つも有効にしていない。長さだけで担保する方針のため（PasswordMinimumLength）。下は書き方の見本",
+            "Enabled": false,
+            "Regex": "[0-9]",
+            "Languages": [
+                {
+                    "Body": "Include at least one digit in the password."
+                },
+                {
+                    "Language": "ja",
+                    "Body": "パスワードには数字を 1 つ以上入れてください。"
+                }
+            ]
+        },
+        {
+            "Enabled": false,
+            "Regex": "[a-z]",
+            "Languages": [
+                {
+                    "Body": "Include at least one lower case letter in the password."
+                },
+                {
+                    "Language": "ja",
+                    "Body": "パスワードには英小文字を 1 つ以上入れてください。"
+                }
+            ]
+        },
+        {
+            "Enabled": false,
+            "Regex": "[A-Z]",
+            "Languages": [
+                {
+                    "Body": "Include at least one upper case letter in the password."
+                },
+                {
+                    "Language": "ja",
+                    "Body": "パスワードには英大文字を 1 つ以上入れてください。"
+                }
+            ]
+        },
+        {
+            "Enabled": false,
+            "Regex": "[^0-9a-zA-Z]",
+            "Languages": [
+                {
+                    "Body": "Include at least one symbol in the password."
+                },
+                {
+                    "Language": "ja",
+                    "Body": "パスワードには記号を 1 つ以上入れてください。"
+                }
+            ]
+        }
+    ]
+}

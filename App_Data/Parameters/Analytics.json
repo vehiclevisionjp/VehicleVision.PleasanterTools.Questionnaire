@@ -1,0 +1,15 @@
+{
+    "//": "回答画面のアクセス解析（Issue #162）。**既定は無効**で、設定しなければ回答者の端末から第三者への要求は 1 つも出ない。実値は Analytics.local.json（git 管理外）か環境変数で上書きする",
+
+    "//AnalyticsProvider": "使うサービス。None（既定） / Ga4 / Gtm / Matomo / Plausible。**知らない値は無効として扱う**（解析が無くても回答は取れるので、起動は止めない）",
+    "AnalyticsProvider": "None",
+
+    "//AnalyticsSiteId": "サービスによって意味が変わる。Ga4: 測定 ID（G-XXXXXXX）／Gtm: コンテナ ID（GTM-XXXXXXX）／Matomo: サイト ID（数字）／Plausible: 計測するドメイン",
+    "AnalyticsSiteId": null,
+
+    "//AnalyticsScriptOrigin": "スクリプトの配信元。**Matomo は必須**（自前設置の URL）。Plausible は省略すると https://plausible.io。Google の 2 つは決まった配信元を使うので指定しない。http(s) の絶対 URL 以外は無効として扱う",
+    "AnalyticsScriptOrigin": null,
+
+    "//AnalyticsShowNotice": "回答者へ「外部サービスへ送っている」ことを知らせるか。**既定は知らせる。** 完全匿名を掲げてきた画面で黙って送るのは筋が通らない",
+    "AnalyticsShowNotice": true
+}

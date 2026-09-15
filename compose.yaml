@@ -1,0 +1,437 @@
+# 開発環境ひとそろい。
+#
+# **ホストに .NET SDK も node も DB クライアントも要求しない**ことが目的。
+# Pleasanter と 3 種類の RDBMS、本アプリをまとめて起動する。
+#
+# Pleasanter 側の定義は tools/pleasanter-testenv/docker-compose.yml を include して
+# 再利用する（二重管理しないため）。そちらの service 名は db / codedefiner /
+# pleasanter / verify。`db` は SQL Server。
+#
+#   SQL Server で動かす:  docker compose --profile sqlserver up -d --wait
+#   PostgreSQL で動かす:  docker compose --profile postgres  up -d --wait
+#   MySQL で動かす:       docker compose --profile mysql     up -d --wait
+#   ウイルススキャンも:   docker compose --profile postgres --profile clamav up -d --wait
+#   後片付け:             docker compose --profile "*" down -v
+#
+# Pleasanter（db / codedefiner / pleasanter）は profile を持たないので常に起動する。
+# **tools/pleasanter-testenv を同時に起動しないこと。** ポートが衝突する。
+#
+# **Windows の Git Bash からは MSYS_NO_PATHCONV=1 を付けること。**
+
+name: questionnaire-dev
+
+# **自己署名の証明書（PFX）を守るパスワード。検証環境用の固定値。**
+# 作る側（devcert）と読む側（app）で必ず同じ値を使う。片方だけ直すと
+# 「証明書は在るのに Kestrel が起動しない」になるので、**1 か所に書いて参照する**
+x-devcert-password: &devcert-password "${DEV_HTTPS_CERT_PASSWORD:-Questionnaire#DevCert1}"
+
+# **アプリとマイグレーションで同じ設定を使う。**
+# 二重に書くと、片方だけ直したときに「当てたはずなのに古い」が起きる
+x-app-environment: &app-environment
+    ASPNETCORE_ENVIRONMENT: Development
+    # **Azure の実行環境は既定 UTC。** 明示しないと回答日時が 9 時間ずれる
+    # （_documents/実機検証結果.md 4 章）
+    TZ: Asia/Tokyo
+    # 接続先はプロファイルに応じて .env か環境変数で差し替える
+    QUESTIONNAIRE_DB_PROVIDER: ${DEV_DB_PROVIDER:-SqlServer}
+    QUESTIONNAIRE_DB_CONNECTIONSTRING: ${DEV_DB_CONNECTIONSTRING:-Server=db;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True}
+    # **検証環境は自己署名の証明書を使うので、暗号化の検査を緩める。**
+    # 本番では設定しないこと（設定すると平文のまま起動できてしまう）
+    QUESTIONNAIRE_DB_ALLOW_INSECURE: "true"
+    QUESTIONNAIRE_PLEASANTER_BASEURL: http://pleasanter:8080
+    # **実値をここへ書かない。** 検証環境用の固定値のみ
+    QUESTIONNAIRE_PLEASANTER_APIKEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
+    # **管理者の 2 要素の共有鍵を守る鍵。** これを失うと登録済みの 2 要素が全て使えなくなる。
+    # 本番では App Service の設定か Key Vault に置き、**控えを取っておくこと**。
+    # ここにあるのは検証環境用の固定値
+    QUESTIONNAIRE_SECRET_KEY: ${DEV_SECRET_KEY:-4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=}
+    # **検証環境だけ緩める。** 端から端まで通す試験が既定の枠（10 回）を使い切るため。
+    # **本番では設定しないこと**
+    # **端から端まで通す試験は 1 件ごとに管理者を作り直す**（setup ＋ 2 要素の登録）。
+    # 試験が増えるほど枠を食うので、検証環境では大きめに取る。**本番では設定しないこと**
+    # **検証環境では 2 要素を必須にする**（Issue #172）。
+    # 製品の既定は「任意」（Issue #154）だが、ここを任意にすると
+    # **初期設定の直後に管理画面へ入ってしまい、2 要素の画面を写しに撮れない。**
+    # 取説（_documents/アンケート作成-運用手順書.md）はこの状態の図で説明している。
+    # 任意・無効の振る舞いを手元で見たいときは DEV_ADMIN_TWOFACTOR で切り替える
+    QUESTIONNAIRE_ADMIN_TWOFACTOR: ${DEV_ADMIN_TWOFACTOR:-required}
+    # ---- SAML（Issue #166）--------------------------------------------------
+    # **既定は無効。** saml profile の IdP と合わせて使うときだけ有効にする
+    #
+    #   DEV_SAML_ENABLED=true docker compose --profile sqlserver --profile saml up -d --wait
+    #
+    # ⚠️ **SAML は HTTPS でしか動かない**（途中を預ける cookie が SameSite=None; Secure）。
+    # 手元では https://localhost:8443 を使うこと
+    QUESTIONNAIRE_SAML_ENABLED: ${DEV_SAML_ENABLED:-false}
+    QUESTIONNAIRE_SAML_ENTITYID: ${DEV_SAML_ENTITYID:-https://localhost:8443/questionnaire}
+    QUESTIONNAIRE_SAML_IDPENTITYID: ${DEV_SAML_IDPENTITYID:-https://localhost:8543/realms/questionnaire}
+    QUESTIONNAIRE_SAML_SINGLESIGNONURL: ${DEV_SAML_SSOURL:-https://localhost:8543/realms/questionnaire/protocol/saml}
+    # **realm へ焼き込んだ検証用の証明書**（tools/saml-idp/realm-questionnaire.json と同じもの）
+    QUESTIONNAIRE_SAML_IDPCERTIFICATE: ${DEV_SAML_IDPCERTIFICATE:-MIIDIzCCAgugAwIBAgIUHy3DB8BizZXAJOsyFseVAeZnRj0wDQYJKoZIhvcNAQELBQAwITEfMB0GA1UEAwwWcXVlc3Rpb25uYWlyZS10ZXN0LWlkcDAeFw0yNjA5MDkwMTQ1MjhaFw0zNjA5MDYwMTQ1MjhaMCExHzAdBgNVBAMMFnF1ZXN0aW9ubmFpcmUtdGVzdC1pZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFaF2Bk88oso/N3K1wzCwP966u+DaEdtCVLvnrMd69o/O4ACN629JVV/RyQbB4ur0cbbWoM2q8S8MB50cwAWX+VT6g4qR9o0X6OFaqBrXylTeIs72IzNcb6t+wiXGcOH9qYLvsVH7ISAZDcUwY4bxc/9Xl9yfFCKnCFh1DU/1IBIwiGRlSlqcIvGo6scdf+dyAfbAdy2baMLNTIrkHY1BWVviD/jjLOSQOUj9p6IE6rE4+nD9z1AcLDoMcwU1y4PncjwNRczV6xQWxHg/0ho/H2CXvGhhiC6mFuYdP2oaw6xhurBPhdc19k6FYwhTFaJieHwxG9Y0XfZXjTu0Hj+ftAgMBAAGjUzBRMB0GA1UdDgQWBBRCA/z/eFTDiZzm1jN6SaPJxau2OjAfBgNVHSMEGDAWgBRCA/z/eFTDiZzm1jN6SaPJxau2OjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBAWlKIbpNJEwOYHnvZthwm86wJWFBLaxX3TffpAjhxxGoixlFK28UjomkukSf8JJiyts/BXI/n8OsXHXSlqOqRvnxPufMwbm6NDlo8q2sPNYwk7acF97o7kPkq+9MqR1CHmeJDpDTh138dh/FKaQFi7GPUXzvIXyO6KHZKlnMapIOo3sS4L6xr13ViobgRX1XFq9tIob5rW8aRptKcW3BIWqTknd0zJbTi4QNIjWq6MO0QmDkhDqdM1gtw4AO+EuMNVLkBLdGiUnKkiEaXLHVdkppUW6nHg0PKpOhgAiQmzrU4BOiFJCj712FrfotJhKQdhD9TsCyaokoZudUhXNwF}
+    # **単一ログアウトの窓口**（Issue #191）。Keycloak は SSO と同じ URL で受ける。
+    # **未設定なら SLO を使わない**（対応していない IdP でも動くこと）
+    QUESTIONNAIRE_SAML_SINGLELOGOUTURL: ${DEV_SAML_SLOURL:-https://localhost:8543/realms/questionnaire/protocol/saml}
+    QUESTIONNAIRE_SAML_UNKNOWNUSER: ${DEV_SAML_UNKNOWNUSER:-Reject}
+    QUESTIONNAIRE_SAML_BUTTONLABEL: ${DEV_SAML_BUTTONLABEL:-検証用 IdP でログイン}
+    # ---- メール（Issue #189）------------------------------------------------
+    # **既定は無効。** mail profile の Mailpit と合わせて使うときだけ有効にする
+    #
+    #   DEV_MAIL_ENABLED=true docker compose --profile sqlserver --profile mail up -d --wait
+    #
+    # **Mailpit は受け取るだけで、外へは 1 通も出さない**（検証用の行き止まり）。
+    # 受け取ったメールは http://localhost:8025 と、その HTTP API で読める。
+    # ⚠️ **暗号化も認証もしない設定。** 手元の容器同士だからで、本番では必ず
+    # StartTls ＋ 認証を使うこと
+    QUESTIONNAIRE_MAIL_ENABLED: ${DEV_MAIL_ENABLED:-false}
+    QUESTIONNAIRE_MAIL_SMTP_HOST: ${DEV_MAIL_HOST:-mailpit}
+    QUESTIONNAIRE_MAIL_SMTP_PORT: ${DEV_MAIL_PORT:-1025}
+    QUESTIONNAIRE_MAIL_SMTP_SECURITY: ${DEV_MAIL_SECURITY:-None}
+    QUESTIONNAIRE_MAIL_FROM_ADDRESS: ${DEV_MAIL_FROM:-noreply@questionnaire.test}
+    QUESTIONNAIRE_MAIL_FROM_NAME: ${DEV_MAIL_FROM_NAME:-アンケート}
+    # **メールに載せる URL の起点**（招待メール）。
+    # ⚠️ **要求の Host ヘッダから組み立てない**（host header injection）。
+    # 設定が無ければ、リンクを載せるメールは送らない
+    QUESTIONNAIRE_MAIL_BASEURL: ${DEV_MAIL_BASEURL:-https://localhost:8443}
+    QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN: ${DEV_LOGIN_ATTEMPTS:-2000}
+    QUESTIONNAIRE_REQUESTS_PER_MIN: ${DEV_REQUESTS_PER_MIN:-6000}
+    # **proof-of-work は検証環境でも効かせたままにする**（Issue #55）。
+    # 切ると「本番でだけ落ちる」道を残すことになる。
+    # 難しさだけ下げて、試験の待ち時間を短くする
+    QUESTIONNAIRE_ALTCHA_MIN_NUMBER: ${DEV_ALTCHA_MIN:-1000}
+    QUESTIONNAIRE_ALTCHA_MAX_NUMBER: ${DEV_ALTCHA_MAX:-5000}
+    # ウイルススキャンは既定で無効。clamav profile と併せて有効にする
+    QUESTIONNAIRE_VIRUSSCAN_ENABLED: ${DEV_VIRUSSCAN_ENABLED:-false}
+    QUESTIONNAIRE_VIRUSSCAN_HOST: clamav
+    QUESTIONNAIRE_VIRUSSCAN_PORT: "3310"
+    # **埋め込みを許す配信元**（Issue #104 / #107）。**製品の既定は空。**
+    # 検証環境では、許した／許していないの両方を試せるように 2 つだけ入れる
+    QUESTIONNAIRE_EMBED_ALLOWEDHOSTS: ${DEV_EMBED_ALLOWEDHOSTS:-www.example.com,*.example.net}
+
+include:
+  - path: tools/pleasanter-testenv/docker-compose.yml
+
+services:
+  # ---- 3 RDBMS -------------------------------------------------------------
+  # SQL Server は include 先の `db` を使う（profile: sqlserver で起動する）
+
+  # **SQL Server だけ、本アプリの DB を作る係が要る**（Issue #97）。
+  # PostgreSQL と MySQL は公式イメージの `POSTGRES_DB` / `MYSQL_DATABASE` が
+  # 起動時に作るが、**SQL Server のイメージにはその仕掛けが無い。**
+  # 接続文字列に書いても作られないし、**スキーマの適用（FluentMigrator）も
+  # データベース自体は作らない。** 誰も作らないと `migrate` が
+  # 「Cannot open database "Questionnaire"」で必ず落ちる。
+  # CI も同じことをしている（.github/workflows/integration.yml）。
+  #
+  # **`db` と同じくプロファイルを持たせない。** `migrate` は 3 つのプロファイルで
+  # 共用しており、SQL Server 専用にすると
+  # 「service "migrate" depends on undefined service "db-init"」で
+  # PostgreSQL / MySQL 側が壊れる（実測）。`db` 自体が常に起動する作りなので、
+  # この係も常に走らせて構わない。**空のデータベースを 1 つ作るだけ。**
+  #
+  # **同じイメージを使い回す。** sqlcmd のためだけに別のイメージを増やさない
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2025-CU8-ubuntu-24.04
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Tokyo
+      MSSQL_SA_PASSWORD: ${TESTENV_SA_PASSWORD:-Questionnaire#Test1}
+    # **何度実行しても同じ結果にする。** 既にあれば作らない
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -eu
+        /opt/mssql-tools18/bin/sqlcmd -S db -U sa -P "$$MSSQL_SA_PASSWORD" -C -b \
+          -Q "IF DB_ID('Questionnaire') IS NULL CREATE DATABASE [Questionnaire];"
+
+  db-postgres:
+    # タグはレジストリで確認して固定する（2026-08-18 時点の最新メジャー）
+    image: postgres:18-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_PASSWORD: ${TESTENV_SA_PASSWORD:-Questionnaire#Test1}
+      POSTGRES_DB: questionnaire
+      TZ: Asia/Tokyo
+    ports:
+      - "${DEV_POSTGRES_PORT:-15432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    volumes:
+      # **PostgreSQL 18 以降はマウント位置が /var/lib/postgresql。**
+      # 従来の /var/lib/postgresql/data へ当てると起動時に弾かれる
+      # （pg_upgrade をマウント境界越しに行えないため）
+      - postgres-data:/var/lib/postgresql
+
+  db-mysql:
+    image: mysql:26
+    profiles: ["mysql"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TESTENV_SA_PASSWORD:-Questionnaire#Test1}
+      MYSQL_DATABASE: questionnaire
+      TZ: Asia/Tokyo
+    # **utf8mb4 を明示する。** 既定が 3 バイトの utf8 だと絵文字が入らない
+    # （_documents/データモデル設計.md 4 章）
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_as_cs
+    ports:
+      - "${DEV_MYSQL_PORT:-13306}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  # ---- 検証用の IdP（オプション。Issue #166）---------------------------------
+  # **SAML のログインを手元で通すためだけの IdP。** 既定では起動しない。
+  #
+  #   docker compose --profile sqlserver --profile saml up -d --wait
+  #
+  # **Keycloak は Apache-2.0。** 本アプリのイメージへ同梱せず、別プロセスとして立てる。
+  # ⚠️ **realm に検証用の鍵と利用者を焼き込んである。** 本番へ持ち込まないこと
+  # （tools/saml-idp/realm-questionnaire.json）。
+  #
+  # **署名鍵を realm へ固定している理由**は、SP 側の設定（証明書）を
+  # 起動のたびに書き換えずに済ませるため。Keycloak は既定だと起動時に鍵を作る
+  saml-idp:
+    image: quay.io/keycloak/keycloak:26.7.3
+    profiles: ["saml"]
+    # ⚠️ **HTTPS で立てる。** Keycloak のログインの途中を保つ cookie は
+    # `Secure` 付きで発行されるため、**http だと戻ってこず cookie_not_found になる**
+    # （実際に踏んだ）。TLS の材料は tools/saml-idp/tls（**検証用の自己署名**）
+    command:
+      - start-dev
+      - --import-realm
+      - --https-certificate-file=/opt/keycloak/conf/tls/cert.pem
+      - --https-certificate-key-file=/opt/keycloak/conf/tls/key.pem
+    environment:
+      TZ: Asia/Tokyo
+      # 検証環境用の固定値。**本番の資格情報ではない**
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: idp-test-admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${DEV_SAML_IDP_PORT:-8543}:8443"
+    volumes:
+      - ./tools/saml-idp/realm:/opt/keycloak/data/import:ro
+      - ./tools/saml-idp/tls:/opt/keycloak/conf/tls:ro
+    healthcheck:
+      # **TLS を有効にすると管理ポート（9000）も https になり、
+      # イメージに curl も openssl も無いので health を叩けない。**
+      # そこで**待ち受けているかだけ**を見る。Keycloak は起動の最後に
+      # ポートを開くので（ログの "Listening on" が最終行）、これで足りる
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8443"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+
+  # ---- ウイルススキャン（オプション） ---------------------------------------
+  # **既定は無効。** profile を付けたときだけ起動する。
+  # ---- 検証用のメール受け（Issue #189）---------------------------------------
+  # **SMTP を受けて溜めるだけの行き止まり。** 外へは 1 通も出ないので、
+  # 実在するアドレスを宛先にしても誰にも届かない。
+  #
+  #   DEV_MAIL_ENABLED=true docker compose --profile sqlserver --profile mail up -d --wait
+  #
+  # | 役割 | URL |
+  # | --- | --- |
+  # | 受け取ったメールを見る | http://localhost:8025 |
+  # | 試験から読む HTTP API | http://localhost:8025/api/v1/messages |
+  #
+  # **Mailpit は MIT。別のコンテナとして立てるだけで、成果物には含まれない**
+  # （Keycloak と同じ扱い。NOTICE に計上してある）
+  mailpit:
+    image: axllent/mailpit:v1.31.1
+    profiles: ["mail"]
+    environment:
+      TZ: Asia/Tokyo
+      # **溜めっぱなしにしない。** 試験を回すほど溜まる
+      MP_MAX_MESSAGES: "500"
+    ports:
+      - "${DEV_MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${DEV_MAILPIT_UI_PORT:-8025}:8025"
+    healthcheck:
+      # **Mailpit 自身が持っている検査を使う**（容器に curl が無い）
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # Azure App Service では**サイドカーコンテナ**として同じ形で動かす
+  # （_documents/添付ファイル検査-運用手順書.md）。
+  # **ClamAV は GPL-2.0。本アプリのイメージへ同梱しない**（別プロセスとして接続する）
+  clamav:
+    image: clamav/clamav:1.5-debian13-slim
+    profiles: ["clamav"]
+    environment:
+      TZ: Asia/Tokyo
+    ports:
+      - "${DEV_CLAMD_PORT:-13310}:3310"
+    healthcheck:
+      # 定義データベースの取得が終わるまで ready にならない。起動に数分かかる
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 180s
+
+  # ---- 検証環境だけの自己署名証明書 -------------------------------------------
+  # **`crypto.subtle` は安全なコンテキスト（https か localhost）でしか使えない**
+  # （Issue #67）。容器同士を平文の http で繋いでいる限り、端から端まで通す試験では
+  # 自前の SHA-256（控え。`Frontend/src/lib/sha256.ts`）しか通らず、
+  # **本番で実際に使われる経路が一度も試されない。** そこで https でも待ち受ける。
+  #
+  # **鍵をリポジトリへ置かない。** 起動のたびに容器の中で作り、名前付きボリューム
+  # （devcert）だけに置く。作業ツリーにもイメージの層にも残らない。
+  # **イメージへ焼き込まないのは Microsoft の助言でもある**
+  # （「Copying certificates into an image isn't recommended ... There is significant
+  # risk of certificate disclosure」。
+  # https://learn.microsoft.com/aspnet/core/security/docker-https 2026-08-20 参照）。
+  #
+  # **イメージは build 段階で既に引いている SDK を使い回す。** 新しい依存を増やさない。
+  # `dotnet dev-certs https --export-path <pfx> --password <パスワード>` は
+  # Microsoft が案内している作り方（同上）。
+  #
+  # **この証明書は `localhost` などの名前しか持たない**（.NET 10 の SAN は
+  # localhost / *.dev.localhost / *.dev.internal / host.docker.internal /
+  # host.containers.internal / 127.0.0.1 / ::1。
+  # https://learn.microsoft.com/dotnet/core/tools/dotnet-dev-certs 2026-08-20 参照）。
+  # `questionnaire-app` では名前が合わないので、**ブラウザ側で証明書の検査を外す**
+  # （tools/screenshots/playwright.config.ts の ignoreHTTPSErrors）。
+  # **検証環境だけの割り切り。本番へ持ち込まないこと**
+  devcert:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    profiles: ["sqlserver", "postgres", "mysql", "app"]
+    restart: "no"
+    environment:
+      TZ: Asia/Tokyo
+      DEV_HTTPS_CERT_PASSWORD: *devcert-password
+    volumes:
+      - devcert:/https
+    # **毎回作り直す。** 期限切れの証明書が残って「昨日は動いたのに」を作らない。
+    # **アプリは root で動かない**（Dockerfile の `USER $APP_UID`）ので、
+    # 読める権限にしておく。鍵はこのボリュームの外へ出ない。
+    # `$$` は compose に食わせないための書き方（容器の中の sh が展開する）
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        rm -f /https/aspnetapp.pfx
+        dotnet dev-certs https --export-path /https/aspnetapp.pfx --password "$$DEV_HTTPS_CERT_PASSWORD"
+        chmod 0444 /https/aspnetapp.pfx
+        ls -l /https/aspnetapp.pfx
+
+  # ---- スキーマを当てる ------------------------------------------------------
+  # **アプリ起動時の自動適用はしない**（_documents/データモデル設計.md 5 章。
+  # スケールアウト時に同時実行され得る）。**その代わり、起動より前に当てる係を置く。**
+  # app は完了を待ってから立ち上がるので、`up --wait` 一発で順番が揃う。
+  #
+  # **DB へ depends_on を書かない。** 使う DB はプロファイルごとに違い、書くと
+  # 選んでいない DB まで一緒に起動してしまう。代わりに中で待つ（--wait-for-db）。
+  # SQL Server は初回の起動が長いので余裕を取る
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["sqlserver", "postgres", "mysql", "app"]
+    environment: *app-environment
+    depends_on:
+      # **SQL Server のときだけ DB を作る係を待つ**（Issue #97）。
+      # **PostgreSQL / MySQL へは漏れない。** プロファイルが合わない依存は
+      # compose が黙って外す（`docker compose --profile postgres config` で確認済み）
+      db-init:
+        condition: service_completed_successfully
+    command: ["--migrate", "--wait-for-db=180"]
+    restart: "no"
+
+  # ---- 本アプリ ------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["sqlserver", "postgres", "mysql", "app"]
+    environment:
+      <<: *app-environment
+      # **8080 の平文はそのまま残し、8443 で https も待ち受ける**（Issue #67）。
+      # `HTTP_PORTS` / `HTTPS_PORTS` は「ポート番号だけを指定する」ための設定キーで、
+      # `;` 区切りの一覧。**`ASPNETCORE_URLS` を設定すると上書きされる**ので使わない
+      # （https://learn.microsoft.com/aspnet/core/fundamentals/servers/kestrel/endpoints
+      # 2026-08-20 参照）。8080 は Dockerfile の `ASPNETCORE_HTTP_PORTS` と同じ値。
+      # **対で読めるように、ここでも両方書いておく**
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ASPNETCORE_HTTPS_PORTS: "8443"
+      # **Kestrel の既定の証明書。** `ASPNETCORE_` は前置きなので、設定キーとしては
+      # `Kestrel:Certificates:Default:Path` / `:Password` になる
+      # （https://learn.microsoft.com/aspnet/core/security/docker-https 2026-08-20 参照）。
+      # 実体は devcert が作ってボリュームへ置いたもの
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /https/aspnetapp.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: *devcert-password
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      # **証明書が出来てから起こす。** 無いまま HTTPS_PORTS を渡すと Kestrel が落ちる
+      devcert:
+        condition: service_completed_successfully
+    ports:
+      - "${DEV_APP_PORT:-8081}:8080"
+      # **平文の 8081 は動いたまま。** https は別の番号で足す。
+      # `_documents/開発環境.md`「HTTPS（自己署名）で動かす」
+      - "${DEV_APP_HTTPS_PORT:-8443}:8443"
+    volumes:
+      # **読むだけ。** アプリ側から鍵を書き換えさせない
+      - devcert:/https:ro
+    networks:
+      default:
+        aliases:
+          # **`app` という名前でブラウザから開かない。**
+          # Chrome は `.app` を HSTS のプリロード一覧に持っており、
+          # 単一ラベルの `app` でも https へ強制されて ERR_SSL_PROTOCOL_ERROR になる
+          # （実測。curl では http のまま 200 が返る）
+          - questionnaire-app
+
+  # ---- 取説用の写しを撮る ----------------------------------------------------
+  # **ホストに Playwright とブラウザを入れない。**
+  # **日本語フォントを入れてある**（入れないと文字が豆腐になる）
+  #
+  # **先に検証環境を起こしておくこと**（app が要る）。
+  # app は DB のプロファイル側で定義されているので、ここでは depends_on を書けない。
+  #
+  #   docker compose --profile sqlserver up -d --wait
+  #   docker compose --profile sqlserver --profile screenshots run --rm screenshots
+  screenshots:
+    build:
+      context: ./tools/screenshots
+      dockerfile: Dockerfile
+    profiles: ["screenshots"]
+    environment:
+      TZ: Asia/Tokyo
+      # コンテナ同士なので、外向けの番号ではなく service 名で繋ぐ
+      QUESTIONNAIRE_BASE_URL: http://questionnaire-app:8080
+      # **https 側。** `crypto.subtle` は安全なコンテキストでしか使えないので、
+      # 本番で実際に使われる経路はこちらでしか試せない（Issue #67）。
+      # 平文の経路も残っている（控えの SHA-256）ので、**両方を試す**
+      # （specs/secure-context.spec.ts）
+      QUESTIONNAIRE_HTTPS_BASE_URL: https://questionnaire-app:8443
+    volumes:
+      # 撮った写しと報告書をホストへ出す
+      - ./tools/screenshots/shots:/work/shots
+      - ./tools/screenshots/report:/work/report
+
+volumes:
+  postgres-data:
+  mysql-data:
+  # **自己署名の証明書の置き場**（devcert が作り、app が読む）。
+  # **`down -v` で消える。** 鍵を長生きさせない
+  devcert:

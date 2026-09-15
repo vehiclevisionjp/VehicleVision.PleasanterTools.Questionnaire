@@ -1,9 +1,25 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <!-- パスワードのハッシュ（PBKDF2）は ASP.NET Core の共有フレームワークに含まれるため
+         PackageReference は要らない（NU1510） -->
+    <!-- TOTP（RFC 6238）。MIT。**自前で書かない** -->
+    <!-- bot 対策の proof-of-work（Issue #55）。BSD-2-Clause -->
+    <PackageReference Include="Ixnas.AltchaNet" Version="1.2.1" />
+    <!-- 管理画面の SAML 2.0 ログイン（Issue #166）。BSD-3-Clause -->
+    <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.20.1" />
+    <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.20.1" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
+    <PackageReference Include="nClam" Version="9.0.0" />
+    <PackageReference Include="Otp.NET" Version="1.4.1" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Core\VehicleVision.PleasanterTools.Questionnaire.Core.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Data\VehicleVision.PleasanterTools.Questionnaire.Data.csproj" />
+    <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Mail\VehicleVision.PleasanterTools.Questionnaire.Mail.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Pleasanter\VehicleVision.PleasanterTools.Questionnaire.Pleasanter.csproj" />
+    <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Scripting\VehicleVision.PleasanterTools.Questionnaire.Scripting.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Worker\VehicleVision.PleasanterTools.Questionnaire.Worker.csproj" />
   </ItemGroup>
 

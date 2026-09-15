@@ -1,0 +1,82 @@
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
+
+namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
+
+/// <summary>ログの行を偽装されないこと。</summary>
+public class LogSafeTests
+{
+    [Fact]
+    public void 改行を含む値でログの行を割れない()
+    {
+        // **これがログへそのまま出ると、後続が別の出来事に見える**
+        var forged = "admin\n2026-08-19 00:00:00 info: 管理者が承認しました";
+
+        var text = LogSafe.Text(forged);
+
+        Assert.DoesNotContain("\n", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("\r", text, StringComparison.Ordinal);
+        Assert.StartsWith("admin", text, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("\r")]
+    [InlineData("\t")]
+    [InlineData("\0")]
+    [InlineData("[31m")]
+    public void 制御文字は落とす(string control)
+    {
+        var text = LogSafe.Text($"admin{control}rest");
+
+        Assert.DoesNotContain(control, text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 落としたことを隠さない()
+    {
+        var text = LogSafe.Text("admin\nrest");
+
+        // **黙って均すと、何が起きたのか後から分からない**
+        Assert.Contains("制御文字を除去", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 長すぎる値は切る()
+    {
+        var text = LogSafe.Text(new string('a', 500));
+
+        // **ログが埋まって他が読めなくなるのを防ぐ**
+        Assert.True(text.Length < 200, $"切れていない: {text.Length} 文字");
+        Assert.Contains("切り詰め", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 上限ちょうどの値は切らない()
+    {
+        var text = LogSafe.Text(new string('a', 128));
+
+        Assert.Equal(new string('a', 128), text);
+        Assert.DoesNotContain("切り詰め", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 制御文字だけなら空にせず分かる形にする()
+    {
+        Assert.Equal("(制御文字のみ)", LogSafe.Text("\n\r\t"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void 値が無いときも読める形にする(string? value)
+    {
+        Assert.Equal("(なし)", LogSafe.Text(value));
+    }
+
+    [Fact]
+    public void 普通の値はそのまま出す()
+    {
+        Assert.Equal("admin@example.com", LogSafe.Text("admin@example.com"));
+        // **日本語を壊さない**
+        Assert.Equal("管理担当", LogSafe.Text("管理担当"));
+    }
+}

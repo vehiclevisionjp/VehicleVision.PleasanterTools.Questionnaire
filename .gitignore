@@ -12,6 +12,8 @@ _dist/
 ## node（フロントエンド: TypeScript + Vite + Svelte）
 node_modules/
 .vite/
+## フロントエンドのビルド成果物（Dockerfile か npm run build で作る）
+src/VehicleVision.PleasanterTools.Questionnaire.Web/wwwroot/
 
 ## secrets / local config（接続文字列・APIキーはコミットしない）
 appsettings.*.local.json
@@ -30,10 +32,20 @@ _testresults/
 temp/
 
 ## Claude Code の並列 worktree（Agent isolation:"worktree"）の作業コピー
-.claude/
+## **`.claude/` を丸ごと無視しないこと。** settings.json はリポジトリ共有の設定で、
+## 追跡されないと各人の手元にしか存在しない（.claude/README.md）
+.claude/worktrees/
+
+## Claude Code の個人設定（settings.json のローカル上書き）
+.claude/settings.local.json
 
 ## Parameters のローカル上書き（実値。コミットしない）
 App_Data/Parameters/*.local.json
 
 ## 検証環境の出力
 tools/pleasanter-testenv/results/
+
+# 写しを撮ったときの生成物。**報告書と失敗時の記録は git へ入れない**
+# （毎回変わるので、取り込むたびに衝突する）
+tools/screenshots/report/
+tools/screenshots/artifacts/

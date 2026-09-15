@@ -1,0 +1,157 @@
+﻿namespace VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
+
+/// <summary>サーバが画面へ返す文言の鍵。</summary>
+/// <remarks>
+/// <para>
+/// **鍵はここにだけ書く。** 呼ぶ側は文字列を直接書かない。
+/// </para>
+/// <para>
+/// **ここの定数と <see cref="ServerMessages"/> のカタログは
+/// 厳密に一致していなければならない。** 定数を足してカタログへ入れ忘れても、
+/// カタログにだけあって定数が無くても、単体テスト
+/// （<c>ServerMessagesTests</c>）で落ちる。
+/// **足し忘れに気付ける形にしておくのがこの分け方の目的**
+/// （<c>_documents/多言語対応方針.md</c> 4 章）。
+/// </para>
+/// </remarks>
+public static class ServerMessageKeys
+{
+    // ---- 認証 ---------------------------------------------------------------
+
+    /// <summary>**段階を区別しない文言。** 利用者名の総当たりに使わせない。</summary>
+    public const string InvalidCredentials = "auth.invalidCredentials";
+
+    public const string LoginIdAndPasswordRequired = "auth.loginIdAndPasswordRequired";
+
+    public const string AdministratorAlreadyExists = "auth.administratorAlreadyExists";
+
+    public const string LoginTemporarilyLocked = "auth.loginTemporarilyLocked";
+
+    public const string EnrollmentRestartRequired = "auth.enrollmentRestartRequired";
+
+    public const string TotpCodeMismatch = "auth.totpCodeMismatch";
+
+    /// <summary>2 要素認証を無効にしているため、登録できない。</summary>
+    public const string TwoFactorDisabled = "auth.twoFactorDisabled";
+
+    /// <summary>2 要素認証が必須なので、自分では解除できない。</summary>
+    public const string TwoFactorRequired = "auth.twoFactorRequired";
+
+    /// <summary>2 要素認証を登録していない。</summary>
+    public const string TwoFactorNotEnrolled = "auth.twoFactorNotEnrolled";
+
+    /// <summary>パスワードが短い。**最低の長さを差し込む**（`{0}`）。</summary>
+    public const string PasswordTooShort = "auth.passwordTooShort";
+
+    /// <summary>パスワードがログイン ID と同じ。</summary>
+    public const string PasswordSameAsLoginId = "auth.passwordSameAsLoginId";
+
+    /// <summary>設定された条件に合わない。**文言を書いていない条件のときに使う。**</summary>
+    public const string PasswordPolicyMismatch = "auth.passwordPolicyMismatch";
+
+    // ---- 管理者の管理 -------------------------------------------------------
+
+    public const string RoleNotSupported = "users.roleNotSupported";
+
+    public const string AdminUserNotFound = "users.notFound";
+
+    public const string DuplicateLoginId = "users.duplicateLoginId";
+
+    public const string InvalidInput = "users.invalidInput";
+
+    public const string SelfNotAllowed = "users.selfNotAllowed";
+
+    public const string LastAdministrator = "users.lastAdministrator";
+
+    public const string OperationTemporarilyLocked = "users.operationTemporarilyLocked";
+
+    /// <summary>**理由を分けない。** トークンの当たり外れを外から確かめさせない。</summary>
+    public const string InvitationInvalid = "users.invitationInvalid";
+
+    public const string CurrentPasswordRejected = "users.currentPasswordRejected";
+
+    public const string UnsupportedLanguage = "users.unsupportedLanguage";
+
+    // ---- アンケート ---------------------------------------------------------
+
+    public const string SurveyTitleRequired = "surveys.titleRequired";
+
+    public const string PleasanterSiteIdRequired = "surveys.pleasanterSiteIdRequired";
+
+    public const string DefinitionAndMappingRequired = "surveys.definitionAndMappingRequired";
+
+    public const string SurveyUpdatedByOther = "surveys.updatedByOther";
+
+    public const string PublishBlockedByMapping = "surveys.publishBlockedByMapping";
+
+    public const string NoAnswerableQuestion = "surveys.noAnswerableQuestion";
+
+    /// <summary>分岐が壊れていて公開できない。</summary>
+    public const string PublishBlockedByFlow = "surveys.publishBlockedByFlow";
+
+    /// <summary>設問の設定が矛盾していて公開できない（Issue #101）。</summary>
+    public const string PublishBlockedBySettings = "surveys.publishBlockedBySettings";
+
+    /// <summary>再編集リンクの添え書き（Issue #202）。**{0} が期限。**</summary>
+    public const string EditLinkMailNote = "editLink.mail.note";
+
+    /// <summary>招待メールの件名（Issue #189）。</summary>
+    public const string InvitationMailSubject = "invitation.mail.subject";
+
+    /// <summary>招待メールの本文（Issue #189）。**{0} が URL、{1} が期限。**</summary>
+    public const string InvitationMailBody = "invitation.mail.body";
+
+    /// <summary>自動返信の設定が送れる形になっていなくて公開できない（Issue #189）。</summary>
+    public const string PublishBlockedByAutoReply = "surveys.publishBlockedByAutoReply";
+
+    public const string NotPublishedYet = "surveys.notPublishedYet";
+
+    /// <summary>その版は既にある。**同時に 2 人が公開を押した場合など。**</summary>
+    public const string VersionAlreadyPublished = "surveys.versionAlreadyPublished";
+
+    /// <summary>複製先に元と同じサイトを指定した。**1 アンケート = 1 サイト。**</summary>
+    public const string DuplicateSiteIdMustDiffer = "surveys.duplicateSiteIdMustDiffer";
+
+    /// <summary>
+    /// テンプレートに対してアンケートの操作をしようとした（Issue #58）。
+    /// **テンプレートは書き込み先を持たないので公開できない。**
+    /// </summary>
+    public const string SurveyIsTemplate = "surveys.isTemplate";
+
+    // ---- テンプレート -------------------------------------------------------
+
+    /// <summary>テンプレートの元にするアンケートを指定していない。</summary>
+    public const string TemplateSourceRequired = "templates.sourceRequired";
+    /// テーマの色の形が違う（Issue #56）。
+    /// **受け付けるのは <c>#rgb</c> と <c>#rrggbb</c> だけ。**
+    /// </summary>
+    public const string ThemeColorInvalid = "surveys.themeColorInvalid";
+
+    /// <summary>
+    /// 埋め込み先が、運用側の許した配信元に入っていない（Issue #104 / #107）。
+    /// **どこを許すかは <c>QUESTIONNAIRE_EMBED_ALLOWEDHOSTS</c> が決める。**
+    /// </summary>
+    public const string EmbedHostNotAllowed = "surveys.embedHostNotAllowed";
+
+    /// <summary>
+    /// ヘッダ画像を受け付けられない。
+    /// **理由の内訳は文言にしない**（拡張子・中身・大きさのどれで落ちたかは別で返す）。
+    /// </summary>
+    public const string HeaderImageRejected = "surveys.headerImageRejected";
+    /// <summary>回答数の上限に 0 以下を指定した。**上限を外すなら未指定にする。**</summary>
+    public const string ResponseLimitMustBePositive = "surveys.responseLimitMustBePositive";
+
+    /// <summary>
+    /// 上限に達しているので再開できない。**受付数（`{0}`）と上限（`{1}`）を差し込む。**
+    /// </summary>
+    public const string ResponseLimitReached = "surveys.responseLimitReached";
+    // ---- 送信状況 -----------------------------------------------------------
+
+    /// <summary>戻す回答を指定していない。</summary>
+    public const string ResponseTokenRequired = "outbox.responseTokenRequired";
+
+    /// <summary>
+    /// 戻す先が見つからない。**既に誰かが戻した / 送信できて消えた場合を含む。**
+    /// </summary>
+    public const string DeadLetterNotFound = "outbox.deadLetterNotFound";
+}
