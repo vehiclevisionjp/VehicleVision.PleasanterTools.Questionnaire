@@ -15,6 +15,9 @@ public enum PleasanterColumnKind
     Description,
     Check,
     Attachments,
+    Title,
+    Body,
+    Status,
 }
 
 /// <summary>列名から種別を判定する。</summary>
@@ -34,11 +37,35 @@ public static partial class PleasanterColumn
             return null;
         }
 
+        if (columnName is nameof(PleasanterColumnKind.Title)
+            or nameof(PleasanterColumnKind.Body)
+            or nameof(PleasanterColumnKind.Status))
+        {
+            return Enum.Parse<PleasanterColumnKind>(columnName);
+        }
+
         var match = ColumnNamePattern.Match(columnName);
         return match.Success && Enum.TryParse<PleasanterColumnKind>(match.Groups[1].Value, out var kind)
             ? kind
             : null;
     }
+
+    /// <summary>標準 26 列の枠を消費する列か。</summary>
+    /// <remarks>
+    /// <c>Title</c>、<c>Body</c>、<c>Status</c> はレコード本体のプロパティであり、
+    /// 型ごとにある <c>A</c>〜<c>Z</c> の列ではないため。
+    /// </remarks>
+    public static bool ConsumesColumnSlot(string columnName) =>
+        KindOf(columnName) is not PleasanterColumnKind.Title
+            and not PleasanterColumnKind.Body
+            and not PleasanterColumnKind.Status;
+
+    /// <summary>状態列か。</summary>
+    /// <remarks>
+    /// 状態だけは Pleasanter が整数として受け取る。列名ごとの型知識を呼び出し側へ漏らさないため。
+    /// </remarks>
+    public static bool IsStatus(string columnName) =>
+        KindOf(columnName) is PleasanterColumnKind.Status;
 
     /// <summary>その種別が複数の値を保持できるか。</summary>
     /// <remarks>

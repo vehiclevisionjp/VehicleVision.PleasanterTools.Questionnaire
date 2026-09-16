@@ -43,6 +43,21 @@ public class PleasanterRecordBuilderTests
     }
 
     [Fact]
+    public void レコード本体の列はハッシュに入れず本体へ振り分ける()
+    {
+        var record = Builder().Build(Columns(
+            ("Title", ["件名"]),
+            ("Body", ["本文"]),
+            ("Status", ["10"])));
+
+        Assert.Equal("件名", record.Body["Title"]);
+        Assert.Equal("本文", record.Body["Body"]);
+        Assert.Equal(10, record.Body["Status"]);
+        Assert.DoesNotContain(record.Body.Keys, key => key is "TitleHash" or "BodyHash" or "StatusHash");
+        Assert.Empty(record.Problems);
+    }
+
+    [Fact]
     public void 空の値は消すための値になる()
     {
         // **空配列は「消す」を意味する**（編集で回答を消したとき）
@@ -123,6 +138,15 @@ public class PleasanterRecordBuilderTests
 
         Assert.False(record.Body.ContainsKey("NumHash"));
         Assert.Single(record.Problems);
+    }
+
+    [Fact]
+    public void 整数として読めないStatusは不備とする()
+    {
+        var record = Builder().Build(Columns(("Status", ["処理中"])));
+
+        Assert.False(record.Body.ContainsKey("Status"));
+        Assert.Contains(record.Problems, problem => problem.ColumnName == "Status");
     }
 
     [Fact]

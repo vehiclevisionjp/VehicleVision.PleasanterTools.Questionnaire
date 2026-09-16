@@ -48,6 +48,9 @@ public enum MappingProblemCode
     /// <summary>添付の口なのに、書き込み先が添付列でない。</summary>
     FilePortNeedsAttachmentColumn,
 
+    /// <summary>状態列へ整数を確実に出せない。</summary>
+    StatusNeedsInteger,
+
     /// <summary>どこへも割り当てられていない設問。**拒否はしないが警告する。**</summary>
     UnmappedQuestion,
 }
@@ -73,11 +76,16 @@ public static class MappingValidator
     /// 添付列かどうかの判定。**列名の決まりは Pleasanter 側の知識**なので、
     /// ここでは持たずに受け取る。渡さなければ列名の側は確かめない。
     /// </param>
+    /// <param name="isStatusColumn">
+    /// 状態列かどうかの判定。状態の列名と型は Pleasanter 側の知識なので、
+    /// ここでは整数を確実に出せる割り当てかだけを検査する。
+    /// </param>
     public static ImmutableArray<MappingProblem> Validate(
         MappingDefinition mapping,
         SurveyDefinition definition,
         IReadOnlyCollection<string>? reservedColumns = null,
-        Func<string, bool>? isAttachmentColumn = null)
+        Func<string, bool>? isAttachmentColumn = null,
+        Func<string, bool>? isStatusColumn = null)
     {
         ArgumentNullException.ThrowIfNull(mapping);
         ArgumentNullException.ThrowIfNull(definition);
@@ -138,6 +146,13 @@ public static class MappingValidator
                     MappingProblemCode.InvalidShape, assignment.TargetColumn));
             }
 
+            if (isStatusColumn?.Invoke(assignment.TargetColumn) is true
+                && !ProducesInteger(assignment, definition))
+            {
+                problems.Add(new MappingProblem(
+                    MappingProblemCode.StatusNeedsInteger, assignment.TargetColumn));
+            }
+
             if (assignment.Converter is { Operation: ConverterOperations.Script } converter
                 && string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("script")))
             {
@@ -179,6 +194,61 @@ public static class MappingValidator
 
         return Finish(problems, mapping, definition);
     }
+
+    /// <summary>割り当てが整数または未設定を確実に出せるか。</summary>
+    /// <remarks>
+    /// 送信時まで失敗を持ち越さないため、回答者が任意の文字列を入れられる経路は許可しない。
+    /// </remarks>
+    private static bool ProducesInteger(ColumnAssignment assignment, SurveyDefinition definition)
+    {
+        if (assignment.Converter is null)
+        {
+            if (assignment.Sources.Length != 1)
+            {
+                return false;
+            }
+
+            var source = assignment.Sources[0];
+            var question = definition.FindQuestion(source.QuestionId);
+            if (question is null || source.Port is not QuestionPort.Value)
+            {
+                return false;
+            }
+
+            if (question.Type is QuestionType.Scale or QuestionType.Rating)
+            {
+                return true;
+            }
+
+            if (question.Type is QuestionType.Ranking && source.RowId is not null)
+            {
+                return true;
+            }
+
+            return question.Type is QuestionType.Radio or QuestionType.Dropdown
+                && question.Choices.All(choice =>
+                    !choice.IsOther
+                    && IsIntegerOrEmpty(choice.Value));
+        }
+
+        return assignment.Converter.Operation switch
+        {
+            ConverterOperations.Constant =>
+                IsIntegerOrEmpty(assignment.Converter.Config.GetValueOrDefault("value")),
+            ConverterOperations.When =>
+                IsIntegerOrEmpty(assignment.Converter.Config.GetValueOrDefault("then"))
+                && IsIntegerOrEmpty(assignment.Converter.Config.GetValueOrDefault("else")),
+            _ => false,
+        };
+    }
+
+    private static bool IsIntegerOrEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+        || int.TryParse(
+            value,
+            System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out _);
 
     /// <summary>行の指定が噛み合っているかを見る（Issue #54）。</summary>
     /// <remarks>

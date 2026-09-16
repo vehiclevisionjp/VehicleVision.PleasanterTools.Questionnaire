@@ -89,6 +89,7 @@ public static class ColumnBudget
             .. mapping.Assignments
                 .Select(assignment => assignment.TargetColumn)
                 .Where(column => !string.IsNullOrWhiteSpace(column))
+                .Where(ConsumesColumnSlot)
                 .GroupBy(PrefixOf, StringComparer.OrdinalIgnoreCase)
                 .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new ColumnUsage(
@@ -97,6 +98,11 @@ public static class ColumnBudget
                     availablePerType)),
         ];
     }
+
+    private static bool ConsumesColumnSlot(string columnName) =>
+        !string.Equals(columnName, "Title", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(columnName, "Body", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(columnName, "Status", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>この定義を「行ごとに 1 列」で写すと、いくつ入力が要るか。</summary>
     /// <remarks>

@@ -306,7 +306,7 @@ export const ja = {
   'mapping.attachmentLead': '添付の設問 1 つを添付列にそのまま割り当てます。変換は使用できません。',
   'mapping.empty': 'まだ割り当てがありません。このままでも公開できますが、回答は Pleasanter に保存されません。',
   'mapping.targetColumn': '書き込み先の列',
-  'mapping.targetColumnPlaceholder': 'ClassA / NumA など',
+  'mapping.targetColumnPlaceholder': 'Title / ClassA / NumA など',
   'mapping.attachmentColumnPlaceholder': 'AttachmentsA など',
   'mapping.converterFixed': '変換なし（添付では変更できません）',
   'mapping.converter': '変換',
@@ -360,6 +360,7 @@ export const ja = {
   'problem.NonFileQuestionAsAttachment': '添付列に割り当てられるのは、添付の設問だけです',
   'problem.AttachmentColumnNeedsFilePort': '添付列には「添付ファイル本体」を割り当ててください',
   'problem.FilePortNeedsAttachmentColumn': '「添付ファイル本体」は添付列にしか割り当てられません',
+  'problem.StatusNeedsInteger': 'Status には整数を確実に出せる割り当てだけを指定できます',
   'problem.UnmappedQuestion': 'どの列にも割り当てられていません（Pleasanter に保存されません）',
   // ---- 監査ログ -----------------------------------------------------------
   'audit.title': '操作の記録',
@@ -1006,7 +1007,7 @@ export const en: Record<MessageKey, string> = {
   'mapping.empty':
     'Nothing is assigned yet. You can still publish, but no response will be kept in Pleasanter.',
   'mapping.targetColumn': 'Target column',
-  'mapping.targetColumnPlaceholder': 'ClassA / NumA, for example',
+  'mapping.targetColumnPlaceholder': 'Title / ClassA / NumA, for example',
   'mapping.attachmentColumnPlaceholder': 'AttachmentsA, for example',
   'mapping.converterFixed': 'No converter (fixed for attachments)',
   'mapping.converter': 'Converter',
@@ -1064,6 +1065,8 @@ export const en: Record<MessageKey, string> = {
     'An attachment column needs "the attachment itself" connected to it',
   'problem.FilePortNeedsAttachmentColumn':
     '"The attachment itself" can only be connected to an attachment column',
+  'problem.StatusNeedsInteger':
+    'Status can only use an assignment that is guaranteed to produce an integer',
   'problem.UnmappedQuestion': 'Not assigned to any column (nothing will be kept in Pleasanter)',
   // ---- Audit log ----------------------------------------------------------
   'audit.title': 'Activity log',

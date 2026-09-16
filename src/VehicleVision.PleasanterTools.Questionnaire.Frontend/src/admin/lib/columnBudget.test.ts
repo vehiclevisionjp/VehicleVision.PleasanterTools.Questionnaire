@@ -113,6 +113,10 @@ describe('measure', () => {
     expect(measure(mapping('', '   '))).toEqual([]);
   });
 
+  it('レコード本体の列は標準列の枠として数えない', () => {
+    expect(measure(mapping('Title', 'Body', 'Status'))).toEqual([]);
+  });
+
   it('接頭辞の順に並べる', () => {
     expect(measure(mapping('NumA', 'ClassA', 'DateA')).map((item) => item.prefix)).toEqual([
       'Class',

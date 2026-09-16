@@ -303,6 +303,22 @@ public class GridMappingTests
     }
 
     [Fact]
+    public void レコード本体の列は標準列の枠として数えない()
+    {
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct("Title", new MappingSource("q-grid", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Body", new MappingSource("q-grid", QuestionPort.Value, "quality")),
+                ColumnAssignment.Direct("Status", new MappingSource("q-rank", QuestionPort.Value, "price")),
+            ],
+        };
+
+        Assert.Empty(ColumnBudget.Measure(mapping));
+    }
+
+    [Fact]
     public void 行ごとに写すと何本要るかを見積もれる()
     {
         // グリッド 2 行 ＋ ランキング 3 項目 = 5 本

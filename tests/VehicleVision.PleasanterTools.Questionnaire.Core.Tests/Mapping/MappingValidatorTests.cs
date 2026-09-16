@@ -152,6 +152,51 @@ public class MappingValidatorTests
     }
 
     [Fact]
+    public void Statusへ整数でない固定値を割り当てると拒否する()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(ConverterOperations.Constant, ("value", "処理中")),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            isStatusColumn: column => column == "Status");
+
+        Assert.Contains(MappingProblemCode.StatusNeedsInteger, Codes(problems));
+    }
+
+    [Fact]
+    public void Statusへ整数の固定値を割り当てられる()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(ConverterOperations.Constant, ("value", "10")),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            isStatusColumn: column => column == "Status");
+
+        Assert.DoesNotContain(MappingProblemCode.StatusNeedsInteger, Codes(problems));
+    }
+
+    [Fact]
+    public void Statusへ任意の文字列を受ける設問を直接割り当てると拒否する()
+    {
+        var mapping = Mapping(ColumnAssignment.Direct("Status", new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            isStatusColumn: column => column == "Status");
+
+        Assert.Contains(MappingProblemCode.StatusNeedsInteger, Codes(problems));
+    }
+
+    [Fact]
     public void 未割り当ての設問は警告するが保存は拒否しない()
     {
         // **回答の正本 JSON には残る**ので、列へ写らないだけでは拒否しない

@@ -81,6 +81,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
         ArgumentNullException.ThrowIfNull(columns);
 
         var hashes = new Dictionary<PleasanterColumnKind, Dictionary<string, object?>>();
+        var properties = new Dictionary<string, object?>(StringComparer.Ordinal);
         var problems = ImmutableArray.CreateBuilder<ColumnConversionProblem>();
 
         foreach (var (columnName, values) in columns)
@@ -103,6 +104,14 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
 
             if (!TryConvert(kind.Value, columnName, values, problems, out var converted))
             {
+                continue;
+            }
+
+            if (kind is PleasanterColumnKind.Title
+                or PleasanterColumnKind.Body
+                or PleasanterColumnKind.Status)
+            {
+                properties[columnName] = converted;
                 continue;
             }
 
@@ -138,7 +147,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
 
         AddAttachments(attachments, hashes, problems);
 
-        var body = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var body = new Dictionary<string, object?>(properties, StringComparer.Ordinal);
         foreach (var (kind, hash) in hashes)
         {
             body[$"{kind}Hash"] = hash;
@@ -243,6 +252,8 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                 return true;
 
             case PleasanterColumnKind.Description:
+            case PleasanterColumnKind.Title:
+            case PleasanterColumnKind.Body:
                 converted = value ?? string.Empty;
                 return true;
 
@@ -266,6 +277,22 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                 }
 
                 converted = number;
+                return true;
+
+            case PleasanterColumnKind.Status:
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    converted = null;
+                    return true;
+                }
+
+                if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var status))
+                {
+                    problems.Add(new ColumnConversionProblem(columnName, $"整数として読めない: {value}"));
+                    return false;
+                }
+
+                converted = status;
                 return true;
 
             case PleasanterColumnKind.Date:

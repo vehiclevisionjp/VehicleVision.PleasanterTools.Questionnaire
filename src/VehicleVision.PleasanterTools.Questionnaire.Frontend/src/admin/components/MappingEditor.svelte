@@ -188,6 +188,12 @@
     <strong>{t('mapping.attachmentLeadStrong')}</strong>{t('mapping.attachmentLead')}
   </p>
 
+  <datalist id="record-properties">
+    <option value="Title"></option>
+    <option value="Body"></option>
+    <option value="Status"></option>
+  </datalist>
+
   {#if mapping.assignments.length === 0}
     <p class="status">{t('mapping.empty')}</p>
   {:else}
@@ -372,6 +378,7 @@
                 <input
                   type="text"
                   aria-label={t('mapping.targetColumn')}
+                  list="record-properties"
                   placeholder={attachment
                     ? t('mapping.attachmentColumnPlaceholder')
                     : t('mapping.targetColumnPlaceholder')}

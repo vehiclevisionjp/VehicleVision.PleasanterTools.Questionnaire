@@ -15,6 +15,7 @@ import { hasRowPorts, isDisplayOnly, rowPorts } from './types';
  * `ClassA` と別の型として数えられて、型ごとの上限がすり抜ける。
  */
 export const STANDARD_COLUMNS_PER_TYPE = 26;
+const RECORD_PROPERTIES = new Set(['title', 'body', 'status']);
 
 /**
  * 列名から型の接頭辞を取り出す。
@@ -65,6 +66,7 @@ export function measure(
   for (const assignment of mapping.assignments) {
     const column = assignment.targetColumn?.trim() ?? '';
     if (column === '') continue;
+    if (RECORD_PROPERTIES.has(column.toLowerCase())) continue;
 
     const prefix = prefixOf(column);
     const columns = byPrefix.get(prefix) ?? new Set<string>();
