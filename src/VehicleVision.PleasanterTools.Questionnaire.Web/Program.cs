@@ -116,6 +116,7 @@ builder.Services.AddSingleton<IResponseOutbox, ResponseOutbox>();
 builder.Services.AddSingleton<IResponseTokenStore, ResponseTokenStore>();
 builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
+builder.Services.AddSingleton<IMonitoringStore, MonitoringStore>();
 builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
 builder.Services.AddSingleton<ISurveyDeletionStore, SurveyDeletionStore>();
 // **ヘッダ画像の置き場**（Issue #56）。外部のストレージへは置かない
@@ -435,6 +436,23 @@ if (mailOptions.IsReady)
     builder.Services.AddHostedService<MailSenderHostedService>();
 }
 
+// **設定したときだけ監視の口を生やす。** 既定で外部から DB の状態を読める口を作らない。
+var monitoringTokenValue = builder.Configuration[MonitoringToken.Setting];
+MonitoringToken? monitoringToken = string.IsNullOrWhiteSpace(monitoringTokenValue)
+    ? null
+    : new MonitoringToken(monitoringTokenValue);
+if (monitoringToken is not null)
+{
+    builder.Services.AddSingleton(serviceProvider => new MonitoringService(
+        provider,
+        connectionString,
+        serviceProvider.GetRequiredService<IResponseOutbox>(),
+        serviceProvider.GetRequiredService<IMonitoringStore>(),
+        serviceProvider.GetRequiredService<IMailOutbox>(),
+        mailOptions,
+        serviceProvider.GetRequiredService<TimeProvider>()));
+}
+
 // **どの設定ファイルを読んだかを記録に残す**（Issue #158）。
 // **optional なので、置き場を間違えても黙って既定で動いてしまう。**
 // 「読めているつもりで読めていない」を起動時に見せる
@@ -635,6 +653,10 @@ app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
 app.MapAdminVersionEndpoints();
+if (monitoringToken is not null)
+{
+    app.MapMonitoringEndpoints(monitoringToken);
+}
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
 app.MapGet("/admin", () => Results.File("admin.html", "text/html"));
