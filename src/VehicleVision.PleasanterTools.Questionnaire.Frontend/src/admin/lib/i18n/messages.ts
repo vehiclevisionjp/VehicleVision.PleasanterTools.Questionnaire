@@ -242,6 +242,9 @@ export const ja = {
   // ---- 設問 ---------------------------------------------------------------
   'question.titlePlaceholder': '設問文',
   'question.descriptionPlaceholder': '補足（任意）',
+  'question.descriptionFormat': '説明文の書き方',
+  'question.descriptionFormatPlain': 'プレーン（改行のみ）',
+  'question.descriptionFormatMarkup': '記法',
   'question.markupPlaceholder': '本文（任意）。空行で段落が分かれます\n例: **太字** *斜体* [リンクの文字](https://example.com/)',
   'question.markupHint':
     '使える書き方: **太字** / *斜体* / [文字](https://…) / 行頭の「- 」で箇条書き / 行頭の「1. 」で番号付き / 行頭の「## 」で見出し。\nHTML は使用できません（そのまま文字として表示されます）。リンクは https のみ使用できます。',
@@ -984,6 +987,9 @@ export const en: Record<MessageKey, string> = {
 
   'question.titlePlaceholder': 'Question text',
   'question.descriptionPlaceholder': 'Note (optional)',
+  'question.descriptionFormat': 'Description style',
+  'question.descriptionFormatPlain': 'Plain (line breaks only)',
+  'question.descriptionFormatMarkup': 'Markup',
   'question.markupPlaceholder':
     'Body (optional). A blank line starts a new paragraph\ne.g. **bold** *italic* [link text](https://example.com/)',
   'question.markupHint':

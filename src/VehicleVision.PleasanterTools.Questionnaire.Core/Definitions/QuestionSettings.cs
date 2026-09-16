@@ -6,6 +6,12 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 /// </remarks>
 public sealed record QuestionSettings
 {
+    /// <summary>説明文の書き方。既定は記法を解釈しない。</summary>
+    /// <remarks>
+    /// <see cref="QuestionType.Note"/> は従来どおり常に記法として扱い、この設定を使わない。
+    /// </remarks>
+    public DescriptionFormat DescriptionFormat { get; init; }
+
     /// <summary>文字数の上限。<see cref="QuestionType.Text"/> / <see cref="QuestionType.Paragraph"/>。</summary>
     public int? MaxLength { get; init; }
 
@@ -104,6 +110,16 @@ public sealed record QuestionSettings
     /// **ただし画面へ出す前にもう一度確かめる**（設定は後から狭められる）。
     /// </remarks>
     public EmbedSource? Embed { get; init; }
+}
+
+/// <summary>設問の説明文の書き方。</summary>
+public enum DescriptionFormat
+{
+    /// <summary>記法を解釈せず、改行だけを表示する。</summary>
+    Plain,
+
+    /// <summary><c>NoteMarkup</c> が受け付ける安全な記法を使う。</summary>
+    Markup,
 }
 
 /// <summary>文字列入力の形式検証。</summary>

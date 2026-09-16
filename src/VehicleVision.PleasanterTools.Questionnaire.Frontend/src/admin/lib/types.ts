@@ -194,6 +194,13 @@ export interface Choice {
 }
 
 export interface QuestionSettings {
+  /**
+   * 説明文の書き方（Issue #267）。
+   *
+   * **無ければプレーン。** 過去の説明文に含まれる `*` や `#` の見え方を変えない。
+   * `Note` は従来どおり常に記法として扱う。
+   */
+  descriptionFormat?: 'Plain' | 'Markup';
   maxLength?: number;
   placeholder?: LocalizedText;
   scaleMinimum?: number;

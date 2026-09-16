@@ -175,7 +175,9 @@
   });
 
   const descriptionBlocks = $derived(
-    question.type === 'Confirm' ? noteBlocks(question.descriptionBlocks, language) : [],
+    question.settings.descriptionFormat === 'Markup'
+      ? noteBlocks(question.descriptionBlocks, language)
+      : [],
   );
 </script>
 
@@ -510,6 +512,7 @@
     color: var(--muted);
     margin: 0.25rem 0 0.75rem;
     font-size: 0.9rem;
+    white-space: pre-line;
   }
 
   .choice {

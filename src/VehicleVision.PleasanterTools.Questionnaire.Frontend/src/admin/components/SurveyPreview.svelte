@@ -4,7 +4,12 @@
   import { applyShuffle, createShuffleSeed } from '../../lib/shuffle';
   import { translator } from '../../lib/i18n/messages';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../../lib/i18n/language';
-  import type { AnswerState, NoteBlock, SurveyDefinition as AnswerDefinition } from '../../lib/types';
+  import type {
+    AnswerState,
+    NoteBlock,
+    Question as AnswerQuestion,
+    SurveyDefinition as AnswerDefinition,
+  } from '../../lib/types';
   import { text } from '../../lib/types';
   import { validatePage } from '../../lib/validation';
   import type { SurveyDefinition } from '../lib/types';
@@ -83,7 +88,10 @@
   const noteSources = $derived(
     definition.pages.flatMap((page) =>
       page.questions
-        .filter((question) => question.type === 'Note' || question.type === 'Confirm')
+        .filter(
+          (question) =>
+            question.type === 'Note' || question.settings.descriptionFormat === 'Markup',
+        )
         .flatMap((question) =>
           Object.entries(question.description ?? {})
             .filter(([, markup]) => markup !== '')
@@ -193,15 +201,17 @@
   }
 
   /**
-   * 説明文ブロックに、サーバへ読んでもらった書式を添える（Issue #108）。
+   * 記法を選んだ説明文に、サーバへ読んでもらった書式を添える（Issue #108 / #267）。
    *
    * **記法を読むのはサーバだけ。** ここで同じ実装を持つと、
    * プレビューでは付いた書式が公開後に付かない、という食い違いが起きる。
    */
-  function withNoteBlocks(question: { questionId: string; type: string }) {
+  function withNoteBlocks(question: AnswerQuestion) {
     const blocks = parsedNotes[question.questionId] ?? null;
     if (question.type === 'Note') return { ...question, noteBlocks: blocks };
-    if (question.type === 'Confirm') return { ...question, descriptionBlocks: blocks };
+    if (question.settings.descriptionFormat === 'Markup') {
+      return { ...question, descriptionBlocks: blocks };
+    }
     return question;
   }
 

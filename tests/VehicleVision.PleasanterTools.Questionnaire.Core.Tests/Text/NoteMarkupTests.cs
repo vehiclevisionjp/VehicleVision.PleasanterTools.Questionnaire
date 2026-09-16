@@ -210,7 +210,7 @@ public sealed class NoteMarkupTests
     }
 
     [Fact]
-    public void 説明文ブロックと確認だけが書式を持つ()
+    public void 説明文ブロックと記法を選んだ設問だけが書式を持つ()
     {
         var note = new Question
         {
@@ -220,7 +220,11 @@ public sealed class NoteMarkupTests
             Description = LocalizedText.Japanese("**太字**"),
         };
         var text = note with { Type = QuestionType.Text };
-        var confirm = note with { Type = QuestionType.Confirm };
+        var confirm = note with
+        {
+            Type = QuestionType.Confirm,
+            Settings = new QuestionSettings { DescriptionFormat = DescriptionFormat.Markup },
+        };
 
         Assert.NotNull(note.NoteBlocks);
         Assert.Equal(NoteInlineKind.Bold, note.NoteBlocks!["ja"][0].Inlines[0].Kind);
@@ -229,6 +233,35 @@ public sealed class NoteMarkupTests
         Assert.Equal(
             NoteInlineKind.Bold,
             confirm.DescriptionBlocks!["ja"][0].Inlines[0].Kind);
+    }
+
+    [Fact]
+    public void 通常の設問は既定で説明文の記法を解釈しない()
+    {
+        var question = new Question
+        {
+            QuestionId = "q1",
+            Type = QuestionType.Text,
+            Title = LocalizedText.Japanese("設問"),
+            Description = LocalizedText.Japanese("**そのまま**"),
+        };
+
+        Assert.Null(question.DescriptionBlocks);
+    }
+
+    [Fact]
+    public void 説明文ブロックは設定がプレーンでも記法を解釈する()
+    {
+        var note = new Question
+        {
+            QuestionId = "n1",
+            Type = QuestionType.Note,
+            Title = LocalizedText.Japanese("ご案内"),
+            Description = LocalizedText.Japanese("**太字**"),
+            Settings = new QuestionSettings { DescriptionFormat = DescriptionFormat.Plain },
+        };
+
+        Assert.Equal(NoteInlineKind.Bold, note.NoteBlocks!["ja"][0].Inlines[0].Kind);
     }
 
     [Fact]

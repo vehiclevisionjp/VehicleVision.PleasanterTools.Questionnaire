@@ -109,12 +109,16 @@ public sealed record Question
         get => Type is QuestionType.Note ? ParseDescription() : null;
     }
 
-    /// <summary>確認・同意の説明文を、書式の付いた形にしたもの。</summary>
+    /// <summary>設問の説明文を、書式の付いた形にしたもの。</summary>
     /// <remarks>
-    /// 利用規約などを別画面で読めるよう、説明文ブロックと同じ安全な記法を使う。
+    /// <see cref="QuestionSettings.DescriptionFormat"/> が <see cref="DescriptionFormat.Markup"/>
+    /// のときだけ、説明文ブロックと同じ安全な記法を使う。
     /// </remarks>
     public IReadOnlyDictionary<string, ImmutableArray<NoteBlock>>? DescriptionBlocks =>
-        Type is QuestionType.Confirm ? ParseDescription() : null;
+        Type is not QuestionType.Note
+            && Settings.DescriptionFormat is DescriptionFormat.Markup
+                ? ParseDescription()
+                : null;
 
     private IReadOnlyDictionary<string, ImmutableArray<NoteBlock>>? ParseDescription()
     {

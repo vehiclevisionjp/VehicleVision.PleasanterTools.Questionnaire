@@ -30,10 +30,10 @@
   import { t } from '../lib/i18n/state.svelte';
 
   /**
-   * 説明文ブロックの記法の文字数の上限（Issue #108）。
+   * 説明文の文字数の上限（Issue #108 / #267）。
    *
    * **サーバ側の `NoteMarkup.MaximumLength` と揃える。**
-   * 超えた分はサーバが切り落とすので、入力の時点で止める。
+   * 公開時に拒まれる前に、入力の時点で止める。
    */
   const NOTE_MARKUP_MAX_LENGTH = 4000;
 
@@ -473,9 +473,8 @@
     </div>
   </div>
 
-  {#if displayOnly || question.type === 'Confirm'}
-    <!-- **説明文ブロックと確認・同意の補足は記法で書ける**（Issue #108 / #257）。
-         **受け付けるのは記法だけで、HTML は平文として出る** -->
+  {#if question.type === 'Note'}
+    <!-- **説明文ブロックは従来どおり記法で書く。** 設問側の既定変更に巻き込まない -->
     <textarea
       class="description markup"
       rows="6"
@@ -487,14 +486,39 @@
     ></textarea>
     <p class="markup-hint">{t('question.markupHint')}</p>
   {:else}
-    <input
+    <textarea
       class="description"
-      type="text"
-      placeholder={t('question.descriptionPlaceholder')}
+      class:markup={question.settings.descriptionFormat === 'Markup'}
+      rows="6"
+      maxlength={NOTE_MARKUP_MAX_LENGTH}
+      placeholder={t(
+        question.settings.descriptionFormat === 'Markup'
+          ? 'question.markupPlaceholder'
+          : 'question.descriptionPlaceholder',
+      )}
       value={text(question.description, editing)}
       oninput={(event) =>
         update({ description: withText(question.description, event.currentTarget.value, editing) })}
-    />
+    ></textarea>
+    <label class="description-format">
+      {t('question.descriptionFormat')}
+      <select
+        value={question.settings.descriptionFormat ?? 'Plain'}
+        onchange={(event) =>
+          update({
+            settings: {
+              ...question.settings,
+              descriptionFormat: event.currentTarget.value as 'Plain' | 'Markup',
+            },
+          })}
+      >
+        <option value="Plain">{t('question.descriptionFormatPlain')}</option>
+        <option value="Markup">{t('question.descriptionFormatMarkup')}</option>
+      </select>
+    </label>
+    {#if question.settings.descriptionFormat === 'Markup'}
+      <p class="markup-hint">{t('question.markupHint')}</p>
+    {/if}
   {/if}
 
   <div class="meta">
@@ -1112,6 +1136,7 @@
 
   input[type='text'],
   input[type='number'],
+  textarea,
   select {
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--border);
@@ -1124,12 +1149,17 @@
     width: 100%;
     margin-top: 0.5rem;
     color: var(--muted);
-  }
-
-  .markup {
     resize: vertical;
     line-height: 1.6;
     font-family: inherit;
+  }
+
+  .description-format {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
   }
 
   .markup-hint {
