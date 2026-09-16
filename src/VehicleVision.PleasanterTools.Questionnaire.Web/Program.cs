@@ -32,6 +32,10 @@ var builder = WebApplication.CreateBuilder(args);
 // （App_Data/Parameters/README.md。Issue #158）
 builder.Configuration.AddParameterFiles();
 
+// **CIDR の書き間違いは起動時に止める。** 無制限へ黙って落ちると、絞ったつもりの口が開く。
+var endpointNetworkRestrictions =
+    EndpointNetworkRestrictions.FromConfiguration(builder.Configuration);
+
 // ---- 複数インスタンスの認証 --------------------------------------------------
 // 管理画面の Cookie は ASP.NET Core Data Protection で保護される。AKS で複数 Pod にすると、
 // 鍵束を共有しない限り「別 Pod へ振られた途端にログアウト」になる。
@@ -602,6 +606,10 @@ foreach (var network in ForwardedProxyNetworks.Parse(
     forwardedHeadersOptions.KnownIPNetworks.Add(network);
 }
 app.UseForwardedHeaders(forwardedHeadersOptions);
+
+// **転送ヘッダから本当の送信元へ直した後で照合する。**
+// 先に置くと、リバースプロキシ配下では全要求がプロキシ自身の IP に見える。
+app.UseEndpointNetworkRestrictions(endpointNetworkRestrictions);
 
 if (!app.Environment.IsDevelopment())
 {

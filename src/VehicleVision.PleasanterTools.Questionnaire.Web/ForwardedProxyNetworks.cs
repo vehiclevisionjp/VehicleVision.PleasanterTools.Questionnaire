@@ -9,7 +9,11 @@ public static class ForwardedProxyNetworks
     public const string Setting = "QUESTIONNAIRE_FORWARDED_NETWORKS";
 
     /// <summary>設定値を CIDR の一覧にする。</summary>
-    public static IReadOnlyList<IPNetwork> Parse(string? value)
+    public static IReadOnlyList<IPNetwork> Parse(string? value) =>
+        Parse(value, Setting);
+
+    /// <summary>指定した設定値を CIDR の一覧にする。</summary>
+    public static IReadOnlyList<IPNetwork> Parse(string? value, string setting)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -18,13 +22,13 @@ public static class ForwardedProxyNetworks
 
         return value
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(ParseOne)
+            .Select(value => ParseOne(value, setting))
             .ToArray();
     }
 
-    private static IPNetwork ParseOne(string value) =>
+    private static IPNetwork ParseOne(string value, string setting) =>
         IPNetwork.TryParse(value, out var network)
             ? network
             : throw new InvalidOperationException(
-                $"{Setting} に CIDR でない値がある: {value}");
+                $"{setting} に CIDR でない値がある: {value}");
 }
