@@ -16,6 +16,7 @@
     completeOwnTotp,
     disableOwnTotp,
   } from '../lib/api';
+  import AdminSessionList from './AdminSessionList.svelte';
   import { twoFactorPolicyLabel } from '../lib/adminUsers';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
@@ -264,6 +265,10 @@
       </form>
     {/if}
   </div>
+
+  <div class="session-card">
+    <AdminSessionList />
+  </div>
 </section>
 
 <style lang="scss">
@@ -292,6 +297,14 @@
 
   .card {
     max-width: 28rem;
+    padding: 1.25rem;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 1.25rem;
+  }
+
+  .session-card {
     padding: 1.25rem;
     background: #fff;
     border: 1px solid var(--border);

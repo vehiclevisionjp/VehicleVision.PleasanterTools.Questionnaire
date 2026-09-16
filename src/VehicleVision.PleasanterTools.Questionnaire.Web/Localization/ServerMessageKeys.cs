@@ -72,6 +72,10 @@ public static class ServerMessageKeys
 
     public const string UnsupportedLanguage = "users.unsupportedLanguage";
 
+    public const string AdminSessionNotFound = "sessions.notFound";
+
+    public const string CurrentSessionCannotBeRevoked = "sessions.currentCannotBeRevoked";
+
     // ---- アンケート ---------------------------------------------------------
 
     public const string SurveyTitleRequired = "surveys.titleRequired";

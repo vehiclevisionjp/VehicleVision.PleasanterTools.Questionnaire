@@ -64,6 +64,9 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | `QUESTIONNAIRE_TIMEZONE_DEFAULT` | 本アプリの既定タイムゾーン（既定 `Asia/Tokyo`）。`Service.json` の `TimeZoneDefault` と同じ |
 | `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト）。**送信チケットの署名鍵もここから派生させる** |
 | `QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` | 複数インスタンスで管理画面の Cookie を共有する鍵束ディレクトリ。AKS では ReadWriteMany の永続ボリュームを指定する |
+| `QUESTIONNAIRE_ADMIN_SESSION_STORE` | 管理者セッションの保存先。`Database`（既定）/ `Redis`。⚠️ Redis 停止時は全管理者をログアウト扱いにする |
+| `QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING` | `Redis` を選んだときの接続文字列。資格情報を含むため環境変数か Key Vault だけで与える |
+| `QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX` | Redis キーの接頭辞。既定 `questionnaire:admin-session:`。同じ Redis を複数環境で共用するときに分ける |
 | `QUESTIONNAIRE_ASSET_STORE` | 資産の保存先。`Database`（既定）/ `Path` / `AzureBlob` / `S3` |
 | `QUESTIONNAIRE_ASSET_PATH` | `Path` の保存ディレクトリ。複数インスタンスでは全インスタンスが同じ共有領域を参照する |
 | `QUESTIONNAIRE_ASSET_AZURE_CONTAINERURI` | `AzureBlob` のコンテナー URI。マネージド ID を使う既定の指定方法 |
@@ -138,6 +141,22 @@ dotnet run --project src/VehicleVision.PleasanterTools.Questionnaire.Web -- --ge
 Data Protection は管理画面の Cookie に使う。AKS の複数 Pod では
 `QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` を ReadWriteMany の永続ボリュームへ向け、
 Pod 間で鍵束を共有する。
+
+管理者の cookie はセッション ID だけを持つが、その ID の改ざん防止にも Data Protection を使う。
+**セッションストアを Redis にしても、鍵束の共有はやめられない。**
+
+### 管理者セッションストア
+
+既定の `Database` は本アプリの DB に `AdminSessions` を作る。追加のサービスは要らない。
+大規模構成では `Redis` を選べる。
+
+Redis はセッション専用の領域を使い、`maxmemory-policy` は `noeviction` にする。
+**メモリ不足時にキーを個別に追い出す設定では、端末一覧の索引とセッション本体の片方だけが
+消え得るため使用しない。** 書き込みは失敗してログインを成立させない方が安全である。
+
+⚠️ **Redis を選ぶことは、Redis 停止時に管理画面の全員がログアウト扱いになることを
+受け入れる選択である。** cookie だけで通す代替動作はしない。失効が効かない状態で
+管理操作を許す方が危険なため。
 
 ## タイムゾーンに注意
 

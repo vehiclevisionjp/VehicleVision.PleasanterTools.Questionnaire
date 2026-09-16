@@ -18,6 +18,7 @@ public static class AuditNotes
     private const string ItemKey = "questionnaire:audit_notes";
 
     private const string TargetKey = "questionnaire:audit_target";
+    private const string TargetsKey = "questionnaire:audit_targets";
 
     /// <summary>補足を 1 つ預ける。</summary>
     /// <remarks>**制御文字は落として長さも切る**（<see cref="LogSafe"/>）。</remarks>
@@ -61,7 +62,25 @@ public static class AuditNotes
             (LogSafe.Text(targetType), targetId is null ? null : LogSafe.Text(targetId));
     }
 
+    /// <summary>1 回の操作で失効させた複数の対象を、1 対象 1 監査行として預ける。</summary>
+    public static void SetTargets(
+        HttpContext context,
+        string targetType,
+        IEnumerable<Guid> targetIds)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetType);
+        ArgumentNullException.ThrowIfNull(targetIds);
+        context.Items[TargetsKey] = targetIds
+            .Select(id => (LogSafe.Text(targetType), (string?)id.ToString()))
+            .ToList();
+    }
+
     /// <summary>明示された対象。**無ければ経路の値から見分ける。**</summary>
     internal static (string TargetType, string? TargetId)? TargetOf(HttpContext context) =>
         context.Items[TargetKey] as (string, string?)?;
+
+    internal static IReadOnlyList<(string? TargetType, string? TargetId)>? TargetsOf(
+        HttpContext context) =>
+        context.Items[TargetsKey] as IReadOnlyList<(string?, string?)>;
 }

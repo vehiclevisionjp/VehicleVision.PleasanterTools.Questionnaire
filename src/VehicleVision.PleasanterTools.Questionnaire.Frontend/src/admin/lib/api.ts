@@ -3,6 +3,7 @@ import type { NoteBlock } from '../../lib/types';
 import type {
   AdminNotificationPage,
   AdminSession,
+  AdminSessionRow,
   AdminUserRow,
   IssuedInvitation,
   AttachmentRejectionPage,
@@ -203,6 +204,27 @@ export const disableOwnTotp = (password: string) =>
   });
 
 export const logout = () => call<{ signedOut: boolean }>('/api/admin/logout', { method: 'POST', json: {} });
+
+export const listAdminSessions = (adminUserId?: string) =>
+  call<{ sessions: AdminSessionRow[] }>(
+    adminUserId === undefined
+      ? '/api/admin/me/sessions'
+      : `/api/admin/users/${adminUserId}/sessions`,
+  );
+
+export const revokeAdminSession = (adminSessionId: string, adminUserId?: string) =>
+  call<{ revoked: boolean }>(
+    adminUserId === undefined
+      ? `/api/admin/me/sessions/${adminSessionId}/revoke`
+      : `/api/admin/users/${adminUserId}/sessions/${adminSessionId}/revoke`,
+    { method: 'POST', json: {} },
+  );
+
+export const revokeOtherOwnSessions = () =>
+  call<{ revoked: number }>('/api/admin/me/sessions/revoke-others', {
+    method: 'POST',
+    json: {},
+  });
 
 /**
  * 管理画面を出す言語を決める。

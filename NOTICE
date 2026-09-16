@@ -25,6 +25,8 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Data.SqlClient 7.0.3 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
+  StackExchange.Redis 3.2.1 / MIT / https://www.nuget.org/packages/StackExchange.Redis/3.2.1
+    （大規模構成で選択できる管理者セッションストア。既定は本アプリの DB）
   Microsoft.Extensions.DependencyInjection 10.0.12 / MIT
   Microsoft.Extensions.Configuration.Abstractions 10.0.11 / MIT
   Microsoft.Extensions.Hosting.Abstractions 10.0.11 / MIT

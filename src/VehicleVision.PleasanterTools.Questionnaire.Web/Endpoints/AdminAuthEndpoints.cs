@@ -367,12 +367,14 @@ public static class AdminAuthEndpoints
         // ---- ログアウト ------------------------------------------------------
         group.MapPost("/logout", async (HttpContext context) =>
         {
+            var sessions = context.RequestServices.GetRequiredService<AdminSessionManager>();
+
             // **途中状態も一緒に消す。** 残しておくと 2 要素から再開できてしまう
-            await context.SignOutAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
-            await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Session).ConfigureAwait(false);
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
 
             // 2 要素の登録し直しの途中も消す
-            await context.SignOutAsync(AdminAuthSchemes.Reenroll).ConfigureAwait(false);
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Reenroll).ConfigureAwait(false);
             return Results.Ok(new { signedOut = true });
         });
 
@@ -400,7 +402,8 @@ public static class AdminAuthEndpoints
                 return Results.Ok(new { authenticated = true });
 
             case SecondFactorOutcome.LockedOut:
-                await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+                await context.RequestServices.GetRequiredService<AdminSessionManager>()
+                    .RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
                 return Results.Json(
                     new
                     {
@@ -434,7 +437,7 @@ public static class AdminAuthEndpoints
     };
 
     /// <summary>パスワードまで通った状態にする。**ここでは何も操作させない。**</summary>
-    internal static Task SignInPendingAsync(HttpContext context, AdminUser user, string? secret)
+    internal static async Task SignInPendingAsync(HttpContext context, AdminUser user, string? secret)
     {
         var claims = new List<Claim>
         {
@@ -449,7 +452,12 @@ public static class AdminAuthEndpoints
         }
 
         var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Pending);
-        return context.SignInAsync(AdminAuthSchemes.Pending, new ClaimsPrincipal(identity));
+        await context.RequestServices.GetRequiredService<AdminSessionManager>().SignInAsync(
+            context,
+            AdminAuthSchemes.Pending,
+            AdminSessionKind.Pending,
+            new ClaimsPrincipal(identity),
+            AdminAuthSchemes.PendingLifetime).ConfigureAwait(false);
     }
 
     /// <summary>2 要素まで通った状態にする。</summary>
@@ -464,8 +472,9 @@ public static class AdminAuthEndpoints
     internal static async Task SignInSessionAsync(
         HttpContext context, AdminUser user, SamlSessionKeys? samlSession = null)
     {
-        // **途中状態は必ず消す。** 共有鍵の claim を残さない
-        await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+        // **途中状態は必ず消す。** ストアにも共有鍵を残さない
+        await context.RequestServices.GetRequiredService<AdminSessionManager>()
+            .RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
 
         List<Claim> claims =
         [
@@ -488,10 +497,12 @@ public static class AdminAuthEndpoints
 
         var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Session);
 
-        await context.SignInAsync(
+        await context.RequestServices.GetRequiredService<AdminSessionManager>().SignInAsync(
+            context,
             AdminAuthSchemes.Session,
+            AdminSessionKind.Session,
             new ClaimsPrincipal(identity),
-            new AuthenticationProperties { IsPersistent = false }).ConfigureAwait(false);
+            AdminAuthSchemes.SessionLifetime).ConfigureAwait(false);
     }
 
     /// <summary>ログイン ID とパスワード。</summary>

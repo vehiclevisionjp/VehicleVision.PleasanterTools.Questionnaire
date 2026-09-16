@@ -23,6 +23,7 @@
     invitationUrl,
     roleLabel,
   } from '../lib/adminUsers';
+  import AdminSessionList from './AdminSessionList.svelte';
   import type { AdminUserRow, IssuedInvitation } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -42,6 +43,7 @@
   let loading = $state(true);
   let error = $state('');
   let busy = $state('');
+  let sessionsFor = $state('');
 
   /** 追加する相手。 */
   let newLoginId = $state('');
@@ -311,8 +313,26 @@
                     {t('users.resetTwoFactor')}
                   </button>
                 {/if}
+
+                {#if user.adminUserId !== ownAdminUserId && !user.invitationPending}
+                  <button
+                    type="button"
+                    class="link"
+                    onclick={() =>
+                      (sessionsFor = sessionsFor === user.adminUserId ? '' : user.adminUserId)}
+                  >
+                    {t('users.sessions')}
+                  </button>
+                {/if}
               </td>
             </tr>
+            {#if sessionsFor === user.adminUserId}
+              <tr>
+                <td colspan="6">
+                  <AdminSessionList adminUserId={user.adminUserId} canRevoke={canWrite} />
+                </td>
+              </tr>
+            {/if}
           {/each}
         </tbody>
       </table>

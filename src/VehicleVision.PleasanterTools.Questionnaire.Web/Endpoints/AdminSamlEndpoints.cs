@@ -256,8 +256,9 @@ public static class AdminSamlEndpoints
             var keys = ReadSessionKeys(context.User.Identity as ClaimsIdentity);
 
             // ⚠️ **先に落とす。** IdP へ行けなくても、こちらは確実にログアウトする
-            await context.SignOutAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
-            await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+            var sessions = context.RequestServices.GetRequiredService<AdminSessionManager>();
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Session).ConfigureAwait(false);
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
 
             if (!options.SingleLogoutEnabled || keys is null)
             {
@@ -293,8 +294,9 @@ public static class AdminSamlEndpoints
         {
             // ⚠️ **署名を確かめる前に落とす。** 偽の要求で落とされても
             // 「ログアウトさせられる」だけで、入られるより軽い
-            await context.SignOutAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
-            await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+            var sessions = context.RequestServices.GetRequiredService<AdminSessionManager>();
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Session).ConfigureAwait(false);
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
 
             if (!options.SingleLogoutEnabled)
             {

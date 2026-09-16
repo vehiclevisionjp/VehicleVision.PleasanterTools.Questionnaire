@@ -162,7 +162,8 @@ public sealed class AuditLogRetentionService(
     IAttachmentRejectionStore? rejections = null,
     IAdminNotificationStore? notifications = null,
     IResponseOutbox? outbox = null,
-    IResponseEditTokenStore? editTokens = null)
+    IResponseEditTokenStore? editTokens = null,
+    IAdminSessionStore? adminSessions = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -193,7 +194,8 @@ public sealed class AuditLogRetentionService(
             && !(rejections is not null && options.AttachmentRejectionEnabled)
             && !(notifications is not null && options.NotificationEnabled)
             && !(outbox is not null && options.DeadLetterEnabled)
-            && editTokens is null)
+            && editTokens is null
+            && adminSessions is null)
         {
             return;
         }
@@ -222,6 +224,21 @@ public sealed class AuditLogRetentionService(
                 await Task.Delay(options.SweepInterval, _time, stoppingToken).ConfigureAwait(false);
 
                 var now = _time.GetLocalNow().DateTime;
+
+                // **DB のセッションは期限を過ぎても行が残る。**
+                // Redis は TTL で消えるので、同じ口を呼んでも何もしない。
+                if (adminSessions is not null)
+                {
+                    var expiredSessions = await adminSessions
+                        .DeleteExpiredAsync(_time.GetUtcNow().UtcDateTime, stoppingToken)
+                        .ConfigureAwait(false);
+                    if (expiredSessions > 0)
+                    {
+                        logger.LogInformation(
+                            "期限を過ぎた管理者セッションを {Count} 件消した",
+                            expiredSessions);
+                    }
+                }
 
                 // **期限切れの再編集リンクを消す**（Issue #202）。
                 // **保持期間の設定を持たない。** 期限を過ぎた行は、もう誰も使えない

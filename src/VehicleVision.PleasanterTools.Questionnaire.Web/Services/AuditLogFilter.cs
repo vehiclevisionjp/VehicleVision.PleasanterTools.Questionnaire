@@ -47,6 +47,7 @@ public sealed partial class AuditLogFilter(
     /// <summary>経路の値から対象を見分ける。**順番に見て、最初に当たったものを使う。**</summary>
     private static readonly (string RouteKey, string TargetType)[] Targets =
     [
+        ("adminSessionId", "AdminSession"),
         ("adminUserId", "AdminUser"),
         ("surveyId", "Survey"),
         // **テンプレートはアンケートと別の対象として残す**（Issue #58）。
@@ -145,20 +146,28 @@ public sealed partial class AuditLogFilter(
 
     private async Task WriteAsync(HttpContext http, int statusCode)
     {
-        var (targetType, targetId) = TargetOf(http);
+        IReadOnlyList<(string? TargetType, string? TargetId)>? targets =
+            AuditNotes.TargetsOf(http);
+        if (targets is null || targets.Count == 0)
+        {
+            targets = [TargetOf(http)];
+        }
 
-        await store.WriteAsync(
-            new AuditEntry(
-                DateTime.Now,
-                AdminUserIdOf(http),
-                ActionOf(http),
-                statusCode,
-                targetType,
-                targetId,
-                DetailOf(http),
-                IpAddressOf(http)),
-            http.RequestAborted)
-            .ConfigureAwait(false);
+        foreach (var (targetType, targetId) in targets)
+        {
+            await store.WriteAsync(
+                new AuditEntry(
+                    DateTime.Now,
+                    AdminUserIdOf(http),
+                    ActionOf(http),
+                    statusCode,
+                    targetType,
+                    targetId,
+                    DetailOf(http),
+                    IpAddressOf(http)),
+                http.RequestAborted)
+                .ConfigureAwait(false);
+        }
     }
 
     /// <summary>誰が。**認証を通っていない試み（招待の受け取りなど）では <c>null</c>。**</summary>
