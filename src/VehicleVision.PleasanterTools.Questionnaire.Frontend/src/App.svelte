@@ -159,6 +159,8 @@
    * 判断が付かないときは残さない側へ倒す。
    */
   let allowsDraft = $state(false);
+  /** テスト公開中か。**回答者へ必ず明示する。** */
+  let isTest = $state(false);
   /** 端末に前回の下書きがあるか。**勝手には戻さない。** */
   let draftFound = $state(false);
   /** 下書きから戻したことの知らせ。 */
@@ -297,6 +299,7 @@
 
     // **分からなければ残さない側へ倒す**（Issue #59）
     allowsDraft = result.form.allowsDraft ?? false;
+    isTest = result.form.isTest ?? false;
 
     // **メールの再編集リンクから来たなら、先に引き換える**（Issue #202）。
     // ここで端末の回答トークンを差し替えてから、いつもの流れへ入る
@@ -613,6 +616,10 @@
       {/each}
     </select>
   </div>
+
+  {#if isTest}
+    <p class="status test-banner" role="status">{t('test.banner')}</p>
+  {/if}
 
   {#if screen === 'loading'}
     <p class="status">{t('status.loading')}</p>

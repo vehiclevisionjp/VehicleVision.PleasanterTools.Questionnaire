@@ -458,6 +458,8 @@ export interface SurveySummary {
    * 回答者には受付完了と伝えているので、届いたかどうかで数え方を変えない。
    */
   responseCount: number;
+  /** テスト公開中に受け付けた回答の件数。 */
+  testResponseCount: number;
 }
 
 /**
@@ -472,13 +474,13 @@ export interface SurveyPage {
 }
 
 /**
- * 一度でも公開したことがあるか。
+ * 回答用 URL を開ける状態か。
  *
- * **`!== null` では守れない。** サーバは null のプロパティを落として返すので、
- * 未公開のときは `null` ではなく `undefined` になる。
+ * **版の有無だけで決めない。** テスト公開から下書きへ戻しても版は残るため、
+ * 状態を見ないと下書きの URL を誤って出してしまう。
  */
 export function isPublished(survey: SurveySummary): boolean {
-  return (survey.publishedVersion ?? null) !== null;
+  return survey.status === 1 || survey.status === 2 || survey.status === 3;
 }
 
 /**
@@ -502,6 +504,8 @@ export function surveyStatusKey(status: number): MessageKey {
       return 'status.published';
     case 2:
       return 'status.suspended';
+    case 3:
+      return 'status.testPublished';
     default:
       return 'status.unknown';
   }

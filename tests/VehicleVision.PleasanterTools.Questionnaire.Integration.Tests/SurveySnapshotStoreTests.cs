@@ -152,4 +152,59 @@ public class SurveySnapshotStoreTests
 
         Assert.Null(await snapshots.FindAsync(Guid.NewGuid(), 1));
     }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task サイトID変更はテスト対応を捨て送信待ちと本公開で拒否する(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        DatabaseMigrator.MigrateUp(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, connectionString);
+        var repository = new SurveyRepository(factory);
+        var tokens = new ResponseTokenStore(factory);
+        var outbox = new ResponseOutbox(factory);
+
+        var surveyId = Guid.NewGuid();
+        var token = $"tok-{Guid.NewGuid():N}";
+        await repository.SaveAsync(new SurveyRecord(
+            surveyId, $"pub-{Guid.NewGuid():N}", "検証用", 10, null,
+            (int)SurveyStatus.TestPublished, 1));
+        Assert.True(await tokens.EnsureAsync(token, surveyId, isTest: true));
+
+        Assert.Equal(
+            PleasanterSiteUpdateResult.Updated,
+            await repository.UpdatePleasanterSiteIdAsync(surveyId, 20));
+        Assert.Equal(20, (await repository.FindBySurveyIdAsync(surveyId))!.PleasanterSiteId);
+        Assert.True(await tokens.EnsureAsync(token, surveyId, isTest: true));
+
+        await outbox.SaveAsync(token, surveyId, 1, "{}", isTest: true);
+        Assert.Equal(
+            PleasanterSiteUpdateResult.PendingResponses,
+            await repository.UpdatePleasanterSiteIdAsync(surveyId, 30));
+
+        // ⚠️ **デッドレターでは止めない。** テスト公開は割り当ての誤りを見つけるためのもので、
+        // デッドレターが出るのは想定どおり。ここで止めると、直すためにサイトを
+        // 変えたいときに永久に変えられなくなる
+        await outbox.DeadLetterAsync(token, "列へ写せない");
+        Assert.Equal(
+            PleasanterSiteUpdateResult.Updated,
+            await repository.UpdatePleasanterSiteIdAsync(surveyId, 25));
+
+        // **テストのデッドレターは旧サイト向けなので、対応表と一緒に捨てる**
+        Assert.Null(await outbox.FindPayloadAsync(token));
+
+        await outbox.SaveAsync(token, surveyId, 1, "{}", isTest: true);
+        await outbox.CompleteAsync(token);
+        var record = await repository.FindBySurveyIdAsync(surveyId);
+        await repository.SaveAsync(record! with { Status = (int)SurveyStatus.Published });
+        Assert.Equal(
+            PleasanterSiteUpdateResult.NotEditable,
+            await repository.UpdatePleasanterSiteIdAsync(surveyId, 30));
+    }
 }

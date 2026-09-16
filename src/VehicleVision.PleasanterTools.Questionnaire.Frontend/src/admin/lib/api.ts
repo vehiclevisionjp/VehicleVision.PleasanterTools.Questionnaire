@@ -364,10 +364,28 @@ export const adminAssetUrl = (surveyId: string, assetId: string): string =>
 export const loadProblems = (surveyId: string) =>
   call<MappingProblem[]>(`/api/admin/surveys/${surveyId}/problems`);
 
-export const publish = (surveyId: string) =>
-  call<{ version: number; warnings: MappingProblem[] }>(`/api/admin/surveys/${surveyId}/publish`, {
+export const testPublish = (surveyId: string) =>
+  call<{ version: number; warnings: MappingProblem[] }>(`/api/admin/surveys/${surveyId}/test-publish`, {
     method: 'POST',
     json: {},
+  });
+
+export const publish = (surveyId: string) =>
+  call<{ status: string }>(`/api/admin/surveys/${surveyId}/publish`, {
+    method: 'POST',
+    json: {},
+  });
+
+export const revertToDraft = (surveyId: string) =>
+  call<{ status: string }>(`/api/admin/surveys/${surveyId}/revert-to-draft`, {
+    method: 'POST',
+    json: {},
+  });
+
+export const updateSurveySiteId = (surveyId: string, pleasanterSiteId: number) =>
+  call<{ pleasanterSiteId: number }>(`/api/admin/surveys/${surveyId}/site-id`, {
+    method: 'PUT',
+    json: { pleasanterSiteId },
   });
 
 /**

@@ -84,7 +84,8 @@ public sealed record FormResponse(
     string PublicId,
     SurveyDefinition Definition,
     bool RequiresProofOfWork,
-    bool AllowsDraft = false);
+    bool AllowsDraft = false,
+    bool IsTest = false);
 
 /// <summary>回答画面向けの口。**認証は無い。**</summary>
 public static class FormEndpoints
@@ -115,7 +116,11 @@ public static class FormEndpoints
             return form is null
                 ? ToProblem(rejection)
                 : Results.Ok(new FormResponse(
-                    publicId, form.Definition, form.RequiresProofOfWork, form.AllowsDraft));
+                    publicId,
+                    form.Definition,
+                    form.RequiresProofOfWork,
+                    form.AllowsDraft,
+                    form.IsTest));
         });
 
         // **ヘッダ画像を配る**（Issue #56）。

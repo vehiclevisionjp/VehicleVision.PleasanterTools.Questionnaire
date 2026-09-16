@@ -45,6 +45,10 @@ public class AnswerDraftSettingTests
         public Task SaveAsync(SurveyRecord record, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
+        public Task<PleasanterSiteUpdateResult> UpdatePleasanterSiteIdAsync(
+            Guid surveyId, long pleasanterSiteId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<bool> SuspendForResponseLimitAsync(
             Guid surveyId, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
@@ -132,6 +136,10 @@ public class AnswerDraftSettingTests
             string responseToken, Guid surveyId, int surveyVersion, string payloadJson,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+        public Task SaveAsync(
+            string responseToken, Guid surveyId, int surveyVersion, string payloadJson, bool isTest,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task<PendingResponse?> ClaimAsync(
             string lockedBy, TimeSpan lockDuration, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -181,9 +189,17 @@ public class AnswerDraftSettingTests
 
     private sealed class NullTokens : IResponseTokenStore
     {
+        public Task<bool> IsTestAsync(
+            string responseToken, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<bool> EnsureAsync(
             string responseToken, Guid surveyId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<bool> EnsureAsync(
+            string responseToken, Guid surveyId, bool isTest,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<long?> FindReferenceIdAsync(
             string responseToken, CancellationToken cancellationToken = default) =>

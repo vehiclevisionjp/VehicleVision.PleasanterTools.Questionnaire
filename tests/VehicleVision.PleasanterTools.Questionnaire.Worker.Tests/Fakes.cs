@@ -72,6 +72,15 @@ public sealed class FakeOutbox : IResponseOutbox
         return Task.CompletedTask;
     }
 
+    public Task SaveAsync(
+        string responseToken,
+        Guid surveyId,
+        int surveyVersion,
+        string payloadJson,
+        bool isTest,
+        CancellationToken cancellationToken = default) =>
+        SaveAsync(responseToken, surveyId, surveyVersion, payloadJson, cancellationToken);
+
     // ---- 管理画面から読む口。**送信の流れの試験では使わない** ------------------
 
     public Task<OutboxStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>
@@ -99,12 +108,23 @@ public sealed class FakeTokenStore : IResponseTokenStore
         string responseToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(Map.TryGetValue(responseToken, out var id) ? id : null);
 
+    public Task<bool> IsTestAsync(
+        string responseToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
+
     public Task<bool> EnsureAsync(
         string responseToken, Guid surveyId, CancellationToken cancellationToken = default)
     {
         // **既にある ReferenceId は触らない**
         return Task.FromResult(Map.TryAdd(responseToken, null));
     }
+
+    public Task<bool> EnsureAsync(
+        string responseToken,
+        Guid surveyId,
+        bool isTest,
+        CancellationToken cancellationToken = default) =>
+        EnsureAsync(responseToken, surveyId, cancellationToken);
 
     public Task<int> CountAcceptedAsync(
         Guid surveyId, CancellationToken cancellationToken = default) =>

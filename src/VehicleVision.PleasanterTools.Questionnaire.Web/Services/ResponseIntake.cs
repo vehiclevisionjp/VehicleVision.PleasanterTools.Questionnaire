@@ -85,7 +85,8 @@ public sealed record IntakeResult(
 public sealed record PublishedForm(
     SurveyDefinition Definition,
     bool RequiresProofOfWork,
-    bool AllowsDraft = false);
+    bool AllowsDraft = false,
+    bool IsTest = false);
 
 /// <summary>回答を受け付けて送信待ちへ入れる。</summary>
 /// <remarks>
@@ -155,7 +156,10 @@ public sealed class ResponseIntake(
             // 運用の設定なので、公開し直さずに切り替えられる
             : (
                 new PublishedForm(
-                    snapshot.Definition, survey.RequireProofOfWork, survey.AllowDraft),
+                    snapshot.Definition,
+                    survey.RequireProofOfWork,
+                    survey.AllowDraft,
+                    survey.Status == (int)SurveyStatus.TestPublished),
                 null);
     }
 
@@ -268,6 +272,7 @@ public sealed class ResponseIntake(
         }
 
         var version = survey.PublishedVersion.Value;
+        var isTest = survey.Status == (int)SurveyStatus.TestPublished;
         var snapshot = await snapshots.FindAsync(survey.SurveyId, version, cancellationToken)
             .ConfigureAwait(false);
 
@@ -328,8 +333,13 @@ public sealed class ResponseIntake(
         //
         // **作ったか既にあったかを受け取る。** 前の回答の編集は受付数を増やさない
         var isNewResponse = await tokens
-            .EnsureAsync(responseToken, survey.SurveyId, cancellationToken)
+            .EnsureAsync(responseToken, survey.SurveyId, isTest, cancellationToken)
             .ConfigureAwait(false);
+        // **テスト回答の印は、作った後の編集でも変えない。**
+        // 本公開後に同じ端末から編集しても、本番回答へ数え替えないため
+        var responseIsTest = isNewResponse
+            ? isTest
+            : await tokens.IsTestAsync(responseToken, cancellationToken).ConfigureAwait(false);
 
         // **通らなかったページ・出していない設問の回答は落とす**（Issue #41）。
         // 落とさないと、画面を通さずに送るだけで隠した設問へ書き込める。
@@ -341,7 +351,13 @@ public sealed class ResponseIntake(
 
         var payload = ResponsePayload.Create(responseToken, kept, files);
         await outbox
-            .SaveAsync(responseToken, survey.SurveyId, version, payload.ToJson(), cancellationToken)
+            .SaveAsync(
+                responseToken,
+                survey.SurveyId,
+                version,
+                payload.ToJson(),
+                responseIsTest,
+                cancellationToken)
             .ConfigureAwait(false);
 
         // **自動返信は、受付が確定してから積む**（Issue #189）。
@@ -368,12 +384,16 @@ public sealed class ResponseIntake(
         // **書けた後で数える。** 断られた回答を滞留に数えない。
         // **同じトークンの上書きも 1 件として数えてしまう**が、
         // 数え直しのたびに実際の件数へ戻るので、多く見えるのは次の計測までに限られる
-        backlog?.OnAccepted(survey.SurveyId);
+        if (!responseIsTest)
+        {
+            backlog?.OnAccepted(survey.SurveyId);
+        }
 
         // **この回答で上限に届いたなら、ここで止める。**
         // 次の人が入力し終えてから断られるのを減らす。
         // **数え直さない。** 受付の前に数えた件数に、今受け付けた 1 件を足せば足りる
-        if (survey.ResponseLimit is { } limit
+        if (!isTest
+            && survey.ResponseLimit is { } limit
             && accepted is { } before
             && (isNewResponse ? before + 1 : before) >= limit)
         {
@@ -535,7 +555,9 @@ public sealed class ResponseIntake(
     {
         // **0 以下は「上限なし」として扱う。** 公開直後に 0 が入っていて
         // 誰も回答できない、という壊れ方をさせない
-        if (survey.ResponseLimit is not { } limit || limit <= 0)
+        if (survey.Status == (int)SurveyStatus.TestPublished
+            || survey.ResponseLimit is not { } limit
+            || limit <= 0)
         {
             return (null, null);
         }
@@ -673,7 +695,8 @@ public sealed class ResponseIntake(
                 : IntakeRejection.Suspended;
         }
 
-        if (survey.Status != (int)SurveyStatus.Published)
+        if (survey.Status is not ((int)SurveyStatus.Published)
+            and not ((int)SurveyStatus.TestPublished))
         {
             return IntakeRejection.NotFound;
         }

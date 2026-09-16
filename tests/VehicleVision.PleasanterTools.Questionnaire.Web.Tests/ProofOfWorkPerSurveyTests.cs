@@ -49,6 +49,10 @@ public class ProofOfWorkPerSurveyTests
         public Task SaveAsync(SurveyRecord record, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
+        public Task<PleasanterSiteUpdateResult> UpdatePleasanterSiteIdAsync(
+            Guid surveyId, long pleasanterSiteId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<bool> SuspendForResponseLimitAsync(
             Guid surveyId, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
