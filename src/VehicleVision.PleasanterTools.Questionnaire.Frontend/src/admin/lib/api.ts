@@ -218,6 +218,7 @@ export const listSurveys = (
   limit: number,
   title: string,
   status: number | null,
+  includeArchived = false,
 ) => {
   const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
 
@@ -227,6 +228,10 @@ export const listSurveys = (
 
   if (status !== null) {
     query.set('status', String(status));
+  }
+
+  if (includeArchived) {
+    query.set('includeArchived', 'true');
   }
 
   return call<SurveyPage>(`/api/admin/surveys?${query}`);
@@ -414,6 +419,18 @@ export const suspend = (surveyId: string) =>
 
 export const resume = (surveyId: string) =>
   call<{ status: string }>(`/api/admin/surveys/${surveyId}/resume`, { method: 'POST', json: {} });
+
+export const archiveSurvey = (surveyId: string) =>
+  call<{ archivedAt: string }>(`/api/admin/surveys/${surveyId}/archive`, {
+    method: 'POST',
+    json: {},
+  });
+
+export const restoreSurvey = (surveyId: string) =>
+  call<{ archivedAt?: string }>(`/api/admin/surveys/${surveyId}/restore`, {
+    method: 'POST',
+    json: {},
+  });
 
 /**
  * 管理操作の記録を読む。

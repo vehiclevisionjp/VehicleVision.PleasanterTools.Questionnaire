@@ -1,11 +1,13 @@
 <script lang="ts">
   import {
+    archiveSurvey,
     createSurvey,
     duplicateSurvey,
     listSurveys,
     publish,
     revertToDraft,
     resume,
+    restoreSurvey,
     saveAsTemplate,
     saveSurveySettings,
     suspend,
@@ -63,6 +65,7 @@
   let statusInput = $state('');
   let titleFilter = $state('');
   let statusFilter = $state<number | null>(null);
+  let includeArchived = $state(false);
 
   let creating = $state(false);
   let newTitle = $state('');
@@ -117,12 +120,17 @@
 
   // **絞り込みとページを変えたら読み直す。** $effect が依存を拾う
   $effect(() => {
-    void reload(offset, titleFilter, statusFilter);
+    void reload(offset, titleFilter, statusFilter, includeArchived);
   });
 
-  async function reload(from: number, title: string, status: number | null) {
+  async function reload(
+    from: number,
+    title: string,
+    status: number | null,
+    withArchived: boolean,
+  ) {
     loading = true;
-    const result = await listSurveys(from, pageSize, title, status);
+    const result = await listSurveys(from, pageSize, title, status, withArchived);
     loading = false;
 
     if (!result.ok) {
@@ -253,7 +261,7 @@
       return;
     }
 
-    await reload(offset, titleFilter, statusFilter);
+    await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
   async function changePublication(survey: SurveySummary, publishNow: boolean) {
@@ -265,7 +273,7 @@
       return;
     }
 
-    await reload(offset, titleFilter, statusFilter);
+    await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
   function openSite(survey: SurveySummary) {
@@ -295,7 +303,7 @@
     }
 
     siteFor = null;
-    await reload(offset, titleFilter, statusFilter);
+    await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
   function toggleQr(survey: SurveySummary) {
@@ -342,7 +350,24 @@
     }
 
     settingsFor = null;
-    await reload(offset, titleFilter, statusFilter);
+    await reload(offset, titleFilter, statusFilter, includeArchived);
+  }
+
+  async function changeArchive(survey: SurveySummary) {
+    const archived = survey.archivedAt != null;
+    if (!archived && !confirm(t('archive.confirm', { title: survey.title }))) {
+      return;
+    }
+
+    const result = archived
+      ? await restoreSurvey(survey.surveyId)
+      : await archiveSurvey(survey.surveyId);
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
   /** 受付数の表示。**上限があれば「/ 上限」を添える。** */
@@ -402,6 +427,14 @@
       <option value="2">{t('status.suspended')}</option>
       <option value="3">{t('status.testPublished')}</option>
     </select>
+  </label>
+  <label class="check filter-archived">
+    <input
+      type="checkbox"
+      bind:checked={includeArchived}
+      onchange={() => (offset = 0)}
+    />
+    {t('list.includeArchived')}
   </label>
   <div class="actions">
     <button type="submit" class="secondary">{t('list.filterApply')}</button>
@@ -579,9 +612,14 @@
       {#each surveys as survey (survey.surveyId)}
         <tr>
           <td>
-            <button type="button" class="link" onclick={() => onopen(survey.surveyId)}>
-              {survey.title}
-            </button>
+            {#if survey.archivedAt == null}
+              <button type="button" class="link" onclick={() => onopen(survey.surveyId)}>
+                {survey.title}
+              </button>
+            {:else}
+              <span>{survey.title}</span>
+              <span class="reason">{t('archive.archived')}</span>
+            {/if}
           </td>
           <td>
             <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
@@ -619,7 +657,7 @@
           <td class="muted">{formatDate(survey.updatedAt)}</td>
           <td class="row-actions">
             <div class="row-actions-inner">
-            {#if survey.status === 1 || survey.status === 2}
+            {#if survey.archivedAt == null && (survey.status === 1 || survey.status === 2)}
               <button type="button" class="secondary" onclick={() => toggle(survey)}>
                 {survey.status === 1 ? t('list.suspend') : t('list.resume')}
               </button>
@@ -628,7 +666,7 @@
                 {t('qr.open')}
               </button>
             {/if}
-            {#if survey.status === 3}
+            {#if survey.archivedAt == null && survey.status === 3}
               <button type="button" onclick={() => changePublication(survey, true)}>
                 {t('list.publish')}
               </button>
@@ -639,24 +677,29 @@
                 {t('qr.open')}
               </button>
             {/if}
-            {#if survey.status === 0 || survey.status === 3}
+            {#if survey.archivedAt == null && (survey.status === 0 || survey.status === 3)}
               <button type="button" class="secondary" onclick={() => openSite(survey)}>
                 {t('siteId.open')}
               </button>
             {/if}
-            <button type="button" class="secondary" onclick={() => openSettings(survey)}>
-              {t('settings.open')}
-            </button>
-            {#if canDuplicate}
+            {#if survey.archivedAt == null}
+              <button type="button" class="secondary" onclick={() => openSettings(survey)}>
+                {t('settings.open')}
+              </button>
+            {/if}
+            {#if canDuplicate && survey.archivedAt == null}
               <button type="button" class="secondary" onclick={() => openDuplicate(survey)}>
                 {t('duplicate.open')}
               </button>
             {/if}
-            {#if canUseTemplates}
+            {#if canUseTemplates && survey.archivedAt == null}
               <button type="button" class="secondary" onclick={() => openTemplate(survey)}>
                 {t('template.save')}
               </button>
             {/if}
+            <button type="button" class="secondary" onclick={() => changeArchive(survey)}>
+              {survey.archivedAt == null ? t('archive.open') : t('archive.restore')}
+            </button>
             </div>
           </td>
         </tr>
