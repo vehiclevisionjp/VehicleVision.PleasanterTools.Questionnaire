@@ -95,6 +95,39 @@ public sealed class SharedFixedWindowRateLimiter(
 /// <summary>設定に応じてプロセス内または共有の固定窓を作る。</summary>
 public static class RateLimitPartitions
 {
+    /// <summary>アンケート 1 本あたりの枠を作る。</summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠️ **<c>publicId</c> を持たない要求は、この段で数えない。**
+    /// 以前は <c>"none"</c> という 1 つの枠へまとめていたため、
+    /// **管理画面・監視 API・資産の配信の合計**が 1 分あたり
+    /// <c>permitLimit</c> 件で頭打ちになっていた（Issue #311）。
+    /// </para>
+    /// <para>
+    /// **送信元ごとではなく全体の合計**だったので、
+    /// 管理者の操作が増えただけで無関係な利用者が 429 を受け得た。
+    /// **実際に、写しの一式が 13 秒で超えて 11 本が落ちた。**
+    /// </para>
+    /// <para>
+    /// **回答画面以外は 1 段目（送信元ごとの枠）で守る。**
+    /// この段の役目は「特定のアンケートだけを狙って叩かれること」を防ぐこと。
+    /// </para>
+    /// </remarks>
+    public static RateLimitPartition<string> Survey(
+        string? publicId,
+        int permitLimit,
+        TimeSpan window,
+        ISharedRateLimitStore? sharedStore,
+        ILogger logger)
+    {
+        if (publicId is null)
+        {
+            return RateLimitPartition.GetNoLimiter("none");
+        }
+
+        return FixedWindow(publicId, "survey", permitLimit, window, sharedStore, logger);
+    }
+
     public static RateLimitPartition<string> FixedWindow(
         string partition,
         string scope,

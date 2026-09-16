@@ -602,17 +602,14 @@ builder.Services
                 rateLimitLogger);
         }),
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
-        {
-            var publicId = context.Request.RouteValues["publicId"]?.ToString();
-            return RateLimitPartitions.FixedWindow(
-                publicId ?? "none",
-                "survey",
+            // ⚠️ **publicId を持たない要求はこの段で数えない**（Issue #311）。
+            // 経路の値は UseRouting が利用者のミドルウェアより前に入るため、ここで取れる
+            RateLimitPartitions.Survey(
+                context.Request.RouteValues["publicId"]?.ToString(),
                 formPermitLimit,
                 TimeSpan.FromMinutes(1),
-                // publicId の無いヘルスチェックや管理 API を全 Pod 共通の 1 枠へ集めない。
-                publicId is null ? null : sharedRateLimits,
-                rateLimitLogger);
-        }));
+                sharedRateLimits,
+                rateLimitLogger)));
 
     // **回答の送信だけ別枠にする。** 書き込みは読み取りより高くつくので、
     // 画面を開くだけの要求と同じ枠で数えない。
