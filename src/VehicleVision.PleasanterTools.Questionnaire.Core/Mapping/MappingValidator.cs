@@ -27,6 +27,9 @@ public enum MappingProblemCode
     /// <summary>スクリプト変換なのにスクリプトが空。</summary>
     EmptyScript,
 
+    /// <summary>変換に必要な設定が空。</summary>
+    MissingConverterConfig,
+
     /// <summary>添付の割り当てなのに、形が <c>1 : 0 : 1</c> になっていない。</summary>
     InvalidAttachmentShape,
 
@@ -159,6 +162,12 @@ public static class MappingValidator
                 problems.Add(new MappingProblem(
                     MappingProblemCode.EmptyScript, assignment.TargetColumn));
             }
+            else if (assignment.Converter is { } configuredConverter
+                && HasMissingConfig(configuredConverter))
+            {
+                problems.Add(new MappingProblem(
+                    MappingProblemCode.MissingConverterConfig, assignment.TargetColumn));
+            }
 
             foreach (var source in assignment.Sources)
             {
@@ -194,6 +203,23 @@ public static class MappingValidator
 
         return Finish(problems, mapping, definition);
     }
+
+    /// <summary>既定値のない必須設定が欠けているか。</summary>
+    private static bool HasMissingConfig(MappingConverter converter) =>
+        converter.Operation switch
+        {
+            ConverterOperations.Map => !converter.Config.Keys.Any(key =>
+                key.StartsWith("map.", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(key["map.".Length..])),
+            ConverterOperations.ToCheck or ConverterOperations.Constant =>
+                string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("value")),
+            ConverterOperations.Contains =>
+                string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("keyword")),
+            ConverterOperations.When =>
+                string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("when"))
+                || string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("then")),
+            _ => false,
+        };
 
     /// <summary>割り当てが書き込み先の型または未設定を確実に出せるか。</summary>
     /// <remarks>
