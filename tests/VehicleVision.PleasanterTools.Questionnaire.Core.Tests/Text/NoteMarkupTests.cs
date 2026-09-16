@@ -346,7 +346,7 @@ public sealed class NoteMarkupTests
     public void 既定のImmutableArrayは空として扱う()
     {
         // JSON から読んだ値がそのまま列挙されても落ちないこと
-        var block = new NoteBlock(NoteBlockKind.Paragraph);
+        var block = new NoteBlock(NoteBlockKind.Paragraph, [], []);
 
         Assert.Empty(block.Inlines);
         Assert.Empty(block.Items);

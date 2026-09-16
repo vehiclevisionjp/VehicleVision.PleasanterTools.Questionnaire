@@ -18,6 +18,9 @@ public sealed class EndpointNetworkRestrictionsTests
         Assert.True(restrictions.IsAllowed(
             "/openapi/v1.json",
             IPAddress.Parse("203.0.113.1")));
+        Assert.True(restrictions.IsAllowed(
+            "/scalar/",
+            IPAddress.Parse("203.0.113.1")));
     }
 
     [Theory]
@@ -60,6 +63,12 @@ public sealed class EndpointNetworkRestrictionsTests
             IPAddress.Parse("10.1.2.3")));
         Assert.False(restrictions.IsAllowed(
             "/openapi/v1.json",
+            IPAddress.Parse("192.0.2.10")));
+        Assert.True(restrictions.IsAllowed(
+            "/scalar/scalar.js",
+            IPAddress.Parse("10.1.2.3")));
+        Assert.False(restrictions.IsAllowed(
+            "/scalar/scalar.js",
             IPAddress.Parse("192.0.2.10")));
     }
 

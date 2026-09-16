@@ -1,9 +1,11 @@
 using System.Threading.RateLimiting;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Scalar.AspNetCore;
 using StackExchange.Redis;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -659,6 +661,7 @@ var analyticsSources = analyticsOptions.CspSources;
 // どのサービスも iframe で課題を出すので、script-src と frame-src の両方に要る
 var captchaSources = captchaOptions.CspSources;
 var externalScriptSources = analyticsSources.AddRange(captchaSources);
+const string scalarCspNonceKey = "ScalarCspNonce";
 var contentSecurityPolicy = string.Join("; ",
 [
     "default-src 'self'",
@@ -674,13 +677,8 @@ var contentSecurityPolicy = string.Join("; ",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "object-src 'none'",
-    .. externalScriptSources.IsEmpty
-        ? Array.Empty<string>()
-        :
-        [
-            "script-src 'self'" + Join(externalScriptSources),
-            "connect-src 'self'" + Join(externalScriptSources),
-        ],
+    "script-src 'self'" + Join(externalScriptSources),
+    "connect-src 'self'" + Join(externalScriptSources),
 ]);
 
 static string Join(System.Collections.Immutable.ImmutableArray<string> sources) =>
@@ -718,11 +716,23 @@ if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
 app.Use(async (context, next) =>
 {
     var headers = context.Response.Headers;
+    var csp = contentSecurityPolicy;
+    if (context.Request.Path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase))
+    {
+        // Scalar は画面を組み立てる inline script を返す。要求ごとの nonce だけを許して CSP を緩めない。
+        var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        context.Items[scalarCspNonceKey] = nonce;
+        csp = csp.Replace(
+            "script-src 'self'",
+            $"script-src 'self' 'nonce-{nonce}'",
+            StringComparison.Ordinal);
+    }
+
     headers["X-Content-Type-Options"] = "nosniff";
     headers["Referrer-Policy"] = "no-referrer";
     headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()";
     // **2 要素の QR は data: URI で描く。** 外部から画像を取りに行かせない
-    headers["Content-Security-Policy"] = contentSecurityPolicy;
+    headers["Content-Security-Policy"] = csp;
     await next();
 });
 
@@ -761,6 +771,13 @@ if (monitoringToken is not null)
 if (openApiExposure.Enabled)
 {
     app.MapOpenApi();
+    app.MapScalarApiReference((options, context) =>
+    {
+        // CDN の既定フォントと利用状況テレメトリーを止め、画面から第三者へ要求を出さない。
+        options.DisableDefaultFonts().DisableTelemetry().DisableAgent().WithNonce(
+            context.Items[scalarCspNonceKey] as string
+            ?? throw new InvalidOperationException("Scalar の CSP nonce を設定できなかった"));
+    });
 }
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
