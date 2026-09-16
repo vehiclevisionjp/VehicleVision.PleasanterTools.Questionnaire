@@ -1,4 +1,4 @@
-﻿using System.Collections.Frozen;
+using System.Collections.Frozen;
 using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
@@ -271,6 +271,21 @@ public static class ServerMessages
             ServerMessageKeys.InvalidArchiveState,
             "アーカイブの状態がすでに変わっています。再読み込みしてください。",
             "The archive state has already changed. Reload the page.");
+
+        Add(
+            ServerMessageKeys.SurveyDeleteRequiresArchive,
+            "完全に削除できるのはアーカイブ済みのアンケートだけです。先にアーカイブしてください。",
+            "Only archived surveys can be permanently deleted. Archive this survey first.");
+
+        Add(
+            ServerMessageKeys.SurveyDeleteTitleMismatch,
+            "入力した題名がアンケートの題名と一致しません。",
+            "The title you entered does not match the survey title.");
+
+        Add(
+            ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery,
+            "送信待ちまたは送信中の回答・メールが残っているため、完全に削除できません。",
+            "This survey cannot be permanently deleted while responses or mail are pending or being sent.");
 
         Add(
             ServerMessageKeys.SiteIdLockedAfterPublish,

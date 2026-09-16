@@ -1,4 +1,4 @@
-﻿namespace VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
+namespace VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 /// <summary>サーバが画面へ返す文言の鍵。</summary>
 /// <remarks>
@@ -116,6 +116,13 @@ public static class ServerMessageKeys
 
     /// <summary>既にアーカイブ済み、または既に復元済み。</summary>
     public const string InvalidArchiveState = "surveys.invalidArchiveState";
+
+    public const string SurveyDeleteRequiresArchive = "surveys.deleteRequiresArchive";
+
+    public const string SurveyDeleteTitleMismatch = "surveys.deleteTitleMismatch";
+
+    public const string SurveyDeleteBlockedByPendingDelivery =
+        "surveys.deleteBlockedByPendingDelivery";
 
     public const string SiteIdLockedAfterPublish = "surveys.siteIdLockedAfterPublish";
 

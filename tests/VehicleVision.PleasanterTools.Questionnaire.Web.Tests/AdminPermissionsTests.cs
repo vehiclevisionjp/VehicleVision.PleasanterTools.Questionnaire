@@ -32,12 +32,24 @@ public class AdminPermissionsTests
     }
 
     [Fact]
+    public void 完全削除は特権管理者だけが持つ()
+    {
+        foreach (var role in Enum.GetValues<AdminRole>())
+        {
+            Assert.Equal(
+                role == AdminRole.Administrator,
+                AdminPermissions.Of(role).Contains(AdminPermissions.SurveysDelete));
+        }
+    }
+
+    [Fact]
     public void アンケート管理者は人に触れない()
     {
         var permissions = AdminPermissions.Of(AdminRole.SurveyAdministrator);
 
         Assert.Contains(AdminPermissions.SurveysPublish, permissions);
         Assert.Contains(AdminPermissions.OutboxRequeue, permissions);
+        Assert.DoesNotContain(AdminPermissions.SurveysDelete, permissions);
 
         // **人の出入りには触れない**
         Assert.DoesNotContain(AdminPermissions.UsersRead, permissions);
@@ -59,6 +71,7 @@ public class AdminPermissionsTests
         Assert.DoesNotContain(AdminPermissions.SurveysRead, permissions);
         Assert.DoesNotContain(AdminPermissions.SurveysWrite, permissions);
         Assert.DoesNotContain(AdminPermissions.SurveysPublish, permissions);
+        Assert.DoesNotContain(AdminPermissions.SurveysDelete, permissions);
     }
 
     /// <summary>**編集者は公開できない。** ここが今回いちばん変わるところ。</summary>
@@ -70,6 +83,7 @@ public class AdminPermissionsTests
         Assert.Contains(AdminPermissions.SurveysRead, permissions);
         Assert.Contains(AdminPermissions.SurveysWrite, permissions);
         Assert.DoesNotContain(AdminPermissions.SurveysPublish, permissions);
+        Assert.DoesNotContain(AdminPermissions.SurveysDelete, permissions);
 
         // **送信状況もお知らせも見せない**（今までと同じ）
         Assert.DoesNotContain(AdminPermissions.OutboxRead, permissions);

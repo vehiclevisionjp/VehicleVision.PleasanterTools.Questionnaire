@@ -29,6 +29,13 @@ public static class AdminPermissions
     /// </remarks>
     public const string SurveysPublish = "surveys.publish";
 
+    /// <summary>アーカイブ済みアンケートの完全削除。</summary>
+    /// <remarks>
+    /// **公開やアーカイブとは分ける。** Pleasanter 側に回答を残したまま、
+    /// 本アプリから追跡する手掛かりを失う操作なので、特権管理者だけに持たせる。
+    /// </remarks>
+    public const string SurveysDelete = "surveys.delete";
+
     /// <summary>テンプレートの利用。</summary>
     public const string TemplatesRead = "templates.read";
 
@@ -66,6 +73,7 @@ public static class AdminPermissions
         SurveysRead,
         SurveysWrite,
         SurveysPublish,
+        SurveysDelete,
         TemplatesRead,
         TemplatesWrite,
         OutboxRead,

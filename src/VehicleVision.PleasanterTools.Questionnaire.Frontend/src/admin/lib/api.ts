@@ -433,6 +433,18 @@ export const restoreSurvey = (surveyId: string) =>
   });
 
 /**
+ * アーカイブ済みアンケートを本アプリから完全に削除する。
+ *
+ * **Pleasanter 側の回答は削除しない。** 題名は押し間違いを防ぐ確認値で、
+ * サーバでも現在の題名との完全一致を確かめる。
+ */
+export const deleteSurvey = (surveyId: string, title: string) =>
+  call<void>(`/api/admin/surveys/${surveyId}/delete`, {
+    method: 'POST',
+    json: { title },
+  });
+
+/**
  * 管理操作の記録を読む。
  *
  * **絞り込みはサーバへ渡す。** 全件受け取って画面で絞ると、

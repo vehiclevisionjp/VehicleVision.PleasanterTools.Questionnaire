@@ -563,6 +563,7 @@ export type AdminPermission =
   | 'surveys.read'
   | 'surveys.write'
   | 'surveys.publish'
+  | 'surveys.delete'
   | 'templates.read'
   | 'templates.write'
   | 'outbox.read'
