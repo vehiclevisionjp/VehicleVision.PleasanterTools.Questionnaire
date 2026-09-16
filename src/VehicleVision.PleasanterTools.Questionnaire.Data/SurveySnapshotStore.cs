@@ -449,9 +449,15 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             return PleasanterSiteUpdateResult.Updated;
         }
 
+        // **数えるのは送信待ちだけ**（`Pending` と `Sending`）。どちらのサイトへ行くかが
+        // 決まらないため止める。
+        // ⚠️ **デッドレターは数えない。** テスト公開は割り当ての誤りを見つけるためのもので、
+        // **デッドレターが出るのはむしろ想定どおり。** これで止めると、
+        // 直すためにサイトを変えたいときに永久に変えられなくなる
         var pending = await connection.ExecuteScalarAsync<int>(Sql(
-            "SELECT COUNT(*) FROM [Responses] WHERE [SurveyId] = @SurveyId",
-            new { SurveyId = surveyId },
+            "SELECT COUNT(*) FROM [Responses] "
+            + "WHERE [SurveyId] = @SurveyId AND [Status] <> @DeadLetterStatus",
+            new { SurveyId = surveyId, DeadLetterStatus = (int)ResponseStatus.DeadLetter },
             transaction,
             cancellationToken)).ConfigureAwait(false);
         if (pending > 0)
@@ -460,9 +466,28 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             return PleasanterSiteUpdateResult.PendingResponses;
         }
 
+        // **旧サイトを指しているものを捨てる。** 対応表を残すと、
+        // 次の回答が旧サイトのレコードを更新しに行く
         await connection.ExecuteAsync(Sql(
             "DELETE FROM [ResponseTokens] WHERE [SurveyId] = @SurveyId AND [IsTest] = @IsTest",
             new { SurveyId = surveyId, IsTest = true },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
+
+        // **テストのデッドレターも捨てる。** 中身は旧サイト向けの割り当てで、
+        // 再送しても確かめたいことの答えにならない。
+        // ⚠️ **本番のデッドレターは消さない**（ここへ来るのは本公開前だけだが、
+        // 条件を緩めたときに巻き添えにしないため明示する）
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [Responses] "
+            + "WHERE [SurveyId] = @SurveyId AND [IsTest] = @IsTest "
+            + "  AND [Status] = @DeadLetterStatus",
+            new
+            {
+                SurveyId = surveyId,
+                IsTest = true,
+                DeadLetterStatus = (int)ResponseStatus.DeadLetter,
+            },
             transaction,
             cancellationToken)).ConfigureAwait(false);
         await connection.ExecuteAsync(Sql(

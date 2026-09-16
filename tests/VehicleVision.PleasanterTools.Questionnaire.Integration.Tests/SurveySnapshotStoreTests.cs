@@ -188,6 +188,18 @@ public class SurveySnapshotStoreTests
             PleasanterSiteUpdateResult.PendingResponses,
             await repository.UpdatePleasanterSiteIdAsync(surveyId, 30));
 
+        // ⚠️ **デッドレターでは止めない。** テスト公開は割り当ての誤りを見つけるためのもので、
+        // デッドレターが出るのは想定どおり。ここで止めると、直すためにサイトを
+        // 変えたいときに永久に変えられなくなる
+        await outbox.DeadLetterAsync(token, "列へ写せない");
+        Assert.Equal(
+            PleasanterSiteUpdateResult.Updated,
+            await repository.UpdatePleasanterSiteIdAsync(surveyId, 25));
+
+        // **テストのデッドレターは旧サイト向けなので、対応表と一緒に捨てる**
+        Assert.Null(await outbox.FindPayloadAsync(token));
+
+        await outbox.SaveAsync(token, surveyId, 1, "{}", isTest: true);
         await outbox.CompleteAsync(token);
         var record = await repository.FindBySurveyIdAsync(surveyId);
         await repository.SaveAsync(record! with { Status = (int)SurveyStatus.Published });
