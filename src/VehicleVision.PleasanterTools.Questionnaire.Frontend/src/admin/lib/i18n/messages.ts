@@ -20,6 +20,7 @@ export const ja = {
   'app.language': '表示言語',
   'app.networkError': '通信できませんでした。',
   'app.requestFailed': '処理できませんでした（{status}）。',
+  'app.version': '動作中の版: {version}{commit}',
 
   // ---- ログイン -----------------------------------------------------------
   'signIn.setupTitle': '最初の管理者を登録する',
@@ -764,6 +765,7 @@ export const en: Record<MessageKey, string> = {
   'app.language': 'Display language',
   'app.networkError': 'Could not reach the server.',
   'app.requestFailed': 'The request could not be processed ({status}).',
+  'app.version': 'Running version: {version}{commit}',
 
   'signIn.setupTitle': 'Register the first administrator',
   'signIn.title': 'Sign in to administration',

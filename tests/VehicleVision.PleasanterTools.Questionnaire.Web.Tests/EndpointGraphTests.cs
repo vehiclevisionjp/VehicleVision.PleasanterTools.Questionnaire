@@ -46,6 +46,7 @@ public class EndpointGraphTests
         app.MapAdminSurveyEndpoints();
         app.MapAdminTemplateEndpoints();
         app.MapAdminUserEndpoints();
+        app.MapAdminVersionEndpoints();
         app.MapAnalyticsEndpoints();
         app.MapFormEndpoints();
 

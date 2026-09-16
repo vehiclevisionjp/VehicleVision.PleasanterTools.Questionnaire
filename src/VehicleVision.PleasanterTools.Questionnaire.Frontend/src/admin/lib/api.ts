@@ -85,6 +85,15 @@ async function call<T>(
 
 export const getSession = () => call<AdminSession>('/api/admin/session');
 
+export interface ApplicationVersion {
+  version: string;
+  commit?: string | null;
+}
+
+/** 動作中の版を読む。**認証済みの管理者にだけサーバが返す。** */
+export const getApplicationVersion = () =>
+  call<ApplicationVersion>('/api/admin/application/version');
+
 export const setupFirstAdministrator = (loginId: string, password: string) =>
   call<{ next: string }>('/api/admin/setup', { method: 'POST', json: { loginId, password } });
 
