@@ -439,8 +439,8 @@ export const restoreSurvey = (surveyId: string) =>
  * サーバでも現在の題名との完全一致を確かめる。
  */
 export const deleteSurvey = (surveyId: string, title: string) =>
-  call<void>(`/api/admin/surveys/${surveyId}`, {
-    method: 'DELETE',
+  call<void>(`/api/admin/surveys/${surveyId}/delete`, {
+    method: 'POST',
     json: { title },
   });
 

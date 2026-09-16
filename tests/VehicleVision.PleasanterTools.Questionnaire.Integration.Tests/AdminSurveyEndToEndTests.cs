@@ -204,8 +204,8 @@ public class AdminSurveyEndToEndTests
         var surveyId = await CreateSurveyAsync(http);
 
         using (var beforeArchive = await http.SendAsync(new HttpRequestMessage(
-            HttpMethod.Delete,
-            $"/api/admin/surveys/{surveyId}")
+            HttpMethod.Post,
+            $"/api/admin/surveys/{surveyId}/delete")
         {
             Content = JsonContent.Create(new { title = "検証用" }),
         }))
@@ -220,8 +220,8 @@ public class AdminSurveyEndToEndTests
         }
 
         using (var wrongTitle = await http.SendAsync(new HttpRequestMessage(
-            HttpMethod.Delete,
-            $"/api/admin/surveys/{surveyId}")
+            HttpMethod.Post,
+            $"/api/admin/surveys/{surveyId}/delete")
         {
             Content = JsonContent.Create(new { title = "違う題名" }),
         }))
@@ -230,8 +230,8 @@ public class AdminSurveyEndToEndTests
         }
 
         using (var deleted = await http.SendAsync(new HttpRequestMessage(
-            HttpMethod.Delete,
-            $"/api/admin/surveys/{surveyId}")
+            HttpMethod.Post,
+            $"/api/admin/surveys/{surveyId}/delete")
         {
             Content = JsonContent.Create(new { title = "検証用" }),
         }))
@@ -252,7 +252,7 @@ public class AdminSurveyEndToEndTests
             + "WHERE [Action] = @Action AND [TargetId] = @TargetId",
             new
             {
-                Action = "DELETE /api/admin/surveys/{surveyId}",
+                Action = "POST /api/admin/surveys/{surveyId}/delete",
                 TargetId = surveyId.ToString(),
             });
 

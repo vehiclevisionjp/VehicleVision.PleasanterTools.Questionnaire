@@ -930,10 +930,13 @@ public static class AdminSurveyEndpoints
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
         // ---- 完全削除（Administrator だけ） ----------------------------------
-        group.MapDelete("/{surveyId:guid}", async (
+        // ⚠️ **DELETE ではなく POST。** 題名の確認を本文で受け取る必要があるが、
+        // **最小 API は DELETE の本文を推論で受け取らない**（起動時に落ちる）。
+        // 中継するものが DELETE の本文を落とすこともある。
+        // この節の状態変更（archive / restore / test-publish）と形もそろう
+        group.MapPost("/{surveyId:guid}/delete", async (
             Guid surveyId,
-            // **本文を省略しても落ちないようにする。** DELETE の本文は
-            // 中継するものによっては落とされる。**消えない方へ倒す**
+            // **本文を省略しても落ちないようにする。** 題名の不一致として断り、**消えない方へ倒す**
             DeleteSurveyRequest? request,
             HttpContext context,
             ISurveyDeletionStore deletion,
