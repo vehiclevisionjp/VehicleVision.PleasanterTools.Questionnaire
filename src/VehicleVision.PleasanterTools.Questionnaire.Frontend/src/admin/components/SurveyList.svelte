@@ -678,11 +678,11 @@
     <thead>
       <tr>
         <th>{t('list.columnTitle')}</th>
-        <th>{t('list.columnStatus')}</th>
-        <th>{t('list.columnVersion')}</th>
-        <th>{t('list.columnResponses')}</th>
-        <th>{t('list.columnUrl')}</th>
-        <th>{t('list.columnUpdated')}</th>
+        <th class="compact-column">{t('list.columnStatus')}</th>
+        <th class="compact-column">{t('list.columnVersion')}</th>
+        <th class="compact-column">{t('list.columnResponses')}</th>
+        <th class="compact-column">{t('list.columnUrl')}</th>
+        <th class="compact-column">{t('list.columnUpdated')}</th>
         <th></th>
       </tr>
     </thead>
@@ -699,7 +699,7 @@
               <span class="reason">{t('archive.archived')}</span>
             {/if}
           </td>
-          <td>
+          <td class="compact-column">
             <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
             <!--
               **なぜ止まっているのかが分かること**（_documents/データモデル設計.md 2.1）。
@@ -712,15 +712,21 @@
               {/if}
             {/if}
           </td>
-          <td>{survey.publishedVersion ?? '—'}</td>
-          <td class="responses">
-            <div>{responses(survey)}</div>
-            <div>{t('list.testResponseCount', { count: survey.testResponseCount })}</div>
+          <td class="compact-column">{survey.publishedVersion ?? '—'}</td>
+          <td class="responses compact-column">
+            <span>{responses(survey)}</span>
+            <span class="test-response-count">
+              {t('list.testResponseCount', { count: survey.testResponseCount })}
+            </span>
             {#if survey.testResponseCount > 0}
-              <div class="hint">{t('list.testResponseCleanup')}</div>
+              <span
+                class="test-response-cleanup"
+                title={t('list.testResponseCleanup')}
+                aria-label={t('list.testResponseCleanup')}
+              >※</span>
             {/if}
           </td>
-          <td>
+          <td class="compact-column">
             {#if isPublished(survey)}
               <a href={formUrl(survey.publicId)} target="_blank" rel="noreferrer">
                 {survey.publicId}
@@ -732,7 +738,7 @@
               <span class="muted">{t('list.notPublished')}</span>
             {/if}
           </td>
-          <td class="muted">{formatDate(survey.updatedAt)}</td>
+          <td class="muted compact-column">{formatDate(survey.updatedAt)}</td>
           <td class="row-actions">
             <div class="row-actions-inner">
             {#if survey.archivedAt == null && (survey.status === 1 || survey.status === 2)}
@@ -923,7 +929,14 @@
   .row-actions-inner {
     display: flex;
     flex-wrap: wrap;
+    /* 行ごとに釦数が違っても、折り返した各行の右端をそろえる */
+    justify-content: flex-end;
     gap: 0.4rem;
+  }
+
+  .row-actions-inner button {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8rem;
   }
 
   label {
@@ -987,6 +1000,11 @@
     font-weight: 600;
   }
 
+  .compact-column {
+    width: 1%;
+    white-space: nowrap;
+  }
+
   tbody tr:last-child td {
     border-bottom: none;
   }
@@ -1016,6 +1034,17 @@
 
   .responses {
     white-space: nowrap;
+  }
+
+  .test-response-count::before {
+    content: ' / ';
+  }
+
+  .test-response-cleanup {
+    margin-left: 0.2rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    cursor: help;
   }
 
   .status-0 {
