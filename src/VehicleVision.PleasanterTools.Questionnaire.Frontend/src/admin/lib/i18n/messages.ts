@@ -31,6 +31,41 @@ export const ja = {
   'breadcrumb.users': '管理者の管理',
   'breadcrumb.account': '自分のアカウント',
   'breadcrumb.samlSettings': 'SAML 設定',
+  'breadcrumb.help': '使い方',
+
+  // ---- 使い方 -------------------------------------------------------------
+  'help.open': '使い方',
+  'help.title': '使い方',
+  'help.back': '← アンケート一覧へ戻る',
+  'help.lead': 'アンケートを作成してから、Pleasanter に回答が届くまでの基本的な手順です。',
+  'help.workflowTitle': 'アンケートを公開するまで',
+  'help.create':
+    'アンケート一覧で「新規作成」を押し、題名と回答を保存する Pleasanter のサイト ID を指定します。',
+  'help.questions':
+    '作成したアンケートを開き、設問・選択肢・説明を作ります。回答画面と同じ見た目は「プレビュー」で確認できます。',
+  'help.mapping':
+    '「割り当て」で、各設問の回答を Pleasanter のどの列へ入れるかを指定します。保存先の列に合わない値は公開できません。',
+  'help.publish':
+    '下書きを保存し、「テスト公開」で実際に送信できることを確認してから「公開する」を押します。公開後の変更は、次の公開まで回答画面に反映されません。',
+  'help.pleasanterTitle': 'Pleasanter 側の準備',
+  'help.siteId':
+    'アンケートごとに、回答を保存する Pleasanter のサイト ID を指定します。同じサイトを複数のアンケートで共有しないでください。',
+  'help.apiKey':
+    'このアプリのサーバ設定に、対象サイトへレコードを作成できる Pleasanter の API キーを設定します。API キーは回答者のブラウザへ渡りません。',
+  'help.columns':
+    'Pleasanter のサイトに、割り当て先として使う列を用意します。列の種類と設問の回答形式を対応させ、必要なら回答 JSON を保存する列も指定します。',
+  'help.deliveryTitle': '公開 URL と回答の流れ',
+  'help.share':
+    '公開後、アンケート一覧に表示される回答用 URL を回答者へ配ります。QR コードを使う場合も、一覧の「QR コード」から画像を保存して配布します。',
+  'help.arrival':
+    '回答者が送信すると、このアプリがいったん受け付けて Pleasanter へ送信します。Pleasanter の対象サイトにレコードが作成され、割り当てた列へ回答が入ります。',
+  'help.troubleshootingTitle': 'うまくいかないとき',
+  'help.backlog':
+    '送信待ちが増えたり受付が止まったりした場合は、ヘッダの「送信状況」で滞留の件数・最も古い待ち時間・自動停止の状態を確認します。',
+  'help.failed':
+    '送信できなかった回答は「送信状況」に残ります。失敗の理由と Pleasanter の接続・API キー・権限を直してから、1 件ずつ送信待ちに戻してください。',
+  'help.mappingValidation':
+    '公開またはテスト公開で割り当ての検証に失敗した場合は、設問が未割り当てでないか、Pleasanter の列名・列の種類・変換の設定が合っているかを確認します。',
 
   // ---- ログイン -----------------------------------------------------------
   'signIn.setupTitle': '最初の管理者を登録する',
@@ -868,6 +903,42 @@ export const en: Record<MessageKey, string> = {
   'breadcrumb.users': 'Manage administrators',
   'breadcrumb.account': 'My account',
   'breadcrumb.samlSettings': 'SAML settings',
+  'breadcrumb.help': 'Help',
+
+  // ---- Help ---------------------------------------------------------------
+  'help.open': 'Help',
+  'help.title': 'Help',
+  'help.back': '← Back to surveys',
+  'help.lead':
+    'The basic steps from creating a survey to getting its responses into Pleasanter.',
+  'help.workflowTitle': 'Publishing a survey',
+  'help.create':
+    'On the survey list, select “Create”, then give the survey a title and the Pleasanter site ID that will store its responses.',
+  'help.questions':
+    'Open the new survey and create its questions, choices and descriptions. Use “Preview” to check how the response screen will look.',
+  'help.mapping':
+    'Under “Mapping”, choose which Pleasanter column receives each answer. A value that does not fit its target column prevents publication.',
+  'help.publish':
+    'Save the draft, use “Test publish” to confirm that it can send responses, then select “Publish”. Changes after publication do not reach the response screen until you publish again.',
+  'help.pleasanterTitle': 'Preparing Pleasanter',
+  'help.siteId':
+    'Give each survey the ID of the Pleasanter site that stores its responses. Do not share one site between multiple surveys.',
+  'help.apiKey':
+    'Configure a Pleasanter API key that can create records in the target site on this application’s server. The API key is never sent to respondents’ browsers.',
+  'help.columns':
+    'Prepare the Pleasanter columns used as mapping targets. Match each column type to its question’s answer format, and optionally choose a column that stores the response JSON.',
+  'help.deliveryTitle': 'Response URL and delivery',
+  'help.share':
+    'After publishing, share the response URL shown in the survey list. To share a QR code, save its image from “QR code” in the list.',
+  'help.arrival':
+    'When a respondent submits, this application accepts the response first and sends it to Pleasanter. A record is created in the target site and mapped answers are written to its columns.',
+  'help.troubleshootingTitle': 'When something goes wrong',
+  'help.backlog':
+    'If responses are waiting or intake is paused, open “Delivery” in the header. Check the backlog count, how long the oldest response has waited, and whether intake was stopped automatically.',
+  'help.failed':
+    'Responses that could not be delivered remain in “Delivery”. Fix the failure reason and the Pleasanter connection, API key or permissions, then put each response back into the queue.',
+  'help.mappingValidation':
+    'If test publication or publication rejects the mapping, check that every question is mapped and that the Pleasanter column name, column type and conversion settings agree.',
 
   'signIn.setupTitle': 'Register the first administrator',
   'signIn.title': 'Sign in to administration',
