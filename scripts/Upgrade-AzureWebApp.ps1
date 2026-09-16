@@ -1,4 +1,9 @@
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
+
+# **Write-Host は意図して使っている。** これは運用者が見ながら流す道具で、
+# 進み具合を人へ見せるのが目的。戻り値として拾わせたい出力ではない
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+    'PSAvoidUsingWriteHost', '', Justification = '運用者へ進み具合を見せるため')]
 
 <#
 .SYNOPSIS
@@ -73,7 +78,9 @@ function Invoke-AzJson {
         [string[]]$Arguments
     )
 
-    $output = & az @Arguments --output json 2>&1
+    # **標準エラーを混ぜないこと。** az は警告を標準エラーへ書くので、
+    # 2>&1 で混ぜると ConvertFrom-Json が壊れる
+    $output = & az @Arguments --only-show-errors --output json
     if ($LASTEXITCODE -ne 0) {
         throw "Azure CLI command failed: az $($Arguments -join ' ')"
     }
@@ -169,6 +176,26 @@ function Invoke-KuduRequest {
     }
 }
 
+function Write-KuduCommandResult {
+    # **出力を必ず見せる。** どの移行で落ちたのかは、この出力にしか無い
+    # （アプリの出力は英語。Issue #225）
+    param(
+        [Parameter(Mandatory)]
+        [psobject]$Result
+    )
+
+    $outputProperty = $Result.PSObject.Properties['Output']
+    if ($null -ne $outputProperty -and -not [string]::IsNullOrWhiteSpace($outputProperty.Value)) {
+        Write-Host $outputProperty.Value.TrimEnd()
+    }
+
+    # **$error という名前を使わないこと。** PowerShell の自動変数を隠してしまう
+    $errorProperty = $Result.PSObject.Properties['Error']
+    if ($null -ne $errorProperty -and -not [string]::IsNullOrWhiteSpace($errorProperty.Value)) {
+        Write-Host $errorProperty.Value.TrimEnd()
+    }
+}
+
 function Test-HealthEndpoint {
     param(
         [Parameter(Mandatory)]
@@ -192,6 +219,10 @@ function Test-HealthEndpoint {
         Write-Host "Health check attempt $attempt failed. Retrying in 10 seconds."
         Start-Sleep -Seconds 10
     }
+
+    # **抜けたら失敗として扱う。** 2xx 以外を返し続けた場合に
+    # 黙って戻ると、更新が成功したように見える
+    throw "Health check failed after 12 attempts: $Uri"
 }
 
 if ($null -eq (Get-Command az -ErrorAction SilentlyContinue)) {
@@ -236,10 +267,13 @@ if ($Rollback) {
         return
     }
 
+    # ⚠️ **PUT /api/zip は控えに無いファイルを消さない**（Kudu の REST API の仕様）。
+    # 新版だけにあったファイルは残るので、運用者へ伝える
     Invoke-KuduRequest -Method Put -Uri "$kuduBaseUri/api/zip/site/wwwroot/" -AccessToken $accessToken -InFile $rollbackPath | Out-Null
     Invoke-AzCommand -Arguments (@('webapp', 'restart') + $deploymentArguments)
     Test-HealthEndpoint -Uri $healthUri | Out-Null
     Write-Host 'Rollback completed.'
+    Write-Host 'Files that existed only in the newer release were not deleted. Remove them from site/wwwroot if required.'
     Write-Host 'Database was not rolled back. Restore it from the backup taken before migration if required.'
     return
 }
@@ -292,12 +326,24 @@ try {
     $backupPath = Join-Path $resolvedBackupDirectory "$WebApp$slotSuffix-$backupTimestamp.zip"
     $metadataPath = "$backupPath.metadata.json"
 
-    $currentHealth = Invoke-WebRequest -Uri $healthUri
+    # **更新前の /healthz は記録が目的。落ちていても更新を止めない。**
+    # 起動に失敗した版を直すために更新することがある
+    $currentStatusCode = $null
+    $currentContent = $null
+    try {
+        $currentHealth = Invoke-WebRequest -Uri $healthUri
+        $currentStatusCode = $currentHealth.StatusCode
+        $currentContent = $currentHealth.Content
+    }
+    catch {
+        Write-Host "The current /healthz did not respond. Continuing with the update."
+    }
+
     [pscustomobject]@{
         RecordedAtUtc = [DateTime]::UtcNow.ToString('O')
         HealthUri = $healthUri
-        HealthStatusCode = $currentHealth.StatusCode
-        HealthResponse = $currentHealth.Content
+        HealthStatusCode = $currentStatusCode
+        HealthResponse = $currentContent
     } | ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding utf8NoBOM
 
     Write-Host "Creating wwwroot backup: $backupPath"
@@ -316,6 +362,7 @@ try {
         } | ConvertTo-Json -Compress
         $migrationResponse = Invoke-KuduRequest -Method Post -Uri "$kuduBaseUri/api/command" -AccessToken $accessToken -Body $migrationCommand
         $migrationResult = $migrationResponse.Content | ConvertFrom-Json
+        Write-KuduCommandResult -Result $migrationResult
         if ($migrationResult.ExitCode -ne 0) {
             throw "Database migration failed with exit code $($migrationResult.ExitCode)."
         }
@@ -326,6 +373,7 @@ try {
         } | ConvertTo-Json -Compress
         $statusResponse = Invoke-KuduRequest -Method Post -Uri "$kuduBaseUri/api/command" -AccessToken $accessToken -Body $statusCommand
         $statusResult = $statusResponse.Content | ConvertFrom-Json
+        Write-KuduCommandResult -Result $statusResult
         if ($statusResult.ExitCode -ne 0) {
             throw "Migration status check failed with exit code $($statusResult.ExitCode)."
         }
