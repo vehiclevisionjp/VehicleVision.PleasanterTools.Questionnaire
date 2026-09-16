@@ -2,6 +2,7 @@
   import {
     archiveSurvey,
     createSurvey,
+    deleteSurvey,
     duplicateSurvey,
     listSurveys,
     publish,
@@ -20,6 +21,7 @@
     type SurveySummary,
   } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
+  import { canConfirmSurveyDeletion, deletionResponseCount } from '../lib/surveyDeletion';
   import SurveyQrCode from './SurveyQrCode.svelte';
   import TemplatePanel from './TemplatePanel.svelte';
 
@@ -40,9 +42,16 @@
      * **サーバ側でも同じ判定をしている**（`AdminTemplateEndpoints`）。
      */
     canUseTemplates?: boolean;
+    /** 完全削除を出してよい相手か。**Administrator だけ。** */
+    canDelete?: boolean;
   }
 
-  let { onopen, canDuplicate = false, canUseTemplates = false }: Props = $props();
+  let {
+    onopen,
+    canDuplicate = false,
+    canUseTemplates = false,
+    canDelete = false,
+  }: Props = $props();
 
   let surveys = $state<SurveySummary[]>([]);
   let loading = $state(true);
@@ -117,6 +126,11 @@
   let siteFor = $state<SurveySummary | null>(null);
   let siteId = $state('');
   let siteBusy = $state(false);
+
+  /** 完全削除の確認を開いているアーカイブ済みアンケート。 */
+  let deleting = $state<SurveySummary | null>(null);
+  let deleteTitle = $state('');
+  let deleteBusy = $state(false);
 
   // **絞り込みとページを変えたら読み直す。** $effect が依存を拾う
   $effect(() => {
@@ -370,6 +384,32 @@
     await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
+  function openDelete(survey: SurveySummary) {
+    error = '';
+    deleting = survey;
+    deleteTitle = '';
+  }
+
+  async function removeSurvey(event: SubmitEvent) {
+    event.preventDefault();
+    const target = deleting;
+    if (target === null || deleteBusy || !canConfirmSurveyDeletion(target, deleteTitle)) {
+      return;
+    }
+
+    deleteBusy = true;
+    const result = await deleteSurvey(target.surveyId, deleteTitle);
+    deleteBusy = false;
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    deleting = null;
+    deleteTitle = '';
+    await reload(offset, titleFilter, statusFilter, includeArchived);
+  }
+
   /** 受付数の表示。**上限があれば「/ 上限」を添える。** */
   function responses(survey: SurveySummary): string {
     return survey.responseLimit == null
@@ -586,6 +626,44 @@
   </form>
 {/if}
 
+{#if deleting}
+  <form class="create danger-panel" onsubmit={removeSurvey}>
+    <h2>{t('delete.title', { title: deleting.title })}</h2>
+    <dl>
+      <div>
+        <dt>{t('delete.responseCount')}</dt>
+        <dd>{deletionResponseCount(deleting)}</dd>
+      </div>
+      <div>
+        <dt>{t('delete.siteId')}</dt>
+        <dd>{deleting.pleasanterSiteId}</dd>
+      </div>
+      <div>
+        <dt>{t('delete.archivedAt')}</dt>
+        <dd>{formatDate(deleting.archivedAt!)}</dd>
+      </div>
+    </dl>
+    <p class="warn">{t('delete.pleasanterWarning')}</p>
+    <p class="warn">{t('delete.traceWarning')}</p>
+    <label>
+      {t('delete.confirmLabel', { title: deleting.title })}
+      <input type="text" bind:value={deleteTitle} autocomplete="off" required />
+    </label>
+    <div class="actions">
+      <button
+        type="submit"
+        class="danger"
+        disabled={deleteBusy || !canConfirmSurveyDeletion(deleting, deleteTitle)}
+      >
+        {t('delete.submit')}
+      </button>
+      <button type="button" class="secondary" onclick={() => (deleting = null)}>
+        {t('delete.cancel')}
+      </button>
+    </div>
+  </form>
+{/if}
+
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 
 {#if loading}
@@ -700,6 +778,11 @@
             <button type="button" class="secondary" onclick={() => changeArchive(survey)}>
               {survey.archivedAt == null ? t('archive.open') : t('archive.restore')}
             </button>
+            {#if canDelete && survey.archivedAt != null}
+              <button type="button" class="danger" onclick={() => openDelete(survey)}>
+                {t('delete.open')}
+              </button>
+            {/if}
             </div>
           </td>
         </tr>
@@ -797,6 +880,34 @@
   .create h2 {
     margin: 0;
     font-size: 1.05rem;
+  }
+
+  .danger-panel {
+    border-color: var(--error);
+  }
+
+  .danger-panel dl {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0;
+  }
+
+  .danger-panel dl div {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .danger-panel dt {
+    font-weight: 600;
+  }
+
+  .danger-panel dd {
+    margin: 0;
+  }
+
+  button.danger {
+    background: var(--error);
+    border-color: var(--error);
   }
 
   .actions {
