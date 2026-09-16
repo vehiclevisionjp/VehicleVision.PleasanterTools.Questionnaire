@@ -450,8 +450,8 @@ public static class AdminSurveyEndpoints
             return Results.Ok(problems.Select(Describe));
         });
 
-        // ---- 公開 ------------------------------------------------------------
-        group.MapPost("/{surveyId:guid}/publish", async (
+        // ---- テスト公開 ------------------------------------------------------
+        group.MapPost("/{surveyId:guid}/test-publish", async (
             Guid surveyId,
             HttpContext context,
             ISurveyDraftStore drafts,
@@ -477,6 +477,20 @@ public static class AdminSurveyEndpoints
                 {
                     message = ServerMessages.Get(
                         ServerMessageKeys.SurveyIsTemplate, RequestLanguage.Of(context)),
+                });
+            }
+
+            if (beforePublish is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (beforePublish.Status != (int)SurveyStatus.Draft)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.InvalidSurveyStatus, RequestLanguage.Of(context)),
                 });
             }
 
@@ -596,9 +610,13 @@ public static class AdminSurveyEndpoints
             if (record is not null)
             {
                 await surveys.SaveAsync(
-                    record with { Status = (int)SurveyStatus.Published }, cancellationToken)
+                    record with { Status = (int)SurveyStatus.TestPublished }, cancellationToken)
                     .ConfigureAwait(false);
             }
+
+            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+            AuditNotes.Add(context, "fromStatus", SurveyStatus.Draft.ToString());
+            AuditNotes.Add(context, "toStatus", SurveyStatus.TestPublished.ToString());
 
             return Results.Ok(new
             {
@@ -606,6 +624,140 @@ public static class AdminSurveyEndpoints
                 // **未割り当ては拒否しないが、公開後も伝える**
                 warnings = problems.Where(problem => !problem.IsBlocking).Select(Describe),
             });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+
+        // ---- 本公開 ----------------------------------------------------------
+        // **テスト公開で固めた版をそのまま使う。** ここで固め直すと、
+        // テストで確かめた版と本番で回答する版が別物になる。
+        group.MapPost("/{surveyId:guid}/publish", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            CancellationToken cancellationToken) =>
+        {
+            var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (record is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (record.Status != (int)SurveyStatus.TestPublished
+                || record.PublishedVersion is null)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.InvalidSurveyStatus, RequestLanguage.Of(context)),
+                });
+            }
+
+            await surveys.SaveAsync(
+                record with { Status = (int)SurveyStatus.Published },
+                cancellationToken).ConfigureAwait(false);
+
+            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+            AuditNotes.Add(context, "fromStatus", SurveyStatus.TestPublished.ToString());
+            AuditNotes.Add(context, "toStatus", SurveyStatus.Published.ToString());
+            return Results.Ok(new { status = SurveyStatus.Published.ToString() });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+
+        // ---- テスト公開から下書きへ戻す --------------------------------------
+        group.MapPost("/{surveyId:guid}/revert-to-draft", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            CancellationToken cancellationToken) =>
+        {
+            var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (record is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (record.Status != (int)SurveyStatus.TestPublished)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.InvalidSurveyStatus, RequestLanguage.Of(context)),
+                });
+            }
+
+            await surveys.SaveAsync(
+                record with { Status = (int)SurveyStatus.Draft },
+                cancellationToken).ConfigureAwait(false);
+
+            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+            AuditNotes.Add(context, "fromStatus", SurveyStatus.TestPublished.ToString());
+            AuditNotes.Add(context, "toStatus", SurveyStatus.Draft.ToString());
+            return Results.Ok(new { status = SurveyStatus.Draft.ToString() });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+
+        // ---- Pleasanter サイト ID -------------------------------------------
+        group.MapPut("/{surveyId:guid}/site-id", async (
+            Guid surveyId,
+            UpdateSiteIdRequest request,
+            HttpContext context,
+            ISurveyRepository surveys,
+            CancellationToken cancellationToken) =>
+        {
+            if (request.PleasanterSiteId <= 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PleasanterSiteIdRequired, RequestLanguage.Of(context)),
+                });
+            }
+
+            var before = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            var result = await surveys.UpdatePleasanterSiteIdAsync(
+                surveyId, request.PleasanterSiteId, cancellationToken).ConfigureAwait(false);
+
+            if (result == PleasanterSiteUpdateResult.NotFound)
+            {
+                return Results.NotFound();
+            }
+
+            if (result == PleasanterSiteUpdateResult.NotEditable)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SiteIdLockedAfterPublish, RequestLanguage.Of(context)),
+                });
+            }
+
+            if (result == PleasanterSiteUpdateResult.PendingResponses)
+            {
+                return Results.Conflict(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SiteIdBlockedByPendingResponses,
+                        RequestLanguage.Of(context)),
+                });
+            }
+
+            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+            if (before is not null)
+            {
+                AuditNotes.Add(
+                    context,
+                    "oldPleasanterSiteId",
+                    before.PleasanterSiteId.ToString(CultureInfo.InvariantCulture));
+            }
+            AuditNotes.Add(
+                context,
+                "newPleasanterSiteId",
+                request.PleasanterSiteId.ToString(CultureInfo.InvariantCulture));
+
+            return Results.Ok(new { pleasanterSiteId = request.PleasanterSiteId });
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
@@ -742,6 +894,16 @@ public static class AdminSurveyEndpoints
             });
         }
 
+        if ((status == SurveyStatus.Suspended && record.Status != (int)SurveyStatus.Published)
+            || (status == SurveyStatus.Published && record.Status != (int)SurveyStatus.Suspended))
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.InvalidSurveyStatus, RequestLanguage.Of(context)),
+            });
+        }
+
         // **公開していないものは再開できない。** 版が無いので回答画面が組み立てられない
         if (status is SurveyStatus.Published && record.PublishedVersion is null)
         {
@@ -786,6 +948,10 @@ public static class AdminSurveyEndpoints
             : record with { Status = (int)status, SuspendedReason = null, SuspendedAt = null };
 
         await surveys.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+
+        AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+        AuditNotes.Add(context, "fromStatus", ((SurveyStatus)record.Status).ToString());
+        AuditNotes.Add(context, "toStatus", status.ToString());
 
         return Results.Ok(new { status = status.ToString() });
     }
@@ -889,6 +1055,9 @@ public static class AdminSurveyEndpoints
     /// </param>
     public sealed record SurveySettingsRequest(
         int? ResponseLimit, bool? RequireProofOfWork = null, bool? AllowDraft = null);
+
+    /// <summary>テスト公開まで変更できる Pleasanter サイト ID。</summary>
+    public sealed record UpdateSiteIdRequest(long PleasanterSiteId);
 
     /// <summary>下書きの保存。</summary>
     /// <param name="Revision">読んだときの版。**これが今の版と違えば拒否する。**</param>

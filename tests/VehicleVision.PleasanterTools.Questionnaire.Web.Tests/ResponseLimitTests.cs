@@ -46,6 +46,12 @@ public class ResponseLimitTests
             return Task.CompletedTask;
         }
 
+        public Task<PleasanterSiteUpdateResult> UpdatePleasanterSiteIdAsync(
+            Guid surveyId,
+            long pleasanterSiteId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         /// <summary>**公開中の行しか止めない**（本物の SQL と同じ条件）。</summary>
         public Task<bool> SuspendForResponseLimitAsync(
             Guid surveyId, CancellationToken cancellationToken = default)
@@ -95,6 +101,15 @@ public class ResponseLimitTests
             _surveys[responseToken] = surveyId;
             return Task.CompletedTask;
         }
+
+        public Task SaveAsync(
+            string responseToken,
+            Guid surveyId,
+            int surveyVersion,
+            string payloadJson,
+            bool isTest,
+            CancellationToken cancellationToken = default) =>
+            SaveAsync(responseToken, surveyId, surveyVersion, payloadJson, cancellationToken);
 
         public Task<PendingResponse?> ClaimAsync(
             string lockedBy, TimeSpan lockDuration, CancellationToken cancellationToken = default) =>
@@ -155,13 +170,30 @@ public class ResponseLimitTests
     /// <remarks>**他の試験からも使う**ので <c>internal</c>（<c>ProofOfWorkPerSurveyTests</c>）。</remarks>
     internal sealed class FakeTokens : IResponseTokenStore
     {
-        private readonly HashSet<string> _tokens = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, bool> _tokens = new(StringComparer.Ordinal);
+
+        public bool? LastIsTest { get; private set; }
+
+        public bool? LastReadIsTest { get; private set; }
 
         /// <summary>数えた回数。**上限が無ければ数えないことを見る。**</summary>
         public int CountCalls { get; private set; }
 
         /// <summary>既にある回答として登録しておく。</summary>
-        public void Seed(params string[] tokens) => _tokens.UnionWith(tokens);
+        public void Seed(params string[] tokens)
+        {
+            foreach (var token in tokens)
+            {
+                _tokens[token] = false;
+            }
+        }
+
+        public Task<bool> IsTestAsync(
+            string responseToken, CancellationToken cancellationToken = default)
+        {
+            LastReadIsTest = _tokens.GetValueOrDefault(responseToken);
+            return Task.FromResult(LastReadIsTest.Value);
+        }
 
         public Task<long?> FindReferenceIdAsync(
             string responseToken, CancellationToken cancellationToken = default) =>
@@ -169,13 +201,23 @@ public class ResponseLimitTests
 
         public Task<bool> EnsureAsync(
             string responseToken, Guid surveyId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(_tokens.Add(responseToken));
+            Task.FromResult(_tokens.TryAdd(responseToken, false));
+
+        public Task<bool> EnsureAsync(
+            string responseToken,
+            Guid surveyId,
+            bool isTest,
+            CancellationToken cancellationToken = default)
+        {
+            LastIsTest = isTest;
+            return Task.FromResult(_tokens.TryAdd(responseToken, isTest));
+        }
 
         public Task<int> CountAcceptedAsync(
             Guid surveyId, CancellationToken cancellationToken = default)
         {
             CountCalls++;
-            return Task.FromResult(_tokens.Count);
+            return Task.FromResult(_tokens.Count(pair => !pair.Value));
         }
 
         public Task SaveAsync(
@@ -255,6 +297,37 @@ public class ResponseLimitTests
 
     private static Task<IntakeResult> SubmitAsync(ResponseIntake intake, string token) =>
         intake.SubmitAsync(PublicId, token, [Answer.Of("q1", "よかった")]);
+
+    [Fact]
+    public async Task テスト公開は受け付けてテスト回答として記録する()
+    {
+        var (intake, _, tokens) = Intake(
+            responseLimit: 1,
+            status: (int)SurveyStatus.TestPublished,
+            existingTokens: ["production"]);
+
+        var (form, rejection) = await intake.GetPublishedAsync(PublicId);
+        var result = await SubmitAsync(intake, "test");
+
+        Assert.Null(rejection);
+        Assert.NotNull(form);
+        Assert.True(form.IsTest);
+        Assert.True(result.Accepted);
+        Assert.True(tokens.LastIsTest);
+        Assert.Equal(0, tokens.CountCalls);
+    }
+
+    [Fact]
+    public async Task 本公開後に編集してもテスト回答の印を変えない()
+    {
+        var (intake, surveys, tokens) = Intake(status: (int)SurveyStatus.TestPublished);
+        Assert.True((await SubmitAsync(intake, "test")).Accepted);
+
+        await surveys.SaveAsync(surveys.Survey with { Status = (int)SurveyStatus.Published });
+        Assert.True((await SubmitAsync(intake, "test")).Accepted);
+
+        Assert.True(tokens.LastReadIsTest);
+    }
 
     // ---- 滞留による受付停止（Issue #72）--------------------------------------
 

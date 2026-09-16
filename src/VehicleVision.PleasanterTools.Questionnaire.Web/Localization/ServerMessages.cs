@@ -258,6 +258,21 @@ public static class ServerMessages
             "This version has already been published. Reload and try again.");
 
         Add(
+            ServerMessageKeys.InvalidSurveyStatus,
+            "現在の状態ではこの操作を行えません。再読み込みしてください。",
+            "This action is not available in the current state. Reload the page.");
+
+        Add(
+            ServerMessageKeys.SiteIdLockedAfterPublish,
+            "本公開したアンケートの Pleasanter サイト ID は変更できません。",
+            "The Pleasanter site ID cannot be changed after production publication.");
+
+        Add(
+            ServerMessageKeys.SiteIdBlockedByPendingResponses,
+            "送信待ちの回答が残っているため、Pleasanter サイト ID を変更できません。",
+            "The Pleasanter site ID cannot be changed while responses are waiting to be sent.");
+
+        Add(
             ServerMessageKeys.DuplicateSiteIdMustDiffer,
             "複製先には、元とは別の Pleasanter のサイト ID を指定してください。",
             "Specify a Pleasanter site ID other than the one the original survey writes to.");

@@ -48,6 +48,10 @@ public class ResponseIntakeAttachmentTests
         public Task SaveAsync(SurveyRecord record, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
+        public Task<PleasanterSiteUpdateResult> UpdatePleasanterSiteIdAsync(
+            Guid surveyId, long pleasanterSiteId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<bool> SuspendForResponseLimitAsync(
             Guid surveyId, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
@@ -74,6 +78,15 @@ public class ResponseIntakeAttachmentTests
             SavedPayload = payloadJson;
             return Task.CompletedTask;
         }
+
+        public Task SaveAsync(
+            string responseToken,
+            Guid surveyId,
+            int surveyVersion,
+            string payloadJson,
+            bool isTest,
+            CancellationToken cancellationToken = default) =>
+            SaveAsync(responseToken, surveyId, surveyVersion, payloadJson, cancellationToken);
 
         public Task<PendingResponse?> ClaimAsync(
             string lockedBy, TimeSpan lockDuration, CancellationToken cancellationToken = default) =>
@@ -129,6 +142,10 @@ public class ResponseIntakeAttachmentTests
 
     private sealed class FakeTokens : IResponseTokenStore
     {
+        public Task<bool> IsTestAsync(
+            string responseToken, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
         public Task<long?> FindReferenceIdAsync(
             string responseToken, CancellationToken cancellationToken = default) =>
             Task.FromResult<long?>(null);
@@ -136,6 +153,11 @@ public class ResponseIntakeAttachmentTests
         public Task<bool> EnsureAsync(
             string responseToken, Guid surveyId, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
+
+        public Task<bool> EnsureAsync(
+            string responseToken, Guid surveyId, bool isTest,
+            CancellationToken cancellationToken = default) =>
+            EnsureAsync(responseToken, surveyId, cancellationToken);
 
         public Task<int> CountAcceptedAsync(
             Guid surveyId, CancellationToken cancellationToken = default) =>
