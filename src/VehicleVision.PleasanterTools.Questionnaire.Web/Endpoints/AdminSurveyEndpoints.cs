@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.Features;
@@ -929,6 +929,81 @@ public static class AdminSurveyEndpoints
             ChangeArchiveAsync(surveyId, archive: false, context, surveys, cancellationToken))
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
+        // ---- 完全削除（Administrator だけ） ----------------------------------
+        group.MapDelete("/{surveyId:guid}", async (
+            Guid surveyId,
+            DeleteSurveyRequest request,
+            HttpContext context,
+            ISurveyDeletionStore deletion,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await deletion.DeleteAsync(
+                surveyId, request.Title, cancellationToken).ConfigureAwait(false);
+
+            if (result.Status == SurveyDeletionStatus.NotFound)
+            {
+                return Results.NotFound();
+            }
+
+            if (result.Status == SurveyDeletionStatus.Template)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SurveyIsTemplate, RequestLanguage.Of(context)),
+                });
+            }
+
+            if (result.Status == SurveyDeletionStatus.NotArchived)
+            {
+                return Results.Conflict(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SurveyDeleteRequiresArchive, RequestLanguage.Of(context)),
+                });
+            }
+
+            if (result.Status == SurveyDeletionStatus.TitleMismatch)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SurveyDeleteTitleMismatch, RequestLanguage.Of(context)),
+                });
+            }
+
+            if (result.Status == SurveyDeletionStatus.PendingDelivery)
+            {
+                return Results.Conflict(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery,
+                        RequestLanguage.Of(context)),
+                });
+            }
+
+            var deleted = result.Survey
+                ?? throw new InvalidOperationException("削除結果にアンケート情報がありません。");
+            AuditNotes.SetTarget(context, "survey", deleted.SurveyId.ToString());
+            AuditNotes.Add(context, "surveyId", deleted.SurveyId.ToString());
+            AuditNotes.Add(context, "publicId", deleted.PublicId);
+            AuditNotes.Add(context, "title", deleted.Title);
+            AuditNotes.Add(
+                context,
+                "pleasanterSiteId",
+                deleted.PleasanterSiteId.ToString(CultureInfo.InvariantCulture));
+            AuditNotes.Add(
+                context,
+                "responseCount",
+                deleted.ResponseCount.ToString(CultureInfo.InvariantCulture));
+            AuditNotes.Add(
+                context,
+                "archivedAt",
+                deleted.ArchivedAt.ToString("O", CultureInfo.InvariantCulture));
+
+            return Results.NoContent();
+        }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysDelete));
+
         return builder;
     }
 
@@ -1182,6 +1257,9 @@ public static class AdminSurveyEndpoints
 
     /// <summary>テスト公開まで変更できる Pleasanter サイト ID。</summary>
     public sealed record UpdateSiteIdRequest(long PleasanterSiteId);
+
+    /// <summary>完全削除の確認。**現在の題名と完全に一致しなければ削除しない。**</summary>
+    public sealed record DeleteSurveyRequest(string? Title);
 
     /// <summary>下書きの保存。</summary>
     /// <param name="Revision">読んだときの版。**これが今の版と違えば拒否する。**</param>

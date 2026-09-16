@@ -192,6 +192,78 @@ public class AdminSurveyEndToEndTests
         Assert.Equal(2, (await ReadAsync(afterPublish))!["definition"]!["version"]!.GetValue<int>());
     }
 
+    [Fact]
+    public async Task アーカイブと題名を確認して完全削除し削除前の値を監査ログへ残す()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var beforeArchive = await http.SendAsync(new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"/api/admin/surveys/{surveyId}")
+        {
+            Content = JsonContent.Create(new { title = "検証用" }),
+        }))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, beforeArchive.StatusCode);
+        }
+
+        using (var archive = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/archive", new { }))
+        {
+            archive.EnsureSuccessStatusCode();
+        }
+
+        using (var wrongTitle = await http.SendAsync(new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"/api/admin/surveys/{surveyId}")
+        {
+            Content = JsonContent.Create(new { title = "違う題名" }),
+        }))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, wrongTitle.StatusCode);
+        }
+
+        using (var deleted = await http.SendAsync(new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"/api/admin/surveys/{surveyId}")
+        {
+            Content = JsonContent.Create(new { title = "検証用" }),
+        }))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        }
+
+        using (var missing = await http.GetAsync($"/api/admin/surveys/{surveyId}"))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        }
+
+        await using var connection = new DbConnectionFactory(
+            DatabaseProvider.SqlServer, ConnectionString).Create();
+        await connection.OpenAsync();
+        var detail = await connection.QuerySingleAsync<string>(
+            "SELECT [DetailJson] FROM [AuditLogs] "
+            + "WHERE [Action] = @Action AND [TargetId] = @TargetId",
+            new
+            {
+                Action = "DELETE /api/admin/surveys/{surveyId}",
+                TargetId = surveyId.ToString(),
+            });
+
+        Assert.Contains("\"surveyId\"", detail, StringComparison.Ordinal);
+        Assert.Contains("\"publicId\"", detail, StringComparison.Ordinal);
+        Assert.Contains("\"title\":\"検証用\"", detail, StringComparison.Ordinal);
+        Assert.Contains("\"pleasanterSiteId\":\"1\"", detail, StringComparison.Ordinal);
+        Assert.Contains("\"responseCount\":\"0\"", detail, StringComparison.Ordinal);
+        Assert.Contains("\"archivedAt\"", detail, StringComparison.Ordinal);
+    }
+
     /// <summary>埋め込みを 1 つ持つ下書き（Issue #104 / #107）。</summary>
     private static object EmbedDraftBody(string surveyId, int revision, string url) => new
     {
