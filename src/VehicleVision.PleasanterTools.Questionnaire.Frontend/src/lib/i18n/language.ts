@@ -6,10 +6,10 @@
  */
 
 /** 本アプリが画面に出せる言語。 */
-export type Language = 'ja' | 'en';
+export type Language = 'ja' | 'en' | 'zh' | 'de' | 'ko' | 'es' | 'vi';
 
 /** 選べる言語。**先頭が既定。** */
-export const SUPPORTED_LANGUAGES: readonly Language[] = ['ja', 'en'];
+export const SUPPORTED_LANGUAGES: readonly Language[] = ['ja', 'en', 'zh', 'de', 'ko', 'es', 'vi'];
 
 /**
  * 未翻訳・未指定のときに使う言語。
@@ -23,12 +23,22 @@ export const DEFAULT_LANGUAGE: Language = 'ja';
 export const LANGUAGE_NAMES: Record<Language, string> = {
   ja: '日本語',
   en: 'English',
+  zh: '中文',
+  de: 'Deutsch',
+  ko: '한국어',
+  es: 'Español',
+  vi: 'Tiếng Việt',
 };
 
 /** `Intl` へ渡すロケール。 */
 const LOCALES: Record<Language, string> = {
   ja: 'ja-JP',
   en: 'en-US',
+  zh: 'zh-CN',
+  de: 'de-DE',
+  ko: 'ko-KR',
+  es: 'es-ES',
+  vi: 'vi-VN',
 };
 
 /**

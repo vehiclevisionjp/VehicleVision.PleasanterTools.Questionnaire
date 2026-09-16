@@ -1,4 +1,4 @@
-import { DEFAULT_LANGUAGE, interpolate, type Language } from '../../../lib/i18n/language';
+import { interpolate, type Language } from '../../../lib/i18n/language';
 
 /**
  * 管理画面の文言。
@@ -1598,7 +1598,7 @@ export const en: Record<MessageKey, string> = {
     + 'honeypot field in effect.',
 };
 
-const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };
+const CATALOGS: Partial<Record<Language, Record<MessageKey, string>>> = { ja, en };
 
 /** 文言を引く関数。 */
 export type Translate = (
@@ -1612,8 +1612,8 @@ export type Translate = (
  * **翻訳が無ければ既定の言語へ落ちる**（`_documents/多言語対応方針.md` 1 章）。
  */
 export function translator(language: Language): Translate {
-  const catalog = CATALOGS[language] ?? CATALOGS[DEFAULT_LANGUAGE];
+  const catalog = CATALOGS[language] ?? ja;
 
   return (key, parameters) =>
-    interpolate(catalog[key] || CATALOGS[DEFAULT_LANGUAGE][key], parameters, language);
+    interpolate(catalog[key] || ja[key], parameters, language);
 }

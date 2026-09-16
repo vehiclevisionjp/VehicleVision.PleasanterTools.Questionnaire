@@ -13,6 +13,7 @@ describe('normalizeLanguage', () => {
   it('対応している言語はそのまま返す', () => {
     expect(normalizeLanguage('ja')).toBe('ja');
     expect(normalizeLanguage('en')).toBe('en');
+    expect(normalizeLanguage('vi')).toBe('vi');
   });
 
   // **地域まで見ない。** `en-US` も `en-GB` も同じ英語として扱う
@@ -28,7 +29,7 @@ describe('normalizeLanguage', () => {
 
   it('対応していない言語は null', () => {
     expect(normalizeLanguage('fr')).toBeNull();
-    expect(normalizeLanguage('zh-CN')).toBeNull();
+    expect(normalizeLanguage('vn')).toBeNull();
   });
 
   it('空や未指定は null', () => {
@@ -45,7 +46,7 @@ describe('negotiateLanguage', () => {
 
   // **明示が対応外なら、無かったものとして次を見る**
   it('明示が対応外ならブラウザの設定を見る', () => {
-    expect(negotiateLanguage('fr', ['de', 'en-US'])).toBe('en');
+    expect(negotiateLanguage('fr', ['it', 'en-US'])).toBe('en');
   });
 
   it('ブラウザの設定は先頭から順に見る', () => {
@@ -54,13 +55,17 @@ describe('negotiateLanguage', () => {
   });
 
   it('どれも当たらなければ既定の言語', () => {
-    expect(negotiateLanguage(null, ['fr', 'de'])).toBe(DEFAULT_LANGUAGE);
+    expect(negotiateLanguage(null, ['fr', 'it'])).toBe(DEFAULT_LANGUAGE);
     expect(negotiateLanguage(undefined)).toBe(DEFAULT_LANGUAGE);
   });
 
   // **既定はサーバ側の `LocalizedText.DefaultLanguage` と同じでなければならない**
   it('既定の言語は対応している言語の 1 つ', () => {
     expect(SUPPORTED_LANGUAGES).toContain(DEFAULT_LANGUAGE);
+  });
+
+  it('7 言語を選べる', () => {
+    expect(SUPPORTED_LANGUAGES).toEqual(['ja', 'en', 'zh', 'de', 'ko', 'es', 'vi']);
   });
 });
 

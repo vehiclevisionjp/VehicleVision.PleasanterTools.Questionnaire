@@ -1,4 +1,4 @@
-import { DEFAULT_LANGUAGE, interpolate, type Language } from './language';
+import { interpolate, type Language } from './language';
 
 /**
  * 回答画面の文言。
@@ -294,7 +294,7 @@ export const en: Record<MessageKey, string> = {
   'serverValidation.unknown': 'Please check what you entered',
 };
 
-const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };
+const CATALOGS: Partial<Record<Language, Record<MessageKey, string>>> = { ja, en };
 
 /**
  * サーバが返した検証エラーの符号に対する鍵。
@@ -319,8 +319,8 @@ export type Translate = (
  * **翻訳が無ければ既定の言語へ落ちる**（`_documents/多言語対応方針.md` 1 章）。
  */
 export function translator(language: Language): Translate {
-  const catalog = CATALOGS[language] ?? CATALOGS[DEFAULT_LANGUAGE];
+  const catalog = CATALOGS[language] ?? ja;
 
   return (key, parameters) =>
-    interpolate(catalog[key] || CATALOGS[DEFAULT_LANGUAGE][key], parameters, language);
+    interpolate(catalog[key] || ja[key], parameters, language);
 }
