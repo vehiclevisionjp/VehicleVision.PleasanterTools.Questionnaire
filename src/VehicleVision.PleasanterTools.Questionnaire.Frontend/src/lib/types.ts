@@ -67,6 +67,8 @@ export interface Choice {
 }
 
 export interface QuestionSettings {
+  /** 説明文の書き方。無ければ記法を解釈しない。 */
+  descriptionFormat?: 'Plain' | 'Markup';
   maxLength?: number;
   placeholder?: LocalizedText;
   defaultValue?: string;
@@ -189,7 +191,7 @@ export interface Question {
    * **画面はこちらしか見ない。** 記法の解釈はサーバにしか無い。
    */
   noteBlocks?: Record<string, NoteBlock[]> | null;
-  /** 確認・同意の説明文を安全な要素として描画するための構造。 */
+  /** 記法を選んだ説明文を安全な要素として描画するための構造。 */
   descriptionBlocks?: Record<string, NoteBlock[]> | null;
 }
 

@@ -39,6 +39,7 @@ public class SurveyJsonTests
                         Settings = new QuestionSettings
                         {
                             MaxLength = 100,
+                            DescriptionFormat = DescriptionFormat.Markup,
                             Format = TextFormat.Email,
                             ScaleMinimum = 1,
                             ScaleMaximum = 5,
@@ -91,6 +92,7 @@ public class SurveyJsonTests
         Assert.Equal(2, question.Choices.Length);
         Assert.True(question.Choices[1].IsOther);
         Assert.Equal(100, question.Settings.MaxLength);
+        Assert.Equal(DescriptionFormat.Markup, question.Settings.DescriptionFormat);
         Assert.Equal(TextFormat.Email, question.Settings.Format);
         Assert.True(restored.FindQuestion("note1")!.IsDisplayOnly);
     }
@@ -125,6 +127,28 @@ public class SurveyJsonTests
         Assert.Contains("\"Radio\"", json);
         Assert.Contains("\"OneQuestionPerPage\"", json);
         Assert.DoesNotContain("\"type\":2", json);
+        Assert.Contains("\"descriptionFormat\":\"Markup\"", json);
+    }
+
+    [Fact]
+    public void 過去のJSONに書き方が無ければプレーンになる()
+    {
+        const string json =
+            """
+            {
+              "questionId": "q1",
+              "type": "Text",
+              "title": { "ja": "設問" },
+              "description": { "ja": "**そのまま**" },
+              "settings": {}
+            }
+            """;
+
+        var question = SurveyJson.Deserialize<Question>(json);
+
+        Assert.NotNull(question);
+        Assert.Equal(DescriptionFormat.Plain, question.Settings.DescriptionFormat);
+        Assert.Null(question.DescriptionBlocks);
     }
 
     [Fact]
