@@ -8,12 +8,20 @@
   import SignInPanel from './components/SignInPanel.svelte';
   import SurveyEditor from './components/SurveyEditor.svelte';
   import SurveyList from './components/SurveyList.svelte';
-  import { getSession, listNotifications, logout, saveLanguage } from './lib/api';
+  import {
+    getApplicationVersion,
+    getSession,
+    listNotifications,
+    logout,
+    saveLanguage,
+    type ApplicationVersion,
+  } from './lib/api';
   import type { AdminPermission, AdminSession } from './lib/types';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../lib/i18n/language';
   import { language, resolveLanguage, t } from './lib/i18n/state.svelte';
 
   let session = $state<AdminSession>();
+  let applicationVersion = $state<ApplicationVersion>();
   let loading = $state(true);
   let failed = $state(false);
 
@@ -146,10 +154,17 @@
 
     failed = false;
     session = result.value;
+    applicationVersion = undefined;
 
     // **利用者ごとの設定 → ブラウザの言語設定 → `ja`**
     // （`_documents/多言語対応方針.md` 2 章）
     resolveLanguage(session.language ?? null);
+
+    // **認証済みになってから読む。** 認証前の画面へ版を出さず、失敗してもログインを妨げない。
+    if (session.authenticated) {
+      const version = await getApplicationVersion();
+      applicationVersion = version.ok ? version.value : undefined;
+    }
 
     // **未読の件数だけ先に読む**（Issue #80）。
     // **失敗しても管理画面は使える。** 気付くための飾りであって、入口ではない
@@ -353,6 +368,14 @@
         />
       {/if}
     </main>
+    {#if applicationVersion}
+      <footer class="version">
+        {t('app.version', {
+          version: applicationVersion.version,
+          commit: applicationVersion.commit ? ` (${applicationVersion.commit})` : '',
+        })}
+      </footer>
+    {/if}
   {:else if needsEnrollment}
     <EnrollPanel onadvance={refresh} />
   {:else if session}
@@ -512,5 +535,13 @@
     text-align: center;
     color: var(--muted);
     margin-top: 4rem;
+  }
+
+  .version {
+    padding: 0 1.5rem 1.5rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-align: right;
   }
 </style>

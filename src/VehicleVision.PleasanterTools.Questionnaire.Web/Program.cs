@@ -634,6 +634,7 @@ app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
+app.MapAdminVersionEndpoints();
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
 app.MapGet("/admin", () => Results.File("admin.html", "text/html"));
