@@ -21,6 +21,8 @@ export const ja = {
   'app.networkError': '通信できませんでした。',
   'app.requestFailed': '処理できませんでした（{status}）。',
   'app.version': '動作中の版: {version}{commit}',
+  'app.insecureMode':
+    '閉じた環境向けの HTTP 設定で動作しています。通信は暗号化されず、管理者のパスワードとアンケートの合言葉が平文で流れます。SAML は IdP 側の制約により利用できないことがあります。',
   'breadcrumb.label': 'パンくずリスト',
   'breadcrumb.surveyEditor': 'アンケートの編集: {title}',
   'breadcrumb.auditLogs': '操作の記録',
@@ -781,6 +783,8 @@ export const en: Record<MessageKey, string> = {
   'app.networkError': 'Could not reach the server.',
   'app.requestFailed': 'The request could not be processed ({status}).',
   'app.version': 'Running version: {version}{commit}',
+  'app.insecureMode':
+    'This application is running in HTTP mode for closed networks. Traffic is not encrypted, including administrator passwords and survey passphrases. SAML may be unavailable because of IdP requirements.',
   'breadcrumb.label': 'Breadcrumbs',
   'breadcrumb.surveyEditor': 'Edit survey: {title}',
   'breadcrumb.auditLogs': 'Activity log',

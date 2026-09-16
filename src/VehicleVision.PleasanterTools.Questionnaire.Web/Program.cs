@@ -36,6 +36,9 @@ builder.Configuration.AddParameterFiles();
 var endpointNetworkRestrictions =
     EndpointNetworkRestrictions.FromConfiguration(builder.Configuration);
 
+// **HTTP を許す構成は運用者に明示させる。** 未設定や false では従来の保護を変えない。
+var transportSecurity = TransportSecurityOptions.FromConfiguration(builder.Configuration);
+
 // ---- 複数インスタンスの認証 --------------------------------------------------
 // 管理画面の Cookie は ASP.NET Core Data Protection で保護される。AKS で複数 Pod にすると、
 // 鍵束を共有しない限り「別 Pod へ振られた途端にログアウト」になる。
@@ -544,6 +547,16 @@ if (!string.Equals(
 
 var app = builder.Build();
 
+if (transportSecurity.AllowInsecure)
+{
+    // **英語で書く。** Azure の Kudu の Debug console で日本語が化ける（Issue #225）
+    app.Logger.LogWarning(
+        "Insecure HTTP mode is enabled by QUESTIONNAIRE_ALLOW_INSECURE. "
+        + "HTTPS redirection and HSTS are disabled. "
+        + "Use this mode only in a closed network because passwords are sent in plaintext "
+        + "and SAML may not work.");
+}
+
 // **CSP は起動時に 1 度だけ組み立てる**（Issue #104 / #107）。
 //
 // **アンケートごとには出し分けない。** 出し分けるには、回答画面の HTML を返す時点で
@@ -610,7 +623,7 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 // 先に置くと、リバースプロキシ配下では全要求がプロキシ自身の IP に見える。
 app.UseEndpointNetworkRestrictions(endpointNetworkRestrictions);
 
-if (!app.Environment.IsDevelopment())
+if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
 {
     app.UseHsts();
     // Kubelet の HTTP probe は 3xx も成功と扱う。probe をリダイレクトすると、
@@ -659,7 +672,7 @@ app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
-app.MapAdminVersionEndpoints();
+app.MapAdminVersionEndpoints(transportSecurity.AllowInsecure);
 if (monitoringToken is not null)
 {
     app.MapMonitoringEndpoints(monitoringToken);

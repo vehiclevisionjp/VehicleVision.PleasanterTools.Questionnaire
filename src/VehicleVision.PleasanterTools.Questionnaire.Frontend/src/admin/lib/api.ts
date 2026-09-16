@@ -88,6 +88,7 @@ export const getSession = () => call<AdminSession>('/api/admin/session');
 export interface ApplicationVersion {
   version: string;
   commit?: string | null;
+  allowInsecure: boolean;
 }
 
 /** 動作中の版を読む。**認証済みの管理者にだけサーバが返す。** */

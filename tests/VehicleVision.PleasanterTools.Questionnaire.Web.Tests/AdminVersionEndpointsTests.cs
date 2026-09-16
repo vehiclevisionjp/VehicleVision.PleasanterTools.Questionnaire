@@ -30,5 +30,14 @@ public class AdminVersionEndpointsTests
 
         Assert.Equal("0.2.0", response.Version);
         Assert.Null(response.Commit);
+        Assert.False(response.AllowInsecure);
+    }
+
+    [Fact]
+    public void HTTP運用の宣言を管理画面へ返す()
+    {
+        var response = AdminVersionEndpoints.ToResponse("0.2.0", allowInsecure: true);
+
+        Assert.True(response.AllowInsecure);
     }
 }
