@@ -932,13 +932,15 @@ public static class AdminSurveyEndpoints
         // ---- 完全削除（Administrator だけ） ----------------------------------
         group.MapDelete("/{surveyId:guid}", async (
             Guid surveyId,
-            DeleteSurveyRequest request,
+            // **本文を省略しても落ちないようにする。** DELETE の本文は
+            // 中継するものによっては落とされる。**消えない方へ倒す**
+            DeleteSurveyRequest? request,
             HttpContext context,
             ISurveyDeletionStore deletion,
             CancellationToken cancellationToken) =>
         {
             var result = await deletion.DeleteAsync(
-                surveyId, request.Title, cancellationToken).ConfigureAwait(false);
+                surveyId, request?.Title, cancellationToken).ConfigureAwait(false);
 
             if (result.Status == SurveyDeletionStatus.NotFound)
             {
