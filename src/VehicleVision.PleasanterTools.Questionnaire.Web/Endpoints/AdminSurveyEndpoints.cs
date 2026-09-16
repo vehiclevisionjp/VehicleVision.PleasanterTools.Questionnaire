@@ -412,7 +412,11 @@ public static class AdminSurveyEndpoints
             }
 
             var problems = MappingValidator.Validate(
-                draft.Mapping, draft.Definition, null, PleasanterColumn.IsAttachment);
+                draft.Mapping,
+                draft.Definition,
+                null,
+                PleasanterColumn.IsAttachment,
+                column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
             return Results.Ok(problems.Select(Describe));
         });
 
@@ -449,7 +453,11 @@ public static class AdminSurveyEndpoints
             // **公開のときだけ拒否する。** 壊れた定義で回答を受け付けると、
             // 受け付けた回答が Pleasanter へ届かないまま溜まる
             var problems = MappingValidator.Validate(
-                draft.Mapping, draft.Definition, null, PleasanterColumn.IsAttachment);
+                draft.Mapping,
+                draft.Definition,
+                null,
+                PleasanterColumn.IsAttachment,
+                column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
             var blocking = problems.Where(problem => problem.IsBlocking).ToList();
             if (blocking.Count > 0)
             {

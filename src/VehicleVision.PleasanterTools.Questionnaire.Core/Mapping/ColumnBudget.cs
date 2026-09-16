@@ -89,6 +89,7 @@ public static class ColumnBudget
             .. mapping.Assignments
                 .Select(assignment => assignment.TargetColumn)
                 .Where(column => !string.IsNullOrWhiteSpace(column))
+                .Where(ConsumesColumnSlot)
                 .GroupBy(PrefixOf, StringComparer.OrdinalIgnoreCase)
                 .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new ColumnUsage(
@@ -97,6 +98,10 @@ public static class ColumnBudget
                     availablePerType)),
         ];
     }
+
+    private static bool ConsumesColumnSlot(string columnName) =>
+        columnName.Length > 1
+        && (char.IsAsciiLetterUpper(columnName[^1]) || char.IsAsciiDigit(columnName[^1]));
 
     /// <summary>この定義を「行ごとに 1 列」で写すと、いくつ入力が要るか。</summary>
     /// <remarks>

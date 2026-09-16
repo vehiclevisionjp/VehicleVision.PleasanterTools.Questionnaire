@@ -188,6 +188,20 @@
     <strong>{t('mapping.attachmentLeadStrong')}</strong>{t('mapping.attachmentLead')}
   </p>
 
+  <datalist id="record-properties">
+    <option value="Title"></option>
+    <option value="Body"></option>
+    <option value="Status"></option>
+    <option value="Manager" label="Manager（利用者 ID）"></option>
+    <option value="Owner" label="Owner（利用者 ID）"></option>
+    <option value="Locked"></option>
+    <option value="StartTime" label="StartTime（期限付きテーブルのみ）"></option>
+    <option value="CompletionTime" label="CompletionTime（期限付きテーブルのみ）"></option>
+    <option value="WorkValue" label="WorkValue（期限付きテーブルのみ）"></option>
+    <option value="ProgressRate" label="ProgressRate（期限付きテーブルのみ）"></option>
+    <option value="RemainingWorkValue" label="RemainingWorkValue（期限付きテーブルのみ）"></option>
+  </datalist>
+
   {#if mapping.assignments.length === 0}
     <p class="status">{t('mapping.empty')}</p>
   {:else}
@@ -372,6 +386,7 @@
                 <input
                   type="text"
                   aria-label={t('mapping.targetColumn')}
+                  list="record-properties"
                   placeholder={attachment
                     ? t('mapping.attachmentColumnPlaceholder')
                     : t('mapping.targetColumnPlaceholder')}

@@ -48,6 +48,9 @@ public enum MappingProblemCode
     /// <summary>添付の口なのに、書き込み先が添付列でない。</summary>
     FilePortNeedsAttachmentColumn,
 
+    /// <summary>書き込み先の型へ確実に変換できない。</summary>
+    TargetColumnNeedsCompatibleValue,
+
     /// <summary>どこへも割り当てられていない設問。**拒否はしないが警告する。**</summary>
     UnmappedQuestion,
 }
@@ -73,11 +76,16 @@ public static class MappingValidator
     /// 添付列かどうかの判定。**列名の決まりは Pleasanter 側の知識**なので、
     /// ここでは持たずに受け取る。渡さなければ列名の側は確かめない。
     /// </param>
+    /// <param name="targetValueKind">
+    /// 入れ物に入らない書き込み先の値の型。列名と型は Pleasanter 側の知識なので、
+    /// ここではその型を確実に出せる割り当てかだけを検査する。
+    /// </param>
     public static ImmutableArray<MappingProblem> Validate(
         MappingDefinition mapping,
         SurveyDefinition definition,
         IReadOnlyCollection<string>? reservedColumns = null,
-        Func<string, bool>? isAttachmentColumn = null)
+        Func<string, bool>? isAttachmentColumn = null,
+        Func<string, MappingTargetValueKind?>? targetValueKind = null)
     {
         ArgumentNullException.ThrowIfNull(mapping);
         ArgumentNullException.ThrowIfNull(definition);
@@ -138,6 +146,13 @@ public static class MappingValidator
                     MappingProblemCode.InvalidShape, assignment.TargetColumn));
             }
 
+            if (targetValueKind?.Invoke(assignment.TargetColumn) is { } kind
+                && !Produces(assignment, definition, kind))
+            {
+                problems.Add(new MappingProblem(
+                    MappingProblemCode.TargetColumnNeedsCompatibleValue, assignment.TargetColumn));
+            }
+
             if (assignment.Converter is { Operation: ConverterOperations.Script } converter
                 && string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("script")))
             {
@@ -179,6 +194,97 @@ public static class MappingValidator
 
         return Finish(problems, mapping, definition);
     }
+
+    /// <summary>割り当てが書き込み先の型または未設定を確実に出せるか。</summary>
+    /// <remarks>
+    /// 送信時まで失敗を持ち越さないため、回答者が任意の文字列を入れられる経路は許可しない。
+    /// </remarks>
+    private static bool Produces(
+        ColumnAssignment assignment,
+        SurveyDefinition definition,
+        MappingTargetValueKind target)
+    {
+        if (assignment.Converter is null)
+        {
+            if (assignment.Sources.Length != 1)
+            {
+                return false;
+            }
+
+            var source = assignment.Sources[0];
+            var question = definition.FindQuestion(source.QuestionId);
+            if (question is null || source.Port is not QuestionPort.Value)
+            {
+                return false;
+            }
+
+            return ProducesDirectly(question, source, target);
+        }
+
+        return assignment.Converter.Operation switch
+        {
+            ConverterOperations.Constant =>
+                CanConvert(assignment.Converter.Config.GetValueOrDefault("value"), target),
+            ConverterOperations.When =>
+                CanConvert(assignment.Converter.Config.GetValueOrDefault("then"), target)
+                && CanConvert(assignment.Converter.Config.GetValueOrDefault("else"), target),
+            _ => false,
+        };
+    }
+
+    private static bool ProducesDirectly(
+        Question question,
+        MappingSource source,
+        MappingTargetValueKind target)
+    {
+        if (target is MappingTargetValueKind.DateTime)
+        {
+            return question.Type is QuestionType.Date;
+        }
+
+        if (question.Type is QuestionType.Scale or QuestionType.Rating)
+        {
+            return target is MappingTargetValueKind.Integer or MappingTargetValueKind.Decimal;
+        }
+
+        if (question.Type is QuestionType.Ranking && source.RowId is not null)
+        {
+            return target is MappingTargetValueKind.Integer or MappingTargetValueKind.Decimal;
+        }
+
+        return question.Type is QuestionType.Radio or QuestionType.Dropdown
+            && question.Choices.All(choice =>
+                !choice.IsOther
+                && CanConvert(choice.Value, target));
+    }
+
+    private static bool CanConvert(string? value, MappingTargetValueKind target) =>
+        string.IsNullOrWhiteSpace(value)
+        || target switch
+        {
+            MappingTargetValueKind.Integer => int.TryParse(
+                value,
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out _),
+            MappingTargetValueKind.Boolean => bool.TryParse(value, out _),
+            MappingTargetValueKind.Decimal => decimal.TryParse(
+                value,
+                System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out _),
+            MappingTargetValueKind.DateTime => DateOnly.TryParse(
+                value,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out _)
+                || DateTimeOffset.TryParse(
+                    value,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out _),
+            _ => true,
+        };
 
     /// <summary>行の指定が噛み合っているかを見る（Issue #54）。</summary>
     /// <remarks>

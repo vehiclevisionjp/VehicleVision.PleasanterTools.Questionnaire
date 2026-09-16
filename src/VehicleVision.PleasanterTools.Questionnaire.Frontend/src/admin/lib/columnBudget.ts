@@ -65,6 +65,7 @@ export function measure(
   for (const assignment of mapping.assignments) {
     const column = assignment.targetColumn?.trim() ?? '';
     if (column === '') continue;
+    if (!/[A-Z0-9]$/.test(column)) continue;
 
     const prefix = prefixOf(column);
     const columns = byPrefix.get(prefix) ?? new Set<string>();
