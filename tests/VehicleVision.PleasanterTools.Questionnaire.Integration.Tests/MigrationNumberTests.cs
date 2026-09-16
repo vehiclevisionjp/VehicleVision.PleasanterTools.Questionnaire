@@ -74,4 +74,15 @@ public class MigrationNumberTests
     // 他のブランチが取った番号がこちらに無いのが普通で、飛んでいること自体は害が無い。
     // FluentMigrator は番号順に流すだけで、連番であることを求めない。
     // **害があるのは重複だけ**（片方が静かに飛ばされる）。
+
+    [Fact]
+    public void 未適用の一覧は型の名前で出す()
+    {
+        // ⚠️ **説明文は日本語で、Kudu のコンソールで化ける**（Issue #225 / #243）。
+        // 型の名前なら ASCII で、そのままファイルとして探せる
+        var names = Migrations().Select(migration => migration.Type.Name).ToList();
+
+        Assert.All(names, name => Assert.Matches("^[A-Za-z0-9_]+$", name));
+        Assert.Contains("M0001_InitialSchema", names);
+    }
 }

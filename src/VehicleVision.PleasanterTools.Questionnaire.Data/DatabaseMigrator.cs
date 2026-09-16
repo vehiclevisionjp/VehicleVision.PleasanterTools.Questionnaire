@@ -34,8 +34,19 @@ public static class DatabaseMigrator
 
     /// <summary>まだ当たっていないマイグレーションの名前。</summary>
     /// <remarks>
+    /// <para>
     /// **「当て忘れている」と言うだけでは直せない。** 何が足りないかまで見せる。
     /// **DB は読むだけで、版の表も作らない。**
+    /// </para>
+    /// <para>
+    /// ⚠️ **説明文（<c>[Migration(20, "…")]</c> の第 2 引数）を出さないこと。**
+    /// あれは日本語で、**Azure の Kudu の Debug console では丸ごと文字化けする**
+    /// （Issue #225 で出力を英語にしたのに、ここだけ日本語が漏れていた）。
+    /// </para>
+    /// <para>
+    /// **代わりに型の名前を出す**（<c>M0020_TestPublishedResponses</c>）。
+    /// ASCII なので化けず、**そのままファイル名として探せる。**
+    /// </para>
     /// </remarks>
     public static IReadOnlyList<string> PendingMigrations(
         DatabaseProvider provider,
@@ -49,7 +60,7 @@ public static class DatabaseMigrator
 
         return [.. runner.MigrationLoader.LoadMigrations()
             .Where(migration => !applied.HasAppliedMigration(migration.Key))
-            .Select(migration => $"{migration.Key} {migration.Value.Description}")];
+            .Select(migration => $"{migration.Key} {migration.Value.Migration.GetType().Name}")];
     }
 
     /// <summary>DB が接続を受けるようになるまで待つ。</summary>
