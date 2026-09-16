@@ -661,6 +661,36 @@ public class SurveyDraftStoreTests
         Assert.Null(await surveys.FindBySurveyIdAsync(target.SurveyId));
     }
 
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 配布資産の期限設定を保存して読み直せる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+        var definition = Definition(surveyId, "q1") with
+        {
+            AssetDelivery = new AssetDeliverySettings
+            {
+                Expiration = AssetTicketExpiration.AcceptTo,
+                Days = 45,
+            },
+        };
+
+        await drafts.SaveAsync(
+            surveyId, definition, new MappingDefinition(), expectedRevision: 0);
+
+        var loaded = await drafts.LoadAsync(surveyId);
+        Assert.Equal(AssetTicketExpiration.AcceptTo, loaded!.Definition.AssetDelivery!.Expiration);
+        Assert.Equal(45, loaded.Definition.AssetDelivery.Days);
+    }
+
     // ---- テンプレート（Issue #58） -----------------------------------------
 
     /// <summary>

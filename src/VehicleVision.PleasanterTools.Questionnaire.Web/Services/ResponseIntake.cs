@@ -45,7 +45,9 @@ public enum IntakeRejection
 public sealed record IntakeResult(
     IntakeRejection? Rejection = null,
     ImmutableArray<ValidationError> Errors = default,
-    ImmutableArray<AttachmentRejection> Attachments = default)
+    ImmutableArray<AttachmentRejection> Attachments = default,
+    string? AssetTicket = null,
+    bool GrantsInstantAssetAccess = false)
 {
     public bool Accepted => Rejection is null;
 
@@ -88,6 +90,12 @@ public sealed record PublishedForm(
     bool AllowsDraft = false,
     bool IsTest = false);
 
+/// <summary>公開版から配る資産と、引換券が必要か。</summary>
+public sealed record PublishedAsset(SurveyAsset Asset, Guid SurveyId, bool RequiresTicket);
+
+/// <summary>引換券から完了画面を再表示するための公開版。</summary>
+public sealed record AssetTicketForm(Guid SurveyId, SurveyDefinition Definition);
+
 /// <summary>回答を受け付けて送信待ちへ入れる。</summary>
 /// <remarks>
 /// <para>
@@ -111,7 +119,8 @@ public sealed class ResponseIntake(
     IAttachmentRejectionStore? rejections = null,
     ILogger<ResponseIntake>? logger = null,
     IAdminNotificationStore? notifications = null,
-    AutoReplyDispatcher? autoReply = null)
+    AutoReplyDispatcher? autoReply = null,
+    IAssetTicketStore? assetTickets = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -229,7 +238,7 @@ public sealed class ResponseIntake(
     /// **資産 ID を知っているだけでは返さない。** 公開中の版の記法が参照するものだけに
     /// 絞ることで、下書きで上げただけの画像や過去の画像を公開しない。
     /// </remarks>
-    public async Task<SurveyAsset?> GetPublishedAssetAsync(
+    public async Task<PublishedAsset?> GetPublishedAssetAsync(
         string publicId,
         Guid assetId,
         CancellationToken cancellationToken = default)
@@ -254,8 +263,33 @@ public sealed class ResponseIntake(
             return null;
         }
 
-        return await assets.FindAsync(survey.SurveyId, assetId, cancellationToken)
+        var asset = await assets.FindAsync(survey.SurveyId, assetId, cancellationToken)
             .ConfigureAwait(false);
+        return asset is null
+            ? null
+            : new PublishedAsset(
+                asset,
+                survey.SurveyId,
+                SurveyAssetReferences.RequiresTicket(snapshot.Definition, assetId));
+    }
+
+    /// <summary>受付状態に関係なく、引換券を使える公開版を返す。</summary>
+    /// <remarks>アーカイブ済み・削除済みは返さない。</remarks>
+    public async Task<AssetTicketForm?> GetAssetTicketFormAsync(
+        string publicId,
+        CancellationToken cancellationToken = default)
+    {
+        var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
+            .ConfigureAwait(false);
+        if (survey is null || survey.ArchivedAt is not null || survey.PublishedVersion is null)
+        {
+            return null;
+        }
+
+        var snapshot = await snapshots
+            .FindAsync(survey.SurveyId, survey.PublishedVersion.Value, cancellationToken)
+            .ConfigureAwait(false);
+        return snapshot is null ? null : new AssetTicketForm(survey.SurveyId, snapshot.Definition);
     }
 
     /// <summary>回答を受け付ける。</summary>
@@ -388,6 +422,31 @@ public sealed class ResponseIntake(
             .ToList();
 
         var payload = ResponsePayload.Create(responseToken, kept, files);
+
+        string? assetTicket = null;
+        DateTime? assetTicketExpiresAt = null;
+        var assetDelivery = snapshot.Definition.AssetDelivery ?? new AssetDeliverySettings();
+        var grantsInstantAssetAccess =
+            SurveyAssetReferences.HasTicketedAssets(snapshot.Definition)
+            && assetDelivery.Expiration == AssetTicketExpiration.CompletedOnly;
+        if (assetTickets is not null
+            && SurveyAssetReferences.HasTicketedAssets(snapshot.Definition)
+            && !grantsInstantAssetAccess)
+        {
+            var now = _time.GetUtcNow().UtcDateTime;
+            assetTicketExpiresAt = assetDelivery.ExpiresAt(now, survey.AcceptTo);
+            if (assetTicketExpiresAt > now)
+            {
+                assetTicket = AssetTicket.Create();
+                await assetTickets.SaveAsync(
+                    AssetTicket.HashOf(assetTicket),
+                    responseToken,
+                    survey.SurveyId,
+                    assetTicketExpiresAt.Value,
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         await outbox
             .SaveAsync(
                 responseToken,
@@ -415,7 +474,9 @@ public sealed class ResponseIntake(
                     // **再編集リンクの URL と期限に要る**（Issue #202）。
                     // **期限は受付の終了を超えない**
                     publicId: survey.PublicId,
-                    acceptTo: survey.AcceptTo)
+                    acceptTo: survey.AcceptTo,
+                    assetTicket: assetTicket,
+                    assetTicketExpiresAt: assetTicketExpiresAt)
                 .ConfigureAwait(false);
         }
 
@@ -446,7 +507,9 @@ public sealed class ResponseIntake(
                 .ConfigureAwait(false);
         }
 
-        return IntakeResult.Ok();
+        return new IntakeResult(
+            AssetTicket: assetTicket,
+            GrantsInstantAssetAccess: grantsInstantAssetAccess);
     }
 
     /// <summary>回答数の上限に届いたことを管理者へ知らせる（Issue #80）。</summary>

@@ -99,6 +99,9 @@ public static class ServerMessageKeys
     /// <summary>再編集リンクの添え書き（Issue #202）。**{0} が期限。**</summary>
     public const string EditLinkMailNote = "editLink.mail.note";
 
+    /// <summary>配布資産の引換券の添え書き（Issue #318）。**{0} が期限。**</summary>
+    public const string AssetTicketMailNote = "assetTicket.mail.note";
+
     /// <summary>招待メールの件名（Issue #189）。</summary>
     public const string InvitationMailSubject = "invitation.mail.subject";
 

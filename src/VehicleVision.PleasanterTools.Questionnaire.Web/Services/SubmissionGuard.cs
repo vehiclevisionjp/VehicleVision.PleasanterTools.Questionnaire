@@ -96,6 +96,12 @@ public sealed class SubmissionGuard
     /// <summary>チケットの書式の版。**変えるときは検証側の分岐を足す。**</summary>
     private const string Version = "t1";
 
+    /// <summary>完了時限定の資産アクセス許可を識別する版。</summary>
+    public const string AssetAccessVersion = "a1";
+
+    /// <summary>完了時限定の資産アクセス許可の寿命。</summary>
+    public static readonly TimeSpan AssetAccessLifetime = TimeSpan.FromMinutes(30);
+
     /// <summary>署名鍵を用途で分けるためのラベル。</summary>
     /// <remarks>
     /// **同じ鍵を別の用途へそのまま使わない。** 片方の署名が
@@ -104,7 +110,11 @@ public sealed class SubmissionGuard
     private static readonly byte[] KeyLabel =
         Encoding.UTF8.GetBytes("questionnaire:submission-ticket:v1");
 
+    private static readonly byte[] AssetAccessKeyLabel =
+        Encoding.UTF8.GetBytes("questionnaire:asset-access:v1");
+
     private readonly byte[] key;
+    private readonly byte[] assetAccessKey;
     private readonly SubmissionGuardOptions options;
     private readonly TimeProvider time;
 
@@ -119,6 +129,11 @@ public sealed class SubmissionGuard
         // **設定の鍵をそのまま使わず、用途ごとに派生させる**
         this.key = HKDF.DeriveKey(
             HashAlgorithmName.SHA256, SecretProtector.DecodeKey(base64Key), 32, info: KeyLabel);
+        this.assetAccessKey = HKDF.DeriveKey(
+            HashAlgorithmName.SHA256,
+            SecretProtector.DecodeKey(base64Key),
+            32,
+            info: AssetAccessKeyLabel);
         this.options = options;
         this.time = time;
     }
@@ -133,6 +148,50 @@ public sealed class SubmissionGuard
         var issuedAt = time.GetUtcNow().ToUnixTimeSeconds();
         var signature = Sign(publicId, responseToken, issuedAt);
         return string.Join('.', Version, issuedAt.ToString(CultureInfo.InvariantCulture), signature);
+    }
+
+    /// <summary>完了時限定の資産アクセス許可を発行する。</summary>
+    /// <remarks>
+    /// 送信チケットと同じく、発行時刻を署名へ封じ込めてサーバ側には保存しない。
+    /// 用途の違う署名が相互に通らないよう、版と派生鍵を分ける。
+    /// </remarks>
+    public string IssueAssetAccess(string publicId)
+    {
+        var issuedAt = time.GetUtcNow().ToUnixTimeSeconds();
+        var signature = SignAssetAccess(publicId, issuedAt);
+        return string.Join(
+            '.',
+            AssetAccessVersion,
+            issuedAt.ToString(CultureInfo.InvariantCulture),
+            signature);
+    }
+
+    /// <summary>完了時限定の資産アクセス許可が有効か。</summary>
+    public bool CheckAssetAccess(string? ticket, string publicId)
+    {
+        if (string.IsNullOrEmpty(ticket))
+        {
+            return false;
+        }
+
+        var parts = ticket.Split('.');
+        if (parts.Length != 3
+            || !string.Equals(parts[0], AssetAccessVersion, StringComparison.Ordinal)
+            || !long.TryParse(
+                parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var issuedAt))
+        {
+            return false;
+        }
+
+        var expected = SignAssetAccess(publicId, issuedAt);
+        if (!CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(parts[2])))
+        {
+            return false;
+        }
+
+        var elapsed = time.GetUtcNow() - DateTimeOffset.FromUnixTimeSeconds(issuedAt);
+        return elapsed >= TimeSpan.Zero && elapsed <= AssetAccessLifetime;
     }
 
     /// <summary>送信を受け付けてよいかを見る。受け付けてよければ <c>null</c>。</summary>
@@ -198,15 +257,46 @@ public sealed class SubmissionGuard
 
     private string Sign(string publicId, string responseToken, long issuedAt)
     {
+        return Sign(
+            key,
+            Version,
+            publicId,
+            responseToken,
+            issuedAt);
+    }
+
+    private string SignAssetAccess(string publicId, long issuedAt)
+    {
+        return Sign(
+            assetAccessKey,
+            AssetAccessVersion,
+            publicId,
+            responseToken: null,
+            issuedAt);
+    }
+
+    private static string Sign(
+        byte[] signingKey,
+        string version,
+        string publicId,
+        string? responseToken,
+        long issuedAt)
+    {
         // **区切りに改行を使い、長さの違いで同じ入力にならないようにする**
         var payload = Encoding.UTF8.GetBytes(
-            string.Join(
-                '\n',
-                Version,
-                publicId,
-                responseToken,
-                issuedAt.ToString(CultureInfo.InvariantCulture)));
+            responseToken is null
+                ? string.Join(
+                    '\n',
+                    version,
+                    publicId,
+                    issuedAt.ToString(CultureInfo.InvariantCulture))
+                : string.Join(
+                    '\n',
+                    version,
+                    publicId,
+                    responseToken,
+                    issuedAt.ToString(CultureInfo.InvariantCulture)));
 
-        return Base64Url.EncodeToString(HMACSHA256.HashData(key, payload));
+        return Base64Url.EncodeToString(HMACSHA256.HashData(signingKey, payload));
     }
 }

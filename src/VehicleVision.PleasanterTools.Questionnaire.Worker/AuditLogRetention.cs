@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
@@ -163,7 +163,8 @@ public sealed class AuditLogRetentionService(
     IAdminNotificationStore? notifications = null,
     IResponseOutbox? outbox = null,
     IResponseEditTokenStore? editTokens = null,
-    IAdminSessionStore? adminSessions = null)
+    IAdminSessionStore? adminSessions = null,
+    IAssetTicketStore? assetTickets = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -195,7 +196,8 @@ public sealed class AuditLogRetentionService(
             && !(notifications is not null && options.NotificationEnabled)
             && !(outbox is not null && options.DeadLetterEnabled)
             && editTokens is null
-            && adminSessions is null)
+            && adminSessions is null
+            && assetTickets is null)
         {
             return;
         }
@@ -251,6 +253,21 @@ public sealed class AuditLogRetentionService(
                     if (expired > 0)
                     {
                         logger.LogInformation("期限切れの再編集リンクを {Count} 件消した", expired);
+                    }
+
+                }
+
+                if (assetTickets is not null)
+                {
+                    var expiredAssetTickets = await assetTickets
+                        .DeleteExpiredAsync(_time.GetUtcNow().UtcDateTime, stoppingToken)
+                        .ConfigureAwait(false);
+
+                    if (expiredAssetTickets > 0)
+                    {
+                        logger.LogInformation(
+                            "期限切れの配布資産引換券を {Count} 件消した",
+                            expiredAssetTickets);
                     }
                 }
 

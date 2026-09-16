@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.Features;
@@ -151,30 +151,54 @@ public static class FormEndpoints
             return Results.File(image.Content, image.ContentType);
         });
 
-        // **公開版の本文が参照する自前資産だけを配る**（Issue #266 / #269）。
-        // 認証や回答トークンとは結び付けない。配信ログから回答者を辿れる識別子を増やさない
+        // **公開版の本文が参照する自前資産だけを配る**（Issue #266 / #269 / #318）。
+        // 設問・説明文の画像は回答前に要るので無条件、完了画面だけの配布物は引換券を要する
         forms.MapGet("/{publicId}/assets/{assetId:guid}", async (
             string publicId,
             Guid assetId,
             HttpContext context,
             ResponseIntake intake,
+            IAssetTicketStore assetTickets,
+            SubmissionGuard guard,
+            TimeProvider timeProvider,
             AssetOptions options,
             CancellationToken cancellationToken) =>
         {
-            var asset = await intake.GetPublishedAssetAsync(publicId, assetId, cancellationToken);
-            if (asset is null || !options.IsAllowed(asset.FileName, asset.ContentType))
+            var published = await intake.GetPublishedAssetAsync(publicId, assetId, cancellationToken);
+            if (published is null
+                || !options.IsAllowed(published.Asset.FileName, published.Asset.ContentType))
             {
                 return Results.NotFound();
             }
 
-            // **URL は本アプリのままにする。** 保存先へ転送しないので、
-            // 後からこの口へ 1 回限りの引換券を追加できる
-            context.Response.Headers.CacheControl = "public, max-age=86400";
+            if (published.RequiresTicket)
+            {
+                var ticket = context.Request.Cookies[AssetTicket.CookieName];
+                if (!await AssetTicket.CanAccessAsync(
+                    ticket,
+                    publicId,
+                    published.SurveyId,
+                    guard,
+                    assetTickets,
+                    timeProvider.GetUtcNow().UtcDateTime,
+                    cancellationToken))
+                {
+                    return Results.NotFound();
+                }
+
+                context.Response.Headers.CacheControl = "private, no-store";
+            }
+            else
+            {
+                // **設問・説明文の画像は引換券なし。** 回答中にまだ回答は存在しない
+                context.Response.Headers.CacheControl = "public, max-age=86400";
+            }
+
             // **必ず attachment。** PDF や Office 文書をブラウザ内で開かせない
             return Results.File(
-                asset.Content,
-                asset.ContentType,
-                fileDownloadName: asset.FileName);
+                published.Asset.Content,
+                published.Asset.ContentType,
+                fileDownloadName: published.Asset.FileName);
         });
 
         // **送信チケットを出す。** 画面を開いた時刻を署名に閉じ込めて返すだけで、
@@ -251,6 +275,57 @@ public static class FormEndpoints
             return responseToken is null
                 ? Results.NotFound()
                 : Results.Ok(new { responseToken });
+        }).RequireRateLimiting(SubmitRateLimitPolicy);
+
+        // ---- 配布資産の引換券（Issue #318）-----------------------------------
+        forms.MapPost("/{publicId}/asset-ticket", async (
+            string publicId,
+            AssetTicketRedeemRequest request,
+            HttpContext context,
+            ResponseIntake intake,
+            IAssetTicketStore assetTickets,
+            TimeProvider timeProvider,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.AssetTicket))
+            {
+                return Results.NotFound();
+            }
+
+            // **受付終了・停止中でも使える。** アーカイブ・削除だけはここで拒否する
+            var form = await intake.GetAssetTicketFormAsync(publicId, cancellationToken);
+            if (form is null)
+            {
+                return Results.NotFound();
+            }
+
+            var grant = await assetTickets.RedeemAsync(
+                AssetTicket.HashOf(request.AssetTicket),
+                form.SurveyId,
+                timeProvider.GetUtcNow().UtcDateTime,
+                cancellationToken);
+            if (grant is null)
+            {
+                return Results.NotFound();
+            }
+
+            context.Response.Cookies.Append(
+                AssetTicket.CookieName,
+                request.AssetTicket,
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = context.Request.IsHttps,
+                    SameSite = SameSiteMode.Lax,
+                    Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
+                    Expires = new DateTimeOffset(DateTime.SpecifyKind(
+                        grant.ExpiresAtUtc, DateTimeKind.Utc)),
+                });
+
+            return Results.Ok(new FormResponse(
+                publicId,
+                form.Definition,
+                RequiresProofOfWork: false));
         }).RequireRateLimiting(SubmitRateLimitPolicy);
 
         forms.MapGet("/{publicId}/responses/{responseToken}", async (
@@ -410,8 +485,24 @@ public static class FormEndpoints
 
             if (result.Accepted)
             {
+                if (result.GrantsInstantAssetAccess)
+                {
+                    // **セッション Cookie。** 署名内の発行時刻で 30 分に制限する。
+                    // DB へ引換券を保存せず、この送信直後の画面だけで使わせる。
+                    context.Response.Cookies.Append(
+                        AssetTicket.CookieName,
+                        guard.IssueAssetAccess(publicId),
+                        new CookieOptions
+                        {
+                            HttpOnly = true,
+                            Secure = context.Request.IsHttps,
+                            SameSite = SameSiteMode.Lax,
+                            Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
+                        });
+                }
+
                 // **受付完了。** Pleasanter へはこの後ワーカーが送る
-                return Results.Accepted();
+                return Results.Accepted(value: new { assetTicket = result.AssetTicket });
             }
 
             return result.Rejection switch
@@ -429,6 +520,9 @@ public static class FormEndpoints
     /// <summary>再編集リンクの引き換えで受け取る中身（Issue #202）。</summary>
     /// <remarks>⚠️ **経路ではなく本文で受け取る。** ログへ載せないため。</remarks>
     public sealed record EditLinkRedeemRequest(string? EditToken);
+
+    /// <summary>配布資産の引換券。⚠️ **経路ではなく本文で受け取る。**</summary>
+    public sealed record AssetTicketRedeemRequest(string? AssetTicket);
 
     /// <summary>回答トークンを作る。**暗号論的乱数から作る。**</summary>
     /// <remarks>

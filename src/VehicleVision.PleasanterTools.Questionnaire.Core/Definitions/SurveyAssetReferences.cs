@@ -17,16 +17,56 @@ public static class SurveyAssetReferences
             .Any(inline => inline.AssetId == assetId);
     }
 
+    /// <summary>完了画面からだけ参照されるため、引換券を要する資産か。</summary>
+    public static bool RequiresTicket(SurveyDefinition definition, Guid assetId)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+
+        return ConfirmationMarkups(definition).Any(markup => Contains(markup, assetId))
+            && !QuestionMarkups(definition).Any(markup => Contains(markup, assetId));
+    }
+
+    /// <summary>完了画面に配布資産が 1 件以上あるか。</summary>
+    public static bool HasTicketedAssets(SurveyDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+
+        var questionAssets = QuestionMarkups(definition)
+            .SelectMany(AssetIds)
+            .ToHashSet();
+        return ConfirmationMarkups(definition)
+            .SelectMany(AssetIds)
+            .Any(assetId => !questionAssets.Contains(assetId));
+    }
+
     private static IEnumerable<string> Markups(SurveyDefinition definition)
     {
-        if (definition.ConfirmationMessage is { } confirmation)
+        foreach (var markup in ConfirmationMarkups(definition))
         {
-            foreach (var language in confirmation.Languages)
-            {
-                yield return confirmation.Get(language);
-            }
+            yield return markup;
         }
 
+        foreach (var markup in QuestionMarkups(definition))
+        {
+            yield return markup;
+        }
+    }
+
+    private static IEnumerable<string> ConfirmationMarkups(SurveyDefinition definition)
+    {
+        if (definition.ConfirmationMessage is not { } confirmation)
+        {
+            yield break;
+        }
+
+        foreach (var language in confirmation.Languages)
+        {
+            yield return confirmation.Get(language);
+        }
+    }
+
+    private static IEnumerable<string> QuestionMarkups(SurveyDefinition definition)
+    {
         foreach (var question in definition.AllQuestions)
         {
             if (question.Description is null
@@ -42,4 +82,13 @@ public static class SurveyAssetReferences
             }
         }
     }
+
+    private static bool Contains(string markup, Guid assetId) => AssetIds(markup).Contains(assetId);
+
+    private static IEnumerable<Guid> AssetIds(string markup) =>
+        NoteMarkup.Parse(markup)
+            .SelectMany(block => block.Inlines.Concat(
+                block.Items.SelectMany(item => item.Inlines)))
+            .Where(inline => inline.AssetId is not null)
+            .Select(inline => inline.AssetId!.Value);
 }

@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Data.Common;
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -227,6 +227,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         bool AllowEditingAfterSubmit,
         string? ThemeJson,
         string? AutoReplyJson,
+        string? AssetDeliveryJson,
         int? PublishedVersion,
         int DraftRevision);
 
@@ -439,7 +440,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         var survey = await connection.QueryFirstOrDefaultAsync<SurveyRow>(Sql(
             "SELECT [SurveyId], [TitleJson], [DescriptionJson], "
             + "       [ConfirmationMessageJson], [DisplayMode], [ShowProgress], "
-            + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], "
+            + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], [AssetDeliveryJson], "
             + "       [PublishedVersion], "
             + "       [DraftRevision] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
@@ -554,6 +555,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             // ⚠️ **列が無いと黙って落ちる。** 定義に項目を足したら、ここも足すこと
             // （端から端まで通す試験で見つかった。Issue #189）
             AutoReply = ReadAutoReply(survey.AutoReplyJson),
+            AssetDelivery = ReadAssetDelivery(survey.AssetDeliveryJson),
             Pages = pages
                 .Select(page => new Page
                 {
@@ -606,6 +608,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "  [DisplayMode] = @DisplayMode, [ShowProgress] = @ShowProgress, "
             + "  [AllowEditingAfterSubmit] = @AllowEditingAfterSubmit, "
             + "  [ThemeJson] = @ThemeJson, [AutoReplyJson] = @AutoReplyJson, "
+            + "  [AssetDeliveryJson] = @AssetDeliveryJson, "
             + "  [Title] = @Title, [UpdatedAt] = @Now "
             + "WHERE [SurveyId] = @SurveyId AND [DraftRevision] = @ExpectedRevision",
             new
@@ -620,6 +623,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 definition.AllowEditingAfterSubmit,
                 ThemeJson = WriteTheme(definition.Theme),
                 AutoReplyJson = WriteAutoReply(definition.AutoReply),
+                AssetDeliveryJson = WriteAssetDelivery(definition.AssetDelivery),
                 // 一覧に出す用の平文。**多言語の正本は TitleJson**
                 Title = Shorten(definition.Title.Get(LocalizedText.DefaultLanguage), 512),
                 Now = DbTime.UtcNowTruncated(),
@@ -838,12 +842,14 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "   [DraftRevision], [DisplayMode], [ShowProgress], "
             + "   [AllowEditingAfterSubmit], [TitleJson], [DescriptionJson], "
             + "   [ConfirmationMessageJson], [IsTemplate], [ThemeJson], [AutoReplyJson], "
+            + "   [AssetDeliveryJson], "
             + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, NULL, "
             + "        0, @DisplayMode, @ShowProgress, "
             + "        @AllowEditingAfterSubmit, @TitleJson, @DescriptionJson, "
             + "        @ConfirmationMessageJson, @IsTemplate, @ThemeJson, @AutoReplyJson, "
+            + "        @AssetDeliveryJson, "
             + "        @Now, @Now)",
             new
             {
@@ -862,6 +868,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 ThemeJson = WriteTheme(definition.Theme),
                 // **自動返信も複製に付いてくる**（文面はテンプレートの一部）
                 AutoReplyJson = WriteAutoReply(definition.AutoReply),
+                AssetDeliveryJson = WriteAssetDelivery(definition.AssetDelivery),
                 // 一覧に出す用の平文。**多言語の正本は TitleJson**
                 Title = Shorten(definition.Title.Get(LocalizedText.DefaultLanguage), 512),
                 Now = now,
@@ -1274,6 +1281,12 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
     /// </remarks>
     private static string? WriteAutoReply(AutoReplySettings? autoReply) =>
         autoReply is null || !autoReply.Enabled ? null : SurveyJson.Serialize(autoReply);
+
+    private static AssetDeliverySettings? ReadAssetDelivery(string? json) =>
+        string.IsNullOrWhiteSpace(json) ? null : SurveyJson.Deserialize<AssetDeliverySettings>(json);
+
+    private static string? WriteAssetDelivery(AssetDeliverySettings? assetDelivery) =>
+        assetDelivery is null ? null : SurveyJson.Serialize(assetDelivery);
 
     private static LocalizedText? ReadText(string? json) =>
         json is null ? null : SurveyJson.Deserialize<LocalizedText>(json);
