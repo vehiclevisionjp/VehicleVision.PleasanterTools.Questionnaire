@@ -241,6 +241,15 @@ public static class MappingValidator
         SurveyDefinition definition,
         MappingTargetValueKind target)
     {
+        // **文字列はどの経路からでも作れる。** 変換は文字列を返すので、
+        // 文字列の列へ入れるときに変換へ失敗しようがない。
+        // ⚠️ **ここを通さないと、変換を挟んだ途端に Title と Body が弾かれる**
+        // （Issue #246 は変換の無い経路しか直していなかった）
+        if (target is MappingTargetValueKind.String)
+        {
+            return true;
+        }
+
         if (assignment.Converter is null)
         {
             if (assignment.Sources.Length != 1)

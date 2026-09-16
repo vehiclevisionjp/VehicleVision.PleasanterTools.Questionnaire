@@ -566,4 +566,30 @@ public class MappingValidatorTests
         Assert.Contains(
             MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
     }
+
+    [Theory]
+    [InlineData(ConverterOperations.Join)]
+    [InlineData(ConverterOperations.Coalesce)]
+    [InlineData(ConverterOperations.Map)]
+    [InlineData(ConverterOperations.Script)]
+    public void 変換を挟んでも文字列の列へ割り当てられる(string operation)
+    {
+        // ⚠️ **Issue #246 は変換の無い経路しか直していなかった。**
+        // join で 2 つの回答を題名にする、のような使い方が弾かれていた
+        var converter = new MappingConverter(
+            operation,
+            System.Collections.Immutable.ImmutableDictionary<string, string>.Empty
+                .Add("separator", " ")
+                .Add("script", "return 'x';")
+                .Add("map.はい", "Yes"));
+
+        var problems = MappingValidator.Validate(
+            Mapping(ColumnAssignment.Converted(
+                "Title", converter, new MappingSource("q1", QuestionPort.Value))),
+            Definition("q1"),
+            targetValueKind: _ => MappingTargetValueKind.String);
+
+        Assert.DoesNotContain(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
 }
