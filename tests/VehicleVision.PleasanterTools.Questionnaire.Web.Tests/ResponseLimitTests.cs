@@ -256,6 +256,7 @@ public class ResponseLimitTests
         int? suspendedReason = null,
         int? backlogPerSurvey = null,
         IAdminNotificationStore? notifications = null,
+        DateTime? archivedAt = null,
         params string[] existingTokens)
     {
         var survey = new SurveyRecord(
@@ -267,7 +268,8 @@ public class ResponseLimitTests
             status,
             1,
             ResponseLimit: responseLimit,
-            SuspendedReason: suspendedReason);
+            SuspendedReason: suspendedReason,
+            ArchivedAt: archivedAt);
 
         var surveys = new FakeSurveys(survey);
         var tokens = new FakeTokens();
@@ -297,6 +299,22 @@ public class ResponseLimitTests
 
     private static Task<IntakeResult> SubmitAsync(ResponseIntake intake, string token) =>
         intake.SubmitAsync(PublicId, token, [Answer.Of("q1", "よかった")]);
+
+    [Fact]
+    public async Task アーカイブ済みは存在しない公開IDと同じ理由で拒否する()
+    {
+        var (intake, _, tokens) = Intake(
+            archivedAt: new DateTime(2026, 9, 16, 7, 0, 0, DateTimeKind.Unspecified));
+
+        var (form, getRejection) = await intake.GetPublishedAsync(PublicId);
+        var submit = await SubmitAsync(intake, "archived");
+
+        Assert.Null(form);
+        Assert.Equal(IntakeRejection.NotFound, getRejection);
+        Assert.Equal(IntakeRejection.NotFound, submit.Rejection);
+        Assert.Equal(0, tokens.CountCalls);
+        Assert.True(await intake.RequiresProofOfWorkAsync(PublicId));
+    }
 
     [Fact]
     public async Task テスト公開は受け付けてテスト回答として記録する()

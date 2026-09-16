@@ -263,6 +263,16 @@ public static class ServerMessages
             "This action is not available in the current state. Reload the page.");
 
         Add(
+            ServerMessageKeys.SurveyArchived,
+            "このアンケートはアーカイブ済みです。復元してから変更してください。",
+            "This survey is archived. Restore it before making changes.");
+
+        Add(
+            ServerMessageKeys.InvalidArchiveState,
+            "アーカイブの状態がすでに変わっています。再読み込みしてください。",
+            "The archive state has already changed. Reload the page.");
+
+        Add(
             ServerMessageKeys.SiteIdLockedAfterPublish,
             "本公開したアンケートの Pleasanter サイト ID は変更できません。",
             "The Pleasanter site ID cannot be changed after production publication.");
