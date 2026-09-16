@@ -19,11 +19,18 @@
   import type { AdminPermission, AdminSession } from './lib/types';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../lib/i18n/language';
   import { language, resolveLanguage, t } from './lib/i18n/state.svelte';
+  import {
+    buildBreadcrumbs,
+    truncateBreadcrumbTitle,
+    type AdminPage,
+  } from './lib/breadcrumbs';
 
   let session = $state<AdminSession>();
   let applicationVersion = $state<ApplicationVersion>();
   let loading = $state(true);
   let failed = $state(false);
+  let surveyBreadcrumbTitle = $state<string | null>(null);
+  let navigationGuard = $state<(() => boolean) | null>(null);
 
   /** 開いているアンケート。**URL に出す**（再読み込みで戻れるように） */
   let openSurveyId = $state(readSurveyId());
@@ -111,36 +118,77 @@
     history.pushState(null, '', path);
   }
 
+  function navigate(path: string, flags: Partial<Record<string, boolean>> = {}) {
+    if (navigationGuard && !navigationGuard()) {
+      return false;
+    }
+
+    only(path, flags);
+    return true;
+  }
+
   function openUserList() {
-    only('/admin/users', { users: true });
+    if (navigate('/admin/users', { users: true })) {
+      openUsers = true;
+    }
   }
 
   function openMyAccount() {
-    only('/admin/me', { account: true });
+    if (navigate('/admin/me', { account: true })) {
+      openAccount = true;
+    }
   }
 
   function open(surveyId: string) {
-    only(`/admin/surveys/${surveyId}`);
-    openSurveyId = surveyId;
+    if (navigate(`/admin/surveys/${surveyId}`)) {
+      openSurveyId = surveyId;
+    }
   }
 
   function openAudit() {
-    only('/admin/audit-logs');
-    openAuditLog = true;
+    if (navigate('/admin/audit-logs')) {
+      openAuditLog = true;
+    }
   }
 
   function openDelivery() {
-    only('/admin/outbox');
-    openOutbox = true;
+    if (navigate('/admin/outbox')) {
+      openOutbox = true;
+    }
   }
 
   function openNotificationList() {
-    only('/admin/notifications');
-    openNotifications = true;
+    if (navigate('/admin/notifications')) {
+      openNotifications = true;
+    }
   }
 
   function back() {
-    only('/admin');
+    navigate('/admin');
+  }
+
+  const breadcrumbPage = $derived.by<AdminPage>(() => {
+    if (openSurveyId) return 'survey-editor';
+    if (openAuditLog && canSeeAuditLog) return 'audit-logs';
+    if (openOutbox && canSeeOutbox) return 'outbox';
+    if (openNotifications && canSeeNotifications) return 'notifications';
+    if (openUsers && canSeeUsers) return 'users';
+    if (openAccount) return 'account';
+    return 'surveys';
+  });
+
+  function breadcrumbLabel(page: AdminPage): string {
+    if (page === 'surveys') return t('list.title');
+    if (page === 'survey-editor') {
+      return t('breadcrumb.surveyEditor', {
+        title: truncateBreadcrumbTitle(surveyBreadcrumbTitle ?? ''),
+      });
+    }
+    if (page === 'audit-logs') return t('breadcrumb.auditLogs');
+    if (page === 'outbox') return t('breadcrumb.outbox');
+    if (page === 'notifications') return t('breadcrumb.notifications');
+    if (page === 'users') return t('breadcrumb.users');
+    return t('breadcrumb.account');
   }
 
   async function refresh() {
@@ -320,6 +368,25 @@
       <button type="button" class="link" onclick={signOut}>{t('app.signOut')}</button>
     </header>
 
+    <nav class="breadcrumbs" aria-label={t('breadcrumb.label')}>
+      <ol>
+        {#each buildBreadcrumbs(breadcrumbPage) as breadcrumb, index (breadcrumb.page)}
+          <li>
+            {#if breadcrumb.path}
+              <button type="button" class="breadcrumb-link" onclick={() => navigate(breadcrumb.path!)}>
+                {breadcrumbLabel(breadcrumb.page)}
+              </button>
+            {:else}
+              <span aria-current="page">{breadcrumbLabel(breadcrumb.page)}</span>
+            {/if}
+            {#if index < buildBreadcrumbs(breadcrumbPage).length - 1}
+              <span class="breadcrumb-separator" aria-hidden="true">/</span>
+            {/if}
+          </li>
+        {/each}
+      </ol>
+    </nav>
+
     <!--
       **表を出す画面だけ広く使う。** 列が多くて識別子も入るので、
       他の画面と同じ幅だと横に流さないと読めない
@@ -350,6 +417,8 @@
           surveyId={openSurveyId}
           mailEnabled={session?.mailEnabled ?? false}
           onback={back}
+          onbreadcrumbchange={(title) => (surveyBreadcrumbTitle = title)}
+          onnavigationguardchange={(guard) => (navigationGuard = guard)}
         />
       {:else}
         <!--
@@ -465,6 +534,44 @@
     padding: 0.75rem 1.5rem;
     background: #fff;
     border-bottom: 1px solid var(--border);
+  }
+
+  .breadcrumbs {
+    padding: 0.5rem 1.5rem;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .breadcrumbs ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    max-width: 80rem;
+    padding: 0;
+    margin: 0 auto;
+    list-style: none;
+  }
+
+  .breadcrumbs li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .breadcrumb-link {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  .breadcrumb-separator {
+    color: var(--border);
   }
 
   .brand {
