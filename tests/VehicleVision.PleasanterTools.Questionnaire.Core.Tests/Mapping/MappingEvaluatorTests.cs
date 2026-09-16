@@ -62,6 +62,90 @@ public class MappingEvaluatorTests
     }
 
     [Fact]
+    public void mapにない値は既定値へ置き換える()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(
+                ConverterOperations.Map,
+                ("map.満足", "5"),
+                ("default", "0")),
+            new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", "未回答の選択肢")]);
+
+        Assert.Equal(["0"], result.Columns["NumA"].ToArray());
+    }
+
+    [Fact]
+    public void mapの空の既定値は未回答にする()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(
+                ConverterOperations.Map,
+                ("map.満足", "5"),
+                ("default", "")),
+            new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", "未回答の選択肢")]);
+
+        Assert.Empty(result.Columns["NumA"]);
+    }
+
+    [Theory]
+    [InlineData("123", null, "123")]
+    [InlineData("12.345", "2", "12.35")]
+    [InlineData("-1.5", "0", "-2")]
+    public void 数値として読める値を不変カルチャで出す(
+        string input,
+        string? decimals,
+        string expected)
+    {
+        var config = decimals is null
+            ? new[] { ("default", "0") }
+            : new[] { ("default", "0"), ("decimals", decimals) };
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(ConverterOperations.ToNumber, config),
+            new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", input)]);
+
+        Assert.Equal([expected], result.Columns["NumA"].ToArray());
+    }
+
+    [Theory]
+    [InlineData("数値ではない", "10")]
+    [InlineData("１２３", "10")]
+    public void 数値として読めない値は既定値を出す(string input, string fallback)
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(
+                ConverterOperations.ToNumber,
+                ("default", fallback)),
+            new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", input)]);
+
+        Assert.Equal([fallback], result.Columns["NumA"].ToArray());
+    }
+
+    [Fact]
+    public void 数値として読めず既定値が空なら未回答にする()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(ConverterOperations.ToNumber, ("default", "")),
+            new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", "数値ではない")]);
+
+        Assert.Empty(result.Columns["NumA"]);
+    }
+
+    [Fact]
     public void 複数の設問を連結して一つの列へ入れる()
     {
         // **N : 1 : 1。** 入力の順序は宣言順で決まる

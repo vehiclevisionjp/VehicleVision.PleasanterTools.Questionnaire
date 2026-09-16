@@ -149,8 +149,8 @@ public static class MappingValidator
                     MappingProblemCode.InvalidShape, assignment.TargetColumn));
             }
 
-            if (targetValueKind?.Invoke(assignment.TargetColumn) is { } kind
-                && !Produces(assignment, definition, kind))
+            var targetKind = targetValueKind?.Invoke(assignment.TargetColumn);
+            if (targetKind is { } kind && !Produces(assignment, definition, kind))
             {
                 problems.Add(new MappingProblem(
                     MappingProblemCode.TargetColumnNeedsCompatibleValue, assignment.TargetColumn));
@@ -163,7 +163,8 @@ public static class MappingValidator
                     MappingProblemCode.EmptyScript, assignment.TargetColumn));
             }
             else if (assignment.Converter is { } configuredConverter
-                && HasMissingConfig(configuredConverter))
+                && (HasMissingConfig(configuredConverter)
+                    || NeedsNumericMapDefault(configuredConverter, targetKind)))
             {
                 problems.Add(new MappingProblem(
                     MappingProblemCode.MissingConverterConfig, assignment.TargetColumn));
@@ -211,6 +212,9 @@ public static class MappingValidator
             ConverterOperations.Map => !converter.Config.Keys.Any(key =>
                 key.StartsWith("map.", StringComparison.Ordinal)
                 && !string.IsNullOrWhiteSpace(key["map.".Length..])),
+            ConverterOperations.ToNumber =>
+                !converter.Config.ContainsKey("default")
+                || !HasValidDecimals(converter.Config.GetValueOrDefault("decimals")),
             ConverterOperations.ToCheck or ConverterOperations.Constant =>
                 string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("value")),
             ConverterOperations.Contains =>
@@ -221,6 +225,13 @@ public static class MappingValidator
             _ => false,
         };
 
+    private static bool NeedsNumericMapDefault(
+        MappingConverter converter,
+        MappingTargetValueKind? target) =>
+        converter.Operation is ConverterOperations.Map
+        && target is MappingTargetValueKind.Integer or MappingTargetValueKind.Decimal
+        && !converter.Config.ContainsKey("default");
+
     /// <summary>割り当てが書き込み先の型または未設定を確実に出せるか。</summary>
     /// <remarks>
     /// 送信時まで失敗を持ち越さないため、回答者が任意の文字列を入れられる経路は許可しない。
@@ -230,6 +241,15 @@ public static class MappingValidator
         SurveyDefinition definition,
         MappingTargetValueKind target)
     {
+        // **文字列はどの経路からでも作れる。** 変換は文字列を返すので、
+        // 文字列の列へ入れるときに変換へ失敗しようがない。
+        // ⚠️ **ここを通さないと、変換を挟んだ途端に Title と Body が弾かれる**
+        // （Issue #246 は変換の無い経路しか直していなかった）
+        if (target is MappingTargetValueKind.String)
+        {
+            return true;
+        }
+
         if (assignment.Converter is null)
         {
             if (assignment.Sources.Length != 1)
@@ -249,6 +269,10 @@ public static class MappingValidator
 
         return assignment.Converter.Operation switch
         {
+            ConverterOperations.Map =>
+                ProducesMappedValues(assignment.Converter.Config, target),
+            ConverterOperations.ToNumber =>
+                ProducesNumber(assignment.Converter.Config, target),
             ConverterOperations.Constant =>
                 CanConvert(assignment.Converter.Config.GetValueOrDefault("value"), target),
             ConverterOperations.When =>
@@ -257,6 +281,52 @@ public static class MappingValidator
             _ => false,
         };
     }
+
+    private static bool ProducesMappedValues(
+        ImmutableDictionary<string, string> config,
+        MappingTargetValueKind target) =>
+        target is MappingTargetValueKind.Integer or MappingTargetValueKind.Decimal
+        && config.TryGetValue("default", out var defaultValue)
+        && CanConvert(defaultValue, target)
+        && config
+            .Where(pair =>
+                pair.Key.StartsWith("map.", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(pair.Key["map.".Length..]))
+            .All(pair => CanConvert(pair.Value, target));
+
+    private static bool ProducesNumber(
+        ImmutableDictionary<string, string> config,
+        MappingTargetValueKind target)
+    {
+        if (!config.TryGetValue("default", out var defaultValue)
+            || !HasValidDecimals(config.GetValueOrDefault("decimals"))
+            || !CanConvert(defaultValue, target))
+        {
+            return false;
+        }
+
+        return target switch
+        {
+            MappingTargetValueKind.Decimal => true,
+            MappingTargetValueKind.Integer =>
+                int.TryParse(
+                    config.GetValueOrDefault("decimals"),
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var decimals)
+                && decimals == 0,
+            _ => false,
+        };
+    }
+
+    private static bool HasValidDecimals(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+        || int.TryParse(
+            value,
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var decimals)
+        && decimals is >= 0 and <= 28;
 
     private static bool ProducesDirectly(
         Question question,

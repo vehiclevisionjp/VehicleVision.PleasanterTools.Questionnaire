@@ -24,7 +24,11 @@ export const converterConfigFields: Readonly<Record<string, readonly ConverterCo
       defaultValue: ',',
     },
   ],
-  map: [],
+  map: [{ key: 'default', label: 'mapping.config.mapDefault' }],
+  toNumber: [
+    { key: 'default', label: 'mapping.config.numberDefault' },
+    { key: 'decimals', label: 'mapping.config.numberDecimals' },
+  ],
   toCheck: [{ key: 'value', label: 'mapping.config.checkValue' }],
   contains: [{ key: 'keyword', label: 'mapping.config.keyword' }],
   constant: [{ key: 'value', label: 'mapping.config.constantValue' }],
@@ -51,7 +55,16 @@ export function converterForOperation(
   operation: string,
   current: MappingConverter | null | undefined,
 ): MappingConverter | null {
-  return operation === '' ? null : { operation, config: current?.config ?? {} };
+  if (operation === '') return null;
+
+  const config = current?.config ?? {};
+  return {
+    operation,
+    config:
+      (operation === 'map' || operation === 'toNumber') && !('default' in config)
+        ? { ...config, default: '' }
+        : config,
+  };
 }
 
 export function mapRowsFromConfig(config: Readonly<Record<string, string>>): MapConfigRow[] {
