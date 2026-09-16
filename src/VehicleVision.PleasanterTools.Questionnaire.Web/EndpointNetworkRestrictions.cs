@@ -11,18 +11,24 @@ public sealed class EndpointNetworkRestrictions
     /// <summary>監視 API を許すネットワークの設定。</summary>
     public const string MonitoringSetting = "QUESTIONNAIRE_MONITORING_NETWORKS";
 
+    /// <summary>OpenAPI 文書を許すネットワークの設定。</summary>
+    public const string OpenApiSetting = "QUESTIONNAIRE_OPENAPI_NETWORKS";
+
     /// <summary>生存確認の設定を引き継ぐ値。</summary>
     public const string Inherit = "inherit";
 
     private readonly IReadOnlyList<IPNetwork> healthNetworks;
     private readonly IReadOnlyList<IPNetwork> monitoringNetworks;
+    private readonly IReadOnlyList<IPNetwork> openApiNetworks;
 
     private EndpointNetworkRestrictions(
         IReadOnlyList<IPNetwork> healthNetworks,
-        IReadOnlyList<IPNetwork> monitoringNetworks)
+        IReadOnlyList<IPNetwork> monitoringNetworks,
+        IReadOnlyList<IPNetwork> openApiNetworks)
     {
         this.healthNetworks = healthNetworks;
         this.monitoringNetworks = monitoringNetworks;
+        this.openApiNetworks = openApiNetworks;
     }
 
     /// <summary>設定を読み、CIDR でない値があれば起動を止める。</summary>
@@ -40,8 +46,15 @@ public sealed class EndpointNetworkRestrictions
             StringComparison.Ordinal)
             ? health
             : ForwardedProxyNetworks.Parse(monitoringValue, MonitoringSetting);
+        var openApiValue = configuration[OpenApiSetting];
+        var openApi = string.Equals(
+            openApiValue?.Trim(),
+            Inherit,
+            StringComparison.Ordinal)
+            ? health
+            : ForwardedProxyNetworks.Parse(openApiValue, OpenApiSetting);
 
-        return new EndpointNetworkRestrictions(health, monitoring);
+        return new EndpointNetworkRestrictions(health, monitoring, openApi);
     }
 
     /// <summary>対象経路を今の送信元へ見せてよいか。</summary>
@@ -51,7 +64,9 @@ public sealed class EndpointNetworkRestrictions
             ? healthNetworks
             : IsMonitoringPath(path)
                 ? monitoringNetworks
-                : null;
+                : IsOpenApiPath(path)
+                    ? openApiNetworks
+                    : null;
 
         if (networks is null || networks.Count == 0)
         {
@@ -78,6 +93,9 @@ public sealed class EndpointNetworkRestrictions
         path.StartsWithSegments(
             "/api/monitoring/status",
             StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsOpenApiPath(PathString path) =>
+        path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>生存確認と監視 API の送信元を絞るパイプライン。</summary>

@@ -45,6 +45,7 @@ public static class AdminOutboxEndpoints
     public static IEndpointRouteBuilder MapAdminOutboxEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin/outbox")
+            .WithTags("管理 API")
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.OutboxRead));
 
         AdminAuthSchemes.AddNoStore(group);

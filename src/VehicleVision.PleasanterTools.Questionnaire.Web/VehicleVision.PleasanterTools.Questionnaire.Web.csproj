@@ -13,6 +13,7 @@
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageReference Include="nClam" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <PackageReference Include="Otp.NET" Version="1.4.1" />
   </ItemGroup>
 

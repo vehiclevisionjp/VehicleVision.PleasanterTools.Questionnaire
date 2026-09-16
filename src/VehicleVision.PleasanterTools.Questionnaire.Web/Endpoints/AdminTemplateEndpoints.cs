@@ -29,6 +29,7 @@ public static class AdminTemplateEndpoints
     public static IEndpointRouteBuilder MapAdminTemplateEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin/templates")
+            .WithTags("管理 API")
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.TemplatesRead));
 
         AdminAuthSchemes.AddNoStore(group);

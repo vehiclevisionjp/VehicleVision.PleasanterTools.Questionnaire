@@ -27,6 +27,7 @@ public static class AdminAuditLogEndpoints
     public static IEndpointRouteBuilder MapAdminAuditLogEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin/audit-logs")
+            .WithTags("管理 API")
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.AuditRead));
 
         AdminAuthSchemes.AddNoStore(group);

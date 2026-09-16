@@ -33,7 +33,8 @@ public static class AdminAuthEndpoints
 
     public static IEndpointRouteBuilder MapAdminAuthEndpoints(this IEndpointRouteBuilder builder)
     {
-        var group = builder.MapGroup("/api/admin");
+        var group = builder.MapGroup("/api/admin")
+            .WithTags("管理 API");
         AdminAuthSchemes.AddNoStore(group);
 
         // **管理操作を残す**（Issue #19）。読み取りは残さない
