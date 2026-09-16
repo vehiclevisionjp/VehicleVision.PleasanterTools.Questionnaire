@@ -114,6 +114,7 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | `QUESTIONNAIRE_ALTCHA_ENABLED` | `false` で proof-of-work を切る。**アプリ全体。検証環境のためだけ** |
 | `QUESTIONNAIRE_ALTCHA_MIN_NUMBER` | 探させる数の下限（既定 50000）。**大きいほど回答者の待ち時間も伸びる** |
 | `QUESTIONNAIRE_ALTCHA_MAX_NUMBER` | 探させる数の上限（既定 150000） |
+| `QUESTIONNAIRE_LOGIN_PROOF_OF_WORK` | `true` で管理画面のパスワードログインと招待受取へ proof-of-work を課す（既定 `false`） |
 | `QUESTIONNAIRE_ATTACHMENT_*` | 添付の許可拡張子・サイズ・個数の上限 |
 | `QUESTIONNAIRE_VIRUSSCAN_*` | ウイルススキャン（**既定は無効**） |
 

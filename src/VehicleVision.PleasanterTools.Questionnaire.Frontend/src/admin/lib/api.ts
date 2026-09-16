@@ -1,5 +1,6 @@
 import { acceptLanguageHeader, t } from './i18n/state.svelte';
 import type { NoteBlock } from '../../lib/types';
+import type { AltchaChallenge } from '../../lib/altcha';
 import type {
   AdminNotificationPage,
   AdminSession,
@@ -100,8 +101,20 @@ export const getApplicationVersion = () =>
 export const setupFirstAdministrator = (loginId: string, password: string) =>
   call<{ next: string }>('/api/admin/setup', { method: 'POST', json: { loginId, password } });
 
-export const login = (loginId: string, password: string) =>
-  call<{ next: string }>('/api/admin/login', { method: 'POST', json: { loginId, password } });
+export const getAdminCaptchaChallenge = () =>
+  call<AltchaChallenge>('/api/admin/captcha/challenge');
+
+export const login = (loginId: string, password: string, altcha?: string) =>
+  call<{ next: string }>('/api/admin/login', {
+    method: 'POST',
+    json: { loginId, password, altcha },
+  });
+
+export const acceptInvitation = (token: string, password: string, altcha?: string) =>
+  call<{ next: string }>('/api/admin/invitations/accept', {
+    method: 'POST',
+    json: { token, password, altcha },
+  });
 
 export const verifyTotp = (code: string) =>
   call<{ authenticated: boolean }>('/api/admin/login/totp', { method: 'POST', json: { code } });

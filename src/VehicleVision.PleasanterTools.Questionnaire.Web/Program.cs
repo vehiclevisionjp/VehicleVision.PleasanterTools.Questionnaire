@@ -155,6 +155,7 @@ builder.Services.AddSingleton(serviceProvider => new AltchaGuard(
         ?? throw new InvalidOperationException("QUESTIONNAIRE_SECRET_KEY が設定されていない"),
     serviceProvider.GetRequiredService<AltchaOptions>(),
     serviceProvider.GetRequiredService<IAltchaChallengeStore>()));
+builder.Services.AddSingleton(AdminCaptchaOptions.FromConfiguration(builder.Configuration));
 
 builder.Services.AddSingleton(pleasanterOptions);
 builder.Services.AddSingleton(new PleasanterDateTime(pleasanterOptions.ApiKeyUserTimeZoneId));

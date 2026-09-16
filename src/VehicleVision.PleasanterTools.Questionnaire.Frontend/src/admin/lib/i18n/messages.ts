@@ -56,6 +56,11 @@ export const ja = {
   'signIn.recoveryLabel': '復旧コード',
   'signIn.useRecovery': '認証アプリが使えない場合（復旧コードでログイン）',
   'signIn.useTotp': '認証アプリでログイン',
+  'signIn.captchaFailed': '確認用の計算を完了できませんでした。もう一度お試しください。',
+  'invitation.title': '管理者の招待を受け取る',
+  'invitation.lead': '管理画面で使うパスワードを決めてください。',
+  'invitation.accept': '招待を受け取る',
+  'invitation.accepting': '確認しています…',
   // ---- SAML（Issue #166）------------------------------------------------------
   // ---- 管理者の管理（Issue #156）----------------------------------------------
   'users.open': '管理者',
@@ -887,6 +892,11 @@ export const en: Record<MessageKey, string> = {
   'signIn.recoveryLabel': 'Recovery code',
   'signIn.useRecovery': 'I cannot use my authenticator (use a recovery code)',
   'signIn.useTotp': 'Use my authenticator',
+  'signIn.captchaFailed': 'Could not complete the verification. Please try again.',
+  'invitation.title': 'Accept administrator invitation',
+  'invitation.lead': 'Choose the password you will use for administration.',
+  'invitation.accept': 'Accept invitation',
+  'invitation.accepting': 'Checking…',
   'users.open': 'Administrators',
   'users.title': 'Manage administrators',
   'users.lead':
