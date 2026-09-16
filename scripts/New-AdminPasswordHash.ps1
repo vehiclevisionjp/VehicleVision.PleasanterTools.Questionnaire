@@ -12,10 +12,18 @@ Use this only to recover from a lockout where no administrator can sign in.
 See _documents/管理者の棚卸し-運用手順書.md.
 
 .PARAMETER Password
-The new password. Omit to be prompted without echoing the value.
+The new password, as a SecureString. Omit to be prompted without echoing the value.
 
 .EXAMPLE
 .\New-AdminPasswordHash.ps1
+
+.EXAMPLE
+# Non-interactive. Read the password from a secret store, never from a literal.
+.\New-AdminPasswordHash.ps1 -Password (Get-Secret 'questionnaire-admin')
+
+.EXAMPLE
+# Last resort for a one-off run. The literal stays in shell history.
+.\New-AdminPasswordHash.ps1 -Password (ConvertTo-SecureString 'P@ssw0rd!' -AsPlainText -Force)
 #>
 [CmdletBinding()]
 param(
