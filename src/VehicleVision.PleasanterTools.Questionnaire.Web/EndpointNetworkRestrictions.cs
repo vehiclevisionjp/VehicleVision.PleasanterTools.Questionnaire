@@ -11,7 +11,7 @@ public sealed class EndpointNetworkRestrictions
     /// <summary>監視 API を許すネットワークの設定。</summary>
     public const string MonitoringSetting = "QUESTIONNAIRE_MONITORING_NETWORKS";
 
-    /// <summary>OpenAPI 文書を許すネットワークの設定。</summary>
+    /// <summary>OpenAPI 文書と API リファレンス画面を許すネットワークの設定。</summary>
     public const string OpenApiSetting = "QUESTIONNAIRE_OPENAPI_NETWORKS";
 
     /// <summary>生存確認の設定を引き継ぐ値。</summary>
@@ -95,7 +95,8 @@ public sealed class EndpointNetworkRestrictions
             StringComparison.OrdinalIgnoreCase);
 
     private static bool IsOpenApiPath(PathString path) =>
-        path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase);
+        path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>生存確認と監視 API の送信元を絞るパイプライン。</summary>

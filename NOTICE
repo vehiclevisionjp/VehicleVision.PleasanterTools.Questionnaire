@@ -32,6 +32,9 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.Hosting.Abstractions 10.0.11 / MIT
   Microsoft.Extensions.Logging.Abstractions 10.0.11 / MIT
   Microsoft.AspNetCore.OpenApi 10.0.12 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.OpenApi
+  Scalar.AspNetCore 2.17.4 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.17.4
+    （OpenAPI 文書を読む画面。画面本体は埋め込みアセットで同梱し、CDN の既定フォントと
+      利用状況テレメトリーは無効化する）
   Jint 4.16.2 / BSD-2-Clause / https://github.com/sebastienros/jint
     （変換スクリプトの実行エンジン。Acornima などを推移的に伴う）
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
