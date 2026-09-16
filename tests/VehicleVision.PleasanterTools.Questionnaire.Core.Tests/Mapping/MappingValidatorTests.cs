@@ -288,4 +288,57 @@ public class MappingValidatorTests
 
         Assert.Empty(MappingValidator.Validate(new MappingDefinition(), definition));
     }
+
+    [Theory]
+    [InlineData(QuestionType.Text)]
+    [InlineData(QuestionType.Paragraph)]
+    [InlineData(QuestionType.Radio)]
+    [InlineData(QuestionType.Checkbox)]
+    [InlineData(QuestionType.Date)]
+    [InlineData(QuestionType.Scale)]
+    public void どの設問からでも文字列の列へ割り当てられる(QuestionType type)
+    {
+        // ⚠️ **文字列はどの設問からでも作れる。** ここを弾くと
+        // Title と Body へ何も割り当てられない（Issue #246）
+        var definition = Definition("q1") with
+        {
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = type,
+                            Title = LocalizedText.Japanese("q1"),
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var problems = MappingValidator.Validate(
+            Mapping(ColumnAssignment.Direct("Body", new MappingSource("q1", QuestionPort.Value))),
+            definition,
+            targetValueKind: _ => MappingTargetValueKind.String);
+
+        Assert.DoesNotContain(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Fact]
+    public void 自由記述は整数の列へは割り当てられない()
+    {
+        // **数値や日時は変換に失敗し得る。** そちらの検査は効いたままであること
+        var problems = MappingValidator.Validate(
+            Mapping(ColumnAssignment.Direct("Status", new MappingSource("q1", QuestionPort.Value))),
+            Definition("q1"),
+            targetValueKind: _ => MappingTargetValueKind.Integer);
+
+        Assert.Contains(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
 }
