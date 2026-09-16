@@ -39,6 +39,18 @@ public sealed class SurveyAssetStorageTests : IDisposable
     }
 
     [Fact]
+    public void AzureBlobは接続文字列なしならマネージドIDを使う()
+    {
+        var options = SurveyAssetStorageOptions.FromConfiguration(Configuration(
+            (SurveyAssetStorageOptions.StoreSetting, "AzureBlob"),
+            (SurveyAssetStorageOptions.AzureContainerUriSetting,
+                "https://storage.example.test/assets")));
+
+        Assert.Null(options.AzureConnectionString);
+        Assert.IsType<AzureBlobAssetObjectStore>(options.CreateObjectStore());
+    }
+
+    [Fact]
     public void S3互換の接続項目を読める()
     {
         var options = SurveyAssetStorageOptions.FromConfiguration(Configuration(
@@ -57,6 +69,19 @@ public sealed class SurveyAssetStorageTests : IDisposable
         Assert.Equal("ap-northeast-1", options.S3Region);
         Assert.Equal("access", options.S3AccessKey);
         Assert.Equal("secret", options.S3SecretKey);
+    }
+
+    [Fact]
+    public void S3はアクセスキーなしなら既定の資格情報探索を使う()
+    {
+        var options = SurveyAssetStorageOptions.FromConfiguration(Configuration(
+            (SurveyAssetStorageOptions.StoreSetting, "S3"),
+            (SurveyAssetStorageOptions.S3BucketSetting, "survey-assets"),
+            (SurveyAssetStorageOptions.S3RegionSetting, "ap-northeast-1")));
+
+        Assert.Null(options.S3AccessKey);
+        Assert.Null(options.S3SecretKey);
+        Assert.IsType<S3AssetObjectStore>(options.CreateObjectStore());
     }
 
     [Fact]

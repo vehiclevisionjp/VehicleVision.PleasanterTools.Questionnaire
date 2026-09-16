@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -65,13 +66,23 @@ public class AttachmentScanEndToEndTests
         ],
     };
 
-    private static MultipartFormDataContent Multipart(string fileName, string content)
+    private static MultipartFormDataContent Multipart(
+        string fileName,
+        string content,
+        string ticket,
+        string altcha)
     {
         var form = new MultipartFormDataContent
         {
             {
                 new StringContent(
-                    JsonSerializer.Serialize(new { answers = Array.Empty<object>() }),
+                    JsonSerializer.Serialize(new
+                    {
+                        answers = Array.Empty<object>(),
+                        ticket,
+                        trap = string.Empty,
+                        altcha,
+                    }),
                     Encoding.UTF8,
                     "application/json"),
                 "answers"
@@ -82,8 +93,19 @@ public class AttachmentScanEndToEndTests
         return form;
     }
 
-    private static string NewToken() => Convert.ToHexStringLower(
-        Guid.NewGuid().ToByteArray().Concat(Guid.NewGuid().ToByteArray().Take(8)).ToArray());
+    private static async Task<(string ResponseToken, string Ticket, string Altcha)> IssueTicketAsync(
+        HttpClient http,
+        string publicId)
+    {
+        using var response = await http.PostAsJsonAsync(
+            $"/api/forms/{publicId}/ticket", new { });
+        response.EnsureSuccessStatusCode();
+        var body = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
+        return (
+            body["responseToken"]!.GetValue<string>(),
+            body["ticket"]!.GetValue<string>(),
+            AltchaSolver.Solve(body));
+    }
 
     [Fact]
     public async Task 検体は弾かれ無害なファイルは通る()
@@ -103,8 +125,13 @@ public class AttachmentScanEndToEndTests
         await surveys.PublishAsync(surveyId, 1, Definition(), new MappingDefinition(), null);
 
         using var http = new HttpClient { BaseAddress = new Uri(BaseUrl) };
-        var cleanToken = NewToken();
-        var infectedToken = NewToken();
+        var (cleanToken, cleanTicket, cleanAltcha) = await IssueTicketAsync(http, publicId);
+        var (infectedToken, infectedTicket, infectedAltcha) =
+            await IssueTicketAsync(http, publicId);
+
+        // **送信チケットには人が入力するための最短時間がある。**
+        // 待たないとウイルス検査へ届く前に bot として拒否される
+        await Task.Delay(TimeSpan.FromSeconds(4));
 
         try
         {
@@ -112,14 +139,14 @@ public class AttachmentScanEndToEndTests
             // 拡張子や先頭バイトの検査ではなく、スキャナが効いていることを見たい
             using (var clean = await http.PutAsync(
                 $"/api/forms/{publicId}/responses/{cleanToken}",
-                Multipart("readme.txt", "これは無害なファイルです。")))
+                Multipart("readme.txt", "これは無害なファイルです。", cleanTicket, cleanAltcha)))
             {
                 Assert.Equal(HttpStatusCode.Accepted, clean.StatusCode);
             }
 
             using (var infected = await http.PutAsync(
                 $"/api/forms/{publicId}/responses/{infectedToken}",
-                Multipart("readme.txt", EicarText)))
+                Multipart("readme.txt", EicarText, infectedTicket, infectedAltcha)))
             {
                 Assert.Equal(HttpStatusCode.UnprocessableEntity, infected.StatusCode);
 

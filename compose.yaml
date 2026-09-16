@@ -11,6 +11,7 @@
 #   PostgreSQL で動かす:  docker compose --profile postgres  up -d --wait
 #   MySQL で動かす:       docker compose --profile mysql     up -d --wait
 #   ウイルススキャンも:   docker compose --profile postgres --profile clamav up -d --wait
+#   外部ストアの検証:     docker compose --profile sqlserver --profile azurite --profile minio --profile valkey up -d --wait
 #   後片付け:             docker compose --profile "*" down -v
 #
 # Pleasanter（db / codedefiner / pleasanter）は profile を持たないので常に起動する。
@@ -103,6 +104,19 @@ x-app-environment: &app-environment
     QUESTIONNAIRE_VIRUSSCAN_ENABLED: ${DEV_VIRUSSCAN_ENABLED:-false}
     QUESTIONNAIRE_VIRUSSCAN_HOST: clamav
     QUESTIONNAIRE_VIRUSSCAN_PORT: "3310"
+    # ---- 外部ストア（Issue #271 / #299）-------------------------------------
+    # **既定はどちらも DB。** 対応する profile を起こしただけでは切り替えない
+    QUESTIONNAIRE_ASSET_STORE: ${DEV_ASSET_STORE:-Database}
+    QUESTIONNAIRE_ASSET_AZURE_CONNECTIONSTRING: ${DEV_ASSET_AZURE_CONNECTIONSTRING:-DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;}
+    QUESTIONNAIRE_ASSET_AZURE_CONTAINERNAME: ${DEV_ASSET_AZURE_CONTAINERNAME:-survey-assets}
+    QUESTIONNAIRE_ASSET_S3_BUCKET: ${DEV_ASSET_S3_BUCKET:-survey-assets}
+    QUESTIONNAIRE_ASSET_S3_SERVICEURL: ${DEV_ASSET_S3_SERVICEURL:-http://minio:9000}
+    QUESTIONNAIRE_ASSET_S3_FORCEPATHSTYLE: ${DEV_ASSET_S3_FORCEPATHSTYLE:-true}
+    QUESTIONNAIRE_ASSET_S3_REGION: ${DEV_ASSET_S3_REGION:-us-east-1}
+    QUESTIONNAIRE_ASSET_S3_ACCESSKEY: ${DEV_ASSET_S3_ACCESSKEY:-questionnaire}
+    QUESTIONNAIRE_ASSET_S3_SECRETKEY: ${DEV_ASSET_S3_SECRETKEY:-Questionnaire#Minio1}
+    QUESTIONNAIRE_ADMIN_SESSION_STORE: ${DEV_ADMIN_SESSION_STORE:-Database}
+    QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING: ${DEV_ADMIN_SESSION_REDIS_CONNECTIONSTRING:-valkey:6379}
     # **埋め込みを許す配信元**（Issue #104 / #107）。**製品の既定は空。**
     # 検証環境では、許した／許していないの両方を試せるように 2 つだけ入れる
     QUESTIONNAIRE_EMBED_ALLOWEDHOSTS: ${DEV_EMBED_ALLOWEDHOSTS:-www.example.com,*.example.net}
@@ -190,6 +204,67 @@ services:
       start_period: 20s
     volumes:
       - mysql-data:/var/lib/mysql
+
+  # ---- 外部ストアの互換実装（オプション。Issue #292）-------------------------
+  # **いずれも専用 profile を付けたときだけ起動する。**
+  # アプリの既定保存先は DB のままで、DEV_ASSET_STORE /
+  # DEV_ADMIN_SESSION_STORE を明示したときだけ切り替わる。
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    profiles: ["azurite"]
+    command: azurite-blob --blobHost 0.0.0.0 --location /data
+    environment:
+      TZ: Asia/Tokyo
+    ports:
+      - "${DEV_AZURITE_BLOB_PORT:-10000}:10000"
+    volumes:
+      - azurite-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const s=require('net').connect(10000,'127.0.0.1');s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1))"
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    # **Docker Hub の配布は終了しているため、公式 README が案内する Quay を使う。**
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    profiles: ["minio"]
+    command: server /data --console-address ":9001"
+    environment:
+      TZ: Asia/Tokyo
+      # 検証環境専用の固定値。本番へ持ち込まない
+      MINIO_ROOT_USER: ${DEV_ASSET_S3_ACCESSKEY:-questionnaire}
+      MINIO_ROOT_PASSWORD: ${DEV_ASSET_S3_SECRETKEY:-Questionnaire#Minio1}
+    ports:
+      - "${DEV_MINIO_API_PORT:-19000}:9000"
+      - "${DEV_MINIO_CONSOLE_PORT:-19001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  valkey:
+    # Redis 互換プロトコルを BSD-3-Clause の実装で確かめる。
+    image: valkey/valkey:9.1.2-alpine
+    profiles: ["valkey"]
+    environment:
+      TZ: Asia/Tokyo
+    ports:
+      - "${DEV_VALKEY_PORT:-16379}:6379"
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
 
   # ---- 検証用の IdP（オプション。Issue #166）---------------------------------
   # **SAML のログインを手元で通すためだけの IdP。** 既定では起動しない。
@@ -432,6 +507,9 @@ services:
 volumes:
   postgres-data:
   mysql-data:
+  azurite-data:
+  minio-data:
+  valkey-data:
   # **自己署名の証明書の置き場**（devcert が作り、app が読む）。
   # **`down -v` で消える。** 鍵を長生きさせない
   devcert:

@@ -101,6 +101,11 @@ Copyright (C) PMC Co.,Ltd.
   Mailpit 1.31.1 / MIT / https://github.com/axllent/mailpit
     （メールの検証用の受け。SMTP を受けて溜めるだけで外へは出さない。
       **別のコンテナとして立てるだけで、成果物には含まれない**）
+  Azurite 3.37.0 / MIT / https://github.com/Azure/Azurite
+    （Azure Blob Storage の検証用。**別のコンテナとして立てるだけで、成果物には含まれない**）
+  Valkey 9.1.2 / BSD-3-Clause / https://github.com/valkey-io/valkey
+    （Redis 互換セッションストアの検証用。
+      **別のコンテナとして立てるだけで、成果物には含まれない**）
   coverlet.collector 10.0.1 / MIT
   Microsoft.Extensions.Configuration 10.0.11 / MIT
     （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
@@ -111,6 +116,19 @@ Copyright (C) PMC Co.,Ltd.
       アプリ側は net10.0 の共有フレームワークが提供するため参照しない＝NU1510）
 
 **依存を追加したら、ここへ追記してからコミットすること。**
+
+--------------------------------------------------------------------------------
+MinIO について
+--------------------------------------------------------------------------------
+
+S3 互換ストレージの結合テストでは、MinIO
+（RELEASE.2025-09-07T16-13-09Z、GNU AGPL v3）を使用できます。
+
+  https://github.com/minio/minio
+
+**MinIO は本ソフトウェアの依存や配布物へ含めず、リンクもしません。**
+開発者が `minio` profile を明示したときだけ公式コンテナを取得し、
+検証用の別プロセスとして起動します。
 
 --------------------------------------------------------------------------------
 ClamAV について
