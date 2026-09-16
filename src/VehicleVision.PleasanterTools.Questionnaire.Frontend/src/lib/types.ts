@@ -72,6 +72,14 @@ export interface QuestionSettings {
   maxLength?: number;
   placeholder?: LocalizedText;
   defaultValue?: string;
+  /** 全角の ASCII 英数字・記号を半角へ変換する。 */
+  convertFullWidthAsciiToHalfWidth?: boolean;
+  /** 半角カナを全角へ変換する。 */
+  convertHalfWidthKanaToFullWidth?: boolean;
+  /** 全角空白を半角へ変換する。 */
+  convertFullWidthSpacesToHalfWidth?: boolean;
+  /** 前後の空白を取り除く。 */
+  trimWhitespace?: boolean;
   scaleMinimum?: number;
   scaleMaximum?: number;
   scaleMinimumLabel?: LocalizedText;

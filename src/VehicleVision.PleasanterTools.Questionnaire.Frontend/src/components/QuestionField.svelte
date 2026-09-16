@@ -10,6 +10,7 @@
   } from '../lib/types';
   import type { Language } from '../lib/i18n/language';
   import { translator } from '../lib/i18n/messages';
+  import { hasAnswerNormalization, normalizeAnswer } from '../lib/answerNormalization';
   import { noteBlocks } from '../lib/note';
   import NoteContent from './NoteContent.svelte';
   import EmbedBlock from './EmbedBlock.svelte';
@@ -39,6 +40,10 @@
 
   function setSingle(value: string) {
     answer = { ...current, values: value === '' ? [] : [value] };
+  }
+
+  function normalizeSingle() {
+    setSingle(normalizeAnswer(current.values[0] ?? '', question.settings));
   }
 
   function toggleMultiple(value: string, checked: boolean) {
@@ -179,6 +184,10 @@
       ? noteBlocks(question.descriptionBlocks, language)
       : [],
   );
+
+  const normalizationNotice = $derived(
+    hasAnswerNormalization(question.settings) ? t('question.normalizationNotice') : '',
+  );
 </script>
 
 <!-- 説明文ブロックは回答を持たない -->
@@ -237,27 +246,43 @@
       <p class="description">{selectionLimits}</p>
     {/if}
 
+    {#if normalizationNotice !== ''}
+      <p class="description" id={`normalization-${question.questionId}`}>{normalizationNotice}</p>
+    {/if}
+
     {#if question.type === 'Text'}
       <input
         type="text"
         aria-labelledby={labelId}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={[
+          normalizationNotice !== '' ? `normalization-${question.questionId}` : '',
+          error ? errorId : '',
+        ]
+          .filter(Boolean)
+          .join(' ') || undefined}
         aria-invalid={error !== undefined}
         maxlength={question.settings.maxLength}
         placeholder={text(question.settings.placeholder, language)}
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}
+        onblur={normalizeSingle}
       />
     {:else if question.type === 'Paragraph'}
       <textarea
         rows="4"
         aria-labelledby={labelId}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={[
+          normalizationNotice !== '' ? `normalization-${question.questionId}` : '',
+          error ? errorId : '',
+        ]
+          .filter(Boolean)
+          .join(' ') || undefined}
         aria-invalid={error !== undefined}
         maxlength={question.settings.maxLength}
         placeholder={text(question.settings.placeholder, language)}
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}
+        onblur={normalizeSingle}
       ></textarea>
     {:else if question.type === 'Radio'}
       {#each question.choices as choice (choice.value)}

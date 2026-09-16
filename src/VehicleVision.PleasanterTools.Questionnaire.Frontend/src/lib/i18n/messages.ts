@@ -91,6 +91,7 @@ export const ja = {
   'question.selectionRange': '{minimum} 個以上 {maximum} 個以下で選んでください',
   'question.selectionMinimum': '{minimum} 個以上選んでください',
   'question.selectionMaximum': '{maximum} 個まで選べます',
+  'question.normalizationNotice': '入力後、設定に従って文字の全角・半角や前後の空白を自動で変換します。',
 
   // ---- 送信できなかった -----------------------------------------------------
   'submit.tooManyRequests': '送信が混み合っています。少し時間を置いてもう一度お試しください。',
@@ -232,6 +233,8 @@ export const en: Record<MessageKey, string> = {
   'question.selectionRange': 'Choose between {minimum} and {maximum} options',
   'question.selectionMinimum': 'Choose at least {minimum} options',
   'question.selectionMaximum': 'Choose up to {maximum} options',
+  'question.normalizationNotice':
+    'After entry, character width and surrounding whitespace are converted automatically as configured.',
 
   'submit.tooManyRequests': 'The service is busy. Please wait a moment and submit again.',
   'submit.rejected': 'Your response was not accepted. Please press "Submit" again.',

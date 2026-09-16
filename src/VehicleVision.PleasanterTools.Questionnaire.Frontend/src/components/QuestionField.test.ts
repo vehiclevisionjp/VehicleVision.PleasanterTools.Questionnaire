@@ -87,3 +87,36 @@ describe('設問の説明文', () => {
     );
   });
 });
+
+describe('回答の自動変換', () => {
+  it('有効な設問では回答者へ自動変換を伝える', () => {
+    const question: Question = {
+      ...confirmQuestion(),
+      type: 'Text',
+      title: { ja: '郵便番号' },
+      settings: { convertFullWidthAsciiToHalfWidth: true },
+    };
+
+    const { body } = render(QuestionField, {
+      props: { question, language: 'ja', answer: { values: [], otherText: '' } },
+    });
+
+    expect(body).toContain('自動で変換します');
+    expect(body).toContain('aria-describedby="normalization-confirm1"');
+  });
+
+  it('無効な設問では自動変換の案内を出さない', () => {
+    const question: Question = {
+      ...confirmQuestion(),
+      type: 'Text',
+      title: { ja: '氏名' },
+      settings: {},
+    };
+
+    const { body } = render(QuestionField, {
+      props: { question, language: 'ja', answer: { values: [], otherText: '' } },
+    });
+
+    expect(body).not.toContain('自動で変換します');
+  });
+});
