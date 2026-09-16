@@ -34,6 +34,7 @@ public sealed record SurveyDraft(
 /// <param name="AllowDraft">
 /// 回答の下書きを端末へ残すか（Issue #59）。**既定は無効。**
 /// </param>
+/// <param name="ArchivedAt">アーカイブした時刻（UTC）。アーカイブしていなければ <c>null</c>。</param>
 public sealed record SurveySummary(
     Guid SurveyId,
     string PublicId,
@@ -48,7 +49,8 @@ public sealed record SurveySummary(
     int ResponseCount = 0,
     bool RequireProofOfWork = true,
     bool AllowDraft = false,
-    int TestResponseCount = 0);
+    int TestResponseCount = 0,
+    DateTime? ArchivedAt = null);
 
 /// <summary>複製で作るアンケートの、**写さない値**（Issue #46）。</summary>
 /// <param name="SurveyId">複製先の内部 ID。</param>
@@ -101,6 +103,7 @@ public sealed record SurveyTemplateTarget(
 /// <param name="Offset">読み飛ばす件数。</param>
 /// <param name="TitleContains">題名の部分一致。空白だけなら効かせない。</param>
 /// <param name="Status">状態の一致。指定が無ければ全部。</param>
+/// <param name="IncludeArchived">アーカイブ済みも含めるか。既定では含めない。</param>
 public sealed record SurveyListQuery
 {
     public int Limit { get; init; } = 50;
@@ -110,6 +113,8 @@ public sealed record SurveyListQuery
     public string? TitleContains { get; init; }
 
     public SurveyStatus? Status { get; init; }
+
+    public bool IncludeArchived { get; init; }
 }
 
 /// <summary>下書きが、読んだ後に他の人に書き換えられていた。</summary>
@@ -260,6 +265,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         int Port,
         string? RowId);
 
+    private sealed record CopySourceRow(bool IsTemplate, DateTime? ArchivedAt);
+
     /// <summary>複製で写すヘッダ画像の 1 行。</summary>
     private sealed record AssetRow(
         string ContentType, string FileName, long ByteSize, string ContentBase64);
@@ -303,6 +310,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         public long TestResponseCount { get; set; }
 
         public DateTime UpdatedAt { get; set; }
+
+        public DateTime? ArchivedAt { get; set; }
     }
 
     public async Task<IReadOnlyList<SurveySummary>> ListAsync(
@@ -322,6 +331,11 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         parameters.Add("IsTestResponse", true);
         parameters.Add("Limit", query.Limit);
         parameters.Add("Offset", query.Offset);
+
+        if (!query.IncludeArchived)
+        {
+            conditions.Add("s.[ArchivedAt] IS NULL");
+        }
 
         if (!string.IsNullOrWhiteSpace(query.TitleContains))
         {
@@ -351,7 +365,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         // 1 本だけではページの境目で行が重複したり抜けたりする
         var rows = await connection.QueryAsync<SummaryRow>(Sql(
             "SELECT s.[SurveyId], s.[PublicId], s.[Title], s.[PleasanterSiteId], "
-            + "       s.[Status], s.[PublishedVersion], s.[UpdatedAt], "
+            + "       s.[Status], s.[PublishedVersion], s.[UpdatedAt], s.[ArchivedAt], "
             + "       s.[SuspendedReason], s.[SuspendedAt], s.[ResponseLimit], "
             + "       s.[RequireProofOfWork], s.[AllowDraft], "
             + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
@@ -381,7 +395,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 (int)row.ResponseCount,
                 row.RequireProofOfWork,
                 row.AllowDraft,
-                (int)row.TestResponseCount)),
+                (int)row.TestResponseCount,
+                row.ArchivedAt)),
         ];
     }
 
@@ -771,13 +786,15 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         // **同じトランザクションの中で読む。** 読んでから書くまでの間に
         // 元が保存されると、写した先が新旧の混ざったものになる。
         // **種類が食い違ったら何もしない**（アンケートとテンプレートの取り違え）
-        var actualIsTemplate = await connection.QueryFirstOrDefaultAsync<bool?>(Sql(
-            "SELECT [IsTemplate] FROM [Surveys] WHERE [SurveyId] = @SurveyId",
+        var sourceRow = await connection.QueryFirstOrDefaultAsync<CopySourceRow>(Sql(
+            "SELECT [IsTemplate], [ArchivedAt] FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = sourceSurveyId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        if (actualIsTemplate != sourceIsTemplate)
+        if (sourceRow is null
+            || sourceRow.IsTemplate != sourceIsTemplate
+            || (!sourceIsTemplate && sourceRow.ArchivedAt is not null))
         {
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             return false;

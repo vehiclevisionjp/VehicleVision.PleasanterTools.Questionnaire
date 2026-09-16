@@ -460,6 +460,8 @@ export interface SurveySummary {
   responseCount: number;
   /** テスト公開中に受け付けた回答の件数。 */
   testResponseCount: number;
+  /** アーカイブした時刻。**無ければ通常のアンケート。** */
+  archivedAt?: string | null;
 }
 
 /**
@@ -480,7 +482,8 @@ export interface SurveyPage {
  * 状態を見ないと下書きの URL を誤って出してしまう。
  */
 export function isPublished(survey: SurveySummary): boolean {
-  return survey.status === 1 || survey.status === 2 || survey.status === 3;
+  return survey.archivedAt == null
+    && (survey.status === 1 || survey.status === 2 || survey.status === 3);
 }
 
 /**

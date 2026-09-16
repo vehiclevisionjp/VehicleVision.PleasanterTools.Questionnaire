@@ -167,6 +167,34 @@ public class ResponseLimitStoreTests
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public async Task アーカイブ済みの行を回答上限で止めない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var surveys = new SurveyRepository(Create(provider, connectionString));
+        var surveyId = Guid.NewGuid();
+        var archivedAt = DbTime.UtcNowTruncated();
+
+        await surveys.SaveAsync(
+            Published(surveyId, responseLimit: 1) with { ArchivedAt = archivedAt });
+
+        Assert.False(await surveys.SuspendForResponseLimitAsync(surveyId));
+
+        var record = await surveys.FindBySurveyIdAsync(surveyId);
+        Assert.NotNull(record);
+        Assert.Equal((int)SurveyStatus.Published, record.Status);
+        Assert.Equal(archivedAt, record.ArchivedAt);
+        Assert.Null(record.SuspendedReason);
+        Assert.Null(record.SuspendedAt);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public async Task 下書きへ戻した行を自動停止で止めない(
         DatabaseProvider provider,
         string connectionString)

@@ -71,7 +71,8 @@ public static class AdminSurveyEndpoints
             int? limit = null,
             int? offset = null,
             string? title = null,
-            int? status = null) =>
+            int? status = null,
+            bool includeArchived = false) =>
         {
             var take = Math.Clamp(limit ?? DefaultListLimit, 1, MaxListLimit);
 
@@ -89,6 +90,7 @@ public static class AdminSurveyEndpoints
                     Offset = Math.Max(offset ?? 0, 0),
                     TitleContains = title,
                     Status = status is { } known ? (SurveyStatus)known : null,
+                    IncludeArchived = includeArchived,
                 },
                 cancellationToken).ConfigureAwait(false);
 
@@ -165,6 +167,11 @@ public static class AdminSurveyEndpoints
                 return Results.NotFound();
             }
 
+            if (source.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
             // **テンプレートは複製の口から作らせない**（Issue #58）。
             // テンプレートはサイトを持たず、題名に「のコピー」も付けたくない。
             // 専用の口（`AdminTemplateEndpoints`）を通させる
@@ -223,6 +230,7 @@ public static class AdminSurveyEndpoints
         // 問い合わせると、編集画面が外部サービスの遅延と可用性に引きずられる。
         group.MapGet("/{surveyId:guid}/column-availability", async (
             Guid surveyId,
+            HttpContext context,
             ISurveyRepository surveys,
             PleasanterApiClient pleasanter,
             CancellationToken cancellationToken) =>
@@ -232,6 +240,11 @@ public static class AdminSurveyEndpoints
             if (survey is null)
             {
                 return Results.NotFound();
+            }
+
+            if (survey.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
             }
 
             var response = await pleasanter.GetSiteAsync(survey.PleasanterSiteId, cancellationToken)
@@ -253,9 +266,22 @@ public static class AdminSurveyEndpoints
             SaveDraftRequest request,
             HttpContext context,
             ISurveyDraftStore drafts,
+            ISurveyRepository surveys,
             EmbedOptions embeds,
             CancellationToken cancellationToken) =>
         {
+            var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (record is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (record.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
             if (request.Definition is null || request.Mapping is null)
             {
                 return Results.BadRequest(new
@@ -485,6 +511,11 @@ public static class AdminSurveyEndpoints
                 return Results.NotFound();
             }
 
+            if (beforePublish.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
             if (beforePublish.Status != (int)SurveyStatus.Draft)
             {
                 return Results.BadRequest(new
@@ -643,6 +674,11 @@ public static class AdminSurveyEndpoints
                 return Results.NotFound();
             }
 
+            if (record.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
             if (record.Status != (int)SurveyStatus.TestPublished
                 || record.PublishedVersion is null)
             {
@@ -676,6 +712,11 @@ public static class AdminSurveyEndpoints
             if (record is null)
             {
                 return Results.NotFound();
+            }
+
+            if (record.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
             }
 
             if (record.Status != (int)SurveyStatus.TestPublished)
@@ -717,6 +758,11 @@ public static class AdminSurveyEndpoints
 
             var before = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
                 .ConfigureAwait(false);
+            if (before?.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
             var result = await surveys.UpdatePleasanterSiteIdAsync(
                 surveyId, request.PleasanterSiteId, cancellationToken).ConfigureAwait(false);
 
@@ -812,6 +858,11 @@ public static class AdminSurveyEndpoints
                 return Results.NotFound();
             }
 
+            if (record.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
             // **指定が無ければ今の値のまま**（Issue #66）。
             // `bool` で受けて既定値の `false` を書き込むと、
             // **項目を知らない相手が保存しただけで proof-of-work が黙って外れる**
@@ -861,8 +912,76 @@ public static class AdminSurveyEndpoints
                 surveyId, SurveyStatus.Published, context, surveys, tokens, cancellationToken))
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
+        // ---- アーカイブと復元 ------------------------------------------------
+        group.MapPost("/{surveyId:guid}/archive", (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            CancellationToken cancellationToken) =>
+            ChangeArchiveAsync(surveyId, archive: true, context, surveys, cancellationToken))
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+
+        group.MapPost("/{surveyId:guid}/restore", (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            CancellationToken cancellationToken) =>
+            ChangeArchiveAsync(surveyId, archive: false, context, surveys, cancellationToken))
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+
         return builder;
     }
+
+    private static async Task<IResult> ChangeArchiveAsync(
+        Guid surveyId,
+        bool archive,
+        HttpContext context,
+        ISurveyRepository surveys,
+        CancellationToken cancellationToken)
+    {
+        var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+            .ConfigureAwait(false);
+        if (record is null)
+        {
+            return Results.NotFound();
+        }
+
+        // **テンプレートは別の一覧と削除の仕組みを持つ。**
+        // アーカイブを混ぜると、テンプレート一覧から戻す口が無くなる。
+        if (record.IsTemplate)
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.SurveyIsTemplate, RequestLanguage.Of(context)),
+            });
+        }
+
+        if (archive == (record.ArchivedAt is not null))
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.InvalidArchiveState, RequestLanguage.Of(context)),
+            });
+        }
+
+        var archivedAt = archive ? DbTime.UtcNowTruncated() : (DateTime?)null;
+        await surveys.SaveAsync(record with { ArchivedAt = archivedAt }, cancellationToken)
+            .ConfigureAwait(false);
+
+        AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+        AuditNotes.Add(context, "archive", archive ? "true" : "false");
+
+        return Results.Ok(new { archivedAt });
+    }
+
+    private static IResult ArchivedSurvey(HttpContext context) =>
+        Results.Conflict(new
+        {
+            message = ServerMessages.Get(
+                ServerMessageKeys.SurveyArchived, RequestLanguage.Of(context)),
+        });
 
     /// <summary>停止と再開。**理由を必ず書き換える。**</summary>
     /// <remarks>
@@ -882,6 +1001,11 @@ public static class AdminSurveyEndpoints
         if (record is null)
         {
             return Results.NotFound();
+        }
+
+        if (record.ArchivedAt is not null)
+        {
+            return ArchivedSurvey(context);
         }
 
         // **テンプレートには状態が無い**（Issue #58）。公開しないので止める対象でもない
