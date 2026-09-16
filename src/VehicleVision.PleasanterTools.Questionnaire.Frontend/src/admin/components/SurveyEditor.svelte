@@ -47,9 +47,11 @@
     /** サーバ側でメールを送れる状態か（Issue #189）。**自動返信の欄で知らせる。** */
     mailEnabled: boolean;
     onback: () => void;
+    onbreadcrumbchange: (title: string | null) => void;
+    onnavigationguardchange: (guard: (() => boolean) | null) => void;
   }
 
-  let { surveyId, mailEnabled, onback }: Props = $props();
+  let { surveyId, mailEnabled, onback, onbreadcrumbchange, onnavigationguardchange }: Props = $props();
 
   /**
     * 入力欄が書き込む言語。
@@ -63,6 +65,7 @@
   let editing = $state<Language>(language());
 
   let definition = $state<SurveyDefinition>();
+  let savedDefinition = $state<SurveyDefinition>();
 
   /** プレビューを開いているか。**保存前の下書きをそのまま見る。** */
   let previewing = $state(false);
@@ -92,6 +95,7 @@
     };
   });
   let mapping = $state<MappingDefinition>({ assignments: [] });
+  let savedMapping = $state<MappingDefinition>({ assignments: [] });
   let revision = $state(0);
   let columnAvailability = $state<ColumnAvailabilityResponse>({
     source: 'standard',
@@ -109,6 +113,23 @@
   let publishFlow = $state<FlowProblem[]>([]);
 
   const allQuestions = $derived(definition?.pages.flatMap((page) => page.questions) ?? []);
+  const hasUnsavedChanges = $derived(
+    definition !== undefined &&
+      (JSON.stringify(definition) !== JSON.stringify(savedDefinition) ||
+        JSON.stringify(mapping) !== JSON.stringify(savedMapping)),
+  );
+  const breadcrumbTitle = $derived(
+    definition ? displayText(definition.title, language()) || null : null,
+  );
+
+  $effect(() => {
+    onbreadcrumbchange(breadcrumbTitle);
+  });
+
+  $effect(() => {
+    onnavigationguardchange(confirmDiscardChanges);
+    return () => onnavigationguardchange(null);
+  });
 
   /**
    * 編集中の分岐の不備。
@@ -155,7 +176,9 @@
 
     error = '';
     definition = result.value.definition;
+    savedDefinition = result.value.definition;
     mapping = result.value.mapping;
+    savedMapping = result.value.mapping;
     revision = result.value.revision;
     await refreshColumnAvailability(id);
   }
@@ -278,7 +301,19 @@
     }
 
     revision = result.value.revision;
+    savedDefinition = definition;
+    savedMapping = mapping;
     notice = t('editor.saved');
+  }
+
+  function confirmDiscardChanges(): boolean {
+    return !hasUnsavedChanges || confirm(t('editor.confirmDiscardChanges'));
+  }
+
+  function back() {
+    if (confirmDiscardChanges()) {
+      onback();
+    }
   }
 
   async function doPublish() {
@@ -402,7 +437,7 @@
 </script>
 
 <header class="bar">
-  <button type="button" class="link" onclick={onback}>{t('editor.back')}</button>
+  <button type="button" class="link" onclick={back}>{t('editor.back')}</button>
 
   <div class="right">
     <span class="revision">{t('editor.revision', { revision })}</span>
