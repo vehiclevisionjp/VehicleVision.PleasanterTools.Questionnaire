@@ -432,6 +432,14 @@ var requestPermitLimit = int.TryParse(
     ? configuredRequests
     : 60;
 
+// **アンケート 1 本あたりの枠。** 他の枠と同じく検証環境でだけ緩められるようにする。
+// ⚠️ **`publicId` を持たない要求は 1 つの枠にまとめて数えられる**ので、
+// これは実質「回答画面以外すべての合計」の上限にもなる（Issue #311）
+var formPermitLimit = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_FORM_REQUESTS_PER_MIN"], out var configuredForm)
+    ? configuredForm
+    : 600;
+
 builder.Services
     .AddAuthentication(AdminAuthSchemes.Session)
     .AddCookie(AdminAuthSchemes.Session, options =>
@@ -599,7 +607,7 @@ builder.Services
             return RateLimitPartitions.FixedWindow(
                 publicId ?? "none",
                 "survey",
-                600,
+                formPermitLimit,
                 TimeSpan.FromMinutes(1),
                 // publicId の無いヘルスチェックや管理 API を全 Pod 共通の 1 枠へ集めない。
                 publicId is null ? null : sharedRateLimits,
