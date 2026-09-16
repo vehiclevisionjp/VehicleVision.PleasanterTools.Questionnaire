@@ -17,6 +17,7 @@ import type {
   SurveyDraft,
   SurveyPage,
   SurveyTemplateSummary,
+  SamlSettings,
 } from './types';
 
 /**
@@ -235,6 +236,23 @@ export const saveLanguage = (language: string | null) =>
   call<{ language: string | null }>('/api/admin/me/language', {
     method: 'PUT',
     json: { language },
+  });
+
+// ---- SAML 設定（Issue #254）-------------------------------------------------
+
+export const getSamlSettings = () =>
+  call<SamlSettings>('/api/admin/saml/settings');
+
+export const saveSamlSettings = (settings: SamlSettings) =>
+  call<SamlSettings>('/api/admin/saml/settings', {
+    method: 'PUT',
+    json: settings,
+  });
+
+export const testSamlMetadata = (metadataUrl: string) =>
+  call<{ reachable: boolean; entityId?: string | null }>('/api/admin/saml/settings/test', {
+    method: 'POST',
+    json: { metadataUrl },
   });
 
 // ---- アンケート -------------------------------------------------------------

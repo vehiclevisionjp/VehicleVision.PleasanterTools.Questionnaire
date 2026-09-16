@@ -6,6 +6,7 @@
   import NotificationList from './components/NotificationList.svelte';
   import OutboxStatusPanel from './components/OutboxStatusPanel.svelte';
   import SignInPanel from './components/SignInPanel.svelte';
+  import SamlSettingsPanel from './components/SamlSettingsPanel.svelte';
   import SurveyEditor from './components/SurveyEditor.svelte';
   import SurveyList from './components/SurveyList.svelte';
   import {
@@ -50,6 +51,9 @@
   /** 自分のアカウントを開いているか。**これも URL に出す。**（Issue #156） */
   let openAccount = $state(readAccount());
 
+  /** SAML 設定を開いているか。**特権管理者だけに見せる。** */
+  let openSamlSettings = $state(readSamlSettings());
+
   /**
    * 未読の件数。**ヘッダのバッジに出す。**
    *
@@ -77,6 +81,7 @@
       openNotifications = readNotifications();
       openUsers = readUsers();
       openAccount = readAccount();
+      openSamlSettings = readSamlSettings();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -107,6 +112,10 @@
     return /^\/admin\/me\/?$/.test(location.pathname);
   }
 
+  function readSamlSettings(): boolean {
+    return /^\/admin\/saml-settings\/?$/.test(location.pathname);
+  }
+
   /** 画面を 1 つだけ開く。**出し分けの取りこぼしを防ぐ。** */
   function only(path: string, flags: Partial<Record<string, boolean>> = {}) {
     openSurveyId = null;
@@ -115,6 +124,7 @@
     openNotifications = false;
     openUsers = flags.users ?? false;
     openAccount = flags.account ?? false;
+    openSamlSettings = flags.samlSettings ?? false;
     history.pushState(null, '', path);
   }
 
@@ -136,6 +146,12 @@
   function openMyAccount() {
     if (navigate('/admin/me', { account: true })) {
       openAccount = true;
+    }
+  }
+
+  function openSamlSettingsPanel() {
+    if (navigate('/admin/saml-settings', { samlSettings: true })) {
+      openSamlSettings = true;
     }
   }
 
@@ -174,6 +190,7 @@
     if (openNotifications && canSeeNotifications) return 'notifications';
     if (openUsers && canSeeUsers) return 'users';
     if (openAccount) return 'account';
+    if (openSamlSettings && canManageSaml) return 'saml-settings';
     return 'surveys';
   });
 
@@ -188,6 +205,7 @@
     if (page === 'outbox') return t('breadcrumb.outbox');
     if (page === 'notifications') return t('breadcrumb.notifications');
     if (page === 'users') return t('breadcrumb.users');
+    if (page === 'saml-settings') return t('breadcrumb.samlSettings');
     return t('breadcrumb.account');
   }
 
@@ -255,6 +273,7 @@
     openNotifications = false;
     openUsers = false;
     openAccount = false;
+    openSamlSettings = false;
     unreadCount = 0;
     history.replaceState(null, '', '/admin');
     await refresh();
@@ -309,6 +328,9 @@
    */
   const canSeeUsers = $derived(can('users.read'));
 
+  /** 認証の入口を変えられるのは Administrator だけ。 */
+  const canManageSaml = $derived(can('settings.saml'));
+
   const needsEnrollment = $derived(
     session !== undefined &&
       !session.authenticated &&
@@ -362,6 +384,10 @@
         <button type="button" class="link" onclick={openUserList}>{t('users.open')}</button>
       {/if}
 
+      {#if canManageSaml}
+        <button type="button" class="link" onclick={openSamlSettingsPanel}>{t('saml.open')}</button>
+      {/if}
+
       <!-- **自分の設定は誰でも開ける。** 役割を問わない -->
       <button type="button" class="link" onclick={openMyAccount}>{t('account.open')}</button>
 
@@ -411,6 +437,8 @@
           canReset={can('users.resetTwoFactor')}
           onback={back}
         />
+      {:else if openSamlSettings && canManageSaml}
+        <SamlSettingsPanel onback={back} />
       {:else if openAccount}
         <MyAccountPanel {session} onchanged={refresh} onback={back} />
       {:else if openAuditLog && canSeeAuditLog}
