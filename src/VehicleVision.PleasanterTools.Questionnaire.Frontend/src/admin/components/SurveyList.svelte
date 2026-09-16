@@ -719,11 +719,7 @@
               {t('list.testResponseCount', { count: survey.testResponseCount })}
             </span>
             {#if survey.testResponseCount > 0}
-              <span
-                class="test-response-cleanup"
-                title={t('list.testResponseCleanup')}
-                aria-label={t('list.testResponseCleanup')}
-              >※</span>
+              <span class="test-response-cleanup" aria-hidden="true">※</span>
             {/if}
           </td>
           <td class="compact-column">
@@ -795,6 +791,14 @@
       {/each}
     </tbody>
   </table>
+
+  <!--
+    ⚠️ **印だけにしない。** Pleasanter 側のテスト回答は本アプリから消せず、
+    運用側で消してもらうしかない。**やるべきことは文で残す**
+  -->
+  {#if surveys.some((survey) => survey.testResponseCount > 0)}
+    <p class="hint test-response-note">※ {t('list.testResponseCleanup')}</p>
+  {/if}
 
   <nav class="pager">
     <button
@@ -1044,7 +1048,10 @@
     margin-left: 0.2rem;
     color: var(--muted);
     font-size: 0.8rem;
-    cursor: help;
+  }
+
+  .test-response-note {
+    margin-top: 0.5rem;
   }
 
   .status-0 {
