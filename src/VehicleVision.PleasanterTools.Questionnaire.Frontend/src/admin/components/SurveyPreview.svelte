@@ -47,10 +47,12 @@
      * 返さないので、上げたばかりの画像はここからは見えない。
      */
     headerImageUrl?: string | null;
+    /** 本文用画像を管理画面の配信口へ変換する。 */
+    assetUrl?: (assetId: string) => string;
     onclose: () => void;
   }
 
-  let { definition, headerImageUrl = null, onclose }: Props = $props();
+  let { definition, headerImageUrl = null, assetUrl, onclose }: Props = $props();
 
   /**
    * テーマを写す枠（Issue #56）。
@@ -301,6 +303,7 @@
         <QuestionField
           question={withNoteBlocks(question) as never}
           {language}
+          {assetUrl}
           bind:answer={
             () => ensure(question.questionId), (value) => (answers[question.questionId] = value)
           }

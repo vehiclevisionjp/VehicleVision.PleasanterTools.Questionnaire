@@ -6,6 +6,7 @@
     loadEmbedOptions,
     testPublish,
     saveDraft,
+    uploadContentImage,
     type ColumnAvailabilityResponse,
   } from '../lib/api';
   import {
@@ -110,6 +111,9 @@
   let conflict = $state(false);
   let warnings = $state<MappingProblem[]>([]);
   let selectedQuestionId = $state<string | null>(null);
+  let assetUploading = $state(false);
+  let assetMarkup = $state('');
+  let assetError = $state('');
 
   /** 公開が断られたときにサーバが返した分岐の不備。**サーバが最後の判定者。** */
   let publishFlow = $state<FlowProblem[]>([]);
@@ -184,6 +188,23 @@
     selectedQuestionId = null;
     revision = result.value.revision;
     await refreshColumnAvailability(id);
+  }
+
+  async function uploadAsset(file: File | undefined) {
+    if (!file || assetUploading) return;
+
+    assetUploading = true;
+    assetError = '';
+    assetMarkup = '';
+    const result = await uploadContentImage(surveyId, file);
+    assetUploading = false;
+
+    if (!result.ok) {
+      assetError = result.message;
+      return;
+    }
+
+    assetMarkup = `![${file.name}](asset:${result.value.assetId})`;
   }
 
   async function refreshColumnAvailability(id = surveyId) {
@@ -596,6 +617,28 @@
       />
     </label>
 
+    <div class="asset-upload">
+      <label>
+        {t('editor.contentAsset')}
+        <input
+          type="file"
+          accept=".png,.jpg,.jpeg,.gif,.webp"
+          disabled={assetUploading}
+          onchange={(event) => void uploadAsset(event.currentTarget.files?.[0])}
+        />
+      </label>
+      <p class="hint">{t('editor.contentAssetHint')}</p>
+      {#if assetMarkup}
+        <label>
+          {t('editor.contentAssetMarkup')}
+          <input type="text" readonly value={assetMarkup} onclick={(event) => event.currentTarget.select()} />
+        </label>
+      {/if}
+      {#if assetError}
+        <p class="error" role="alert">{assetError}</p>
+      {/if}
+    </div>
+
     <div class="toggles">
       <label class="inline">
         <input
@@ -774,6 +817,7 @@
            公開前の画像は回答画面の口からは出ない -->
       <SurveyPreview
         {definition}
+        assetUrl={(assetId) => adminAssetUrl(surveyId, assetId)}
         headerImageUrl={definition.theme?.headerImageId
           ? adminAssetUrl(surveyId, definition.theme.headerImageId)
           : null}

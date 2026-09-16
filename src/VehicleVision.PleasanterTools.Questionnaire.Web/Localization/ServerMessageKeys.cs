@@ -157,6 +157,13 @@ public static class ServerMessageKeys
     /// **理由の内訳は文言にしない**（拡張子・中身・大きさのどれで落ちたかは別で返す）。
     /// </summary>
     public const string HeaderImageRejected = "surveys.headerImageRejected";
+
+    /// <summary>本文用の画像資産を受け付けられない。</summary>
+    public const string ContentImageRejected = "surveys.contentImageRejected";
+
+    /// <summary>アンケートへ保存できる画像資産の枚数を超えている。</summary>
+    public const string ContentImageLimitReached = "surveys.contentImageLimitReached";
+
     /// <summary>回答数の上限に 0 以下を指定した。**上限を外すなら未指定にする。**</summary>
     public const string ResponseLimitMustBePositive = "surveys.responseLimitMustBePositive";
 

@@ -193,6 +193,8 @@
 
   /** ヘッダ画像の URL。**本アプリの口だけを指す**（外部へ取りに行かない）。 */
   const headerImage = $derived(definition ? headerImageUrl(publicId, definition.theme) : null);
+  const contentAssetUrl = (assetId: string) =>
+    `/api/forms/${encodeURIComponent(publicId)}/assets/${encodeURIComponent(assetId)}`;
 
   /** 画面に出す区切り。**1 問 1 ページ表示なら 1 設問で 1 区切り。** */
   const steps = $derived(toSteps(path, definition?.displayMode ?? 'Paged'));
@@ -728,6 +730,7 @@
         <QuestionField
           {question}
           {language}
+          assetUrl={contentAssetUrl}
           bind:answer={answers[question.questionId]}
           error={errors[question.questionId]}
         />

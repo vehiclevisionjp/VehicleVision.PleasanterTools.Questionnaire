@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
+using System.Text.RegularExpressions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Text;
@@ -13,8 +14,9 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Text;
 /// </para>
 /// <para>
 /// **Markdown の一部だけを真似る。** 全部を実装しない。
-/// 前書き（会社の説明や注意書き）に要るのは、太字・斜体・リンク・箇条書き・見出しだけ。
-/// 表も画像も引用もコードも受け付けない。**受け付ける形が少ないほど、
+/// 前書き（会社の説明や注意書き）に要るのは、太字・斜体・リンク・自前の画像・
+/// 箇条書き・見出しだけ。外部画像・表・引用・コードは受け付けない。
+/// **受け付ける形が少ないほど、
 /// 「これで全部か」を人が確かめられる。**
 /// </para>
 /// <list type="bullet">
@@ -23,10 +25,15 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Text;
 ///   <item><c>1. 項目</c>（番号の付く箇条書き）</item>
 ///   <item>空行で段落を分ける</item>
 ///   <item><c>**太字**</c> / <c>*斜体*</c> / <c>[文字](https://…)</c></item>
+///   <item><c>![説明](asset:GUID)</c> / <c>[文字](asset:GUID)</c></item>
 /// </list>
 /// </remarks>
 public static class NoteMarkup
 {
+    private static readonly Regex AssetReference = new(
+        @"asset:(?<id>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})",
+        RegexOptions.CultureInvariant);
+
     /// <summary>受け付ける記法の文字数の上限。</summary>
     /// <remarks>
     /// **上限が無いと定義の JSON が際限なく膨らむ。**
@@ -141,6 +148,33 @@ public static class NoteMarkup
         return blocks.ToImmutable();
     }
 
+    /// <summary>記法が参照する自前資産の識別子を返す。</summary>
+    public static IEnumerable<Guid> AssetIds(string? markup)
+    {
+        if (string.IsNullOrEmpty(markup))
+        {
+            yield break;
+        }
+
+        foreach (Match match in AssetReference.Matches(markup))
+        {
+            if (Guid.TryParse(match.Groups["id"].Value, out var assetId))
+            {
+                yield return assetId;
+            }
+        }
+    }
+
+    /// <summary>資産 ID だけを書き換え、その他の原文を保つ。</summary>
+    public static string RewriteAssetIds(
+        string markup,
+        IReadOnlyDictionary<Guid, Guid> replacements) =>
+        AssetReference.Replace(markup, match =>
+            Guid.TryParse(match.Groups["id"].Value, out var source)
+            && replacements.TryGetValue(source, out var target)
+                ? $"asset:{target:D}"
+                : match.Value);
+
     /// <summary>段落の並びを記法へ戻す。</summary>
     /// <remarks>
     /// **管理画面が編集し直せるようにするため。** 原文を別に保存すると、
@@ -211,6 +245,14 @@ public static class NoteMarkup
                 case NoteInlineKind.Link:
                     builder.Append('[').Append(inline.Text)
                         .Append("](").Append(inline.Href).Append(')');
+                    break;
+                case NoteInlineKind.AssetImage:
+                    builder.Append("![").Append(inline.Text)
+                        .Append("](asset:").Append(inline.AssetId).Append(')');
+                    break;
+                case NoteInlineKind.AssetLink:
+                    builder.Append('[').Append(inline.Text)
+                        .Append("](asset:").Append(inline.AssetId).Append(')');
                     break;
                 default:
                     builder.Append(inline.Text);
@@ -290,6 +332,14 @@ public static class NoteMarkup
 
         while (index < text.Length)
         {
+            if (TryReadAsset(text, index, image: true, out var image, out var imageEnd))
+            {
+                FlushPlain();
+                inlines.Add(image);
+                index = imageEnd;
+                continue;
+            }
+
             if (TryReadEmphasis(text, index, "**", out var boldText, out var boldEnd))
             {
                 FlushPlain();
@@ -382,11 +432,66 @@ public static class NoteMarkup
             return false;
         }
 
-        // **`https:` でなければリンクにしない。** ここで弾いた分は文字として残る
-        link = NoteInline.IsAllowedHref(href)
-            ? new NoteInline(NoteInlineKind.Link, label, href)
-            : new NoteInline(NoteInlineKind.Text, label);
+        if (TryParseAssetId(href, out var assetId))
+        {
+            link = new NoteInline(NoteInlineKind.AssetLink, label, AssetId: assetId);
+        }
+        else
+        {
+            // **`https:` でなければリンクにしない。** ここで弾いた分は文字として残る
+            link = NoteInline.IsAllowedHref(href)
+                ? new NoteInline(NoteInlineKind.Link, label, href)
+                : new NoteInline(NoteInlineKind.Text, label);
+        }
+
         end = hrefEnd + 1;
         return true;
+    }
+
+    private static bool TryReadAsset(
+        string text,
+        int start,
+        bool image,
+        out NoteInline asset,
+        out int end)
+    {
+        asset = new NoteInline(NoteInlineKind.Text, string.Empty);
+        end = start;
+
+        if (!image || !text.AsSpan(start).StartsWith("![", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var labelEnd = text.IndexOf(']', start + 2);
+        if (labelEnd < 0 || labelEnd + 1 >= text.Length || text[labelEnd + 1] != '(')
+        {
+            return false;
+        }
+
+        var hrefEnd = text.IndexOf(')', labelEnd + 2);
+        if (hrefEnd < 0)
+        {
+            return false;
+        }
+
+        var label = text[(start + 2)..labelEnd].Trim();
+        var href = text[(labelEnd + 2)..hrefEnd].Trim();
+        if (label.Length == 0 || !TryParseAssetId(href, out var assetId))
+        {
+            return false;
+        }
+
+        asset = new NoteInline(NoteInlineKind.AssetImage, label, AssetId: assetId);
+        end = hrefEnd + 1;
+        return true;
+    }
+
+    private static bool TryParseAssetId(string value, out Guid assetId)
+    {
+        const string prefix = "asset:";
+        assetId = default;
+        return value.StartsWith(prefix, StringComparison.Ordinal)
+            && Guid.TryParseExact(value[prefix.Length..], "D", out assetId);
     }
 }

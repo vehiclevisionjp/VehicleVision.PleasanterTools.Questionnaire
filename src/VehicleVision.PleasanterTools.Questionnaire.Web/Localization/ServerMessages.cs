@@ -330,6 +330,16 @@ public static class ServerMessages
             "この画像は使用できません。PNG・JPEG・GIF・WebP の 2 MB 以内の画像を選んでください。",
             "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 2 MB.");
 
+        Add(
+            ServerMessageKeys.ContentImageRejected,
+            "この画像は使用できません。PNG・JPEG・GIF・WebP の 1 MB 以内の画像を選んでください。",
+            "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 1 MB.");
+
+        Add(
+            ServerMessageKeys.ContentImageLimitReached,
+            "このアンケートへ保存できる画像は 20 枚までです。",
+            "Up to 20 images can be stored for this survey.");
+
         // ---- 回答数の上限 ---------------------------------------------------
         Add(
             ServerMessageKeys.ResponseLimitMustBePositive,

@@ -60,6 +60,7 @@ public sealed record SurveyDefinition
     /// <summary>指定した ID の設問を返す。無ければ <c>null</c>。</summary>
     public Question? FindQuestion(string questionId) =>
         AllQuestions.FirstOrDefault(question => question.QuestionId == questionId);
+
 }
 
 /// <summary>回答画面の表示モード。</summary>

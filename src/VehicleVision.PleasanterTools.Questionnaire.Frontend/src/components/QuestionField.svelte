@@ -22,9 +22,11 @@
     /** **まだ初期化されていないことがある。** 辞書からそのまま渡ってくるため */
     answer: AnswerState | undefined;
     error?: string;
+    /** 記法に含まれる自前資産を、本アプリの配信口へ変換する。 */
+    assetUrl?: (assetId: string) => string;
   }
 
-  let { question, language, answer = $bindable(), error }: Props = $props();
+  let { question, language, answer = $bindable(), error, assetUrl }: Props = $props();
 
   const t = $derived(translator(language));
 
@@ -198,7 +200,7 @@
     <!-- **書式の付いた本文があればそちらを出す**（Issue #108）。
          公開済みの古い版には noteBlocks が無いので、平文へ落とす -->
     {#if blocks.length > 0}
-      <NoteContent {blocks} />
+      <NoteContent {blocks} {assetUrl} />
     {:else if question.description}
       <p>{text(question.description, language)}</p>
     {/if}
@@ -236,7 +238,7 @@
     {/if}
 
     {#if descriptionBlocks.length > 0}
-      <div class="description"><NoteContent blocks={descriptionBlocks} /></div>
+      <div class="description"><NoteContent blocks={descriptionBlocks} {assetUrl} /></div>
     {:else if question.description}
       <p class="description">{text(question.description, language)}</p>
     {/if}

@@ -481,13 +481,21 @@ builder.Services.AddRateLimiter(options =>
     // **複数の軸で掛ける。** 1 つの軸だけでは抜けられる
     options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
-            RateLimitPartition.GetFixedWindowLimiter(
-                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        {
+            // **本文画像は 1 画面で複数要求される。** 通常 API の 60 件枠を食わせると、
+            // 同じ NAT 配下の回答者が数人開いただけでフォーム本体まで止まる
+            var isAsset = context.Request.Path.StartsWithSegments("/api/forms")
+                && context.Request.Path.Value?.Contains(
+                    "/assets/", StringComparison.OrdinalIgnoreCase) is true;
+            var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            return RateLimitPartition.GetFixedWindowLimiter(
+                $"{address}|{(isAsset ? "asset" : "api")}",
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = requestPermitLimit,
+                    PermitLimit = isAsset ? 600 : requestPermitLimit,
                     Window = TimeSpan.FromMinutes(1),
-                })),
+                });
+        }),
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
             RateLimitPartition.GetFixedWindowLimiter(
                 context.Request.RouteValues["publicId"]?.ToString() ?? "none",

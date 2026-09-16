@@ -138,6 +138,49 @@ public sealed class NoteMarkupTests
         Assert.Equal("https://example.com/about", inline.Href);
     }
 
+    [Fact]
+    public void 自前資産の画像とリンクだけを構造へ変換する()
+    {
+        var imageId = Guid.NewGuid();
+        var linkId = Guid.NewGuid();
+
+        var blocks = NoteMarkup.Parse(
+            $"![案内図](asset:{imageId:D}) [大きく見る](asset:{linkId:D})");
+
+        Assert.Equal(3, blocks[0].Inlines.Length);
+        Assert.Equal(NoteInlineKind.AssetImage, blocks[0].Inlines[0].Kind);
+        Assert.Equal(imageId, blocks[0].Inlines[0].AssetId);
+        Assert.Equal(NoteInlineKind.AssetLink, blocks[0].Inlines[2].Kind);
+        Assert.Equal(linkId, blocks[0].Inlines[2].AssetId);
+        Assert.All(blocks[0].Inlines, inline => Assert.Null(inline.Href));
+    }
+
+    [Theory]
+    [InlineData("![外部](https://example.com/image.png)")]
+    [InlineData("![データ](data:image/png;base64,AAAA)")]
+    [InlineData("![不正](asset:not-a-guid)")]
+    public void 外部画像と不正な資産IDは画像にしない(string markup)
+    {
+        var blocks = NoteMarkup.Parse(markup);
+
+        Assert.DoesNotContain(
+            blocks.SelectMany(block => block.Inlines),
+            inline => inline.Kind == NoteInlineKind.AssetImage);
+    }
+
+    [Fact]
+    public void 資産IDを書き換えても他の原文は変えない()
+    {
+        var source = Guid.NewGuid();
+        var target = Guid.NewGuid();
+        var markup = $"前 ![画像](asset:{source:D}) 後";
+
+        var rewritten = NoteMarkup.RewriteAssetIds(
+            markup, new Dictionary<Guid, Guid> { [source] = target });
+
+        Assert.Equal($"前 ![画像](asset:{target:D}) 後", rewritten);
+    }
+
     [Theory]
     [InlineData("javascript:alert(1)")]
     [InlineData("JavaScript:alert(1)")]
@@ -326,4 +369,5 @@ public sealed class NoteMarkupTests
         Assert.Contains("\"noteBlocks\"", json, StringComparison.Ordinal);
         Assert.Contains("\"Link\"", json, StringComparison.Ordinal);
     }
+
 }

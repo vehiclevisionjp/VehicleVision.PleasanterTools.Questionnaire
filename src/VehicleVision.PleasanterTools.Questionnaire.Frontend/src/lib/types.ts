@@ -157,7 +157,7 @@ export interface GridRow {
 export type NoteBlockKind = 'Paragraph' | 'Heading' | 'BulletList' | 'NumberedList';
 
 /** 説明文ブロックの文字装飾の種類。 */
-export type NoteInlineKind = 'Text' | 'Bold' | 'Italic' | 'Link';
+export type NoteInlineKind = 'Text' | 'Bold' | 'Italic' | 'Link' | 'AssetImage' | 'AssetLink';
 
 /** 説明文ブロックの中の文字列 1 片。 */
 export interface NoteInline {
@@ -166,6 +166,8 @@ export interface NoteInline {
   text: string;
   /** リンク先。**サーバが `https:` だけを通している。** */
   href?: string | null;
+  /** 自前資産の識別子。**保存先 URL は受け取らない。** */
+  assetId?: string | null;
 }
 
 /** 箇条書きの項目 1 つ。 */

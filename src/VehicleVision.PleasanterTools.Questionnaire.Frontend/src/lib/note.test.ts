@@ -104,6 +104,17 @@ describe('renderableInlines', () => {
     expect(renderableInlines([link])).toEqual([link]);
   });
 
+  it('正しい資産 ID の画像とリンクだけを通す', () => {
+    const assetId = '4b7f4f64-d588-4b7d-97be-6c3056543729';
+    const image = { kind: 'AssetImage' as const, text: '案内', assetId };
+    const link = { kind: 'AssetLink' as const, text: '配布画像', assetId };
+
+    expect(renderableInlines([image, link])).toEqual([image, link]);
+    expect(
+      renderableInlines([{ kind: 'AssetImage', text: '不正', assetId: '../../admin' }]),
+    ).toEqual([{ kind: 'Text', text: '不正' }]);
+  });
+
   it('空の文字は出さない', () => {
     expect(renderableInlines([{ kind: 'Text', text: '' }])).toEqual([]);
   });

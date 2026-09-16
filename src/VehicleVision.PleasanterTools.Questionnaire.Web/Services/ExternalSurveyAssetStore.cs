@@ -101,6 +101,64 @@ internal sealed class ExternalSurveyAssetStore(
         }
     }
 
+    public async Task<Guid?> TryAddContentAsync(
+        Guid surveyId,
+        string contentType,
+        string fileName,
+        byte[] content,
+        int maximumCount,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        var assetId = Guid.NewGuid();
+        await objects.PutAsync(assetId, content, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var transaction = await connection
+                .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            var reserved = await connection.ExecuteAsync(Sql(
+                "UPDATE [Surveys] SET [ContentAssetCount] = [ContentAssetCount] + 1 "
+                + "WHERE [SurveyId] = @SurveyId AND [ContentAssetCount] < @MaximumCount",
+                new { SurveyId = surveyId, MaximumCount = maximumCount },
+                transaction,
+                cancellationToken)).ConfigureAwait(false);
+            if (reserved == 0)
+            {
+                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                await objects.DeleteAsync(assetId, CancellationToken.None).ConfigureAwait(false);
+                return null;
+            }
+
+            await connection.ExecuteAsync(Sql(
+                "INSERT INTO [SurveyAssets] "
+                + "  ([AssetId], [SurveyId], [ContentType], [FileName], [ByteSize], "
+                + "   [ContentBase64], [CreatedAt]) "
+                + "VALUES (@AssetId, @SurveyId, @ContentType, @FileName, @ByteSize, "
+                + "        @StorageKey, @Now)",
+                new
+                {
+                    AssetId = assetId,
+                    SurveyId = surveyId,
+                    ContentType = contentType,
+                    FileName = fileName,
+                    ByteSize = (long)content.Length,
+                    StorageKey = assetId.ToString("N"),
+                    Now = DbTime.UtcNowTruncated(),
+                },
+                transaction,
+                cancellationToken)).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return assetId;
+        }
+        catch
+        {
+            await objects.DeleteAsync(assetId, CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+    }
+
     public async Task DeleteSurveyAsync(
         Guid surveyId,
         CancellationToken cancellationToken = default)
@@ -134,10 +192,12 @@ internal sealed class ExternalSurveyAssetStore(
     private CommandDefinition Sql(
         string sql,
         object? parameters = null,
+        DbTransaction? transaction = null,
         CancellationToken cancellationToken = default) =>
         new(
             SqlDialect.Format(connectionFactory.Provider, sql),
             parameters,
+            transaction,
             cancellationToken: cancellationToken);
 
     private async Task<DbConnection> OpenAsync(CancellationToken cancellationToken)

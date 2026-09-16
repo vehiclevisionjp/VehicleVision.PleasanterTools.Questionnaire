@@ -189,6 +189,15 @@ public class SurveyDeletionStoreTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<Guid?> TryAddContentAsync(
+            Guid surveyId,
+            string contentType,
+            string fileName,
+            byte[] content,
+            int maximumCount,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task DeleteSurveyAsync(
             Guid surveyId,
             CancellationToken cancellationToken = default)

@@ -439,6 +439,81 @@ public static class AdminSurveyEndpoints
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
+        // ---- 説明文と完了画面の画像（Issue #266 / #269）---------------------
+        group.MapPost("/{surveyId:guid}/assets", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            ISurveyAssetStore assets,
+            CancellationToken cancellationToken) =>
+        {
+            var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (survey is null)
+            {
+                return Results.NotFound();
+            }
+
+            var bodySize = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (bodySize is { IsReadOnly: false })
+            {
+                bodySize.MaxRequestBodySize = ContentImage.MaxRequestBodyBytes;
+            }
+
+            if (!context.Request.HasFormContentType)
+            {
+                return ContentImageRejected(context);
+            }
+
+            IFormFile? file;
+            try
+            {
+                var form = await context.Request.ReadFormAsync(cancellationToken);
+                file = form.Files.GetFile("image") ?? form.Files.FirstOrDefault();
+            }
+            catch (BadHttpRequestException exception)
+            {
+                return Results.StatusCode(exception.StatusCode);
+            }
+
+            if (file is null)
+            {
+                return ContentImageRejected(context);
+            }
+
+            using var buffer = new MemoryStream((int)Math.Max(file.Length, 0));
+            await file.CopyToAsync(buffer, cancellationToken);
+            var incoming = new IncomingAttachment(file.FileName, buffer.ToArray());
+            var rejections = await ContentImage.InspectAsync(incoming, cancellationToken);
+            var contentType = HeaderImage.ContentTypeOf(file.FileName);
+            if (!rejections.IsEmpty || contentType is null)
+            {
+                return ContentImageRejected(
+                    context,
+                    rejections.Select(rejection => rejection.Reason.ToString()));
+            }
+
+            var assetId = await assets.TryAddContentAsync(
+                surveyId,
+                contentType,
+                file.FileName,
+                incoming.Content.ToArray(),
+                ContentImage.MaxAssetsPerSurvey,
+                cancellationToken)
+                .ConfigureAwait(false);
+            if (assetId is null)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.ContentImageLimitReached, RequestLanguage.Of(context)),
+                });
+            }
+
+            return Results.Ok(new { assetId });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
+
         // **編集中の画像を管理画面へ返す。** 公開前の画像は回答画面の口からは出ない
         group.MapGet("/{surveyId:guid}/assets/{assetId:guid}", async (
             Guid surveyId,
@@ -1011,6 +1086,16 @@ public static class AdminSurveyEndpoints
 
         return builder;
     }
+
+    private static IResult ContentImageRejected(
+        HttpContext context,
+        IEnumerable<string>? reasons = null) =>
+        Results.BadRequest(new
+        {
+            message = ServerMessages.Get(
+                ServerMessageKeys.ContentImageRejected, RequestLanguage.Of(context)),
+            reasons,
+        });
 
     private static async Task<IResult> ChangeArchiveAsync(
         Guid surveyId,
