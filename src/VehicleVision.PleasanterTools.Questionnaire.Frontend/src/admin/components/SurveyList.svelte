@@ -678,11 +678,11 @@
     <thead>
       <tr>
         <th>{t('list.columnTitle')}</th>
-        <th>{t('list.columnStatus')}</th>
-        <th>{t('list.columnVersion')}</th>
-        <th>{t('list.columnResponses')}</th>
-        <th>{t('list.columnUrl')}</th>
-        <th>{t('list.columnUpdated')}</th>
+        <th class="compact-column">{t('list.columnStatus')}</th>
+        <th class="compact-column">{t('list.columnVersion')}</th>
+        <th class="compact-column">{t('list.columnResponses')}</th>
+        <th class="compact-column">{t('list.columnUrl')}</th>
+        <th class="compact-column">{t('list.columnUpdated')}</th>
         <th></th>
       </tr>
     </thead>
@@ -699,7 +699,7 @@
               <span class="reason">{t('archive.archived')}</span>
             {/if}
           </td>
-          <td>
+          <td class="compact-column">
             <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
             <!--
               **なぜ止まっているのかが分かること**（_documents/データモデル設計.md 2.1）。
@@ -712,15 +712,17 @@
               {/if}
             {/if}
           </td>
-          <td>{survey.publishedVersion ?? '—'}</td>
-          <td class="responses">
-            <div>{responses(survey)}</div>
-            <div>{t('list.testResponseCount', { count: survey.testResponseCount })}</div>
+          <td class="compact-column">{survey.publishedVersion ?? '—'}</td>
+          <td class="responses compact-column">
+            <span>{responses(survey)}</span>
+            <span class="test-response-count">
+              {t('list.testResponseCount', { count: survey.testResponseCount })}
+            </span>
             {#if survey.testResponseCount > 0}
-              <div class="hint">{t('list.testResponseCleanup')}</div>
+              <span class="test-response-cleanup" aria-hidden="true">※</span>
             {/if}
           </td>
-          <td>
+          <td class="compact-column">
             {#if isPublished(survey)}
               <a href={formUrl(survey.publicId)} target="_blank" rel="noreferrer">
                 {survey.publicId}
@@ -732,7 +734,7 @@
               <span class="muted">{t('list.notPublished')}</span>
             {/if}
           </td>
-          <td class="muted">{formatDate(survey.updatedAt)}</td>
+          <td class="muted compact-column">{formatDate(survey.updatedAt)}</td>
           <td class="row-actions">
             <div class="row-actions-inner">
             {#if survey.archivedAt == null && (survey.status === 1 || survey.status === 2)}
@@ -789,6 +791,14 @@
       {/each}
     </tbody>
   </table>
+
+  <!--
+    ⚠️ **印だけにしない。** Pleasanter 側のテスト回答は本アプリから消せず、
+    運用側で消してもらうしかない。**やるべきことは文で残す**
+  -->
+  {#if surveys.some((survey) => survey.testResponseCount > 0)}
+    <p class="hint test-response-note">※ {t('list.testResponseCleanup')}</p>
+  {/if}
 
   <nav class="pager">
     <button
@@ -917,13 +927,35 @@
 
   /*
     停止と複製が並ぶ。**td は display: flex にしない**（表の桁が崩れる）ので、
-    中に入れ物を 1 枚はさんでそこを flex にする。
+    中に入れ物を 1 枚はさんでそこを格子にする。
     **横だけに余白を付けると、折り返した先の行が詰まる**（Issue #150）
+
+    ⚠️ **flex の折り返しにしないこと。** 釦の出る条件が行ごとに違うので、
+    文字数なりに並べると**折り返す位置が行ごとに変わって縦に揃わない。**
+    **格子なら幅が揃い、何個出ても桁の位置が動かない。**
   */
   .row-actions-inner {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    display: grid;
+    /* **等幅。** 入る数は桁の広さで決まり、余れば 1 行に収まる */
+    grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+    gap: 0.3rem;
+    /* 狭い画面で潰れないように、桁そのものの下限を決める */
+    min-width: 11.5rem;
+  }
+
+  /* **1 つぶんの高さを抑える。** 段が増えても伸びにくくする */
+  .row-actions-inner button {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    /* **文字数が違っても同じ大きさに見えるようにする** */
+    text-align: center;
+  }
+
+  /* **釦の桁は広めに取る。** 等幅にすると 1 個あたりの幅が要る */
+  .row-actions {
+    width: 16rem;
   }
 
   label {
@@ -987,6 +1019,11 @@
     font-weight: 600;
   }
 
+  .compact-column {
+    width: 1%;
+    white-space: nowrap;
+  }
+
   tbody tr:last-child td {
     border-bottom: none;
   }
@@ -1016,6 +1053,20 @@
 
   .responses {
     white-space: nowrap;
+  }
+
+  .test-response-count::before {
+    content: ' / ';
+  }
+
+  .test-response-cleanup {
+    margin-left: 0.2rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .test-response-note {
+    margin-top: 0.5rem;
   }
 
   .status-0 {
