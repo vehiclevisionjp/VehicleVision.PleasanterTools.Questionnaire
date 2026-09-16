@@ -151,6 +151,67 @@ public class MappingValidatorTests
             Codes(MappingValidator.Validate(mapping, Definition("q1"))));
     }
 
+    [Theory]
+    [InlineData(ConverterOperations.Map)]
+    [InlineData(ConverterOperations.ToCheck)]
+    [InlineData(ConverterOperations.Contains)]
+    [InlineData(ConverterOperations.Constant)]
+    [InlineData(ConverterOperations.When)]
+    public void 必須の変換設定が空なら拒否する(string operation)
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(operation),
+            new MappingSource("q1")));
+
+        Assert.Contains(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
+    [Fact]
+    public void mapに置換元が一つあれば置換後が空でも拒否しない()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(ConverterOperations.Map, ("map.削除する", "")),
+            new MappingSource("q1")));
+
+        Assert.DoesNotContain(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
+    [Fact]
+    public void joinは区切りが未指定でも拒否しない()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(ConverterOperations.Join),
+            new MappingSource("q1")));
+
+        Assert.DoesNotContain(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
+    [Fact]
+    public void whenはelseが空でも拒否しない()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(
+                ConverterOperations.When,
+                ("when", "対象"),
+                ("then", "変換後"),
+                ("else", "")),
+            new MappingSource("q1")));
+
+        Assert.DoesNotContain(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
     [Fact]
     public void Statusへ整数でない固定値を割り当てると拒否する()
     {

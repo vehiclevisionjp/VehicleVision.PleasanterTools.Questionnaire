@@ -14,6 +14,12 @@
   import type { Language } from '../../lib/i18n/language';
   import { t } from '../lib/i18n/state.svelte';
   import type { MessageKey } from '../lib/i18n/messages';
+  import {
+    converterConfigFields,
+    converterForOperation,
+    setConfigValue,
+  } from '../lib/converterConfig';
+  import MapConfigEditor from './MapConfigEditor.svelte';
 
   interface Props {
     mapping: MappingDefinition;
@@ -167,6 +173,17 @@
 
     // **回答画面で出る文字列と同じ見え方にする。** 未翻訳なら日本語へ落ちる
     return displayText(question.title, editing) || questionId;
+  }
+
+  /** 入力につないだ設問から、map の元の値として選べる選択肢を集める。 */
+  function mapCandidates(assignment: ColumnAssignment): string[] {
+    const values = assignment.sources.flatMap(
+      (source) =>
+        questions.find((question) => question.questionId === source.questionId)?.choices.map(
+          (choice) => choice.value,
+        ) ?? [],
+    );
+    return [...new Set(values)];
   }
 
   /** その割り当てが添付のものか。 */
@@ -388,10 +405,7 @@
                     onchange={(event) => {
                       const operation = event.currentTarget.value;
                       patch(index, {
-                        converter:
-                          operation === ''
-                            ? null
-                            : { operation, config: assignment.converter?.config ?? {} },
+                        converter: converterForOperation(operation, assignment.converter),
                       });
                     }}
                   >
@@ -399,6 +413,62 @@
                       <option value={converter.value}>{t(converter.key)}</option>
                     {/each}
                   </select>
+
+                  {#if assignment.converter}
+                    {@const operation = assignment.converter.operation}
+                    {@const config = assignment.converter.config}
+                    {#if operation === 'map'}
+                      <MapConfigEditor
+                        {config}
+                        candidates={mapCandidates(assignment)}
+                        listId={`mapping-map-source-${index}`}
+                        onchange={(next) =>
+                          patch(index, { converter: { operation, config: next } })}
+                      />
+                    {:else}
+                      <div class="converter-config">
+                        {#each converterConfigFields[operation] ?? [] as field (field.key)}
+                          <label>
+                            <span>{t(field.label)}</span>
+                            {#if field.multiline}
+                              <textarea
+                                rows="6"
+                                value={config[field.key] ?? field.defaultValue ?? ''}
+                                oninput={(event) =>
+                                  patch(index, {
+                                    converter: {
+                                      operation,
+                                      config: setConfigValue(
+                                        config,
+                                        field.key,
+                                        event.currentTarget.value,
+                                      ),
+                                    },
+                                  })}
+                              ></textarea>
+                            {:else}
+                              <input
+                                type="text"
+                                placeholder={field.placeholder ? t(field.placeholder) : ''}
+                                value={config[field.key] ?? field.defaultValue ?? ''}
+                                oninput={(event) =>
+                                  patch(index, {
+                                    converter: {
+                                      operation,
+                                      config: setConfigValue(
+                                        config,
+                                        field.key,
+                                        event.currentTarget.value,
+                                      ),
+                                    },
+                                  })}
+                              />
+                            {/if}
+                          </label>
+                        {/each}
+                      </div>
+                    {/if}
+                  {/if}
                 {/if}
               </td>
 
@@ -620,6 +690,7 @@
   }
 
   input,
+  textarea,
   select {
     display: block;
     width: 100%;
@@ -629,6 +700,23 @@
     font: inherit;
     color: #101828;
     box-sizing: border-box;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  .converter-config {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+
+    label > span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-bottom: 0.2rem;
+    }
   }
 
   .hint {
