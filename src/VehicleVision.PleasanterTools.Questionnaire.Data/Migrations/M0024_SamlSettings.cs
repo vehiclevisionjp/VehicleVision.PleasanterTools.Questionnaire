@@ -3,8 +3,8 @@ using FluentMigrator;
 namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
 /// <summary>SAML の設定を再起動せず変更できるようにする（Issue #254）。</summary>
-[Migration(23, "SAML の設定を保存する")]
-public sealed class M0023_SamlSettings : Migration
+[Migration(24, "SAML の設定を保存する")]
+public sealed class M0024_SamlSettings : Migration
 {
     public override void Up()
     {
