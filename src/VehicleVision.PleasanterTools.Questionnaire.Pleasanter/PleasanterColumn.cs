@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
@@ -15,14 +16,34 @@ public enum PleasanterColumnKind
     Description,
     Check,
     Attachments,
-    Title,
-    Body,
-    Status,
 }
+
+/// <summary>入れ物に入らず、レコード本体へ書き出す列。</summary>
+public sealed record PleasanterRecordProperty(string Name, MappingTargetValueKind ValueKind);
 
 /// <summary>列名から種別を判定する。</summary>
 public static partial class PleasanterColumn
 {
+    private static readonly IReadOnlyDictionary<string, PleasanterRecordProperty> RecordPropertyByName =
+        new Dictionary<string, PleasanterRecordProperty>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Title"] = new("Title", MappingTargetValueKind.String),
+            ["Body"] = new("Body", MappingTargetValueKind.String),
+            ["Status"] = new("Status", MappingTargetValueKind.Integer),
+            ["Manager"] = new("Manager", MappingTargetValueKind.Integer),
+            ["Owner"] = new("Owner", MappingTargetValueKind.Integer),
+            ["Locked"] = new("Locked", MappingTargetValueKind.Boolean),
+            ["StartTime"] = new("StartTime", MappingTargetValueKind.DateTime),
+            ["CompletionTime"] = new("CompletionTime", MappingTargetValueKind.DateTime),
+            ["WorkValue"] = new("WorkValue", MappingTargetValueKind.Decimal),
+            ["ProgressRate"] = new("ProgressRate", MappingTargetValueKind.Decimal),
+            ["RemainingWorkValue"] = new("RemainingWorkValue", MappingTargetValueKind.Decimal),
+        };
+
+    /// <summary>入れ物に入らない書き込み先の一覧。</summary>
+    public static IEnumerable<PleasanterRecordProperty> RecordProperties =>
+        RecordPropertyByName.Values;
+
     /// <summary><c>ClassA</c> / <c>Class001</c> のどちらの形も受ける。</summary>
     [GeneratedRegex(
         "^(Class|Num|Date|Description|Check|Attachments)([A-Z]|[0-9]{3})$",
@@ -37,35 +58,20 @@ public static partial class PleasanterColumn
             return null;
         }
 
-        if (columnName is nameof(PleasanterColumnKind.Title)
-            or nameof(PleasanterColumnKind.Body)
-            or nameof(PleasanterColumnKind.Status))
-        {
-            return Enum.Parse<PleasanterColumnKind>(columnName);
-        }
-
         var match = ColumnNamePattern.Match(columnName);
         return match.Success && Enum.TryParse<PleasanterColumnKind>(match.Groups[1].Value, out var kind)
             ? kind
             : null;
     }
 
-    /// <summary>標準 26 列の枠を消費する列か。</summary>
-    /// <remarks>
-    /// <c>Title</c>、<c>Body</c>、<c>Status</c> はレコード本体のプロパティであり、
-    /// 型ごとにある <c>A</c>〜<c>Z</c> の列ではないため。
-    /// </remarks>
-    public static bool ConsumesColumnSlot(string columnName) =>
-        KindOf(columnName) is not PleasanterColumnKind.Title
-            and not PleasanterColumnKind.Body
-            and not PleasanterColumnKind.Status;
+    /// <summary>レコード本体へ書き出す列を取得する。</summary>
+    public static PleasanterRecordProperty? RecordPropertyOf(string columnName) =>
+        RecordPropertyByName.GetValueOrDefault(columnName);
 
-    /// <summary>状態列か。</summary>
-    /// <remarks>
-    /// 状態だけは Pleasanter が整数として受け取る。列名ごとの型知識を呼び出し側へ漏らさないため。
-    /// </remarks>
-    public static bool IsStatus(string columnName) =>
-        KindOf(columnName) is PleasanterColumnKind.Status;
+    /// <summary>標準 26 列の枠を消費する列か。</summary>
+    /// <remarks>レコード本体のプロパティは、型ごとにある <c>A</c>〜<c>Z</c> の列ではないため。</remarks>
+    public static bool ConsumesColumnSlot(string columnName) =>
+        RecordPropertyOf(columnName) is null;
 
     /// <summary>その種別が複数の値を保持できるか。</summary>
     /// <remarks>

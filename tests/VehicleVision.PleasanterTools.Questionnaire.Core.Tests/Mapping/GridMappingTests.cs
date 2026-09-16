@@ -311,7 +311,14 @@ public class GridMappingTests
             [
                 ColumnAssignment.Direct("Title", new MappingSource("q-grid", QuestionPort.Value, "price")),
                 ColumnAssignment.Direct("Body", new MappingSource("q-grid", QuestionPort.Value, "quality")),
-                ColumnAssignment.Direct("Status", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Manager", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Owner", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Locked", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("StartTime", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("CompletionTime", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("WorkValue", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("ProgressRate", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("RemainingWorkValue", new MappingSource("q-rank", QuestionPort.Value, "price")),
             ],
         };
 

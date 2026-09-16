@@ -416,7 +416,7 @@ public static class AdminSurveyEndpoints
                 draft.Definition,
                 null,
                 PleasanterColumn.IsAttachment,
-                PleasanterColumn.IsStatus);
+                column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
             return Results.Ok(problems.Select(Describe));
         });
 
@@ -457,7 +457,7 @@ public static class AdminSurveyEndpoints
                 draft.Definition,
                 null,
                 PleasanterColumn.IsAttachment,
-                PleasanterColumn.IsStatus);
+                column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
             var blocking = problems.Where(problem => problem.IsBlocking).ToList();
             if (blocking.Count > 0)
             {

@@ -114,7 +114,23 @@ describe('measure', () => {
   });
 
   it('レコード本体の列は標準列の枠として数えない', () => {
-    expect(measure(mapping('Title', 'Body', 'Status'))).toEqual([]);
+    expect(
+      measure(
+        mapping(
+          'Title',
+          'Body',
+          'Status',
+          'Manager',
+          'Owner',
+          'Locked',
+          'StartTime',
+          'CompletionTime',
+          'WorkValue',
+          'ProgressRate',
+          'RemainingWorkValue',
+        ),
+      ),
+    ).toEqual([]);
   });
 
   it('接頭辞の順に並べる', () => {

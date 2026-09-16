@@ -100,9 +100,8 @@ public static class ColumnBudget
     }
 
     private static bool ConsumesColumnSlot(string columnName) =>
-        !string.Equals(columnName, "Title", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(columnName, "Body", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(columnName, "Status", StringComparison.OrdinalIgnoreCase);
+        columnName.Length > 1
+        && (char.IsAsciiLetterUpper(columnName[^1]) || char.IsAsciiDigit(columnName[^1]));
 
     /// <summary>この定義を「行ごとに 1 列」で写すと、いくつ入力が要るか。</summary>
     /// <remarks>

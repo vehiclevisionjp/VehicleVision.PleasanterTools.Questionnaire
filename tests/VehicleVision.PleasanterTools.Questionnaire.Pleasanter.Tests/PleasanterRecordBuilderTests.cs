@@ -58,6 +58,30 @@ public class PleasanterRecordBuilderTests
     }
 
     [Fact]
+    public void レコード本体の各型を対応する値へ変換する()
+    {
+        var record = Builder().Build(Columns(
+            ("Manager", ["123"]),
+            ("Owner", ["456"]),
+            ("Locked", ["true"]),
+            ("StartTime", ["2026-09-16"]),
+            ("CompletionTime", ["2026-09-16T12:34:56+09:00"]),
+            ("WorkValue", ["1.5"]),
+            ("ProgressRate", ["75.25"]),
+            ("RemainingWorkValue", ["0"])));
+
+        Assert.Equal(123, record.Body["Manager"]);
+        Assert.Equal(456, record.Body["Owner"]);
+        Assert.Equal(true, record.Body["Locked"]);
+        Assert.Equal("2026-09-16T00:00:00", record.Body["StartTime"]);
+        Assert.Equal("2026-09-16T12:34:56", record.Body["CompletionTime"]);
+        Assert.Equal(1.5m, record.Body["WorkValue"]);
+        Assert.Equal(75.25m, record.Body["ProgressRate"]);
+        Assert.Equal(0m, record.Body["RemainingWorkValue"]);
+        Assert.Empty(record.Problems);
+    }
+
+    [Fact]
     public void 空の値は消すための値になる()
     {
         // **空配列は「消す」を意味する**（編集で回答を消したとき）
@@ -147,6 +171,27 @@ public class PleasanterRecordBuilderTests
 
         Assert.False(record.Body.ContainsKey("Status"));
         Assert.Contains(record.Problems, problem => problem.ColumnName == "Status");
+    }
+
+    [Theory]
+    [InlineData("Locked", "yes")]
+    [InlineData("WorkValue", "金額")]
+    [InlineData("StartTime", "来週")]
+    public void 本体の型として読めない値は不備とする(string columnName, string value)
+    {
+        var record = Builder().Build(Columns((columnName, [value])));
+
+        Assert.False(record.Body.ContainsKey(columnName));
+        Assert.Contains(record.Problems, problem => problem.ColumnName == columnName);
+    }
+
+    [Fact]
+    public void 未回答の本体日時は日付列と同じ最小日時で送る()
+    {
+        var record = Builder().Build(Columns(("StartTime", [])));
+
+        Assert.Equal(PleasanterDateTime.UnansweredDate, record.Body["StartTime"]);
+        Assert.Empty(record.Problems);
     }
 
     [Fact]

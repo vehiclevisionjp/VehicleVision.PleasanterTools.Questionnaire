@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
@@ -86,6 +87,16 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
 
         foreach (var (columnName, values) in columns)
         {
+            if (PleasanterColumn.RecordPropertyOf(columnName) is { } property)
+            {
+                if (TryConvert(property.ValueKind, columnName, values, problems, out var propertyValue))
+                {
+                    properties[property.Name] = propertyValue;
+                }
+
+                continue;
+            }
+
             var kind = PleasanterColumn.KindOf(columnName);
             if (kind is null)
             {
@@ -104,14 +115,6 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
 
             if (!TryConvert(kind.Value, columnName, values, problems, out var converted))
             {
-                continue;
-            }
-
-            if (kind is PleasanterColumnKind.Title
-                or PleasanterColumnKind.Body
-                or PleasanterColumnKind.Status)
-            {
-                properties[columnName] = converted;
                 continue;
             }
 
@@ -252,8 +255,6 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                 return true;
 
             case PleasanterColumnKind.Description:
-            case PleasanterColumnKind.Title:
-            case PleasanterColumnKind.Body:
                 converted = value ?? string.Empty;
                 return true;
 
@@ -277,22 +278,6 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                 }
 
                 converted = number;
-                return true;
-
-            case PleasanterColumnKind.Status:
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    converted = null;
-                    return true;
-                }
-
-                if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var status))
-                {
-                    problems.Add(new ColumnConversionProblem(columnName, $"整数として読めない: {value}"));
-                    return false;
-                }
-
-                converted = status;
                 return true;
 
             case PleasanterColumnKind.Date:
@@ -325,6 +310,91 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
 
             default:
                 problems.Add(new ColumnConversionProblem(columnName, "対応していない列種別"));
+                return false;
+        }
+    }
+
+    private bool TryConvert(
+        MappingTargetValueKind kind,
+        string columnName,
+        ImmutableArray<string> values,
+        ImmutableArray<ColumnConversionProblem>.Builder problems,
+        out object? converted)
+    {
+        converted = null;
+
+        if (values.Length > 1)
+        {
+            problems.Add(new ColumnConversionProblem(
+                columnName, $"値が {values.Length} 個ある。1 列には 1 値しか入らない"));
+            return false;
+        }
+
+        var value = values.IsDefaultOrEmpty ? null : values[0];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            converted = kind is MappingTargetValueKind.String ? string.Empty
+                : kind is MappingTargetValueKind.DateTime ? PleasanterDateTime.UnansweredDate
+                : null;
+            return true;
+        }
+
+        switch (kind)
+        {
+            case MappingTargetValueKind.String:
+                converted = value;
+                return true;
+
+            case MappingTargetValueKind.Integer:
+                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer))
+                {
+                    converted = integer;
+                    return true;
+                }
+
+                problems.Add(new ColumnConversionProblem(columnName, $"整数として読めない: {value}"));
+                return false;
+
+            case MappingTargetValueKind.Boolean:
+                if (bool.TryParse(value, out var boolean))
+                {
+                    converted = boolean;
+                    return true;
+                }
+
+                problems.Add(new ColumnConversionProblem(columnName, $"真偽値として読めない: {value}"));
+                return false;
+
+            case MappingTargetValueKind.Decimal:
+                if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var decimalValue))
+                {
+                    converted = decimalValue;
+                    return true;
+                }
+
+                problems.Add(new ColumnConversionProblem(columnName, $"数値として読めない: {value}"));
+                return false;
+
+            case MappingTargetValueKind.DateTime:
+                var asDateOnly = PleasanterDateTime.DateOnlyToPleasanter(value);
+                if (asDateOnly is not null)
+                {
+                    converted = asDateOnly;
+                    return true;
+                }
+
+                if (DateTimeOffset.TryParse(
+                        value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var moment))
+                {
+                    converted = dateTime.ToPleasanter(moment);
+                    return true;
+                }
+
+                problems.Add(new ColumnConversionProblem(columnName, $"日時として読めない: {value}"));
+                return false;
+
+            default:
+                problems.Add(new ColumnConversionProblem(columnName, "対応していない値の型"));
                 return false;
         }
     }

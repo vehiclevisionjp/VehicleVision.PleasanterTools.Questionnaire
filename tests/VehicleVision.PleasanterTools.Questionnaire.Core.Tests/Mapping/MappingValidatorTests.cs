@@ -162,9 +162,11 @@ public class MappingValidatorTests
         var problems = MappingValidator.Validate(
             mapping,
             Definition("q1"),
-            isStatusColumn: column => column == "Status");
+            targetValueKind: column => column == "Status"
+                ? MappingTargetValueKind.Integer
+                : null);
 
-        Assert.Contains(MappingProblemCode.StatusNeedsInteger, Codes(problems));
+        Assert.Contains(MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
     }
 
     [Fact]
@@ -178,9 +180,11 @@ public class MappingValidatorTests
         var problems = MappingValidator.Validate(
             mapping,
             Definition("q1"),
-            isStatusColumn: column => column == "Status");
+            targetValueKind: column => column == "Status"
+                ? MappingTargetValueKind.Integer
+                : null);
 
-        Assert.DoesNotContain(MappingProblemCode.StatusNeedsInteger, Codes(problems));
+        Assert.DoesNotContain(MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
     }
 
     [Fact]
@@ -191,9 +195,55 @@ public class MappingValidatorTests
         var problems = MappingValidator.Validate(
             mapping,
             Definition("q1"),
-            isStatusColumn: column => column == "Status");
+            targetValueKind: column => column == "Status"
+                ? MappingTargetValueKind.Integer
+                : null);
 
-        Assert.Contains(MappingProblemCode.StatusNeedsInteger, Codes(problems));
+        Assert.Contains(MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Theory]
+    [InlineData("Locked", MappingTargetValueKind.Boolean, "true")]
+    [InlineData("WorkValue", MappingTargetValueKind.Decimal, "1.5")]
+    [InlineData("StartTime", MappingTargetValueKind.DateTime, "2026-09-16")]
+    public void 本体の型に合う固定値は割り当てられる(
+        string column,
+        MappingTargetValueKind kind,
+        string value)
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            column,
+            MappingConverter.Of(ConverterOperations.Constant, ("value", value)),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: target => target == column ? kind : null);
+
+        Assert.DoesNotContain(MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Theory]
+    [InlineData("Locked", MappingTargetValueKind.Boolean, "1")]
+    [InlineData("WorkValue", MappingTargetValueKind.Decimal, "金額")]
+    [InlineData("StartTime", MappingTargetValueKind.DateTime, "来週")]
+    public void 本体の型に合わない固定値は公開前に拒否する(
+        string column,
+        MappingTargetValueKind kind,
+        string value)
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            column,
+            MappingConverter.Of(ConverterOperations.Constant, ("value", value)),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: target => target == column ? kind : null);
+
+        Assert.Contains(MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
     }
 
     [Fact]

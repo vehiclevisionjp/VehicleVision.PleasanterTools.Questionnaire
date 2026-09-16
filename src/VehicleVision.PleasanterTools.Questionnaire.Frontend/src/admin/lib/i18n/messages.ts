@@ -360,7 +360,7 @@ export const ja = {
   'problem.NonFileQuestionAsAttachment': '添付列に割り当てられるのは、添付の設問だけです',
   'problem.AttachmentColumnNeedsFilePort': '添付列には「添付ファイル本体」を割り当ててください',
   'problem.FilePortNeedsAttachmentColumn': '「添付ファイル本体」は添付列にしか割り当てられません',
-  'problem.StatusNeedsInteger': 'Status には整数を確実に出せる割り当てだけを指定できます',
+  'problem.TargetColumnNeedsCompatibleValue': '書き込み先の型へ確実に変換できる割り当てだけを指定できます',
   'problem.UnmappedQuestion': 'どの列にも割り当てられていません（Pleasanter に保存されません）',
   // ---- 監査ログ -----------------------------------------------------------
   'audit.title': '操作の記録',
@@ -1065,8 +1065,8 @@ export const en: Record<MessageKey, string> = {
     'An attachment column needs "the attachment itself" connected to it',
   'problem.FilePortNeedsAttachmentColumn':
     '"The attachment itself" can only be connected to an attachment column',
-  'problem.StatusNeedsInteger':
-    'Status can only use an assignment that is guaranteed to produce an integer',
+  'problem.TargetColumnNeedsCompatibleValue':
+    'The assignment must be guaranteed to produce a value compatible with the target column type',
   'problem.UnmappedQuestion': 'Not assigned to any column (nothing will be kept in Pleasanter)',
   // ---- Audit log ----------------------------------------------------------
   'audit.title': 'Activity log',
