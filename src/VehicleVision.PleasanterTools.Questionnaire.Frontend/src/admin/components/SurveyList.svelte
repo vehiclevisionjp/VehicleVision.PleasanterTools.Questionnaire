@@ -927,20 +927,35 @@
 
   /*
     停止と複製が並ぶ。**td は display: flex にしない**（表の桁が崩れる）ので、
-    中に入れ物を 1 枚はさんでそこを flex にする。
+    中に入れ物を 1 枚はさんでそこを格子にする。
     **横だけに余白を付けると、折り返した先の行が詰まる**（Issue #150）
+
+    ⚠️ **flex の折り返しにしないこと。** 釦の出る条件が行ごとに違うので、
+    文字数なりに並べると**折り返す位置が行ごとに変わって縦に揃わない。**
+    **格子なら幅が揃い、何個出ても桁の位置が動かない。**
   */
   .row-actions-inner {
-    display: flex;
-    flex-wrap: wrap;
-    /* 行ごとに釦数が違っても、折り返した各行の右端をそろえる */
-    justify-content: flex-end;
-    gap: 0.4rem;
+    display: grid;
+    /* **等幅。** 入る数は桁の広さで決まり、余れば 1 行に収まる */
+    grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+    gap: 0.3rem;
+    /* 狭い画面で潰れないように、桁そのものの下限を決める */
+    min-width: 11.5rem;
   }
 
+  /* **1 つぶんの高さを抑える。** 段が増えても伸びにくくする */
   .row-actions-inner button {
-    padding: 0.35rem 0.5rem;
-    font-size: 0.8rem;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    /* **文字数が違っても同じ大きさに見えるようにする** */
+    text-align: center;
+  }
+
+  /* **釦の桁は広めに取る。** 等幅にすると 1 個あたりの幅が要る */
+  .row-actions {
+    width: 16rem;
   }
 
   label {
