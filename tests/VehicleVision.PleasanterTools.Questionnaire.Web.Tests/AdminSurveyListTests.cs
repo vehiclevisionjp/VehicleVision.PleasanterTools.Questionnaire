@@ -64,6 +64,7 @@ public class AdminSurveyListTests
         Assert.Null(query.Status);
         Assert.Null(query.TitleContains);
         Assert.Equal(0, query.Offset);
+        Assert.False(query.IncludeArchived);
     }
 
     [Fact]

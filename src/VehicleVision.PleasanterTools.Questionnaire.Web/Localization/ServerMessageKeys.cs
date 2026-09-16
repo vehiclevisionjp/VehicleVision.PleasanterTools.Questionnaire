@@ -111,6 +111,12 @@ public static class ServerMessageKeys
 
     public const string InvalidSurveyStatus = "surveys.invalidStatus";
 
+    /// <summary>アーカイブ済みのアンケートを変更しようとした。</summary>
+    public const string SurveyArchived = "surveys.archived";
+
+    /// <summary>既にアーカイブ済み、または既に復元済み。</summary>
+    public const string InvalidArchiveState = "surveys.invalidArchiveState";
+
     public const string SiteIdLockedAfterPublish = "surveys.siteIdLockedAfterPublish";
 
     public const string SiteIdBlockedByPendingResponses = "surveys.siteIdBlockedByPendingResponses";

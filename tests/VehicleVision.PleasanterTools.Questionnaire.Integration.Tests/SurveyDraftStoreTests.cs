@@ -465,6 +465,33 @@ public class SurveyDraftStoreTests
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public async Task アーカイブ済みは明示した一覧だけに出る(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+        var record = await surveys.FindBySurveyIdAsync(surveyId);
+        var archivedAt = new DateTime(2026, 9, 16, 7, 0, 0, DateTimeKind.Unspecified);
+        await surveys.SaveAsync(record! with { ArchivedAt = archivedAt });
+
+        Assert.DoesNotContain(
+            await drafts.ListAsync(new SurveyListQuery()),
+            summary => summary.SurveyId == surveyId);
+
+        var archived = Assert.Single(
+            await drafts.ListAsync(new SurveyListQuery { IncludeArchived = true }),
+            summary => summary.SurveyId == surveyId);
+        Assert.Equal(archivedAt, archived.ArchivedAt);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public async Task 無いアンケートはnullが返る(DatabaseProvider provider, string connectionString)
     {
         if (!Enabled)

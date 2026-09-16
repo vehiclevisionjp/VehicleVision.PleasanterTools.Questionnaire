@@ -183,7 +183,7 @@ public sealed class ResponseIntake(
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
             .ConfigureAwait(false);
 
-        return survey?.RequireProofOfWork ?? true;
+        return survey is { ArchivedAt: null } ? survey.RequireProofOfWork : true;
     }
 
     /// <summary>公開中のヘッダ画像を返す（Issue #56）。**無ければ <c>null</c>。**</summary>
@@ -677,9 +677,9 @@ public sealed class ResponseIntake(
     /// <summary>受け付けられる状態かを見る。</summary>
     private IntakeRejection? CheckAcceptable(SurveyRecord? survey)
     {
-        if (survey is null || survey.PublishedVersion is null)
+        if (survey is null || survey.PublishedVersion is null || survey.ArchivedAt is not null)
         {
-            // **存在しない公開 ID と、未公開のアンケートを区別しない。**
+            // **存在しない公開 ID と、未公開・アーカイブ済みのアンケートを区別しない。**
             // 区別すると、公開 ID の総当たりで「実在するか」が分かってしまう
             return IntakeRejection.NotFound;
         }
