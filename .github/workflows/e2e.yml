@@ -260,18 +260,23 @@ jobs:
               + `/actions/runs/${context.runId}`;
             const marker = '<!-- e2e-workflow-failure -->';
             const title = '端から端まで通す試験が失敗している';
-            const body = `${marker}
-            ## CI の失敗を検出しました
-
-            **失敗した job**
-
-            ${failedJobs}
-
-            **実行 URL**
-
-            ${runUrl}
-
-            同じ失敗で Issue を重複させないため、この Issue が開いている間は最新の失敗内容へ更新します。`;
+            // **行を配列で組む。** テンプレート文字列だと YAML の字下げが本文へ入り、
+            // 4 文字以上の字下げとして丸ごとコードブロックに描画される
+            const body = [
+              marker,
+              '## CI の失敗を検出しました',
+              '',
+              '**失敗した job**',
+              '',
+              failedJobs,
+              '',
+              '**実行 URL**',
+              '',
+              runUrl,
+              '',
+              '同じ失敗で Issue を重複させないため、この Issue が開いている間は'
+                + '最新の失敗内容へ更新します。',
+            ].join('\n');
 
             const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
