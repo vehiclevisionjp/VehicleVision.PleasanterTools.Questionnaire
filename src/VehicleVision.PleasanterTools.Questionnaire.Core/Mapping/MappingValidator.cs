@@ -237,6 +237,15 @@ public static class MappingValidator
         MappingSource source,
         MappingTargetValueKind target)
     {
+        // **文字列はどの設問からでも作れる。** ここを通さないと
+        // `Title` と `Body` へ何も割り当てられない（Issue #246）。
+        // ⚠️ **この検査は「確実に変換できるか」を見るもの**で、
+        // 数値や日時のように**変換に失敗し得る型だけが対象**である
+        if (target is MappingTargetValueKind.String)
+        {
+            return true;
+        }
+
         if (target is MappingTargetValueKind.DateTime)
         {
             return question.Type is QuestionType.Date;
