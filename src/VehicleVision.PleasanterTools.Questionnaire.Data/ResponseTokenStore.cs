@@ -21,6 +21,11 @@ public interface IResponseTokenStore
         string responseToken,
         CancellationToken cancellationToken = default);
 
+    /// <summary>その回答がテスト公開中に作られたものか。</summary>
+    Task<bool> IsTestAsync(
+        string responseToken,
+        CancellationToken cancellationToken = default);
+
     /// <summary>行が無ければ作る。**既にある <c>ReferenceId</c> は触らない。**</summary>
     /// <returns>
     /// このとき作ったなら <c>true</c>。既にあったなら <c>false</c>。
@@ -34,6 +39,13 @@ public interface IResponseTokenStore
     Task<bool> EnsureAsync(
         string responseToken,
         Guid surveyId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>テスト回答かを付けて、行が無ければ作る。</summary>
+    Task<bool> EnsureAsync(
+        string responseToken,
+        Guid surveyId,
+        bool isTest,
         CancellationToken cancellationToken = default);
 
     /// <summary>そのアンケートが受け付けた回答の件数（Issue #53）。</summary>
@@ -69,6 +81,17 @@ public interface IResponseTokenStore
 /// <summary>Dapper を使った実装。</summary>
 public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) : IResponseTokenStore
 {
+    public async Task<bool> IsTestAsync(
+        string responseToken,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await connection.QueryFirstOrDefaultAsync<bool>(Sql(
+            "SELECT [IsTest] FROM [ResponseTokens] WHERE [ResponseToken] = @ResponseToken",
+            new { ResponseToken = responseToken },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
     public async Task<long?> FindReferenceIdAsync(
         string responseToken,
         CancellationToken cancellationToken = default)
@@ -86,6 +109,13 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
         string responseToken,
         Guid surveyId,
         CancellationToken cancellationToken = default)
+        => await EnsureAsync(responseToken, surveyId, false, cancellationToken).ConfigureAwait(false);
+
+    public async Task<bool> EnsureAsync(
+        string responseToken,
+        Guid surveyId,
+        bool isTest,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(responseToken);
 
@@ -98,7 +128,13 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
         {
             await connection.ExecuteAsync(Sql(
                 SqlDialect.InsertResponseToken,
-                new { ResponseToken = responseToken, SurveyId = surveyId, Now = DbTime.ForDb(DateTime.Now) },
+                new
+                {
+                    ResponseToken = responseToken,
+                    SurveyId = surveyId,
+                    IsTest = isTest,
+                    Now = DbTime.ForDb(DateTime.Now),
+                },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
             return true;
@@ -131,8 +167,9 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
         // **COUNT の型は 3 者で違う**（SQL Server は int、他は bigint）が、
         // 単独の値として取る分には Dapper が合わせてくれる
         return await connection.ExecuteScalarAsync<int>(Sql(
-            "SELECT COUNT(*) FROM [ResponseTokens] WHERE [SurveyId] = @SurveyId",
-            new { SurveyId = surveyId },
+            "SELECT COUNT(*) FROM [ResponseTokens] "
+            + "WHERE [SurveyId] = @SurveyId AND [IsTest] = @IsTest",
+            new { SurveyId = surveyId, IsTest = false },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
@@ -150,6 +187,7 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
                 ResponseToken = responseToken,
                 SurveyId = surveyId,
                 ReferenceId = referenceId,
+                IsTest = false,
                 Now = DbTime.UtcNowTruncated(),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);

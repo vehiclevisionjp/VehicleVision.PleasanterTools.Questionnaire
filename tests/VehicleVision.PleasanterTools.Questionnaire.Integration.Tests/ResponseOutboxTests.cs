@@ -223,6 +223,31 @@ public class ResponseOutboxTests
         Assert.Equal(4321, await tokens.FindReferenceIdAsync(token));
     }
 
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task テスト回答は本番件数と滞留監視から外れる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (outbox, tokens) = Create(provider, connectionString);
+        var token = NewToken();
+        var surveyId = Guid.NewGuid();
+
+        Assert.True(await tokens.EnsureAsync(token, surveyId, isTest: true));
+        await outbox.SaveAsync(token, surveyId, 1, "{}", isTest: true);
+
+        Assert.True(await tokens.IsTestAsync(token));
+        Assert.Equal(0, await tokens.CountAcceptedAsync(surveyId));
+        Assert.Equal(0, (await outbox.CountBacklogAsync(1)).Total);
+
+        await outbox.CompleteAsync(token);
+    }
+
     /// <summary>1 件だけ確保する。テーブルは空にしてあるので、取れるのは対象の行だけ。</summary>
     private static Task<PendingResponse?> ClaimUntilAsync(
         IResponseOutbox outbox,

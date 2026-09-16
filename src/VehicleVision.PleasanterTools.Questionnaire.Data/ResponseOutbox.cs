@@ -115,6 +115,15 @@ public interface IResponseOutbox
         string payloadJson,
         CancellationToken cancellationToken = default);
 
+    /// <summary>テスト回答かを付けて送信待ちへ保存する。</summary>
+    Task SaveAsync(
+        string responseToken,
+        Guid surveyId,
+        int surveyVersion,
+        string payloadJson,
+        bool isTest,
+        CancellationToken cancellationToken = default);
+
     /// <summary>送るべき 1 件を確保する。無ければ <c>null</c>。</summary>
     Task<PendingResponse?> ClaimAsync(
         string lockedBy,
@@ -218,6 +227,17 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         int surveyVersion,
         string payloadJson,
         CancellationToken cancellationToken = default)
+        => await SaveAsync(
+            responseToken, surveyId, surveyVersion, payloadJson, false, cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task SaveAsync(
+        string responseToken,
+        Guid surveyId,
+        int surveyVersion,
+        string payloadJson,
+        bool isTest,
+        CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(Sql(
@@ -228,6 +248,7 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
                 SurveyId = surveyId,
                 SurveyVersion = surveyVersion,
                 PayloadJson = payloadJson,
+                IsTest = isTest,
                 PendingStatus = (int)ResponseStatus.Pending,
                 Now = DbTime.UtcNowTruncated(),
             },
@@ -406,11 +427,12 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         // ここを 1 往復に縮めても効かない
         var total = await connection.ExecuteScalarAsync<int>(Sql(
             SqlDialect.PendingBacklogTotal,
+            new { IsTest = false },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         var rows = await connection.QueryAsync<BacklogRow>(Sql(
             SqlDialect.PendingBacklogBySurvey,
-            new { AtLeast = (long)perSurveyAtLeast },
+            new { AtLeast = (long)perSurveyAtLeast, IsTest = false },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return new PendingBacklog(

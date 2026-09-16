@@ -56,6 +56,15 @@ public class ResponseBacklogGuardTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task SaveAsync(
+            string responseToken,
+            Guid surveyId,
+            int surveyVersion,
+            string payloadJson,
+            bool isTest,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<PendingResponse?> ClaimAsync(
             string lockedBy,
             TimeSpan lockDuration,
