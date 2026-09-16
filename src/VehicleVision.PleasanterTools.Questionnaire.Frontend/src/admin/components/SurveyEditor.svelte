@@ -41,6 +41,7 @@
   import AutoReplyEditor from './AutoReplyEditor.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
   import { adminAssetUrl } from '../lib/api';
+  import { addQuestionAssignment } from '../lib/mappingSelection';
 
   interface Props {
     surveyId: string;
@@ -108,6 +109,7 @@
   let notice = $state('');
   let conflict = $state(false);
   let warnings = $state<MappingProblem[]>([]);
+  let selectedQuestionId = $state<string | null>(null);
 
   /** 公開が断られたときにサーバが返した分岐の不備。**サーバが最後の判定者。** */
   let publishFlow = $state<FlowProblem[]>([]);
@@ -179,6 +181,7 @@
     savedDefinition = result.value.definition;
     mapping = result.value.mapping;
     savedMapping = result.value.mapping;
+    selectedQuestionId = null;
     revision = result.value.revision;
     await refreshColumnAvailability(id);
   }
@@ -251,7 +254,15 @@
   function removeQuestion(pageIndex: number, questionIndex: number) {
     const page = definition?.pages[pageIndex];
     if (!page) return;
+    if (page.questions[questionIndex]?.questionId === selectedQuestionId) {
+      selectedQuestionId = null;
+    }
     updatePage(pageIndex, { questions: page.questions.filter((_, i) => i !== questionIndex) });
+  }
+
+  function assignQuestion(questionId: string) {
+    selectedQuestionId = questionId;
+    mapping = addQuestionAssignment(mapping, questionId);
   }
 
   function moveQuestion(pageIndex: number, questionIndex: number, direction: -1 | 1) {
@@ -629,6 +640,8 @@
     onchange={(next) => (definition = { ...definition!, autoReply: next })}
   />
 
+  <div class="editor-columns">
+    <div class="question-column">
   {#each definition.pages as page, pageIndex (page.pageId)}
     {@const targets = jumpTargets(pageIndex)}
     {@const stale = staleTargetId(page.next, targets.map((target) => target.pageId))}
@@ -660,6 +673,7 @@
         <QuestionEditor
           {question}
           {editing}
+          selected={selectedQuestionId === question.questionId}
           mappedColumns={columnsFor(question.questionId)}
           canMoveUp={questionIndex > 0}
           canMoveDown={questionIndex < page.questions.length - 1}
@@ -667,6 +681,8 @@
           priorQuestions={priorQuestions(pageIndex, questionIndex)}
           branchTakenBy={branchTakenBy(pageIndex, questionIndex)}
           {allowedEmbedHosts}
+          onselect={() => (selectedQuestionId = question.questionId)}
+          onassign={() => assignQuestion(question.questionId)}
           onchange={(next) => updateQuestion(pageIndex, questionIndex, next)}
           onremove={() => removeQuestion(pageIndex, questionIndex)}
           onmove={(direction) => moveQuestion(pageIndex, questionIndex, direction)}
@@ -730,15 +746,20 @@
   {/each}
 
   <button type="button" class="secondary" onclick={addPage}>{t('editor.addPage')}</button>
+    </div>
 
-  <MappingEditor
-    {mapping}
-    questions={allQuestions}
-    {editing}
-    availability={columnAvailability}
-    onrefresh={() => refreshColumnAvailability()}
-    onchange={(next) => (mapping = next)}
-  />
+    <div class="mapping-column">
+      <MappingEditor
+        {mapping}
+        questions={allQuestions}
+        {editing}
+        {selectedQuestionId}
+        availability={columnAvailability}
+        onrefresh={() => refreshColumnAvailability()}
+        onchange={(next) => (mapping = next)}
+      />
+    </div>
+  </div>
 {/if}
 
 <!--
@@ -851,6 +872,24 @@
 
   .page {
     background: var(--bg);
+  }
+
+  .editor-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .question-column,
+  .mapping-column {
+    min-width: 0;
+  }
+
+  @media (max-width: 75rem) {
+    .editor-columns {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   label {

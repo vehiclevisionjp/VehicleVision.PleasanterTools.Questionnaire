@@ -43,6 +43,8 @@
     editing: Language;
     /** 割り当て先の列。**無いと「Pleasanter に残らない」ことが分からない** */
     mappedColumns: string[];
+    /** 左右の対応を見失わないよう、右の行を示している設問を強調する。 */
+    selected: boolean;
     canMoveUp: boolean;
     canMoveDown: boolean;
     /**
@@ -67,6 +69,8 @@
      * 知らせるだけで、**弾くのはサーバ。**
      */
     allowedEmbedHosts: string[];
+    onselect: () => void;
+    onassign: () => void;
     onchange: (question: Question) => void;
     onremove: () => void;
     onmove: (direction: -1 | 1) => void;
@@ -76,12 +80,15 @@
     question,
     editing,
     mappedColumns,
+    selected,
     canMoveUp,
     canMoveDown,
     jumpTargets,
     priorQuestions,
     branchTakenBy,
     allowedEmbedHosts,
+    onselect,
+    onassign,
     onchange,
     onremove,
     onmove,
@@ -411,7 +418,7 @@
   }
 </script>
 
-<article class="question">
+<article class="question" class:selected>
   <div class="head">
     <input
       class="title"
@@ -542,6 +549,20 @@
       <span class="unmapped">{t('question.unmapped')}</span>
     {:else}
       <span class="mapped">{t('question.mapped', { columns: mappedColumns.join(' / ') })}</span>
+    {/if}
+
+    {#if !displayOnly}
+      <button
+        type="button"
+        class="secondary small select"
+        aria-pressed={selected}
+        onclick={onselect}
+      >
+        {t('question.showAssignments')}
+      </button>
+      <button type="button" class="secondary small assign" onclick={onassign}>
+        {t('question.assign')}
+      </button>
     {/if}
   </div>
 
@@ -1123,6 +1144,11 @@
     margin-bottom: 0.75rem;
   }
 
+  .question.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+
   .head {
     display: flex;
     gap: 0.5rem;
@@ -1198,6 +1224,10 @@
 
   .mapped {
     color: #067647;
+  }
+
+  .select {
+    margin-left: auto;
   }
 
   .note {

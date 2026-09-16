@@ -20,12 +20,15 @@
     setConfigValue,
   } from '../lib/converterConfig';
   import MapConfigEditor from './MapConfigEditor.svelte';
+  import { includesQuestion } from '../lib/mappingSelection';
 
   interface Props {
     mapping: MappingDefinition;
     questions: Question[];
     /** 設問の文言をどの言語で出すか。**設問エディタで選んでいる言語に揃える。** */
     editing: Language;
+    /** 左右を見比べられるよう、左で選んだ設問を入力に含む行を明示する。 */
+    selectedQuestionId: string | null;
     /** 列数の根拠。取得に失敗したときは標準の本数を使う。 */
     availability: ColumnAvailabilityResponse;
     /** 明示的に押したときだけ、Pleasanter の列定義を取り直す。 */
@@ -33,7 +36,15 @@
     onchange: (mapping: MappingDefinition) => void;
   }
 
-  let { mapping, questions, editing, availability, onrefresh, onchange }: Props = $props();
+  let {
+    mapping,
+    questions,
+    editing,
+    selectedQuestionId,
+    availability,
+    onrefresh,
+    onchange,
+  }: Props = $props();
 
   /**
    * 変換の種類。**入力が複数なら必ずどれかが要る。**
@@ -293,8 +304,16 @@
             {@const needsSingleSource =
               !attachment && assignment.converter == null && assignment.sources.length !== 1}
             {@const noAttachmentColumn = attachment && assignment.targetColumn === ''}
-            <tr class:attachment class:has-notes={needsSingleSource || noAttachmentColumn}>
+            {@const selectedAssignment = includesQuestion(assignment, selectedQuestionId)}
+            <tr
+              class:attachment
+              class:selected={selectedAssignment}
+              class:has-notes={needsSingleSource || noAttachmentColumn}
+            >
               <td class="source">
+                {#if selectedAssignment}
+                  <span class="selection-marker">{t('mapping.selectedQuestionAssignment')}</span>
+                {/if}
                 <!--
                   **入力が複数のときは 1 つの升の中で積み、番号を振る**（Issue #86）。
                   行を分けて結合すると、変換とターゲットがどの入力群に掛かるのか読めなくなる
@@ -538,7 +557,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 2rem 0 0.5rem;
+    margin: 0 0 0.5rem;
   }
 
   .buttons {
@@ -609,6 +628,22 @@
     padding: 0.6rem 0.75rem;
     vertical-align: top;
     border-top: 1px solid var(--border);
+  }
+
+  tr.selected > td {
+    background: color-mix(in srgb, var(--accent) 8%, #fff);
+  }
+
+  tr.selected > td:first-child {
+    box-shadow: inset 3px 0 var(--accent);
+  }
+
+  .selection-marker {
+    display: inline-block;
+    margin-bottom: 0.4rem;
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 600;
   }
 
   /* **不備の行は割り当ての行と地続きに見せる。** 別の行に見えると対応が切れる */
