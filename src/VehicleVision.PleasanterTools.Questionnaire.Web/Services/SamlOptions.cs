@@ -127,15 +127,24 @@ public sealed class SamlOptions
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        if (!IsTrue(configuration[EnabledKey]))
+        return FromValues(key => configuration[key]);
+    }
+
+    /// <summary>鍵ごとの生値から設定を読む。</summary>
+    /// <remarks>DB と外部設定を合成した後にも、従来と同じ検証を通すための入口。</remarks>
+    public static SamlOptions FromValues(Func<string, string?> valueOf)
+    {
+        ArgumentNullException.ThrowIfNull(valueOf);
+
+        if (!IsTrue(valueOf(EnabledKey)))
         {
             return new SamlOptions();
         }
 
-        var entityId = Trim(configuration[EntityIdKey]);
-        var idpEntityId = Trim(configuration[IdpEntityIdKey]);
-        var singleSignOnUrl = Trim(configuration[SingleSignOnUrlKey]);
-        var certificates = ReadCertificates(configuration[IdpCertificateKey]);
+        var entityId = Trim(valueOf(EntityIdKey));
+        var idpEntityId = Trim(valueOf(IdpEntityIdKey));
+        var singleSignOnUrl = Trim(valueOf(SingleSignOnUrlKey));
+        var certificates = ReadCertificates(valueOf(IdpCertificateKey));
 
         Require(entityId, EntityIdKey);
         Require(idpEntityId, IdpEntityIdKey);
@@ -155,7 +164,7 @@ public sealed class SamlOptions
         }
 
         // **単一ログアウトは任意**（Issue #191）。**未設定でも SAML は使える**
-        var singleLogoutUrl = Trim(configuration[SingleLogoutUrlKey]);
+        var singleLogoutUrl = Trim(valueOf(SingleLogoutUrlKey));
         Uri? sloUri = null;
 
         if (singleLogoutUrl.Length > 0
@@ -166,9 +175,9 @@ public sealed class SamlOptions
                 $"{SingleLogoutUrlKey} は http(s) の絶対 URL で書いてください: {singleLogoutUrl}");
         }
 
-        var loginIdSource = ParseEnum<SamlLoginIdSource>(configuration[LoginIdSourceKey], LoginIdSourceKey)
+        var loginIdSource = ParseEnum<SamlLoginIdSource>(valueOf(LoginIdSourceKey), LoginIdSourceKey)
             ?? SamlLoginIdSource.NameId;
-        var loginIdClaim = Trim(configuration[LoginIdClaimKey]);
+        var loginIdClaim = Trim(valueOf(LoginIdClaimKey));
 
         if (loginIdSource == SamlLoginIdSource.Claim && loginIdClaim.Length == 0)
         {
@@ -184,13 +193,13 @@ public sealed class SamlOptions
             SingleSignOnUrl = ssoUri,
             SingleLogoutUrl = sloUri,
             IdpCertificates = certificates,
-            UnknownUser = ParseEnum<SamlUnknownUserPolicy>(configuration[UnknownUserKey], UnknownUserKey)
+            UnknownUser = ParseEnum<SamlUnknownUserPolicy>(valueOf(UnknownUserKey), UnknownUserKey)
                 ?? SamlUnknownUserPolicy.Reject,
-            RegisterRole = ParseEnum<AdminRole>(configuration[RegisterRoleKey], RegisterRoleKey)
+            RegisterRole = ParseEnum<AdminRole>(valueOf(RegisterRoleKey), RegisterRoleKey)
                 ?? AdminRole.Editor,
             LoginIdSource = loginIdSource,
             LoginIdClaim = loginIdClaim,
-            ButtonLabel = Trim(configuration[ButtonLabelKey]),
+            ButtonLabel = Trim(valueOf(ButtonLabelKey)),
         };
     }
 

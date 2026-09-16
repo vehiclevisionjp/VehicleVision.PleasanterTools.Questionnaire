@@ -59,6 +59,12 @@ public class EndpointGraphTests
             .ToList();
 
         Assert.NotEmpty(endpoints);
+        Assert.Contains(
+            endpoints.OfType<RouteEndpoint>(),
+            endpoint => endpoint.RoutePattern.RawText == "/api/admin/saml/settings");
+        Assert.Contains(
+            endpoints.OfType<RouteEndpoint>(),
+            endpoint => endpoint.RoutePattern.RawText == "/api/admin/saml/settings/test");
     }
 
     /// <summary>口が受け取るサービスを、型だけ DI へ置く。</summary>
@@ -79,6 +85,7 @@ public class EndpointGraphTests
         // **本体が DI へ入れている枠の型。** 自前の組み立て先には出てこない
         services.AddSingleton(TimeProvider.System);
         services.AddDataProtection();
+        services.AddHttpClient();
 
         var candidates = assemblies
             .SelectMany(TypesOf)

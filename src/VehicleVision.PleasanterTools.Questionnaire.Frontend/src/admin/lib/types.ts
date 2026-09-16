@@ -589,7 +589,36 @@ export type AdminPermission =
   | 'audit.read'
   | 'users.read'
   | 'users.write'
-  | 'users.resetTwoFactor';
+  | 'users.resetTwoFactor'
+  | 'settings.saml';
+
+export interface SamlSettings {
+  enabled: boolean;
+  entityId: string;
+  idpEntityId: string;
+  singleSignOnUrl: string;
+  idpCertificate: string;
+  unknownUser: string;
+  registerRole: string;
+  loginIdSource: string;
+  loginIdClaim: string;
+  buttonLabel: string;
+  singleLogoutUrl: string;
+  fixedFields: Record<SamlSettingField, boolean>;
+}
+
+export type SamlSettingField =
+  | 'enabled'
+  | 'entityId'
+  | 'idpEntityId'
+  | 'singleSignOnUrl'
+  | 'idpCertificate'
+  | 'unknownUser'
+  | 'registerRole'
+  | 'loginIdSource'
+  | 'loginIdClaim'
+  | 'buttonLabel'
+  | 'singleLogoutUrl';
 
 /**
  * 管理者の一覧の 1 行（Issue #156）。

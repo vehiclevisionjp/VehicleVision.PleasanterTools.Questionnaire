@@ -134,6 +134,7 @@ builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
 builder.Services.AddSurveyAssetStorage(builder.Configuration);
 builder.Services.AddSingleton<ISurveyDeletionStore, SurveyDeletionStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
+builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
 
 // **添付を弾いた記録は監査ログと別の表**（Issue #39）。
 // あちらは IpAddress を持つ。**弾いた記録は回答者側の出来事**なので、
@@ -354,11 +355,23 @@ builder.Services.AddSingleton(new AdminAuthOptions { TwoFactor = twoFactorPolicy
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
 
-// **SAML は既定で無効**（Issue #166）。有効なのに設定が足りなければ、
-// ここで例外になって起動しない。**「有効にしたつもり」で動き続けさせない**
-var samlOptions = SamlOptions.FromConfiguration(builder.Configuration);
-builder.Services.AddSingleton(samlOptions);
+// **外部設定だけで有効にしている従来構成は、起動時の検証も保つ。**
+// 書き間違いを 500 応答になるまで見つけられない構成へ後退させない。
+_ = SamlOptions.FromConfiguration(builder.Configuration);
+
+// **要求ごとに DB を読む。** 管理画面で変えた設定を再起動なしで反映する（Issue #254）。
+// 外部設定に値があれば DB より優先し、動いている構成を更新で変えない。
+builder.Services.AddSingleton<ISamlOptionsProvider, SamlOptionsProvider>();
 builder.Services.AddSingleton<SamlAuthenticator>();
+builder.Services
+    .AddHttpClient("SamlMetadata", client => client.Timeout = TimeSpan.FromSeconds(10))
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        // **転送先も検査せず追わない。** 内部アドレスへの迂回路にしない。
+        AllowAutoRedirect = false,
+        UseProxy = false,
+        ConnectCallback = SamlMetadataConnection.ConnectAsync,
+    });
 builder.Services.AddSingleton<AdminUserService>();
 
 // ---- bot 対策 --------------------------------------------------------------
@@ -726,13 +739,12 @@ app.MapFormEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminSessionEndpoints();
-// **SAML を使うときだけ受け口を生やす**（Issue #166）。
-// 使わない構成で認証の外の口を開けたままにしない（添付の検査の受け口と同じ考え方）。
-// **中で「無効なら 404」と書くより強い。** 無効なら経路そのものが無い
-if (samlOptions.Enabled)
-{
-    app.MapAdminSamlEndpoints();
-}
+// **経路は常に登録し、無効な間は各入口が 404 にする。**
+// ⚠️ **元は「有効なときだけ生やす」だった**（Issue #166。使わない構成で
+// 認証の外の口を開けたままにしないため）が、**管理画面から設定を変えられるように
+// した**ので、起動時に決めると変更のたびに再起動が要る。
+// **無効な間は各入口が 404 を返すことで、外から見た姿は変わらない**
+app.MapAdminSamlEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();

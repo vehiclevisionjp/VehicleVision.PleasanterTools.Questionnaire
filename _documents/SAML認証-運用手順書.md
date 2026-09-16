@@ -1,11 +1,15 @@
 # SAML 認証 運用手順書
 
-管理画面へ **SAML 2.0 のシングルサインオン**で入れるようにする手順（Issue #166）。
+管理画面へ **SAML 2.0 のシングルサインオン**で入れるようにし、
+管理画面から設定を変更する手順（Issue #166、#254）。
 
 **既定は無効。** 設定しなければ、これまでどおりログイン ID とパスワード（＋ 2 要素）だけになる。
 
 - 実装: `src/VehicleVision.PleasanterTools.Questionnaire.Web/Services/SamlOptions.cs`、
-  `Services/SamlAuthenticator.cs`、`Endpoints/AdminSamlEndpoints.cs`
+  `Services/SamlOptionsProvider.cs`、`Services/SamlAuthenticator.cs`、
+  `Endpoints/AdminSamlEndpoints.cs`
+- 保存先: `src/VehicleVision.PleasanterTools.Questionnaire.Data/SamlSettingStore.cs`、
+  `Migrations/M0023_SamlSettings.cs`
 - 使っているライブラリ: [ITfoxtec.Identity.Saml2](https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2)
   4.20.1（BSD-3-Clause。2026-09-09 参照）
 
@@ -37,6 +41,8 @@
 | 利用者の突き合わせ | **ログイン ID**（既定は `NameID`。属性からも取れる） |
 | 未登録の利用者 | **拒絶**（既定）か **その場で登録**（JIT）を選べる |
 | 単一ログアウト | **対応**（Issue #191）。`QUESTIONNAIRE_SAML_SINGLELOGOUTURL` を設定したときだけ使う。SP 起点・IdP 起点の両方を受ける |
+| 設定の反映 | DB の設定は**再起動なし**で次の要求から反映する |
+| 設定できる人 | `Administrator` だけ。アンケートの権限とは別 |
 
 ### やり取りの流れ
 
@@ -79,6 +85,11 @@ sequenceDiagram
   操作の記録（`AuditLogs`）に残す
 - **最初の管理者を作る画面には SAML の釦を出さない。**
   IdP から来た人を最初の管理者にすると、誰でも全権を取れる
+- ⚠️ **ログイン ID とパスワードの入口は無効化しない。**
+  SAML を有効にした本人が、その設定で入れるとは限らない。
+  設定を誤った場合は、パスワードと必要な 2 要素認証で入り直して修正する
+- **設定の変更は `AuditLogs` に残す。**
+  証明書の本文は記録せず、`idpCertificate` を変更した事実だけを残す
 
 ### HTTPS が要る
 
@@ -88,7 +99,44 @@ sequenceDiagram
 
 ## 3. 設定
 
-環境変数（または Key Vault）で与える。一覧は
+### 3.1 設定を読む順序
+
+次の順で、最初に値があるものを使う。
+
+1. 環境変数、Key Vault、`App_Data/Parameters` などの**外部設定**
+2. DB の `SamlSettings`
+3. 既定値
+
+外部設定で指定した項目は、管理画面に**「設定で固定されています」**と表示され、
+編集できない。DB に保存済みの値は消さずに残るため、後で外部設定を外すと再び使われる。
+
+⚠️ **既存環境の互換性を優先する。** これまでの環境変数を残したまま更新すれば、
+DB の値より環境変数が優先され、動作は変わらない。
+
+DB の保存先を作るため、更新後にマイグレーション 23 を適用する。
+マイグレーションの実行方法は
+[`データモデル設計.md`](データモデル設計.md) の「マイグレーション」を参照する。
+
+### 3.2 管理画面から設定する
+
+1. `Administrator` で管理画面へログインする
+2. 上部の **SAML 設定**を開く
+3. IdP の Entity ID、シングルサインオン URL、署名証明書などを入力する
+4. 未登録利用者の扱いと、JIT 登録する場合の役割を確認する
+5. 必要な場合は単一ログアウト URL も入力する
+6. **保存する**を押す
+7. 操作の記録で `PUT /api/admin/saml/settings` が成功していることを確認する
+
+**保存した設定は再起動なしで反映される。** 有効化に必要な値が不足している場合や、
+証明書・URL・列挙値を読めない場合は保存を拒否し、直前の設定を使い続ける。
+
+⚠️ **有効化後もパスワードで入れることを確認する。** SAML の設定を誤っても、
+合言葉の入口は残る。SAML 専用の利用者を JIT で作った場合、その利用者はパスワードを
+持たないため、既存のパスワード利用者で確認する。
+
+### 3.3 外部設定で固定する
+
+環境変数（または Key Vault）で固定する場合の一覧は
 [`App_Data/Parameters/README.md`](../App_Data/Parameters/README.md)。
 
 ```bash
@@ -105,8 +153,9 @@ QUESTIONNAIRE_SAML_UNKNOWNUSER=Reject
 QUESTIONNAIRE_SAML_BUTTONLABEL=会社アカウントでログイン
 ```
 
-**足りない設定があるまま `ENABLED=true` にすると、起動時に例外で止まる。**
-「有効にしたつもりが効いていない」を後から探さないようにするため、黙って無効へ落とさない。
+外部設定だけで `ENABLED=true` にしている従来構成では、足りない設定があると
+**起動時に例外で止まる。** 管理画面から保存する場合は、保存時に同じ検証を行う。
+どちらも「有効にしたつもりが効いていない」状態へ黙って落とさない。
 
 ### 未登録の利用者をどう扱うか
 
@@ -134,7 +183,26 @@ QUESTIONNAIRE_SAML_LOGINIDCLAIM=login_id
 **IdP 側でメールアドレスを変えると、本アプリでは別人になる。**
 変えたときは、本アプリ側のログイン ID も合わせて直すこと。
 
-## 4. IdP へ登録する値
+## 4. 接続の試験と IdP へ登録する値
+
+### 4.1 IdP メタデータの取得
+
+SAML 設定画面の **接続の試験**へ IdP のメタデータ URL を入力し、
+**メタデータを取得する**を押す。
+
+この試験で行うのは次だけ。
+
+- HTTP または HTTPS でメタデータを取得する
+- 取得結果が SAML の `EntityDescriptor` または `EntitiesDescriptor` であることを確かめる
+- `EntityDescriptor` に Entity ID があれば画面へ表示する
+
+⚠️ **実際のログインは試さない。** IdP の画面へ移動しないため、設定画面から戻れなくならない。
+取得の上限は 10 秒、XML は 1 MiB とし、外部実体や DTD は読まない。
+また、接続試験を内部サービスの探索へ使わせないため、ループバック、プライベート、
+リンクローカルなどの IP アドレスには接続せず、HTTP の転送も追わない。
+**閉域内だけにある IdP はこの試験の対象外**だが、SAML ログイン自体にはこの制限を掛けない。
+
+### 4.2 IdP へ登録する値
 
 本アプリを起動してから、次の口が SP のメタデータを返す。
 
@@ -200,6 +268,7 @@ GET https://{本アプリのホスト}/api/admin/saml/metadata
 
 ⚠️ **証明書を入れ替えるときは、新旧 2 枚を並べて設定してから IdP を切り替えること。**
 1 枚ずつ入れ替えると、切り替えの瞬間に誰も入れなくなる。
+管理画面から変更した場合は、変更項目 `idpCertificate` が操作の記録に残る。
 
 ## 7. 手元で試す
 

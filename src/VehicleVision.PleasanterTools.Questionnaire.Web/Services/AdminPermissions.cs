@@ -67,6 +67,10 @@ public static class AdminPermissions
     /// </remarks>
     public const string UsersResetTwoFactor = "users.resetTwoFactor";
 
+    /// <summary>SAML の設定の閲覧・変更。</summary>
+    /// <remarks>認証の入口を変えるため、特権管理者だけに持たせる。</remarks>
+    public const string SamlSettings = "settings.saml";
+
     /// <summary>すべての権限。**役割の対応表を作るときに使う。**</summary>
     public static readonly ImmutableArray<string> All =
     [
@@ -83,6 +87,7 @@ public static class AdminPermissions
         UsersRead,
         UsersWrite,
         UsersResetTwoFactor,
+        SamlSettings,
     ];
 
     /// <summary>役割ごとに持つ権限。</summary>
