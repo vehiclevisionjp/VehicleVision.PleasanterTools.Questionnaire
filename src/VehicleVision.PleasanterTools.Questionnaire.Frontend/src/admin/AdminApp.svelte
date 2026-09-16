@@ -2,6 +2,7 @@
   import AdminUserList from './components/AdminUserList.svelte';
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
+  import HelpPanel from './components/HelpPanel.svelte';
   import InvitationAcceptPanel from './components/InvitationAcceptPanel.svelte';
   import MyAccountPanel from './components/MyAccountPanel.svelte';
   import NotificationList from './components/NotificationList.svelte';
@@ -55,6 +56,9 @@
   /** SAML 設定を開いているか。**特権管理者だけに見せる。** */
   let openSamlSettings = $state(readSamlSettings());
 
+  /** 使い方を開いているか。**これも URL に出す。** */
+  let openHelp = $state(readHelp());
+
   /**
    * 未読の件数。**ヘッダのバッジに出す。**
    *
@@ -83,6 +87,7 @@
       openUsers = readUsers();
       openAccount = readAccount();
       openSamlSettings = readSamlSettings();
+      openHelp = readHelp();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -117,6 +122,10 @@
     return /^\/admin\/saml-settings\/?$/.test(location.pathname);
   }
 
+  function readHelp(): boolean {
+    return /^\/admin\/help\/?$/.test(location.pathname);
+  }
+
   /** 画面を 1 つだけ開く。**出し分けの取りこぼしを防ぐ。** */
   function only(path: string, flags: Partial<Record<string, boolean>> = {}) {
     openSurveyId = null;
@@ -126,6 +135,7 @@
     openUsers = flags.users ?? false;
     openAccount = flags.account ?? false;
     openSamlSettings = flags.samlSettings ?? false;
+    openHelp = flags.help ?? false;
     history.pushState(null, '', path);
   }
 
@@ -153,6 +163,12 @@
   function openSamlSettingsPanel() {
     if (navigate('/admin/saml-settings', { samlSettings: true })) {
       openSamlSettings = true;
+    }
+  }
+
+  function openHelpPanel() {
+    if (navigate('/admin/help', { help: true })) {
+      openHelp = true;
     }
   }
 
@@ -192,6 +208,7 @@
     if (openUsers && canSeeUsers) return 'users';
     if (openAccount) return 'account';
     if (openSamlSettings && canManageSaml) return 'saml-settings';
+    if (openHelp) return 'help';
     return 'surveys';
   });
 
@@ -207,6 +224,7 @@
     if (page === 'notifications') return t('breadcrumb.notifications');
     if (page === 'users') return t('breadcrumb.users');
     if (page === 'saml-settings') return t('breadcrumb.samlSettings');
+    if (page === 'help') return t('breadcrumb.help');
     return t('breadcrumb.account');
   }
 
@@ -275,6 +293,7 @@
     openUsers = false;
     openAccount = false;
     openSamlSettings = false;
+    openHelp = false;
     unreadCount = 0;
     history.replaceState(null, '', '/admin');
     await refresh();
@@ -398,6 +417,8 @@
         <button type="button" class="link" onclick={openSamlSettingsPanel}>{t('saml.open')}</button>
       {/if}
 
+      <button type="button" class="link" onclick={openHelpPanel}>{t('help.open')}</button>
+
       <!-- **自分の設定は誰でも開ける。** 役割を問わない -->
       <button type="button" class="link" onclick={openMyAccount}>{t('account.open')}</button>
 
@@ -449,6 +470,8 @@
         />
       {:else if openSamlSettings && canManageSaml}
         <SamlSettingsPanel onback={back} />
+      {:else if openHelp}
+        <HelpPanel onback={back} />
       {:else if openAccount}
         <MyAccountPanel {session} onchanged={refresh} onback={back} />
       {:else if openAuditLog && canSeeAuditLog}

@@ -6,6 +6,7 @@ export type AdminPage =
   | 'notifications'
   | 'users'
   | 'saml-settings'
+  | 'help'
   | 'account';
 
 export interface Breadcrumb {
