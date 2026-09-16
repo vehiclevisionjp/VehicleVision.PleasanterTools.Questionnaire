@@ -399,15 +399,17 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        // **公開中の行しか止めない。** 既に停止中なら 0 行で終わり、
-        // 手で止めた理由（Manual）を上書きしない。何度呼んでも同じ結果になる
+        // **公開中かつアーカイブしていない行しか止めない。**
+        // 既に停止中なら 0 行で終わり、手で止めた理由（Manual）を上書きしない。
+        // アーカイブと回答受付が競合しても、畳んだ後の状態を書き換えない
         var affected = await connection.ExecuteAsync(Sql(
             "UPDATE [Surveys] SET "
             + "  [Status] = @SuspendedStatus, "
             + "  [SuspendedReason] = @Reason, "
             + "  [SuspendedAt] = @Now, "
             + "  [UpdatedAt] = @Now "
-            + "WHERE [SurveyId] = @SurveyId AND [Status] = @PublishedStatus",
+            + "WHERE [SurveyId] = @SurveyId "
+            + "  AND [Status] = @PublishedStatus AND [ArchivedAt] IS NULL",
             new
             {
                 SurveyId = surveyId,
