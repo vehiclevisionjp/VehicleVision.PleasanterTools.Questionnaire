@@ -79,7 +79,10 @@ public static class NoteMarkup
             paragraph.Clear();
             if (inlines.Length > 0)
             {
-                blocks.Add(new NoteBlock(NoteBlockKind.Paragraph, Inlines: inlines));
+                blocks.Add(new NoteBlock(
+                    NoteBlockKind.Paragraph,
+                    Inlines: inlines,
+                    Items: []));
             }
         }
 
@@ -90,7 +93,7 @@ public static class NoteMarkup
                 return;
             }
 
-            blocks.Add(new NoteBlock(listKind, Items: items.ToImmutable()));
+            blocks.Add(new NoteBlock(listKind, [], items.ToImmutable()));
             items.Clear();
         }
 
@@ -113,7 +116,10 @@ public static class NoteMarkup
                 if (inlines.Length > 0)
                 {
                     blocks.Add(new NoteBlock(
-                        NoteBlockKind.Heading, Inlines: inlines, Level: level));
+                        NoteBlockKind.Heading,
+                        Inlines: inlines,
+                        Items: [],
+                        Level: level));
                 }
 
                 continue;

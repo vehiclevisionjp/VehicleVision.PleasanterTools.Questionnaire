@@ -111,8 +111,8 @@ public sealed record NoteListItem(ImmutableArray<NoteInline> Inlines)
 /// </remarks>
 public sealed record NoteBlock(
     NoteBlockKind Kind,
-    ImmutableArray<NoteInline> Inlines = default,
-    ImmutableArray<NoteListItem> Items = default,
+    ImmutableArray<NoteInline> Inlines,
+    ImmutableArray<NoteListItem> Items,
     int Level = 0)
 {
     /// <summary>見出しの深さの下限。</summary>
