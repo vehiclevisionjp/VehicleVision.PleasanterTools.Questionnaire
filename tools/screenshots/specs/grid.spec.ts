@@ -68,13 +68,13 @@ test.describe('グリッドとランキング', () => {
     await page.getByRole('button', { name: '送信する' }).click();
 
     await expect(page.getByText('すべての行に回答してください')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'ありがとうございました。' })).toBeHidden();
+    await expect(page.getByRole('heading', { name: '回答を受け付けました' })).toBeHidden();
 
     // 残りを埋めれば送れる
     await page.getByRole('radio', { name: '品質: 悪い' }).check();
     await page.getByRole('button', { name: '送信する' }).click();
 
-    await expect(page.getByRole('heading', { name: 'ありがとうございました。' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '回答を受け付けました' })).toBeVisible();
   });
 
   test('ランキングをキーボードだけで並べ替えられる', async ({ page }) => {
@@ -123,6 +123,6 @@ test.describe('グリッドとランキング', () => {
     const grid = body.answers.find((answer) => answer.questionId === 'q-grid');
 
     expect(grid?.rows).toEqual({ price: ['good'], quality: ['bad'] });
-    await expect(page.getByRole('heading', { name: 'ありがとうございました。' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '回答を受け付けました' })).toBeVisible();
   });
 });

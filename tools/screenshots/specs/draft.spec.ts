@@ -140,7 +140,7 @@ test.describe('回答の下書き', () => {
     await page.waitForTimeout(4000);
     await page.getByRole('button', { name: '送信する' }).click();
 
-    await expect(page.getByRole('heading', { name: 'ありがとうございました。' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '回答を受け付けました' })).toBeVisible();
 
     const stored = await page.evaluate(
       (publicId) => localStorage.getItem(`questionnaire.draft.${publicId}`),

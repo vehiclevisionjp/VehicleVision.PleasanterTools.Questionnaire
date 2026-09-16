@@ -15,18 +15,15 @@ import { totp } from './totp';
 /**
  * 既に通っているログインの控え。**先に走る試験が書き出すもの。**
  *
- * - `artifacts/auth.json` … `specs/manual.spec.ts`
- * - `artifacts/branching-auth.json` … `specs/branching.spec.ts`
- * - `artifacts/secure-context-auth.json` … この関数が作るもの
+ * - `.auth.json` … `specs/manual.spec.ts` または、この関数が作るもの
+ *
+ * **`artifacts/` には置かない。** Playwright は実行開始時に outputDir を空にするため、
+ * `manual.spec.ts` と残りを分けて走らせると、間で控えが消えてしまう
  */
-const knownAuthFiles = [
-  'artifacts/auth.json',
-  'artifacts/branching-auth.json',
-  'artifacts/secure-context-auth.json',
-];
+const knownAuthFiles = ['.auth.json'];
 
 /** 自分で作ったときの置き場。 */
-const ownAuthFile = 'artifacts/secure-context-auth.json';
+const ownAuthFile = '.auth.json';
 
 /**
  * ログイン済みの状態をしまったファイルの場所を返す。
@@ -57,7 +54,7 @@ export async function ensureAdminStorageState(
 
     if ((await setupHeading.count()) === 0) {
       throw new Error(
-        '管理者が既に居るのに、ログインの控え（artifacts/*.json）が無い。'
+        '管理者が既に居るのに、ログインの控え（.auth.json）が無い。'
           + 'まっさらな検証環境で走らせるか、先に manual / branching の試験を通すこと',
       );
     }

@@ -53,3 +53,23 @@ export function totp(secretBase32: string, at: Date = new Date()): string {
 
   return String(code % 1_000_000).padStart(6, '0');
 }
+
+/**
+ * 直前に使った枠と違う枠のコードを作る。
+ *
+ * **同じ 30 秒枠のコードは一度しか通らない**（`AdminAuthenticator`）。
+ * 登録した直後にログインし直すと、枠が変わるまで必ず弾かれる。
+ * 一式が速くなるほど踏みやすい。**速さで隠れる不具合なので、待って避ける。**
+ */
+export async function totpInNewWindow(secretBase32: string, usedAt: Date): Promise<string> {
+  const usedStep = Math.floor(usedAt.getTime() / 1000 / 30);
+
+  for (;;) {
+    const now = new Date();
+    if (Math.floor(now.getTime() / 1000 / 30) !== usedStep) {
+      return totp(secretBase32, now);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}

@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { prepareBranchingSurvey } from '../lib/branching';
-import { demoAdmin } from '../lib/setup';
-import { totp } from '../lib/totp';
+import { ensureAdminStorageState } from '../lib/admin';
 
 /**
  * 分岐が回答画面で本当に効くことを確かめる。
@@ -11,51 +10,32 @@ import { totp } from '../lib/totp';
  * 画面が出した設問がサーバに落とされる／隠したはずの答えが保存される、
  * のどちらも起き得る。
  *
- * **まっさらな検証環境が前提**（管理者がまだ 1 人も居ない）。
+ * 単独で走らせたときは管理者を作り、一式では先に作った管理者を引き継ぐ。
  */
 const demoSiteId = Number(process.env['SHOT_SITE_ID'] ?? '1');
 
-const authFile = 'artifacts/branching-auth.json';
+const authFile = '.auth.json';
 
 let publicId = '';
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('分岐（下ごしらえ）', () => {
-  test('管理者を作る', async ({ page }) => {
-    await page.goto('/admin');
-
-    await expect(page.getByRole('heading', { name: '最初の管理者を登録する' })).toBeVisible();
-
-    await page.getByLabel('ログイン ID').fill(demoAdmin.loginId);
-    await page.getByLabel('パスワード', { exact: true }).fill(demoAdmin.password);
-    await page.getByLabel('パスワード（確認）').fill(demoAdmin.password);
-    await page.getByRole('button', { name: '登録する' }).click();
-
-    await expect(page.getByRole('heading', { name: '2 要素認証を登録する' })).toBeVisible();
-    const secret = (await page.locator('.secret code').innerText()).replace(/\s/g, '');
-
-    await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret));
-    await page.getByRole('button', { name: '登録する' }).click();
-
-    await expect(page.getByRole('heading', { name: '復旧コードを控えてください' })).toBeVisible();
-    await page.getByLabel('控えました').check();
-    await page.getByRole('button', { name: '管理画面へ進む' }).click();
-
-    await expect(page.getByRole('heading', { name: 'アンケート' })).toBeVisible();
-    await page.context().storageState({ path: authFile });
-  });
+test.beforeAll(async ({ browser, baseURL }) => {
+  await ensureAdminStorageState(browser, baseURL ?? '');
 });
 
 test.describe('分岐', () => {
   test.use({ storageState: authFile });
 
-  test('見本のアンケートを公開する', async ({ page }) => {
-    // **page.request を使う。** request フィクスチャは別の入れ物で cookie を持たない
-    const survey = await prepareBranchingSurvey(page.request, demoSiteId);
-    publicId = survey.publicId;
-
-    expect(publicId).not.toBe('');
+  test('見本のアンケートを公開する', async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ baseURL, storageState: authFile });
+    try {
+      const survey = await prepareBranchingSurvey(context.request, demoSiteId);
+      publicId = survey.publicId;
+      expect(publicId).not.toBe('');
+    } finally {
+      await context.close();
+    }
   });
 
   test('条件を満たすと設問が現れ、外すと消える', async ({ page }) => {
@@ -103,7 +83,7 @@ test.describe('分岐', () => {
     await page.waitForTimeout(4000);
     await page.getByRole('button', { name: '送信する' }).click();
 
-    await expect(page.getByRole('heading', { name: 'ありがとうございました。' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '回答を受け付けました' })).toBeVisible();
   });
 
   test('通った側では必須で止まる', async ({ page }) => {
