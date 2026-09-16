@@ -1,11 +1,13 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import {
+    getAdminCaptchaChallenge,
     login,
     setupFirstAdministrator,
     verifyRecoveryCode,
     verifyTotp,
   } from '../lib/api';
+  import { solveAltcha } from '../../lib/altcha';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -85,9 +87,26 @@
     }
 
     busy = true;
+    let altcha: string | undefined;
+    if (!isSetup && session.captchaEnabled) {
+      const challenge = await getAdminCaptchaChallenge();
+      if (!challenge.ok) {
+        busy = false;
+        error = challenge.message;
+        return;
+      }
+
+      altcha = (await solveAltcha(challenge.value)) ?? undefined;
+      if (altcha === undefined) {
+        busy = false;
+        error = t('signIn.captchaFailed');
+        return;
+      }
+    }
+
     const result = isSetup
       ? await setupFirstAdministrator(loginId, password)
-      : await login(loginId, password);
+      : await login(loginId, password, altcha);
     busy = false;
 
     if (!result.ok) {

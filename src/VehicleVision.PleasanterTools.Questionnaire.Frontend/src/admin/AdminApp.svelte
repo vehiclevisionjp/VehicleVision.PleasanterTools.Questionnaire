@@ -2,6 +2,7 @@
   import AdminUserList from './components/AdminUserList.svelte';
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
+  import InvitationAcceptPanel from './components/InvitationAcceptPanel.svelte';
   import MyAccountPanel from './components/MyAccountPanel.svelte';
   import NotificationList from './components/NotificationList.svelte';
   import OutboxStatusPanel from './components/OutboxStatusPanel.svelte';
@@ -337,6 +338,15 @@
       session.pending === true &&
       session.needsEnrollment === true,
   );
+
+  let acceptingInvitation = $state(
+    /^\/admin\/invitations\/accept\/?$/.test(location.pathname),
+  );
+
+  function finishInvitation() {
+    acceptingInvitation = false;
+    void refresh();
+  }
 </script>
 
 <div class="shell">
@@ -480,6 +490,8 @@
         })}
       </footer>
     {/if}
+  {:else if acceptingInvitation && session}
+    <InvitationAcceptPanel {session} onadvance={finishInvitation} />
   {:else if needsEnrollment}
     <EnrollPanel onadvance={refresh} />
   {:else if session}

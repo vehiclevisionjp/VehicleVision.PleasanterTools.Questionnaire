@@ -688,6 +688,9 @@ export interface AdminSession {
   /** SAML でのログインが使えるか（Issue #166）。**既定は無効** */
   samlEnabled?: boolean;
 
+  /** パスワードログインと招待受取に proof-of-work が必要か（Issue #252）。 */
+  captchaEnabled?: boolean;
+
   /** SAML の釦に出す文字。`null` なら決まった文言を使う */
   samlLabel?: string | null;
 

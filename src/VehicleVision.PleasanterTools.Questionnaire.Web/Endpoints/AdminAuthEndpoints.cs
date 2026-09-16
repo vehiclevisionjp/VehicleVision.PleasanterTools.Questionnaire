@@ -46,6 +46,7 @@ public static class AdminAuthEndpoints
             IAdminUserStore store,
             ISamlOptionsProvider samlProvider,
             AdminAuthOptions options,
+            AdminCaptchaOptions captcha,
             MailOptions mail,
             CancellationToken cancellationToken) =>
         {
@@ -101,6 +102,7 @@ public static class AdminAuthEndpoints
                     hasTotp,
                     samlEnabled,
                     samlLabel,
+                    captchaEnabled = captcha.Enabled,
 
                     // **IdP へログアウトを頼めるか**（Issue #191）。
                     // 画面はこれを見て、ログアウトの行き先を決める
@@ -138,8 +140,15 @@ public static class AdminAuthEndpoints
                 needsEnrollment,
                 samlEnabled,
                 samlLabel,
+                captchaEnabled = captcha.Enabled,
             });
         });
+
+        // **課題を出すだけでは利用者を調べない。** ログイン ID の実在を応答時間へ出さない。
+        group.MapGet("/captcha/challenge", (
+            AdminCaptchaOptions options,
+            AltchaGuard altcha) =>
+            options.Enabled ? Results.Ok(altcha.Issue()) : Results.NotFound());
 
         // ---- 最初の管理者 ----------------------------------------------------
         group.MapPost("/setup", async (
@@ -205,11 +214,24 @@ public static class AdminAuthEndpoints
             AdminCredentialRequest request,
             HttpContext context,
             AdminAuthenticator authenticator,
+            AdminCaptchaOptions captcha,
+            AltchaGuard altcha,
             CancellationToken cancellationToken) =>
         {
             // **誰が狙われているかは、記録に残っていないと分からない。**
             // パスワードは預けない（AuditNotes の但し書き）
             AuditNotes.Add(context, "loginId", request.LoginId);
+
+            // **この handler より先にレート制限 middleware が動く。**
+            // 無制限に署名検証だけをさせて、サーバの CPU を使わせない。
+            if (captcha.Enabled
+                && await altcha.CheckRequiredAsync(request.Altcha, cancellationToken)
+                    .ConfigureAwait(false) is not null)
+            {
+                return Results.Json(
+                    new { message = InvalidMessage(context) },
+                    statusCode: StatusCodes.Status401Unauthorized);
+            }
 
             if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
             {
@@ -508,7 +530,10 @@ public static class AdminAuthEndpoints
     }
 
     /// <summary>ログイン ID とパスワード。</summary>
-    public sealed record AdminCredentialRequest(string? LoginId, string? Password);
+    public sealed record AdminCredentialRequest(
+        string? LoginId,
+        string? Password,
+        string? Altcha = null);
 
     /// <summary>使い捨てパスワードか復旧コード。</summary>
     public sealed record AdminCodeRequest(string? Code);

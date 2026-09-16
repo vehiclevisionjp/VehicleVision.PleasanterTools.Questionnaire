@@ -482,8 +482,21 @@ public static class AdminUserEndpoints
             AdminUserService service,
             AdminAuthenticator authenticator,
             AdminAuthOptions options,
+            AdminCaptchaOptions captcha,
+            AltchaGuard altcha,
             CancellationToken cancellationToken) =>
         {
+            // **この handler より先にログイン用のレート制限が動く。**
+            // CAPTCHA の成否は招待トークンの当たり外れと同じ応答に隠す。
+            if (captcha.Enabled
+                && await altcha.CheckRequiredAsync(request.Altcha, cancellationToken)
+                    .ConfigureAwait(false) is not null)
+            {
+                return Failure(
+                    AdminUserOutcome.InvitationInvalid,
+                    RequestLanguage.Of(context));
+            }
+
             var (outcome, user, passwordProblem) = await service
                 .AcceptInvitationAsync(
                     request.Token, request.Password, RequestLanguage.Of(context), cancellationToken)
@@ -674,5 +687,8 @@ public static class AdminUserEndpoints
     public sealed record AdminCodeRequest(string? Code);
 
     /// <summary>招待と、本人が決めたパスワード。</summary>
-    public sealed record AdminInvitationAcceptRequest(string? Token, string? Password);
+    public sealed record AdminInvitationAcceptRequest(
+        string? Token,
+        string? Password,
+        string? Altcha = null);
 }
