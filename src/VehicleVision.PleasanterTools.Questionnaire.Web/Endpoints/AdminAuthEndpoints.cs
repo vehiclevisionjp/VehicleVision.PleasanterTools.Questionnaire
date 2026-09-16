@@ -43,12 +43,13 @@ public static class AdminAuthEndpoints
         group.MapGet("/session", async (
             HttpContext context,
             IAdminUserStore store,
-            SamlOptions saml,
+            ISamlOptionsProvider samlProvider,
             AdminAuthOptions options,
             MailOptions mail,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
+            var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
 
             // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）

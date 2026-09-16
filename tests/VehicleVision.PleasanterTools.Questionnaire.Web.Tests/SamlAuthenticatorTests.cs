@@ -18,6 +18,20 @@ public class SamlAuthenticatorTests
         PasswordHasher Hasher,
         SamlAuthenticator Authenticator);
 
+    private sealed class StaticSamlOptionsProvider(SamlOptions options) : ISamlOptionsProvider
+    {
+        public Task<SamlOptionsSnapshot> GetAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new SamlOptionsSnapshot(
+                options,
+                new SamlSettingValues(),
+                new HashSet<string>()));
+
+        public Task<SamlOptionsSnapshot> SaveAsync(
+            SamlSettingValues values,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
     private static Harness Create(
         SamlOptions options,
         TwoFactorPolicy twoFactor = TwoFactorPolicy.Optional)
@@ -32,7 +46,7 @@ public class SamlAuthenticatorTests
             new SamlAuthenticator(
                 store,
                 hasher,
-                options,
+                new StaticSamlOptionsProvider(options),
                 new AdminAuthOptions { TwoFactor = twoFactor },
                 NullLogger<SamlAuthenticator>.Instance));
     }

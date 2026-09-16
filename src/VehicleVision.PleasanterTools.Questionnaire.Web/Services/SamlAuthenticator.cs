@@ -56,7 +56,7 @@ public sealed record SamlSignInResult(
 public sealed class SamlAuthenticator(
     IAdminUserStore store,
     PasswordHasher hasher,
-    SamlOptions options,
+    ISamlOptionsProvider optionsProvider,
     AdminAuthOptions authOptions,
     ILogger<SamlAuthenticator> logger)
 {
@@ -65,7 +65,18 @@ public sealed class SamlAuthenticator(
         string loginId,
         CancellationToken cancellationToken = default)
     {
+        var options = (await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+        return await SignInAsync(loginId, options, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>応答の検証に使ったものと同じ設定で利用者を扱う。</summary>
+    public async Task<SamlSignInResult> SignInAsync(
+        string loginId,
+        SamlOptions options,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(loginId);
+        ArgumentNullException.ThrowIfNull(options);
 
         var trimmed = loginId.Trim();
         var user = await store.FindByLoginIdAsync(trimmed, cancellationToken).ConfigureAwait(false);
@@ -82,7 +93,8 @@ public sealed class SamlAuthenticator(
                 return new SamlSignInResult(SamlSignInOutcome.Unknown);
             }
 
-            user = await RegisterAsync(trimmed, cancellationToken).ConfigureAwait(false);
+            user = await RegisterAsync(trimmed, options.RegisterRole, cancellationToken)
+                .ConfigureAwait(false);
             registered = true;
 
             logger.LogInformation(
@@ -119,7 +131,10 @@ public sealed class SamlAuthenticator(
     /// この利用者はパスワードのログインでは通らない。
     /// 使えるようにしたいときは、招待の手順で本人にパスワードを決めさせる。
     /// </remarks>
-    private async Task<AdminUser> RegisterAsync(string loginId, CancellationToken cancellationToken)
+    private async Task<AdminUser> RegisterAsync(
+        string loginId,
+        AdminRole registerRole,
+        CancellationToken cancellationToken)
     {
         var user = new AdminUser
         {
@@ -129,7 +144,7 @@ public sealed class SamlAuthenticator(
             // **推測できない値。** 誰にも渡さないので、パスワードでは入れない
             PasswordHash = hasher.Hash(Convert.ToBase64String(Guid.NewGuid().ToByteArray())
                 + Convert.ToBase64String(Guid.NewGuid().ToByteArray())),
-            Role = options.RegisterRole,
+            Role = registerRole,
         };
 
         await store.CreateAsync(user, cancellationToken).ConfigureAwait(false);

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Xml;
 using Microsoft.IdentityModel.Tokens.Saml2;
 using ITfoxtec.Identity.Saml2;
 using ITfoxtec.Identity.Saml2.Claims;
@@ -8,6 +9,7 @@ using ITfoxtec.Identity.Saml2.Schemas;
 using ITfoxtec.Identity.Saml2.Schemas.Metadata;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -30,8 +32,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// 詳しい理由はサーバのログと操作の記録に残す。
 /// </para>
 /// <para>
-/// **この入口は、SAML を有効にしたときだけ生える**（<c>Program.cs</c>）。
-/// ここで「無効なら 404」と書き分けていない。**経路そのものを作らない方が強い。**
+/// **SAML が無効な間、認証の入口は 404 を返す。**
+/// 管理画面から再起動なしで有効化するため、経路自体は常に登録する。
 /// </para>
 /// </remarks>
 public static class AdminSamlEndpoints
@@ -66,8 +68,17 @@ public static class AdminSamlEndpoints
         // ---- SP のメタデータ -------------------------------------------------
         // **IdP へ登録する値を、実際に動いている設定から出す。**
         // 手で書き写すと、EntityID や受け口の URL の食い違いに気付けない
-        group.MapGet("/metadata", (HttpContext context, SamlOptions options) =>
+        group.MapGet("/metadata", async (
+            HttpContext context,
+            ISamlOptionsProvider optionsProvider,
+            CancellationToken cancellationToken) =>
         {
+            var options = (await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+            if (!options.Enabled)
+            {
+                return Results.NotFound();
+            }
+
             var descriptor = new EntityDescriptor(options.ToSaml2Configuration())
             {
                 ValidUntil = 365,
@@ -95,12 +106,19 @@ public static class AdminSamlEndpoints
         });
 
         // ---- IdP へ送り出す --------------------------------------------------
-        group.MapGet("/login", (
+        group.MapGet("/login", async (
             HttpContext context,
-            SamlOptions options,
+            ISamlOptionsProvider optionsProvider,
             IDataProtectionProvider protectionProvider,
-            string? returnUrl) =>
+            string? returnUrl,
+            CancellationToken cancellationToken) =>
         {
+            var options = (await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+            if (!options.Enabled)
+            {
+                return Results.NotFound();
+            }
+
             var configuration = options.ToSaml2Configuration();
             var request = new Saml2AuthnRequest(configuration)
             {
@@ -126,12 +144,18 @@ public static class AdminSamlEndpoints
         // ---- IdP から受け取る ------------------------------------------------
         group.MapPost("/acs", async (
             HttpContext context,
-            SamlOptions options,
+            ISamlOptionsProvider optionsProvider,
             SamlAuthenticator authenticator,
             IDataProtectionProvider protectionProvider,
             ILogger<SamlAuthenticator> logger,
             CancellationToken cancellationToken) =>
         {
+            var options = (await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+            if (!options.Enabled)
+            {
+                return Results.NotFound();
+            }
+
             var relay = ReadRelay(context, protectionProvider);
             ClearRelay(context);
 
@@ -191,7 +215,9 @@ public static class AdminSamlEndpoints
             // **誰が来たかを記録に残す**（AuditNotes は本文へ触らない）
             AuditNotes.Add(context, "loginId", loginId);
 
-            var result = await authenticator.SignInAsync(loginId, cancellationToken)
+            // **署名検証と JIT の方針を同じスナップショットで決める。**
+            // 途中で設定が更新されても、1 回の応答に新旧の方針を混ぜない。
+            var result = await authenticator.SignInAsync(loginId, options, cancellationToken)
                 .ConfigureAwait(false);
 
             if (result.Registered)
@@ -225,6 +251,7 @@ public static class AdminSamlEndpoints
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
         MapSingleLogout(group);
+        MapSettings(group);
 
         return builder;
     }
@@ -249,10 +276,12 @@ public static class AdminSamlEndpoints
         // ---- SP 起点：IdP へログアウトを頼む ---------------------------------
         group.MapGet("/logout", async (
             HttpContext context,
-            SamlOptions options,
+            ISamlOptionsProvider optionsProvider,
             IDataProtectionProvider protectionProvider,
-            ILogger<SamlAuthenticator> logger) =>
+            ILogger<SamlAuthenticator> logger,
+            CancellationToken cancellationToken) =>
         {
+            var options = (await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
             var keys = ReadSessionKeys(context.User.Identity as ClaimsIdentity);
 
             // ⚠️ **先に落とす。** IdP へ行けなくても、こちらは確実にログアウトする
@@ -288,9 +317,10 @@ public static class AdminSamlEndpoints
         // ---- IdP 起点と、頼んだぶんの返事 ------------------------------------
         var slo = async (
             HttpContext context,
-            SamlOptions options,
+            ISamlOptionsProvider optionsProvider,
             IDataProtectionProvider protectionProvider,
-            ILogger<SamlAuthenticator> logger) =>
+            ILogger<SamlAuthenticator> logger,
+            CancellationToken cancellationToken) =>
         {
             // ⚠️ **署名を確かめる前に落とす。** 偽の要求で落とされても
             // 「ログアウトさせられる」だけで、入られるより軽い
@@ -298,6 +328,7 @@ public static class AdminSamlEndpoints
             await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Session).ConfigureAwait(false);
             await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
 
+            var options = (await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
             if (!options.SingleLogoutEnabled)
             {
                 return Results.NotFound();
@@ -366,6 +397,213 @@ public static class AdminSamlEndpoints
         group.MapGet("/slo", slo).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
         group.MapPost("/slo", slo).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
     }
+
+    /// <summary>特権管理者だけが使える SAML 設定の入口。</summary>
+    private static void MapSettings(RouteGroupBuilder group)
+    {
+        var policy = AdminPermissions.PolicyOf(AdminPermissions.SamlSettings);
+
+        group.MapGet("/settings", async (
+            ISamlOptionsProvider provider,
+            CancellationToken cancellationToken) =>
+        {
+            var snapshot = await provider.GetAsync(cancellationToken).ConfigureAwait(false);
+            return Results.Ok(SettingsBody(snapshot));
+        }).RequireAuthorization(policy);
+
+        group.MapPut("/settings", async (
+            SamlSettingsRequest request,
+            HttpContext context,
+            ISamlOptionsProvider provider,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var before = await provider.GetAsync(cancellationToken).ConfigureAwait(false);
+                var changedFields = ChangedFields(before, request);
+                if (changedFields.Count > 0)
+                {
+                    // **証明書の本文は残さない。** どの項目を変えたかだけで改竄を追える。
+                    AuditNotes.Add(context, "changedFields", string.Join(",", changedFields));
+                }
+
+                var snapshot = await provider
+                    .SaveAsync(request.ToValues(), cancellationToken)
+                    .ConfigureAwait(false);
+                return Results.Ok(SettingsBody(snapshot));
+            }
+            catch (InvalidOperationException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+        }).RequireAuthorization(policy);
+
+        group.MapPost("/settings/test", async (
+            SamlMetadataTestRequest request,
+            IHttpClientFactory clientFactory,
+            CancellationToken cancellationToken) =>
+        {
+            if (!Uri.TryCreate(request.MetadataUrl?.Trim(), UriKind.Absolute, out var metadataUrl)
+                || (metadataUrl.Scheme != Uri.UriSchemeHttps
+                    && metadataUrl.Scheme != Uri.UriSchemeHttp))
+            {
+                return Results.BadRequest(new { code = "invalid-url" });
+            }
+
+            try
+            {
+                using var response = await clientFactory
+                    .CreateClient("SamlMetadata")
+                    .GetAsync(metadataUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                    .ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+
+                await using var stream = await response.Content
+                    .ReadAsStreamAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                using var reader = XmlReader.Create(stream, new XmlReaderSettings
+                {
+                    DtdProcessing = DtdProcessing.Prohibit,
+                    MaxCharactersInDocument = 1_048_576,
+                    XmlResolver = null,
+                });
+
+                while (reader.Read() && reader.NodeType != XmlNodeType.Element)
+                {
+                }
+
+                if (reader.LocalName is not ("EntityDescriptor" or "EntitiesDescriptor"))
+                {
+                    return Results.BadRequest(new { code = "not-metadata" });
+                }
+
+                return Results.Ok(new
+                {
+                    reachable = true,
+                    entityId = reader.GetAttribute("entityID"),
+                });
+            }
+            catch (Exception exception) when (exception is HttpRequestException
+                or TaskCanceledException
+                or XmlException)
+            {
+                return Results.BadRequest(new { code = "fetch-failed" });
+            }
+        }).RequireAuthorization(policy);
+    }
+
+    private static IReadOnlyList<string> ChangedFields(
+        SamlOptionsSnapshot before,
+        SamlSettingsRequest request)
+    {
+        var old = before.Values;
+        var changed = new List<string>();
+
+        void Add(string name, string key, string? previous, string? next)
+        {
+            if (!before.FixedKeys.Contains(key)
+                && !string.Equals(previous?.Trim(), next?.Trim(), StringComparison.Ordinal))
+            {
+                changed.Add(name);
+            }
+        }
+
+        Add("enabled", SamlOptions.EnabledKey, old.Enabled, request.Enabled ? "true" : "false");
+        Add("entityId", SamlOptions.EntityIdKey, old.EntityId, request.EntityId);
+        Add("idpEntityId", SamlOptions.IdpEntityIdKey, old.IdpEntityId, request.IdpEntityId);
+        Add(
+            "singleSignOnUrl",
+            SamlOptions.SingleSignOnUrlKey,
+            old.SingleSignOnUrl,
+            request.SingleSignOnUrl);
+        Add(
+            "idpCertificate",
+            SamlOptions.IdpCertificateKey,
+            old.IdpCertificate,
+            request.IdpCertificate);
+        Add("unknownUser", SamlOptions.UnknownUserKey, old.UnknownUser, request.UnknownUser);
+        Add("registerRole", SamlOptions.RegisterRoleKey, old.RegisterRole, request.RegisterRole);
+        Add(
+            "loginIdSource",
+            SamlOptions.LoginIdSourceKey,
+            old.LoginIdSource,
+            request.LoginIdSource);
+        Add("loginIdClaim", SamlOptions.LoginIdClaimKey, old.LoginIdClaim, request.LoginIdClaim);
+        Add("buttonLabel", SamlOptions.ButtonLabelKey, old.ButtonLabel, request.ButtonLabel);
+        Add(
+            "singleLogoutUrl",
+            SamlOptions.SingleLogoutUrlKey,
+            old.SingleLogoutUrl,
+            request.SingleLogoutUrl);
+
+        return changed;
+    }
+
+    private static object SettingsBody(SamlOptionsSnapshot snapshot)
+    {
+        bool Fixed(string key) => snapshot.FixedKeys.Contains(key);
+        var values = snapshot.Values;
+
+        return new
+        {
+            enabled = string.Equals(values.Enabled, "true", StringComparison.OrdinalIgnoreCase),
+            entityId = values.EntityId,
+            idpEntityId = values.IdpEntityId,
+            singleSignOnUrl = values.SingleSignOnUrl,
+            idpCertificate = values.IdpCertificate,
+            unknownUser = values.UnknownUser,
+            registerRole = values.RegisterRole,
+            loginIdSource = values.LoginIdSource,
+            loginIdClaim = values.LoginIdClaim,
+            buttonLabel = values.ButtonLabel,
+            singleLogoutUrl = values.SingleLogoutUrl,
+            fixedFields = new
+            {
+                enabled = Fixed(SamlOptions.EnabledKey),
+                entityId = Fixed(SamlOptions.EntityIdKey),
+                idpEntityId = Fixed(SamlOptions.IdpEntityIdKey),
+                singleSignOnUrl = Fixed(SamlOptions.SingleSignOnUrlKey),
+                idpCertificate = Fixed(SamlOptions.IdpCertificateKey),
+                unknownUser = Fixed(SamlOptions.UnknownUserKey),
+                registerRole = Fixed(SamlOptions.RegisterRoleKey),
+                loginIdSource = Fixed(SamlOptions.LoginIdSourceKey),
+                loginIdClaim = Fixed(SamlOptions.LoginIdClaimKey),
+                buttonLabel = Fixed(SamlOptions.ButtonLabelKey),
+                singleLogoutUrl = Fixed(SamlOptions.SingleLogoutUrlKey),
+            },
+        };
+    }
+
+    public sealed record SamlSettingsRequest(
+        bool Enabled,
+        string? EntityId,
+        string? IdpEntityId,
+        string? SingleSignOnUrl,
+        string? IdpCertificate,
+        string? UnknownUser,
+        string? RegisterRole,
+        string? LoginIdSource,
+        string? LoginIdClaim,
+        string? ButtonLabel,
+        string? SingleLogoutUrl)
+    {
+        public SamlSettingValues ToValues() => new()
+        {
+            Enabled = Enabled ? "true" : "false",
+            EntityId = EntityId,
+            IdpEntityId = IdpEntityId,
+            SingleSignOnUrl = SingleSignOnUrl,
+            IdpCertificate = IdpCertificate,
+            UnknownUser = UnknownUser,
+            RegisterRole = RegisterRole,
+            LoginIdSource = LoginIdSource,
+            LoginIdClaim = LoginIdClaim,
+            ButtonLabel = ButtonLabel,
+            SingleLogoutUrl = SingleLogoutUrl,
+        };
+    }
+
+    public sealed record SamlMetadataTestRequest(string? MetadataUrl);
 
     /// <summary>来たものが「頼んだぶんの返事」か。</summary>
     private static bool IsLogoutResponse(HttpContext context)
