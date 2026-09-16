@@ -273,7 +273,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
 
                 if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
                 {
-                    problems.Add(new ColumnConversionProblem(columnName, $"数値として読めない: {value}"));
+                    problems.Add(new ColumnConversionProblem(columnName, "数値として読めない"));
                     return false;
                 }
 
@@ -305,7 +305,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                     return true;
                 }
 
-                problems.Add(new ColumnConversionProblem(columnName, $"日時として読めない: {value}"));
+                problems.Add(new ColumnConversionProblem(columnName, "日時として読めない"));
                 return false;
 
             default:
@@ -352,7 +352,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                     return true;
                 }
 
-                problems.Add(new ColumnConversionProblem(columnName, $"整数として読めない: {value}"));
+                problems.Add(new ColumnConversionProblem(columnName, "整数として読めない"));
                 return false;
 
             case MappingTargetValueKind.Boolean:
@@ -362,7 +362,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                     return true;
                 }
 
-                problems.Add(new ColumnConversionProblem(columnName, $"真偽値として読めない: {value}"));
+                problems.Add(new ColumnConversionProblem(columnName, "真偽値として読めない"));
                 return false;
 
             case MappingTargetValueKind.Decimal:
@@ -372,7 +372,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                     return true;
                 }
 
-                problems.Add(new ColumnConversionProblem(columnName, $"数値として読めない: {value}"));
+                problems.Add(new ColumnConversionProblem(columnName, "数値として読めない"));
                 return false;
 
             case MappingTargetValueKind.DateTime:
@@ -390,7 +390,7 @@ public sealed class PleasanterRecordBuilder(PleasanterDateTime dateTime)
                     return true;
                 }
 
-                problems.Add(new ColumnConversionProblem(columnName, $"日時として読めない: {value}"));
+                problems.Add(new ColumnConversionProblem(columnName, "日時として読めない"));
                 return false;
 
             default:

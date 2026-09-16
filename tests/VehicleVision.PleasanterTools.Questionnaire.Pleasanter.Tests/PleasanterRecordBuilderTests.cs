@@ -185,6 +185,23 @@ public class PleasanterRecordBuilderTests
         Assert.Contains(record.Problems, problem => problem.ColumnName == columnName);
     }
 
+    [Theory]
+    [InlineData("NumA", "とても満足")]
+    [InlineData("DateA", "来週")]
+    [InlineData("Status", "処理中")]
+    [InlineData("Locked", "yes")]
+    [InlineData("WorkValue", "金額")]
+    [InlineData("StartTime", "来週")]
+    public void 不備の理由に回答の値を載せない(string columnName, string value)
+    {
+        // **理由はデッドレターの LastError に残り、管理画面へ出る。**
+        // 完全匿名が前提なので、回答の中身をここへ流さない
+        var record = Builder().Build(Columns((columnName, [value])));
+
+        var problem = Assert.Single(record.Problems);
+        Assert.DoesNotContain(value, problem.Reason, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void 未回答の本体日時は日付列と同じ最小日時で送る()
     {
