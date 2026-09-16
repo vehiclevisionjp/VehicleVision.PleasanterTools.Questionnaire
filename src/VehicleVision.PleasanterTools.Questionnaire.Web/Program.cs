@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
@@ -68,6 +69,35 @@ var provider = Enum.Parse<DatabaseProvider>(
     builder.Configuration["QUESTIONNAIRE_DB_PROVIDER"] ?? nameof(DatabaseProvider.SqlServer));
 var connectionString = builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"]
     ?? throw new InvalidOperationException("QUESTIONNAIRE_DB_CONNECTIONSTRING が設定されていない");
+var sharedStateOptions = SharedStateOptions.FromConfiguration(builder.Configuration);
+var sessionStoreKind =
+    builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_STORE"] ?? "Database";
+var useRedisSessionStore =
+    string.Equals(sessionStoreKind, "Redis", StringComparison.OrdinalIgnoreCase);
+
+// **接続設定と ConnectionMultiplexer は共有状態と管理者セッションで共用する。**
+// 別々に持つと、片方だけ接続先や資格情報を更新する事故が起きる。
+if (sharedStateOptions.UseRedis || useRedisSessionStore)
+{
+    var redisConnectionString =
+        builder.Configuration[SharedStateOptions.ConnectionStringKey]
+        ?? throw new InvalidOperationException(
+            $"{SharedStateOptions.ConnectionStringKey} is required when Redis is used.");
+    var redisConfiguration = ConfigurationOptions.Parse(redisConnectionString);
+
+    // **一時的に到達できなくてもアプリ自体は起動する。**
+    // 共有状態はプロセス内へ倒し、セッション照合はログアウト扱いにする。
+    redisConfiguration.AbortOnConnectFail = false;
+    builder.Services.AddSingleton<IConnectionMultiplexer>(
+        ConnectionMultiplexer.Connect(redisConfiguration));
+}
+
+builder.Services.AddSingleton(sharedStateOptions);
+if (sharedStateOptions.UseRedis)
+{
+    builder.Services.AddSingleton<ISharedRateLimitStore, RedisSharedRateLimitStore>();
+    builder.Services.AddSingleton<ISharedBacklogStateStore, RedisSharedBacklogStateStore>();
+}
 
 // **DB への通信が平文で流れていないかを起動時に見る。**
 // 接続文字列は運用者が与えるのでコードからは中身が見えず、
@@ -285,26 +315,12 @@ builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
 
 // **既定は DB。** 追加の基盤なしで、個別失効と端末一覧を使えるようにする。
 // 大規模構成では Redis を選べるが、停止時に cookie だけで通すことはしない。
-var sessionStoreKind =
-    builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_STORE"] ?? "Database";
 if (string.Equals(sessionStoreKind, "Database", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<IAdminSessionStore, DatabaseAdminSessionStore>();
 }
 else if (string.Equals(sessionStoreKind, "Redis", StringComparison.OrdinalIgnoreCase))
 {
-    var redisConnectionString =
-        builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING"]
-        ?? throw new InvalidOperationException(
-            "QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING is required "
-            + "when the administrator session store is Redis.");
-    var redisConfiguration = ConfigurationOptions.Parse(redisConnectionString);
-
-    // **一時的に到達できなくてもアプリ自体は起動する。**
-    // ただしセッション照合は失敗するため、管理者は全員ログアウト扱いになる。
-    redisConfiguration.AbortOnConnectFail = false;
-    builder.Services.AddSingleton<IConnectionMultiplexer>(
-        ConnectionMultiplexer.Connect(redisConfiguration));
     builder.Services.AddSingleton<IAdminSessionStore>(serviceProvider =>
         new RedisAdminSessionStore(
             serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
@@ -549,9 +565,14 @@ builder.Services.AddHostedService<AuditLogRetentionService>();
 // ---- レート制限 ------------------------------------------------------------
 // **DB へ書く前に効かせる。** 書いてから弾いても消費は起きている
 // （_documents/非機能設計.md 1 章）
-builder.Services.AddRateLimiter(options =>
+builder.Services.AddRateLimiter();
+builder.Services
+    .AddOptions<RateLimiterOptions>()
+    .Configure<IServiceProvider, ILoggerFactory>((options, serviceProvider, loggerFactory) =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    var sharedRateLimits = serviceProvider.GetService<ISharedRateLimitStore>();
+    var rateLimitLogger = loggerFactory.CreateLogger("SharedRateLimit");
 
     // **複数の軸で掛ける。** 1 つの軸だけでは抜けられる
     options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
@@ -563,34 +584,39 @@ builder.Services.AddRateLimiter(options =>
                 && context.Request.Path.Value?.Contains(
                     "/assets/", StringComparison.OrdinalIgnoreCase) is true;
             var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            return RateLimitPartition.GetFixedWindowLimiter(
-                $"{address}|{(isAsset ? "asset" : "api")}",
-                _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = isAsset ? 600 : requestPermitLimit,
-                    Window = TimeSpan.FromMinutes(1),
-                });
+            var kind = isAsset ? "asset" : "api";
+            return RateLimitPartitions.FixedWindow(
+                $"{address}|{kind}",
+                "request",
+                isAsset ? 600 : requestPermitLimit,
+                TimeSpan.FromMinutes(1),
+                sharedRateLimits,
+                rateLimitLogger);
         }),
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
-            RateLimitPartition.GetFixedWindowLimiter(
-                context.Request.RouteValues["publicId"]?.ToString() ?? "none",
-                _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 600,
-                    Window = TimeSpan.FromMinutes(1),
-                })));
+        {
+            var publicId = context.Request.RouteValues["publicId"]?.ToString();
+            return RateLimitPartitions.FixedWindow(
+                publicId ?? "none",
+                "survey",
+                600,
+                TimeSpan.FromMinutes(1),
+                // publicId の無いヘルスチェックや管理 API を全 Pod 共通の 1 枠へ集めない。
+                publicId is null ? null : sharedRateLimits,
+                rateLimitLogger);
+        }));
 
     // **回答の送信だけ別枠にする。** 書き込みは読み取りより高くつくので、
     // 画面を開くだけの要求と同じ枠で数えない。
     // **NAT の内側から大勢が答えることがある**ので、締めすぎないこと
     options.AddPolicy(FormEndpoints.SubmitRateLimitPolicy, context =>
-        RateLimitPartition.GetFixedWindowLimiter(
+        RateLimitPartitions.FixedWindow(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = submitPermitLimit,
-                Window = TimeSpan.FromMinutes(1),
-            }));
+            "submit",
+            submitPermitLimit,
+            TimeSpan.FromMinutes(1),
+            sharedRateLimits,
+            rateLimitLogger));
 
     // **ログインの試行だけは別枠で厳しくする。**
     // 全体の枠に紛れさせると、1 分に 60 回の総当たりが通ってしまう。
@@ -598,13 +624,13 @@ builder.Services.AddRateLimiter(options =>
     // **回数を設定で変えられるようにしてある。** 検証環境では端から端まで通す試験が
     // 既定の枠を使い切ってしまうため。**本番では既定のまま使うこと**
     options.AddPolicy(AdminAuthSchemes.LoginRateLimitPolicy, context =>
-        RateLimitPartition.GetFixedWindowLimiter(
+        RateLimitPartitions.FixedWindow(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = loginPermitLimit,
-                Window = TimeSpan.FromMinutes(5),
-            }));
+            "login",
+            loginPermitLimit,
+            TimeSpan.FromMinutes(5),
+            sharedRateLimits,
+            rateLimitLogger));
 });
 
 // **スキーマが揃っていないまま起動しない。**
@@ -802,7 +828,8 @@ app.MapFallbackToFile("/f/{**path}", "index.html");
 
 // 生存確認。**アンケートの情報を出さない**
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
-    .WithTags("生存確認");
+    .WithTags("生存確認")
+    .DisableRateLimiting();
 
 // 受付可能かの確認。Pleasanter が止まっても回答は DB に積んで再送できるため、
 // **ここで見る依存先は本アプリの DB だけ。** 例外の中身は接続先や資格情報を
@@ -819,7 +846,8 @@ app.MapGet("/ready", async (CancellationToken cancellationToken) =>
         ? Results.Ok(new { status = "ready" })
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
 })
-    .WithTags("生存確認");
+    .WithTags("生存確認")
+    .DisableRateLimiting();
 
 app.Run();
 

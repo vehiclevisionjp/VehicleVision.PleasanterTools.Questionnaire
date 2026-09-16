@@ -424,7 +424,11 @@ public sealed class ResponseIntake(
         // 数え直しのたびに実際の件数へ戻るので、多く見えるのは次の計測までに限られる
         if (!responseIsTest)
         {
-            backlog?.OnAccepted(survey.SurveyId);
+            if (backlog is not null)
+            {
+                await backlog.OnAcceptedAsync(survey.SurveyId, cancellationToken)
+                    .ConfigureAwait(false);
+            }
         }
 
         // **この回答で上限に届いたなら、ここで止める。**
