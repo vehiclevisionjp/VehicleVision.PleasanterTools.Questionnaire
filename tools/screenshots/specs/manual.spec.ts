@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { expectFewSurveys, expectNoAdminYet } from '../lib/fresh';
 import { demoAdmin, prepareSurvey } from '../lib/setup';
 import { findTofu, japaneseSamples } from '../lib/tofu';
-import { totp } from '../lib/totp';
+import { totp, totpInNewWindow } from '../lib/totp';
 
 /**
  * 取説へ載せる画面の写しを撮る。
@@ -76,6 +76,7 @@ test.describe.configure({ mode: 'serial' });
 let publicId = '';
 let surveyId = '';
 let secretBase32 = '';
+let enrolledAt = new Date(0);
 
 test.describe('取説用の写し', { tag: '@standalone' }, () => {
 
@@ -103,7 +104,8 @@ test.describe('取説用の写し', { tag: '@standalone' }, () => {
 
     await shoot(page, 'admin-02-enroll');
 
-    await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret));
+    enrolledAt = new Date();
+    await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret, enrolledAt));
     await page.getByRole('button', { name: '登録する' }).click();
 
     // **復旧コードはここでしか出せない**
@@ -267,8 +269,14 @@ test.describe('取説用の写し（ログイン済み）', { tag: '@standalone'
 
     // **ここで止めると、ログアウト前に保存した cookie は既に失効している。**
     // 続く spec へ有効なログインを渡すため、撮った後に認証を完了して控えを更新する
-    await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secretBase32));
-    await page.getByRole('button', { name: 'ログインする' }).click();
+    // **ログイン時の見出しは登録時と違う。** 登録は「認証アプリに表示された 6 桁のコード」、
+    // ログインは「6 桁のコード」。取り違えると、この段でだけ止まる
+    //
+    // **登録で使った枠のコードは通らない。** 同じ 30 秒枠は一度しか受け付けない。
+    // 一式が 30 秒未満で終わると必ずここで弾かれるので、枠が変わるまで待つ
+    const code = await totpInNewWindow(secretBase32, enrolledAt);
+    await page.getByLabel('6 桁のコード', { exact: true }).fill(code);
+    await page.getByRole('button', { name: 'ログイン', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'アンケート' })).toBeVisible();
     await page.context().storageState({ path: authFile });
   });
