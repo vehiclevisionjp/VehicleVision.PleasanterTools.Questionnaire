@@ -82,16 +82,18 @@ public static class ColumnBudget
     public static ImmutableArray<ColumnUsage> Measure(
         MappingDefinition mapping,
         int availablePerType = StandardColumnsPerType)
-        => Measure(mapping, new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-        {
-            [""] = availablePerType,
-        });
+        => Measure(mapping, ImmutableDictionary<string, int>.Empty, availablePerType);
 
     /// <summary>今の割り当てで、型ごとに何本使っているか。</summary>
-    /// <param name="availableByPrefix">実際のサイトで使える本数。無い型は標準の本数で数える。</param>
+    /// <param name="availableByPrefix">実際のサイトで使える本数。</param>
+    /// <param name="fallbackPerType">
+    /// <paramref name="availableByPrefix"/> に無い型を数えるときの本数。
+    /// **サイトから取れなかったときはここだけで数える**ので、既定を無視しないこと。
+    /// </param>
     public static ImmutableArray<ColumnUsage> Measure(
         MappingDefinition mapping,
-        IReadOnlyDictionary<string, int> availableByPrefix)
+        IReadOnlyDictionary<string, int> availableByPrefix,
+        int fallbackPerType = StandardColumnsPerType)
     {
         ArgumentNullException.ThrowIfNull(mapping);
         ArgumentNullException.ThrowIfNull(availableByPrefix);
@@ -107,7 +109,7 @@ public static class ColumnBudget
                 .Select(group => new ColumnUsage(
                     group.Key,
                     group.Select(column => column).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
-                    availableByPrefix.GetValueOrDefault(group.Key, StandardColumnsPerType))),
+                    availableByPrefix.GetValueOrDefault(group.Key, fallbackPerType))),
         ];
     }
 

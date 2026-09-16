@@ -292,6 +292,45 @@ public class GridMappingTests
         Assert.True(usage.Single(entry => entry.Prefix == "Num").Fits);
     }
 
+    [Fact]
+    public void 実際の列数に無い型は指定した既定の本数で数える()
+    {
+        // **既定を無視しないこと。** サイトから取れなかったときは、
+        // 呼び手が渡したこの本数だけで数えることになる
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct("ClassA", new MappingSource("q", QuestionPort.Value, "a")),
+                ColumnAssignment.Direct("ClassB", new MappingSource("q", QuestionPort.Value, "b")),
+            ],
+        };
+
+        var usage = Assert.Single(ColumnBudget.Measure(
+            mapping,
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Num"] = 3 },
+            fallbackPerType: 5));
+
+        Assert.Equal(5, usage.Available);
+        Assert.Equal(3, usage.Remaining);
+    }
+
+    [Fact]
+    public void 本数を数値で渡したときはその本数で数える()
+    {
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct("ClassA", new MappingSource("q", QuestionPort.Value, "a")),
+            ],
+        };
+
+        var usage = Assert.Single(ColumnBudget.Measure(mapping, availablePerType: 100));
+
+        Assert.Equal(100, usage.Available);
+    }
+
     [Theory]
     [InlineData("ClassA", "Class")]
     [InlineData("ClassZ", "Class")]
