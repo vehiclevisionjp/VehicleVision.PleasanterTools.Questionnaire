@@ -14,6 +14,7 @@ import { DEFAULT_LANGUAGE, interpolate, type Language } from './language';
 export const ja = {
   // ---- 画面の状態 ----------------------------------------------------------
   'status.loading': '読み込んでいます…',
+  'test.banner': 'これはテスト公開中のアンケートです。送信した回答は Pleasanter へ実際に登録されます。',
 
   // ---- 受け付けられない -----------------------------------------------------
   'rejected.notFound.title': 'アンケートが見つかりません',
@@ -161,6 +162,7 @@ export type MessageKey = keyof typeof ja;
  */
 export const en: Record<MessageKey, string> = {
   'status.loading': 'Loading…',
+  'test.banner': 'This survey is in test publication. Submitted responses are actually written to Pleasanter.',
 
   'rejected.notFound.title': 'Survey not found',
   'rejected.closed.title': 'Not accepting responses',
