@@ -23,6 +23,7 @@ public static class AdminVersionEndpoints
         bool allowInsecure)
     {
         var group = builder.MapGroup("/api/admin/application")
+            .WithTags("管理 API")
             .RequireAuthorization(AdminAuthSchemes.SessionPolicy);
 
         AdminAuthSchemes.AddNoStore(group);

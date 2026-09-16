@@ -37,6 +37,10 @@ builder.Configuration.AddParameterFiles();
 var endpointNetworkRestrictions =
     EndpointNetworkRestrictions.FromConfiguration(builder.Configuration);
 
+// **既定は閉じる。** 管理 API を含む仕様から下調べを済ませられるため、
+// 明示した環境だけで出す。
+var openApiExposure = OpenApiExposureOptions.FromConfiguration(builder.Configuration);
+
 // **HTTP を許す構成は運用者に明示させる。** 未設定や false では従来の保護を変えない。
 var transportSecurity = TransportSecurityOptions.FromConfiguration(builder.Configuration);
 
@@ -118,6 +122,7 @@ var pleasanterOptions = new PleasanterOptions
 };
 
 // ---- サービス --------------------------------------------------------------
+builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IDbConnectionFactory>(
     new DbConnectionFactory(provider, connectionString));
 builder.Services.AddSingleton<IResponseOutbox, ResponseOutbox>();
@@ -741,6 +746,11 @@ if (monitoringToken is not null)
     app.MapMonitoringEndpoints(monitoringToken);
 }
 
+if (openApiExposure.Enabled)
+{
+    app.MapOpenApi();
+}
+
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
 app.MapGet("/admin", () => Results.File("admin.html", "text/html"));
 app.MapFallbackToFile("/admin/{**path}", "admin.html");
@@ -761,7 +771,8 @@ if (attachmentOptions.VirusScan is
 app.MapFallbackToFile("/f/{**path}", "index.html");
 
 // 生存確認。**アンケートの情報を出さない**
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
+    .WithTags("生存確認");
 
 // 受付可能かの確認。Pleasanter が止まっても回答は DB に積んで再送できるため、
 // **ここで見る依存先は本アプリの DB だけ。** 例外の中身は接続先や資格情報を
@@ -777,7 +788,8 @@ app.MapGet("/ready", async (CancellationToken cancellationToken) =>
     return failure is null
         ? Results.Ok(new { status = "ready" })
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
-});
+})
+    .WithTags("生存確認");
 
 app.Run();
 

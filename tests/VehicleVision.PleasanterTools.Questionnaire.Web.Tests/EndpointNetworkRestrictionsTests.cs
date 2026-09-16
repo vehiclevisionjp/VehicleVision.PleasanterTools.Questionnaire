@@ -15,6 +15,9 @@ public sealed class EndpointNetworkRestrictionsTests
         Assert.True(restrictions.IsAllowed(
             "/api/monitoring/status",
             IPAddress.Parse("203.0.113.1")));
+        Assert.True(restrictions.IsAllowed(
+            "/openapi/v1.json",
+            IPAddress.Parse("203.0.113.1")));
     }
 
     [Theory]
@@ -42,6 +45,21 @@ public sealed class EndpointNetworkRestrictionsTests
             IPAddress.Parse("10.1.2.3")));
         Assert.False(restrictions.IsAllowed(
             "/api/monitoring/status",
+            IPAddress.Parse("192.0.2.10")));
+    }
+
+    [Fact]
+    public void OpenAPIはinheritで生存確認のCIDRを引き継ぐ()
+    {
+        var restrictions = Read(
+            (EndpointNetworkRestrictions.HealthSetting, "10.0.0.0/8"),
+            (EndpointNetworkRestrictions.OpenApiSetting, "inherit"));
+
+        Assert.True(restrictions.IsAllowed(
+            "/openapi/v1.json",
+            IPAddress.Parse("10.1.2.3")));
+        Assert.False(restrictions.IsAllowed(
+            "/openapi/v1.json",
             IPAddress.Parse("192.0.2.10")));
     }
 

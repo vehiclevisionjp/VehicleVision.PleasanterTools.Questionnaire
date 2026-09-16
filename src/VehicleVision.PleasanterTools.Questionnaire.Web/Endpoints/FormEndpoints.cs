@@ -105,7 +105,8 @@ public static class FormEndpoints
 
     public static IEndpointRouteBuilder MapFormEndpoints(this IEndpointRouteBuilder app)
     {
-        var forms = app.MapGroup("/api/forms");
+        var forms = app.MapGroup("/api/forms")
+            .WithTags("回答画面");
 
         forms.MapGet("/{publicId}", async (
             string publicId,

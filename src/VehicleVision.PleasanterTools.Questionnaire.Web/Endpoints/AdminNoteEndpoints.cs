@@ -44,6 +44,7 @@ public static class AdminNoteEndpoints
     public static IEndpointRouteBuilder MapAdminNoteEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin/note")
+            .WithTags("管理 API")
             .RequireAuthorization(policy => policy.AddAuthenticationSchemes(AdminAuthSchemes.Session)
                 .RequireAuthenticatedUser());
 

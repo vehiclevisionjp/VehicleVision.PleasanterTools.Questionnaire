@@ -38,6 +38,7 @@ public static class AdminSurveyEndpoints
     {
         // **群には「閲覧」を掛ける**（Issue #160）。書き込み・公開は口ごとに足す
         var group = builder.MapGroup("/api/admin/surveys")
+            .WithTags("管理 API")
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysRead));
 
         // **管理操作を残す**（Issue #19）。読み取りは残さない

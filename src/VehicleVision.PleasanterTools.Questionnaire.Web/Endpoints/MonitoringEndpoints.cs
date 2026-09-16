@@ -28,7 +28,8 @@ public static class MonitoringEndpoints
             return status.DatabaseConnected
                 ? Results.Ok(status)
                 : Results.Json(status, statusCode: StatusCodes.Status503ServiceUnavailable);
-        });
+        })
+            .WithTags("監視 API");
 
         return builder;
     }

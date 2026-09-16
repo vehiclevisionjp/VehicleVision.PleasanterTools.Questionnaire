@@ -57,7 +57,8 @@ public static class AdminSamlEndpoints
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        var group = builder.MapGroup("/api/admin/saml");
+        var group = builder.MapGroup("/api/admin/saml")
+            .WithTags("管理 API");
         AdminAuthSchemes.AddNoStore(group);
 
         // **入れた・断られたを記録に残す**（Issue #19）。GET は残らない
