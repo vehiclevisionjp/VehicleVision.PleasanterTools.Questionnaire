@@ -49,6 +49,7 @@ public class EndpointGraphTests
         app.MapAdminVersionEndpoints();
         app.MapAnalyticsEndpoints();
         app.MapFormEndpoints();
+        app.MapMonitoringEndpoints(new MonitoringToken("test-monitoring-token"));
 
         // **ここで初めて RequestDelegateFactory が走る。**
         // 引数の取り方が通らない宣言は、この列挙で例外になる

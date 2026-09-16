@@ -24,4 +24,13 @@ public sealed class ForwardedProxyNetworksTests
 
         Assert.Contains(ForwardedProxyNetworks.Setting, exception.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void 呼び出し元の設定名をエラーへ出す()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => ForwardedProxyNetworks.Parse("not-cidr", "OTHER_SETTING"));
+
+        Assert.Contains("OTHER_SETTING", exception.Message, StringComparison.Ordinal);
+    }
 }
