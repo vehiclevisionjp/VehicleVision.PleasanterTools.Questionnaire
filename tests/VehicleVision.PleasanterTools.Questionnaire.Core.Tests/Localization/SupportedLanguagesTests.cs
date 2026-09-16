@@ -7,9 +7,15 @@ public class SupportedLanguagesTests
     [Theory]
     [InlineData("ja", "ja")]
     [InlineData("en", "en")]
+    [InlineData("zh", "zh")]
+    [InlineData("de", "de")]
+    [InlineData("ko", "ko")]
+    [InlineData("es", "es")]
+    [InlineData("vi", "vi")]
     [InlineData("EN", "en")]
     [InlineData("en-US", "en")]
     [InlineData("ja-JP", "ja")]
+    [InlineData("zh-Hans", "zh")]
     [InlineData("en_GB", "en")]
     [InlineData("  en-us  ", "en")]
     public void 地域を落として言語コードに寄せる(string tag, string expected)
@@ -19,7 +25,6 @@ public class SupportedLanguagesTests
 
     [Theory]
     [InlineData("fr")]
-    [InlineData("zh-Hans")]
     [InlineData("")]
     [InlineData("   ")]
     [InlineData(null)]
@@ -63,7 +68,7 @@ public class SupportedLanguagesTests
     }
 
     [Theory]
-    [InlineData("fr-FR,de;q=0.8")]
+    [InlineData("fr-FR,it;q=0.8")]
     [InlineData("*")]
     [InlineData("")]
     [InlineData(null)]
@@ -96,5 +101,25 @@ public class SupportedLanguagesTests
     public void 既定の言語が選択肢の先頭にある()
     {
         Assert.Equal(SupportedLanguages.Default, SupportedLanguages.All[0]);
+    }
+
+    [Theory]
+    [InlineData("vi", "vn")]
+    [InlineData("vi-VN", "vn")]
+    [InlineData("ja", "ja")]
+    [InlineData("fr", null)]
+    public void Pleasanterへ渡すときだけベトナム語を読み替える(string language, string? expected)
+    {
+        Assert.Equal(expected, SupportedLanguages.ToPleasanterLanguage(language));
+    }
+
+    [Theory]
+    [InlineData("vn", "vi")]
+    [InlineData("vn-VN", "vi")]
+    [InlineData("ja", "ja")]
+    [InlineData("fr", null)]
+    public void Pleasanterから受け取るときだけベトナム語を読み替える(string language, string? expected)
+    {
+        Assert.Equal(expected, SupportedLanguages.FromPleasanterLanguage(language));
     }
 }
