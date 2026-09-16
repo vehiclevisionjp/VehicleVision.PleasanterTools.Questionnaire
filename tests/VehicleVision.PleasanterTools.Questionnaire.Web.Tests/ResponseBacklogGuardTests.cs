@@ -113,8 +113,96 @@ public class ResponseBacklogGuardTests
             throw new NotSupportedException();
     }
 
+    private sealed class SharedBacklog : ISharedBacklogStateStore
+    {
+        private readonly object _gate = new();
+        private SharedBacklogState _state = new(
+            0,
+            ImmutableDictionary<Guid, int>.Empty,
+            false,
+            ImmutableHashSet<Guid>.Empty,
+            new DateTimeOffset(2026, 8, 20, 0, 0, 0, TimeSpan.Zero));
+
+        public int Accepted { get; private set; }
+
+        public void Set(int total, params (Guid SurveyId, int Count)[] bySurvey)
+        {
+            lock (_gate)
+            {
+                _state = _state with
+                {
+                    Total = total,
+                    BySurvey = bySurvey.ToImmutableDictionary(row => row.SurveyId, row => row.Count),
+                };
+            }
+        }
+
+        public Task<SharedBacklogState> GetOrSampleAsync(
+            TimeSpan sampleInterval,
+            int perSurveyAtLeast,
+            Func<CancellationToken, Task<PendingBacklog>> sample,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                return Task.FromResult(_state);
+            }
+        }
+
+        public Task IncrementAcceptedAsync(
+            Guid surveyId,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                Accepted++;
+                _state = _state with
+                {
+                    Total = _state.Total + 1,
+                    BySurvey = _state.BySurvey.SetItem(
+                        surveyId, _state.For(surveyId) + 1),
+                };
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> SetTotalBlockedAsync(
+            bool blocked,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                var changed = _state.TotalBlocked != blocked;
+                _state = _state with { TotalBlocked = blocked };
+                return Task.FromResult(changed);
+            }
+        }
+
+        public Task<bool> SetSurveyBlockedAsync(
+            Guid surveyId,
+            bool blocked,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+            {
+                var changed = _state.BlockedSurveys.Contains(surveyId) != blocked;
+                _state = _state with
+                {
+                    BlockedSurveys = blocked
+                        ? _state.BlockedSurveys.Add(surveyId)
+                        : _state.BlockedSurveys.Remove(surveyId),
+                };
+                return Task.FromResult(changed);
+            }
+        }
+    }
+
     private static (ResponseBacklogGuard Guard, CountingOutbox Outbox, FakeTimeProvider Time)
-        Build(BacklogGuardOptions? options = null, IAdminNotificationStore? notifications = null)
+        Build(
+            BacklogGuardOptions? options = null,
+            IAdminNotificationStore? notifications = null,
+            ISharedBacklogStateStore? sharedState = null)
     {
         var outbox = new CountingOutbox();
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 8, 20, 0, 0, 0, TimeSpan.Zero));
@@ -124,7 +212,8 @@ public class ResponseBacklogGuardTests
             options ?? new BacklogGuardOptions { PerSurveyLimit = 100, TotalLimit = 500 },
             NullLogger<ResponseBacklogGuard>.Instance,
             time,
-            notifications);
+            notifications,
+            sharedState);
 
         return (guard, outbox, time);
     }
@@ -171,6 +260,38 @@ public class ResponseBacklogGuardTests
         outbox.Set(total: 120, (Watched, 100));
 
         Assert.True(await guard.IsBlockedAsync(Watched));
+    }
+
+    [Fact]
+    public async Task 共有時は全プロセスが同じ停止判断を見て知らせを重複させない()
+    {
+        var shared = new SharedBacklog();
+        shared.Set(total: 120, (Watched, 100));
+        var notifications = new FakeAdminNotificationStore();
+        var (first, _, _) = Build(notifications: notifications, sharedState: shared);
+        var (second, _, _) = Build(notifications: notifications, sharedState: shared);
+
+        Assert.True(await first.IsBlockedAsync(Watched));
+        Assert.True(await second.IsBlockedAsync(Watched));
+
+        Assert.Equal(
+            [((int)AdminNotificationKind.BacklogBlockedSurvey, Watched)],
+            notifications.Raised);
+        Assert.Equal(1, first.GetStatus().BlockedSurveyCount);
+        Assert.Equal(1, second.GetStatus().BlockedSurveyCount);
+    }
+
+    [Fact]
+    public async Task 受付後の増分を共有状態へ足す()
+    {
+        var shared = new SharedBacklog();
+        var (guard, _, _) = Build(sharedState: shared);
+
+        await guard.OnAcceptedAsync(Watched);
+
+        Assert.Equal(1, shared.Accepted);
+        Assert.False(await guard.IsBlockedAsync(Watched));
+        Assert.Equal(1, guard.GetStatus().Total);
     }
 
     // ---- 止める・止めない ---------------------------------------------------

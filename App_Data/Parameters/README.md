@@ -65,8 +65,10 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト）。**送信チケットの署名鍵もここから派生させる** |
 | `QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` | 複数インスタンスで管理画面の Cookie を共有する鍵束ディレクトリ。AKS では ReadWriteMany の永続ボリュームを指定する |
 | `QUESTIONNAIRE_ADMIN_SESSION_STORE` | 管理者セッションの保存先。`Database`（既定）/ `Redis`。⚠️ Redis 停止時は全管理者をログアウト扱いにする |
-| `QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING` | `Redis` を選んだときの接続文字列。資格情報を含むため環境変数か Key Vault だけで与える |
+| `QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING` | 管理者セッションまたは共有状態で `Redis` を選んだときの接続文字列。両方で同じ接続を使う。資格情報を含むため環境変数か Key Vault だけで与える |
 | `QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX` | Redis キーの接頭辞。既定 `questionnaire:admin-session:`。同じ Redis を複数環境で共用するときに分ける |
+| `QUESTIONNAIRE_SHARED_STATE_STORE` | レート制限と滞留の見張りの保存先。`Process`（既定）/ `Redis`。⚠️ 未設定時はプロセスごとに数える |
+| `QUESTIONNAIRE_SHARED_STATE_REDIS_PREFIX` | 共有状態の Redis キー接頭辞。既定 `questionnaire:shared-state:`。同じ Redis を複数環境で共用するときに分ける |
 | `QUESTIONNAIRE_ASSET_STORE` | 資産の保存先。`Database`（既定）/ `Path` / `AzureBlob` / `S3` |
 | `QUESTIONNAIRE_ASSET_PATH` | `Path` の保存ディレクトリ。複数インスタンスでは全インスタンスが同じ共有領域を参照する |
 | `QUESTIONNAIRE_ASSET_AZURE_CONTAINERURI` | `AzureBlob` のコンテナー URI。マネージド ID を使う既定の指定方法 |
@@ -110,7 +112,9 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |
+| `QUESTIONNAIRE_REQUESTS_PER_MIN` | 送信元 IP ごとの要求上限（1 分あたり・既定 60） |
 | `QUESTIONNAIRE_SUBMITS_PER_MIN` | 送信元 IP ごとの回答送信の上限（1 分あたり・既定 20） |
+| `QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN` | 送信元 IP ごとのログイン試行上限（5 分あたり・既定 10）。**検証環境向けの変更口であり、本番で緩めない** |
 | `QUESTIONNAIRE_ALTCHA_ENABLED` | `false` で proof-of-work を切る。**アプリ全体。検証環境のためだけ** |
 | `QUESTIONNAIRE_ALTCHA_MIN_NUMBER` | 探させる数の下限（既定 50000）。**大きいほど回答者の待ち時間も伸びる** |
 | `QUESTIONNAIRE_ALTCHA_MAX_NUMBER` | 探させる数の上限（既定 150000） |
@@ -120,6 +124,22 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 
 **proof-of-work の要否はアンケートごとにも切り替えられる**（管理画面の公開設定。Issue #66）。
 **どちらも有効なときだけ課す**ので、ここで切るとアンケート側の設定に関わらず課さない。
+
+### 複数プロセスのレート制限
+
+⚠️ **`QUESTIONNAIRE_SHARED_STATE_STORE=Redis` を設定せずに複数プロセスで動かす場合は、
+`QUESTIONNAIRE_REQUESTS_PER_MIN`、`QUESTIONNAIRE_SUBMITS_PER_MIN`、
+`QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN` を、それぞれプロセス数で割った値にすること。**
+プロセス内のレート制限は互いの回数を見ないため、設定値が同じなら実効上限はプロセス数倍になる。
+
+Redis で共有する場合は `QUESTIONNAIRE_SHARED_STATE_STORE=Redis` と
+`QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING` を設定する。
+管理者セッションでも Redis を使う場合は同じ接続と接続オブジェクトへ相乗りし、
+接続設定を二重には持たない。Redis に接続できない間は要求を全部通すのではなく、
+各プロセス内のレート制限と滞留の見張りへ切り替え、警告をログへ出す。
+
+⚠️ **`QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN` は結合試験が枠を使い切らないための逃げ道でもある。**
+本番へ反映する前に、検証環境の大きな値を持ち込んでいないことを確認する。
 
 添付とウイルススキャンの項目は
 [`_documents/添付ファイル検査-運用手順書.md`](../../_documents/添付ファイル検査-運用手順書.md)
