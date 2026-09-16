@@ -9,7 +9,8 @@
     type Question,
     type QuestionPort,
   } from '../lib/types';
-  import { measure } from '../lib/columnBudget';
+  import { measure, STANDARD_COLUMNS_PER_TYPE } from '../lib/columnBudget';
+  import type { ColumnAvailabilityResponse } from '../lib/api';
   import type { Language } from '../../lib/i18n/language';
   import { t } from '../lib/i18n/state.svelte';
   import type { MessageKey } from '../lib/i18n/messages';
@@ -19,10 +20,14 @@
     questions: Question[];
     /** 設問の文言をどの言語で出すか。**設問エディタで選んでいる言語に揃える。** */
     editing: Language;
+    /** 列数の根拠。取得に失敗したときは標準の本数を使う。 */
+    availability: ColumnAvailabilityResponse;
+    /** 明示的に押したときだけ、Pleasanter の列定義を取り直す。 */
+    onrefresh: () => void;
     onchange: (mapping: MappingDefinition) => void;
   }
 
-  let { mapping, questions, editing, onchange }: Props = $props();
+  let { mapping, questions, editing, availability, onrefresh, onchange }: Props = $props();
 
   /**
    * 変換の種類。**入力が複数なら必ずどれかが要る。**
@@ -53,7 +58,7 @@
    * **グリッドは 1 設問で行数ぶんの列を食う。**
    * 保存や公開のときに初めて足りないと分かると、作り直しになる。
    */
-  const usage = $derived(measure(mapping));
+  const usage = $derived(measure(mapping, availability.availableByPrefix));
 
   /** 足りていない型。**あれば公開できない。** */
   const overflowing = $derived(usage.filter((entry) => !entry.fits));
@@ -106,7 +111,15 @@
       }
     }
 
-    // **列は型ごとに 26 本しか無い。** 空で出して、不備として見せる
+    const available = availability.availableByPrefix.Attachments ?? STANDARD_COLUMNS_PER_TYPE;
+    for (let number = 1; number <= available - STANDARD_COLUMNS_PER_TYPE; number += 1) {
+      const column = `Attachments${String(number).padStart(3, '0')}`;
+      if (!used.has(column.toUpperCase())) {
+        return column;
+      }
+    }
+
+    // **実在する列だけを補完する。** 取れないときは標準構成に限定して不備として見せる
     return '';
   }
 
@@ -177,6 +190,9 @@
         title={fileQuestions.length === 0 ? t('mapping.noFileQuestion') : ''}
         onclick={addAttachment}>{t('mapping.addAttachmentColumn')}</button
       >
+      <button type="button" class="secondary small" onclick={onrefresh}>
+        {t('mapping.refreshColumnAvailability')}
+      </button>
     </div>
   </div>
 
@@ -187,14 +203,32 @@
     <br />
     <strong>{t('mapping.attachmentLeadStrong')}</strong>{t('mapping.attachmentLead')}
   </p>
+  <p class="status">
+    {t(
+      availability.source === 'site'
+        ? 'mapping.budgetBasisSite'
+        : 'mapping.budgetBasisStandard',
+    )}
+  </p>
+
+  <datalist id="record-properties">
+    <option value="Title"></option>
+    <option value="Body"></option>
+    <option value="Status"></option>
+    <option value="Manager" label="Manager（利用者 ID）"></option>
+    <option value="Owner" label="Owner（利用者 ID）"></option>
+    <option value="Locked"></option>
+    <option value="StartTime" label="StartTime（期限付きテーブルのみ）"></option>
+    <option value="CompletionTime" label="CompletionTime（期限付きテーブルのみ）"></option>
+    <option value="WorkValue" label="WorkValue（期限付きテーブルのみ）"></option>
+    <option value="ProgressRate" label="ProgressRate（期限付きテーブルのみ）"></option>
+    <option value="RemainingWorkValue" label="RemainingWorkValue（期限付きテーブルのみ）"></option>
+  </datalist>
 
   {#if mapping.assignments.length === 0}
     <p class="status">{t('mapping.empty')}</p>
   {:else}
-    <!--
-      **列は型ごとに 26 本しかない**（Issue #74）。
-      グリッドは 1 設問で行数ぶんを食うので、作っている最中に見えないと手遅れになる
-    -->
+    <!-- **グリッドは 1 設問で行数ぶんを食う。** 作っている最中に見えないと手遅れになる。 -->
     <ul class="budget">
       {#each usage as entry (entry.prefix)}
         <li class:over={!entry.fits}>
@@ -372,6 +406,7 @@
                 <input
                   type="text"
                   aria-label={t('mapping.targetColumn')}
+                  list="record-properties"
                   placeholder={attachment
                     ? t('mapping.attachmentColumnPlaceholder')
                     : t('mapping.targetColumnPlaceholder')}
@@ -398,7 +433,7 @@
                     <p class="warn">{t('mapping.needsSingleSource')}</p>
                   {/if}
                   {#if noAttachmentColumn}
-                    <!-- **列は型ごとに 26 本しか無い** -->
+                    <!-- **実在する添付列を使い切った。** -->
                     <p class="warn">{t('mapping.noAttachmentColumnLeft')}</p>
                   {/if}
                 </td>

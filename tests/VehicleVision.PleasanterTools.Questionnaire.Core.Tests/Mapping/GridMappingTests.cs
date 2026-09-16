@@ -267,6 +267,70 @@ public class GridMappingTests
         Assert.Equal(-4, usage.Remaining);
     }
 
+    [Fact]
+    public void 型ごとに実際の列数を指定できる()
+    {
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct("ClassA", new MappingSource("q-grid", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Class001", new MappingSource("q-grid", QuestionPort.Value, "quality")),
+                ColumnAssignment.Direct("NumA", new MappingSource("q-rank", QuestionPort.Value, "price")),
+            ],
+        };
+
+        var availableByPrefix = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Class"] = 126,
+            ["Num"] = 1,
+        };
+
+        var usage = ColumnBudget.Measure(mapping, availableByPrefix);
+
+        Assert.Equal(124, usage.Single(entry => entry.Prefix == "Class").Remaining);
+        Assert.True(usage.Single(entry => entry.Prefix == "Num").Fits);
+    }
+
+    [Fact]
+    public void 実際の列数に無い型は指定した既定の本数で数える()
+    {
+        // **既定を無視しないこと。** サイトから取れなかったときは、
+        // 呼び手が渡したこの本数だけで数えることになる
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct("ClassA", new MappingSource("q", QuestionPort.Value, "a")),
+                ColumnAssignment.Direct("ClassB", new MappingSource("q", QuestionPort.Value, "b")),
+            ],
+        };
+
+        var usage = Assert.Single(ColumnBudget.Measure(
+            mapping,
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Num"] = 3 },
+            fallbackPerType: 5));
+
+        Assert.Equal(5, usage.Available);
+        Assert.Equal(3, usage.Remaining);
+    }
+
+    [Fact]
+    public void 本数を数値で渡したときはその本数で数える()
+    {
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct("ClassA", new MappingSource("q", QuestionPort.Value, "a")),
+            ],
+        };
+
+        var usage = Assert.Single(ColumnBudget.Measure(mapping, availablePerType: 100));
+
+        Assert.Equal(100, usage.Available);
+    }
+
     [Theory]
     [InlineData("ClassA", "Class")]
     [InlineData("ClassZ", "Class")]
@@ -300,6 +364,29 @@ public class GridMappingTests
 
         Assert.Equal("Class", usage.Prefix);
         Assert.Equal(2, usage.Used);
+    }
+
+    [Fact]
+    public void レコード本体の列は標準列の枠として数えない()
+    {
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct("Title", new MappingSource("q-grid", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Body", new MappingSource("q-grid", QuestionPort.Value, "quality")),
+                ColumnAssignment.Direct("Manager", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Owner", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Locked", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("StartTime", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("CompletionTime", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("WorkValue", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("ProgressRate", new MappingSource("q-rank", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("RemainingWorkValue", new MappingSource("q-rank", QuestionPort.Value, "price")),
+            ],
+        };
+
+        Assert.Empty(ColumnBudget.Measure(mapping));
     }
 
     [Fact]

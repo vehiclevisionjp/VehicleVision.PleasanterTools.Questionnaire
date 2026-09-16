@@ -1,12 +1,18 @@
 <script lang="ts">
   import {
+    archiveSurvey,
     createSurvey,
+    deleteSurvey,
     duplicateSurvey,
     listSurveys,
+    publish,
+    revertToDraft,
     resume,
+    restoreSurvey,
     saveAsTemplate,
     saveSurveySettings,
     suspend,
+    updateSurveySiteId,
   } from '../lib/api';
   import {
     isPublished,
@@ -15,6 +21,7 @@
     type SurveySummary,
   } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
+  import { canConfirmSurveyDeletion, deletionResponseCount } from '../lib/surveyDeletion';
   import SurveyQrCode from './SurveyQrCode.svelte';
   import TemplatePanel from './TemplatePanel.svelte';
 
@@ -35,9 +42,16 @@
      * **サーバ側でも同じ判定をしている**（`AdminTemplateEndpoints`）。
      */
     canUseTemplates?: boolean;
+    /** 完全削除を出してよい相手か。**Administrator だけ。** */
+    canDelete?: boolean;
   }
 
-  let { onopen, canDuplicate = false, canUseTemplates = false }: Props = $props();
+  let {
+    onopen,
+    canDuplicate = false,
+    canUseTemplates = false,
+    canDelete = false,
+  }: Props = $props();
 
   let surveys = $state<SurveySummary[]>([]);
   let loading = $state(true);
@@ -60,6 +74,7 @@
   let statusInput = $state('');
   let titleFilter = $state('');
   let statusFilter = $state<number | null>(null);
+  let includeArchived = $state(false);
 
   let creating = $state(false);
   let newTitle = $state('');
@@ -108,15 +123,28 @@
    */
   let settingsAllowDraft = $state(false);
   let settingsBusy = $state(false);
+  let siteFor = $state<SurveySummary | null>(null);
+  let siteId = $state('');
+  let siteBusy = $state(false);
+
+  /** 完全削除の確認を開いているアーカイブ済みアンケート。 */
+  let deleting = $state<SurveySummary | null>(null);
+  let deleteTitle = $state('');
+  let deleteBusy = $state(false);
 
   // **絞り込みとページを変えたら読み直す。** $effect が依存を拾う
   $effect(() => {
-    void reload(offset, titleFilter, statusFilter);
+    void reload(offset, titleFilter, statusFilter, includeArchived);
   });
 
-  async function reload(from: number, title: string, status: number | null) {
+  async function reload(
+    from: number,
+    title: string,
+    status: number | null,
+    withArchived: boolean,
+  ) {
     loading = true;
-    const result = await listSurveys(from, pageSize, title, status);
+    const result = await listSurveys(from, pageSize, title, status, withArchived);
     loading = false;
 
     if (!result.ok) {
@@ -247,7 +275,49 @@
       return;
     }
 
-    await reload(offset, titleFilter, statusFilter);
+    await reload(offset, titleFilter, statusFilter, includeArchived);
+  }
+
+  async function changePublication(survey: SurveySummary, publishNow: boolean) {
+    const result = publishNow
+      ? await publish(survey.surveyId)
+      : await revertToDraft(survey.surveyId);
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    await reload(offset, titleFilter, statusFilter, includeArchived);
+  }
+
+  function openSite(survey: SurveySummary) {
+    error = '';
+    siteFor = survey;
+    siteId = String(survey.pleasanterSiteId);
+  }
+
+  async function saveSite(event: SubmitEvent) {
+    event.preventDefault();
+    const target = siteFor;
+    const value = Number(siteId);
+    if (target === null || siteBusy) {
+      return;
+    }
+    if (!Number.isInteger(value) || value <= 0) {
+      error = t('list.newSiteIdInvalid');
+      return;
+    }
+
+    siteBusy = true;
+    const result = await updateSurveySiteId(target.surveyId, value);
+    siteBusy = false;
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    siteFor = null;
+    await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
   function toggleQr(survey: SurveySummary) {
@@ -294,7 +364,50 @@
     }
 
     settingsFor = null;
-    await reload(offset, titleFilter, statusFilter);
+    await reload(offset, titleFilter, statusFilter, includeArchived);
+  }
+
+  async function changeArchive(survey: SurveySummary) {
+    const archived = survey.archivedAt != null;
+    if (!archived && !confirm(t('archive.confirm', { title: survey.title }))) {
+      return;
+    }
+
+    const result = archived
+      ? await restoreSurvey(survey.surveyId)
+      : await archiveSurvey(survey.surveyId);
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    await reload(offset, titleFilter, statusFilter, includeArchived);
+  }
+
+  function openDelete(survey: SurveySummary) {
+    error = '';
+    deleting = survey;
+    deleteTitle = '';
+  }
+
+  async function removeSurvey(event: SubmitEvent) {
+    event.preventDefault();
+    const target = deleting;
+    if (target === null || deleteBusy || !canConfirmSurveyDeletion(target, deleteTitle)) {
+      return;
+    }
+
+    deleteBusy = true;
+    const result = await deleteSurvey(target.surveyId, deleteTitle);
+    deleteBusy = false;
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    deleting = null;
+    deleteTitle = '';
+    await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
   /** 受付数の表示。**上限があれば「/ 上限」を添える。** */
@@ -352,7 +465,16 @@
       <option value="0">{t('status.draft')}</option>
       <option value="1">{t('status.published')}</option>
       <option value="2">{t('status.suspended')}</option>
+      <option value="3">{t('status.testPublished')}</option>
     </select>
+  </label>
+  <label class="check filter-archived">
+    <input
+      type="checkbox"
+      bind:checked={includeArchived}
+      onchange={() => (offset = 0)}
+    />
+    {t('list.includeArchived')}
   </label>
   <div class="actions">
     <button type="submit" class="secondary">{t('list.filterApply')}</button>
@@ -381,6 +503,23 @@
       <span class="hint">{t('list.newJsonColumnHint')}</span>
     </label>
     <button type="submit">{t('list.submit')}</button>
+  </form>
+{/if}
+
+{#if siteFor}
+  <form class="create" onsubmit={saveSite}>
+    <h2>{t('siteId.title', { title: siteFor.title })}</h2>
+    <label>
+      {t('siteId.label')}
+      <input type="text" inputmode="numeric" bind:value={siteId} required />
+    </label>
+    <p class="warn">{t('siteId.warning')}</p>
+    <div class="actions">
+      <button type="submit" disabled={siteBusy}>{t('siteId.submit')}</button>
+      <button type="button" class="secondary" onclick={() => (siteFor = null)}>
+        {t('settings.cancel')}
+      </button>
+    </div>
   </form>
 {/if}
 
@@ -487,6 +626,44 @@
   </form>
 {/if}
 
+{#if deleting}
+  <form class="create danger-panel" onsubmit={removeSurvey}>
+    <h2>{t('delete.title', { title: deleting.title })}</h2>
+    <dl>
+      <div>
+        <dt>{t('delete.responseCount')}</dt>
+        <dd>{deletionResponseCount(deleting)}</dd>
+      </div>
+      <div>
+        <dt>{t('delete.siteId')}</dt>
+        <dd>{deleting.pleasanterSiteId}</dd>
+      </div>
+      <div>
+        <dt>{t('delete.archivedAt')}</dt>
+        <dd>{formatDate(deleting.archivedAt!)}</dd>
+      </div>
+    </dl>
+    <p class="warn">{t('delete.pleasanterWarning')}</p>
+    <p class="warn">{t('delete.traceWarning')}</p>
+    <label>
+      {t('delete.confirmLabel', { title: deleting.title })}
+      <input type="text" bind:value={deleteTitle} autocomplete="off" required />
+    </label>
+    <div class="actions">
+      <button
+        type="submit"
+        class="danger"
+        disabled={deleteBusy || !canConfirmSurveyDeletion(deleting, deleteTitle)}
+      >
+        {t('delete.submit')}
+      </button>
+      <button type="button" class="secondary" onclick={() => (deleting = null)}>
+        {t('delete.cancel')}
+      </button>
+    </div>
+  </form>
+{/if}
+
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 
 {#if loading}
@@ -513,9 +690,14 @@
       {#each surveys as survey (survey.surveyId)}
         <tr>
           <td>
-            <button type="button" class="link" onclick={() => onopen(survey.surveyId)}>
-              {survey.title}
-            </button>
+            {#if survey.archivedAt == null}
+              <button type="button" class="link" onclick={() => onopen(survey.surveyId)}>
+                {survey.title}
+              </button>
+            {:else}
+              <span>{survey.title}</span>
+              <span class="reason">{t('archive.archived')}</span>
+            {/if}
           </td>
           <td>
             <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
@@ -531,12 +713,21 @@
             {/if}
           </td>
           <td>{survey.publishedVersion ?? '—'}</td>
-          <td class="responses">{responses(survey)}</td>
+          <td class="responses">
+            <div>{responses(survey)}</div>
+            <div>{t('list.testResponseCount', { count: survey.testResponseCount })}</div>
+            {#if survey.testResponseCount > 0}
+              <div class="hint">{t('list.testResponseCleanup')}</div>
+            {/if}
+          </td>
           <td>
             {#if isPublished(survey)}
               <a href={formUrl(survey.publicId)} target="_blank" rel="noreferrer">
                 {survey.publicId}
               </a>
+              {#if survey.status === 3}
+                <span class="reason">{t('list.testUrl')}</span>
+              {/if}
             {:else}
               <span class="muted">{t('list.notPublished')}</span>
             {/if}
@@ -544,7 +735,7 @@
           <td class="muted">{formatDate(survey.updatedAt)}</td>
           <td class="row-actions">
             <div class="row-actions-inner">
-            {#if isPublished(survey)}
+            {#if survey.archivedAt == null && (survey.status === 1 || survey.status === 2)}
               <button type="button" class="secondary" onclick={() => toggle(survey)}>
                 {survey.status === 1 ? t('list.suspend') : t('list.resume')}
               </button>
@@ -553,17 +744,43 @@
                 {t('qr.open')}
               </button>
             {/if}
-            <button type="button" class="secondary" onclick={() => openSettings(survey)}>
-              {t('settings.open')}
-            </button>
-            {#if canDuplicate}
+            {#if survey.archivedAt == null && survey.status === 3}
+              <button type="button" onclick={() => changePublication(survey, true)}>
+                {t('list.publish')}
+              </button>
+              <button type="button" class="secondary" onclick={() => changePublication(survey, false)}>
+                {t('list.revertToDraft')}
+              </button>
+              <button type="button" class="secondary" onclick={() => toggleQr(survey)}>
+                {t('qr.open')}
+              </button>
+            {/if}
+            {#if survey.archivedAt == null && (survey.status === 0 || survey.status === 3)}
+              <button type="button" class="secondary" onclick={() => openSite(survey)}>
+                {t('siteId.open')}
+              </button>
+            {/if}
+            {#if survey.archivedAt == null}
+              <button type="button" class="secondary" onclick={() => openSettings(survey)}>
+                {t('settings.open')}
+              </button>
+            {/if}
+            {#if canDuplicate && survey.archivedAt == null}
               <button type="button" class="secondary" onclick={() => openDuplicate(survey)}>
                 {t('duplicate.open')}
               </button>
             {/if}
-            {#if canUseTemplates}
+            {#if canUseTemplates && survey.archivedAt == null}
               <button type="button" class="secondary" onclick={() => openTemplate(survey)}>
                 {t('template.save')}
+              </button>
+            {/if}
+            <button type="button" class="secondary" onclick={() => changeArchive(survey)}>
+              {survey.archivedAt == null ? t('archive.open') : t('archive.restore')}
+            </button>
+            {#if canDelete && survey.archivedAt != null}
+              <button type="button" class="danger" onclick={() => openDelete(survey)}>
+                {t('delete.open')}
               </button>
             {/if}
             </div>
@@ -663,6 +880,34 @@
   .create h2 {
     margin: 0;
     font-size: 1.05rem;
+  }
+
+  .danger-panel {
+    border-color: var(--error);
+  }
+
+  .danger-panel dl {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0;
+  }
+
+  .danger-panel dl div {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .danger-panel dt {
+    font-weight: 600;
+  }
+
+  .danger-panel dd {
+    margin: 0;
+  }
+
+  button.danger {
+    background: var(--error);
+    border-color: var(--error);
   }
 
   .actions {
@@ -784,6 +1029,11 @@
 
   .status-2 {
     color: var(--error);
+    font-weight: 600;
+  }
+
+  .status-3 {
+    color: #9a6700;
     font-weight: 600;
   }
 

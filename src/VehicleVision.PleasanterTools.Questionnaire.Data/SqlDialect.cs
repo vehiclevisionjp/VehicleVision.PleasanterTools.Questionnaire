@@ -183,7 +183,8 @@ public static partial class SqlDialect
     /// <summary>滞留している回答の総件数を数える SQL（Issue #72）。</summary>
     /// <remarks>
     /// <para>
-    /// **デッドレターも数える。** 送信待ちと違って**自然に捌けない**ので、
+    /// **アーカイブしていないアンケートのデッドレターも数える。**
+    /// 送信待ちと違って**自然に捌けない**ので、
     /// 溜まった行が DB を圧迫することでは同じ。
     /// 除くと「送信待ちは 0 件なのに DB が溢れる」が起きる。
     /// </para>
@@ -191,18 +192,24 @@ public static partial class SqlDialect
     /// **受付のたびには呼ばない。** 見張りが一定間隔で 1 回だけ数える。
     /// </para>
     /// </remarks>
-    public const string PendingBacklogTotal = "SELECT COUNT(*) FROM [Responses]";
+    public const string PendingBacklogTotal =
+        "SELECT COUNT(*) FROM [Responses] r "
+        + "LEFT JOIN [Surveys] s ON s.[SurveyId] = r.[SurveyId] "
+        + "WHERE r.[IsTest] = @IsTest AND s.[ArchivedAt] IS NULL";
 
     /// <summary>閾値に近いアンケートだけを数える SQL（Issue #72）。</summary>
     /// <remarks>
     /// **<c>HAVING</c> で絞る。** 全アンケートぶんの行を返すと、
     /// アンケートが増えるほど見張りの費用が上がる。
+    /// **アーカイブ済みは受付しないため除く。**
     /// **返るのは危ないものだけ**なので、たいていは 0 行で終わる。
     /// </remarks>
     public const string PendingBacklogBySurvey =
-        "SELECT [SurveyId] AS [SurveyId], COUNT(*) AS [Count] "
-        + "FROM [Responses] "
-        + "GROUP BY [SurveyId] "
+        "SELECT r.[SurveyId] AS [SurveyId], COUNT(*) AS [Count] "
+        + "FROM [Responses] r "
+        + "LEFT JOIN [Surveys] s ON s.[SurveyId] = r.[SurveyId] "
+        + "WHERE r.[IsTest] = @IsTest AND s.[ArchivedAt] IS NULL "
+        + "GROUP BY r.[SurveyId] "
         + "HAVING COUNT(*) >= @AtLeast";
 
     /// <summary>デッドレターを新しい順に読む SQL。</summary>
@@ -288,25 +295,27 @@ public static partial class SqlDialect
         DatabaseProvider.SqlServer =>
             "UPDATE [Responses] SET " +
             "  [SurveyVersion] = @SurveyVersion, [PayloadJson] = @PayloadJson, " +
+            "  [IsTest] = @IsTest, " +
             "  [Status] = @PendingStatus, [NextAttemptAt] = @Now, [RetryCount] = 0, " +
             "  [LastError] = NULL, [LockedBy] = NULL, [LockedUntil] = NULL, [UpdatedAt] = @Now " +
             "WHERE [ResponseToken] = @ResponseToken; " +
             "IF @@ROWCOUNT = 0 " +
             "INSERT INTO [Responses] " +
             "  ([ResponseToken], [SurveyId], [SurveyVersion], [PayloadJson], [Status], " +
-            "   [RetryCount], [NextAttemptAt], [CreatedAt], [UpdatedAt]) " +
+            "   [RetryCount], [NextAttemptAt], [IsTest], [CreatedAt], [UpdatedAt]) " +
             "VALUES (@ResponseToken, @SurveyId, @SurveyVersion, @PayloadJson, @PendingStatus, " +
-            "        0, @Now, @Now, @Now);",
+            "        0, @Now, @IsTest, @Now, @Now);",
 
         DatabaseProvider.PostgreSql =>
             "INSERT INTO \"Responses\" " +
             "  (\"ResponseToken\", \"SurveyId\", \"SurveyVersion\", \"PayloadJson\", \"Status\", " +
-            "   \"RetryCount\", \"NextAttemptAt\", \"CreatedAt\", \"UpdatedAt\") " +
+            "   \"RetryCount\", \"NextAttemptAt\", \"IsTest\", \"CreatedAt\", \"UpdatedAt\") " +
             "VALUES (@ResponseToken, @SurveyId, @SurveyVersion, @PayloadJson, @PendingStatus, " +
-            "        0, @Now, @Now, @Now) " +
+            "        0, @Now, @IsTest, @Now, @Now) " +
             "ON CONFLICT (\"ResponseToken\") DO UPDATE SET " +
             "  \"SurveyVersion\" = EXCLUDED.\"SurveyVersion\", " +
             "  \"PayloadJson\" = EXCLUDED.\"PayloadJson\", " +
+            "  \"IsTest\" = EXCLUDED.\"IsTest\", " +
             "  \"Status\" = EXCLUDED.\"Status\", " +
             "  \"NextAttemptAt\" = EXCLUDED.\"NextAttemptAt\", " +
             "  \"RetryCount\" = 0, \"LastError\" = NULL, " +
@@ -316,12 +325,13 @@ public static partial class SqlDialect
         DatabaseProvider.MySql =>
             "INSERT INTO `Responses` " +
             "  (`ResponseToken`, `SurveyId`, `SurveyVersion`, `PayloadJson`, `Status`, " +
-            "   `RetryCount`, `NextAttemptAt`, `CreatedAt`, `UpdatedAt`) " +
+            "   `RetryCount`, `NextAttemptAt`, `IsTest`, `CreatedAt`, `UpdatedAt`) " +
             "VALUES (@ResponseToken, @SurveyId, @SurveyVersion, @PayloadJson, @PendingStatus, " +
-            "        0, @Now, @Now, @Now) " +
+            "        0, @Now, @IsTest, @Now, @Now) " +
             "ON DUPLICATE KEY UPDATE " +
             "  `SurveyVersion` = VALUES(`SurveyVersion`), " +
             "  `PayloadJson` = VALUES(`PayloadJson`), " +
+            "  `IsTest` = VALUES(`IsTest`), " +
             "  `Status` = VALUES(`Status`), " +
             "  `NextAttemptAt` = VALUES(`NextAttemptAt`), " +
             "  `RetryCount` = 0, `LastError` = NULL, " +
@@ -347,8 +357,8 @@ public static partial class SqlDialect
     /// </remarks>
     public const string InsertResponseToken =
         "INSERT INTO [ResponseTokens] " +
-        "  ([ResponseToken], [SurveyId], [PleasanterReferenceId], [CreatedAt], [UpdatedAt]) " +
-        "VALUES (@ResponseToken, @SurveyId, NULL, @Now, @Now)";
+        "  ([ResponseToken], [SurveyId], [PleasanterReferenceId], [IsTest], [CreatedAt], [UpdatedAt]) " +
+        "VALUES (@ResponseToken, @SurveyId, NULL, @IsTest, @Now, @Now)";
 
 
     /// <summary>トークンと <c>ReferenceId</c> の対応を保存する SQL。</summary>
@@ -360,21 +370,21 @@ public static partial class SqlDialect
             "WHERE [ResponseToken] = @ResponseToken; " +
             "IF @@ROWCOUNT = 0 " +
             "INSERT INTO [ResponseTokens] " +
-            "  ([ResponseToken], [SurveyId], [PleasanterReferenceId], [CreatedAt], [UpdatedAt]) " +
-            "VALUES (@ResponseToken, @SurveyId, @ReferenceId, @Now, @Now);",
+            "  ([ResponseToken], [SurveyId], [PleasanterReferenceId], [IsTest], [CreatedAt], [UpdatedAt]) " +
+            "VALUES (@ResponseToken, @SurveyId, @ReferenceId, @IsTest, @Now, @Now);",
 
         DatabaseProvider.PostgreSql =>
             "INSERT INTO \"ResponseTokens\" " +
-            "  (\"ResponseToken\", \"SurveyId\", \"PleasanterReferenceId\", \"CreatedAt\", \"UpdatedAt\") " +
-            "VALUES (@ResponseToken, @SurveyId, @ReferenceId, @Now, @Now) " +
+            "  (\"ResponseToken\", \"SurveyId\", \"PleasanterReferenceId\", \"IsTest\", \"CreatedAt\", \"UpdatedAt\") " +
+            "VALUES (@ResponseToken, @SurveyId, @ReferenceId, @IsTest, @Now, @Now) " +
             "ON CONFLICT (\"ResponseToken\") DO UPDATE SET " +
             "  \"PleasanterReferenceId\" = EXCLUDED.\"PleasanterReferenceId\", " +
             "  \"UpdatedAt\" = EXCLUDED.\"UpdatedAt\"",
 
         DatabaseProvider.MySql =>
             "INSERT INTO `ResponseTokens` " +
-            "  (`ResponseToken`, `SurveyId`, `PleasanterReferenceId`, `CreatedAt`, `UpdatedAt`) " +
-            "VALUES (@ResponseToken, @SurveyId, @ReferenceId, @Now, @Now) " +
+            "  (`ResponseToken`, `SurveyId`, `PleasanterReferenceId`, `IsTest`, `CreatedAt`, `UpdatedAt`) " +
+            "VALUES (@ResponseToken, @SurveyId, @ReferenceId, @IsTest, @Now, @Now) " +
             "ON DUPLICATE KEY UPDATE " +
             "  `PleasanterReferenceId` = VALUES(`PleasanterReferenceId`), " +
             "  `UpdatedAt` = VALUES(`UpdatedAt`)",

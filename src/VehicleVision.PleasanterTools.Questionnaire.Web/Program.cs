@@ -1,4 +1,4 @@
-﻿using System.Threading.RateLimiting;
+using System.Threading.RateLimiting;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
@@ -117,6 +117,7 @@ builder.Services.AddSingleton<IResponseTokenStore, ResponseTokenStore>();
 builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
 builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
+builder.Services.AddSingleton<ISurveyDeletionStore, SurveyDeletionStore>();
 // **ヘッダ画像の置き場**（Issue #56）。外部のストレージへは置かない
 builder.Services.AddSingleton<ISurveyAssetStore, SurveyAssetStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
@@ -512,10 +513,11 @@ if (!string.Equals(
     if (pendingMigrations.Count > 0)
     {
         throw new InvalidOperationException(
-            "DB のスキーマが古い。当たっていないマイグレーションがある: "
+            // **英語で書く。** Azure の Kudu の Debug console で日本語が化ける（Issue #225）
+            "The database schema is out of date. Pending migrations: "
             + string.Join(" / ", pendingMigrations)
-            + "。--migrate を付けて起動すると当たる"
-            + "（開発環境の手順は _documents/開発環境.md）");
+            + ". Run this executable with --migrate to apply them"
+            + " (see _documents/導入-更新運用手順書.md).");
     }
 }
 

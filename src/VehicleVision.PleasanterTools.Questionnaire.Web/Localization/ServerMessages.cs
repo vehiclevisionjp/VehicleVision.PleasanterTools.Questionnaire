@@ -1,4 +1,4 @@
-﻿using System.Collections.Frozen;
+using System.Collections.Frozen;
 using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
@@ -256,6 +256,46 @@ public static class ServerMessages
             ServerMessageKeys.VersionAlreadyPublished,
             "この版はすでに公開されています。再読み込みしてから、もう一度お試しください。",
             "This version has already been published. Reload and try again.");
+
+        Add(
+            ServerMessageKeys.InvalidSurveyStatus,
+            "現在の状態ではこの操作を行えません。再読み込みしてください。",
+            "This action is not available in the current state. Reload the page.");
+
+        Add(
+            ServerMessageKeys.SurveyArchived,
+            "このアンケートはアーカイブ済みです。復元してから変更してください。",
+            "This survey is archived. Restore it before making changes.");
+
+        Add(
+            ServerMessageKeys.InvalidArchiveState,
+            "アーカイブの状態がすでに変わっています。再読み込みしてください。",
+            "The archive state has already changed. Reload the page.");
+
+        Add(
+            ServerMessageKeys.SurveyDeleteRequiresArchive,
+            "完全に削除できるのはアーカイブ済みのアンケートだけです。先にアーカイブしてください。",
+            "Only archived surveys can be permanently deleted. Archive this survey first.");
+
+        Add(
+            ServerMessageKeys.SurveyDeleteTitleMismatch,
+            "入力した題名がアンケートの題名と一致しません。",
+            "The title you entered does not match the survey title.");
+
+        Add(
+            ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery,
+            "送信待ちまたは送信中の回答・メールが残っているため、完全に削除できません。",
+            "This survey cannot be permanently deleted while responses or mail are pending or being sent.");
+
+        Add(
+            ServerMessageKeys.SiteIdLockedAfterPublish,
+            "本公開したアンケートの Pleasanter サイト ID は変更できません。",
+            "The Pleasanter site ID cannot be changed after production publication.");
+
+        Add(
+            ServerMessageKeys.SiteIdBlockedByPendingResponses,
+            "送信待ちの回答が残っているため、Pleasanter サイト ID を変更できません。",
+            "The Pleasanter site ID cannot be changed while responses are waiting to be sent.");
 
         Add(
             ServerMessageKeys.DuplicateSiteIdMustDiffer,

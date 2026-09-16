@@ -18,6 +18,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web;
 /// **公開済みのイメージからも同じことができる**（<c>dotnet …Web.dll --migrate</c>）。
 /// デプロイ手順とコンテナの起動順の両方で同じ口を使う。
 /// </para>
+/// <para>
+/// **コンソールへ出す文字列は英語で書くこと。** Azure の Kudu の Debug console では
+/// 日本語が化け、「当たった」のか「当たっていない」のかを運用者が読めない（Issue #225）。
+/// コメントとドキュメントは日本語のままでよい。
+/// </para>
 /// </remarks>
 public static class MigrationCommand
 {
@@ -47,7 +52,7 @@ public static class MigrationCommand
         var wait = WaitFor(args);
         if (wait > TimeSpan.Zero)
         {
-            Console.WriteLine($"DB が繋がるのを待つ（最大 {wait.TotalSeconds:0} 秒）…");
+            Console.WriteLine($"Waiting for the database (up to {wait.TotalSeconds:0}s)...");
             var failure = await DatabaseMigrator
                 .WaitForDatabaseAsync(provider, connectionString, wait, cancellationToken)
                 .ConfigureAwait(false);
@@ -55,7 +60,7 @@ public static class MigrationCommand
             if (failure is not null)
             {
                 await Console.Error.WriteLineAsync(
-                    $"DB へ繋がらないまま {wait.TotalSeconds:0} 秒が過ぎた: {failure.Message}")
+                    $"Database not reachable after {wait.TotalSeconds:0}s: {failure.Message}")
                     .ConfigureAwait(false);
                 return 2;
             }
@@ -64,11 +69,11 @@ public static class MigrationCommand
         var pending = DatabaseMigrator.PendingMigrations(provider, connectionString);
         if (pending.Count == 0)
         {
-            Console.WriteLine($"マイグレーションはすべて当たっている（{provider}）。");
+            Console.WriteLine($"All migrations are applied ({provider}).");
             return 0;
         }
 
-        Console.WriteLine($"当たっていないマイグレーション（{provider}）:");
+        Console.WriteLine($"Pending migrations ({provider}):");
         foreach (var migration in pending)
         {
             Console.WriteLine($"  - {migration}");
@@ -81,7 +86,7 @@ public static class MigrationCommand
         }
 
         DatabaseMigrator.MigrateUp(provider, connectionString);
-        Console.WriteLine($"{pending.Count} 件を当てた。");
+        Console.WriteLine($"Applied {pending.Count} migration(s).");
         return 0;
     }
 

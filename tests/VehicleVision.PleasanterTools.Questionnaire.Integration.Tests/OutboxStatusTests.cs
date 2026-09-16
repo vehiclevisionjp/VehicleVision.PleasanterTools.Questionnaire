@@ -78,6 +78,37 @@ public class OutboxStatusTests
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public async Task アーカイブ済みの滞留は受付の見張りから除く(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (outbox, surveys) = await CreateAsync(provider, connectionString).ConfigureAwait(true);
+        var surveyId = Guid.NewGuid();
+        await surveys.SaveAsync(new SurveyRecord(
+            surveyId,
+            $"pub-{Guid.NewGuid():N}",
+            "アーカイブ済み",
+            PleasanterSiteId: 1,
+            ResponseJsonColumn: null,
+            Status: (int)SurveyStatus.Published,
+            PublishedVersion: 1,
+            ArchivedAt: new DateTime(2026, 9, 16, 7, 0, 0, DateTimeKind.Unspecified)))
+            .ConfigureAwait(true);
+        await outbox.SaveAsync(NewToken(), surveyId, 1, """{"a":1}""").ConfigureAwait(true);
+
+        var backlog = await outbox.CountBacklogAsync(1).ConfigureAwait(true);
+
+        Assert.Equal(0, backlog.Total);
+        Assert.Equal(0, backlog.For(surveyId));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public async Task 下限に満たないアンケートは返らない(
         DatabaseProvider provider,
         string connectionString)

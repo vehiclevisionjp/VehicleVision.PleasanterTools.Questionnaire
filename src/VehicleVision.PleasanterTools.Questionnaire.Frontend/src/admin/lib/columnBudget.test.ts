@@ -113,6 +113,26 @@ describe('measure', () => {
     expect(measure(mapping('', '   '))).toEqual([]);
   });
 
+  it('レコード本体の列は標準列の枠として数えない', () => {
+    expect(
+      measure(
+        mapping(
+          'Title',
+          'Body',
+          'Status',
+          'Manager',
+          'Owner',
+          'Locked',
+          'StartTime',
+          'CompletionTime',
+          'WorkValue',
+          'ProgressRate',
+          'RemainingWorkValue',
+        ),
+      ),
+    ).toEqual([]);
+  });
+
   it('接頭辞の順に並べる', () => {
     expect(measure(mapping('NumA', 'ClassA', 'DateA')).map((item) => item.prefix)).toEqual([
       'Class',
@@ -147,6 +167,15 @@ describe('measure', () => {
 
     expect(usage?.available).toBe(1);
     expect(usage?.fits).toBe(false);
+  });
+
+  it('型ごとに実際の列数を指定できる', () => {
+    const usage = measure(mapping('ClassA', 'Class001', 'NumA'), { Class: 126, Num: 1 });
+
+    expect(usage).toEqual([
+      { prefix: 'Class', used: 2, available: 126, remaining: 124, fits: true },
+      { prefix: 'Num', used: 1, available: 1, remaining: 0, fits: true },
+    ]);
   });
 
   it('割り当てが無ければ空', () => {

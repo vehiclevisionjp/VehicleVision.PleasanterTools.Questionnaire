@@ -43,6 +43,45 @@ public class PleasanterRecordBuilderTests
     }
 
     [Fact]
+    public void レコード本体の列はハッシュに入れず本体へ振り分ける()
+    {
+        var record = Builder().Build(Columns(
+            ("Title", ["件名"]),
+            ("Body", ["本文"]),
+            ("Status", ["10"])));
+
+        Assert.Equal("件名", record.Body["Title"]);
+        Assert.Equal("本文", record.Body["Body"]);
+        Assert.Equal(10, record.Body["Status"]);
+        Assert.DoesNotContain(record.Body.Keys, key => key is "TitleHash" or "BodyHash" or "StatusHash");
+        Assert.Empty(record.Problems);
+    }
+
+    [Fact]
+    public void レコード本体の各型を対応する値へ変換する()
+    {
+        var record = Builder().Build(Columns(
+            ("Manager", ["123"]),
+            ("Owner", ["456"]),
+            ("Locked", ["true"]),
+            ("StartTime", ["2026-09-16"]),
+            ("CompletionTime", ["2026-09-16T12:34:56+09:00"]),
+            ("WorkValue", ["1.5"]),
+            ("ProgressRate", ["75.25"]),
+            ("RemainingWorkValue", ["0"])));
+
+        Assert.Equal(123, record.Body["Manager"]);
+        Assert.Equal(456, record.Body["Owner"]);
+        Assert.Equal(true, record.Body["Locked"]);
+        Assert.Equal("2026-09-16T00:00:00", record.Body["StartTime"]);
+        Assert.Equal("2026-09-16T12:34:56", record.Body["CompletionTime"]);
+        Assert.Equal(1.5m, record.Body["WorkValue"]);
+        Assert.Equal(75.25m, record.Body["ProgressRate"]);
+        Assert.Equal(0m, record.Body["RemainingWorkValue"]);
+        Assert.Empty(record.Problems);
+    }
+
+    [Fact]
     public void 空の値は消すための値になる()
     {
         // **空配列は「消す」を意味する**（編集で回答を消したとき）
@@ -123,6 +162,53 @@ public class PleasanterRecordBuilderTests
 
         Assert.False(record.Body.ContainsKey("NumHash"));
         Assert.Single(record.Problems);
+    }
+
+    [Fact]
+    public void 整数として読めないStatusは不備とする()
+    {
+        var record = Builder().Build(Columns(("Status", ["処理中"])));
+
+        Assert.False(record.Body.ContainsKey("Status"));
+        Assert.Contains(record.Problems, problem => problem.ColumnName == "Status");
+    }
+
+    [Theory]
+    [InlineData("Locked", "yes")]
+    [InlineData("WorkValue", "金額")]
+    [InlineData("StartTime", "来週")]
+    public void 本体の型として読めない値は不備とする(string columnName, string value)
+    {
+        var record = Builder().Build(Columns((columnName, [value])));
+
+        Assert.False(record.Body.ContainsKey(columnName));
+        Assert.Contains(record.Problems, problem => problem.ColumnName == columnName);
+    }
+
+    [Theory]
+    [InlineData("NumA", "とても満足")]
+    [InlineData("DateA", "来週")]
+    [InlineData("Status", "処理中")]
+    [InlineData("Locked", "yes")]
+    [InlineData("WorkValue", "金額")]
+    [InlineData("StartTime", "来週")]
+    public void 不備の理由に回答の値を載せない(string columnName, string value)
+    {
+        // **理由はデッドレターの LastError に残り、管理画面へ出る。**
+        // 完全匿名が前提なので、回答の中身をここへ流さない
+        var record = Builder().Build(Columns((columnName, [value])));
+
+        var problem = Assert.Single(record.Problems);
+        Assert.DoesNotContain(value, problem.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 未回答の本体日時は日付列と同じ最小日時で送る()
+    {
+        var record = Builder().Build(Columns(("StartTime", [])));
+
+        Assert.Equal(PleasanterDateTime.UnansweredDate, record.Body["StartTime"]);
+        Assert.Empty(record.Problems);
     }
 
     [Fact]

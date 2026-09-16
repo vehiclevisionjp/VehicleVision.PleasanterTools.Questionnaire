@@ -115,6 +115,21 @@ public interface ISurveyRepository
     Task<bool> SuspendForResponseLimitAsync(
         Guid surveyId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>テスト公開までの書き込み先を変更し、旧サイトとの対応を捨てる。</summary>
+    Task<PleasanterSiteUpdateResult> UpdatePleasanterSiteIdAsync(
+        Guid surveyId,
+        long pleasanterSiteId,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>Pleasanter サイト ID の変更結果。</summary>
+public enum PleasanterSiteUpdateResult
+{
+    Updated,
+    NotFound,
+    NotEditable,
+    PendingResponses,
 }
 
 /// <summary>アンケートの 1 行。</summary>
@@ -150,6 +165,7 @@ public interface ISurveyRepository
 ///
 /// **サーバへは送らない。** 下書きは端末の中だけに置く。
 /// </param>
+/// <param name="ArchivedAt">アーカイブした時刻（UTC）。アーカイブしていなければ <c>null</c>。</param>
 public sealed record SurveyRecord(
     Guid SurveyId,
     string PublicId,
@@ -165,7 +181,8 @@ public sealed record SurveyRecord(
     int? SuspendedReason = null,
     DateTime? SuspendedAt = null,
     bool RequireProofOfWork = true,
-    bool AllowDraft = false);
+    bool AllowDraft = false,
+    DateTime? ArchivedAt = null);
 
 /// <summary>アンケートの状態。</summary>
 public enum SurveyStatus
@@ -178,6 +195,9 @@ public enum SurveyStatus
 
     /// <summary>停止中。理由は <c>SuspendedReason</c>。</summary>
     Suspended = 2,
+
+    /// <summary>テスト公開中。回答は Pleasanter へ送るが、本番件数には含めない。</summary>
+    TestPublished = 3,
 }
 
 /// <summary>受付を止めている理由。</summary>
@@ -208,6 +228,8 @@ public enum SurveySuspendedReason
 /// <summary>Dapper を使った実装。</summary>
 public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : ISurveyRepository
 {
+    private sealed record SiteDestinationRow(int Status, long PleasanterSiteId);
+
     /// <remarks>
     /// **<c>IsTemplate</c> は書かない**（Issue #58）。
     /// テンプレートかどうかは作るときに決まるもので、
@@ -232,6 +254,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             // **旗も書く**（Issue #66）。管理画面の公開設定はここを通る
             + "  [RequireProofOfWork] = @RequireProofOfWork, "
             + "  [AllowDraft] = @AllowDraft, "
+            + "  [ArchivedAt] = @ArchivedAt, "
             + "  [UpdatedAt] = @Now "
             + "WHERE [SurveyId] = @SurveyId",
             new
@@ -250,6 +273,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.SuspendedAt,
                 survey.RequireProofOfWork,
                 survey.AllowDraft,
+                survey.ArchivedAt,
                 Now = now,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -264,12 +288,12 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             + "  ([SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "   [AcceptFrom], [AcceptTo], [ResponseLimit], "
-            + "   [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], "
+            + "   [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], [ArchivedAt], "
             + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, @PublishedVersion, "
             + "        @AcceptFrom, @AcceptTo, @ResponseLimit, "
-            + "        @SuspendedReason, @SuspendedAt, @RequireProofOfWork, @AllowDraft, "
+            + "        @SuspendedReason, @SuspendedAt, @RequireProofOfWork, @AllowDraft, @ArchivedAt, "
             + "        @Now, @Now)",
             new
             {
@@ -287,6 +311,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.SuspendedAt,
                 survey.RequireProofOfWork,
                 survey.AllowDraft,
+                survey.ArchivedAt,
                 Now = now,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -347,7 +372,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate], "
-            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft] "
+            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], [ArchivedAt] "
             + "FROM [Surveys] WHERE [PublicId] = @PublicId",
             new { PublicId = publicId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -362,7 +387,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate], "
-            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft] "
+            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], [ArchivedAt] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -374,15 +399,17 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        // **公開中の行しか止めない。** 既に停止中なら 0 行で終わり、
-        // 手で止めた理由（Manual）を上書きしない。何度呼んでも同じ結果になる
+        // **公開中かつアーカイブしていない行しか止めない。**
+        // 既に停止中なら 0 行で終わり、手で止めた理由（Manual）を上書きしない。
+        // アーカイブと回答受付が競合しても、畳んだ後の状態を書き換えない
         var affected = await connection.ExecuteAsync(Sql(
             "UPDATE [Surveys] SET "
             + "  [Status] = @SuspendedStatus, "
             + "  [SuspendedReason] = @Reason, "
             + "  [SuspendedAt] = @Now, "
             + "  [UpdatedAt] = @Now "
-            + "WHERE [SurveyId] = @SurveyId AND [Status] = @PublishedStatus",
+            + "WHERE [SurveyId] = @SurveyId "
+            + "  AND [Status] = @PublishedStatus AND [ArchivedAt] IS NULL",
             new
             {
                 SurveyId = surveyId,
@@ -394,6 +421,96 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return affected > 0;
+    }
+
+    public async Task<PleasanterSiteUpdateResult> UpdatePleasanterSiteIdAsync(
+        Guid surveyId,
+        long pleasanterSiteId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var destination = await connection.QueryFirstOrDefaultAsync<SiteDestinationRow>(Sql(
+            "SELECT [Status], [PleasanterSiteId] FROM [Surveys] WHERE [SurveyId] = @SurveyId",
+            new { SurveyId = surveyId },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
+        if (destination is null)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return PleasanterSiteUpdateResult.NotFound;
+        }
+
+        if (destination.Status is not ((int)SurveyStatus.Draft)
+            and not ((int)SurveyStatus.TestPublished))
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return PleasanterSiteUpdateResult.NotEditable;
+        }
+
+        if (destination.PleasanterSiteId == pleasanterSiteId)
+        {
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return PleasanterSiteUpdateResult.Updated;
+        }
+
+        // **数えるのは送信待ちだけ**（`Pending` と `Sending`）。どちらのサイトへ行くかが
+        // 決まらないため止める。
+        // ⚠️ **デッドレターは数えない。** テスト公開は割り当ての誤りを見つけるためのもので、
+        // **デッドレターが出るのはむしろ想定どおり。** これで止めると、
+        // 直すためにサイトを変えたいときに永久に変えられなくなる
+        var pending = await connection.ExecuteScalarAsync<int>(Sql(
+            "SELECT COUNT(*) FROM [Responses] "
+            + "WHERE [SurveyId] = @SurveyId AND [Status] <> @DeadLetterStatus",
+            new { SurveyId = surveyId, DeadLetterStatus = (int)ResponseStatus.DeadLetter },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
+        if (pending > 0)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return PleasanterSiteUpdateResult.PendingResponses;
+        }
+
+        // **旧サイトを指しているものを捨てる。** 対応表を残すと、
+        // 次の回答が旧サイトのレコードを更新しに行く
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [ResponseTokens] WHERE [SurveyId] = @SurveyId AND [IsTest] = @IsTest",
+            new { SurveyId = surveyId, IsTest = true },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
+
+        // **テストのデッドレターも捨てる。** 中身は旧サイト向けの割り当てで、
+        // 再送しても確かめたいことの答えにならない。
+        // ⚠️ **本番のデッドレターは消さない**（ここへ来るのは本公開前だけだが、
+        // 条件を緩めたときに巻き添えにしないため明示する）
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [Responses] "
+            + "WHERE [SurveyId] = @SurveyId AND [IsTest] = @IsTest "
+            + "  AND [Status] = @DeadLetterStatus",
+            new
+            {
+                SurveyId = surveyId,
+                IsTest = true,
+                DeadLetterStatus = (int)ResponseStatus.DeadLetter,
+            },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
+        await connection.ExecuteAsync(Sql(
+            "UPDATE [Surveys] SET [PleasanterSiteId] = @PleasanterSiteId, [UpdatedAt] = @Now "
+            + "WHERE [SurveyId] = @SurveyId",
+            new
+            {
+                SurveyId = surveyId,
+                PleasanterSiteId = pleasanterSiteId,
+                Now = DbTime.UtcNowTruncated(),
+            },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return PleasanterSiteUpdateResult.Updated;
     }
 
     private DatabaseProvider Provider => connectionFactory.Provider;

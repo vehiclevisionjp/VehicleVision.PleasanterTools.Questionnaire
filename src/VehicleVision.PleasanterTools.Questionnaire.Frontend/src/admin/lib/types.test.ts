@@ -184,10 +184,18 @@ describe('isDisplayOnly と isPublished', () => {
       status: 0,
       updatedAt: '2026-08-21T00:00:00Z',
       responseCount: 0,
+      testResponseCount: 0,
     };
 
     expect(isPublished({ ...base })).toBe(false);
     expect(isPublished({ ...base, publishedVersion: null })).toBe(false);
-    expect(isPublished({ ...base, publishedVersion: 1 })).toBe(true);
+    expect(isPublished({ ...base, status: 3, publishedVersion: 1 })).toBe(true);
+    expect(isPublished({ ...base, status: 1, publishedVersion: 1 })).toBe(true);
+    expect(isPublished({
+      ...base,
+      status: 1,
+      publishedVersion: 1,
+      archivedAt: '2026-09-16T07:00:00Z',
+    })).toBe(false);
   });
 });

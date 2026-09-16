@@ -349,6 +349,7 @@
           onopen={open}
           canDuplicate={can('surveys.publish')}
           canUseTemplates={can('templates.read')}
+          canDelete={can('surveys.delete')}
         />
       {/if}
     </main>

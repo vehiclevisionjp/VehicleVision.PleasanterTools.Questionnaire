@@ -218,6 +218,7 @@ export const listSurveys = (
   limit: number,
   title: string,
   status: number | null,
+  includeArchived = false,
 ) => {
   const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
 
@@ -227,6 +228,10 @@ export const listSurveys = (
 
   if (status !== null) {
     query.set('status', String(status));
+  }
+
+  if (includeArchived) {
+    query.set('includeArchived', 'true');
   }
 
   return call<SurveyPage>(`/api/admin/surveys?${query}`);
@@ -302,6 +307,15 @@ export const deleteTemplate = (templateId: string) =>
 
 export const loadDraft = (surveyId: string) => call<SurveyDraft>(`/api/admin/surveys/${surveyId}`);
 
+/** マッピング先サイトの列数。取得できないときは標準の本数を使う。 */
+export interface ColumnAvailabilityResponse {
+  source: 'site' | 'standard';
+  availableByPrefix: Record<string, number>;
+}
+
+export const loadColumnAvailability = (surveyId: string) =>
+  call<ColumnAvailabilityResponse>(`/api/admin/surveys/${surveyId}/column-availability`);
+
 /** 埋め込みを許す配信元（Issue #104 / #107）。**運用側の設定なので変わらない。** */
 export interface EmbedOptions {
   enabled: boolean;
@@ -355,10 +369,28 @@ export const adminAssetUrl = (surveyId: string, assetId: string): string =>
 export const loadProblems = (surveyId: string) =>
   call<MappingProblem[]>(`/api/admin/surveys/${surveyId}/problems`);
 
-export const publish = (surveyId: string) =>
-  call<{ version: number; warnings: MappingProblem[] }>(`/api/admin/surveys/${surveyId}/publish`, {
+export const testPublish = (surveyId: string) =>
+  call<{ version: number; warnings: MappingProblem[] }>(`/api/admin/surveys/${surveyId}/test-publish`, {
     method: 'POST',
     json: {},
+  });
+
+export const publish = (surveyId: string) =>
+  call<{ status: string }>(`/api/admin/surveys/${surveyId}/publish`, {
+    method: 'POST',
+    json: {},
+  });
+
+export const revertToDraft = (surveyId: string) =>
+  call<{ status: string }>(`/api/admin/surveys/${surveyId}/revert-to-draft`, {
+    method: 'POST',
+    json: {},
+  });
+
+export const updateSurveySiteId = (surveyId: string, pleasanterSiteId: number) =>
+  call<{ pleasanterSiteId: number }>(`/api/admin/surveys/${surveyId}/site-id`, {
+    method: 'PUT',
+    json: { pleasanterSiteId },
   });
 
 /**
@@ -387,6 +419,30 @@ export const suspend = (surveyId: string) =>
 
 export const resume = (surveyId: string) =>
   call<{ status: string }>(`/api/admin/surveys/${surveyId}/resume`, { method: 'POST', json: {} });
+
+export const archiveSurvey = (surveyId: string) =>
+  call<{ archivedAt: string }>(`/api/admin/surveys/${surveyId}/archive`, {
+    method: 'POST',
+    json: {},
+  });
+
+export const restoreSurvey = (surveyId: string) =>
+  call<{ archivedAt?: string }>(`/api/admin/surveys/${surveyId}/restore`, {
+    method: 'POST',
+    json: {},
+  });
+
+/**
+ * アーカイブ済みアンケートを本アプリから完全に削除する。
+ *
+ * **Pleasanter 側の回答は削除しない。** 題名は押し間違いを防ぐ確認値で、
+ * サーバでも現在の題名との完全一致を確かめる。
+ */
+export const deleteSurvey = (surveyId: string, title: string) =>
+  call<void>(`/api/admin/surveys/${surveyId}/delete`, {
+    method: 'POST',
+    json: { title },
+  });
 
 /**
  * 管理操作の記録を読む。

@@ -1,4 +1,4 @@
-﻿namespace VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
+namespace VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 /// <summary>サーバが画面へ返す文言の鍵。</summary>
 /// <remarks>
@@ -108,6 +108,25 @@ public static class ServerMessageKeys
 
     /// <summary>その版は既にある。**同時に 2 人が公開を押した場合など。**</summary>
     public const string VersionAlreadyPublished = "surveys.versionAlreadyPublished";
+
+    public const string InvalidSurveyStatus = "surveys.invalidStatus";
+
+    /// <summary>アーカイブ済みのアンケートを変更しようとした。</summary>
+    public const string SurveyArchived = "surveys.archived";
+
+    /// <summary>既にアーカイブ済み、または既に復元済み。</summary>
+    public const string InvalidArchiveState = "surveys.invalidArchiveState";
+
+    public const string SurveyDeleteRequiresArchive = "surveys.deleteRequiresArchive";
+
+    public const string SurveyDeleteTitleMismatch = "surveys.deleteTitleMismatch";
+
+    public const string SurveyDeleteBlockedByPendingDelivery =
+        "surveys.deleteBlockedByPendingDelivery";
+
+    public const string SiteIdLockedAfterPublish = "surveys.siteIdLockedAfterPublish";
+
+    public const string SiteIdBlockedByPendingResponses = "surveys.siteIdBlockedByPendingResponses";
 
     /// <summary>複製先に元と同じサイトを指定した。**1 アンケート = 1 サイト。**</summary>
     public const string DuplicateSiteIdMustDiffer = "surveys.duplicateSiteIdMustDiffer";
