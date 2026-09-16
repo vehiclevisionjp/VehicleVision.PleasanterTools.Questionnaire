@@ -128,18 +128,4 @@ public class HeaderImageTests
         Assert.False(HeaderImage.Policy.VirusScanEnabled);
     }
 
-    [Fact]
-    public async Task 本文画像は1MBを超えると拒否する()
-    {
-        var large = new byte[ContentImage.MaxBytes + 1];
-        Png.CopyTo(large, 0);
-
-        var rejections = await ContentImage.InspectAsync(
-            new IncomingAttachment("content.png", large));
-
-        Assert.Contains(
-            rejections,
-            rejection => rejection.Reason == AttachmentRejectionReason.TooLarge);
-        Assert.Equal(20, ContentImage.MaxAssetsPerSurvey);
-    }
 }

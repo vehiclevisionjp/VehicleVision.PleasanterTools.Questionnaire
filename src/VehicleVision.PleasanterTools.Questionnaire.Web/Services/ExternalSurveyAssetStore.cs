@@ -19,7 +19,11 @@ internal sealed class ExternalSurveyAssetStore(
     IDbConnectionFactory connectionFactory,
     IAssetObjectStore objects) : ISurveyAssetStore
 {
-    private sealed record Row(Guid AssetId, string ContentType, string ContentBase64);
+    private sealed record Row(
+        Guid AssetId,
+        string ContentType,
+        string FileName,
+        string ContentBase64);
 
     public async Task<Guid> AddAsync(
         Guid surveyId,
@@ -72,7 +76,7 @@ internal sealed class ExternalSurveyAssetStore(
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var row = await connection.QueryFirstOrDefaultAsync<Row>(Sql(
-            "SELECT [AssetId], [ContentType], [ContentBase64] FROM [SurveyAssets] "
+            "SELECT [AssetId], [ContentType], [FileName], [ContentBase64] FROM [SurveyAssets] "
             + "WHERE [SurveyId] = @SurveyId AND [AssetId] = @AssetId",
             new { SurveyId = surveyId, AssetId = assetId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -86,14 +90,20 @@ internal sealed class ExternalSurveyAssetStore(
         {
             var content = await objects.FindAsync(storageKey, cancellationToken)
                 .ConfigureAwait(false);
-            return content is null ? null : new(row.AssetId, row.ContentType, content);
+            return content is null
+                ? null
+                : new(row.AssetId, row.ContentType, row.FileName, content);
         }
 
-        // **DB 保存から切り替えた直後も既存画像を配信する。**
+        // **DB 保存から切り替えた直後も既存資産を配信する。**
         // 移行前の行には保存キーではなく Base64 の実体が残っているため。
         try
         {
-            return new(row.AssetId, row.ContentType, Convert.FromBase64String(row.ContentBase64));
+            return new(
+                row.AssetId,
+                row.ContentType,
+                row.FileName,
+                Convert.FromBase64String(row.ContentBase64));
         }
         catch (FormatException)
         {
@@ -177,7 +187,7 @@ internal sealed class ExternalSurveyAssetStore(
             }
 
             // **複製したアンケートは同じ実体を指す。**
-            // 最後の参照でない限り消すと、残ったアンケートの画像が欠ける。
+            // 最後の参照でない限り消すと、残ったアンケートの資産が欠ける。
             var references = await connection.ExecuteScalarAsync<long>(Sql(
                 "SELECT COUNT(*) FROM [SurveyAssets] WHERE [ContentBase64] = @StorageKey",
                 new { StorageKey = value },

@@ -75,6 +75,9 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | `QUESTIONNAIRE_ASSET_S3_REGION` | S3 の署名に使う region。任意の region 名を指定できる |
 | `QUESTIONNAIRE_ASSET_S3_ACCESSKEY` | S3 のアクセスキー。IAM ロールを使えない場合だけ環境変数か Key Vault で与える |
 | `QUESTIONNAIRE_ASSET_S3_SECRETKEY` | S3 の秘密鍵。アクセスキーと組で指定する |
+| `QUESTIONNAIRE_ASSET_ALLOWEDEXTENSIONS` | 説明文・完了画面で配る資産の許可拡張子。回答添付とは別設定 |
+| `QUESTIONNAIRE_ASSET_MAXFILESIZEBYTES` | 配布資産 1 件の上限。既定 `10485760`（10 MB） |
+| `QUESTIONNAIRE_ASSET_MAXFILECOUNT` | アンケート 1 件の配布資産数。既定 `20` |
 | `QUESTIONNAIRE_FORWARDED_NETWORKS` | `X-Forwarded-*` を信頼するリバースプロキシの CIDR。複数はカンマ区切り。Ingress の送信元範囲だけを指定する |
 | `QUESTIONNAIRE_MONITORING_TOKEN` | 監視 API の Bearer token。**未設定なら監視 API の経路自体を作らない。** 環境変数か Key Vault から与える |
 | `QUESTIONNAIRE_HEALTH_NETWORKS` | `/healthz` と `/ready` を許す送信元 CIDR。複数はカンマ区切り。**未設定なら制限しない** |

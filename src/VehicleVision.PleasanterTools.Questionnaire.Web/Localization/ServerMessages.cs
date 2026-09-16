@@ -331,14 +331,19 @@ public static class ServerMessages
             "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 2 MB.");
 
         Add(
-            ServerMessageKeys.ContentImageRejected,
-            "この画像は使用できません。PNG・JPEG・GIF・WebP の 1 MB 以内の画像を選んでください。",
-            "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 1 MB.");
+            ServerMessageKeys.ContentAssetRejected,
+            "この配布物は使用できません。許可された形式と容量を確認してください。",
+            "That asset cannot be used. Check the allowed file types and size limit.");
 
         Add(
-            ServerMessageKeys.ContentImageLimitReached,
-            "このアンケートへ保存できる画像は 20 枚までです。",
-            "Up to 20 images can be stored for this survey.");
+            ServerMessageKeys.ContentAssetLimitReached,
+            "このアンケートへ保存できる配布物の上限に達しています。",
+            "This survey has reached its asset limit.");
+
+        Add(
+            ServerMessageKeys.AssetScannerUnavailable,
+            "ウイルス検査を利用できないため、配布物を保存できません。管理者へ連絡してください。",
+            "The asset cannot be saved because virus scanning is unavailable. Contact an administrator.");
 
         // ---- 回答数の上限 ---------------------------------------------------
         Add(

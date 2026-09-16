@@ -188,14 +188,21 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // 1. 拡張子の許可リスト 2. 先頭バイトとの一致 は常に有効。3. ウイルススキャンは既定で無効
 var attachmentOptions = AttachmentOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(attachmentOptions);
+var assetOptions = AssetOptions.FromConfiguration(
+    builder.Configuration, attachmentOptions.VirusScan.Enabled);
+builder.Services.AddSingleton(assetOptions);
 
 // **埋め込みを許す配信元**（Issue #104 / #107）。**既定は空＝一切埋め込めない**
 var embedOptions = EmbedOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(embedOptions);
 
-// **添付は multipart で届く。上限を既定値に任せない**（_documents/非機能設計.md 1 章）
+// **添付と配布資産は multipart で届く。上限を既定値に任せない**
+// （_documents/非機能設計.md 1 章）。
+// 大きい方に合わせ、個別の入口ではそれぞれの上限まで絞る
 builder.Services.Configure<FormOptions>(options =>
-    options.MultipartBodyLengthLimit = attachmentOptions.MaxRequestBodyBytes);
+    options.MultipartBodyLengthLimit = Math.Max(
+        attachmentOptions.MaxRequestBodyBytes,
+        assetOptions.MaxRequestBodyBytes));
 
 // **ウイルススキャンは設定で有効にしたときだけ組み込む**（既定は無効）。
 // **ClamAV 本体は GPL-2.0 なので別プロセスとして呼ぶだけ**（LICENSING.md）
@@ -234,6 +241,8 @@ if (attachmentOptions.VirusScan.Enabled)
 // 「有効なのにスキャナが無い」場合は検査側が添付を拒否する（素通しにしない）
 builder.Services.AddSingleton(serviceProvider => new AttachmentInspector(
     attachmentOptions.ToPolicy(), serviceProvider.GetService<IVirusScanner>()));
+builder.Services.AddSingleton(serviceProvider => new AssetInspector(
+    assetOptions, serviceProvider.GetService<IVirusScanner>()));
 
 // ---- アクセス解析（Issue #162）----------------------------------------------
 // **既定は無効。** 設定しなければ、回答者の端末から第三者への要求は 1 つも出ない。

@@ -279,6 +279,7 @@ public class SurveyThemeStoreTests
         var copiedAsset = await assets.FindAsync(target.SurveyId, copiedAssetId);
         Assert.NotNull(copiedAsset);
         Assert.Equal(content, copiedAsset.Content);
+        Assert.Equal("guide.png", copiedAsset.FileName);
     }
 
     [Theory]

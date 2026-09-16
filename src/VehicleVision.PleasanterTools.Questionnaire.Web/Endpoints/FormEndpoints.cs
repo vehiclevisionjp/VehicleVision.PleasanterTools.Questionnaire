@@ -150,17 +150,18 @@ public static class FormEndpoints
             return Results.File(image.Content, image.ContentType);
         });
 
-        // **公開版の本文が参照する自前画像だけを配る**（Issue #266 / #269）。
+        // **公開版の本文が参照する自前資産だけを配る**（Issue #266 / #269）。
         // 認証や回答トークンとは結び付けない。配信ログから回答者を辿れる識別子を増やさない
         forms.MapGet("/{publicId}/assets/{assetId:guid}", async (
             string publicId,
             Guid assetId,
             HttpContext context,
             ResponseIntake intake,
+            AssetOptions options,
             CancellationToken cancellationToken) =>
         {
-            var image = await intake.GetPublishedAssetAsync(publicId, assetId, cancellationToken);
-            if (image is null || !HeaderImage.IsAllowedContentType(image.ContentType))
+            var asset = await intake.GetPublishedAssetAsync(publicId, assetId, cancellationToken);
+            if (asset is null || !options.IsAllowed(asset.FileName, asset.ContentType))
             {
                 return Results.NotFound();
             }
@@ -168,7 +169,11 @@ public static class FormEndpoints
             // **URL は本アプリのままにする。** 保存先へ転送しないので、
             // 後からこの口へ 1 回限りの引換券を追加できる
             context.Response.Headers.CacheControl = "public, max-age=86400";
-            return Results.File(image.Content, image.ContentType);
+            // **必ず attachment。** PDF や Office 文書をブラウザ内で開かせない
+            return Results.File(
+                asset.Content,
+                asset.ContentType,
+                fileDownloadName: asset.FileName);
         });
 
         // **送信チケットを出す。** 画面を開いた時刻を署名に閉じ込めて返すだけで、

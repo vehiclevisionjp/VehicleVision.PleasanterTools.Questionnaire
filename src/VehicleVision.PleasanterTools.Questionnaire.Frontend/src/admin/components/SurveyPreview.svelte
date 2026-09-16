@@ -47,7 +47,7 @@
      * 返さないので、上げたばかりの画像はここからは見えない。
      */
     headerImageUrl?: string | null;
-    /** 本文用画像を管理画面の配信口へ変換する。 */
+    /** 本文用資産を管理画面の配信口へ変換する。 */
     assetUrl?: (assetId: string) => string;
     onclose: () => void;
   }
