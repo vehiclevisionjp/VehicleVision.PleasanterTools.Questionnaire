@@ -30,9 +30,12 @@ public class SurveyDeletionStoreTests
         var archivedAt = DbTime.UtcNowTruncated();
         await SeedCompleteSurveyAsync(factory, surveyId, sourceId, archivedAt);
 
-        var result = await new SurveyDeletionStore(factory).DeleteAsync(surveyId, "完全削除の検証");
+        var assets = new RecordingAssetStore();
+        var result = await new SurveyDeletionStore(factory, assets)
+            .DeleteAsync(surveyId, "完全削除の検証");
 
         Assert.Equal(SurveyDeletionStatus.Deleted, result.Status);
+        Assert.Equal([surveyId], assets.DeletedSurveyIds);
         Assert.Equal(surveyId, result.Survey!.SurveyId);
         Assert.Equal($"public-{surveyId:N}", result.Survey.PublicId);
         Assert.Equal("完全削除の検証", result.Survey.Title);
@@ -166,6 +169,33 @@ public class SurveyDeletionStoreTests
     {
         DatabaseMigrator.MigrateUp(provider, connectionString);
         return new DbConnectionFactory(provider, connectionString);
+    }
+
+    private sealed class RecordingAssetStore : ISurveyAssetStore
+    {
+        public List<Guid> DeletedSurveyIds { get; } = [];
+
+        public Task<Guid> AddAsync(
+            Guid surveyId,
+            string contentType,
+            string fileName,
+            byte[] content,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<SurveyAsset?> FindAsync(
+            Guid surveyId,
+            Guid assetId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteSurveyAsync(
+            Guid surveyId,
+            CancellationToken cancellationToken = default)
+        {
+            DeletedSurveyIds.Add(surveyId);
+            return Task.CompletedTask;
+        }
     }
 
     private static SurveyRecord Record(Guid surveyId, DateTime? archivedAt) =>

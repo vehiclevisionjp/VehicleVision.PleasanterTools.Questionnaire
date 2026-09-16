@@ -64,6 +64,17 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | `QUESTIONNAIRE_TIMEZONE_DEFAULT` | 本アプリの既定タイムゾーン（既定 `Asia/Tokyo`）。`Service.json` の `TimeZoneDefault` と同じ |
 | `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト）。**送信チケットの署名鍵もここから派生させる** |
 | `QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` | 複数インスタンスで管理画面の Cookie を共有する鍵束ディレクトリ。AKS では ReadWriteMany の永続ボリュームを指定する |
+| `QUESTIONNAIRE_ASSET_STORE` | 資産の保存先。`Database`（既定）/ `Path` / `AzureBlob` / `S3` |
+| `QUESTIONNAIRE_ASSET_PATH` | `Path` の保存ディレクトリ。複数インスタンスでは全インスタンスが同じ共有領域を参照する |
+| `QUESTIONNAIRE_ASSET_AZURE_CONTAINERURI` | `AzureBlob` のコンテナー URI。マネージド ID を使う既定の指定方法 |
+| `QUESTIONNAIRE_ASSET_AZURE_CONNECTIONSTRING` | `AzureBlob` の接続文字列。鍵を保管するため非推奨。環境変数か Key Vault だけで与える |
+| `QUESTIONNAIRE_ASSET_AZURE_CONTAINERNAME` | 接続文字列を使う場合のコンテナー名 |
+| `QUESTIONNAIRE_ASSET_S3_BUCKET` | `S3` のバケット名 |
+| `QUESTIONNAIRE_ASSET_S3_SERVICEURL` | S3 互換サービスの入口 URL。AWS S3 では省略できる |
+| `QUESTIONNAIRE_ASSET_S3_FORCEPATHSTYLE` | パス形式のアドレスを使うか。MinIO など必要な環境で `true` |
+| `QUESTIONNAIRE_ASSET_S3_REGION` | S3 の署名に使う region。任意の region 名を指定できる |
+| `QUESTIONNAIRE_ASSET_S3_ACCESSKEY` | S3 のアクセスキー。IAM ロールを使えない場合だけ環境変数か Key Vault で与える |
+| `QUESTIONNAIRE_ASSET_S3_SECRETKEY` | S3 の秘密鍵。アクセスキーと組で指定する |
 | `QUESTIONNAIRE_FORWARDED_NETWORKS` | `X-Forwarded-*` を信頼するリバースプロキシの CIDR。複数はカンマ区切り。Ingress の送信元範囲だけを指定する |
 | `QUESTIONNAIRE_ADMIN_TWOFACTOR` | 管理者の 2 要素認証。`required` / `optional`（既定） / `disabled`。**知らない値は起動時に落ちる。** ⚠️ `disabled` にしても、登録済みの管理者からは 2 要素を外さない |
 | `PasswordMinimumLength` | パスワードの最低の長さ（既定 12）。`Security.json` にも書ける（Issue #157） |
