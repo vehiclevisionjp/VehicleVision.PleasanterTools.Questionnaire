@@ -83,7 +83,7 @@
   const noteSources = $derived(
     definition.pages.flatMap((page) =>
       page.questions
-        .filter((question) => question.type === 'Note')
+        .filter((question) => question.type === 'Note' || question.type === 'Confirm')
         .flatMap((question) =>
           Object.entries(question.description ?? {})
             .filter(([, markup]) => markup !== '')
@@ -199,9 +199,10 @@
    * プレビューでは付いた書式が公開後に付かない、という食い違いが起きる。
    */
   function withNoteBlocks(question: { questionId: string; type: string }) {
-    return question.type === 'Note'
-      ? { ...question, noteBlocks: parsedNotes[question.questionId] ?? null }
-      : question;
+    const blocks = parsedNotes[question.questionId] ?? null;
+    if (question.type === 'Note') return { ...question, noteBlocks: blocks };
+    if (question.type === 'Confirm') return { ...question, descriptionBlocks: blocks };
+    return question;
   }
 
   function goNext() {

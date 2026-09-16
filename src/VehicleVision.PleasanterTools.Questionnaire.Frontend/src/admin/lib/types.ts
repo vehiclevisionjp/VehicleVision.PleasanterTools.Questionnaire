@@ -20,7 +20,8 @@ export type QuestionType =
   | 'CheckboxGrid'
   | 'Ranking'
   | 'Note'
-  | 'Embed';
+  | 'Embed'
+  | 'Confirm';
 
 /**
  * 画面に出す並び。**説明文ブロックは最後**（回答を持たないため）
@@ -43,6 +44,7 @@ export const questionTypes: QuestionType[] = [
   'Ranking',
   'Note',
   'Embed',
+  'Confirm',
 ];
 
 /** 設問の形式の文言の鍵。**形式を足すと鍵が無くなり、型検査で落ちる。** */

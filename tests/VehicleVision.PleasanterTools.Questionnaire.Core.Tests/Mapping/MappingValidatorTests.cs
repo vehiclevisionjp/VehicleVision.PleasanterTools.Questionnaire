@@ -263,6 +263,39 @@ public class MappingValidatorTests
         Assert.Contains(MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
     }
 
+    [Fact]
+    public void 確認は変換せず真偽値の列へ割り当てられる()
+    {
+        var definition = Definition("q1") with
+        {
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = QuestionType.Confirm,
+                            Title = LocalizedText.Japanese("同意"),
+                        },
+                    ],
+                },
+            ],
+        };
+        var assignment = ColumnAssignment.Direct("CheckA", new MappingSource("q1"));
+
+        var problems = MappingValidator.Validate(
+            Mapping(assignment),
+            definition,
+            targetValueKind: _ => MappingTargetValueKind.Boolean);
+
+        Assert.Null(assignment.Converter);
+        Assert.DoesNotContain(MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
     [Theory]
     [InlineData("Locked", MappingTargetValueKind.Boolean, "true")]
     [InlineData("WorkValue", MappingTargetValueKind.Decimal, "1.5")]

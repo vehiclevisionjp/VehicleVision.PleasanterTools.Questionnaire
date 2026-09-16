@@ -128,6 +128,12 @@ public class SurveyJsonTests
     }
 
     [Fact]
+    public void 確認は埋め込みの後ろへ追加されている()
+    {
+        Assert.Equal((int)QuestionType.Embed + 1, (int)QuestionType.Confirm);
+    }
+
+    [Fact]
     public void 多言語は言語コードのオブジェクトで書く()
     {
         var json = SurveyJson.Serialize(LocalizedText.Japanese("こんにちは"));

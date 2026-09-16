@@ -61,6 +61,36 @@ public class AnswerValidatorTests
         Assert.Empty(AnswerValidator.Validate(definition, []));
     }
 
+    [Theory]
+    [InlineData("true", true, 0)]
+    [InlineData("false", true, 1)]
+    [InlineData("false", false, 0)]
+    public void 確認は必須ならチェック済みだけを受け取る(
+        string value,
+        bool required,
+        int expectedErrorCount)
+    {
+        var definition = Definition(Q("q1", QuestionType.Confirm, required));
+
+        var errors = AnswerValidator.Validate(definition, [Answer.Of("q1", value)]);
+
+        Assert.Equal(expectedErrorCount, errors.Length);
+        if (expectedErrorCount > 0)
+        {
+            Assert.Equal(ValidationErrorCode.Required, errors.Single().Code);
+        }
+    }
+
+    [Fact]
+    public void 確認は真偽値以外を受け取らない()
+    {
+        var definition = Definition(Q("q1", QuestionType.Confirm));
+
+        var errors = AnswerValidator.Validate(definition, [Answer.Of("q1", "yes")]);
+
+        Assert.Equal([ValidationErrorCode.NotABoolean], Codes(errors));
+    }
+
     [Fact]
     public void 定義に無い設問への回答は受け取らない()
     {

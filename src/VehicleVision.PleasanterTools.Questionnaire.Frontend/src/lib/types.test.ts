@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { AnswerState, Question, QuestionType } from './types';
 import {
   allowsMultiplePerRow,
+  confirmAnswer,
   hasChoices,
   hasRows,
   hasSelectionRange,
   isDisplayOnly,
+  isConfirmed,
   rowValues,
   text,
 } from './types';
@@ -83,6 +85,16 @@ describe('設問の形式の判定', () => {
   it('表示専用の要素を見分ける', () => {
     expect(isDisplayOnly(question('Note'))).toBe(true);
     expect(isDisplayOnly(question('Text'))).toBe(false);
+  });
+
+  it('確認のチェック状態を真偽値として往復する', () => {
+    const checked = confirmAnswer(undefined, true);
+    expect(checked.values).toEqual(['true']);
+    expect(isConfirmed(checked)).toBe(true);
+
+    const unchecked = confirmAnswer(checked, false);
+    expect(unchecked.values).toEqual(['false']);
+    expect(isConfirmed(unchecked)).toBe(false);
   });
 });
 

@@ -18,7 +18,8 @@ export type QuestionType =
   | 'CheckboxGrid'
   | 'Ranking'
   | 'Note'
-  | 'Embed';
+  | 'Embed'
+  | 'Confirm';
 
 /** 言語コードをキーにした表示文字列。 */
 export type LocalizedText = Record<string, string>;
@@ -188,6 +189,8 @@ export interface Question {
    * **画面はこちらしか見ない。** 記法の解釈はサーバにしか無い。
    */
   noteBlocks?: Record<string, NoteBlock[]> | null;
+  /** 確認・同意の説明文を安全な要素として描画するための構造。 */
+  descriptionBlocks?: Record<string, NoteBlock[]> | null;
 }
 
 export interface Page {
@@ -364,6 +367,16 @@ export function hasSelectionRange(question: Question): boolean {
 /** その行で選ばれている値。**無ければ空。** */
 export function rowValues(answer: AnswerState | undefined, rowId: string): string[] {
   return answer?.rows?.[rowId] ?? [];
+}
+
+/** 確認・同意にチェックが入っているか。 */
+export function isConfirmed(answer: AnswerState | undefined): boolean {
+  return answer?.values[0]?.toLowerCase() === 'true';
+}
+
+/** 確認・同意のチェック状態を回答へ変換する。 */
+export function confirmAnswer(answer: AnswerState | undefined, checked: boolean): AnswerState {
+  return { ...(answer ?? { values: [], otherText: '' }), values: [String(checked)] };
 }
 
 /** 回答を持たない表示専用の要素か。 */

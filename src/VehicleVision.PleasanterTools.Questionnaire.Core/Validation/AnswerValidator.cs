@@ -119,6 +119,30 @@ public static class AnswerValidator
             return;
         }
 
+        if (question.Type is QuestionType.Confirm)
+        {
+            if (answer.Values.Length > 1)
+            {
+                errors.Add(new ValidationError(
+                    question.QuestionId, ValidationErrorCode.MultipleValuesNotAllowed));
+                return;
+            }
+
+            if (!bool.TryParse(answer.SingleValue, out var confirmed))
+            {
+                errors.Add(new ValidationError(question.QuestionId, ValidationErrorCode.NotABoolean));
+                return;
+            }
+
+            // **同意の必須は回答の有無ではなく、同意した事実を要求する。**
+            if (question.IsRequired && !confirmed)
+            {
+                errors.Add(new ValidationError(question.QuestionId, ValidationErrorCode.Required));
+            }
+
+            return;
+        }
+
         // **グリッドは行ごとに見る**（Issue #54）。値の配列ではなく行の辞書に入る
         if (question.HasRows)
         {

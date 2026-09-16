@@ -137,6 +137,23 @@ describe('tracePath', () => {
     expect(tracePath(survey, answered({ q1: ['no'] })).visible.has('q2')).toBe(false);
   });
 
+  it('確認の真偽値を表示条件に使える', () => {
+    const survey = definition([
+      page('p1', [
+        question('q1', { type: 'Confirm' }),
+        question('q2', {
+          visibleWhen: {
+            match: 'All',
+            rules: [{ questionId: 'q1', operator: 'Equals', value: 'true' }],
+          },
+        }),
+      ]),
+    ]);
+
+    expect(tracePath(survey, answered({ q1: ['true'] })).visible.has('q2')).toBe(true);
+    expect(tracePath(survey, answered({ q1: ['false'] })).visible.has('q2')).toBe(false);
+  });
+
   it('未回答は NotEquals を満たさない', () => {
     const survey = definition([
       page('p1', [

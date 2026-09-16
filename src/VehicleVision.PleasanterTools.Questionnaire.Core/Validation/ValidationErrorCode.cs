@@ -60,4 +60,7 @@ public enum ValidationErrorCode
 
     /// <summary>指定された形式（正規表現）に合わない（Issue #102）。</summary>
     PatternMismatch,
+
+    /// <summary>真偽値として解釈できない。</summary>
+    NotABoolean,
 }

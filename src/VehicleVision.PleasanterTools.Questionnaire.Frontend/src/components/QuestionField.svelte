@@ -1,6 +1,13 @@
 <script lang="ts">
   import type { AnswerState, Question } from '../lib/types';
-  import { allowsMultiplePerRow, hasSelectionRange, rowValues, text } from '../lib/types';
+  import {
+    allowsMultiplePerRow,
+    confirmAnswer,
+    hasSelectionRange,
+    isConfirmed,
+    rowValues,
+    text,
+  } from '../lib/types';
   import type { Language } from '../lib/i18n/language';
   import { translator } from '../lib/i18n/messages';
   import { noteBlocks } from '../lib/note';
@@ -166,6 +173,10 @@
     if (maximum !== undefined) return t('question.selectionMaximum', { maximum });
     return '';
   });
+
+  const descriptionBlocks = $derived(
+    question.type === 'Confirm' ? noteBlocks(question.descriptionBlocks, language) : [],
+  );
 </script>
 
 <!-- 説明文ブロックは回答を持たない -->
@@ -185,14 +196,37 @@
   <EmbedBlock {question} {language} />
 {:else}
   <fieldset class="field" class:has-error={error !== undefined}>
-    <legend id={labelId}>
-      {text(question.title, language)}
-      {#if question.isRequired}
-        <span class="required" aria-label={t('question.required')}>*</span>
-      {/if}
-    </legend>
+    {#if question.type !== 'Confirm'}
+      <legend id={labelId}>
+        {text(question.title, language)}
+        {#if question.isRequired}
+          <span class="required" aria-label={t('question.required')}>*</span>
+        {/if}
+      </legend>
+    {/if}
 
-    {#if question.description}
+    {#if question.type === 'Confirm'}
+      <!-- **見出し全体をラベルにする。** 小さなチェック欄だけを狙わせない -->
+      <label class="choice confirm">
+        <input
+          type="checkbox"
+          checked={isConfirmed(current)}
+          aria-describedby={error ? errorId : undefined}
+          aria-invalid={error !== undefined}
+          onchange={(event) => (answer = confirmAnswer(current, event.currentTarget.checked))}
+        />
+        <span>
+          {text(question.title, language)}
+          {#if question.isRequired}
+            <span class="required" aria-label={t('question.required')}>*</span>
+          {/if}
+        </span>
+      </label>
+    {/if}
+
+    {#if descriptionBlocks.length > 0}
+      <div class="description"><NoteContent blocks={descriptionBlocks} /></div>
+    {:else if question.description}
       <p class="description">{text(question.description, language)}</p>
     {/if}
 
@@ -425,6 +459,8 @@
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}
       />
+    {:else if question.type === 'Confirm'}
+      <!-- **同意文言を説明リンクより先に読めるよう、**チェックボックスは上で描画済み -->
     {:else}
       <p class="unsupported">{t('question.unsupported', { type: question.type })}</p>
     {/if}
