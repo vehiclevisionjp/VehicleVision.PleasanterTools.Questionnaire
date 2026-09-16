@@ -61,6 +61,17 @@ export async function prepareFileSurvey(
     throw new Error(`下書きを保存できなかった: ${saved.status()} ${await saved.text()}`);
   }
 
+  // **下書きから直接は公開できない**（Issue #223）。版を固めるのはテスト公開の側
+  const testPublished = await request.post(
+    `/api/admin/surveys/${surveyId}/test-publish`,
+    { data: {} },
+  );
+  if (!testPublished.ok()) {
+    throw new Error(
+      `テスト公開できなかった: ${testPublished.status()} ${await testPublished.text()}`,
+    );
+  }
+
   const published = await request.post(`/api/admin/surveys/${surveyId}/publish`, { data: {} });
   if (!published.ok()) {
     throw new Error(`公開できなかった: ${published.status()} ${await published.text()}`);
