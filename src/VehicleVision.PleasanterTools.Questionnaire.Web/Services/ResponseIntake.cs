@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -287,8 +287,12 @@ public sealed class ResponseIntake(
         // 名前だけ差し替えて中身を偽られないようにする
         var answersWithFiles = ApplyFileNames(answers, files);
 
+        // **変換後の値を検証と保存の正とする。** 画面側の変換は表示を揃えるだけなので、
+        // 直接 API へ送られた回答もここで必ず同じ形にする
+        var normalizedAnswers = AnswerNormalizer.Normalize(snapshot.Definition, answersWithFiles);
+
         // **サーバ側で必ず検証する。** 画面側の検証は体験のためだけ
-        var errors = AnswerValidator.Validate(snapshot.Definition, answersWithFiles)
+        var errors = AnswerValidator.Validate(snapshot.Definition, normalizedAnswers)
             .AddRange(CheckAttachmentTargets(snapshot.Definition, files));
         if (!errors.IsEmpty)
         {
@@ -344,8 +348,8 @@ public sealed class ResponseIntake(
         // **通らなかったページ・出していない設問の回答は落とす**（Issue #41）。
         // 落とさないと、画面を通さずに送るだけで隠した設問へ書き込める。
         // **検証の後で落とす。** 先に落とすと「知らない設問」の指摘が出せなくなる
-        var visible = SurveyFlow.Trace(snapshot.Definition, answersWithFiles);
-        var kept = answersWithFiles
+        var visible = SurveyFlow.Trace(snapshot.Definition, normalizedAnswers);
+        var kept = normalizedAnswers
             .Where(answer => visible.Visible(answer.QuestionId))
             .ToList();
 

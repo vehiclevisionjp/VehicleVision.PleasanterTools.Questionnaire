@@ -860,6 +860,67 @@
   <!-- **決まった形式の検証**（メールアドレス・URL）。
        ⚠️ **`Email` にした記述式（1 行）だけが、自動返信の宛先に選べる**（Issue #189） -->
   {#if showPattern}
+    <div class="normalization">
+      <p class="section">{t('question.normalizationTitle')}</p>
+      <label class="inline">
+        <input
+          type="checkbox"
+          checked={question.settings.convertFullWidthAsciiToHalfWidth ?? false}
+          onchange={(event) =>
+            update({
+              settings: {
+                ...question.settings,
+                convertFullWidthAsciiToHalfWidth: event.currentTarget.checked,
+              },
+            })}
+        />
+        {t('question.convertFullWidthAsciiToHalfWidth')}
+      </label>
+      <label class="inline">
+        <input
+          type="checkbox"
+          checked={question.settings.convertHalfWidthKanaToFullWidth ?? false}
+          onchange={(event) =>
+            update({
+              settings: {
+                ...question.settings,
+                convertHalfWidthKanaToFullWidth: event.currentTarget.checked,
+              },
+            })}
+        />
+        {t('question.convertHalfWidthKanaToFullWidth')}
+      </label>
+      <label class="inline">
+        <input
+          type="checkbox"
+          checked={question.settings.convertFullWidthSpacesToHalfWidth ?? false}
+          onchange={(event) =>
+            update({
+              settings: {
+                ...question.settings,
+                convertFullWidthSpacesToHalfWidth: event.currentTarget.checked,
+              },
+            })}
+        />
+        {t('question.convertFullWidthSpacesToHalfWidth')}
+      </label>
+      <label class="inline">
+        <input
+          type="checkbox"
+          checked={question.settings.trimWhitespace ?? false}
+          onchange={(event) =>
+            update({
+              settings: {
+                ...question.settings,
+                trimWhitespace: event.currentTarget.checked,
+              },
+            })}
+        />
+        {t('question.trimWhitespace')}
+      </label>
+      <p class="hint">{t('question.normalizationHint')}</p>
+    </div>
+
     <label>
       {t('question.format')}
       <select
@@ -1350,6 +1411,12 @@
       display: block;
       margin-top: 0.2rem;
     }
+  }
+
+  .normalization {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
   }
 
   .hint {

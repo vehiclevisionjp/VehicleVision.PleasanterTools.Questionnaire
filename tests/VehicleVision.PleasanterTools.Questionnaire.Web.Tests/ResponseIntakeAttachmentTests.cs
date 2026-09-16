@@ -391,6 +391,49 @@ public class ResponseIntakeAttachmentTests
     }
 
     [Fact]
+    public async Task 変換後の回答を検証して正本へ保存する()
+    {
+        var definition = new SurveyDefinition
+        {
+            SurveyId = SurveyId.ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("検証用"),
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = QuestionType.Text,
+                            Title = LocalizedText.Japanese("郵便番号"),
+                            Settings = new QuestionSettings
+                            {
+                                ConvertFullWidthAsciiToHalfWidth = true,
+                                Pattern = "[0-9]{3}-[0-9]{4}",
+                            },
+                        },
+                    ],
+                },
+            ],
+        };
+        var (intake, outbox, _) = Intake(definition);
+
+        var result = await intake.SubmitAsync(
+            PublicId,
+            Token,
+            [Answer.Of("q1", "１２３－４５６７")],
+            []);
+
+        Assert.True(result.Accepted);
+        var payload = ResponsePayload.FromJson(outbox.SavedPayload!);
+        Assert.Equal("123-4567", payload!.Answers.Single().Values.Single());
+    }
+
+    [Fact]
     public async Task 添付は検査を通ってから送信待ちへ入る()
     {
         var (intake, outbox, _) = Intake();

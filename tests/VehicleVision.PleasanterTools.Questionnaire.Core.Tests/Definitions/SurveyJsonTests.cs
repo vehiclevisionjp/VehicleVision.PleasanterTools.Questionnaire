@@ -40,6 +40,10 @@ public class SurveyJsonTests
                         {
                             MaxLength = 100,
                             DescriptionFormat = DescriptionFormat.Markup,
+                            ConvertFullWidthAsciiToHalfWidth = true,
+                            ConvertHalfWidthKanaToFullWidth = true,
+                            ConvertFullWidthSpacesToHalfWidth = true,
+                            TrimWhitespace = true,
                             Format = TextFormat.Email,
                             ScaleMinimum = 1,
                             ScaleMaximum = 5,
@@ -93,6 +97,10 @@ public class SurveyJsonTests
         Assert.True(question.Choices[1].IsOther);
         Assert.Equal(100, question.Settings.MaxLength);
         Assert.Equal(DescriptionFormat.Markup, question.Settings.DescriptionFormat);
+        Assert.True(question.Settings.ConvertFullWidthAsciiToHalfWidth);
+        Assert.True(question.Settings.ConvertHalfWidthKanaToFullWidth);
+        Assert.True(question.Settings.ConvertFullWidthSpacesToHalfWidth);
+        Assert.True(question.Settings.TrimWhitespace);
         Assert.Equal(TextFormat.Email, question.Settings.Format);
         Assert.True(restored.FindQuestion("note1")!.IsDisplayOnly);
     }
@@ -149,6 +157,10 @@ public class SurveyJsonTests
         Assert.NotNull(question);
         Assert.Equal(DescriptionFormat.Plain, question.Settings.DescriptionFormat);
         Assert.Null(question.DescriptionBlocks);
+        Assert.False(question.Settings.ConvertFullWidthAsciiToHalfWidth);
+        Assert.False(question.Settings.ConvertHalfWidthKanaToFullWidth);
+        Assert.False(question.Settings.ConvertFullWidthSpacesToHalfWidth);
+        Assert.False(question.Settings.TrimWhitespace);
     }
 
     [Fact]

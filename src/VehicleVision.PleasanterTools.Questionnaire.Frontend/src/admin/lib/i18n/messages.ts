@@ -314,6 +314,13 @@ export const ja = {
   'question.patternHint':
     '入力全体が一致するかを判定します（前後は自動で固定されます）。回答者には正規表現ではなく、上のメッセージが表示されます。⚠️ 先読み・後方参照・原子グループは使用できません。安全に照合するため、バックトラックしない照合器を使用しているためです。使用できない書き方は、公開時にエラーになります。',
   'question.patternInvalid': '正規表現として解釈できません。',
+  'question.normalizationTitle': '回答の自動変換',
+  'question.convertFullWidthAsciiToHalfWidth': '英数字・記号を全角から半角へ変換する',
+  'question.convertHalfWidthKanaToFullWidth': 'カナを半角から全角へ変換する',
+  'question.convertFullWidthSpacesToHalfWidth': '空白を全角から半角へ変換する',
+  'question.trimWhitespace': '前後の空白を取り除く',
+  'question.normalizationHint':
+    '変換はそれぞれ独立して指定できます。既定はすべて無効です。変換後の値を入力形式と正規表現で検査し、Pleasanter へ保存します。',
   'question.shuffleChoices': '選択肢の順序を回答者ごとに入れ替える',
   'question.shuffleChoicesHint':
     '先に表示された選択肢が選ばれやすくなる偏りを抑えます。「その他」は入れ替えず、常に末尾に表示します。並び順は 1 回の回答中は変わらないため、前のページに戻っても位置は変わりません。',
@@ -1078,6 +1085,14 @@ export const en: Record<MessageKey, string> = {
   'question.patternMessagePlaceholder': 'e.g. Enter the postal code as 123-4567',
   'question.patternHint':
     'The whole value must match (the start and end are anchored automatically). Respondents see the message above, never the expression itself. Lookaround, backreferences and atomic groups are not available: matching runs on a non-backtracking engine so that a single answer cannot stall the form. Unsupported expressions are rejected when you publish.',
+  'question.normalizationTitle': 'Automatic answer conversion',
+  'question.convertFullWidthAsciiToHalfWidth':
+    'Convert full-width letters, numbers, and symbols to half-width',
+  'question.convertHalfWidthKanaToFullWidth': 'Convert half-width kana to full-width',
+  'question.convertFullWidthSpacesToHalfWidth': 'Convert full-width spaces to half-width',
+  'question.trimWhitespace': 'Remove surrounding whitespace',
+  'question.normalizationHint':
+    'Each conversion can be enabled independently. All are off by default. The converted value is validated against the input format and regular expression, then stored in Pleasanter.',
   'question.patternInvalid': 'This is not a valid regular expression.',
   'question.shuffleChoices': 'Shuffle the options for each respondent',
   'question.shuffleChoicesHint':

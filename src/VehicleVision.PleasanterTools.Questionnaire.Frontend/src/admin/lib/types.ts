@@ -203,6 +203,14 @@ export interface QuestionSettings {
   descriptionFormat?: 'Plain' | 'Markup';
   maxLength?: number;
   placeholder?: LocalizedText;
+  /** 全角の ASCII 英数字・記号を半角へ変換する。既定は無効。 */
+  convertFullWidthAsciiToHalfWidth?: boolean;
+  /** 半角カナを全角へ変換する。既定は無効。 */
+  convertHalfWidthKanaToFullWidth?: boolean;
+  /** 全角空白を半角へ変換する。既定は無効。 */
+  convertFullWidthSpacesToHalfWidth?: boolean;
+  /** 前後の空白を取り除く。既定は無効。 */
+  trimWhitespace?: boolean;
   scaleMinimum?: number;
   scaleMaximum?: number;
   scaleMinimumLabel?: LocalizedText;

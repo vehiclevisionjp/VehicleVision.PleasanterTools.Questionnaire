@@ -21,6 +21,18 @@ public sealed record QuestionSettings
     /// <summary>既定値。</summary>
     public string? DefaultValue { get; init; }
 
+    /// <summary>全角の ASCII 英数字・記号を半角へ変換するか。</summary>
+    public bool ConvertFullWidthAsciiToHalfWidth { get; init; }
+
+    /// <summary>半角カナを全角へ変換するか。</summary>
+    public bool ConvertHalfWidthKanaToFullWidth { get; init; }
+
+    /// <summary>全角空白を半角へ変換するか。</summary>
+    public bool ConvertFullWidthSpacesToHalfWidth { get; init; }
+
+    /// <summary>回答の前後にある空白を取り除くか。</summary>
+    public bool TrimWhitespace { get; init; }
+
     /// <summary>尺度の下限。<see cref="QuestionType.Scale"/> / <see cref="QuestionType.Rating"/>。</summary>
     public int? ScaleMinimum { get; init; }
 
