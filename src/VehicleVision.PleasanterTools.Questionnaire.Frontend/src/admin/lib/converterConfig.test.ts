@@ -21,6 +21,17 @@ describe('変換の固定設定', () => {
     expect(converterForOperation('', { operation: 'join', config: { separator: '、' } })).toBeNull();
   });
 
+  it('mapとtoNumberを選んだ時点で空の既定値を設定する', () => {
+    expect(converterForOperation('map', null)).toEqual({
+      operation: 'map',
+      config: { default: '' },
+    });
+    expect(converterForOperation('toNumber', null)).toEqual({
+      operation: 'toNumber',
+      config: { default: '' },
+    });
+  });
+
   it('設定値を書き換えても保存済みの別の鍵を保持する', () => {
     expect(setConfigValue({ script: 'return value;', future: 'keep' }, 'script', 'return 1;')).toEqual(
       {
@@ -45,6 +56,7 @@ describe('変換の固定設定', () => {
     expect(Object.keys(converterConfigFields)).toEqual([
       'join',
       'map',
+      'toNumber',
       'toCheck',
       'contains',
       'constant',
@@ -57,6 +69,11 @@ describe('変換の固定設定', () => {
       'when',
       'then',
       'else',
+    ]);
+    expect(converterConfigFields.map?.map((field) => field.key)).toEqual(['default']);
+    expect(converterConfigFields.toNumber?.map((field) => field.key)).toEqual([
+      'default',
+      'decimals',
     ]);
   });
 });

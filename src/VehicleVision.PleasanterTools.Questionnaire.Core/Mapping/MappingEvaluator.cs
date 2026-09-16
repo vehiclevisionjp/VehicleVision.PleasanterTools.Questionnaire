@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -12,8 +13,16 @@ public static class ConverterOperations
     /// <summary>入力を連結して 1 つにする。設定 <c>separator</c>。</summary>
     public const string Join = "join";
 
-    /// <summary>値を別の値へ置き換える。設定 <c>map.{元の値}</c> = 置き換え後。</summary>
+    /// <summary>
+    /// 値を別の値へ置き換える。設定 <c>map.{元の値}</c> = 置き換え後、
+    /// <c>default</c> = 対応が無いときの値。
+    /// </summary>
     public const string Map = "map";
+
+    /// <summary>
+    /// 数値として読める値へ寄せる。設定 <c>default</c>、任意で <c>decimals</c>。
+    /// </summary>
+    public const string ToNumber = "toNumber";
 
     /// <summary>設定 <c>value</c> が含まれていれば <c>true</c>。チェック列向け。</summary>
     public const string ToCheck = "toCheck";
@@ -222,10 +231,28 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
                     : [string.Join(converter.Config.GetValueOrDefault("separator", ","), input)];
 
             case ConverterOperations.Map:
+                var mapDefault = converter.Config.GetValueOrDefault("default");
                 return
                 [
-                    .. input.Select(value =>
-                        converter.Config.TryGetValue($"map.{value}", out var mapped) ? mapped : value),
+                    .. input.SelectMany(value =>
+                        converter.Config.TryGetValue($"map.{value}", out var mapped)
+                            ? Output(mapped)
+                            : mapDefault is null ? [value] : Output(mapDefault)),
+                ];
+
+            case ConverterOperations.ToNumber:
+                var numberDefault = converter.Config.GetValueOrDefault("default", string.Empty);
+                var decimals = ReadDecimals(converter.Config.GetValueOrDefault("decimals"));
+                return
+                [
+                    .. input.SelectMany(value =>
+                        decimal.TryParse(
+                            value,
+                            NumberStyles.Number,
+                            CultureInfo.InvariantCulture,
+                            out var number)
+                            ? [FormatNumber(number, decimals)]
+                            : Output(numberDefault)),
                 ];
 
             case ConverterOperations.ToCheck:
@@ -269,6 +296,20 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
                 return input;
         }
     }
+
+    private static ImmutableArray<string> Output(string value) =>
+        string.IsNullOrWhiteSpace(value) ? [] : [value];
+
+    private static int? ReadDecimals(string? value) =>
+        int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var decimals)
+        && decimals is >= 0 and <= 28
+            ? decimals
+            : null;
+
+    private static string FormatNumber(decimal value, int? decimals) =>
+        (decimals is { } digits
+            ? decimal.Round(value, digits, MidpointRounding.AwayFromZero)
+            : value).ToString(CultureInfo.InvariantCulture);
 
     private static string Bool(bool value) => value ? "true" : "false";
 }

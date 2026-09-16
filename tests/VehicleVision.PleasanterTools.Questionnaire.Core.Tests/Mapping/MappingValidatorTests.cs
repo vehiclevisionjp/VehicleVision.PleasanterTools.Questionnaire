@@ -157,6 +157,7 @@ public class MappingValidatorTests
     [InlineData(ConverterOperations.Contains)]
     [InlineData(ConverterOperations.Constant)]
     [InlineData(ConverterOperations.When)]
+    [InlineData(ConverterOperations.ToNumber)]
     public void 必須の変換設定が空なら拒否する(string operation)
     {
         var mapping = Mapping(ColumnAssignment.Converted(
@@ -178,6 +179,136 @@ public class MappingValidatorTests
             new MappingSource("q1")));
 
         Assert.DoesNotContain(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
+    [Fact]
+    public void mapの置換後と既定値がすべて整数なら整数列へ割り当てられる()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(
+                ConverterOperations.Map,
+                ("map.未処理", "10"),
+                ("map.完了", "90"),
+                ("default", "0")),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: _ => MappingTargetValueKind.Integer);
+
+        Assert.DoesNotContain(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Theory]
+    [InlineData(null, "10")]
+    [InlineData("0", "処理中")]
+    public void mapの既定値がないか置換後が整数でなければ整数列を拒否する(
+        string? fallback,
+        string mapped)
+    {
+        var settings = new List<(string Key, string Value)> { ("map.未処理", mapped) };
+        if (fallback is not null)
+        {
+            settings.Add(("default", fallback));
+        }
+
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(ConverterOperations.Map, [.. settings]),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: _ => MappingTargetValueKind.Integer);
+
+        Assert.Contains(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+        if (fallback is null)
+        {
+            Assert.Contains(MappingProblemCode.MissingConverterConfig, Codes(problems));
+        }
+    }
+
+    [Theory]
+    [InlineData(MappingTargetValueKind.Decimal, null, "0")]
+    [InlineData(MappingTargetValueKind.Decimal, "2", "0.5")]
+    [InlineData(MappingTargetValueKind.Integer, "0", "0")]
+    public void toNumberが対象の数値型を確実に出せる設定なら割り当てられる(
+        MappingTargetValueKind kind,
+        string? decimals,
+        string fallback)
+    {
+        var settings = new List<(string Key, string Value)> { ("default", fallback) };
+        if (decimals is not null)
+        {
+            settings.Add(("decimals", decimals));
+        }
+
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(ConverterOperations.ToNumber, [.. settings]),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: _ => kind);
+
+        Assert.DoesNotContain(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+        Assert.DoesNotContain(MappingProblemCode.MissingConverterConfig, Codes(problems));
+    }
+
+    [Theory]
+    [InlineData(MappingTargetValueKind.Integer, null, "0")]
+    [InlineData(MappingTargetValueKind.Integer, "2", "0")]
+    [InlineData(MappingTargetValueKind.Decimal, null, "数値ではない")]
+    public void toNumberが対象の数値型を保証できなければ拒否する(
+        MappingTargetValueKind kind,
+        string? decimals,
+        string fallback)
+    {
+        var settings = new List<(string Key, string Value)> { ("default", fallback) };
+        if (decimals is not null)
+        {
+            settings.Add(("decimals", decimals));
+        }
+
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(ConverterOperations.ToNumber, [.. settings]),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: _ => kind);
+
+        Assert.Contains(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("29")]
+    [InlineData("小数")]
+    public void toNumberの小数桁が不正なら設定不足として拒否する(string decimals)
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(
+                ConverterOperations.ToNumber,
+                ("default", ""),
+                ("decimals", decimals)),
+            new MappingSource("q1")));
+
+        Assert.Contains(
             MappingProblemCode.MissingConverterConfig,
             Codes(MappingValidator.Validate(mapping, Definition("q1"))));
     }

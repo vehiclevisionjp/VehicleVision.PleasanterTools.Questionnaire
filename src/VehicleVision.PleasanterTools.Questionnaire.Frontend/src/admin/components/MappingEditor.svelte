@@ -44,6 +44,7 @@
     { value: '', key: 'converter.none' },
     { value: 'join', key: 'converter.join' },
     { value: 'map', key: 'converter.map' },
+    { value: 'toNumber', key: 'converter.toNumber' },
     { value: 'toCheck', key: 'converter.toCheck' },
     { value: 'contains', key: 'converter.contains' },
     { value: 'constant', key: 'converter.constant' },
@@ -425,9 +426,9 @@
                         onchange={(next) =>
                           patch(index, { converter: { operation, config: next } })}
                       />
-                    {:else}
-                      <div class="converter-config">
-                        {#each converterConfigFields[operation] ?? [] as field (field.key)}
+                    {/if}
+                    <div class="converter-config">
+                      {#each converterConfigFields[operation] ?? [] as field (field.key)}
                           <label>
                             <span>{t(field.label)}</span>
                             {#if field.multiline}
@@ -465,9 +466,8 @@
                               />
                             {/if}
                           </label>
-                        {/each}
-                      </div>
-                    {/if}
+                      {/each}
+                    </div>
                   {/if}
                 {/if}
               </td>
