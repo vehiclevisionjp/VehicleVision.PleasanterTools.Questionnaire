@@ -681,7 +681,7 @@
         <th class="compact-column">{t('list.columnStatus')}</th>
         <th class="compact-column">{t('list.columnVersion')}</th>
         <th class="compact-column">{t('list.columnResponses')}</th>
-        <th class="compact-column">{t('list.columnUrl')}</th>
+        <th class="url-column">{t('list.columnUrl')}</th>
         <th class="compact-column">{t('list.columnUpdated')}</th>
         <th></th>
       </tr>
@@ -722,7 +722,7 @@
               <span class="test-response-cleanup" aria-hidden="true">※</span>
             {/if}
           </td>
-          <td class="compact-column">
+          <td class="url-column">
             {#if isPublished(survey)}
               <a href={formUrl(survey.publicId)} target="_blank" rel="noreferrer">
                 {survey.publicId}
@@ -937,25 +937,28 @@
   .row-actions-inner {
     display: grid;
     /* **等幅。** 入る数は桁の広さで決まり、余れば 1 行に収まる */
-    grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
     gap: 0.3rem;
     /* 狭い画面で潰れないように、桁そのものの下限を決める */
     min-width: 11.5rem;
   }
 
   /* **1 つぶんの高さを抑える。** 段が増えても伸びにくくする */
+  /*
+    ⚠️ **nowrap にしないこと。** 「テンプレートに保存」のような長い札が
+    枠からはみ出して切れる。**折り返せば、はみ出しようがない**
+  */
   .row-actions-inner button {
     padding: 0.25rem 0.4rem;
     font-size: 0.78rem;
     line-height: 1.3;
-    white-space: nowrap;
     /* **文字数が違っても同じ大きさに見えるようにする** */
     text-align: center;
   }
 
   /* **釦の桁は広めに取る。** 等幅にすると 1 個あたりの幅が要る */
   .row-actions {
-    width: 16rem;
+    width: 18rem;
   }
 
   label {
@@ -1022,6 +1025,41 @@
   .compact-column {
     width: 1%;
     white-space: nowrap;
+  }
+
+  /*
+    ⚠️ **題名に余りを取らせる。** これを書かないと、
+    中身の幅を要求する桁（とくに回答用 URL）に押されて**題名が 1 文字ずつ折り返す。**
+  */
+  th:first-child,
+  td:first-child {
+    width: 100%;
+    /*
+      ⚠️ **下限が要る。** 幅が足りないと、縮められるのは題名だけなので
+      **1 文字ずつ折り返すところまで潰れる**（実測。2026-09-16）
+    */
+    min-width: 12rem;
+  }
+
+  /*
+    **回答用 URL は長い。** 縮めない桁にすると幅を要求し、題名を潰す。
+    ⚠️ **折り返させる**
+  */
+  .url-column {
+    /*
+      ⚠️ **width: 1% にしないこと。** break-all と組むと
+      「最小幅＝1 文字」になり、桁が縦 1 列に潰れる。
+      **決め打ちの幅を与えて、その中で折り返させる**
+    */
+    width: 14rem;
+    /*
+      ⚠️ **min-width が要る。** 表の width は提案にすぎず、
+      題名の width:100% に押されて**最小の中身の幅**まで縮む。
+      break-all だとその最小が 1 文字になる
+    */
+    min-width: 14rem;
+    /* **必要なときだけ折る。** break-all は 1 文字ずつ折ってしまう */
+    overflow-wrap: anywhere;
   }
 
   tbody tr:last-child td {
