@@ -1,5 +1,6 @@
 <script lang="ts">
   import QuestionField from './components/QuestionField.svelte';
+  import NoteContent from './components/NoteContent.svelte';
   import {
     forgetSubmission,
     hasSubmitted,
@@ -40,6 +41,7 @@
   import { serverValidationKey, translator, type MessageKey } from './lib/i18n/messages';
   import { applyTheme, headerImageUrl } from './lib/theme';
   import { clearDraft, hasDraft, readDraft, saveDraft } from './lib/draft';
+  import { noteBlocks } from './lib/note';
 
   type Screen = 'loading' | 'answering' | 'answered' | 'completed' | 'rejected' | 'error';
 
@@ -193,6 +195,8 @@
 
   /** ヘッダ画像の URL。**本アプリの口だけを指す**（外部へ取りに行かない）。 */
   const headerImage = $derived(definition ? headerImageUrl(publicId, definition.theme) : null);
+  const contentAssetUrl = (assetId: string) =>
+    `/api/forms/${encodeURIComponent(publicId)}/assets/${encodeURIComponent(assetId)}`;
 
   /** 画面に出す区切り。**1 問 1 ページ表示なら 1 設問で 1 区切り。** */
   const steps = $derived(toSteps(path, definition?.displayMode ?? 'Paged'));
@@ -649,9 +653,15 @@
     </button>
     <p class="note">{t('answered.answerAgainNote')}</p>
   {:else if screen === 'completed' && definition}
-    <!-- **管理者が入れた文言が先。** 無ければ本アプリの文言へ落とす -->
-    <h1>{text(definition.confirmationMessage, language) || t('completed.title')}</h1>
-    <p class="status">{t('completed.thanks')}</p>
+    <h1>{t('completed.title')}</h1>
+    {@const confirmation = noteBlocks(definition.confirmationBlocks, language)}
+    {#if confirmation.length > 0}
+      <div class="status"><NoteContent blocks={confirmation} assetUrl={contentAssetUrl} /></div>
+    {:else}
+      <p class="status">
+        {text(definition.confirmationMessage, language) || t('completed.thanks')}
+      </p>
+    {/if}
     {#if definition.allowEditingAfterSubmit}
       <button type="button" onclick={() => (screen = 'answering')}>{t('completed.edit')}</button>
     {/if}
@@ -728,6 +738,7 @@
         <QuestionField
           {question}
           {language}
+          assetUrl={contentAssetUrl}
           bind:answer={answers[question.questionId]}
           error={errors[question.questionId]}
         />

@@ -2,10 +2,12 @@
   import SurveyPreview from './SurveyPreview.svelte';
   import {
     loadColumnAvailability,
+    loadAssetOptions,
     loadDraft,
     loadEmbedOptions,
     testPublish,
     saveDraft,
+    uploadContentAsset,
     type ColumnAvailabilityResponse,
   } from '../lib/api';
   import {
@@ -42,6 +44,7 @@
   import ThemeEditor from './ThemeEditor.svelte';
   import { adminAssetUrl } from '../lib/api';
   import { addQuestionAssignment } from '../lib/mappingSelection';
+  import { assetMarkup as markupForAsset } from '../lib/asset';
 
   interface Props {
     surveyId: string;
@@ -110,6 +113,22 @@
   let conflict = $state(false);
   let warnings = $state<MappingProblem[]>([]);
   let selectedQuestionId = $state<string | null>(null);
+  let assetUploading = $state(false);
+  let assetMarkup = $state('');
+  let assetError = $state('');
+  let assetExtensions = $state([
+    '.pdf',
+    '.docx',
+    '.xlsx',
+    '.pptx',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+  ]);
+  let assetMaxBytes = $state(10 * 1024 * 1024);
+  let assetMaxCount = $state(20);
 
   /** 公開が断られたときにサーバが返した分岐の不備。**サーバが最後の判定者。** */
   let publishFlow = $state<FlowProblem[]>([]);
@@ -126,6 +145,17 @@
 
   $effect(() => {
     onbreadcrumbchange(breadcrumbTitle);
+  });
+
+  $effect(() => {
+    void (async () => {
+      const result = await loadAssetOptions();
+      if (result.ok) {
+        assetExtensions = result.value.allowedExtensions;
+        assetMaxBytes = result.value.maxFileSizeBytes;
+        assetMaxCount = result.value.maxFileCount;
+      }
+    })();
   });
 
   $effect(() => {
@@ -184,6 +214,23 @@
     selectedQuestionId = null;
     revision = result.value.revision;
     await refreshColumnAvailability(id);
+  }
+
+  async function uploadAsset(file: File | undefined) {
+    if (!file || assetUploading) return;
+
+    assetUploading = true;
+    assetError = '';
+    assetMarkup = '';
+    const result = await uploadContentAsset(surveyId, file);
+    assetUploading = false;
+
+    if (!result.ok) {
+      assetError = result.message;
+      return;
+    }
+
+    assetMarkup = markupForAsset(file.name, result.value.assetId, result.value.isImage);
   }
 
   async function refreshColumnAvailability(id = surveyId) {
@@ -581,8 +628,9 @@
 
     <label>
       {t('editor.confirmationMessage')}
-      <input
-        type="text"
+      <textarea
+        rows="5"
+        maxlength="4000"
         value={text(definition.confirmationMessage, editing)}
         oninput={(event) =>
           (definition = {
@@ -593,8 +641,37 @@
               editing,
             ),
           })}
-      />
+      ></textarea>
     </label>
+    <p class="hint">{t('editor.confirmationMarkupHint')}</p>
+
+    <div class="asset-upload">
+      <label>
+        {t('editor.contentAsset')}
+        <input
+          type="file"
+          accept={assetExtensions.join(',')}
+          disabled={assetUploading}
+          onchange={(event) => void uploadAsset(event.currentTarget.files?.[0])}
+        />
+      </label>
+      <p class="hint">
+        {t('editor.contentAssetHint', {
+          extensions: assetExtensions.join(', '),
+          megabytes: Math.floor(assetMaxBytes / (1024 * 1024)),
+          count: assetMaxCount,
+        })}
+      </p>
+      {#if assetMarkup}
+        <label>
+          {t('editor.contentAssetMarkup')}
+          <input type="text" readonly value={assetMarkup} onclick={(event) => event.currentTarget.select()} />
+        </label>
+      {/if}
+      {#if assetError}
+        <p class="error" role="alert">{assetError}</p>
+      {/if}
+    </div>
 
     <div class="toggles">
       <label class="inline">
@@ -774,6 +851,7 @@
            公開前の画像は回答画面の口からは出ない -->
       <SurveyPreview
         {definition}
+        assetUrl={(assetId) => adminAssetUrl(surveyId, assetId)}
         headerImageUrl={definition.theme?.headerImageId
           ? adminAssetUrl(surveyId, definition.theme.headerImageId)
           : null}

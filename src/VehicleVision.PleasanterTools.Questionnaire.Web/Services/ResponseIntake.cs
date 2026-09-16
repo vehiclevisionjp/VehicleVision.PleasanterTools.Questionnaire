@@ -224,6 +224,40 @@ public sealed class ResponseIntake(
             : null;
     }
 
+    /// <summary>公開中の定義が参照する画像資産を返す。**無ければ <c>null</c>。**</summary>
+    /// <remarks>
+    /// **資産 ID を知っているだけでは返さない。** 公開中の版の記法が参照するものだけに
+    /// 絞ることで、下書きで上げただけの画像や過去の画像を公開しない。
+    /// </remarks>
+    public async Task<SurveyAsset?> GetPublishedAssetAsync(
+        string publicId,
+        Guid assetId,
+        CancellationToken cancellationToken = default)
+    {
+        if (assets is null)
+        {
+            return null;
+        }
+
+        var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
+            .ConfigureAwait(false);
+        if (survey is null || survey.ArchivedAt is not null || survey.PublishedVersion is null)
+        {
+            return null;
+        }
+
+        var snapshot = await snapshots
+            .FindAsync(survey.SurveyId, survey.PublishedVersion.Value, cancellationToken)
+            .ConfigureAwait(false);
+        if (snapshot is null || !SurveyAssetReferences.Contains(snapshot.Definition, assetId))
+        {
+            return null;
+        }
+
+        return await assets.FindAsync(survey.SurveyId, assetId, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     /// <summary>回答を受け付ける。</summary>
     /// <param name="publicId">アンケートの公開 ID。</param>
     /// <param name="responseToken">回答トークン。</param>

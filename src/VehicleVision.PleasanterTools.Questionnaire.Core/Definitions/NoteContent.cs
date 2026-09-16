@@ -36,6 +36,12 @@ public enum NoteInlineKind
 
     /// <summary>リンク。</summary>
     Link,
+
+    /// <summary>アンケートに添付した画像。</summary>
+    AssetImage,
+
+    /// <summary>アンケートに添付した画像へのリンク。</summary>
+    AssetLink,
 }
 
 /// <summary>説明文ブロックの中の文字列 1 片。</summary>
@@ -45,7 +51,16 @@ public enum NoteInlineKind
 /// リンク先。<see cref="NoteInlineKind.Link"/> のときだけ入る。
 /// **<c>https:</c> だけ**（<see cref="IsAllowedHref"/>）。
 /// </param>
-public sealed record NoteInline(NoteInlineKind Kind, string Text, string? Href = null)
+/// <param name="AssetId">
+/// 自前の資産。<see cref="NoteInlineKind.AssetImage"/> と
+/// <see cref="NoteInlineKind.AssetLink"/> のときだけ入る。
+/// **保存先の URL は持たない。** 配信は必ず本アプリを通す。
+/// </param>
+public sealed record NoteInline(
+    NoteInlineKind Kind,
+    string Text,
+    string? Href = null,
+    Guid? AssetId = null)
 {
     /// <summary>リンク先として受け付けてよいか。</summary>
     /// <remarks>

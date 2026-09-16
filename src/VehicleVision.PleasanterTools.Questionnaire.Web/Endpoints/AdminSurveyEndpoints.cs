@@ -11,6 +11,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 
@@ -439,20 +440,130 @@ public static class AdminSurveyEndpoints
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
-        // **編集中の画像を管理画面へ返す。** 公開前の画像は回答画面の口からは出ない
+        // ---- 説明文と完了画面の配布資産（Issue #266 / #269）-----------------
+        group.MapGet("/asset-options", (AssetOptions options) =>
+            Results.Ok(new
+            {
+                allowedExtensions = options.AllowedExtensions,
+                maxFileSizeBytes = options.MaxFileSizeBytes,
+                maxFileCount = options.MaxFileCount,
+            }));
+
+        group.MapPost("/{surveyId:guid}/assets", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            ISurveyAssetStore assets,
+            AssetOptions options,
+            AssetInspector inspector,
+            CancellationToken cancellationToken) =>
+        {
+            var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (survey is null)
+            {
+                return Results.NotFound();
+            }
+
+            var bodySize = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (bodySize is { IsReadOnly: false })
+            {
+                bodySize.MaxRequestBodySize = options.MaxRequestBodyBytes;
+            }
+
+            if (!context.Request.HasFormContentType)
+            {
+                return ContentAssetRejected(context);
+            }
+
+            IFormFile? file;
+            try
+            {
+                var form = await context.Request.ReadFormAsync(cancellationToken);
+                file = form.Files.GetFile("asset") ?? form.Files.FirstOrDefault();
+            }
+            catch (BadHttpRequestException exception)
+            {
+                return Results.StatusCode(exception.StatusCode);
+            }
+
+            if (file is null)
+            {
+                return ContentAssetRejected(context);
+            }
+
+            using var buffer = new MemoryStream((int)Math.Max(file.Length, 0));
+            await file.CopyToAsync(buffer, cancellationToken);
+            var incoming = new IncomingAttachment(file.FileName, buffer.ToArray());
+            // **回答添付と同じ検査器を通す。** 管理者の口を奪われても、
+            // 未検査のファイルを信頼されたドメインから配らせない
+            var rejections = await inspector.InspectAsync(incoming, cancellationToken);
+            var contentType = options.ContentTypeOf(file.FileName);
+            if (rejections.Any(
+                rejection => rejection.Reason is AttachmentRejectionReason.ScannerUnavailable))
+            {
+                return Results.Json(
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.AssetScannerUnavailable,
+                            RequestLanguage.Of(context)),
+                    },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            if (!rejections.IsEmpty || contentType is null)
+            {
+                return ContentAssetRejected(
+                    context,
+                    rejections.Select(rejection => rejection.Reason.ToString()));
+            }
+
+            var assetId = await assets.TryAddContentAsync(
+                surveyId,
+                contentType,
+                file.FileName,
+                incoming.Content.ToArray(),
+                options.MaxFileCount,
+                cancellationToken)
+                .ConfigureAwait(false);
+            if (assetId is null)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.ContentAssetLimitReached, RequestLanguage.Of(context)),
+                });
+            }
+
+            return Results.Ok(new
+            {
+                assetId,
+                isImage = ContentAsset.IsImage(contentType),
+            });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
+
+        // **編集中の資産を管理画面へ返す。** 公開前の資産は回答画面の口からは出ない
         group.MapGet("/{surveyId:guid}/assets/{assetId:guid}", async (
             Guid surveyId,
             Guid assetId,
             ISurveyAssetStore assets,
+            AssetOptions options,
             CancellationToken cancellationToken) =>
         {
             var asset = await assets.FindAsync(surveyId, assetId, cancellationToken)
                 .ConfigureAwait(false);
 
-            // **配る前に型を確かめる。** 画像以外を自分のドメインから配らない
-            return asset is null || !HeaderImage.IsAllowedContentType(asset.ContentType)
+            // **画面内で開かせない。** 管理画面のプレビューでも配布時と同じ扱いにする
+            return asset is null
+                || !(options.IsAllowed(asset.FileName, asset.ContentType)
+                    || HeaderImage.IsAllowedContentType(asset.ContentType))
                 ? Results.NotFound()
-                : Results.File(asset.Content, asset.ContentType);
+                : Results.File(
+                    asset.Content,
+                    asset.ContentType,
+                    fileDownloadName: asset.FileName);
         });
 
         // ---- 公開前の検査 ----------------------------------------------------
@@ -1011,6 +1122,16 @@ public static class AdminSurveyEndpoints
 
         return builder;
     }
+
+    private static IResult ContentAssetRejected(
+        HttpContext context,
+        IEnumerable<string>? reasons = null) =>
+        Results.BadRequest(new
+        {
+            message = ServerMessages.Get(
+                ServerMessageKeys.ContentAssetRejected, RequestLanguage.Of(context)),
+            reasons,
+        });
 
     private static async Task<IResult> ChangeArchiveAsync(
         Guid surveyId,

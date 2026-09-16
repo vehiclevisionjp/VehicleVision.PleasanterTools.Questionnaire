@@ -2,6 +2,7 @@
 using System.Data.Common;
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Text;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data;
@@ -823,6 +824,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 connection, transaction, definition.Theme, target.SurveyId, now, cancellationToken)
                 .ConfigureAwait(false),
         };
+        definition = await CopyContentAssetsAsync(
+            connection, transaction, sourceSurveyId, definition, target.SurveyId, now, cancellationToken)
+            .ConfigureAwait(false);
 
         // **下書きとして作る**（Issue #46）。公開状態も公開済みの版も写さない。
         // **受付期間・回答上限も写さない。** 公開の設定であり、
@@ -1106,6 +1110,134 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return theme with { HeaderImageId = copiedId.ToString() };
+    }
+
+    /// <summary>記法が参照する画像を複製先へ写し、記法内の識別子を差し替える。</summary>
+    private async Task<SurveyDefinition> CopyContentAssetsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        Guid sourceSurveyId,
+        SurveyDefinition definition,
+        Guid targetSurveyId,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var markups = EnumerateMarkup(definition).ToArray();
+        var sourceIds = markups
+            .SelectMany(NoteMarkup.AssetIds)
+            .Distinct()
+            .ToArray();
+        if (sourceIds.Length == 0)
+        {
+            return definition;
+        }
+
+        var replacements = new Dictionary<Guid, Guid>();
+        foreach (var sourceId in sourceIds)
+        {
+            var source = await connection.QueryFirstOrDefaultAsync<AssetRow>(Sql(
+                "SELECT [ContentType], [FileName], [ByteSize], [ContentBase64] "
+                + "FROM [SurveyAssets] WHERE [SurveyId] = @SurveyId AND [AssetId] = @AssetId",
+                new { SurveyId = sourceSurveyId, AssetId = sourceId },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+            if (source is null)
+            {
+                continue;
+            }
+
+            var copiedId = Guid.NewGuid();
+            await connection.ExecuteAsync(Sql(
+                "INSERT INTO [SurveyAssets] "
+                + "  ([AssetId], [SurveyId], [ContentType], [FileName], [ByteSize], "
+                + "   [ContentBase64], [CreatedAt]) "
+                + "VALUES (@AssetId, @SurveyId, @ContentType, @FileName, @ByteSize, "
+                + "        @ContentBase64, @Now)",
+                new
+                {
+                    AssetId = copiedId,
+                    SurveyId = targetSurveyId,
+                    source.ContentType,
+                    source.FileName,
+                    source.ByteSize,
+                    source.ContentBase64,
+                    Now = now,
+                },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+            replacements[sourceId] = copiedId;
+        }
+
+        if (replacements.Count > 0)
+        {
+            await connection.ExecuteAsync(Sql(
+                "UPDATE [Surveys] SET [ContentAssetCount] = @Count WHERE [SurveyId] = @SurveyId",
+                new { Count = replacements.Count, SurveyId = targetSurveyId },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+
+        return RewriteAssetReferences(definition, replacements);
+    }
+
+    private static IEnumerable<string> EnumerateMarkup(SurveyDefinition definition)
+    {
+        if (definition.ConfirmationMessage is { } confirmation)
+        {
+            foreach (var language in confirmation.Languages)
+            {
+                yield return confirmation.Get(language);
+            }
+        }
+
+        foreach (var question in definition.AllQuestions)
+        {
+            if (question.Description is null
+                || (question.Type is not QuestionType.Note
+                    && question.Settings.DescriptionFormat is not DescriptionFormat.Markup))
+            {
+                continue;
+            }
+
+            foreach (var language in question.Description.Languages)
+            {
+                yield return question.Description.Get(language);
+            }
+        }
+    }
+
+    private static SurveyDefinition RewriteAssetReferences(
+        SurveyDefinition definition,
+        IReadOnlyDictionary<Guid, Guid> replacements) =>
+        definition with
+        {
+            ConfirmationMessage = Rewrite(definition.ConfirmationMessage, replacements),
+            Pages = definition.Pages.Select(page => page with
+            {
+                Questions = page.Questions.Select(question =>
+                    question.Type is QuestionType.Note
+                    || question.Settings.DescriptionFormat is DescriptionFormat.Markup
+                        ? question with
+                        {
+                            Description = Rewrite(question.Description, replacements),
+                        }
+                        : question).ToImmutableArray(),
+            }).ToImmutableArray(),
+        };
+
+    private static LocalizedText? Rewrite(
+        LocalizedText? text,
+        IReadOnlyDictionary<Guid, Guid> replacements)
+    {
+        if (text is null)
+        {
+            return null;
+        }
+
+        return new LocalizedText(text.Languages.ToDictionary(
+            language => language,
+            language => NoteMarkup.RewriteAssetIds(text.Get(language), replacements),
+            StringComparer.OrdinalIgnoreCase));
     }
 
     /// <summary>テーマを読む。**形の正しくない値は捨てる。**</summary>

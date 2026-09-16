@@ -367,6 +367,26 @@ export const uploadHeaderImage = (surveyId: string, file: File) => {
   });
 };
 
+/** 説明文と完了画面で使う自前画像を上げる（Issue #266 / #269）。 */
+export interface AssetOptions {
+  allowedExtensions: string[];
+  maxFileSizeBytes: number;
+  maxFileCount: number;
+}
+
+export const loadAssetOptions = () =>
+  call<AssetOptions>('/api/admin/surveys/asset-options');
+
+export const uploadContentAsset = (surveyId: string, file: File) => {
+  const body = new FormData();
+  body.append('asset', file);
+
+  return call<{ assetId: string; isImage: boolean }>(`/api/admin/surveys/${surveyId}/assets`, {
+    method: 'POST',
+    body,
+  });
+};
+
 /**
  * 編集中のヘッダ画像を見る URL。
  *

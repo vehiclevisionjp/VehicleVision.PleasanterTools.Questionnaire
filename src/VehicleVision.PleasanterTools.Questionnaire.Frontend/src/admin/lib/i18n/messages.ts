@@ -235,6 +235,10 @@ export const ja = {
   'editor.title': '題名',
   'editor.description': '説明（任意）',
   'editor.confirmationMessage': '送信後に表示するメッセージ（任意）',
+  'editor.confirmationMarkupHint': '説明文と同じ記法を使えます。画像やリンクには、下で発行した asset: 記法を貼り付けてください。',
+  'editor.contentAsset': '説明文・完了画面で使う配布物',
+  'editor.contentAssetHint': '許可形式: {extensions}。1 件 {megabytes} MB まで、アンケート当たり {count} 件まで。アップロード後の記法を説明文または完了画面へ貼り付けます。',
+  'editor.contentAssetMarkup': '貼り付ける記法',
   'editor.showProgress': '進捗バーを表示する',
   'editor.allowEditingAfterSubmit': '送信後の編集を許可する',
   'editor.nextVersion': '公開すると {version} 版になります',
@@ -1002,6 +1006,12 @@ export const en: Record<MessageKey, string> = {
   'editor.title': 'Title',
   'editor.description': 'Description (optional)',
   'editor.confirmationMessage': 'Message shown after submitting (optional)',
+  'editor.confirmationMarkupHint':
+    'You can use the same markup as descriptions. Paste the asset: markup generated below for an image or link.',
+  'editor.contentAsset': 'Asset for descriptions or the completion screen',
+  'editor.contentAssetHint':
+    'Allowed types: {extensions}. Up to {megabytes} MB each and {count} assets per survey. Paste the generated markup into a description or completion message.',
+  'editor.contentAssetMarkup': 'Markup to paste',
   'editor.showProgress': 'Show a progress bar',
   'editor.allowEditingAfterSubmit': 'Allow editing after submitting',
   'editor.nextVersion': 'Publishing makes this version {version}',

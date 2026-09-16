@@ -8,7 +8,10 @@
    * **`innerHTML` を使わない。** サーバが作った構造から要素を組み立てるだけ。
    * **HTML の文字列を受け取る経路がどこにも無いので、消し漏らしという事故が起きない。**
    */
-  let { blocks }: { blocks: NoteBlock[] } = $props();
+  let {
+    blocks,
+    assetUrl,
+  }: { blocks: NoteBlock[]; assetUrl?: (assetId: string) => string } = $props();
 
   const visible = $derived(renderableBlocks(blocks));
 </script>
@@ -46,7 +49,7 @@
   {/if}
 {/each}
 
-{#snippet piece(inline: { kind: string; text: string; href?: string | null })}
+{#snippet piece(inline: { kind: string; text: string; href?: string | null; assetId?: string | null })}
   {#if inline.kind === 'Bold'}
     <strong>{inline.text}</strong>
   {:else if inline.kind === 'Italic'}
@@ -55,6 +58,10 @@
     <!-- **別のタブで開く。** 回答の途中で画面が置き換わると入力が消える。
          **`noopener` を付ける。** 開いた先から元の画面を触らせない -->
     <a href={inline.href} target="_blank" rel="noopener noreferrer">{inline.text}</a>
+  {:else if inline.kind === 'AssetImage' && inline.assetId && assetUrl}
+    <img src={assetUrl(inline.assetId)} alt={inline.text} />
+  {:else if inline.kind === 'AssetLink' && inline.assetId && assetUrl}
+    <a href={assetUrl(inline.assetId)} target="_blank" rel="noopener">{inline.text}</a>
   {:else}
     {inline.text}
   {/if}
@@ -99,6 +106,13 @@
 
   a {
     color: var(--accent);
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0.5rem 0;
   }
 
   :last-child {
