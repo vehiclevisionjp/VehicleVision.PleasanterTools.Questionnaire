@@ -318,7 +318,11 @@
     const key = problemKey(problem.code);
     const base = key ? t(key) : problem.code;
     const where = problem.targetColumn ? `[${problem.targetColumn}] ` : '';
-    const detail = problem.detail ? `（${problem.detail}）` : '';
+
+    // ⚠️ **detail は設問の ID。そのまま出しても何のことか分からない**（Issue #248）。
+    // 「Pleasanter に保存されません」と言われても、どの設問かが分からなければ直せない。
+    // **分岐の不備と同じように、見出しへ直して出す**
+    const detail = problem.detail ? `（${questionLabel(problem.detail)}）` : '';
     return `${where}${base}${detail}`;
   }
 
@@ -381,14 +385,15 @@
   function whereOf(problem: FlowProblem): string {
     const pageIndex = definition?.pages.findIndex((page) => page.pageId === problem.pageId) ?? -1;
     const page = pageIndex >= 0 ? pageLabel(pageIndex) : (problem.pageId ?? '');
-    const question = problem.questionId ? flowQuestionLabel(problem.questionId) : '';
+    const question = problem.questionId ? questionLabel(problem.questionId) : '';
 
     if (page === '') return question;
     if (question === '') return page;
     return t('flow.where', { page, question });
   }
 
-  function flowQuestionLabel(questionId: string): string {
+  /** 設問の見出し。**見出しが無ければ ID で呼ぶ。** */
+  function questionLabel(questionId: string): string {
     const question = allQuestions.find((entry) => entry.questionId === questionId);
     return question
       ? displayText(question.title, editing) || questionId
