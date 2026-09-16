@@ -96,6 +96,7 @@ x-app-environment: &app-environment
     QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN: ${DEV_LOGIN_ATTEMPTS:-2000}
     QUESTIONNAIRE_REQUESTS_PER_MIN: ${DEV_REQUESTS_PER_MIN:-6000}
     QUESTIONNAIRE_FORM_REQUESTS_PER_MIN: ${DEV_FORM_REQUESTS_PER_MIN:-60000}
+    QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN: ${DEV_ASSET_REQUESTS_PER_MIN:-60000}
     # **proof-of-work は検証環境でも効かせたままにする**（Issue #55）。
     # 切ると「本番でだけ落ちる」道を残すことになる。
     # 難しさだけ下げて、試験の待ち時間を短くする
