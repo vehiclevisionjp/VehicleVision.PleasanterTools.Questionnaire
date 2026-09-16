@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -18,6 +19,30 @@ public class RateLimitPartitionsTests
         var partition = RateLimitPartitions.Survey(
             publicId, permitLimit, Window, sharedStore: null, NullLogger.Instance);
         return partition.Factory(partition.PartitionKey);
+    }
+
+    [Theory]
+    // ビルド成果物。**書体は文字の範囲ごとに分かれるので本数が多い**
+    [InlineData("/assets/admin-DPWwLWYw.js")]
+    [InlineData("/assets/theme-DTjGXjp6.css")]
+    [InlineData("/assets/noto-sans-jp-42-wght-normal.woff2")]
+    // 回答画面の本文画像
+    [InlineData("/api/forms/pub-a/assets/0f8f7b2c-0000-0000-0000-000000000000")]
+    public void 一画面で何本も出るものは緩い枠で数える(string path)
+    {
+        Assert.True(RateLimitPartitions.IsBulkAsset(new PathString(path)));
+    }
+
+    [Theory]
+    [InlineData("/api/forms/pub-a")]
+    [InlineData("/api/admin/surveys")]
+    [InlineData("/healthz")]
+    [InlineData("/admin")]
+    // ⚠️ **接頭辞の一致だけで通さない。** /assetsomething は別物
+    [InlineData("/assetsomething/x.js")]
+    public void 通常の要求は通常の枠で数える(string path)
+    {
+        Assert.False(RateLimitPartitions.IsBulkAsset(new PathString(path)));
     }
 
     [Fact]

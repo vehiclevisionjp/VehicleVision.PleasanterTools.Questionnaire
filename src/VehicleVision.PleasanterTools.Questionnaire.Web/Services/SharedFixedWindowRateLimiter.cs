@@ -95,6 +95,35 @@ public sealed class SharedFixedWindowRateLimiter(
 /// <summary>設定に応じてプロセス内または共有の固定窓を作る。</summary>
 public static class RateLimitPartitions
 {
+    /// <summary>1 画面で複数の要求が出るものかを見分ける。</summary>
+    /// <remarks>
+    /// <para>
+    /// **本文画像も、組み上げたビルド成果物も、1 画面で何本も要求される。**
+    /// 通常 API と同じ枠で数えると、**同じ NAT 配下の利用者が数人開いただけで
+    /// アンケート本体まで止まる。**
+    /// </para>
+    /// <para>
+    /// ⚠️ **書体は文字の範囲ごとに分割されている**（<c>wwwroot/assets</c> に
+    /// woff2 が 366 個）。**表示する文字が増えるほど追加で読まれる**ので、
+    /// 1 画面あたりの本数は content 次第で増える（Issue #316）。
+    /// </para>
+    /// <para>
+    /// ⚠️ **レート制限の外へは出さない。** 上限が無くなるのは別の話。
+    /// </para>
+    /// </remarks>
+    public static bool IsBulkAsset(PathString path)
+    {
+        // ビルド成果物。**ハッシュ付きの不変な名前**で、性質は本文画像と同じ
+        if (path.StartsWithSegments("/assets"))
+        {
+            return true;
+        }
+
+        // 回答画面の本文画像（/api/forms/{publicId}/assets/{assetId}）
+        return path.StartsWithSegments("/api/forms")
+            && path.Value?.Contains("/assets/", StringComparison.OrdinalIgnoreCase) is true;
+    }
+
     /// <summary>アンケート 1 本あたりの枠を作る。</summary>
     /// <remarks>
     /// <para>

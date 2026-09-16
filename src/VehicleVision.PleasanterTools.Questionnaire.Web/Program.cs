@@ -586,11 +586,10 @@ builder.Services
     options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
         {
-            // **本文画像は 1 画面で複数要求される。** 通常 API の 60 件枠を食わせると、
-            // 同じ NAT 配下の回答者が数人開いただけでフォーム本体まで止まる
-            var isAsset = context.Request.Path.StartsWithSegments("/api/forms")
-                && context.Request.Path.Value?.Contains(
-                    "/assets/", StringComparison.OrdinalIgnoreCase) is true;
+            // **本文画像とビルド成果物は 1 画面で複数要求される。**
+            // 通常 API の 60 件枠を食わせると、同じ NAT 配下の回答者が
+            // 数人開いただけでフォーム本体まで止まる（Issue #316）
+            var isAsset = RateLimitPartitions.IsBulkAsset(context.Request.Path);
             var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var kind = isAsset ? "asset" : "api";
             return RateLimitPartitions.FixedWindow(
