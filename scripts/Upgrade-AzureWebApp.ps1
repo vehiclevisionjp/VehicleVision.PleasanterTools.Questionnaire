@@ -196,33 +196,57 @@ function Write-KuduCommandResult {
     }
 }
 
-function Test-HealthEndpoint {
+function Wait-ForEndpoint {
     param(
         [Parameter(Mandatory)]
-        [string]$Uri
+        [string]$Uri,
+
+        [Parameter(Mandatory)]
+        [string]$Label
     )
+
+    # **最後の理由を覚えておく。** /ready は DB へ繋がらない間 503 を返すので、
+    # 「12 回駄目だった」だけでは何を直せばよいか分からない
+    $lastReason = 'no response'
 
     for ($attempt = 1; $attempt -le 12; $attempt++) {
         try {
             $response = Invoke-WebRequest -Uri $Uri
             if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
-                Write-Host "Health check succeeded on attempt $attempt."
+                Write-Host "$Label succeeded on attempt $attempt."
                 return $response
             }
+
+            $lastReason = "HTTP $($response.StatusCode)"
         }
         catch {
-            if ($attempt -eq 12) {
-                throw "Health check failed after $attempt attempts: $Uri"
-            }
+            $statusCode = Get-HttpStatusCode -ErrorRecord $_
+            $lastReason = if ($null -ne $statusCode) { "HTTP $statusCode" } else { $_.Exception.Message }
         }
 
-        Write-Host "Health check attempt $attempt failed. Retrying in 10 seconds."
-        Start-Sleep -Seconds 10
+        if ($attempt -lt 12) {
+            Write-Host "$Label attempt $attempt failed ($lastReason). Retrying in 10 seconds."
+            Start-Sleep -Seconds 10
+        }
     }
 
     # **抜けたら失敗として扱う。** 2xx 以外を返し続けた場合に
     # 黙って戻ると、更新が成功したように見える
-    throw "Health check failed after 12 attempts: $Uri"
+    throw "$Label failed after 12 attempts ($lastReason): $Uri"
+}
+
+function Test-Deployment {
+    # ⚠️ **/healthz だけでは足りない。** あれはプロセスの生存しか見ず、
+    # **DB へ繋がらなくても ok を返す**（Program.cs）。
+    # 設定を取り違えた更新が「成功」で終わってしまうので、
+    # **本アプリ DB への接続を見る /ready まで通すこと**
+    param(
+        [Parameter(Mandatory)]
+        [string]$BaseUri
+    )
+
+    Wait-ForEndpoint -Uri "$BaseUri/healthz" -Label 'Liveness check (/healthz)' | Out-Null
+    Wait-ForEndpoint -Uri "$BaseUri/ready" -Label 'Readiness check (/ready)' | Out-Null
 }
 
 if ($null -eq (Get-Command az -ErrorAction SilentlyContinue)) {
@@ -255,7 +279,8 @@ else {
     $scmHost = "$WebApp.scm.azurewebsites.net"
 }
 
-$healthUri = "https://$($webAppInfo.defaultHostName)/healthz"
+$baseUri = "https://$($webAppInfo.defaultHostName)"
+$healthUri = "$baseUri/healthz"
 $kuduBaseUri = "https://$scmHost"
 $accessToken = Get-KuduAccessToken
 
@@ -271,7 +296,7 @@ if ($Rollback) {
     # 新版だけにあったファイルは残るので、運用者へ伝える
     Invoke-KuduRequest -Method Put -Uri "$kuduBaseUri/api/zip/site/wwwroot/" -AccessToken $accessToken -InFile $rollbackPath | Out-Null
     Invoke-AzCommand -Arguments (@('webapp', 'restart') + $deploymentArguments)
-    Test-HealthEndpoint -Uri $healthUri | Out-Null
+    Test-Deployment -BaseUri $baseUri
     Write-Host 'Rollback completed.'
     Write-Host 'Files that existed only in the newer release were not deleted. Remove them from site/wwwroot if required.'
     Write-Host 'Database was not rolled back. Restore it from the backup taken before migration if required.'
@@ -383,7 +408,7 @@ try {
     }
 
     Invoke-AzCommand -Arguments (@('webapp', 'restart') + $deploymentArguments)
-    Test-HealthEndpoint -Uri $healthUri | Out-Null
+    Test-Deployment -BaseUri $baseUri
     Write-Host 'Update completed.'
     Write-Host "Backup location: $resolvedBackupDirectory"
     Write-Host 'The backup ZIP can contain secrets. The operator is responsible for deleting it securely.'
