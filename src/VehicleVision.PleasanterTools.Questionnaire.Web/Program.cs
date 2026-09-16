@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using StackExchange.Redis;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -272,6 +273,43 @@ var secretKey = builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
 
 builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
 builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
+
+// **既定は DB。** 追加の基盤なしで、個別失効と端末一覧を使えるようにする。
+// 大規模構成では Redis を選べるが、停止時に cookie だけで通すことはしない。
+var sessionStoreKind =
+    builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_STORE"] ?? "Database";
+if (string.Equals(sessionStoreKind, "Database", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<IAdminSessionStore, DatabaseAdminSessionStore>();
+}
+else if (string.Equals(sessionStoreKind, "Redis", StringComparison.OrdinalIgnoreCase))
+{
+    var redisConnectionString =
+        builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING"]
+        ?? throw new InvalidOperationException(
+            "QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING is required "
+            + "when the administrator session store is Redis.");
+    var redisConfiguration = ConfigurationOptions.Parse(redisConnectionString);
+
+    // **一時的に到達できなくてもアプリ自体は起動する。**
+    // ただしセッション照合は失敗するため、管理者は全員ログアウト扱いになる。
+    redisConfiguration.AbortOnConnectFail = false;
+    builder.Services.AddSingleton<IConnectionMultiplexer>(
+        ConnectionMultiplexer.Connect(redisConfiguration));
+    builder.Services.AddSingleton<IAdminSessionStore>(serviceProvider =>
+        new RedisAdminSessionStore(
+            serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
+            builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX"]
+                ?? "questionnaire:admin-session:"));
+}
+else
+{
+    throw new InvalidOperationException(
+        "QUESTIONNAIRE_ADMIN_SESSION_STORE must be Database or Redis "
+        + $"(current value: {sessionStoreKind}).");
+}
+
+builder.Services.AddSingleton<AdminSessionManager>();
 // **パスワードの条件は設定で決める**（Issue #157）。
 // 実値は App_Data/Parameters/Security.json（Pleasanter 本体と同じ書き方）。
 // **積む場所は上の 1 か所にまとめてある。**
@@ -371,6 +409,13 @@ builder.Services
         options, "q.admin.pending", AdminAuthSchemes.PendingLifetime))
     .AddCookie(AdminAuthSchemes.Reenroll, options => AdminAuthSchemes.Configure(
         options, "q.admin.reenroll", AdminAuthSchemes.ReenrollLifetime));
+
+builder.Services.Configure<CookieAuthenticationOptions>(
+    AdminAuthSchemes.Pending,
+    options => options.Events.OnValidatePrincipal = AdminSessionGuard.ValidatePendingAsync);
+builder.Services.Configure<CookieAuthenticationOptions>(
+    AdminAuthSchemes.Reenroll,
+    options => options.Events.OnValidatePrincipal = AdminSessionGuard.ValidateReenrollAsync);
 
 builder.Services.AddAuthorization(options =>
 {
@@ -675,6 +720,7 @@ app.UseStaticFiles();
 app.MapFormEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapAdminAuthEndpoints();
+app.MapAdminSessionEndpoints();
 // **SAML を使うときだけ受け口を生やす**（Issue #166）。
 // 使わない構成で認証の外の口を開けたままにしない（添付の検査の受け口と同じ考え方）。
 // **中で「無効なら 404」と書くより強い。** 無効なら経路そのものが無い

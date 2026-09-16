@@ -39,6 +39,7 @@ public class EndpointGraphTests
 
         app.MapAdminAuditLogEndpoints();
         app.MapAdminAuthEndpoints();
+        app.MapAdminSessionEndpoints();
         app.MapAdminNoteEndpoints();
         app.MapAdminNotificationEndpoints();
         app.MapAdminOutboxEndpoints();

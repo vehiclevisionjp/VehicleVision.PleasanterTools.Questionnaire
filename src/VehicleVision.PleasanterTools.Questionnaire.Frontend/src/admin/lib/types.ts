@@ -686,6 +686,16 @@ export interface AdminSession {
   language?: string | null;
 }
 
+/** サーバ側に残っているログイン済み端末 1 件。 */
+export interface AdminSessionRow {
+  adminSessionId: string;
+  current: boolean;
+  createdAt: string;
+  expiresAt: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
+
 /**
  * その言語の文字列を取り出す。**落とさない。**
  *

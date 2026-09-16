@@ -174,6 +174,16 @@ public static class ServerMessages
             "対応していない言語です。",
             "That language is not supported.");
 
+        Add(
+            ServerMessageKeys.AdminSessionNotFound,
+            "そのセッションは見つかりません。",
+            "That session was not found.");
+
+        Add(
+            ServerMessageKeys.CurrentSessionCannotBeRevoked,
+            "現在使っているセッションはここから終了できません。ログアウトしてください。",
+            "The current session cannot be ended here. Sign out instead.");
+
         // ---- アンケート -----------------------------------------------------
         Add(
             ServerMessageKeys.SurveyTitleRequired,
