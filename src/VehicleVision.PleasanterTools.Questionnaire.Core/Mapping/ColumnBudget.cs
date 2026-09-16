@@ -19,8 +19,9 @@ public sealed record ColumnUsage(string Prefix, int Used, int Available)
 /// <summary>Pleasanter の列がいくつ要るかを数える。</summary>
 /// <remarks>
 /// <para>
-/// **列は型ごとに 26 本しかない**（<c>A</c>〜<c>Z</c>。
-/// <c>_documents/実機検証結果.md</c>）。項目拡張で増やせるが、既定はこれ。
+/// **標準の列は型ごとに 26 本**（<c>A</c>〜<c>Z</c>。
+/// <c>_documents/実機検証結果.md</c>）。項目拡張で増やせるので、実際のサイトから
+/// 数えられるときはその本数を使う。
 /// </para>
 /// <para>
 /// **グリッドは 1 設問で行数ぶんの列を食う**（Issue #54）。
@@ -81,8 +82,21 @@ public static class ColumnBudget
     public static ImmutableArray<ColumnUsage> Measure(
         MappingDefinition mapping,
         int availablePerType = StandardColumnsPerType)
+        => Measure(mapping, ImmutableDictionary<string, int>.Empty, availablePerType);
+
+    /// <summary>今の割り当てで、型ごとに何本使っているか。</summary>
+    /// <param name="availableByPrefix">実際のサイトで使える本数。</param>
+    /// <param name="fallbackPerType">
+    /// <paramref name="availableByPrefix"/> に無い型を数えるときの本数。
+    /// **サイトから取れなかったときはここだけで数える**ので、既定を無視しないこと。
+    /// </param>
+    public static ImmutableArray<ColumnUsage> Measure(
+        MappingDefinition mapping,
+        IReadOnlyDictionary<string, int> availableByPrefix,
+        int fallbackPerType = StandardColumnsPerType)
     {
         ArgumentNullException.ThrowIfNull(mapping);
+        ArgumentNullException.ThrowIfNull(availableByPrefix);
 
         return
         [
@@ -95,7 +109,7 @@ public static class ColumnBudget
                 .Select(group => new ColumnUsage(
                     group.Key,
                     group.Select(column => column).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
-                    availablePerType)),
+                    availableByPrefix.GetValueOrDefault(group.Key, fallbackPerType))),
         ];
     }
 

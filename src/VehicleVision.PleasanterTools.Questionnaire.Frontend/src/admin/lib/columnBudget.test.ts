@@ -169,6 +169,15 @@ describe('measure', () => {
     expect(usage?.fits).toBe(false);
   });
 
+  it('型ごとに実際の列数を指定できる', () => {
+    const usage = measure(mapping('ClassA', 'Class001', 'NumA'), { Class: 126, Num: 1 });
+
+    expect(usage).toEqual([
+      { prefix: 'Class', used: 2, available: 126, remaining: 124, fits: true },
+      { prefix: 'Num', used: 1, available: 1, remaining: 0, fits: true },
+    ]);
+  });
+
   it('割り当てが無ければ空', () => {
     expect(measure(mapping())).toEqual([]);
   });

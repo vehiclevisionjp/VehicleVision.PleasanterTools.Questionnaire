@@ -1,5 +1,6 @@
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
+using System.Text.Json.Nodes;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
@@ -63,5 +64,41 @@ public class AdminSurveyListTests
         Assert.Null(query.Status);
         Assert.Null(query.TitleContains);
         Assert.Equal(0, query.Offset);
+    }
+
+    [Fact]
+    public void GetSiteの列定義を接頭辞ごとに数える()
+    {
+        var response = JsonNode.Parse("""
+            {
+              "Response": {
+                "Data": {
+                  "SiteSettings": {
+                    "Columns": [
+                      { "ColumnName": "ClassA" },
+                      { "ColumnName": "Class001" },
+                      { "ColumnName": "NumA" },
+                      { "ColumnName": "Title" }
+                    ]
+                  }
+                }
+              }
+            }
+            """);
+
+        var availableByPrefix = AdminSurveyEndpoints.AvailableColumnsFrom(response);
+
+        Assert.NotNull(availableByPrefix);
+        Assert.Equal(2, availableByPrefix["Class"]);
+        Assert.Equal(1, availableByPrefix["Num"]);
+        Assert.DoesNotContain("Title", availableByPrefix.Keys);
+    }
+
+    [Fact]
+    public void GetSiteの列定義が無ければ標準の本数へ戻す()
+    {
+        var response = JsonNode.Parse("""{ "Response": { "Data": { "SiteSettings": {} } } }""");
+
+        Assert.Null(AdminSurveyEndpoints.AvailableColumnsFrom(response));
     }
 }

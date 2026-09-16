@@ -317,8 +317,11 @@ export const ja = {
   'mapping.removeSource': '入力を削除',
   'mapping.attachmentReplaceHint': '回答を再送信すると、Pleasanter 側の添付は新しいファイルに置き換わります。',
   'mapping.rowUnset': '（行を選択）',
-  'mapping.budgetEntry': '{prefix}: {used} / {available} 列（標準）',
-  'mapping.budgetOver': '{prefixes} の列が標準の列数を超えています。項目拡張で列を増やしていない Pleasanter サイトでは保存されません。',
+  'mapping.refreshColumnAvailability': '取り直す',
+  'mapping.budgetBasisSite': '実際の Pleasanter サイトの列数で数えています。',
+  'mapping.budgetBasisStandard': 'Pleasanter サイトの列数を取得できないため、標準の本数（型ごとに 26 列）で数えています。',
+  'mapping.budgetEntry': '{prefix}: {used} / {available} 列',
+  'mapping.budgetOver': '{prefixes} の列数を超えています。割り当てを確認してください。',
   'mapping.addSource': '入力を追加',
   'mapping.sourceOrderHint': '上から順に変換へ渡されます。',
   'mapping.missingQuestion': '{questionId}（存在しません）',
@@ -1020,9 +1023,12 @@ export const en: Record<MessageKey, string> = {
   'mapping.attachmentReplaceHint':
     'Sending a response again replaces the attachments on the Pleasanter side.',
   'mapping.rowUnset': '(choose a row)',
+  'mapping.refreshColumnAvailability': 'Refresh',
+  'mapping.budgetBasisSite': 'Counting the columns available in the Pleasanter site.',
+  'mapping.budgetBasisStandard':
+    'The Pleasanter site columns are unavailable, so counting the standard 26 columns per type.',
   'mapping.budgetEntry': '{prefix}: {used} of {available}',
-  'mapping.budgetOver':
-    '{prefixes} exceeds the standard number of columns. Unless the Pleasanter site has extra columns, the extras are not stored.',
+  'mapping.budgetOver': '{prefixes} exceeds the available columns. Check the assignments.',
   'mapping.addSource': 'Add an input',
   'mapping.sourceOrderHint': 'Inputs are passed to the converter from the top down.',
   'mapping.missingQuestion': '{questionId} (does not exist)',
