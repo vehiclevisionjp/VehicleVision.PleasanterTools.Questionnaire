@@ -77,6 +77,9 @@ $ErrorActionPreference = 'Stop'
 
 $scriptVersion = '1.0.0'
 $applicationDll = 'VehicleVision.PleasanterTools.Questionnaire.Web.dll'
+# ⚠️ **app_offline.htm は IIS（Windows）の仕組み。Linux の App Service では効かない。**
+# **Linux ではそもそもファイルが掴まれない**ので、止める必要も無い。
+# **Linux 向けは別に用意する**（Issue #296）
 $offlineFileName = 'app_offline.htm'
 
 function Get-HttpStatusCode {
