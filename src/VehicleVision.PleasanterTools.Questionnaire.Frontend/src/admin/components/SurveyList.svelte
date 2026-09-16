@@ -3,10 +3,13 @@
     createSurvey,
     duplicateSurvey,
     listSurveys,
+    publish,
+    revertToDraft,
     resume,
     saveAsTemplate,
     saveSurveySettings,
     suspend,
+    updateSurveySiteId,
   } from '../lib/api';
   import {
     isPublished,
@@ -108,6 +111,9 @@
    */
   let settingsAllowDraft = $state(false);
   let settingsBusy = $state(false);
+  let siteFor = $state<SurveySummary | null>(null);
+  let siteId = $state('');
+  let siteBusy = $state(false);
 
   // **絞り込みとページを変えたら読み直す。** $effect が依存を拾う
   $effect(() => {
@@ -250,6 +256,48 @@
     await reload(offset, titleFilter, statusFilter);
   }
 
+  async function changePublication(survey: SurveySummary, publishNow: boolean) {
+    const result = publishNow
+      ? await publish(survey.surveyId)
+      : await revertToDraft(survey.surveyId);
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    await reload(offset, titleFilter, statusFilter);
+  }
+
+  function openSite(survey: SurveySummary) {
+    error = '';
+    siteFor = survey;
+    siteId = String(survey.pleasanterSiteId);
+  }
+
+  async function saveSite(event: SubmitEvent) {
+    event.preventDefault();
+    const target = siteFor;
+    const value = Number(siteId);
+    if (target === null || siteBusy) {
+      return;
+    }
+    if (!Number.isInteger(value) || value <= 0) {
+      error = t('list.newSiteIdInvalid');
+      return;
+    }
+
+    siteBusy = true;
+    const result = await updateSurveySiteId(target.surveyId, value);
+    siteBusy = false;
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    siteFor = null;
+    await reload(offset, titleFilter, statusFilter);
+  }
+
   function toggleQr(survey: SurveySummary) {
     // **同じ行をもう一度押したら閉じる。** 開きっぱなしで表が押し下げられない
     showingQr = showingQr?.surveyId === survey.surveyId ? null : survey;
@@ -352,6 +400,7 @@
       <option value="0">{t('status.draft')}</option>
       <option value="1">{t('status.published')}</option>
       <option value="2">{t('status.suspended')}</option>
+      <option value="3">{t('status.testPublished')}</option>
     </select>
   </label>
   <div class="actions">
@@ -381,6 +430,23 @@
       <span class="hint">{t('list.newJsonColumnHint')}</span>
     </label>
     <button type="submit">{t('list.submit')}</button>
+  </form>
+{/if}
+
+{#if siteFor}
+  <form class="create" onsubmit={saveSite}>
+    <h2>{t('siteId.title', { title: siteFor.title })}</h2>
+    <label>
+      {t('siteId.label')}
+      <input type="text" inputmode="numeric" bind:value={siteId} required />
+    </label>
+    <p class="warn">{t('siteId.warning')}</p>
+    <div class="actions">
+      <button type="submit" disabled={siteBusy}>{t('siteId.submit')}</button>
+      <button type="button" class="secondary" onclick={() => (siteFor = null)}>
+        {t('settings.cancel')}
+      </button>
+    </div>
   </form>
 {/if}
 
@@ -531,12 +597,21 @@
             {/if}
           </td>
           <td>{survey.publishedVersion ?? '—'}</td>
-          <td class="responses">{responses(survey)}</td>
+          <td class="responses">
+            <div>{responses(survey)}</div>
+            <div>{t('list.testResponseCount', { count: survey.testResponseCount })}</div>
+            {#if survey.testResponseCount > 0}
+              <div class="hint">{t('list.testResponseCleanup')}</div>
+            {/if}
+          </td>
           <td>
             {#if isPublished(survey)}
               <a href={formUrl(survey.publicId)} target="_blank" rel="noreferrer">
                 {survey.publicId}
               </a>
+              {#if survey.status === 3}
+                <span class="reason">{t('list.testUrl')}</span>
+              {/if}
             {:else}
               <span class="muted">{t('list.notPublished')}</span>
             {/if}
@@ -544,13 +619,29 @@
           <td class="muted">{formatDate(survey.updatedAt)}</td>
           <td class="row-actions">
             <div class="row-actions-inner">
-            {#if isPublished(survey)}
+            {#if survey.status === 1 || survey.status === 2}
               <button type="button" class="secondary" onclick={() => toggle(survey)}>
                 {survey.status === 1 ? t('list.suspend') : t('list.resume')}
               </button>
               <!-- **公開していないものには出さない。** 出しても読めない URL になる -->
               <button type="button" class="secondary" onclick={() => toggleQr(survey)}>
                 {t('qr.open')}
+              </button>
+            {/if}
+            {#if survey.status === 3}
+              <button type="button" onclick={() => changePublication(survey, true)}>
+                {t('list.publish')}
+              </button>
+              <button type="button" class="secondary" onclick={() => changePublication(survey, false)}>
+                {t('list.revertToDraft')}
+              </button>
+              <button type="button" class="secondary" onclick={() => toggleQr(survey)}>
+                {t('qr.open')}
+              </button>
+            {/if}
+            {#if survey.status === 0 || survey.status === 3}
+              <button type="button" class="secondary" onclick={() => openSite(survey)}>
+                {t('siteId.open')}
               </button>
             {/if}
             <button type="button" class="secondary" onclick={() => openSettings(survey)}>
@@ -784,6 +875,11 @@
 
   .status-2 {
     color: var(--error);
+    font-weight: 600;
+  }
+
+  .status-3 {
+    color: #9a6700;
     font-weight: 600;
   }
 

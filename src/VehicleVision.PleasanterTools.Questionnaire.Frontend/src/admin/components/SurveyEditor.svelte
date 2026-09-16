@@ -4,7 +4,7 @@
     loadColumnAvailability,
     loadDraft,
     loadEmbedOptions,
-    publish,
+    testPublish,
     saveDraft,
     type ColumnAvailabilityResponse,
   } from '../lib/api';
@@ -288,7 +288,7 @@
     warnings = [];
     publishFlow = [];
 
-    const result = await publish(surveyId);
+    const result = await testPublish(surveyId);
     saving = false;
 
     if (!result.ok) {
@@ -309,7 +309,7 @@
     }
 
     warnings = result.value.warnings;
-    notice = t('editor.published', { version: result.value.version });
+    notice = t('editor.testPublished', { version: result.value.version });
     await load(surveyId);
   }
 
@@ -413,7 +413,7 @@
       {saving ? t('editor.working') : t('editor.saveDraft')}
     </button>
     <button type="button" onclick={doPublish} disabled={saving || loading}>
-      {t('editor.publish')}
+      {t('editor.testPublish')}
     </button>
   </div>
 </header>

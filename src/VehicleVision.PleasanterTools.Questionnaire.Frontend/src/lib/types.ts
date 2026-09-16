@@ -242,6 +242,8 @@ export interface FormResponse {
    * 分からないときは残さない側へ倒す。
    */
   allowsDraft?: boolean;
+  /** テスト公開中か。**回答画面で明示するための印。** */
+  isTest?: boolean;
 }
 
 /** 送信する回答 1 件。 */
