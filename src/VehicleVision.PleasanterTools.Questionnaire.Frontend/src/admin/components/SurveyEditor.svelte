@@ -1,6 +1,13 @@
 <script lang="ts">
   import SurveyPreview from './SurveyPreview.svelte';
-  import { loadDraft, loadEmbedOptions, publish, saveDraft } from '../lib/api';
+  import {
+    loadColumnAvailability,
+    loadDraft,
+    loadEmbedOptions,
+    publish,
+    saveDraft,
+    type ColumnAvailabilityResponse,
+  } from '../lib/api';
   import {
     displayText,
     problemKey,
@@ -86,6 +93,10 @@
   });
   let mapping = $state<MappingDefinition>({ assignments: [] });
   let revision = $state(0);
+  let columnAvailability = $state<ColumnAvailabilityResponse>({
+    source: 'standard',
+    availableByPrefix: {},
+  });
 
   let loading = $state(true);
   let saving = $state(false);
@@ -146,6 +157,18 @@
     definition = result.value.definition;
     mapping = result.value.mapping;
     revision = result.value.revision;
+    await refreshColumnAvailability(id);
+  }
+
+  async function refreshColumnAvailability(id = surveyId) {
+    const result = await loadColumnAvailability(id);
+    if (!result.ok || id !== surveyId) {
+      // **編集を止めない。** Pleasanter が落ちていても標準構成なら正しく数えられる。
+      columnAvailability = { source: 'standard', availableByPrefix: {} };
+      return;
+    }
+
+    columnAvailability = result.value;
   }
 
   /** その設問が書き込まれる列。 */
@@ -672,6 +695,8 @@
     {mapping}
     questions={allQuestions}
     {editing}
+    availability={columnAvailability}
+    onrefresh={() => refreshColumnAvailability()}
     onchange={(next) => (mapping = next)}
   />
 {/if}

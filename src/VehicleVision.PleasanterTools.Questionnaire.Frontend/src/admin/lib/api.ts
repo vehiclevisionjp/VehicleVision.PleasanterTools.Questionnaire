@@ -302,6 +302,15 @@ export const deleteTemplate = (templateId: string) =>
 
 export const loadDraft = (surveyId: string) => call<SurveyDraft>(`/api/admin/surveys/${surveyId}`);
 
+/** マッピング先サイトの列数。取得できないときは標準の本数を使う。 */
+export interface ColumnAvailabilityResponse {
+  source: 'site' | 'standard';
+  availableByPrefix: Record<string, number>;
+}
+
+export const loadColumnAvailability = (surveyId: string) =>
+  call<ColumnAvailabilityResponse>(`/api/admin/surveys/${surveyId}/column-availability`);
+
 /** 埋め込みを許す配信元（Issue #104 / #107）。**運用側の設定なので変わらない。** */
 export interface EmbedOptions {
   enabled: boolean;

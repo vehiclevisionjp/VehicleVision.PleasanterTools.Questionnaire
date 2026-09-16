@@ -267,6 +267,31 @@ public class GridMappingTests
         Assert.Equal(-4, usage.Remaining);
     }
 
+    [Fact]
+    public void 型ごとに実際の列数を指定できる()
+    {
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct("ClassA", new MappingSource("q-grid", QuestionPort.Value, "price")),
+                ColumnAssignment.Direct("Class001", new MappingSource("q-grid", QuestionPort.Value, "quality")),
+                ColumnAssignment.Direct("NumA", new MappingSource("q-rank", QuestionPort.Value, "price")),
+            ],
+        };
+
+        var availableByPrefix = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Class"] = 126,
+            ["Num"] = 1,
+        };
+
+        var usage = ColumnBudget.Measure(mapping, availableByPrefix);
+
+        Assert.Equal(124, usage.Single(entry => entry.Prefix == "Class").Remaining);
+        Assert.True(usage.Single(entry => entry.Prefix == "Num").Fits);
+    }
+
     [Theory]
     [InlineData("ClassA", "Class")]
     [InlineData("ClassZ", "Class")]

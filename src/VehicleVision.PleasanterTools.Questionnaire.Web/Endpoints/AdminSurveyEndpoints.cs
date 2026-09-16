@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Security.Claims;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.Features;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -215,6 +216,35 @@ public static class AdminSurveyEndpoints
         {
             var draft = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
             return draft is null ? Results.NotFound() : Results.Ok(draft);
+        });
+
+        // ---- 実サイトの列数 --------------------------------------------------
+        // **編集を開くときと、明示した取り直しだけで呼ぶ。** 入力のたびに Pleasanter へ
+        // 問い合わせると、編集画面が外部サービスの遅延と可用性に引きずられる。
+        group.MapGet("/{surveyId:guid}/column-availability", async (
+            Guid surveyId,
+            ISurveyRepository surveys,
+            PleasanterApiClient pleasanter,
+            CancellationToken cancellationToken) =>
+        {
+            var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (survey is null)
+            {
+                return Results.NotFound();
+            }
+
+            var response = await pleasanter.GetSiteAsync(survey.PleasanterSiteId, cancellationToken)
+                .ConfigureAwait(false);
+            var availableByPrefix = response.IsSuccess
+                ? AvailableColumnsFrom(response.Body)
+                : null;
+
+            // **取得に失敗しても編集を止めない。** 項目拡張のない標準構成なら正しい本数であり、
+            // 取得できないことを理由に、利用者が下書きを直せなくなる方を避ける。
+            return Results.Ok(availableByPrefix is null
+                ? new ColumnAvailabilityResponse("standard", new Dictionary<string, int>())
+                : new ColumnAvailabilityResponse("site", availableByPrefix));
         });
 
         // ---- 下書きを保存する ------------------------------------------------
@@ -770,6 +800,35 @@ public static class AdminSurveyEndpoints
         return new SurveyPageResponse([.. rows.Take(take)], rows.Count > take);
     }
 
+    /// <summary><c>GetSite</c> 応答から接頭辞ごとの列数を取り出す。</summary>
+    /// <remarks>
+    /// Pleasanter の <c>GetSite</c> は <c>Response.Data.SiteSettings.Columns</c> に
+    /// <c>ColumnName</c> を持つ。列定義が無ければ、取得できなかったものとして標準値へ戻す。
+    /// </remarks>
+    public static IReadOnlyDictionary<string, int>? AvailableColumnsFrom(JsonNode? body)
+    {
+        var columns = body?["Response"]?["Data"]?["SiteSettings"]?["Columns"]?.AsArray();
+        if (columns is null || columns.Count == 0)
+        {
+            return null;
+        }
+
+        var availableByPrefix = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var column in columns)
+        {
+            var columnName = column?["ColumnName"]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(columnName) || PleasanterColumn.KindOf(columnName) is null)
+            {
+                continue;
+            }
+
+            var prefix = ColumnBudget.PrefixOf(columnName);
+            availableByPrefix[prefix] = availableByPrefix.GetValueOrDefault(prefix) + 1;
+        }
+
+        return availableByPrefix.Count == 0 ? null : availableByPrefix;
+    }
+
     /// <summary>不備を画面に出せる形にする。</summary>
     private static object Describe(MappingProblem problem) => new
     {
@@ -788,6 +847,11 @@ public static class AdminSurveyEndpoints
     public sealed record SurveyPageResponse(
         IReadOnlyList<SurveySummary> Items,
         bool HasMore);
+
+    /// <summary>マッピング編集画面で使う列数。</summary>
+    public sealed record ColumnAvailabilityResponse(
+        string Source,
+        IReadOnlyDictionary<string, int> AvailableByPrefix);
 
     /// <summary>アンケートを新しく作る。</summary>
     public sealed record CreateSurveyRequest(

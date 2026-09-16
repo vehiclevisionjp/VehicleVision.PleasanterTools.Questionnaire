@@ -8,13 +8,16 @@ import { hasRowPorts, isDisplayOnly, rowPorts } from './types';
  * ここはその写しで、**保存や公開を待たずに編集画面へ出すためだけ**にある。
  * **片方だけ直さないこと。** 食い違うと、画面では収まっているのに公開で弾かれる。
  *
- * **列は型ごとに 26 本しかない**（`A`〜`Z`。`_documents/実機検証結果.md`）。
- * 項目拡張で増やせるが、既定はこれ。
+ * **標準の列は型ごとに 26 本**（`A`〜`Z`。`_documents/実機検証結果.md`）。
+ * 項目拡張で増やせるため、実際のサイトから数えられるときはその本数を使う。
  *
  * ⚠️ **英字と数字の両方を落とさないこと。** 落とすと `Class012` が `Clas` になり、
  * `ClassA` と別の型として数えられて、型ごとの上限がすり抜ける。
  */
 export const STANDARD_COLUMNS_PER_TYPE = 26;
+
+/** 接頭辞ごとの、実際のサイトで使える列数。 */
+export type ColumnAvailability = Readonly<Record<string, number>>;
 
 /**
  * 列名から型の接頭辞を取り出す。
@@ -58,7 +61,7 @@ export interface ColumnUsage {
 /** 今の割り当てで、型ごとに何本使っているか。 */
 export function measure(
   mapping: MappingDefinition,
-  availablePerType: number = STANDARD_COLUMNS_PER_TYPE,
+  available: number | ColumnAvailability = STANDARD_COLUMNS_PER_TYPE,
 ): ColumnUsage[] {
   const byPrefix = new Map<string, Set<string>>();
 
@@ -79,10 +82,16 @@ export function measure(
     .map(([prefix, columns]) => ({
       prefix,
       used: columns.size,
-      available: availablePerType,
-      remaining: availablePerType - columns.size,
-      fits: columns.size <= availablePerType,
+      available: availableFor(prefix, available),
+      remaining: availableFor(prefix, available) - columns.size,
+      fits: columns.size <= availableFor(prefix, available),
     }));
+}
+
+function availableFor(prefix: string, available: number | ColumnAvailability): number {
+  if (typeof available === 'number') return available;
+
+  return available[prefix] ?? STANDARD_COLUMNS_PER_TYPE;
 }
 
 /**
