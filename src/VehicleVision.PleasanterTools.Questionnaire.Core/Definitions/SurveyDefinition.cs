@@ -62,6 +62,10 @@ public sealed record SurveyDefinition
     /// </remarks>
     public AutoReplySettings? AutoReply { get; init; }
 
+    /// <summary>回答後に配る資産の引換券の期限（Issue #318）。</summary>
+    /// <remarks><c>null</c> は「回答から 30 日」の既定値として扱う。</remarks>
+    public AssetDeliverySettings? AssetDelivery { get; init; }
+
     /// <summary>全ページの設問を順に返す。</summary>
     public IEnumerable<Question> AllQuestions => Pages.SelectMany(page => page.Questions);
 

@@ -210,6 +210,35 @@ public class AutoReplyDispatcherTests
     }
 
     [Fact]
+    public async Task 配布資産の引換券を断片のURLで本文へ足す()
+    {
+        var (dispatcher, outbox) = Create(new MailOptions
+        {
+            Enabled = true,
+            Host = "smtp.example.test",
+            FromAddress = "noreply@example.test",
+            BaseUrl = "https://survey.example.jp/",
+        });
+
+        await dispatcher.TryEnqueueAsync(
+            SurveyId,
+            Definition(Enabled),
+            Payload(),
+            "ja",
+            publicId: "pub-1",
+            assetTicket: "ticket-1",
+            assetTicketExpiresAt: new DateTime(2026, 10, 17, 0, 0, 0, DateTimeKind.Utc));
+
+        var protectedPayload = Assert.Single(outbox.Enqueued).Payload;
+        var mail = new FakeProtector().Unprotect(protectedPayload);
+        Assert.Contains(
+            "https://survey.example.jp/f/pub-1#d=ticket-1",
+            mail!.Body,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("?d=", mail.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void 識別子は回答トークンから決まる()
     {
         // **同じ回答なら必ず同じ識別子**（二重に積まないために要る）

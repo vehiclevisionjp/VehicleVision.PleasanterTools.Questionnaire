@@ -17,6 +17,11 @@ public class SurveyJsonTests
         Description = LocalizedText.Japanese("ご協力ください🙏"),
         DisplayMode = DisplayMode.OneQuestionPerPage,
         ShowProgress = false,
+        AssetDelivery = new AssetDeliverySettings
+        {
+            Expiration = AssetTicketExpiration.AcceptTo,
+            Days = 45,
+        },
         Pages =
         [
             new Page
@@ -85,6 +90,8 @@ public class SurveyJsonTests
         Assert.Equal(7, restored.Version);
         Assert.Equal(DisplayMode.OneQuestionPerPage, restored.DisplayMode);
         Assert.False(restored.ShowProgress);
+        Assert.Equal(AssetTicketExpiration.AcceptTo, restored.AssetDelivery!.Expiration);
+        Assert.Equal(45, restored.AssetDelivery.Days);
         Assert.Equal("顧客満足度アンケート", restored.Title.Get("ja"));
         Assert.Equal("Customer Satisfaction", restored.Title.Get("en"));
         Assert.Equal("ご協力ください🙏", restored.Description!.Get("ja"));

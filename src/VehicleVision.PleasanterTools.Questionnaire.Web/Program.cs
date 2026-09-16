@@ -159,6 +159,7 @@ builder.Services.AddSingleton<IDbConnectionFactory>(
     new DbConnectionFactory(provider, connectionString));
 builder.Services.AddSingleton<IResponseOutbox, ResponseOutbox>();
 builder.Services.AddSingleton<IResponseTokenStore, ResponseTokenStore>();
+builder.Services.AddSingleton<IAssetTicketStore, AssetTicketStore>();
 builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
 builder.Services.AddSingleton<IMonitoringStore, MonitoringStore>();

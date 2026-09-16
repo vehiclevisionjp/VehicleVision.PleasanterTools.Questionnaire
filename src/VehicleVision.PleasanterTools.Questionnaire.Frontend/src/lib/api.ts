@@ -119,6 +119,39 @@ export async function redeemEditLink(publicId: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * 回答後の配布資産の引換券を、URL の断片から Cookie へ引き換える（Issue #318）。
+ * **成否に関わらず断片をすぐ消す。**
+ */
+export async function redeemAssetTicket(publicId: string): Promise<FormResponse | null> {
+  const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+  const assetTicket = new URLSearchParams(hash).get('d');
+
+  if (assetTicket) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+
+  if (!assetTicket) return null;
+
+  const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}/asset-ticket`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ assetTicket }),
+  });
+
+  return response.ok ? ((await response.json()) as FormResponse) : null;
+}
+
+/** 受付直後の引換券を断片へ載せて、同じ引換口を通す。 */
+export async function activateAssetTicket(
+  publicId: string,
+  assetTicket: string | undefined,
+): Promise<boolean> {
+  if (!assetTicket) return false;
+  window.location.hash = `d=${encodeURIComponent(assetTicket)}`;
+  return (await redeemAssetTicket(publicId)) !== null;
+}
+
 export async function requestTicket(publicId: string): Promise<Ticket | null> {
   const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}/ticket`, {
     method: 'POST',
@@ -195,6 +228,8 @@ export async function loadForm(publicId: string): Promise<LoadResult> {
 
 export interface SubmitResult {
   accepted: boolean;
+  /** 回答後の配布資産を受け取るための引換券。 */
+  assetTicket?: string;
   /** 設問 ID → エラーの種別。サーバ側の検証結果。 */
   errors?: Record<string, string[]>;
   rejection?: RejectionReason;
@@ -293,7 +328,8 @@ export async function submitAnswers(
   if (response.status === 202) {
     // **受け付けられて初めて印を置く。** 開いただけで回答済みにしない
     markSubmitted(publicId);
-    return { accepted: true };
+    const body = (await response.json().catch(() => ({}))) as { assetTicket?: string };
+    return { accepted: true, assetTicket: body.assetTicket };
   }
 
   if (response.status === 413) {

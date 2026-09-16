@@ -694,6 +694,25 @@ public static class AdminSurveyEndpoints
                 });
             }
 
+            if (draft.Definition.AssetDelivery is { Days: < 1 or > AssetDeliverySettings.MaxDays })
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PublishBlockedBySettings, RequestLanguage.Of(context)),
+                    settings = new[]
+                    {
+                        new
+                        {
+                            code = "AssetTicketDaysInvalid",
+                            questionId = (string?)null,
+                            detail = draft.Definition.AssetDelivery.Days.ToString(
+                                System.Globalization.CultureInfo.InvariantCulture),
+                        },
+                    },
+                });
+            }
+
             // **答えようのない設問のまま公開しない**（Issue #101）。
             // 「5 つの選択肢から 7 つ選べ」は回答者が何をしても通らない
             var settingsProblems = QuestionSettingsValidator.Validate(draft.Definition);

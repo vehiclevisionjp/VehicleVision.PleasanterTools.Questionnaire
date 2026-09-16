@@ -52,6 +52,7 @@ public class SurveyDeletionStoreTests
             "ResponseTokens",
             "Responses",
             "ResponseEditTokens",
+            "AssetTickets",
             "MailOutbox",
             "AdminNotifications",
             "SurveyAssets",
@@ -259,6 +260,17 @@ public class SurveyDeletionStoreTests
             (
                 "INSERT INTO [ResponseEditTokens] "
                     + "([EditTokenHash], [ResponseToken], [SurveyId], [ExpiresAt], [CreatedAt]) "
+                    + "VALUES (@Hash, @ResponseToken, @SurveyId, @Now, @Now)",
+                new
+                {
+                    Hash = $"hash-{Guid.NewGuid():N}",
+                    ResponseToken = responseToken,
+                    SurveyId = surveyId,
+                    Now = now,
+                }),
+            (
+                "INSERT INTO [AssetTickets] "
+                    + "([TicketHash], [ResponseToken], [SurveyId], [ExpiresAt], [CreatedAt]) "
                     + "VALUES (@Hash, @ResponseToken, @SurveyId, @Now, @Now)",
                 new
                 {

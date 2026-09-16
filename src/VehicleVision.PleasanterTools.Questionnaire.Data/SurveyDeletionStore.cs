@@ -157,6 +157,7 @@ public sealed class SurveyDeletionStore(
             "AttachmentRejections",
             "SurveyAssets",
             "AdminNotifications",
+            "AssetTickets",
             "ResponseEditTokens",
             "MailOutbox",
             "Responses",

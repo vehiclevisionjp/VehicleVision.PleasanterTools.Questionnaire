@@ -645,6 +645,62 @@
     </label>
     <p class="hint">{t('editor.confirmationMarkupHint')}</p>
 
+    <fieldset>
+      <legend>{t('editor.assetTicketExpiration')}</legend>
+      <label class="inline">
+        <input
+          type="radio"
+          name="asset-ticket-expiration"
+          checked={(definition.assetDelivery?.expiration ?? 'DaysAfterResponse') === 'AcceptTo'}
+          onchange={() =>
+            (definition = {
+              ...definition!,
+              assetDelivery: {
+                expiration: 'AcceptTo',
+                days: definition!.assetDelivery?.days ?? 30,
+              },
+            })}
+        />
+        {t('editor.assetTicketAcceptTo')}
+      </label>
+      <label class="inline">
+        <input
+          type="radio"
+          name="asset-ticket-expiration"
+          checked={(definition.assetDelivery?.expiration ?? 'DaysAfterResponse') === 'DaysAfterResponse'}
+          onchange={() =>
+            (definition = {
+              ...definition!,
+              assetDelivery: {
+                expiration: 'DaysAfterResponse',
+                days: definition!.assetDelivery?.days ?? 30,
+              },
+            })}
+        />
+        {t('editor.assetTicketDaysAfterResponse')}
+      </label>
+      {#if (definition.assetDelivery?.expiration ?? 'DaysAfterResponse') === 'DaysAfterResponse'}
+        <label>
+          {t('editor.assetTicketDays')}
+          <input
+            type="number"
+            min="1"
+            max="365"
+            value={definition.assetDelivery?.days ?? 30}
+            oninput={(event) =>
+              (definition = {
+                ...definition!,
+                assetDelivery: {
+                  expiration: 'DaysAfterResponse',
+                  days: Number(event.currentTarget.value) || 30,
+                },
+              })}
+          />
+        </label>
+      {/if}
+      <p class="hint">{t('editor.assetTicketExpirationHint')}</p>
+    </fieldset>
+
     <div class="asset-upload">
       <label>
         {t('editor.contentAsset')}

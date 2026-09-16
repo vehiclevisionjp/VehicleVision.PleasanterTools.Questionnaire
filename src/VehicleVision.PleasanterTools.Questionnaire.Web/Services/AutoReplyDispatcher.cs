@@ -86,7 +86,9 @@ public sealed class AutoReplyDispatcher(
         string? language,
         CancellationToken cancellationToken = default,
         string? publicId = null,
-        DateTime? acceptTo = null)
+        DateTime? acceptTo = null,
+        string? assetTicket = null,
+        DateTime? assetTicketExpiresAt = null)
     {
         if (definition.AutoReply?.Enabled is not true)
         {
@@ -116,6 +118,8 @@ public sealed class AutoReplyDispatcher(
             // ⚠️ **回答本体のトークンは載せない。** 専用のトークンを 1 本発行する
             mail = await WithEditLinkAsync(mail, definition, payload, publicId, surveyId, acceptTo, language, cancellationToken)
                 .ConfigureAwait(false);
+            mail = WithAssetTicketLink(
+                mail, publicId, assetTicket, assetTicketExpiresAt, language);
 
             // ⚠️ **ここで初めて暗号化する。** 平文のまま DB へ渡る経路を作らない
             return await outbox.EnqueueAsync(
@@ -125,12 +129,42 @@ public sealed class AutoReplyDispatcher(
                 protector.Protect(mail),
                 cancellationToken).ConfigureAwait(false);
         }
+
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // ⚠️ **受付の結果を変えない。** 回答は既に送信待ちへ入っている
             logger.LogError(exception, "自動返信メールを積めなかった。受付の結果は変えない");
             return false;
         }
+    }
+
+    private OutgoingMail WithAssetTicketLink(
+        OutgoingMail mail,
+        string? publicId,
+        string? assetTicket,
+        DateTime? expiresAt,
+        string? language)
+    {
+        if (string.IsNullOrWhiteSpace(publicId)
+            || string.IsNullOrWhiteSpace(assetTicket)
+            || expiresAt is null
+            || options.BaseUrl is not { Length: > 0 } baseUrl)
+        {
+            return mail;
+        }
+
+        var label = ServerMessages.Get(
+            ServerMessageKeys.AssetTicketMailNote,
+            language,
+            expiresAt.Value.ToString(
+                "yyyy-MM-dd HH:mm",
+                System.Globalization.CultureInfo.InvariantCulture));
+        var url = AssetTicket.UrlOf(baseUrl, publicId, assetTicket);
+        return mail with
+        {
+            Body = mail.Body + Environment.NewLine + Environment.NewLine + label
+                + Environment.NewLine + url,
+        };
     }
 
     /// <summary>本文の後ろへ再編集リンクを足す（Issue #202）。</summary>

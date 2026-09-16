@@ -5,6 +5,8 @@
     forgetSubmission,
     hasSubmitted,
     loadForm,
+    activateAssetTicket,
+    redeemAssetTicket,
     redeemEditLink,
     loadPendingAnswers,
     requestTicket,
@@ -177,6 +179,8 @@
   let canEdit = $state(false);
   /** 添付を受け付けなかった理由。**どのファイルが駄目かを出す。** */
   let attachmentMessages = $state<string[]>([]);
+  /** 引換券のリンクから完了画面だけを開いたか。 */
+  let assetTicketVisit = $state(false);
 
   /**
    * 回答から辿る経路。**答えを変えると変わる。**
@@ -285,6 +289,15 @@
     publicId = readPublicId();
     if (publicId === '') {
       screen = 'error';
+      return;
+    }
+
+    // **配布リンクは受付終了後も使える。** 通常の公開判定より先に引き換える
+    const ticketForm = await redeemAssetTicket(publicId);
+    if (ticketForm) {
+      definition = ticketForm.definition;
+      assetTicketVisit = true;
+      screen = 'completed';
       return;
     }
 
@@ -524,6 +537,8 @@
         toAttachments(),
       );
       if (result.accepted) {
+        await activateAssetTicket(publicId, result.assetTicket);
+        assetTicketVisit = false;
         canEdit = true;
         // **送れたら下書きは要らない**（Issue #59）。端末へ残し続けない
         clearDraft(publicId);
@@ -662,12 +677,14 @@
         {text(definition.confirmationMessage, language) || t('completed.thanks')}
       </p>
     {/if}
-    {#if definition.allowEditingAfterSubmit}
+    {#if definition.allowEditingAfterSubmit && !assetTicketVisit}
       <button type="button" onclick={() => (screen = 'answering')}>{t('completed.edit')}</button>
     {/if}
-    <button type="button" class="secondary" onclick={answerAgain}>
-      {t('completed.answerAgain')}
-    </button>
+    {#if !assetTicketVisit}
+      <button type="button" class="secondary" onclick={answerAgain}>
+        {t('completed.answerAgain')}
+      </button>
+    {/if}
   {:else if definition && currentPage}
     <header>
       <!-- **飾り。** 意味は題名が伝えるので `alt` は空にする

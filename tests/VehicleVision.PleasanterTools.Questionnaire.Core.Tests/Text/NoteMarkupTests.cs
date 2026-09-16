@@ -393,6 +393,39 @@ public sealed class NoteMarkupTests
             NoteInlineKind.AssetLink,
             definition.ConfirmationBlocks["en"][0].Inlines[0].Kind);
         Assert.True(SurveyAssetReferences.Contains(definition, assetId));
+        Assert.True(SurveyAssetReferences.RequiresTicket(definition, assetId));
+    }
+
+    [Fact]
+    public void 設問でも使う画像には引換券を要求しない()
+    {
+        var assetId = Guid.NewGuid();
+        var definition = new SurveyDefinition
+        {
+            SurveyId = "s1",
+            Version = 1,
+            Title = LocalizedText.Japanese("調査"),
+            ConfirmationMessage = LocalizedText.Japanese($"[配布](asset:{assetId:D})"),
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "note",
+                            Type = QuestionType.Note,
+                            Title = LocalizedText.Japanese("説明"),
+                            Description = LocalizedText.Japanese($"![画像](asset:{assetId:D})"),
+                        },
+                    ],
+                },
+            ],
+        };
+
+        Assert.False(SurveyAssetReferences.RequiresTicket(definition, assetId));
     }
 
 }
