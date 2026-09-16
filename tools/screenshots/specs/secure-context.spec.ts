@@ -178,7 +178,7 @@ test.describe('proof-of-work の経路', () => {
 
     // **サーバが受け付けて初めて「経路が通った」と言える。**
     // 呼ばれただけでは、答えが正しいかは分からない
-    await expect(page.getByRole('heading', { name: 'ご回答ありがとうございました。' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '回答を受け付けました' })).toBeVisible();
   });
 
   test('平文では控えが解き、その解答も通る', async ({ page }) => {
@@ -196,7 +196,7 @@ test.describe('proof-of-work の経路', () => {
 
     await page.waitForTimeout(4000);
     await page.getByRole('button', { name: '送信する' }).click();
-    await expect(page.getByRole('heading', { name: 'ご回答ありがとうございました。' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '回答を受け付けました' })).toBeVisible();
 
     // **送信が通ったのに 1 度も呼ばれていない＝控えが解いた。**
     // 送信の後に見るのが肝心で、先に見ると「まだ解いていないだけ」と区別できない

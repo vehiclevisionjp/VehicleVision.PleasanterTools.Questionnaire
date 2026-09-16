@@ -5,7 +5,7 @@
   "type": "module",
   "description": "取説用の画面の写しを撮る",
   "scripts": {
-    "shot": "playwright test"
+    "shot": "playwright test specs/manual.spec.ts && playwright test --grep-invert @standalone"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1"

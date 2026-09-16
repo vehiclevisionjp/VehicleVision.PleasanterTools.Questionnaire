@@ -18,7 +18,8 @@ const shots = 'shots';
  * **試験ごとに入れ物（context）は作り直される。** 前の試験で通したログインは
  * そのままでは引き継がれないので、cookie を書き出して次へ渡す。
  */
-const authFile = 'artifacts/auth.json';
+// **Playwright の outputDir の外へ置く。** 分けた次の実行でも認証を引き継ぐため
+const authFile = '.auth.json';
 
 /** Pleasanter のサイト ID。**見本なので実在しなくてよい**（公開までは通る）。 */
 const demoSiteId = Number(process.env['SHOT_SITE_ID'] ?? '1');
@@ -76,7 +77,7 @@ let publicId = '';
 let surveyId = '';
 let secretBase32 = '';
 
-test.describe('取説用の写し', () => {
+test.describe('取説用の写し', { tag: '@standalone' }, () => {
 
   test('管理画面：初期設定から 2 要素の登録まで', async ({ page }) => {
     // **撮り始める前に前提を確かめる**（Issue #65）。
@@ -125,7 +126,7 @@ test.describe('取説用の写し', () => {
   });
 });
 
-test.describe('取説用の写し（ログイン済み）', () => {
+test.describe('取説用の写し（ログイン済み）', { tag: '@standalone' }, () => {
   test.use({ storageState: authFile });
 
   test('管理画面：アンケートを作って公開する', async ({ page }) => {
@@ -163,7 +164,7 @@ test.describe('取説用の写し（ログイン済み）', () => {
     await page.waitForTimeout(4000);
 
     await page.getByRole('button', { name: '送信する' }).click();
-    await expect(page.getByRole('heading', { name: 'ご回答ありがとうございました。' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '回答を受け付けました' })).toBeVisible();
     await shoot(page, 'answer-03-completed');
   });
 
@@ -263,5 +264,12 @@ test.describe('取説用の写し（ログイン済み）', () => {
 
     await expect(page.getByRole('heading', { name: '認証コードを入力' })).toBeVisible();
     await shoot(page, 'admin-08-totp');
+
+    // **ここで止めると、ログアウト前に保存した cookie は既に失効している。**
+    // 続く spec へ有効なログインを渡すため、撮った後に認証を完了して控えを更新する
+    await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secretBase32));
+    await page.getByRole('button', { name: 'ログインする' }).click();
+    await expect(page.getByRole('heading', { name: 'アンケート' })).toBeVisible();
+    await page.context().storageState({ path: authFile });
   });
 });

@@ -142,10 +142,10 @@ test.describe('マッピングの編集画面', () => {
       const rows = page.locator('table tbody tr:not(.notes)');
       await expect.poll(() => rows.count()).toBe(3);
 
-      await expect(page.getByRole('textbox', { name: '書き込み先の列' }).nth(0))
-        .toHaveValue('ClassA');
-      await expect(page.getByRole('textbox', { name: '書き込み先の列' }).nth(1))
-        .toHaveValue('ClassB');
+      // **画面全体から拾わない。** 2 カラム表示では設問側にも入力欄があるため、
+      // 割り当ての行を起点にターゲットを確かめる
+      await expect(rows.nth(0).locator('td.target input')).toHaveValue('ClassA');
+      await expect(rows.nth(1).locator('td.target input')).toHaveValue('ClassB');
     });
 
     test('入力が複数のときは 1 つの升に積んで番号が付く', async ({ page }) => {

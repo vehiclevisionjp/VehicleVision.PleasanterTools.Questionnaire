@@ -14,7 +14,7 @@ import { totp } from '../lib/totp';
 test.use({ viewport: { width: 1920, height: 1080 } });
 test.setTimeout(180000);
 
-test('直した画面を撮る', async ({ page, context }) => {
+test('直した画面を撮る', { tag: '@standalone' }, async ({ page, context }) => {
   // ---- 初期設定から 2 要素まで ----------------------------------------------
   await page.goto('/admin');
   await page.getByRole('heading', { name: '最初の管理者を登録する' }).waitFor();
