@@ -163,6 +163,13 @@ public class AutoReplyEndToEndTests
             saved.EnsureSuccessStatusCode();
         }
 
+        // **下書きから直接は公開できない。** テスト公開を経由する（Issue #223）
+        using (var testPublished = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { }))
+        {
+            testPublished.EnsureSuccessStatusCode();
+        }
+
         using (var published = await http.PostAsJsonAsync(
             $"/api/admin/surveys/{surveyId}/publish", new { }))
         {
