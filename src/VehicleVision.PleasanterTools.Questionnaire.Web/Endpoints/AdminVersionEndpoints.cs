@@ -18,27 +18,32 @@ public static class AdminVersionEndpoints
 {
     private const int CommitLength = 12;
 
-    public static IEndpointRouteBuilder MapAdminVersionEndpoints(this IEndpointRouteBuilder builder)
+    public static IEndpointRouteBuilder MapAdminVersionEndpoints(
+        this IEndpointRouteBuilder builder,
+        bool allowInsecure)
     {
         var group = builder.MapGroup("/api/admin/application")
             .RequireAuthorization(AdminAuthSchemes.SessionPolicy);
 
         AdminAuthSchemes.AddNoStore(group);
 
-        group.MapGet("/version", () => Results.Ok(ReadVersion()));
+        group.MapGet("/version", () => Results.Ok(ReadVersion(allowInsecure)));
 
         return builder;
     }
 
     /// <summary>この Web アセンブリの情報版を、画面へ返す形にする。</summary>
-    public static ApplicationVersionResponse ReadVersion() =>
+    public static ApplicationVersionResponse ReadVersion(bool allowInsecure) =>
         ToResponse(typeof(AdminVersionEndpoints).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? typeof(AdminVersionEndpoints).Assembly.GetName().Version?.ToString()
-            ?? string.Empty);
+            ?? string.Empty,
+            allowInsecure);
 
     /// <summary>情報版を表示用の版と短いコミット ID に分ける。</summary>
-    public static ApplicationVersionResponse ToResponse(string informationalVersion)
+    public static ApplicationVersionResponse ToResponse(
+        string informationalVersion,
+        bool allowInsecure = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(informationalVersion);
 
@@ -47,11 +52,15 @@ public static class AdminVersionEndpoints
             ? parts[1][..CommitLength].ToLowerInvariant()
             : null;
 
-        return new ApplicationVersionResponse(parts[0], commit);
+        return new ApplicationVersionResponse(parts[0], commit, allowInsecure);
     }
 }
 
 /// <summary>管理画面へ返す動作中のアプリケーション版。</summary>
 /// <param name="Version">`Directory.Build.props` の <c>VersionPrefix</c> から作られた版。</param>
 /// <param name="Commit">情報版に含まれるコミット ID の先頭 12 桁。含まれない場合は null。</param>
-public sealed record ApplicationVersionResponse(string Version, string? Commit);
+/// <param name="AllowInsecure">閉じたネットワーク向けの HTTP 運用を明示的に許しているか。</param>
+public sealed record ApplicationVersionResponse(
+    string Version,
+    string? Commit,
+    bool AllowInsecure);

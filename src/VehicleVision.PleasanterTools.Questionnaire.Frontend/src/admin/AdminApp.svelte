@@ -387,6 +387,13 @@
       </ol>
     </nav>
 
+    {#if applicationVersion?.allowInsecure}
+      <aside class="insecure-warning" role="alert">
+        <span class="material-icons" aria-hidden="true">warning</span>
+        <span>{t('app.insecureMode')}</span>
+      </aside>
+    {/if}
+
     <!--
       **表を出す画面だけ広く使う。** 列が多くて識別子も入るので、
       他の画面と同じ幅だと横に流さないと読めない
@@ -559,6 +566,19 @@
     align-items: center;
     gap: 0.5rem;
     min-width: 0;
+  }
+
+  .insecure-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    max-width: 77rem;
+    margin: 1rem auto 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid #f79009;
+    border-radius: 6px;
+    background: #fff4e5;
+    color: #7a4b00;
   }
 
   .breadcrumb-link {

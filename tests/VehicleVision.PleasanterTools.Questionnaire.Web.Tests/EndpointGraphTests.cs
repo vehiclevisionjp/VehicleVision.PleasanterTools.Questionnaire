@@ -46,7 +46,7 @@ public class EndpointGraphTests
         app.MapAdminSurveyEndpoints();
         app.MapAdminTemplateEndpoints();
         app.MapAdminUserEndpoints();
-        app.MapAdminVersionEndpoints();
+        app.MapAdminVersionEndpoints(allowInsecure: false);
         app.MapAnalyticsEndpoints();
         app.MapFormEndpoints();
         app.MapMonitoringEndpoints(new MonitoringToken("test-monitoring-token"));
