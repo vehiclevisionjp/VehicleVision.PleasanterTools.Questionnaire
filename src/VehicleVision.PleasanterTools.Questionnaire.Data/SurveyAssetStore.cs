@@ -16,9 +16,9 @@ public sealed record SurveyAsset(Guid AssetId, string ContentType, byte[] Conten
 /// 識別子を推し当てるだけで**下書きのままのアンケートの画像**まで取り出せる。
 /// </para>
 /// <para>
-/// **消す口は用意しない。** 差し替えても、
+/// **資産 1 個だけを消す口は用意しない。** 差し替えても、
 /// **公開済みの版がまだその画像を指していることがある**（<c>SurveyVersions</c> は不変）。
-/// 消してよいかは版を全部見ないと決まらないので、ここでは判断しない。
+/// 完全削除では、複製先を含む他のアンケートから参照されない実体だけを消す。
 /// </para>
 /// </remarks>
 public interface ISurveyAssetStore
@@ -35,6 +35,13 @@ public interface ISurveyAssetStore
     Task<SurveyAsset?> FindAsync(
         Guid surveyId,
         Guid assetId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// アンケートの完全削除に伴い、他のアンケートから参照されない実体を削除する。
+    /// </summary>
+    Task DeleteSurveyAsync(
+        Guid surveyId,
         CancellationToken cancellationToken = default);
 }
 
@@ -107,6 +114,11 @@ public sealed class SurveyAssetStore(IDbConnectionFactory connectionFactory) : I
             return null;
         }
     }
+
+    public Task DeleteSurveyAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 
     private CommandDefinition Sql(
         string sql,

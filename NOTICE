@@ -41,6 +41,8 @@ Copyright (C) PMC Co.,Ltd.
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
   AWSSDK.SimpleEmailV2 4.0.104.2 / Apache-2.0 / https://github.com/aws/aws-sdk-net
     （Amazon SES の送信経路。**IAM ロールで通るので、保管する秘密が 0 になる**。Issue #198）
+  AWSSDK.S3 4.0.103.3 / Apache-2.0 / https://github.com/aws/aws-sdk-net
+    （アンケート資産の S3 互換保存。既定の資格情報探索で IAM ロールを利用できる。Issue #271）
   Azure.Communication.Email 1.1.0 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure Communication Services の送信経路。**マネージド ID で通る**。Issue #198）
   Azure.Identity 1.21.0 / MIT / https://github.com/Azure/azure-sdk-for-net

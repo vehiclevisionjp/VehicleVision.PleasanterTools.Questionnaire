@@ -122,9 +122,8 @@ builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
 builder.Services.AddSingleton<IMonitoringStore, MonitoringStore>();
 builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
+builder.Services.AddSurveyAssetStorage(builder.Configuration);
 builder.Services.AddSingleton<ISurveyDeletionStore, SurveyDeletionStore>();
-// **ヘッダ画像の置き場**（Issue #56）。外部のストレージへは置かない
-builder.Services.AddSingleton<ISurveyAssetStore, SurveyAssetStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
 
 // **添付を弾いた記録は監査ログと別の表**（Issue #39）。
