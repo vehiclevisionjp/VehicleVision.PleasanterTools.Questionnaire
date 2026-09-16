@@ -602,8 +602,9 @@
 
     <label>
       {t('editor.confirmationMessage')}
-      <input
-        type="text"
+      <textarea
+        rows="5"
+        maxlength="4000"
         value={text(definition.confirmationMessage, editing)}
         oninput={(event) =>
           (definition = {
@@ -614,8 +615,9 @@
               editing,
             ),
           })}
-      />
+      ></textarea>
     </label>
+    <p class="hint">{t('editor.confirmationMarkupHint')}</p>
 
     <div class="asset-upload">
       <label>

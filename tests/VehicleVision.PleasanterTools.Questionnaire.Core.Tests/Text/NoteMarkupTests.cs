@@ -370,4 +370,29 @@ public sealed class NoteMarkupTests
         Assert.Contains("\"Link\"", json, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void 完了画面も説明文と同じ安全な書式を持つ()
+    {
+        var assetId = Guid.NewGuid();
+        var definition = new SurveyDefinition
+        {
+            SurveyId = Guid.NewGuid().ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("調査"),
+            ConfirmationMessage = new LocalizedText(new Dictionary<string, string>
+            {
+                ["ja"] = $"![資料](asset:{assetId:D})",
+                ["en"] = $"[Download](asset:{assetId:D})",
+            }),
+        };
+
+        Assert.Equal(
+            NoteInlineKind.AssetImage,
+            definition.ConfirmationBlocks!["ja"][0].Inlines[0].Kind);
+        Assert.Equal(
+            NoteInlineKind.AssetLink,
+            definition.ConfirmationBlocks["en"][0].Inlines[0].Kind);
+        Assert.True(SurveyAssetReferences.Contains(definition, assetId));
+    }
+
 }

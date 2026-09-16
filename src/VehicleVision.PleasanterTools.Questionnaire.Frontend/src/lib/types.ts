@@ -230,6 +230,8 @@ export interface SurveyDefinition {
   displayMode: 'Paged' | 'OneQuestionPerPage';
   showProgress: boolean;
   confirmationMessage?: LocalizedText;
+  /** 完了画面の本文を安全な要素として描画するための構造。 */
+  confirmationBlocks?: Record<string, NoteBlock[]> | null;
   allowEditingAfterSubmit: boolean;
   /** 回答画面の見た目（Issue #56）。**無ければ既定の見た目。** */
   theme?: SurveyTheme | null;
