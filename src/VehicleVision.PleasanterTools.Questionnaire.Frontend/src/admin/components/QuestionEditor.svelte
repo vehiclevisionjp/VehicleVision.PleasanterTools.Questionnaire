@@ -360,9 +360,9 @@
     return priorQuestions.find((prior) => prior.questionId === rule.questionId);
   }
 
-  /** 最初の選択肢の値。選択肢を持たない設問では空。 */
+  /** 条件へ入れる最初の値。確認はチェック済み、選択肢を持たない設問では空。 */
   function firstValue(target: Question): string {
-    return target.choices[0]?.value ?? '';
+    return target.type === 'Confirm' ? 'true' : (target.choices[0]?.value ?? '');
   }
 
   /**
@@ -392,7 +392,9 @@
     }
 
     const target = referenced(rule);
-    const pickFromChoices = picksFromChoices(operator) && (target?.choices.length ?? 0) > 0;
+    const pickFromChoices =
+      picksFromChoices(operator) &&
+      (target?.type === 'Confirm' || (target?.choices.length ?? 0) > 0);
 
     patchRule(index, {
       operator,
@@ -471,8 +473,8 @@
     </div>
   </div>
 
-  {#if displayOnly}
-    <!-- **説明文ブロックの本文は記法で書ける**（Issue #108）。
+  {#if displayOnly || question.type === 'Confirm'}
+    <!-- **説明文ブロックと確認・同意の補足は記法で書ける**（Issue #108 / #257）。
          **受け付けるのは記法だけで、HTML は平文として出る** -->
     <textarea
       class="description markup"
@@ -1026,7 +1028,15 @@
           </select>
 
           {#if needsConditionValue(rule.operator)}
-            {#if target && picksFromChoices(rule.operator) && target.choices.length > 0}
+            {#if target?.type === 'Confirm' && picksFromChoices(rule.operator)}
+              <select
+                value={rule.value ?? 'true'}
+                onchange={(event) => patchRule(index, { value: event.currentTarget.value })}
+              >
+                <option value="true">{t('condition.confirmed')}</option>
+                <option value="false">{t('condition.notConfirmed')}</option>
+              </select>
+            {:else if target && picksFromChoices(rule.operator) && target.choices.length > 0}
               <!-- **無い選択肢を書かせない。** 選択肢から選ばせる -->
               <select
                 value={rule.value ?? ''}
@@ -1349,4 +1359,3 @@
     padding: 0.35rem 0.75rem;
   }
 </style>
-

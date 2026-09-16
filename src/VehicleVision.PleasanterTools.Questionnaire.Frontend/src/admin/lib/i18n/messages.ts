@@ -322,6 +322,7 @@ export const ja = {
   'questionType.Ranking': 'ランキング（順位付け）',
   'questionType.Note': '説明文（回答なし）',
   'questionType.Embed': '埋め込み（画像・動画・外部ページ）',
+  'questionType.Confirm': '確認・同意（チェックボックス 1 つ）',
 
   // ---- マッピング ---------------------------------------------------------
   'mapping.title': 'Pleasanter への割り当て',
@@ -476,6 +477,8 @@ export const ja = {
   'condition.matchAll': 'すべて満たす',
   'condition.matchAny': 'どれか満たす',
   'condition.valuePlaceholder': '比較する値',
+  'condition.confirmed': 'チェック済み',
+  'condition.notConfirmed': '未チェック',
   'condition.noEarlierQuestion': 'この設問より前に設問がありません。表示条件で参照できるのは前にある設問だけです。',
   'condition.earlierOnly': '選択できるのは、この設問より前にある設問だけです。',
   'condition.unknownChoice': 'この値は現在の選択肢にありません。条件が成立しないままになります。',
@@ -1052,6 +1055,7 @@ export const en: Record<MessageKey, string> = {
   'questionType.Ranking': 'Ranking',
   'questionType.Note': 'Note (no answer)',
   'questionType.Embed': 'Embedded content (image, video, external page)',
+  'questionType.Confirm': 'Confirmation (single checkbox)',
 
   'mapping.title': 'Assignment to Pleasanter',
   'mapping.addColumn': 'Add a column',
@@ -1218,6 +1222,8 @@ export const en: Record<MessageKey, string> = {
   'condition.matchAll': 'All of them',
   'condition.matchAny': 'Any of them',
   'condition.valuePlaceholder': 'Value to compare',
+  'condition.confirmed': 'Checked',
+  'condition.notConfirmed': 'Not checked',
   'condition.noEarlierQuestion':
     'There is no question before this one. A condition can only look at earlier questions.',
   'condition.earlierOnly': 'Only questions before this one can be chosen.',

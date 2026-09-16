@@ -251,6 +251,12 @@ public static class MappingValidator
             return question.Type is QuestionType.Date;
         }
 
+        if (target is MappingTargetValueKind.Boolean
+            && question.Type is QuestionType.Confirm)
+        {
+            return true;
+        }
+
         if (question.Type is QuestionType.Scale or QuestionType.Rating)
         {
             return target is MappingTargetValueKind.Integer or MappingTargetValueKind.Decimal;

@@ -210,7 +210,7 @@ public sealed class NoteMarkupTests
     }
 
     [Fact]
-    public void 説明文ブロックだけが書式を持つ()
+    public void 説明文ブロックと確認だけが書式を持つ()
     {
         var note = new Question
         {
@@ -220,10 +220,15 @@ public sealed class NoteMarkupTests
             Description = LocalizedText.Japanese("**太字**"),
         };
         var text = note with { Type = QuestionType.Text };
+        var confirm = note with { Type = QuestionType.Confirm };
 
         Assert.NotNull(note.NoteBlocks);
         Assert.Equal(NoteInlineKind.Bold, note.NoteBlocks!["ja"][0].Inlines[0].Kind);
         Assert.Null(text.NoteBlocks);
+        Assert.Null(text.DescriptionBlocks);
+        Assert.Equal(
+            NoteInlineKind.Bold,
+            confirm.DescriptionBlocks!["ja"][0].Inlines[0].Kind);
     }
 
     [Fact]

@@ -106,25 +106,34 @@ public sealed record Question
     /// </remarks>
     public IReadOnlyDictionary<string, ImmutableArray<NoteBlock>>? NoteBlocks
     {
-        get
+        get => Type is QuestionType.Note ? ParseDescription() : null;
+    }
+
+    /// <summary>確認・同意の説明文を、書式の付いた形にしたもの。</summary>
+    /// <remarks>
+    /// 利用規約などを別画面で読めるよう、説明文ブロックと同じ安全な記法を使う。
+    /// </remarks>
+    public IReadOnlyDictionary<string, ImmutableArray<NoteBlock>>? DescriptionBlocks =>
+        Type is QuestionType.Confirm ? ParseDescription() : null;
+
+    private IReadOnlyDictionary<string, ImmutableArray<NoteBlock>>? ParseDescription()
+    {
+        if (Description is null)
         {
-            if (Type is not QuestionType.Note || Description is null)
-            {
-                return null;
-            }
-
-            var byLanguage = new Dictionary<string, ImmutableArray<NoteBlock>>(
-                StringComparer.OrdinalIgnoreCase);
-            foreach (var language in Description.Languages)
-            {
-                var blocks = Text.NoteMarkup.Parse(Description.Get(language));
-                if (blocks.Length > 0)
-                {
-                    byLanguage[language] = blocks;
-                }
-            }
-
-            return byLanguage.Count > 0 ? byLanguage : null;
+            return null;
         }
+
+        var byLanguage = new Dictionary<string, ImmutableArray<NoteBlock>>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var language in Description.Languages)
+        {
+            var blocks = Text.NoteMarkup.Parse(Description.Get(language));
+            if (blocks.Length > 0)
+            {
+                byLanguage[language] = blocks;
+            }
+        }
+
+        return byLanguage.Count > 0 ? byLanguage : null;
     }
 }

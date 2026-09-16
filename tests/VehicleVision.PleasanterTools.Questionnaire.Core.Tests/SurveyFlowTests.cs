@@ -158,6 +158,23 @@ public class SurveyFlowTests
     }
 
     [Fact]
+    public void 確認の真偽値を表示条件に使える()
+    {
+        var confirm = Text("q1") with { Type = QuestionType.Confirm };
+        var conditional = Text("q2") with
+        {
+            VisibleWhen = new VisibilityCondition
+            {
+                Rules = [new ConditionRule("q1", ConditionOperator.Equals, "true")],
+            },
+        };
+        var definition = Definition(PageOf("p1", confirm, conditional));
+
+        Assert.True(SurveyFlow.Trace(definition, [Answer.Of("q1", "true")]).Visible("q2"));
+        Assert.False(SurveyFlow.Trace(definition, [Answer.Of("q1", "false")]).Visible("q2"));
+    }
+
+    [Fact]
     public void 飛ばされたページの設問は未回答として扱う()
     {
         // **答えが残っていても、見せていない以上は無かったことにする。**
