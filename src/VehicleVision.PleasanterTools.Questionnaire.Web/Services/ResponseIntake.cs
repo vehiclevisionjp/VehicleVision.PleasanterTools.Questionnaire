@@ -46,7 +46,8 @@ public sealed record IntakeResult(
     IntakeRejection? Rejection = null,
     ImmutableArray<ValidationError> Errors = default,
     ImmutableArray<AttachmentRejection> Attachments = default,
-    string? AssetTicket = null)
+    string? AssetTicket = null,
+    bool GrantsInstantAssetAccess = false)
 {
     public bool Accepted => Rejection is null;
 
@@ -424,11 +425,16 @@ public sealed class ResponseIntake(
 
         string? assetTicket = null;
         DateTime? assetTicketExpiresAt = null;
-        if (assetTickets is not null && SurveyAssetReferences.HasTicketedAssets(snapshot.Definition))
+        var assetDelivery = snapshot.Definition.AssetDelivery ?? new AssetDeliverySettings();
+        var grantsInstantAssetAccess =
+            SurveyAssetReferences.HasTicketedAssets(snapshot.Definition)
+            && assetDelivery.Expiration == AssetTicketExpiration.CompletedOnly;
+        if (assetTickets is not null
+            && SurveyAssetReferences.HasTicketedAssets(snapshot.Definition)
+            && !grantsInstantAssetAccess)
         {
             var now = _time.GetUtcNow().UtcDateTime;
-            var settings = snapshot.Definition.AssetDelivery ?? new AssetDeliverySettings();
-            assetTicketExpiresAt = settings.ExpiresAt(now, survey.AcceptTo);
+            assetTicketExpiresAt = assetDelivery.ExpiresAt(now, survey.AcceptTo);
             if (assetTicketExpiresAt > now)
             {
                 assetTicket = AssetTicket.Create();
@@ -501,7 +507,9 @@ public sealed class ResponseIntake(
                 .ConfigureAwait(false);
         }
 
-        return new IntakeResult(AssetTicket: assetTicket);
+        return new IntakeResult(
+            AssetTicket: assetTicket,
+            GrantsInstantAssetAccess: grantsInstantAssetAccess);
     }
 
     /// <summary>回答数の上限に届いたことを管理者へ知らせる（Issue #80）。</summary>

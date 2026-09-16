@@ -159,6 +159,7 @@ public static class FormEndpoints
             HttpContext context,
             ResponseIntake intake,
             IAssetTicketStore assetTickets,
+            SubmissionGuard guard,
             TimeProvider timeProvider,
             AssetOptions options,
             CancellationToken cancellationToken) =>
@@ -173,14 +174,14 @@ public static class FormEndpoints
             if (published.RequiresTicket)
             {
                 var ticket = context.Request.Cookies[AssetTicket.CookieName];
-                var grant = ticket is null
-                    ? null
-                    : await assetTickets.RedeemAsync(
-                        AssetTicket.HashOf(ticket),
-                        published.SurveyId,
-                        timeProvider.GetUtcNow().UtcDateTime,
-                        cancellationToken);
-                if (grant is null)
+                if (!await AssetTicket.CanAccessAsync(
+                    ticket,
+                    publicId,
+                    published.SurveyId,
+                    guard,
+                    assetTickets,
+                    timeProvider.GetUtcNow().UtcDateTime,
+                    cancellationToken))
                 {
                     return Results.NotFound();
                 }
@@ -484,6 +485,22 @@ public static class FormEndpoints
 
             if (result.Accepted)
             {
+                if (result.GrantsInstantAssetAccess)
+                {
+                    // **セッション Cookie。** 署名内の発行時刻で 30 分に制限する。
+                    // DB へ引換券を保存せず、この送信直後の画面だけで使わせる。
+                    context.Response.Cookies.Append(
+                        AssetTicket.CookieName,
+                        guard.IssueAssetAccess(publicId),
+                        new CookieOptions
+                        {
+                            HttpOnly = true,
+                            Secure = context.Request.IsHttps,
+                            SameSite = SameSiteMode.Lax,
+                            Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
+                        });
+                }
+
                 // **受付完了。** Pleasanter へはこの後ワーカーが送る
                 return Results.Accepted(value: new { assetTicket = result.AssetTicket });
             }

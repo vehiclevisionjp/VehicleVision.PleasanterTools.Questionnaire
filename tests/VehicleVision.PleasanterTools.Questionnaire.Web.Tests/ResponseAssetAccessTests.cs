@@ -79,6 +79,33 @@ public class ResponseAssetAccessTests
         Assert.NotEqual(result.AssetTicket, tickets.TicketHash);
     }
 
+    [Fact]
+    public async Task 完了時限定では引換券を保存せずその場のアクセスを許可する()
+    {
+        var tickets = new FakeAssetTickets();
+        var definition = Definition(completion: true, question: false) with
+        {
+            AssetDelivery = new AssetDeliverySettings
+            {
+                Expiration = AssetTicketExpiration.CompletedOnly,
+            },
+        };
+        var intake = new ResponseIntake(
+            new FakeSurveys(Record()),
+            new FakeSnapshots(new SurveySnapshot(definition, new MappingDefinition(), 1, null)),
+            new ResponseLimitTests.FakeOutbox(),
+            new ResponseLimitTests.FakeTokens(),
+            assets: new FakeAssets(),
+            assetTickets: tickets);
+
+        var result = await intake.SubmitAsync("pub-1", "response-1", []);
+
+        Assert.True(result.Accepted);
+        Assert.True(result.GrantsInstantAssetAccess);
+        Assert.Null(result.AssetTicket);
+        Assert.Equal(0, tickets.SaveCount);
+    }
+
     private static ResponseIntake Intake(
         SurveyDefinition definition,
         SurveyRecord? survey = null) =>
@@ -215,6 +242,8 @@ public class ResponseAssetAccessTests
 
         public DateTime? ExpiresAtUtc { get; private set; }
 
+        public int SaveCount { get; private set; }
+
         public Task SaveAsync(
             string ticketHash,
             string responseToken,
@@ -222,6 +251,7 @@ public class ResponseAssetAccessTests
             DateTime expiresAtUtc,
             CancellationToken cancellationToken = default)
         {
+            SaveCount++;
             TicketHash = ticketHash;
             ExpiresAtUtc = expiresAtUtc;
             return Task.CompletedTask;

@@ -332,12 +332,15 @@ export const ja = {
   'editor.description': '説明（任意）',
   'editor.confirmationMessage': '送信後に表示するメッセージ（任意）',
   'editor.confirmationMarkupHint': '説明文と同じ記法を使えます。画像やリンクには、下で発行した asset: 記法を貼り付けてください。',
-  'editor.assetTicketExpiration': '配布ファイルの受取期限',
+  'editor.assetTicketExpiration': '配布ファイルの配り方',
+  'editor.assetTicketCompletedOnly': '完了したときだけ',
+  'editor.assetTicketCompletedOnlyWarning':
+    'ダウンロード前にタブを閉じた人は二度と受け取れず、救う手段がありません。自動返信メールにも配布リンクを載せられません。',
   'editor.assetTicketAcceptTo': 'アンケートの受付期間に合わせる',
   'editor.assetTicketDaysAfterResponse': '回答から指定日数',
   'editor.assetTicketDays': '日数',
   'editor.assetTicketExpirationHint':
-    '既定は回答から 30 日、上限は 365 日です。受付終了に合わせる設定で終了日時が無い場合は 30 日です。',
+    '既定はアンケートの受付期間に合わせます。回答からの日数は上限 365 日、受付終了日時が無い場合は 30 日です。',
   'editor.contentAsset': '説明文・完了画面で使う配布物',
   'editor.contentAssetHint': '許可形式: {extensions}。1 件 {megabytes} MB まで、アンケート当たり {count} 件まで。アップロード後の記法を説明文または完了画面へ貼り付けます。',
   'editor.contentAssetMarkup': '貼り付ける記法',
@@ -1207,12 +1210,15 @@ export const en: Record<MessageKey, string> = {
   'editor.confirmationMessage': 'Message shown after submitting (optional)',
   'editor.confirmationMarkupHint':
     'You can use the same markup as descriptions. Paste the asset: markup generated below for an image or link.',
-  'editor.assetTicketExpiration': 'Download expiry',
+  'editor.assetTicketExpiration': 'File delivery method',
+  'editor.assetTicketCompletedOnly': 'Only when the response is completed',
+  'editor.assetTicketCompletedOnlyWarning':
+    'If a respondent closes the tab before downloading, they can never retrieve the file and there is no recovery method. A download link cannot be included in the auto-reply email.',
   'editor.assetTicketAcceptTo': 'Use the survey closing date',
   'editor.assetTicketDaysAfterResponse': 'Days after the response',
   'editor.assetTicketDays': 'Days',
   'editor.assetTicketExpirationHint':
-    'The default is 30 days after the response, up to 365 days. If no closing date is set, the expiry is 30 days.',
+    'The default follows the survey closing date. Days after the response is limited to 365 days. If no closing date is set, the expiry is 30 days.',
   'editor.contentAsset': 'Asset for descriptions or the completion screen',
   'editor.contentAssetHint':
     'Allowed types: {extensions}. Up to {megabytes} MB each and {count} assets per survey. Paste the generated markup into a description or completion message.',

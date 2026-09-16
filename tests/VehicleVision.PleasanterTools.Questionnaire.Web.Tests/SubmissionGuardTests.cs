@@ -219,4 +219,35 @@ public sealed class SubmissionGuardTests
         Assert.Throws<ArgumentException>(() =>
             new SubmissionGuard(shortKey, new SubmissionGuardOptions(), TimeProvider.System));
     }
+
+    [Fact]
+    public void 完了時限定の資産アクセス許可は30分だけ通る()
+    {
+        var (guard, time) = Create();
+        var ticket = guard.IssueAssetAccess(PublicId);
+
+        Assert.True(guard.CheckAssetAccess(ticket, PublicId));
+
+        time.Advance(SubmissionGuard.AssetAccessLifetime + TimeSpan.FromSeconds(1));
+
+        Assert.False(guard.CheckAssetAccess(ticket, PublicId));
+    }
+
+    [Fact]
+    public void 完了時限定の資産アクセス許可は別のアンケートで通らない()
+    {
+        var (guard, _) = Create();
+        var ticket = guard.IssueAssetAccess(PublicId);
+
+        Assert.False(guard.CheckAssetAccess(ticket, "other-public-id"));
+    }
+
+    [Fact]
+    public void 送信チケットを資産アクセス許可には使えない()
+    {
+        var (guard, _) = Create();
+        var ticket = guard.Issue(PublicId, ResponseToken);
+
+        Assert.False(guard.CheckAssetAccess(ticket, PublicId));
+    }
 }

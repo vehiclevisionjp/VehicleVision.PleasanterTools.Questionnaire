@@ -354,7 +354,7 @@ export interface AutoReplySettings {
 
 /** 回答後の配布資産に使う引換券の期限（Issue #318）。 */
 export interface AssetDeliverySettings {
-  expiration: 'AcceptTo' | 'DaysAfterResponse';
+  expiration: 'AcceptTo' | 'DaysAfterResponse' | 'CompletedOnly';
   /** 回答からの日数。受付終了が無い場合の既定日数にも使う。 */
   days: number;
 }
@@ -381,7 +381,7 @@ export interface SurveyDefinition {
    * **無ければ送らない。** 件名と本文は定義の一部なので、**公開した版で固定される。**
    */
   autoReply?: AutoReplySettings | null;
-  /** 無ければ「回答から 30 日」。 */
+  /** 無ければ「アンケートの受付期間に合わせる」。 */
   assetDelivery?: AssetDeliverySettings | null;
   pages: Page[];
 }

@@ -694,7 +694,11 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            if (draft.Definition.AssetDelivery is { Days: < 1 or > AssetDeliverySettings.MaxDays })
+            if (draft.Definition.AssetDelivery is
+                {
+                    Expiration: AssetTicketExpiration.DaysAfterResponse,
+                    Days: < 1 or > AssetDeliverySettings.MaxDays,
+                })
             {
                 return Results.BadRequest(new
                 {

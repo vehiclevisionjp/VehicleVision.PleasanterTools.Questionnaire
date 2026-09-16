@@ -8,6 +8,14 @@ public class AssetDeliverySettingsTests
         new(2026, 9, 17, 0, 0, 0, DateTimeKind.Utc);
 
     [Fact]
+    public void 既定は受付期間に合わせる()
+    {
+        Assert.Equal(
+            AssetTicketExpiration.AcceptTo,
+            new AssetDeliverySettings().Expiration);
+    }
+
+    [Fact]
     public void 回答からの日数は受付終了で切り詰めない()
     {
         var settings = new AssetDeliverySettings

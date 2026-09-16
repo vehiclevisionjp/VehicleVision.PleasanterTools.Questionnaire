@@ -239,6 +239,39 @@ public class AutoReplyDispatcherTests
     }
 
     [Fact]
+    public async Task 完了時限定では自動返信へ配布リンクを足さない()
+    {
+        var (dispatcher, outbox) = Create(new MailOptions
+        {
+            Enabled = true,
+            Host = "smtp.example.test",
+            FromAddress = "noreply@example.test",
+            BaseUrl = "https://survey.example.jp/",
+        });
+        var definition = Definition(Enabled) with
+        {
+            AssetDelivery = new AssetDeliverySettings
+            {
+                Expiration = AssetTicketExpiration.CompletedOnly,
+            },
+        };
+
+        await dispatcher.TryEnqueueAsync(
+            SurveyId,
+            definition,
+            Payload(),
+            "ja",
+            publicId: "pub-1");
+
+        var protectedPayload = Assert.Single(outbox.Enqueued).Payload;
+        var mail = new FakeProtector().Unprotect(protectedPayload);
+        Assert.DoesNotContain(
+            "https://survey.example.jp/f/pub-1#d=",
+            mail!.Body,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void 識別子は回答トークンから決まる()
     {
         // **同じ回答なら必ず同じ識別子**（二重に積まないために要る）

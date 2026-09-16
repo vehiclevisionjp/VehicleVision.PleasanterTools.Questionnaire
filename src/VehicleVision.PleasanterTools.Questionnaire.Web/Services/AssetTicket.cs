@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -24,4 +25,31 @@ public static class AssetTicket
     public static string UrlOf(string baseUrl, string publicId, string token) =>
         $"{baseUrl.TrimEnd('/')}/f/{Uri.EscapeDataString(publicId)}"
         + $"#{FragmentKey}={Uri.EscapeDataString(token)}";
+
+    /// <summary>Cookie が資産へのアクセスを許可するか調べる。</summary>
+    public static async Task<bool> CanAccessAsync(
+        string? cookie,
+        string publicId,
+        Guid surveyId,
+        SubmissionGuard guard,
+        IAssetTicketStore tickets,
+        DateTime nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(cookie))
+        {
+            return false;
+        }
+
+        // 署名付きの値は DB 引換券と書式で区別し、期限を署名から検証する。
+        // 壊れた署名を DB 側へ回すと、方式 A なのに表を引く経路ができてしまう。
+        if (cookie.StartsWith(SubmissionGuard.AssetAccessVersion + '.', StringComparison.Ordinal))
+        {
+            return guard.CheckAssetAccess(cookie, publicId);
+        }
+
+        return await tickets
+            .RedeemAsync(HashOf(cookie), surveyId, nowUtc, cancellationToken)
+            .ConfigureAwait(false) is not null;
+    }
 }

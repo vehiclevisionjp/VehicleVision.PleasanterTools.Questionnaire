@@ -651,7 +651,26 @@
         <input
           type="radio"
           name="asset-ticket-expiration"
-          checked={(definition.assetDelivery?.expiration ?? 'DaysAfterResponse') === 'AcceptTo'}
+          checked={definition.assetDelivery?.expiration === 'CompletedOnly'}
+          onchange={() =>
+            (definition = {
+              ...definition!,
+              assetDelivery: {
+                expiration: 'CompletedOnly',
+                days: definition!.assetDelivery?.days ?? 30,
+              },
+            })}
+        />
+        {t('editor.assetTicketCompletedOnly')}
+      </label>
+      {#if definition.assetDelivery?.expiration === 'CompletedOnly'}
+        <p class="warning">{t('editor.assetTicketCompletedOnlyWarning')}</p>
+      {/if}
+      <label class="inline">
+        <input
+          type="radio"
+          name="asset-ticket-expiration"
+          checked={(definition.assetDelivery?.expiration ?? 'AcceptTo') === 'AcceptTo'}
           onchange={() =>
             (definition = {
               ...definition!,
@@ -667,7 +686,7 @@
         <input
           type="radio"
           name="asset-ticket-expiration"
-          checked={(definition.assetDelivery?.expiration ?? 'DaysAfterResponse') === 'DaysAfterResponse'}
+          checked={(definition.assetDelivery?.expiration ?? 'AcceptTo') === 'DaysAfterResponse'}
           onchange={() =>
             (definition = {
               ...definition!,
@@ -679,7 +698,7 @@
         />
         {t('editor.assetTicketDaysAfterResponse')}
       </label>
-      {#if (definition.assetDelivery?.expiration ?? 'DaysAfterResponse') === 'DaysAfterResponse'}
+      {#if (definition.assetDelivery?.expiration ?? 'AcceptTo') === 'DaysAfterResponse'}
         <label>
           {t('editor.assetTicketDays')}
           <input

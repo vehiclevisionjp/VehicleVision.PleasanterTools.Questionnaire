@@ -8,13 +8,16 @@ public enum AssetTicketExpiration
 
     /// <summary>回答した時点から指定日数。</summary>
     DaysAfterResponse,
+
+    /// <summary>回答完了時の画面でだけ配る。引換券は保存しない。</summary>
+    CompletedOnly,
 }
 
 /// <summary>回答後に配る資産の設定（Issue #318）。</summary>
 public sealed record AssetDeliverySettings
 {
     /// <summary>期限の決め方。</summary>
-    public AssetTicketExpiration Expiration { get; init; } = AssetTicketExpiration.DaysAfterResponse;
+    public AssetTicketExpiration Expiration { get; init; } = AssetTicketExpiration.AcceptTo;
 
     /// <summary>回答からの日数。受付終了までを選び、終了が無い場合にも使う。</summary>
     public int Days { get; init; } = DefaultDays;
