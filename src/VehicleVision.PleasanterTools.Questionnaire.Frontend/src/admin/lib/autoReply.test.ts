@@ -97,27 +97,58 @@ describe('validateAutoReply', () => {
 describe('再編集リンク（Issue #202）', () => {
   it('編集を許していなければ止める', () => {
     // **開いても直せないリンクを送らない**
-    const settings = { ...valid, includeEditLink: true };
+    const settings = { ...valid, body: { ja: '{{editUrl}}' } };
     const survey = { ...definition(settings, email), allowEditingAfterSubmit: false };
 
     expect(validateAutoReply(survey).map((problem) => problem.code)).toEqual([
-      'EditLinkNotEditable',
+      'EditLinkKeywordUnavailable',
     ]);
   });
 
   it('編集を許していれば通る', () => {
-    expect(codes(definition({ ...valid, includeEditLink: true }, email))).toEqual([]);
+    expect(codes(definition({ ...valid, body: { ja: '{{editUrl}}' } }, email))).toEqual([]);
   });
 
   it('範囲外の日数は止める', () => {
     // **永久に生きるリンクを作らせない**
-    const settings = { ...valid, includeEditLink: true, editLinkDays: 0 };
+    const settings = { ...valid, body: { ja: '{{editUrlExpiresAt}}' }, editLinkDays: 0 };
 
     expect(codes(definition(settings, email))).toEqual(['EditLinkDaysInvalid']);
   });
 
   it('リンクを付けないなら日数は見ない', () => {
     expect(codes(definition({ ...valid, editLinkDays: 0 }, email))).toEqual([]);
+  });
+});
+
+describe('配布リンク（Issue #319）', () => {
+  const confirmationMessage = {
+    ja: '[資料](asset:11111111-1111-1111-1111-111111111111)',
+  };
+
+  it('配布物が無ければ止める', () => {
+    expect(codes(definition({ ...valid, body: { ja: '{{assetsUrl}}' } }, email))).toEqual([
+      'AssetsUrlKeywordUnavailable',
+    ]);
+  });
+
+  it('完了時だけ配る設定なら止める', () => {
+    const survey = {
+      ...definition({ ...valid, body: { ja: '{{assetsUrlExpiresAt}}' } }, email),
+      confirmationMessage,
+      assetDelivery: { expiration: 'CompletedOnly' as const, days: 30 },
+    };
+
+    expect(codes(survey)).toEqual(['AssetsUrlKeywordUnavailable']);
+  });
+
+  it('メールで配れる資産があれば通る', () => {
+    const survey = {
+      ...definition({ ...valid, body: { ja: '{{assetsUrl}}' } }, email),
+      confirmationMessage,
+    };
+
+    expect(codes(survey)).toEqual([]);
   });
 });
 

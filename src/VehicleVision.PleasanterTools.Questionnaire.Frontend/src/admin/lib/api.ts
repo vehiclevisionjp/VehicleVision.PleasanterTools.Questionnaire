@@ -639,3 +639,23 @@ export const previewNotes = (markups: (string | null)[]) =>
     method: 'POST',
     json: { markups },
   });
+
+export interface AutoReplyPreview {
+  subject: string;
+  body: string;
+  unknownKeywords: string[];
+}
+
+/** 保存前の定義から、本番と同じ処理で自動返信を組み立てる（Issue #319）。 */
+export const previewAutoReply = (definition: SurveyDefinition, language: string) =>
+  call<AutoReplyPreview>('/api/admin/auto-reply/preview', {
+    method: 'POST',
+    json: { definition, language },
+  });
+
+/** 保存前の定義を、ログイン中の管理者本人へ試し送信する（Issue #319）。 */
+export const sendAutoReplyTest = (definition: SurveyDefinition, language: string) =>
+  call<{ queued: boolean }>('/api/admin/auto-reply/test-send', {
+    method: 'POST',
+    json: { definition, language },
+  });

@@ -1,8 +1,33 @@
 <script lang="ts">
-  import { revokeEditLinks } from '../lib/api';
+  import { tick } from 'svelte';
+  import {
+    previewAutoReply,
+    revokeEditLinks,
+    sendAutoReplyTest,
+    type AutoReplyPreview,
+  } from '../lib/api';
   import { t } from '../lib/i18n/state.svelte';
-  import { text, withText, type AutoReplySettings, type Question } from '../lib/types';
+  import {
+    text,
+    withText,
+    type AutoReplySettings,
+    type Question,
+    type SurveyDefinition,
+  } from '../lib/types';
   import type { Language } from '../../lib/i18n/language';
+
+  const PREVIEW_DELAY_MS = 300;
+  const KEYWORDS = [
+    'title',
+    'submittedAt',
+    'acceptTo',
+    'answers',
+    'formUrl',
+    'editUrl',
+    'editUrlExpiresAt',
+    'assetsUrl',
+    'assetsUrlExpiresAt',
+  ] as const;
 
   /**
    * 回答者への自動返信メールを設定する（Issue #189）。
@@ -18,6 +43,8 @@
   interface Props {
     /** このアンケート。**再編集リンクの一括失効に要る**（Issue #202）。 */
     surveyId: string;
+    /** 編集中の定義。**保存前の内容をプレビューへ渡す。** */
+    definition: SurveyDefinition;
     /** 回答の編集を許しているか。**許していなければ再編集リンクは付けられない。** */
     allowEditing: boolean;
     /** 今の設定。**無ければ送らない。** */
@@ -28,15 +55,35 @@
     editing: Language;
     /** サーバ側でメールの送信が有効か。**無効でも設定は保存できる。** */
     mailEnabled: boolean;
+    /** 試し送信の宛先。**ログイン中の管理者自身に固定する。** */
+    testRecipient: string;
+    /** ログイン ID をメールアドレスとして使えるか。 */
+    testRecipientAvailable: boolean;
     onchange: (next: AutoReplySettings | null) => void;
   }
 
-  let { surveyId, allowEditing, autoReply, questions, editing, mailEnabled, onchange }: Props =
-    $props();
+  let {
+    surveyId,
+    definition,
+    allowEditing,
+    autoReply,
+    questions,
+    editing,
+    mailEnabled,
+    testRecipient,
+    testRecipientAvailable,
+    onchange,
+  }: Props = $props();
 
   /** 一括失効の結果。**押したことが分かるように出す。** */
   let revoked = $state('');
   let revoking = $state(false);
+  let bodyInput = $state<HTMLTextAreaElement>();
+  let preview = $state<AutoReplyPreview | null>(null);
+  let previewError = $state('');
+  let testSending = $state(false);
+  let testResult = $state('');
+  let testFailed = $state(false);
 
   async function revoke() {
     revoking = true;
@@ -45,6 +92,21 @@
     revoked = result.ok
       ? t('autoReply.revokeEditLinksDone', { count: result.value.revoked })
       : result.message;
+  }
+
+  async function sendTest() {
+    testSending = true;
+    testResult = '';
+    testFailed = false;
+    const result = await sendAutoReplyTest({ ...definition, autoReply }, editing);
+    testSending = false;
+    if (result.ok) {
+      testResult = t('autoReply.testQueued', { recipient: testRecipient });
+      return;
+    }
+
+    testFailed = true;
+    testResult = result.message;
   }
 
   /**
@@ -59,6 +121,40 @@
   );
 
   const enabled = $derived(autoReply?.enabled ?? false);
+  const usesEditLink = $derived(
+    usesKeyword('editUrl') || usesKeyword('editUrlExpiresAt'),
+  );
+  const previewSource = $derived(
+    enabled ? JSON.stringify({ definition: { ...definition, autoReply }, language: editing }) : '',
+  );
+
+  $effect(() => {
+    const source = previewSource;
+    if (source === '') {
+      preview = null;
+      previewError = '';
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const request = JSON.parse(source) as {
+        definition: SurveyDefinition;
+        language: Language;
+      };
+      const result = await previewAutoReply(request.definition, request.language);
+      if (source !== previewSource) return;
+
+      if (result.ok) {
+        preview = result.value;
+        previewError = '';
+      } else {
+        preview = null;
+        previewError = result.message;
+      }
+    }, PREVIEW_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  });
 
   /**
    * 自動返信を有効にできるか。
@@ -82,6 +178,39 @@
   function update(patch: Partial<AutoReplySettings>) {
     const next: AutoReplySettings = { enabled: false, ...(autoReply ?? {}), ...patch };
     onchange(next.enabled ? next : null);
+  }
+
+  function usesKeyword(keyword: string): boolean {
+    const pattern = new RegExp(`\\{\\{\\s*${keyword}\\s*\\}\\}`);
+    return [autoReply?.subject, autoReply?.body].some(
+      (localized) => localized && Object.values(localized).some((value) => pattern.test(value)),
+    );
+  }
+
+  async function insertKeyword(keyword: string) {
+    const marker = `{{${keyword}}}`;
+    const current = text(autoReply?.body, editing);
+    const start = bodyInput?.selectionStart ?? current.length;
+    const end = bodyInput?.selectionEnd ?? start;
+    update({ body: withText(autoReply?.body, current.slice(0, start) + marker + current.slice(end), editing) });
+
+    await tick();
+    bodyInput?.focus();
+    bodyInput?.setSelectionRange(start + marker.length, start + marker.length);
+  }
+
+  function keywordDescription(keyword: (typeof KEYWORDS)[number]): string {
+    switch (keyword) {
+      case 'title': return t('autoReply.keyword.title');
+      case 'submittedAt': return t('autoReply.keyword.submittedAt');
+      case 'acceptTo': return t('autoReply.keyword.acceptTo');
+      case 'answers': return t('autoReply.keyword.answers');
+      case 'formUrl': return t('autoReply.keyword.formUrl');
+      case 'editUrl': return t('autoReply.keyword.editUrl');
+      case 'editUrlExpiresAt': return t('autoReply.keyword.editUrlExpiresAt');
+      case 'assetsUrl': return t('autoReply.keyword.assetsUrl');
+      case 'assetsUrlExpiresAt': return t('autoReply.keyword.assetsUrlExpiresAt');
+    }
   }
 
   /**
@@ -172,6 +301,7 @@
     <label>
       {t('autoReply.body')}
       <textarea
+        bind:this={bodyInput}
         rows="6"
         value={text(autoReply?.body, editing)}
         oninput={(event) =>
@@ -179,35 +309,19 @@
       ></textarea>
     </label>
     <p class="hint">{t('autoReply.bodyHint')}</p>
-    <!-- **書き間違いはそのまま残る。** 消すと文面の一部が黙って欠けるため -->
     <p class="hint">{t('autoReply.placeholders')}</p>
+    <div class="keywords" aria-label={t('autoReply.keywordList')}>
+      {#each KEYWORDS as keyword (keyword)}
+        <button type="button" class="keyword" onclick={() => insertKeyword(keyword)}>
+          <code>{`{{${keyword}}}`}</code>
+          <span>{keywordDescription(keyword)}</span>
+        </button>
+      {/each}
+    </div>
 
-    <label class="toggle">
-      <input
-        type="checkbox"
-        checked={autoReply?.includeAnswers ?? false}
-        onchange={(event) => update({ includeAnswers: event.currentTarget.checked })}
-      />
-      {t('autoReply.includeAnswers')}
-    </label>
-    <!-- ⚠️ **回答の中身がメールとして外へ出る。** 押す前に読めるところへ置く -->
-    <p class="hint">{t('autoReply.includeAnswersHint')}</p>
-
-    <!-- **回答を直すためのリンク**（Issue #202）。
-         ⚠️ **リンクを持つ人は書き換えられる。** 転送・共有メールボックスは割り切り -->
-    <label class="toggle">
-      <input
-        type="checkbox"
-        checked={autoReply?.includeEditLink ?? false}
-        onchange={(event) => update({ includeEditLink: event.currentTarget.checked })}
-      />
-      {t('autoReply.includeEditLink')}
-    </label>
-    <p class="hint">{t('autoReply.includeEditLinkHint')}</p>
-
-    {#if autoReply?.includeEditLink}
+    {#if usesEditLink}
       {#if !allowEditing}
-        <!-- **開いても直せないリンクを送らせない**（公開のときにも弾かれる） -->
+        <!-- **既知だが使えないキーワードは公開のときにも弾かれる。** -->
         <p class="warning">{t('autoReply.editLinkNeedsEditing')}</p>
       {/if}
 
@@ -230,6 +344,43 @@
       <p class="hint">{t('autoReply.revokeEditLinksHint')}</p>
       {#if revoked}<p class="hint">{revoked}</p>{/if}
     {/if}
+
+    <section class="mail-preview">
+      <h3>{t('autoReply.preview')}</h3>
+      {#if previewError}
+        <p class="warning">{previewError}</p>
+      {:else if preview}
+        {#if preview.unknownKeywords.length > 0}
+          <p class="warning">
+            {t('autoReply.unknownKeywords', {
+              keywords: preview.unknownKeywords.map((keyword) => `{{${keyword}}}`).join(', '),
+            })}
+          </p>
+        {/if}
+        <p class="preview-label">{t('autoReply.previewSubject')}</p>
+        <pre>{preview.subject}</pre>
+        <p class="preview-label">{t('autoReply.previewBody')}</p>
+        <pre>{preview.body}</pre>
+      {/if}
+
+      <div class="test-send">
+        <button
+          type="button"
+          disabled={testSending || !mailEnabled || !testRecipientAvailable}
+          onclick={sendTest}
+        >
+          {testSending ? t('autoReply.testSending') : t('autoReply.testSend')}
+        </button>
+        {#if testRecipientAvailable}
+          <p class="hint">{t('autoReply.testRecipient', { recipient: testRecipient })}</p>
+        {:else}
+          <p class="warning">{t('autoReply.testRecipientUnavailable')}</p>
+        {/if}
+        {#if testResult}
+          <p class:warning={testFailed} class="hint" role="status">{testResult}</p>
+        {/if}
+      </div>
+    </section>
   {/if}
 </section>
 
@@ -282,5 +433,63 @@
     background: var(--warning-surface, #fff4e5);
     color: var(--warning-text, #7a4b00);
     font-size: 0.85rem;
+  }
+
+  .keywords {
+    display: grid;
+    gap: 0.35rem;
+    margin-block: 0.75rem;
+  }
+
+  .keyword {
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    background: var(--surface, #fff);
+    color: inherit;
+    text-align: left;
+  }
+
+  .keyword span {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .mail-preview {
+    margin-block-start: 1rem;
+    padding-block-start: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .mail-preview h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+  }
+
+  .preview-label {
+    margin: 0.75rem 0 0.25rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .mail-preview pre {
+    min-height: 2rem;
+    margin: 0;
+    padding: 0.75rem;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    background: var(--surface, #fff);
+    color: inherit;
+    font: inherit;
+  }
+
+  .test-send {
+    margin-block-start: 1rem;
   }
 </style>

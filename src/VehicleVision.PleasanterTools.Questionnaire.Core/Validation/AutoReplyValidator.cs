@@ -24,14 +24,14 @@ public enum AutoReplyProblemCode
     /// <summary>本文が空。</summary>
     BodyMissing,
 
-    /// <summary>
-    /// 回答の編集を許していないのに、再編集リンクを付けようとしている（Issue #202）。
-    /// **開いても直せないリンクを送ることになる。**
-    /// </summary>
-    EditLinkNotEditable,
-
     /// <summary>再編集リンクの有効日数が範囲外（Issue #202）。</summary>
     EditLinkDaysInvalid,
+
+    /// <summary>再編集を許していないため、再編集リンクのキーワードを使えない。</summary>
+    EditLinkKeywordUnavailable,
+
+    /// <summary>メールで渡せる配布物が無いため、配布リンクのキーワードを使えない。</summary>
+    AssetsUrlKeywordUnavailable,
 }
 
 /// <summary>自動返信の設定の不備 1 件。</summary>
@@ -97,12 +97,16 @@ public static class AutoReplyValidator
             problems.Add(new AutoReplyProblem(AutoReplyProblemCode.BodyMissing));
         }
 
-        if (settings.IncludeEditLink)
+        var usesEditLink =
+            AutoReplyKeywords.Contains(settings, AutoReplyKeywords.EditUrl)
+            || AutoReplyKeywords.Contains(settings, AutoReplyKeywords.EditUrlExpiresAt);
+        if (usesEditLink)
         {
-            // **開いても直せないリンクを送らない**（Issue #202）
+            // 既知だが現在の設定では使えないキーワードは公開時に止める。
+            // 打ち間違いである未知のキーワードは、プレビューで警告しつつ本文へ残す。
             if (!definition.AllowEditingAfterSubmit)
             {
-                problems.Add(new AutoReplyProblem(AutoReplyProblemCode.EditLinkNotEditable));
+                problems.Add(new AutoReplyProblem(AutoReplyProblemCode.EditLinkKeywordUnavailable));
             }
 
             // **永久に生きるリンクを作らせない**
@@ -112,6 +116,16 @@ public static class AutoReplyValidator
                     AutoReplyProblemCode.EditLinkDaysInvalid,
                     settings.EditLinkDays.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             }
+        }
+
+        var usesAssetsLink =
+            AutoReplyKeywords.Contains(settings, AutoReplyKeywords.AssetsUrl)
+            || AutoReplyKeywords.Contains(settings, AutoReplyKeywords.AssetsUrlExpiresAt);
+        if (usesAssetsLink
+            && (!SurveyAssetReferences.HasTicketedAssets(definition)
+                || definition.AssetDelivery?.Expiration is AssetTicketExpiration.CompletedOnly))
+        {
+            problems.Add(new AutoReplyProblem(AutoReplyProblemCode.AssetsUrlKeywordUnavailable));
         }
 
         return problems.ToImmutable();

@@ -791,18 +791,22 @@ export const ja = {
   'autoReply.body': '本文',
   'autoReply.bodyHint': '書式は付けられません。文字だけが送られます。',
   'autoReply.placeholders':
-    '差し込みを書けます。{{title}} はアンケートの題名、{{submittedAt}} は受付日時になります。知らない差し込みはそのまま残ります。',
+    '使うキーワードを押すと、本文のカーソル位置へ挿入します。書いていない内容はメールへ出ません。',
+  'autoReply.keywordList': '使えるキーワード',
+  'autoReply.keyword.title': 'アンケートの題名',
+  'autoReply.keyword.submittedAt': '受付日時',
+  'autoReply.keyword.acceptTo': '受付の終了日時（無ければ空）',
+  'autoReply.keyword.answers': '回答の写し（回答内容がメールとして外へ出ます）',
+  'autoReply.keyword.formUrl': '新しく回答するための URL',
+  'autoReply.keyword.editUrl': '自分の回答を直すリンク（知っている人は回答を変更できます）',
+  'autoReply.keyword.editUrlExpiresAt': '回答を直すリンクの期限',
+  'autoReply.keyword.assetsUrl': '資料の受け取りリンク',
+  'autoReply.keyword.assetsUrlExpiresAt': '資料の受け取りリンクの期限',
   'autoReply.defaultSubject': '{{title}} へのご回答ありがとうございました',
   'autoReply.defaultBody':
     '{{title}} へご回答いただき、ありがとうございました。\n\n受付日時: {{submittedAt}}\n\nこのメールは自動で送信しています。',
-  'autoReply.includeAnswers': '本文のあとに回答の写しを付ける',
-  'autoReply.includeAnswersHint':
-    '回答の中身がメールとして外へ出ます。受け取るのは回答者本人ですが、経路が暗号化されているとは限りません。',
   'autoReply.serverDisabled':
     'メールの送信がサーバ側で有効になっていません。この設定は保存できますが、有効にするまで 1 通も送られません。',
-  'autoReply.includeEditLink': '本文のあとに、回答を直すためのリンクを付ける',
-  'autoReply.includeEditLinkHint':
-    'このリンクを知っている人は、その回答を書き換えられます。転送や共有メールボックスでは他人でも直せます。',
   'autoReply.editLinkDays': 'リンクの有効日数',
   'autoReply.editLinkDaysHint':
     '受付期間の終了は超えません。受付を停止すると、その時点で使えなくなります。',
@@ -812,8 +816,10 @@ export const ja = {
   'autoReply.revokeEditLinksHint':
     '漏れたときに使います。押すと、これまでに送ったリンクはすべて開けなくなります（回答そのものは消えません）。',
   'autoReply.revokeEditLinksDone': '{count} 件のリンクを無効にしました。',
-  'autoReply.problem.EditLinkNotEditable':
-    '回答の編集を許可していないのに、再編集リンクを付けようとしています。',
+  'autoReply.problem.EditLinkKeywordUnavailable':
+    '回答の編集を許可していないため、再編集リンクのキーワードは使えません。',
+  'autoReply.problem.AssetsUrlKeywordUnavailable':
+    'メールで渡せる配布物が無いため、資料の受け取りリンクのキーワードは使えません。',
   'autoReply.problem.EditLinkDaysInvalid': 'リンクの有効日数は 1〜365 で指定してください。',
   'autoReply.problem.ToQuestionMissing': '宛先にする設問が選ばれていません。',
   'autoReply.problem.ToQuestionNotFound': '宛先にする設問が見つかりません（消された可能性があります）。',
@@ -821,6 +827,17 @@ export const ja = {
   'autoReply.problem.SubjectMissing': '件名が空です。',
   'autoReply.problem.BodyMissing': '本文が空です。',
   'autoReply.publishBlocked': '公開できません。自動返信メールの設定を直してください。',
+  'autoReply.preview': '届くメールのプレビュー',
+  'autoReply.previewSubject': '件名',
+  'autoReply.previewBody': '本文（平文）',
+  'autoReply.unknownKeywords':
+    '使えないキーワードがあります: {keywords}。文字としてそのまま送られます。',
+  'autoReply.testSend': '自分へ試し送信する',
+  'autoReply.testSending': '送信待ちへ登録しています…',
+  'autoReply.testRecipient': '宛先はログイン中の管理者自身（{recipient}）に固定されます。',
+  'autoReply.testRecipientUnavailable':
+    'ログイン ID がメールアドレスではないため、試し送信できません。',
+  'autoReply.testQueued': '{recipient} 宛ての試し送信を送信待ちへ登録しました。',
   // ---- テーマ（Issue #56） ----
   'theme.title': '回答画面の見た目',
   'theme.lead': '色・書体・ヘッダ画像を設定できます。未設定の場合は既定の見た目になります。公開すると反映されます。',
@@ -1705,18 +1722,22 @@ export const en: Record<MessageKey, string> = {
   'autoReply.body': 'Body',
   'autoReply.bodyHint': 'No formatting. Plain text only.',
   'autoReply.placeholders':
-    'You can use placeholders. {{title}} is the survey title and {{submittedAt}} is the time it was received. Unknown placeholders are left as they are.',
+    'Select a keyword to insert it at the cursor in the body. Content without a keyword is not added to the mail.',
+  'autoReply.keywordList': 'Available keywords',
+  'autoReply.keyword.title': 'Survey title',
+  'autoReply.keyword.submittedAt': 'Submission time',
+  'autoReply.keyword.acceptTo': 'Closing time (empty if none)',
+  'autoReply.keyword.answers': 'Copy of the answers (response data leaves the system as email)',
+  'autoReply.keyword.formUrl': 'URL for submitting a new response',
+  'autoReply.keyword.editUrl': 'Link for changing this response (anyone with it can make changes)',
+  'autoReply.keyword.editUrlExpiresAt': 'Expiry of the response-editing link',
+  'autoReply.keyword.assetsUrl': 'Link for receiving materials',
+  'autoReply.keyword.assetsUrlExpiresAt': 'Expiry of the materials link',
   'autoReply.defaultSubject': 'Thank you for responding to {{title}}',
   'autoReply.defaultBody':
     'Thank you for responding to {{title}}.\n\nReceived: {{submittedAt}}\n\nThis message was sent automatically.',
-  'autoReply.includeAnswers': 'Append a copy of the answers',
-  'autoReply.includeAnswersHint':
-    'The answers leave the system as email. Only the respondent receives it, but the route is not necessarily encrypted.',
   'autoReply.serverDisabled':
     'Mail sending is not enabled on the server. These settings can be saved, but nothing will be sent until it is.',
-  'autoReply.includeEditLink': 'Append a link for changing the response',
-  'autoReply.includeEditLinkHint':
-    'Anyone who knows this link can change that response. Forwarded mail and shared mailboxes let others change it too.',
   'autoReply.editLinkDays': 'Days the link stays valid',
   'autoReply.editLinkDaysHint':
     'It never outlives the closing date. Suspending the survey makes it unusable straight away.',
@@ -1726,8 +1747,10 @@ export const en: Record<MessageKey, string> = {
   'autoReply.revokeEditLinksHint':
     'Use this if a link leaks. Every link sent so far stops working (the responses themselves are kept).',
   'autoReply.revokeEditLinksDone': 'Revoked {count} links.',
-  'autoReply.problem.EditLinkNotEditable':
-    'A response-editing link is set, but editing after submission is turned off.',
+  'autoReply.problem.EditLinkKeywordUnavailable':
+    'Response editing is turned off, so response-editing link keywords cannot be used.',
+  'autoReply.problem.AssetsUrlKeywordUnavailable':
+    'No materials can be delivered by mail, so materials-link keywords cannot be used.',
   'autoReply.problem.EditLinkDaysInvalid': 'The link must stay valid for 1 to 365 days.',
   'autoReply.problem.ToQuestionMissing': 'No question is selected for the address.',
   'autoReply.problem.ToQuestionNotFound': 'The selected question no longer exists.',
@@ -1735,6 +1758,18 @@ export const en: Record<MessageKey, string> = {
   'autoReply.problem.SubjectMissing': 'The subject is empty.',
   'autoReply.problem.BodyMissing': 'The body is empty.',
   'autoReply.publishBlocked': 'Cannot publish. Fix the auto-reply settings first.',
+  'autoReply.preview': 'Mail preview',
+  'autoReply.previewSubject': 'Subject',
+  'autoReply.previewBody': 'Body (plain text)',
+  'autoReply.unknownKeywords':
+    'Unknown keywords: {keywords}. They will be sent unchanged as text.',
+  'autoReply.testSend': 'Send a test to me',
+  'autoReply.testSending': 'Queuing test message…',
+  'autoReply.testRecipient':
+    'The recipient is fixed to the signed-in administrator ({recipient}).',
+  'autoReply.testRecipientUnavailable':
+    'Your sign-in ID is not an email address, so a test message cannot be sent.',
+  'autoReply.testQueued': 'Queued a test message to {recipient}.',
   // ---- Theme ----
   'theme.title': 'Look of the answer screen',
   'theme.lead':

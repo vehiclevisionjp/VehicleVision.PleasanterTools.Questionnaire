@@ -339,15 +339,6 @@ export interface AutoReplySettings {
   subject?: LocalizedText;
   /** 本文。**平文。** 書式は持たない。 */
   body?: LocalizedText;
-  /** 本文のあとに回答の写しを付けるか。**既定は付けない。** */
-  includeAnswers?: boolean;
-  /**
-   * 本文のあとに、回答を直すためのリンクを付けるか（Issue #202）。
-   *
-   * ⚠️ **このリンクを持つ人は、その回答を書き換えられる。**
-   * 回答の編集を許していないアンケートでは付けられない。
-   */
-  includeEditLink?: boolean;
   /** 再編集リンクの有効日数。**既定 7 日。** 受付期間の終了は超えない。 */
   editLinkDays?: number;
 }
@@ -718,6 +709,8 @@ export interface AdminSession {
    * 接続先も資格情報も返らない。**認証済みのときだけ載る。**
    */
   mailEnabled?: boolean;
+  /** ログイン ID を、本人宛て試し送信のメールアドレスとして使えるか。 */
+  autoReplyTestRecipientAvailable?: boolean;
 
   /**
    * 利用者ごとの表示言語。`null` は「まだ選んでいない」。

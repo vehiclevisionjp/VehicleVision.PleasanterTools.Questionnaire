@@ -131,7 +131,7 @@ public class AutoReplyComposerTests
     }
 
     [Fact]
-    public void 写しを付けない設定なら本文だけ()
+    public void 回答キーワードを書かなければ本文へ足さない()
     {
         var mail = Compose(
             Enabled, Payload(Answer("mail", "a@example.test"), Answer("opinion", "よかった")));
@@ -141,14 +141,16 @@ public class AutoReplyComposerTests
     }
 
     [Fact]
-    public void 写しを付ける設定なら回答を並べる()
+    public void 回答キーワードの位置へ回答を並べる()
     {
         var mail = Compose(
-            Enabled with { IncludeAnswers = true },
+            Enabled with { Body = LocalizedText.Japanese("回答:\n{{answers}}\n以上") },
             Payload(Answer("mail", "a@example.test"), Answer("opinion", "よかった")));
 
         Assert.NotNull(mail);
-        Assert.Contains("ご意見: よかった", mail.Body, StringComparison.Ordinal);
+        Assert.Equal(
+            "回答:\nメールアドレス: a@example.test" + Environment.NewLine + "ご意見: よかった\n以上",
+            mail.Body);
     }
 
     [Fact]
@@ -156,7 +158,7 @@ public class AutoReplyComposerTests
     {
         // **説明文や埋め込みは回答ではない**
         var mail = Compose(
-            Enabled with { IncludeAnswers = true },
+            Enabled with { Body = LocalizedText.Japanese("{{answers}}") },
             Payload(Answer("mail", "a@example.test"), Answer("note", "なにか")));
 
         Assert.NotNull(mail);
@@ -168,7 +170,7 @@ public class AutoReplyComposerTests
     {
         // **段落の回答がそのまま入ると、写しの行と行の境が分からなくなる**
         var mail = Compose(
-            Enabled with { IncludeAnswers = true },
+            Enabled with { Body = LocalizedText.Japanese("{{answers}}") },
             Payload(Answer("mail", "a@example.test"), Answer("opinion", "1 行目\n2 行目")));
 
         Assert.NotNull(mail);
@@ -183,7 +185,7 @@ public class AutoReplyComposerTests
             "opinion", [], FileNames: ImmutableArray.Create("見積書.pdf"));
 
         var mail = Compose(
-            Enabled with { IncludeAnswers = true },
+            Enabled with { Body = LocalizedText.Japanese("{{answers}}") },
             Payload(Answer("mail", "a@example.test"), answer));
 
         Assert.NotNull(mail);
