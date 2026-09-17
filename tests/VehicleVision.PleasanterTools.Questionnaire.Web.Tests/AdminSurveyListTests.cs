@@ -1,6 +1,8 @@
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 using System.Text.Json.Nodes;
+using System.Collections.Immutable;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
@@ -101,5 +103,70 @@ public class AdminSurveyListTests
         var response = JsonNode.Parse("""{ "Response": { "Data": { "SiteSettings": {} } } }""");
 
         Assert.Null(AdminSurveyEndpoints.AvailableColumnsFrom(response));
+    }
+
+    [Fact]
+    public void 同期は対象列だけを加え他の設定と列順を保つ()
+    {
+        var response = JsonNode.Parse("""
+            {
+              "Response": {
+                "Data": {
+                  "SiteSettings": {
+                    "Columns": [
+                      { "ColumnName": "ClassB", "LabelText": "既存" },
+                      { "ColumnName": "ClassA", "LabelText": "リンク", "ChoicesText": "[[123]]" }
+                    ],
+                    "GridColumns": ["ClassB", "ClassA"],
+                    "EditorColumnHash": { "General": ["ClassB", "ClassA"], "Other": ["ClassC"] },
+                    "HistoryColumns": ["ClassB", "ClassA"],
+                    "Scripts": { "all": "保持する" },
+                    "Styles": { "all": "保持する" }
+                  }
+                }
+              }
+            }
+            """)!;
+        var mapping = new MappingDefinition
+        {
+            Assignments = [ColumnAssignment.Direct("ClassA", new MappingSource("q1"))],
+        };
+
+        var plan = SiteSettingsSynchronizer.Build(response, mapping);
+        var settings = plan.SiteSettings;
+
+        Assert.Empty(plan.AddedColumns);
+        Assert.Equal(["ClassB", "ClassA"], plan.GridColumns);
+        Assert.Equal(["ClassB", "ClassA"], plan.EditorColumns);
+        Assert.Equal(["ClassB", "ClassA"], plan.HistoryColumns);
+        Assert.Equal("[[123]]", settings["Columns"]![1]!["ChoicesText"]!.GetValue<string>());
+        Assert.Equal("保持する", settings["Scripts"]!["all"]!.GetValue<string>());
+        Assert.Equal("保持する", settings["Styles"]!["all"]!.GetValue<string>());
+        Assert.Equal(["ClassC"], settings["EditorColumnHash"]!["Other"]!.AsArray()
+            .Select(value => value!.GetValue<string>()));
+
+        var repeated = SiteSettingsSynchronizer.Build(JsonNode.Parse($$"""
+            { "Response": { "Data": { "SiteSettings": {{settings.ToJsonString()}} } } }
+            """)!, mapping);
+        Assert.Equal(settings.ToJsonString(), repeated.SiteSettings.ToJsonString());
+    }
+
+    [Fact]
+    public void リンク設定が反映されなければ対象列を返す()
+    {
+        var response = JsonNode.Parse("""
+            {
+              "Response": {
+                "Data": {
+                  "SiteSettings": {
+                    "Columns": [{ "ColumnName": "ClassA", "ControlType": "ChoicesText", "ChoicesText": "[[123]]" }],
+                    "Links": []
+                  }
+                }
+              }
+            }
+            """)!;
+
+        Assert.Equal(["ClassA"], SiteSettingsSynchronizer.MissingLinks(response, ["ClassA"]));
     }
 }

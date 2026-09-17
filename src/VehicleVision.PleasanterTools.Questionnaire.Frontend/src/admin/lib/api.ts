@@ -300,10 +300,15 @@ export const listSurveys = (
   return call<SurveyPage>(`/api/admin/surveys?${query}`);
 };
 
-export const createSurvey = (title: string, pleasanterSiteId: number, responseJsonColumn?: string) =>
+export const createSurvey = (
+  title: string,
+  pleasanterSiteId: number,
+  responseJsonColumn?: string,
+  createPleasanterSite = false,
+) =>
   call<{ surveyId: string; publicId: string }>('/api/admin/surveys', {
     method: 'POST',
-    json: { title, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
+    json: { title, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null, createPleasanterSite },
   });
 
 /**
@@ -476,6 +481,26 @@ export const updateSurveySiteId = (surveyId: string, pleasanterSiteId: number) =
   call<{ pleasanterSiteId: number }>(`/api/admin/surveys/${surveyId}/site-id`, {
     method: 'PUT',
     json: { pleasanterSiteId },
+  });
+
+export interface SiteSettingsSyncPreview {
+  addedColumns: string[];
+  gridColumns: string[];
+  editorColumns: string[];
+  historyColumns: string[];
+  unchanged: string[];
+}
+
+export const previewSiteSettingsSync = (surveyId: string) =>
+  call<SiteSettingsSyncPreview>(`/api/admin/surveys/${surveyId}/site-settings/preview`, {
+    method: 'POST',
+    json: {},
+  });
+
+export const syncSiteSettings = (surveyId: string) =>
+  call<{ synchronized: true }>(`/api/admin/surveys/${surveyId}/site-settings/sync`, {
+    method: 'POST',
+    json: {},
   });
 
 /**

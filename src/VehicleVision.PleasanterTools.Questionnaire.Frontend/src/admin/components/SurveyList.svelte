@@ -11,7 +11,9 @@
     restoreSurvey,
     saveAsTemplate,
     saveSurveySettings,
+    previewSiteSettingsSync,
     suspend,
+    syncSiteSettings,
     updateSurveySiteId,
   } from '../lib/api';
   import {
@@ -79,6 +81,7 @@
   let creating = $state(false);
   let newTitle = $state('');
   let newSiteId = $state('');
+  let createPleasanterSite = $state(false);
   let newJsonColumn = $state('');
 
   /** 複製を開いているアンケート。**1 度に 1 つだけ開く。** */
@@ -126,6 +129,7 @@
   let siteFor = $state<SurveySummary | null>(null);
   let siteId = $state('');
   let siteBusy = $state(false);
+  let siteSyncPreview = $state<import('../lib/api').SiteSettingsSyncPreview | null>(null);
 
   /** 完全削除の確認を開いているアーカイブ済みアンケート。 */
   let deleting = $state<SurveySummary | null>(null);
@@ -183,12 +187,12 @@
     error = '';
 
     const siteId = Number(newSiteId);
-    if (!Number.isInteger(siteId) || siteId <= 0) {
+    if (!createPleasanterSite && (!Number.isInteger(siteId) || siteId <= 0)) {
       error = t('list.newSiteIdInvalid');
       return;
     }
 
-    const result = await createSurvey(newTitle, siteId, newJsonColumn);
+    const result = await createSurvey(newTitle, siteId, newJsonColumn, createPleasanterSite);
     if (!result.ok) {
       error = result.message;
       return;
@@ -196,6 +200,7 @@
 
     newTitle = '';
     newSiteId = '';
+    createPleasanterSite = false;
     newJsonColumn = '';
     creating = false;
     onopen(result.value.surveyId);
@@ -294,6 +299,40 @@
     error = '';
     siteFor = survey;
     siteId = String(survey.pleasanterSiteId);
+    siteSyncPreview = null;
+  }
+
+  async function previewSiteSync() {
+    const target = siteFor;
+    if (target === null || siteBusy) return;
+
+    error = '';
+    siteBusy = true;
+    const result = await previewSiteSettingsSync(target.surveyId);
+    siteBusy = false;
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    siteSyncPreview = result.value;
+  }
+
+  async function syncSite() {
+    const target = siteFor;
+    if (target === null || siteBusy) return;
+
+    siteBusy = true;
+    const result = await syncSiteSettings(target.surveyId);
+    siteBusy = false;
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    siteSyncPreview = null;
+    siteFor = null;
+    await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
   async function saveSite(event: SubmitEvent) {
@@ -490,8 +529,13 @@
     </label>
     <label>
       {t('list.newSiteId')}
-      <input type="text" inputmode="numeric" bind:value={newSiteId} required />
+      <input type="text" inputmode="numeric" bind:value={newSiteId} required={!createPleasanterSite} disabled={createPleasanterSite} />
     </label>
+    <label class="check">
+      <input type="checkbox" bind:checked={createPleasanterSite} />
+      {t('siteId.create')}
+    </label>
+    {#if createPleasanterSite}<p class="hint">{t('siteId.createHint')}</p>{/if}
     <label>
       {t('list.newJsonColumn')}
       <input
@@ -514,13 +558,37 @@
       <input type="text" inputmode="numeric" bind:value={siteId} required />
     </label>
     <p class="warn">{t('siteId.warning')}</p>
+    <p class="hint">{t('siteId.layoutHint')}</p>
     <div class="actions">
       <button type="submit" disabled={siteBusy}>{t('siteId.submit')}</button>
+      <button type="button" class="secondary" disabled={siteBusy} onclick={previewSiteSync}>
+        {t('siteId.sync')}
+      </button>
       <button type="button" class="secondary" onclick={() => (siteFor = null)}>
         {t('settings.cancel')}
       </button>
     </div>
   </form>
+{/if}
+
+{#if siteSyncPreview && siteFor}
+  <section class="create" aria-live="polite">
+    <h2>{t('siteId.syncConfirmTitle')}</h2>
+    <p>{t('siteId.syncConfirmLead')}</p>
+    <p>{t('siteId.syncAdded', { columns: siteSyncPreview.addedColumns.join('、') || 'なし' })}</p>
+    <p>{t('siteId.syncGrid', { columns: siteSyncPreview.gridColumns.join('、') })}</p>
+    <p>{t('siteId.syncEditor', { columns: siteSyncPreview.editorColumns.join('、') })}</p>
+    <p>{t('siteId.syncHistory', { columns: siteSyncPreview.historyColumns.join('、') })}</p>
+    <ul>
+      {#each siteSyncPreview.unchanged as item (item)}<li>{item}</li>{/each}
+    </ul>
+    <div class="actions">
+      <button type="button" disabled={siteBusy} onclick={syncSite}>{t('siteId.syncConfirm')}</button>
+      <button type="button" class="secondary" onclick={() => (siteSyncPreview = null)}>
+        {t('settings.cancel')}
+      </button>
+    </div>
+  </section>
 {/if}
 
 {#if duplicating}
