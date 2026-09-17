@@ -961,6 +961,8 @@
         </label>
         {#if assetHistorySiteId > 0}
           <p class="hint">{t('history.referenceIdHint')}</p>
+          <!-- **忘れても投射は成功する。** 気付けないので設定方法まで書く -->
+          <p class="hint">{t('history.referenceIdSetupHint')}</p>
           <MappingEditor
             mapping={assetHistoryMapping}
             questions={[]}

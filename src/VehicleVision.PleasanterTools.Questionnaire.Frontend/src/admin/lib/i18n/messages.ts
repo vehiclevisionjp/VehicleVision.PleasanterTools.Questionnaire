@@ -464,6 +464,12 @@ export const ja = {
   'history.mappingTitle': '受取履歴の割り当て',
   'history.referenceIdHint':
     '回答レコードの ReferenceId の割当先には、回答サイトをリンク先に設定済みの Pleasanter リンク列を指定してください。この画面からサイト設定は変更しません。',
+  // **設定を忘れても投射は成功してしまう。** 値は入るがリンクにならないだけで気付きにくい
+  'history.referenceIdSetupHint':
+    'リンク列にするには、Pleasanter 側でその列の「選択肢一覧」へ [[回答サイトの ID]] を入れておきます。'
+    + ' 設定を忘れても投射は成功し、値は入りますがリンクにはなりません。'
+    + ' また、API キーの利用者が回答サイトを見られない場合、Pleasanter はリンクを作らずに黙って無視します。'
+    + ' 有効にしたら、履歴のレコードから回答へ実際に辿れるかを確かめてください。',
   'history.source.EventType': '出来事の種類',
   'history.source.OccurredAt': '起きた日時',
   'history.source.AssetFileName': '資料のファイル名',
@@ -1402,6 +1408,11 @@ export const en: Record<MessageKey, string> = {
   'history.mappingTitle': 'Download history mapping',
   'history.referenceIdHint':
     'Map the response record ReferenceId to a Pleasanter link column already configured to link to the response site. This screen does not change site settings.',
+  'history.referenceIdSetupHint':
+    'To make it a link column, put [[response site ID]] in the choices of that column in Pleasanter.'
+    + ' If you skip this, projection still succeeds: the value is stored but is not a link.'
+    + ' Pleasanter also drops the link silently when the API key user cannot see the response site.'
+    + ' After enabling this, check that a history record really links back to the response.',
   'history.source.EventType': 'Event type',
   'history.source.OccurredAt': 'Occurred at',
   'history.source.AssetFileName': 'Asset file name',
