@@ -12,13 +12,16 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// </remarks>
 public sealed class SurveySnapshotStore(IDbConnectionFactory connectionFactory) : ISurveySnapshotStore
 {
+    // ⚠️ **SELECT の並びと同じ順にすること。** Dapper は引数なしの構築子を持たない
+    // レコードを、列の並びどおりの構築子で組み立てる。**並びがずれると実行時に落ちる**
+    // （手元の単体試験では気付けない。DB が要る）
     private sealed record Row(
         string DefinitionJson,
         string MappingJson,
-        long PleasanterSiteId,
-        string? ResponseJsonColumn,
         long AssetHistorySiteId,
-        string? AssetHistoryMappingJson);
+        string? AssetHistoryMappingJson,
+        long PleasanterSiteId,
+        string? ResponseJsonColumn);
 
     /// <summary>SQL を組み立てる。**識別子は角括弧で囲む。**</summary>
     private CommandDefinition Sql(
