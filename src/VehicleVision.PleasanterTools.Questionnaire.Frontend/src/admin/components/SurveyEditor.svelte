@@ -784,6 +784,7 @@
        ⚠️ **既定は送らない。** 明示的に有効にしたときだけ 1 通出る -->
   <AutoReplyEditor
     {surveyId}
+    {definition}
     allowEditing={definition.allowEditingAfterSubmit}
     autoReply={definition.autoReply}
     questions={definition.pages.flatMap((page) => page.questions)}

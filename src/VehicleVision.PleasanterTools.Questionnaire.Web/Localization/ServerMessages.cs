@@ -220,18 +220,6 @@ public static class ServerMessages
             "公開できません。設問の設定に、回答できない指定があります。",
             "Cannot publish. Some questions have settings that no answer can satisfy.");
 
-        // ---- 再編集リンク（Issue #202）---------------------------------------
-        // ⚠️ **このリンクを持つ人は回答を書き換えられる。** 本人へその旨を伝える
-        Add(
-            ServerMessageKeys.EditLinkMailNote,
-            "回答を直す場合は、次の URL を開いてください（{0} まで）。\n⚠️ この URL を知っている人は回答を書き換えられます。転送しないでください。",
-            "To change your response, open the URL below (valid until {0}).\n⚠️ Anyone with this URL can change your response. Do not forward it.");
-
-        Add(
-            ServerMessageKeys.AssetTicketMailNote,
-            "回答後の配布ファイルは、次の URL から受け取れます（{0} まで）。",
-            "Download the files for your response from the URL below (valid until {0}).");
-
         // ---- 招待メール（Issue #189）----------------------------------------
         // **平文で送る。** 書式は持たない（OutgoingMail が text/plain）
         Add(

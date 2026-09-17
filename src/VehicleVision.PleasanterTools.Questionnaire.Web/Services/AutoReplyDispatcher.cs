@@ -6,7 +6,6 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
-using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -106,20 +105,40 @@ public sealed class AutoReplyDispatcher(
 
         try
         {
-            var submittedAt = TimeZoneInfo.ConvertTime(_time.GetUtcNow(), DisplayTimeZone);
-            var mail = AutoReplyComposer.Compose(definition, payload, language, submittedAt);
+            if (AutoReplyComposer.FindRecipient(definition.AutoReply, payload) is null)
+            {
+                // **宛先の設問に答えていないだけ。** トークンも作らない
+                return false;
+            }
+
+            var now = _time.GetUtcNow();
+            var values = new AutoReplyPlaceholderValues(
+                AcceptTo: ToDisplayTime(acceptTo),
+                FormUrl: FormUrl(publicId));
+
+            // **再編集リンクの値を作る**（Issue #202 / #319）。
+            // ⚠️ **回答本体のトークンは載せない。** 専用のトークンを 1 本発行する
+            values = await WithEditLinkAsync(
+                    values,
+                    definition,
+                    payload,
+                    publicId,
+                    surveyId,
+                    acceptTo,
+                    now,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            values = WithAssetTicketLink(
+                values, publicId, assetTicket, assetTicketExpiresAt);
+
+            var submittedAt = TimeZoneInfo.ConvertTime(now, DisplayTimeZone);
+            var mail = AutoReplyComposer.Compose(
+                definition, payload, language, submittedAt, values);
             if (mail is null)
             {
                 // **宛先の設問に答えていないだけ。** 異常ではない
                 return false;
             }
-
-            // **再編集リンクを付ける**（Issue #202）。
-            // ⚠️ **回答本体のトークンは載せない。** 専用のトークンを 1 本発行する
-            mail = await WithEditLinkAsync(mail, definition, payload, publicId, surveyId, acceptTo, language, cancellationToken)
-                .ConfigureAwait(false);
-            mail = WithAssetTicketLink(
-                mail, publicId, assetTicket, assetTicketExpiresAt, language);
 
             // ⚠️ **ここで初めて暗号化する。** 平文のまま DB へ渡る経路を作らない
             return await outbox.EnqueueAsync(
@@ -138,36 +157,29 @@ public sealed class AutoReplyDispatcher(
         }
     }
 
-    private OutgoingMail WithAssetTicketLink(
-        OutgoingMail mail,
+    private AutoReplyPlaceholderValues WithAssetTicketLink(
+        AutoReplyPlaceholderValues values,
         string? publicId,
         string? assetTicket,
-        DateTime? expiresAt,
-        string? language)
+        DateTime? expiresAt)
     {
         if (string.IsNullOrWhiteSpace(publicId)
             || string.IsNullOrWhiteSpace(assetTicket)
             || expiresAt is null
             || options.BaseUrl is not { Length: > 0 } baseUrl)
         {
-            return mail;
+            return values;
         }
 
-        var label = ServerMessages.Get(
-            ServerMessageKeys.AssetTicketMailNote,
-            language,
-            expiresAt.Value.ToString(
-                "yyyy-MM-dd HH:mm",
-                System.Globalization.CultureInfo.InvariantCulture));
         var url = AssetTicket.UrlOf(baseUrl, publicId, assetTicket);
-        return mail with
+        return values with
         {
-            Body = mail.Body + Environment.NewLine + Environment.NewLine + label
-                + Environment.NewLine + url,
+            AssetsUrl = url,
+            AssetsUrlExpiresAt = ToDisplayTime(expiresAt),
         };
     }
 
-    /// <summary>本文の後ろへ再編集リンクを足す（Issue #202）。</summary>
+    /// <summary>再編集リンクの差し込み値を作る（Issue #202 / #319）。</summary>
     /// <remarks>
     /// <para>
     /// **付けられないなら、黙って付けずに送る。** リンクが無いだけで、
@@ -178,22 +190,25 @@ public sealed class AutoReplyDispatcher(
     /// **開けるのに直せないリンク**を送らない。
     /// </para>
     /// </remarks>
-    private async Task<OutgoingMail> WithEditLinkAsync(
-        OutgoingMail mail,
+    private async Task<AutoReplyPlaceholderValues> WithEditLinkAsync(
+        AutoReplyPlaceholderValues values,
         SurveyDefinition definition,
         ResponsePayload payload,
         string? publicId,
         Guid surveyId,
         DateTime? acceptTo,
-        string? language,
+        DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        if (definition.AutoReply?.IncludeEditLink is not true
+        var settings = definition.AutoReply;
+        if (settings is null
+            || (!AutoReplyKeywords.Contains(settings, AutoReplyKeywords.EditUrl)
+                && !AutoReplyKeywords.Contains(settings, AutoReplyKeywords.EditUrlExpiresAt))
             || !definition.AllowEditingAfterSubmit
             || editTokens is null
             || string.IsNullOrWhiteSpace(publicId))
         {
-            return mail;
+            return values;
         }
 
         if (options.BaseUrl is not { Length: > 0 } baseUrl)
@@ -201,10 +216,10 @@ public sealed class AutoReplyDispatcher(
             // ⚠️ **要求の Host からは作らない**（host header injection。Issue #189）
             logger.LogWarning(
                 "再編集リンクを付けられない（{Key}BASEURL が未設定）", MailOptions.Prefix);
-            return mail;
+            return values;
         }
 
-        var expiresAt = _time.GetUtcNow().UtcDateTime.AddDays(definition.AutoReply.EditLinkDays);
+        var expiresAt = now.UtcDateTime.AddDays(settings.EditLinkDays);
 
         // **受付の終了を超えない**
         if (acceptTo is { } until && until < expiresAt)
@@ -212,10 +227,10 @@ public sealed class AutoReplyDispatcher(
             expiresAt = until;
         }
 
-        if (expiresAt <= _time.GetUtcNow().UtcDateTime)
+        if (expiresAt <= now.UtcDateTime)
         {
             // 既に受付が終わっている。**開いても直せないので付けない**
-            return mail;
+            return values;
         }
 
         var token = ResponseEditLink.Create();
@@ -225,14 +240,24 @@ public sealed class AutoReplyDispatcher(
             .ConfigureAwait(false);
 
         var url = ResponseEditLink.UrlOf(baseUrl, publicId, token);
-
-        var label = ServerMessages.Get(
-            ServerMessageKeys.EditLinkMailNote,
-            language,
-            expiresAt.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture));
-
-        return mail with { Body = mail.Body + Environment.NewLine + Environment.NewLine + label + Environment.NewLine + url };
+        return values with
+        {
+            EditUrl = url,
+            EditUrlExpiresAt = ToDisplayTime(expiresAt),
+        };
     }
+
+    private string? FormUrl(string? publicId) =>
+        options.BaseUrl is { Length: > 0 } baseUrl && !string.IsNullOrWhiteSpace(publicId)
+            ? $"{baseUrl.TrimEnd('/')}/f/{Uri.EscapeDataString(publicId)}"
+            : null;
+
+    private DateTimeOffset? ToDisplayTime(DateTime? value) =>
+        value is null
+            ? null
+            : TimeZoneInfo.ConvertTime(
+                new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)),
+                DisplayTimeZone);
 
     /// <summary>回答トークンから、送信待ちの識別子を決める。</summary>
     /// <remarks>

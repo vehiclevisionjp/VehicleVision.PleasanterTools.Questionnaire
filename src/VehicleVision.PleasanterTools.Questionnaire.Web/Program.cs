@@ -799,6 +799,7 @@ app.MapAdminSamlEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();
+app.MapAdminAutoReplyEndpoints();
 app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();

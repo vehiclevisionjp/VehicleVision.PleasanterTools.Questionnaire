@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mail;
@@ -78,6 +79,38 @@ public class AutoReplyDispatcherTests
                 : null;
     }
 
+    private sealed class FakeEditTokenStore : IResponseEditTokenStore
+    {
+        public List<(string ResponseToken, Guid SurveyId, DateTime ExpiresAt)> Saved { get; } = [];
+
+        public Task SaveAsync(
+            string editTokenHash,
+            string responseToken,
+            Guid surveyId,
+            DateTime expiresAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            Saved.Add((responseToken, surveyId, expiresAtUtc));
+            return Task.CompletedTask;
+        }
+
+        public Task<string?> RedeemAsync(
+            string editTokenHash,
+            DateTime nowUtc,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>(null);
+
+        public Task<int> RevokeBySurveyAsync(
+            Guid surveyId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
+
+        public Task<int> DeleteExpiredAsync(
+            DateTime threshold,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
+    }
+
     private static readonly MailOptions Ready = new()
     {
         Enabled = true,
@@ -122,7 +155,9 @@ public class AutoReplyDispatcherTests
         new(token, [new PayloadAnswer("mail", [address])]);
 
     private static (AutoReplyDispatcher Dispatcher, FakeMailOutbox Outbox) Create(
-        MailOptions? options = null)
+        MailOptions? options = null,
+        IResponseEditTokenStore? editTokens = null,
+        TimeProvider? timeProvider = null)
     {
         var outbox = new FakeMailOutbox();
         return (
@@ -130,7 +165,9 @@ public class AutoReplyDispatcherTests
                 outbox,
                 new FakeProtector(),
                 options ?? Ready,
-                NullLogger<AutoReplyDispatcher>.Instance),
+                NullLogger<AutoReplyDispatcher>.Instance,
+                editTokens: editTokens,
+                timeProvider: timeProvider),
             outbox);
     }
 
@@ -210,7 +247,7 @@ public class AutoReplyDispatcherTests
     }
 
     [Fact]
-    public async Task 配布資産の引換券を断片のURLで本文へ足す()
+    public async Task 配布資産の引換券をキーワードの位置へ差し込む()
     {
         var (dispatcher, outbox) = Create(new MailOptions
         {
@@ -222,7 +259,10 @@ public class AutoReplyDispatcherTests
 
         await dispatcher.TryEnqueueAsync(
             SurveyId,
-            Definition(Enabled),
+            Definition(Enabled with
+            {
+                Body = LocalizedText.Japanese("資料: {{assetsUrl}}\n期限: {{assetsUrlExpiresAt}}"),
+            }),
             Payload(),
             "ja",
             publicId: "pub-1",
@@ -236,6 +276,7 @@ public class AutoReplyDispatcherTests
             mail!.Body,
             StringComparison.Ordinal);
         Assert.DoesNotContain("?d=", mail.Body, StringComparison.Ordinal);
+        Assert.Contains("期限: 2026-10-17 00:00", mail.Body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -248,7 +289,10 @@ public class AutoReplyDispatcherTests
             FromAddress = "noreply@example.test",
             BaseUrl = "https://survey.example.jp/",
         });
-        var definition = Definition(Enabled) with
+        var definition = Definition(Enabled with
+        {
+            Body = LocalizedText.Japanese("資料: {{assetsUrl}}"),
+        }) with
         {
             AssetDelivery = new AssetDeliverySettings
             {
@@ -269,6 +313,93 @@ public class AutoReplyDispatcherTests
             "https://survey.example.jp/f/pub-1#d=",
             mail!.Body,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("{{assetsUrl}}", mail.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 回答画面と受付終了をキーワードの位置へ差し込む()
+    {
+        var (dispatcher, outbox) = Create(new MailOptions
+        {
+            Enabled = true,
+            Host = "smtp.example.test",
+            FromAddress = "noreply@example.test",
+            BaseUrl = "https://survey.example.jp/",
+        });
+
+        await dispatcher.TryEnqueueAsync(
+            SurveyId,
+            Definition(Enabled with
+            {
+                Body = LocalizedText.Japanese("回答: {{formUrl}}\n終了: {{acceptTo}}"),
+            }),
+            Payload(),
+            "ja",
+            publicId: "pub-1",
+            acceptTo: new DateTime(2026, 10, 1, 9, 0, 0, DateTimeKind.Utc));
+
+        var mail = new FakeProtector().Unprotect(Assert.Single(outbox.Enqueued).Payload);
+        Assert.Equal(
+            "回答: https://survey.example.jp/f/pub-1\n終了: 2026-10-01 09:00",
+            mail!.Body);
+    }
+
+    [Fact]
+    public async Task 再編集リンクを発行してキーワードへ差し込む()
+    {
+        var tokens = new FakeEditTokenStore();
+        var time = new FakeTimeProvider(
+            new DateTimeOffset(2026, 9, 17, 0, 0, 0, TimeSpan.Zero));
+        var (dispatcher, outbox) = Create(
+            new MailOptions
+            {
+                Enabled = true,
+                Host = "smtp.example.test",
+                FromAddress = "noreply@example.test",
+                BaseUrl = "https://survey.example.jp/",
+            },
+            tokens,
+            time);
+
+        await dispatcher.TryEnqueueAsync(
+            SurveyId,
+            Definition(Enabled with
+            {
+                Body = LocalizedText.Japanese("修正: {{editUrl}}\n期限: {{editUrlExpiresAt}}"),
+            }),
+            Payload(),
+            "ja",
+            publicId: "pub-1");
+
+        var mail = new FakeProtector().Unprotect(Assert.Single(outbox.Enqueued).Payload);
+        Assert.Contains("修正: https://survey.example.jp/f/pub-1#e=", mail!.Body, StringComparison.Ordinal);
+        Assert.Contains("期限: 2026-09-24 00:00", mail.Body, StringComparison.Ordinal);
+        Assert.Single(tokens.Saved);
+    }
+
+    [Fact]
+    public async Task 再編集リンクを発行できなければ既知のキーワードを空にする()
+    {
+        var (dispatcher, outbox) = Create(new MailOptions
+        {
+            Enabled = true,
+            Host = "smtp.example.test",
+            FromAddress = "noreply@example.test",
+            BaseUrl = "https://survey.example.jp/",
+        });
+
+        await dispatcher.TryEnqueueAsync(
+            SurveyId,
+            Definition(Enabled with
+            {
+                Body = LocalizedText.Japanese("前{{editUrl}}後"),
+            }),
+            Payload(),
+            "ja",
+            publicId: "pub-1");
+
+        var mail = new FakeProtector().Unprotect(Assert.Single(outbox.Enqueued).Payload);
+        Assert.Equal("前後", mail!.Body);
     }
 
     [Fact]

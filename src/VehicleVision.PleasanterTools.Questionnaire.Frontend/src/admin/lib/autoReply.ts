@@ -51,10 +51,13 @@ export function validateAutoReply(definition: SurveyDefinition): AutoReplyProble
   if (isBlank(settings.subject)) problems.push({ code: 'SubjectMissing' });
   if (isBlank(settings.body)) problems.push({ code: 'BodyMissing' });
 
-  if (settings.includeEditLink) {
-    // **開いても直せないリンクを送らない**（Issue #202）
+  const usesEditLink =
+    usesKeyword(settings, 'editUrl') || usesKeyword(settings, 'editUrlExpiresAt');
+  if (usesEditLink) {
+    // 既知だが現在の設定では使えないキーワードは公開時に止める。
+    // 打ち間違いである未知のキーワードは、プレビューで警告しつつ本文へ残す。
     if (!definition.allowEditingAfterSubmit) {
-      problems.push({ code: 'EditLinkNotEditable' });
+      problems.push({ code: 'EditLinkKeywordUnavailable' });
     }
 
     // **永久に生きるリンクを作らせない**
@@ -64,7 +67,43 @@ export function validateAutoReply(definition: SurveyDefinition): AutoReplyProble
     }
   }
 
+  const usesAssetsLink =
+    usesKeyword(settings, 'assetsUrl') || usesKeyword(settings, 'assetsUrlExpiresAt');
+  if (
+    usesAssetsLink &&
+    (!hasTicketedAssets(definition) || definition.assetDelivery?.expiration === 'CompletedOnly')
+  ) {
+    problems.push({ code: 'AssetsUrlKeywordUnavailable' });
+  }
+
   return problems;
+}
+
+function usesKeyword(
+  settings: NonNullable<SurveyDefinition['autoReply']>,
+  keyword: string,
+): boolean {
+  const pattern = new RegExp(`\\{\\{\\s*${keyword}\\s*\\}\\}`);
+  return [settings.subject, settings.body].some(
+    (localized) => localized && Object.values(localized).some((value) => pattern.test(value)),
+  );
+}
+
+function hasTicketedAssets(definition: SurveyDefinition): boolean {
+  const ids = (text: string | undefined): string[] =>
+    [...(text ?? '').matchAll(/asset:([0-9a-f]{8}-[0-9a-f-]{27})/gi)].map(
+      (match) => match[1]!,
+    );
+  const questionIds = new Set(
+    definition.pages.flatMap((page) =>
+      page.questions.flatMap((question) =>
+        Object.values(question.description ?? {}).flatMap((text) => ids(text)),
+      ),
+    ),
+  );
+  return Object.values(definition.confirmationMessage ?? {})
+    .flatMap((text) => ids(text))
+    .some((id) => !questionIds.has(id));
 }
 
 /**

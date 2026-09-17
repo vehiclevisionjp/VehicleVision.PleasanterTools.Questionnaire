@@ -23,6 +23,48 @@ public class MailPlaceholdersTests
     }
 
     [Fact]
+    public void 追加したすべてのキーワードを差し込む()
+    {
+        var values = new AutoReplyPlaceholderValues(
+            AcceptTo: new DateTimeOffset(2026, 9, 30, 18, 0, 0, TimeSpan.FromHours(9)),
+            Answers: "設問: 見本",
+            FormUrl: "https://example.test/f/form",
+            EditUrl: "https://example.test/f/form#e=edit",
+            EditUrlExpiresAt: new DateTimeOffset(2026, 9, 20, 18, 0, 0, TimeSpan.FromHours(9)),
+            AssetsUrl: "https://example.test/f/form#d=asset",
+            AssetsUrlExpiresAt: new DateTimeOffset(2026, 10, 1, 18, 0, 0, TimeSpan.FromHours(9)));
+
+        var actual = MailPlaceholders.Fill(
+            "{{acceptTo}}|{{answers}}|{{formUrl}}|{{editUrl}}|{{editUrlExpiresAt}}|"
+                + "{{assetsUrl}}|{{assetsUrlExpiresAt}}",
+            "満足度調査",
+            SubmittedAt,
+            values);
+
+        Assert.Equal(
+            "2026-09-30 18:00|設問: 見本|https://example.test/f/form|"
+                + "https://example.test/f/form#e=edit|2026-09-20 18:00|"
+                + "https://example.test/f/form#d=asset|2026-10-01 18:00",
+            actual);
+    }
+
+    [Fact]
+    public void 作れない既知のキーワードは空文字にする()
+    {
+        Assert.Equal("前後", Fill("前{{editUrl}}後"));
+    }
+
+    [Fact]
+    public void 未知のキーワードを重複せず見つける()
+    {
+        Assert.Equal<string>(
+            ["titel", "other"],
+            VehicleVision.PleasanterTools.Questionnaire.Core.Definitions.AutoReplyKeywords.UnknownIn(
+                "{{titel}} {{title}}",
+                "{{other}} {{titel}}"));
+    }
+
+    [Fact]
     public void 同じ差し込みを何度でも使える()
     {
         Assert.Equal("満足度調査/満足度調査", Fill("{{title}}/{{title}}"));
