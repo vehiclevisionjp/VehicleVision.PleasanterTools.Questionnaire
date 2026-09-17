@@ -8,6 +8,7 @@
     type MappingDefinition,
     type Question,
     type QuestionPort,
+    type MappingSystemValue,
   } from '../lib/types';
   import { measure, STANDARD_COLUMNS_PER_TYPE } from '../lib/columnBudget';
   import type { ColumnAvailabilityResponse } from '../lib/api';
@@ -34,6 +35,8 @@
     /** 明示的に押したときだけ、Pleasanter の列定義を取り直す。 */
     onrefresh: () => void;
     onchange: (mapping: MappingDefinition) => void;
+    systemSources?: { value: MappingSystemValue; label: string }[];
+    title?: string;
   }
 
   let {
@@ -44,6 +47,8 @@
     availability,
     onrefresh,
     onchange,
+    systemSources = [],
+    title = '',
   }: Props = $props();
 
   /**
@@ -89,11 +94,16 @@
   }
 
   function add() {
+    const firstSystem = systemSources[0];
     update([
       ...mapping.assignments,
       {
         targetColumn: '',
-        sources: answerable[0] ? [{ questionId: answerable[0].questionId, port: 'Value' }] : [],
+        sources: firstSystem
+          ? [{ questionId: '', port: 'Value', systemValue: firstSystem.value }]
+          : answerable[0]
+            ? [{ questionId: answerable[0].questionId, port: 'Value' }]
+            : [],
       },
     ]);
   }
@@ -151,10 +161,16 @@
 
   function addSource(index: number) {
     const assignment = mapping.assignments[index];
-    if (!assignment || !answerable[0]) return;
+    const firstSystem = systemSources[0];
+    if (!assignment || (!answerable[0] && !firstSystem)) return;
 
     patch(index, {
-      sources: [...assignment.sources, { questionId: answerable[0].questionId, port: 'Value' }],
+      sources: [
+        ...assignment.sources,
+        firstSystem
+          ? { questionId: '', port: 'Value', systemValue: firstSystem.value }
+          : { questionId: answerable[0]!.questionId, port: 'Value' },
+      ],
       // **入力が複数なら変換が要る。** どうまとめるかが決まらないため既定を入れる
       converter: assignment.converter ?? { operation: 'join', config: { separator: '、' } },
     });
@@ -209,16 +225,17 @@
 
 <section>
   <div class="bar">
-    <h2>{t('mapping.title')}</h2>
+    <h2>{title || t('mapping.title')}</h2>
     <div class="buttons">
       <button type="button" class="secondary small" onclick={add}>{t('mapping.addColumn')}</button>
-      <button
+      {#if systemSources.length === 0}<button
         type="button"
         class="secondary small"
         disabled={fileQuestions.length === 0}
         title={fileQuestions.length === 0 ? t('mapping.noFileQuestion') : ''}
         onclick={addAttachment}>{t('mapping.addAttachmentColumn')}</button
       >
+      {/if}
       <button type="button" class="secondary small" onclick={onrefresh}>
         {t('mapping.refreshColumnAvailability')}
       </button>
@@ -323,26 +340,38 @@
                     <li>
                       <select
                         aria-label={t('mapping.selectQuestion')}
-                        value={source.questionId}
-                        onchange={(event) =>
+                        value={source.systemValue ? `system:${source.systemValue}` : source.questionId}
+                        onchange={(event) => {
+                          const value = event.currentTarget.value;
                           patch(index, {
                             sources: assignment.sources.map((s, i) =>
-                              i === sourceIndex
-                                ? { ...s, questionId: event.currentTarget.value }
-                                : s,
+                              i !== sourceIndex
+                                ? s
+                                : value.startsWith('system:')
+                                  ? {
+                                      questionId: '',
+                                      port: 'Value',
+                                      systemValue: value.slice('system:'.length) as MappingSystemValue,
+                                    }
+                                  : { questionId: value, port: 'Value' },
                             ),
-                          })}
+                          });
+                        }}
                       >
-                        {#each attachment ? fileQuestions : answerable as question (question.questionId)}
-                          <option value={question.questionId}
-                            >{questionLabel(question.questionId)}</option
-                          >
-                        {/each}
+                        {#if systemSources.length > 0}
+                          {#each systemSources as item (item.value)}
+                            <option value={`system:${item.value}`}>{item.label}</option>
+                          {/each}
+                        {:else}
+                          {#each attachment ? fileQuestions : answerable as question (question.questionId)}
+                            <option value={question.questionId}>{questionLabel(question.questionId)}</option>
+                          {/each}
+                        {/if}
                       </select>
 
                       {#if attachment}
                         <span class="fixed">{t('mapping.attachmentPort')}</span>
-                      {:else}
+                      {:else if !source.systemValue}
                         <!--
                           **グリッドとランキングは 1 設問が入力を複数出す**（Issue #74）。
                           どの行かを選ばないと、行をまたいだ値がまとめて 1 列へ入る
@@ -387,7 +416,8 @@
                             <option value={port.value}>{t(port.key)}</option>
                           {/each}
                         </select>
-
+                      {/if}
+                      {#if !attachment}
                         <button
                           type="button"
                           class="icon danger"

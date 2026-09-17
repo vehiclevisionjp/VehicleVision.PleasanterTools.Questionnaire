@@ -42,6 +42,8 @@ export const ja = {
   'completed.thanks': 'ご協力ありがとうございました。',
   'completed.edit': '回答を編集する',
   'completed.answerAgain': '別の回答を送信する',
+  'assetHistory.notice':
+    '資料を受け取ると、受け取った資料と日時を回答に結び付けて記録します。送信元 IP や端末の情報は記録しません。',
 
   // ---- 回答 -----------------------------------------------------------------
   'form.progressLabel': '回答の進み具合',
@@ -190,6 +192,8 @@ export const en: Record<MessageKey, string> = {
   'completed.thanks': 'Thank you for your time.',
   'completed.edit': 'Edit my response',
   'completed.answerAgain': 'Send another response',
+  'assetHistory.notice':
+    'When you receive a file, the file and time are recorded and linked to your response. Your IP address and device information are not recorded.',
 
   'form.progressLabel': 'Progress',
   'form.pageCount': 'Page {current} of {total}',

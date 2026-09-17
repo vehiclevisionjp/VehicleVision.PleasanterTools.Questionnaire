@@ -48,7 +48,7 @@ public class AssetTicketTests
             new SubmissionGuardOptions(),
             time);
         var store = new RejectingAssetTicketStore();
-        var cookie = guard.IssueAssetAccess("pub-1");
+        var cookie = guard.IssueAssetAccess("pub-1", "response-token");
 
         var allowed = await AssetTicket.CanAccessAsync(
             cookie,
@@ -72,7 +72,7 @@ public class AssetTicketTests
             new SubmissionGuardOptions(),
             time);
         var store = new RejectingAssetTicketStore();
-        var cookie = guard.IssueAssetAccess("pub-1");
+        var cookie = guard.IssueAssetAccess("pub-1", "response-token");
         time.Advance(SubmissionGuard.AssetAccessLifetime + TimeSpan.FromSeconds(1));
 
         var allowed = await AssetTicket.CanAccessAsync(

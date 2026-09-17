@@ -394,10 +394,12 @@ export const saveDraft = (
   definition: SurveyDefinition,
   mapping: MappingDefinition,
   revision: number,
+  assetHistorySiteId: number,
+  assetHistoryMapping: MappingDefinition,
 ) =>
   call<{ revision: number }>(`/api/admin/surveys/${surveyId}`, {
     method: 'PUT',
-    json: { definition, mapping, revision },
+    json: { definition, mapping, revision, assetHistorySiteId, assetHistoryMapping },
   });
 
 /**

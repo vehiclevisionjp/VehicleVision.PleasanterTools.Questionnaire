@@ -97,7 +97,7 @@ public sealed class SubmissionGuard
     private const string Version = "t1";
 
     /// <summary>完了時限定の資産アクセス許可を識別する版。</summary>
-    public const string AssetAccessVersion = "a1";
+    public const string AssetAccessVersion = "a2";
 
     /// <summary>完了時限定の資産アクセス許可の寿命。</summary>
     public static readonly TimeSpan AssetAccessLifetime = TimeSpan.FromMinutes(30);
@@ -155,43 +155,51 @@ public sealed class SubmissionGuard
     /// 送信チケットと同じく、発行時刻を署名へ封じ込めてサーバ側には保存しない。
     /// 用途の違う署名が相互に通らないよう、版と派生鍵を分ける。
     /// </remarks>
-    public string IssueAssetAccess(string publicId)
+    public string IssueAssetAccess(string publicId, string responseToken)
     {
         var issuedAt = time.GetUtcNow().ToUnixTimeSeconds();
-        var signature = SignAssetAccess(publicId, issuedAt);
+        var signature = SignAssetAccess(publicId, responseToken, issuedAt);
         return string.Join(
             '.',
             AssetAccessVersion,
             issuedAt.ToString(CultureInfo.InvariantCulture),
+            responseToken,
             signature);
     }
 
     /// <summary>完了時限定の資産アクセス許可が有効か。</summary>
     public bool CheckAssetAccess(string? ticket, string publicId)
+        => ReadAssetAccess(ticket, publicId) is not null;
+
+    /// <summary>署名が有効なら、封入した回答トークンを返す。</summary>
+    public string? ReadAssetAccess(string? ticket, string publicId)
     {
         if (string.IsNullOrEmpty(ticket))
         {
-            return false;
+            return null;
         }
 
         var parts = ticket.Split('.');
-        if (parts.Length != 3
+        if (parts.Length != 4
             || !string.Equals(parts[0], AssetAccessVersion, StringComparison.Ordinal)
             || !long.TryParse(
                 parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var issuedAt))
         {
-            return false;
+            return null;
         }
 
-        var expected = SignAssetAccess(publicId, issuedAt);
+        var responseToken = parts[2];
+        var expected = SignAssetAccess(publicId, responseToken, issuedAt);
         if (!CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(parts[2])))
+            Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(parts[3])))
         {
-            return false;
+            return null;
         }
 
         var elapsed = time.GetUtcNow() - DateTimeOffset.FromUnixTimeSeconds(issuedAt);
-        return elapsed >= TimeSpan.Zero && elapsed <= AssetAccessLifetime;
+        return elapsed >= TimeSpan.Zero && elapsed <= AssetAccessLifetime
+            ? responseToken
+            : null;
     }
 
     /// <summary>送信を受け付けてよいかを見る。受け付けてよければ <c>null</c>。</summary>
@@ -265,13 +273,13 @@ public sealed class SubmissionGuard
             issuedAt);
     }
 
-    private string SignAssetAccess(string publicId, long issuedAt)
+    private string SignAssetAccess(string publicId, string responseToken, long issuedAt)
     {
         return Sign(
             assetAccessKey,
             AssetAccessVersion,
             publicId,
-            responseToken: null,
+            responseToken,
             issuedAt);
     }
 

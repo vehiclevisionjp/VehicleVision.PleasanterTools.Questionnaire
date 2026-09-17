@@ -126,8 +126,18 @@ public sealed class SurveyDeletionStore(
             },
             transaction,
             cancellationToken)).ConfigureAwait(false);
+        var pendingAssetHistory = await connection.ExecuteScalarAsync<long>(Command(
+            "SELECT COUNT(*) FROM [AssetHistoryOutbox] "
+            + "WHERE [SurveyId] = @SurveyId AND [Status] <> @DeadLetterStatus",
+            new
+            {
+                SurveyId = surveyId,
+                DeadLetterStatus = (int)AssetHistoryStatus.DeadLetter,
+            },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
 
-        if (pendingResponses > 0 || pendingMail > 0)
+        if (pendingResponses > 0 || pendingMail > 0 || pendingAssetHistory > 0)
         {
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             return new(SurveyDeletionStatus.PendingDelivery);
@@ -158,6 +168,7 @@ public sealed class SurveyDeletionStore(
             "SurveyAssets",
             "AdminNotifications",
             "AssetTickets",
+            "AssetHistoryOutbox",
             "ResponseEditTokens",
             "MailOutbox",
             "Responses",

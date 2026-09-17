@@ -165,6 +165,7 @@
   let allowsDraft = $state(false);
   /** テスト公開中か。**回答者へ必ず明示する。** */
   let isTest = $state(false);
+  let recordsAssetHistory = $state(false);
   /** 端末に前回の下書きがあるか。**勝手には戻さない。** */
   let draftFound = $state(false);
   /** 下書きから戻したことの知らせ。 */
@@ -296,6 +297,7 @@
     const ticketForm = await redeemAssetTicket(publicId);
     if (ticketForm) {
       definition = ticketForm.definition;
+      recordsAssetHistory = ticketForm.recordsAssetHistory ?? false;
       assetTicketVisit = true;
       screen = 'completed';
       return;
@@ -317,6 +319,7 @@
     // **分からなければ残さない側へ倒す**（Issue #59）
     allowsDraft = result.form.allowsDraft ?? false;
     isTest = result.form.isTest ?? false;
+    recordsAssetHistory = result.form.recordsAssetHistory ?? false;
 
     // **メールの再編集リンクから来たなら、先に引き換える**（Issue #202）。
     // ここで端末の回答トークンを差し替えてから、いつもの流れへ入る
@@ -669,6 +672,9 @@
     <p class="note">{t('answered.answerAgainNote')}</p>
   {:else if screen === 'completed' && definition}
     <h1>{t('completed.title')}</h1>
+    {#if recordsAssetHistory}
+      <p class="status" role="note">{t('assetHistory.notice')}</p>
+    {/if}
     {@const confirmation = noteBlocks(definition.confirmationBlocks, language)}
     {#if confirmation.length > 0}
       <div class="status"><NoteContent blocks={confirmation} assetUrl={contentAssetUrl} /></div>

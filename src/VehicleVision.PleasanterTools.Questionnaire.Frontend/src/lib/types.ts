@@ -261,6 +261,8 @@ export interface FormResponse {
   allowsDraft?: boolean;
   /** テスト公開中か。**回答画面で明示するための印。** */
   isTest?: boolean;
+  /** 配布資料の受取履歴を回答と結び付けて記録するか。 */
+  recordsAssetHistory?: boolean;
 }
 
 /** 送信する回答 1 件。 */

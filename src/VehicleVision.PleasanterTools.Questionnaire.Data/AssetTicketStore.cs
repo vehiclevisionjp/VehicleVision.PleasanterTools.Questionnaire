@@ -4,7 +4,7 @@ using Dapper;
 namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 
 /// <summary>配布資産の引換券を引き換えた結果。</summary>
-public sealed record AssetTicketGrant(Guid SurveyId, DateTime ExpiresAtUtc);
+public sealed record AssetTicketGrant(Guid SurveyId, string ResponseToken, DateTime ExpiresAtUtc);
 
 /// <summary>回答後の配布資産に使う引換券の読み書き（Issue #318）。</summary>
 public interface IAssetTicketStore
@@ -58,7 +58,7 @@ public sealed class AssetTicketStore(IDbConnectionFactory connectionFactory) : I
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
-    private sealed record RedeemedRow(Guid SurveyId, DateTime ExpiresAt);
+    private sealed record RedeemedRow(Guid SurveyId, string ResponseToken, DateTime ExpiresAt);
 
     public async Task<AssetTicketGrant?> RedeemAsync(
         string ticketHash,
@@ -73,12 +73,14 @@ public sealed class AssetTicketStore(IDbConnectionFactory connectionFactory) : I
 
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var row = await connection.QueryFirstOrDefaultAsync<RedeemedRow>(Sql(
-            "SELECT [SurveyId], [ExpiresAt] FROM [AssetTickets] "
+            "SELECT [SurveyId], [ResponseToken], [ExpiresAt] FROM [AssetTickets] "
             + "WHERE [TicketHash] = @TicketHash AND [SurveyId] = @SurveyId AND [ExpiresAt] > @Now",
             new { TicketHash = ticketHash, SurveyId = surveyId, Now = DbTime.ForDb(nowUtc) },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        return row is null ? null : new AssetTicketGrant(row.SurveyId, row.ExpiresAt);
+        return row is null
+            ? null
+            : new AssetTicketGrant(row.SurveyId, row.ResponseToken, row.ExpiresAt);
     }
 
     public async Task<int> RevokeBySurveyAsync(

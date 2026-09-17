@@ -112,6 +112,10 @@
   });
   let mapping = $state<MappingDefinition>({ assignments: [] });
   let savedMapping = $state<MappingDefinition>({ assignments: [] });
+  let assetHistorySiteId = $state(0);
+  let savedAssetHistorySiteId = $state(0);
+  let assetHistoryMapping = $state<MappingDefinition>({ assignments: [] });
+  let savedAssetHistoryMapping = $state<MappingDefinition>({ assignments: [] });
   let revision = $state(0);
   let columnAvailability = $state<ColumnAvailabilityResponse>({
     source: 'standard',
@@ -149,7 +153,9 @@
   const hasUnsavedChanges = $derived(
     definition !== undefined &&
       (JSON.stringify(definition) !== JSON.stringify(savedDefinition) ||
-        JSON.stringify(mapping) !== JSON.stringify(savedMapping)),
+      JSON.stringify(mapping) !== JSON.stringify(savedMapping) ||
+      assetHistorySiteId !== savedAssetHistorySiteId ||
+      JSON.stringify(assetHistoryMapping) !== JSON.stringify(savedAssetHistoryMapping)),
   );
   const breadcrumbTitle = $derived(
     definition ? displayText(definition.title, language()) || null : null,
@@ -223,6 +229,10 @@
     savedDefinition = result.value.definition;
     mapping = result.value.mapping;
     savedMapping = result.value.mapping;
+    assetHistorySiteId = result.value.assetHistorySiteId ?? 0;
+    savedAssetHistorySiteId = assetHistorySiteId;
+    assetHistoryMapping = result.value.assetHistoryMapping ?? { assignments: [] };
+    savedAssetHistoryMapping = assetHistoryMapping;
     selectedQuestionId = null;
     revision = result.value.revision;
     await refreshColumnAvailability(id);
@@ -358,7 +368,14 @@
     error = '';
     notice = '';
 
-    const result = await saveDraft(surveyId, definition, mapping, revision);
+    const result = await saveDraft(
+      surveyId,
+      definition,
+      mapping,
+      revision,
+      assetHistorySiteId,
+      assetHistoryMapping,
+    );
     saving = false;
 
     if (!result.ok) {
@@ -373,6 +390,8 @@
     revision = result.value.revision;
     savedDefinition = definition;
     savedMapping = mapping;
+    savedAssetHistorySiteId = assetHistorySiteId;
+    savedAssetHistoryMapping = assetHistoryMapping;
     notice = t('editor.saved');
   }
 
@@ -925,6 +944,45 @@
         onrefresh={() => refreshColumnAvailability()}
         onchange={(next) => (mapping = next)}
       />
+      <section class="history-settings">
+        <h2>{t('history.title')}</h2>
+        <p class="hint">{t('history.lead')}</p>
+        <label>
+          <span>{t('history.siteId')}</span>
+          <input
+            type="number"
+            min="0"
+            value={assetHistorySiteId || ''}
+            placeholder="0"
+            oninput={(event) => {
+              assetHistorySiteId = Math.max(0, Number(event.currentTarget.value) || 0);
+            }}
+          />
+        </label>
+        {#if assetHistorySiteId > 0}
+          <p class="hint">{t('history.referenceIdHint')}</p>
+          <!-- **忘れても投射は成功する。** 気付けないので設定方法まで書く -->
+          <p class="hint">{t('history.referenceIdSetupHint')}</p>
+          <MappingEditor
+            mapping={assetHistoryMapping}
+            questions={[]}
+            {editing}
+            selectedQuestionId={null}
+            availability={{ source: 'standard', availableByPrefix: {} }}
+            onrefresh={() => {}}
+            title={t('history.mappingTitle')}
+            systemSources={[
+              { value: 'EventType', label: t('history.source.EventType') },
+              { value: 'OccurredAt', label: t('history.source.OccurredAt') },
+              { value: 'AssetFileName', label: t('history.source.AssetFileName') },
+              { value: 'AssetId', label: t('history.source.AssetId') },
+              { value: 'ReferenceId', label: t('history.source.ReferenceId') },
+              { value: 'SurveyTitle', label: t('history.source.SurveyTitle') },
+            ]}
+            onchange={(next) => (assetHistoryMapping = next)}
+          />
+        {/if}
+      </section>
     </div>
   </div>
 {/if}
