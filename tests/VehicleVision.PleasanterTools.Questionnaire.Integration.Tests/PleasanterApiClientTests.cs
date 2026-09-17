@@ -252,7 +252,16 @@ public class PleasanterApiClientTests
 
         var after = await client.GetSiteAsync(created.Id.Value);
         Assert.True(after.IsSuccess, $"更新後のサイト設定取得に失敗した: {after.StatusCode} {after.Message}");
-        Assert.Equal(["ClassA"], SiteSettingsSynchronizer.MissingLinks(after.Body!, ["ClassA"]));
+        // ⚠️ **Links は返らない。** ChoicesText が往復することと、
+        // リンク先のサイト ID を読み出せることを確かめる
+        Assert.Equal(
+            [linkedSiteId],
+            SiteSettingsSynchronizer.LinkedSiteIds(after.Body!, ["ClassA"]));
+
+        // **リンクが成立する条件そのものを確かめる。**
+        // Pleasanter は相手サイトを引けないとリンクを黙って捨てる
+        var linkedSite = await client.GetSiteAsync(linkedSiteId);
+        Assert.True(linkedSite.IsSuccess, "リンク先のサイトを引けなかった");
         Assert.Equal(
             "対象外",
             after.Body!["Response"]!["Data"]!["SiteSettings"]!["Columns"]![0]!["LabelText"]!.GetValue<string>());

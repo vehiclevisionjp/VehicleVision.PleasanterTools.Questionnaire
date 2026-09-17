@@ -167,6 +167,11 @@ public class AdminSurveyListTests
             }
             """)!;
 
-        Assert.Equal(["ClassA"], SiteSettingsSynchronizer.MissingLinks(response, ["ClassA"]));
+        // ⚠️ **GetSite は Links を返さない**（実機で確認。ChoicesText は戻るが Links は null）。
+        // リンク先のサイト ID は ChoicesText から読む
+        Assert.Equal([123L], SiteSettingsSynchronizer.LinkedSiteIds(response, ["ClassA"]));
+
+        // **対象外の列のリンクは拾わない**
+        Assert.Empty(SiteSettingsSynchronizer.LinkedSiteIds(response, ["ClassB"]));
     }
 }

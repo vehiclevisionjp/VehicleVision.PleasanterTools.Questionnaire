@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -9,7 +11,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// <c>GetSite</c> の結果を渡す。ここでは対象列以外を削除も移動もせず、
 /// スクリプト、スタイル、ビュー、通知、プロセス、権限などの設定も保持する。
 /// </remarks>
-public static class SiteSettingsSynchronizer
+public static partial class SiteSettingsSynchronizer
 {
     /// <summary>現在のサイト設定へマッピング先の列を足し、表示順を整える。</summary>
     public static SiteSettingsSyncPlan Build(JsonNode response, MappingDefinition mapping)
@@ -79,29 +81,54 @@ public static class SiteSettingsSynchronizer
             ]);
     }
 
-    /// <summary>更新後の設定で、対象列のリンクが有効になったか確かめる。</summary>
-    public static IReadOnlyList<string> MissingLinks(JsonNode response, IEnumerable<string> targets)
+    /// <summary>対象列のリンク先として書かれているサイト ID を集める。</summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠️ **<c>GetSite</c> は <c>Links</c> を返さない**（実機で確認。
+    /// <c>ChoicesText</c> は <c>[[1]]</c> のまま戻るが <c>Links</c> は <c>null</c>）。
+    /// **更新後に読み直してもリンクの成立を確かめられない。**
+    /// </para>
+    /// <para>
+    /// 代わりに**リンク先のサイトを同じ API キーで引けるか**を見る。
+    /// Pleasanter 側の <c>SetLinks</c> は**相手サイトへアクセスできるときだけ**
+    /// リンクを作り、**できなければ黙って捨てる**ので、これが実際の判定条件そのもの。
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<long> LinkedSiteIds(JsonNode response, IEnumerable<string> targets)
     {
-        var linked = response["Response"]?["Data"]?["SiteSettings"]?["Links"]?.AsArray()
+        var wanted = targets.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return response["Response"]?["Data"]?["SiteSettings"]?["Columns"]?.AsArray()
             ?.OfType<JsonObject>()
-            .Select(link => link["ColumnName"]?.GetValue<string>())
-            .Where(column => !string.IsNullOrWhiteSpace(column))
-            .Select(column => column!)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase)
-            ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var linkedColumns = response["Response"]?["Data"]?["SiteSettings"]?["Columns"]?.AsArray()
-            ?.OfType<JsonObject>()
-            .Where(HasLinkChoice)
-            .Select(column => column["ColumnName"]?.GetValue<string>())
-            .Where(column => !string.IsNullOrWhiteSpace(column))
-            .Select(column => column!)
+            .Where(column => column["ColumnName"]?.GetValue<string>() is { } name
+                && wanted.Contains(name))
+            .SelectMany(column => LinkedSiteIds(column["ChoicesText"]?.GetValue<string>()))
+            .Distinct()
+            .ToArray()
             ?? [];
-
-        return linkedColumns
-            .Where(column => targets.Contains(column, StringComparer.OrdinalIgnoreCase))
-            .Where(column => !linked.Contains(column))
-            .ToArray();
     }
+
+    private static IEnumerable<long> LinkedSiteIds(string? choicesText)
+    {
+        if (choicesText is null)
+        {
+            yield break;
+        }
+
+        foreach (Match match in LinkChoice().Matches(choicesText))
+        {
+            if (long.TryParse(
+                match.Groups[1].Value,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var siteId) && siteId > 0)
+            {
+                yield return siteId;
+            }
+        }
+    }
+
+    [GeneratedRegex(@"\[\[(\d+)\]\]")]
+    private static partial Regex LinkChoice();
 
     private static JsonArray Rearrange(JsonObject settings, string name, IReadOnlyList<string> targets)
     {
@@ -142,10 +169,6 @@ public static class SiteSettingsSynchronizer
             .Select(column => column!)
             .ToArray();
 
-    private static bool HasLinkChoice(JsonObject column) =>
-        column["ChoicesText"]?.GetValue<string>() is { } choicesText
-        && choicesText.Contains("[[", StringComparison.Ordinal)
-        && choicesText.Contains("]]", StringComparison.Ordinal);
 }
 
 /// <summary>同期前に画面へ表示する変更内容。</summary>

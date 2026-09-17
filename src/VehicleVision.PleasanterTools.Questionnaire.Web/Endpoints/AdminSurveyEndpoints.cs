@@ -383,15 +383,30 @@ public static class AdminSurveyEndpoints
                 return PleasanterFailure(after, context);
             }
 
-            var missingLinks = SiteSettingsSynchronizer.MissingLinks(
+            // ⚠️ **GetSite は Links を返さない**（実機で確認）。読み直しても成立は分からない。
+            // Pleasanter の SetLinks は**相手サイトを引けるときだけ**リンクを作り、
+            // **できなければ黙って捨てる**ので、その条件そのものを確かめる
+            var linkedSiteIds = SiteSettingsSynchronizer.LinkedSiteIds(
                 after.Body,
                 draft.Mapping.Assignments.Select(assignment => assignment.TargetColumn));
-            if (missingLinks.Count > 0)
+            var unreachable = new List<long>();
+            foreach (var linkedSiteId in linkedSiteIds)
+            {
+                var linked = await pleasanter.GetSiteAsync(linkedSiteId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (!linked.IsSuccess)
+                {
+                    unreachable.Add(linkedSiteId);
+                }
+            }
+
+            if (unreachable.Count > 0)
             {
                 return Results.BadRequest(new
                 {
-                    message = "リンク列を設定できませんでした。相手サイト ID または API キーの権限を確認してください。",
-                    missingLinks,
+                    message = "リンク先のサイトを引けませんでした。"
+                        + "相手サイト ID か、API キーの利用者の権限を確認してください。",
+                    unreachableSiteIds = unreachable,
                 });
             }
 
