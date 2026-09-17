@@ -174,6 +174,16 @@ public static class ServerMessages
             "対応していない言語です。",
             "That language is not supported.");
 
+        Add(
+            ServerMessageKeys.AdminSessionNotFound,
+            "そのセッションは見つかりません。",
+            "That session was not found.");
+
+        Add(
+            ServerMessageKeys.CurrentSessionCannotBeRevoked,
+            "現在使っているセッションはここから終了できません。ログアウトしてください。",
+            "The current session cannot be ended here. Sign out instead.");
+
         // ---- アンケート -----------------------------------------------------
         Add(
             ServerMessageKeys.SurveyTitleRequired,
@@ -210,12 +220,19 @@ public static class ServerMessages
             "公開できません。設問の設定に、回答できない指定があります。",
             "Cannot publish. Some questions have settings that no answer can satisfy.");
 
-        // ---- 再編集リンク（Issue #202）---------------------------------------
-        // ⚠️ **このリンクを持つ人は回答を書き換えられる。** 本人へその旨を伝える
+        Add(ServerMessageKeys.AutoReplyTestSubjectPrefix, "【試し送信】", "[Test] ");
         Add(
-            ServerMessageKeys.EditLinkMailNote,
-            "回答を直す場合は、次の URL を開いてください（{0} まで）。\n⚠️ この URL を知っている人は回答を書き換えられます。転送しないでください。",
-            "To change your response, open the URL below (valid until {0}).\n⚠️ Anyone with this URL can change your response. Do not forward it.");
+            ServerMessageKeys.AutoReplyTestLoginIdNotEmail,
+            "ログイン ID がメールアドレスではないため、試し送信できません。",
+            "Your sign-in ID is not an email address, so a test message cannot be sent.");
+        Add(
+            ServerMessageKeys.AutoReplyTestMailDisabled,
+            "メールの送信がサーバ側で有効になっていないため、試し送信できません。",
+            "Mail sending is not enabled on the server, so a test message cannot be sent.");
+        Add(
+            ServerMessageKeys.AutoReplyTestQueueFailed,
+            "試し送信を送信待ちへ登録できませんでした。",
+            "The test message could not be queued.");
 
         // ---- 招待メール（Issue #189）----------------------------------------
         // **平文で送る。** 書式は持たない（OutgoingMail が text/plain）
@@ -329,6 +346,21 @@ public static class ServerMessages
             ServerMessageKeys.HeaderImageRejected,
             "この画像は使用できません。PNG・JPEG・GIF・WebP の 2 MB 以内の画像を選んでください。",
             "That image cannot be used. Choose a PNG, JPEG, GIF or WebP image of up to 2 MB.");
+
+        Add(
+            ServerMessageKeys.ContentAssetRejected,
+            "この配布物は使用できません。許可された形式と容量を確認してください。",
+            "That asset cannot be used. Check the allowed file types and size limit.");
+
+        Add(
+            ServerMessageKeys.ContentAssetLimitReached,
+            "このアンケートへ保存できる配布物の上限に達しています。",
+            "This survey has reached its asset limit.");
+
+        Add(
+            ServerMessageKeys.AssetScannerUnavailable,
+            "ウイルス検査を利用できないため、配布物を保存できません。管理者へ連絡してください。",
+            "The asset cannot be saved because virus scanning is unavailable. Contact an administrator.");
 
         // ---- 回答数の上限 ---------------------------------------------------
         Add(

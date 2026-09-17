@@ -72,6 +72,10 @@ public static class ServerMessageKeys
 
     public const string UnsupportedLanguage = "users.unsupportedLanguage";
 
+    public const string AdminSessionNotFound = "sessions.notFound";
+
+    public const string CurrentSessionCannotBeRevoked = "sessions.currentCannotBeRevoked";
+
     // ---- アンケート ---------------------------------------------------------
 
     public const string SurveyTitleRequired = "surveys.titleRequired";
@@ -92,8 +96,14 @@ public static class ServerMessageKeys
     /// <summary>設問の設定が矛盾していて公開できない（Issue #101）。</summary>
     public const string PublishBlockedBySettings = "surveys.publishBlockedBySettings";
 
-    /// <summary>再編集リンクの添え書き（Issue #202）。**{0} が期限。**</summary>
-    public const string EditLinkMailNote = "editLink.mail.note";
+    /// <summary>完了メールの試し送信で件名へ付ける印（Issue #319）。</summary>
+    public const string AutoReplyTestSubjectPrefix = "autoReply.test.subjectPrefix";
+
+    public const string AutoReplyTestLoginIdNotEmail = "autoReply.test.loginIdNotEmail";
+
+    public const string AutoReplyTestMailDisabled = "autoReply.test.mailDisabled";
+
+    public const string AutoReplyTestQueueFailed = "autoReply.test.queueFailed";
 
     /// <summary>招待メールの件名（Issue #189）。</summary>
     public const string InvitationMailSubject = "invitation.mail.subject";
@@ -157,6 +167,16 @@ public static class ServerMessageKeys
     /// **理由の内訳は文言にしない**（拡張子・中身・大きさのどれで落ちたかは別で返す）。
     /// </summary>
     public const string HeaderImageRejected = "surveys.headerImageRejected";
+
+    /// <summary>本文・完了画面用の配布資産を受け付けられない。</summary>
+    public const string ContentAssetRejected = "surveys.contentAssetRejected";
+
+    /// <summary>アンケートへ保存できる配布資産の件数を超えている。</summary>
+    public const string ContentAssetLimitReached = "surveys.contentAssetLimitReached";
+
+    /// <summary>配布資産をウイルス検査できない。</summary>
+    public const string AssetScannerUnavailable = "surveys.assetScannerUnavailable";
+
     /// <summary>回答数の上限に 0 以下を指定した。**上限を外すなら未指定にする。**</summary>
     public const string ResponseLimitMustBePositive = "surveys.responseLimitMustBePositive";
 

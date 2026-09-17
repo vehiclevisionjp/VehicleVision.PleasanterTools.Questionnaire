@@ -1,7 +1,8 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Data.Common;
 using Dapper;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Text;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data;
@@ -13,7 +14,9 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 public sealed record SurveyDraft(
     SurveyDefinition Definition,
     MappingDefinition Mapping,
-    int Revision);
+    int Revision,
+    long AssetHistorySiteId = 0,
+    MappingDefinition? AssetHistoryMapping = null);
 
 /// <summary>一覧に出すアンケートの要約。</summary>
 /// <param name="SuspendedReason">
@@ -161,7 +164,9 @@ public interface ISurveyDraftStore
         SurveyDefinition definition,
         MappingDefinition mapping,
         int expectedRevision,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        long assetHistorySiteId = 0,
+        MappingDefinition? assetHistoryMapping = null);
 
     /// <summary>アンケートを丸ごと写して、新しい**下書き**を作る（Issue #46）。</summary>
     /// <param name="sourceSurveyId">写す元のアンケート。</param>
@@ -226,8 +231,11 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         bool AllowEditingAfterSubmit,
         string? ThemeJson,
         string? AutoReplyJson,
+        string? AssetDeliveryJson,
         int? PublishedVersion,
-        int DraftRevision);
+        int DraftRevision,
+        long AssetHistorySiteId,
+        string? AssetHistoryMappingJson);
 
     private sealed record PageRow(
         string PageId,
@@ -438,9 +446,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         var survey = await connection.QueryFirstOrDefaultAsync<SurveyRow>(Sql(
             "SELECT [SurveyId], [TitleJson], [DescriptionJson], "
             + "       [ConfirmationMessageJson], [DisplayMode], [ShowProgress], "
-            + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], "
+            + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], [AssetDeliveryJson], "
             + "       [PublishedVersion], "
-            + "       [DraftRevision] "
+            + "       [DraftRevision], [AssetHistorySiteId], [AssetHistoryMappingJson] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
@@ -553,6 +561,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             // ⚠️ **列が無いと黙って落ちる。** 定義に項目を足したら、ここも足すこと
             // （端から端まで通す試験で見つかった。Issue #189）
             AutoReply = ReadAutoReply(survey.AutoReplyJson),
+            AssetDelivery = ReadAssetDelivery(survey.AssetDeliveryJson),
             Pages = pages
                 .Select(page => new Page
                 {
@@ -582,7 +591,15 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 .ToImmutableArray(),
         };
 
-        return new SurveyDraft(definition, mapping, survey.DraftRevision);
+        var assetHistoryMapping = string.IsNullOrWhiteSpace(survey.AssetHistoryMappingJson)
+            ? null
+            : SurveyJson.Deserialize<MappingDefinition>(survey.AssetHistoryMappingJson);
+        return new SurveyDraft(
+            definition,
+            mapping,
+            survey.DraftRevision,
+            survey.AssetHistorySiteId,
+            assetHistoryMapping);
     }
 
     public async Task<int> SaveAsync(
@@ -590,7 +607,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         SurveyDefinition definition,
         MappingDefinition mapping,
         int expectedRevision,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        long assetHistorySiteId = 0,
+        MappingDefinition? assetHistoryMapping = null)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection
@@ -604,7 +623,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "  [ConfirmationMessageJson] = @ConfirmationMessageJson, "
             + "  [DisplayMode] = @DisplayMode, [ShowProgress] = @ShowProgress, "
             + "  [AllowEditingAfterSubmit] = @AllowEditingAfterSubmit, "
+            + "  [AssetHistorySiteId] = @AssetHistorySiteId, "
+            + "  [AssetHistoryMappingJson] = @AssetHistoryMappingJson, "
             + "  [ThemeJson] = @ThemeJson, [AutoReplyJson] = @AutoReplyJson, "
+            + "  [AssetDeliveryJson] = @AssetDeliveryJson, "
             + "  [Title] = @Title, [UpdatedAt] = @Now "
             + "WHERE [SurveyId] = @SurveyId AND [DraftRevision] = @ExpectedRevision",
             new
@@ -617,8 +639,13 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 DisplayMode = (int)definition.DisplayMode,
                 definition.ShowProgress,
                 definition.AllowEditingAfterSubmit,
+                AssetHistorySiteId = Math.Max(0, assetHistorySiteId),
+                AssetHistoryMappingJson = assetHistorySiteId > 0 && assetHistoryMapping is not null
+                    ? SurveyJson.Serialize(assetHistoryMapping)
+                    : null,
                 ThemeJson = WriteTheme(definition.Theme),
                 AutoReplyJson = WriteAutoReply(definition.AutoReply),
+                AssetDeliveryJson = WriteAssetDelivery(definition.AssetDelivery),
                 // 一覧に出す用の平文。**多言語の正本は TitleJson**
                 Title = Shorten(definition.Title.Get(LocalizedText.DefaultLanguage), 512),
                 Now = DbTime.UtcNowTruncated(),
@@ -823,6 +850,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 connection, transaction, definition.Theme, target.SurveyId, now, cancellationToken)
                 .ConfigureAwait(false),
         };
+        definition = await CopyContentAssetsAsync(
+            connection, transaction, sourceSurveyId, definition, target.SurveyId, now, cancellationToken)
+            .ConfigureAwait(false);
 
         // **下書きとして作る**（Issue #46）。公開状態も公開済みの版も写さない。
         // **受付期間・回答上限も写さない。** 公開の設定であり、
@@ -834,12 +864,14 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "   [DraftRevision], [DisplayMode], [ShowProgress], "
             + "   [AllowEditingAfterSubmit], [TitleJson], [DescriptionJson], "
             + "   [ConfirmationMessageJson], [IsTemplate], [ThemeJson], [AutoReplyJson], "
+            + "   [AssetDeliveryJson], "
             + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, NULL, "
             + "        0, @DisplayMode, @ShowProgress, "
             + "        @AllowEditingAfterSubmit, @TitleJson, @DescriptionJson, "
             + "        @ConfirmationMessageJson, @IsTemplate, @ThemeJson, @AutoReplyJson, "
+            + "        @AssetDeliveryJson, "
             + "        @Now, @Now)",
             new
             {
@@ -858,6 +890,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 ThemeJson = WriteTheme(definition.Theme),
                 // **自動返信も複製に付いてくる**（文面はテンプレートの一部）
                 AutoReplyJson = WriteAutoReply(definition.AutoReply),
+                AssetDeliveryJson = WriteAssetDelivery(definition.AssetDelivery),
                 // 一覧に出す用の平文。**多言語の正本は TitleJson**
                 Title = Shorten(definition.Title.Get(LocalizedText.DefaultLanguage), 512),
                 Now = now,
@@ -1108,6 +1141,134 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         return theme with { HeaderImageId = copiedId.ToString() };
     }
 
+    /// <summary>記法が参照する画像を複製先へ写し、記法内の識別子を差し替える。</summary>
+    private async Task<SurveyDefinition> CopyContentAssetsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        Guid sourceSurveyId,
+        SurveyDefinition definition,
+        Guid targetSurveyId,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var markups = EnumerateMarkup(definition).ToArray();
+        var sourceIds = markups
+            .SelectMany(NoteMarkup.AssetIds)
+            .Distinct()
+            .ToArray();
+        if (sourceIds.Length == 0)
+        {
+            return definition;
+        }
+
+        var replacements = new Dictionary<Guid, Guid>();
+        foreach (var sourceId in sourceIds)
+        {
+            var source = await connection.QueryFirstOrDefaultAsync<AssetRow>(Sql(
+                "SELECT [ContentType], [FileName], [ByteSize], [ContentBase64] "
+                + "FROM [SurveyAssets] WHERE [SurveyId] = @SurveyId AND [AssetId] = @AssetId",
+                new { SurveyId = sourceSurveyId, AssetId = sourceId },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+            if (source is null)
+            {
+                continue;
+            }
+
+            var copiedId = Guid.NewGuid();
+            await connection.ExecuteAsync(Sql(
+                "INSERT INTO [SurveyAssets] "
+                + "  ([AssetId], [SurveyId], [ContentType], [FileName], [ByteSize], "
+                + "   [ContentBase64], [CreatedAt]) "
+                + "VALUES (@AssetId, @SurveyId, @ContentType, @FileName, @ByteSize, "
+                + "        @ContentBase64, @Now)",
+                new
+                {
+                    AssetId = copiedId,
+                    SurveyId = targetSurveyId,
+                    source.ContentType,
+                    source.FileName,
+                    source.ByteSize,
+                    source.ContentBase64,
+                    Now = now,
+                },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+            replacements[sourceId] = copiedId;
+        }
+
+        if (replacements.Count > 0)
+        {
+            await connection.ExecuteAsync(Sql(
+                "UPDATE [Surveys] SET [ContentAssetCount] = @Count WHERE [SurveyId] = @SurveyId",
+                new { Count = replacements.Count, SurveyId = targetSurveyId },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+
+        return RewriteAssetReferences(definition, replacements);
+    }
+
+    private static IEnumerable<string> EnumerateMarkup(SurveyDefinition definition)
+    {
+        if (definition.ConfirmationMessage is { } confirmation)
+        {
+            foreach (var language in confirmation.Languages)
+            {
+                yield return confirmation.Get(language);
+            }
+        }
+
+        foreach (var question in definition.AllQuestions)
+        {
+            if (question.Description is null
+                || (question.Type is not QuestionType.Note
+                    && question.Settings.DescriptionFormat is not DescriptionFormat.Markup))
+            {
+                continue;
+            }
+
+            foreach (var language in question.Description.Languages)
+            {
+                yield return question.Description.Get(language);
+            }
+        }
+    }
+
+    private static SurveyDefinition RewriteAssetReferences(
+        SurveyDefinition definition,
+        IReadOnlyDictionary<Guid, Guid> replacements) =>
+        definition with
+        {
+            ConfirmationMessage = Rewrite(definition.ConfirmationMessage, replacements),
+            Pages = definition.Pages.Select(page => page with
+            {
+                Questions = page.Questions.Select(question =>
+                    question.Type is QuestionType.Note
+                    || question.Settings.DescriptionFormat is DescriptionFormat.Markup
+                        ? question with
+                        {
+                            Description = Rewrite(question.Description, replacements),
+                        }
+                        : question).ToImmutableArray(),
+            }).ToImmutableArray(),
+        };
+
+    private static LocalizedText? Rewrite(
+        LocalizedText? text,
+        IReadOnlyDictionary<Guid, Guid> replacements)
+    {
+        if (text is null)
+        {
+            return null;
+        }
+
+        return new LocalizedText(text.Languages.ToDictionary(
+            language => language,
+            language => NoteMarkup.RewriteAssetIds(text.Get(language), replacements),
+            StringComparer.OrdinalIgnoreCase));
+    }
+
     /// <summary>テーマを読む。**形の正しくない値は捨てる。**</summary>
     /// <remarks>
     /// **既定と区別する。** 何も指定していないテーマは <c>null</c> にして返す。
@@ -1142,6 +1303,12 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
     /// </remarks>
     private static string? WriteAutoReply(AutoReplySettings? autoReply) =>
         autoReply is null || !autoReply.Enabled ? null : SurveyJson.Serialize(autoReply);
+
+    private static AssetDeliverySettings? ReadAssetDelivery(string? json) =>
+        string.IsNullOrWhiteSpace(json) ? null : SurveyJson.Deserialize<AssetDeliverySettings>(json);
+
+    private static string? WriteAssetDelivery(AssetDeliverySettings? assetDelivery) =>
+        assetDelivery is null ? null : SurveyJson.Serialize(assetDelivery);
 
     private static LocalizedText? ReadText(string? json) =>
         json is null ? null : SurveyJson.Deserialize<LocalizedText>(json);

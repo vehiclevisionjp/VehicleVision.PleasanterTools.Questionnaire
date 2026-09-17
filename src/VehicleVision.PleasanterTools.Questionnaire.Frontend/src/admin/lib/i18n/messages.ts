@@ -1,4 +1,4 @@
-import { DEFAULT_LANGUAGE, interpolate, type Language } from '../../../lib/i18n/language';
+import { interpolate, type Language } from '../../../lib/i18n/language';
 
 /**
  * 管理画面の文言。
@@ -20,6 +20,52 @@ export const ja = {
   'app.language': '表示言語',
   'app.networkError': '通信できませんでした。',
   'app.requestFailed': '処理できませんでした（{status}）。',
+  'app.version': '動作中の版: {version}{commit}',
+  'app.insecureMode':
+    '閉じた環境向けの HTTP 設定で動作しています。通信は暗号化されず、管理者のパスワードとアンケートの合言葉が平文で流れます。SAML は IdP 側の制約により利用できないことがあります。',
+  'breadcrumb.label': 'パンくずリスト',
+  'breadcrumb.surveyEditor': 'アンケートの編集: {title}',
+  'breadcrumb.auditLogs': '操作の記録',
+  'breadcrumb.outbox': '送信状況',
+  'breadcrumb.notifications': 'お知らせ',
+  'breadcrumb.users': '管理者の管理',
+  'breadcrumb.account': '自分のアカウント',
+  'breadcrumb.samlSettings': 'SAML 設定',
+  'breadcrumb.help': '使い方',
+
+  // ---- 使い方 -------------------------------------------------------------
+  'help.open': '使い方',
+  'help.title': '使い方',
+  'help.back': '← アンケート一覧へ戻る',
+  'help.lead': 'アンケートを作成してから、Pleasanter に回答が届くまでの基本的な手順です。',
+  'help.workflowTitle': 'アンケートを公開するまで',
+  'help.create':
+    'アンケート一覧で「新規作成」を押し、題名と回答を保存する Pleasanter のサイト ID を指定します。',
+  'help.questions':
+    '作成したアンケートを開き、設問・選択肢・説明を作ります。回答画面と同じ見た目は「プレビュー」で確認できます。',
+  'help.mapping':
+    '「割り当て」で、各設問の回答を Pleasanter のどの列へ入れるかを指定します。保存先の列に合わない値は公開できません。',
+  'help.publish':
+    '下書きを保存し、「テスト公開」で実際に送信できることを確認してから「公開する」を押します。公開後の変更は、次の公開まで回答画面に反映されません。',
+  'help.pleasanterTitle': 'Pleasanter 側の準備',
+  'help.siteId':
+    'アンケートごとに、回答を保存する Pleasanter のサイト ID を指定します。同じサイトを複数のアンケートで共有しないでください。',
+  'help.apiKey':
+    'このアプリのサーバ設定に、対象サイトへレコードを作成できる Pleasanter の API キーを設定します。API キーは回答者のブラウザへ渡りません。',
+  'help.columns':
+    'Pleasanter のサイトに、割り当て先として使う列を用意します。列の種類と設問の回答形式を対応させ、必要なら回答 JSON を保存する列も指定します。',
+  'help.deliveryTitle': '公開 URL と回答の流れ',
+  'help.share':
+    '公開後、アンケート一覧に表示される回答用 URL を回答者へ配ります。QR コードを使う場合も、一覧の「QR コード」から画像を保存して配布します。',
+  'help.arrival':
+    '回答者が送信すると、このアプリがいったん受け付けて Pleasanter へ送信します。Pleasanter の対象サイトにレコードが作成され、割り当てた列へ回答が入ります。',
+  'help.troubleshootingTitle': 'うまくいかないとき',
+  'help.backlog':
+    '送信待ちが増えたり受付が止まったりした場合は、ヘッダの「送信状況」で滞留の件数・最も古い待ち時間・自動停止の状態を確認します。',
+  'help.failed':
+    '送信できなかった回答は「送信状況」に残ります。失敗の理由と Pleasanter の接続・API キー・権限を直してから、1 件ずつ送信待ちに戻してください。',
+  'help.mappingValidation':
+    '公開またはテスト公開で割り当ての検証に失敗した場合は、設問が未割り当てでないか、Pleasanter の列名・列の種類・変換の設定が合っているかを確認します。',
 
   // ---- ログイン -----------------------------------------------------------
   'signIn.setupTitle': '最初の管理者を登録する',
@@ -45,6 +91,11 @@ export const ja = {
   'signIn.recoveryLabel': '復旧コード',
   'signIn.useRecovery': '認証アプリが使えない場合（復旧コードでログイン）',
   'signIn.useTotp': '認証アプリでログイン',
+  'signIn.captchaFailed': '確認用の計算を完了できませんでした。もう一度お試しください。',
+  'invitation.title': '管理者の招待を受け取る',
+  'invitation.lead': '管理画面で使うパスワードを決めてください。',
+  'invitation.accept': '招待を受け取る',
+  'invitation.accepting': '確認しています…',
   // ---- SAML（Issue #166）------------------------------------------------------
   // ---- 管理者の管理（Issue #156）----------------------------------------------
   'users.open': '管理者',
@@ -79,6 +130,7 @@ export const ja = {
   'users.disable': '停止する',
   'users.enable': '再開する',
   'users.resetTwoFactor': '2 要素認証を解除する',
+  'users.sessions': 'ログイン中の端末',
   'users.confirmDisable': '{loginId} を停止します。停止するとすぐにログアウトされます。よろしいですか？',
   'users.confirmResetTwoFactor':
     '{loginId} の 2 要素認証を解除します。保護が外れ、この操作は記録に残ります。よろしいですか？',
@@ -121,12 +173,66 @@ export const ja = {
   'account.completeEnroll': '登録を完了する',
   'account.recoveryTitle': '復旧コードを控えてください。この画面を閉じると再表示できません。',
   'account.recoveryNote': '端末を失ったときは、このコードでログインします。1 つ使うと無効になります。',
+  'sessions.title': 'ログイン中の端末',
+  'sessions.lead': 'セッションごとに終了できます。心当たりのない端末はすぐに終了してください。',
+  'sessions.loading': '読み込んでいます…',
+  'sessions.empty': 'ログイン中の端末はありません。',
+  'sessions.device': '端末',
+  'sessions.ipAddress': 'IP アドレス',
+  'sessions.signedInAt': 'ログイン日時',
+  'sessions.expiresAt': '期限',
+  'sessions.action': '操作',
+  'sessions.current': '現在の端末',
+  'sessions.unknown': '不明',
+  'sessions.revoke': '終了する',
+  'sessions.revokeOthers': 'ほかの端末をすべて終了する',
+  'sessions.confirmRevoke': 'この端末のセッションを終了します。よろしいですか？',
+  'sessions.confirmRevokeOthers': '現在の端末を除くすべてのセッションを終了します。よろしいですか？',
   'signIn.samlOr': 'または',
   'signIn.samlButton': 'シングルサインオンでログイン',
   'signIn.samlError.invalid': 'シングルサインオンでのログインを完了できませんでした。もう一度お試しください。',
   'signIn.samlError.unknownUser':
     'このアカウントは管理画面に登録されていません。管理者に追加を依頼してください。',
   'signIn.samlError.disabled': 'このアカウントは利用を停止されています。管理者にお問い合わせください。',
+  'saml.open': 'SAML 設定',
+  'saml.title': 'SAML 設定',
+  'saml.back': '← アンケートの一覧へ',
+  'saml.lead':
+    '外部設定に値がある項目は、その値が優先されます。設定を保存すると、編集できる項目は再起動なしで反映されます。',
+  'saml.fixed': '設定で固定されています',
+  'saml.passwordFallbackTitle': 'パスワードで入る経路は常に残ります。',
+  'saml.passwordFallback':
+    'SAML を有効にした本人が SAML で入れるとは限りません。設定を誤った場合は、ログイン ID・パスワード・必要に応じて 2 要素認証で入り直して修正してください。',
+  'saml.enabled': 'SAML ログインを有効にする',
+  'saml.entityId': 'SP の Entity ID',
+  'saml.idpEntityId': 'IdP の Entity ID',
+  'saml.singleSignOnUrl': 'IdP のシングルサインオン URL',
+  'saml.idpCertificate': 'IdP の署名証明書',
+  'saml.idpCertificateHint':
+    'PEM または DER の Base64。証明書の切り替え中は、新旧 2 枚を並べてください。変更は操作の記録に残ります。',
+  'saml.unknownUser': '未登録の利用者',
+  'saml.unknownUserReject': '拒否する',
+  'saml.unknownUserRegister': 'その場で登録する（JIT）',
+  'saml.registerRole': 'JIT 登録時の役割',
+  'saml.loginIdSource': 'ログイン ID の取得元',
+  'saml.loginIdSourceClaim': '属性',
+  'saml.loginIdClaim': 'ログイン ID に使う属性名',
+  'saml.buttonLabel': 'ログイン画面のボタン表示',
+  'saml.singleLogoutUrl': 'IdP の単一ログアウト URL',
+  'saml.singleLogoutUrlHint': '空欄の場合は、本アプリからだけログアウトします。',
+  'saml.save': '保存する',
+  'saml.saving': '処理しています…',
+  'saml.saved': 'SAML 設定を保存しました。',
+  'saml.testTitle': '接続の試験',
+  'saml.testLead':
+    '指定した URL から IdP メタデータを取得できることだけを確かめます。実際のログイン画面へは移動しません。',
+  'saml.metadataUrl': 'IdP メタデータ URL',
+  'saml.test': 'メタデータを取得する',
+  'saml.testInvalidUrl': 'HTTP または HTTPS の絶対 URL を入力してください。',
+  'saml.testNotMetadata': '取得した内容は SAML メタデータではありません。',
+  'saml.testFailed': 'メタデータを取得できませんでした。URL と IdP の状態をご確認ください。',
+  'saml.testSucceeded': 'SAML メタデータを取得できました。',
+  'saml.testSucceededWithEntityId': 'SAML メタデータを取得できました（Entity ID: {entityId}）。',
 
   // ---- 2 要素の登録 -------------------------------------------------------
   'enroll.title': '2 要素認証を登録する',
@@ -206,6 +312,17 @@ export const ja = {
   'siteId.label': 'Pleasanter のサイト ID',
   'siteId.warning': '変更すると、旧サイトを指すテスト回答の対応表を削除します。Pleasanter 側のレコードは削除されません。',
   'siteId.submit': '変更する',
+  'siteId.create': 'マッピング先サイトを新規作成する',
+  'siteId.createHint': 'アンケート名で Pleasanter のトップ直下に回答用サイトを作成します。',
+  'siteId.layoutHint': '細かいレイアウトは Pleasanter 側で設定してください。',
+  'siteId.sync': '同期内容を確認する',
+  'siteId.syncConfirmTitle': 'この内容で同期しますか？',
+  'siteId.syncConfirmLead': '確認後に初めて Pleasanter のサイト設定を更新します。',
+  'siteId.syncAdded': '追加する列: {columns}',
+  'siteId.syncGrid': '一覧の列順: {columns}',
+  'siteId.syncEditor': '編集の列順: {columns}',
+  'siteId.syncHistory': '履歴の列順: {columns}',
+  'siteId.syncConfirm': 'この内容で同期する',
 
   // ---- 設問エディタ -------------------------------------------------------
   'editor.back': '← 一覧へ',
@@ -221,9 +338,23 @@ export const ja = {
   'editor.conflictLead': '再読み込みしてください。',
   'editor.conflictDetail': 'この画面での変更は保存されていません。再読み込みすると失われます。',
   'editor.reload': '再読み込み',
+  'editor.confirmDiscardChanges': '保存していない変更があります。移動すると変更は失われます。よろしいですか？',
   'editor.title': '題名',
   'editor.description': '説明（任意）',
   'editor.confirmationMessage': '送信後に表示するメッセージ（任意）',
+  'editor.confirmationMarkupHint': '説明文と同じ記法を使えます。画像やリンクには、下で発行した asset: 記法を貼り付けてください。',
+  'editor.assetTicketExpiration': '配布ファイルの配り方',
+  'editor.assetTicketCompletedOnly': '完了したときだけ',
+  'editor.assetTicketCompletedOnlyWarning':
+    'ダウンロード前にタブを閉じた人は二度と受け取れず、救う手段がありません。自動返信メールにも配布リンクを載せられません。',
+  'editor.assetTicketAcceptTo': 'アンケートの受付期間に合わせる',
+  'editor.assetTicketDaysAfterResponse': '回答から指定日数',
+  'editor.assetTicketDays': '日数',
+  'editor.assetTicketExpirationHint':
+    '既定はアンケートの受付期間に合わせます。回答からの日数は上限 365 日、受付終了日時が無い場合は 30 日です。',
+  'editor.contentAsset': '説明文・完了画面で使う配布物',
+  'editor.contentAssetHint': '許可形式: {extensions}。1 件 {megabytes} MB まで、アンケート当たり {count} 件まで。アップロード後の記法を説明文または完了画面へ貼り付けます。',
+  'editor.contentAssetMarkup': '貼り付ける記法',
   'editor.showProgress': '進捗バーを表示する',
   'editor.allowEditingAfterSubmit': '送信後の編集を許可する',
   'editor.nextVersion': '公開すると {version} 版になります',
@@ -241,6 +372,9 @@ export const ja = {
   // ---- 設問 ---------------------------------------------------------------
   'question.titlePlaceholder': '設問文',
   'question.descriptionPlaceholder': '補足（任意）',
+  'question.descriptionFormat': '説明文の書き方',
+  'question.descriptionFormatPlain': 'プレーン（改行のみ）',
+  'question.descriptionFormatMarkup': '記法',
   'question.markupPlaceholder': '本文（任意）。空行で段落が分かれます\n例: **太字** *斜体* [リンクの文字](https://example.com/)',
   'question.markupHint':
     '使える書き方: **太字** / *斜体* / [文字](https://…) / 行頭の「- 」で箇条書き / 行頭の「1. 」で番号付き / 行頭の「## 」で見出し。\nHTML は使用できません（そのまま文字として表示されます）。リンクは https のみ使用できます。',
@@ -251,6 +385,8 @@ export const ja = {
   'question.displayOnly': '回答欄のない、表示専用の要素です。',
   'question.unmapped': '未割り当て（Pleasanter に保存されません）',
   'question.mapped': '→ {columns}',
+  'question.showAssignments': '対応する割り当てを表示',
+  'question.assign': 'この設問を割り当てる',
   'question.choiceLabelPlaceholder': '画面に表示するテキスト',
   'question.choiceValuePlaceholder': 'Pleasanter に保存する値',
   'question.choiceIsOther': 'その他',
@@ -302,6 +438,13 @@ export const ja = {
   'question.patternHint':
     '入力全体が一致するかを判定します（前後は自動で固定されます）。回答者には正規表現ではなく、上のメッセージが表示されます。⚠️ 先読み・後方参照・原子グループは使用できません。安全に照合するため、バックトラックしない照合器を使用しているためです。使用できない書き方は、公開時にエラーになります。',
   'question.patternInvalid': '正規表現として解釈できません。',
+  'question.normalizationTitle': '回答の自動変換',
+  'question.convertFullWidthAsciiToHalfWidth': '英数字・記号を全角から半角へ変換する',
+  'question.convertHalfWidthKanaToFullWidth': 'カナを半角から全角へ変換する',
+  'question.convertFullWidthSpacesToHalfWidth': '空白を全角から半角へ変換する',
+  'question.trimWhitespace': '前後の空白を取り除く',
+  'question.normalizationHint':
+    '変換はそれぞれ独立して指定できます。既定はすべて無効です。変換後の値を入力形式と正規表現で検査し、Pleasanter へ保存します。',
   'question.shuffleChoices': '選択肢の順序を回答者ごとに入れ替える',
   'question.shuffleChoicesHint':
     '先に表示された選択肢が選ばれやすくなる偏りを抑えます。「その他」は入れ替えず、常に末尾に表示します。並び順は 1 回の回答中は変わらないため、前のページに戻っても位置は変わりません。',
@@ -322,9 +465,28 @@ export const ja = {
   'questionType.Ranking': 'ランキング（順位付け）',
   'questionType.Note': '説明文（回答なし）',
   'questionType.Embed': '埋め込み（画像・動画・外部ページ）',
+  'questionType.Confirm': '確認・同意（チェックボックス 1 つ）',
 
   // ---- マッピング ---------------------------------------------------------
   'mapping.title': 'Pleasanter への割り当て',
+  'history.title': '配布資料の受取履歴',
+  'history.lead': 'サイト ID が 0 のときは記録しません。有効にする場合は、出来事を別サイトへ投射する割り当てを設定します。',
+  'history.siteId': '履歴の投射先サイト ID（0 で無効）',
+  'history.mappingTitle': '受取履歴の割り当て',
+  'history.referenceIdHint':
+    '回答レコードの ReferenceId の割当先には、回答サイトをリンク先に設定済みの Pleasanter リンク列を指定してください。この画面からサイト設定は変更しません。',
+  // **設定を忘れても投射は成功してしまう。** 値は入るがリンクにならないだけで気付きにくい
+  'history.referenceIdSetupHint':
+    'リンク列にするには、Pleasanter 側でその列の「選択肢一覧」へ [[回答サイトの ID]] を入れておきます。'
+    + ' 設定を忘れても投射は成功し、値は入りますがリンクにはなりません。'
+    + ' また、API キーの利用者が回答サイトを見られない場合、Pleasanter はリンクを作らずに黙って無視します。'
+    + ' 有効にしたら、履歴のレコードから回答へ実際に辿れるかを確かめてください。',
+  'history.source.EventType': '出来事の種類',
+  'history.source.OccurredAt': '起きた日時',
+  'history.source.AssetFileName': '資料のファイル名',
+  'history.source.AssetId': '資料 ID',
+  'history.source.ReferenceId': '回答レコードの ReferenceId',
+  'history.source.SurveyTitle': 'アンケート題名',
   'mapping.addColumn': '列を追加',
   'mapping.addAttachmentColumn': '添付の列を追加',
   'mapping.noFileQuestion': '添付の設問がありません',
@@ -362,11 +524,29 @@ export const ja = {
   'mapping.selectRow': '行を選択',
   'mapping.selectPort': '取得する値を選択',
   'mapping.selectConverter': '変換を選択',
+  'mapping.selectedQuestionAssignment': '選択中の設問を含む割り当て',
+  'mapping.config.separator': '区切り',
+  'mapping.config.separatorPlaceholder': '既定: ,',
+  'mapping.config.checkValue': '真にする値',
+  'mapping.config.keyword': '含まれるか調べる文字列',
+  'mapping.config.constantValue': '固定値',
+  'mapping.config.whenValue': '条件にする値',
+  'mapping.config.thenValue': '一致したときの値',
+  'mapping.config.elseValue': '一致しないときの値（空なら出力しない）',
+  'mapping.config.script': 'スクリプト',
+  'mapping.config.mapSource': '元の値',
+  'mapping.config.mapTarget': '置き換え後（Manager / Owner は利用者 ID）',
+  'mapping.config.mapDefault': '対応がないときの既定値（空なら未回答）',
+  'mapping.config.numberDefault': '数値として読めないときの既定値（空なら未回答）',
+  'mapping.config.numberDecimals': '小数の桁（省略時は丸めない）',
+  'mapping.config.addMapRow': '置き換えを追加',
+  'mapping.config.removeMapRow': 'この置き換えを削除',
 
   // ---- 変換の種類 ---------------------------------------------------------
   'converter.none': '（変換なし）',
   'converter.join': '連結する（join）',
   'converter.map': '値を置き換える（map）',
+  'converter.toNumber': '数値へ変換する（toNumber）',
   'converter.toCheck': 'チェック列にする（toCheck）',
   'converter.contains': '含むかどうか（contains）',
   'converter.constant': '固定値（constant）',
@@ -387,6 +567,7 @@ export const ja = {
   'problem.DisplayOnlyQuestionAsSource': '説明文ブロックは入力にできません',
   'problem.ReservedColumn': '予約列は書き込み先にできません',
   'problem.EmptyScript': 'スクリプトが空です',
+  'problem.MissingConverterConfig': '変換に必要な設定が空です',
   'problem.InvalidAttachmentShape': '添付の割り当ては入力 1 つ・変換なしにしてください',
   'problem.NonFileQuestionAsAttachment': '添付列に割り当てられるのは、添付の設問だけです',
   'problem.AttachmentColumnNeedsFilePort': '添付列には「添付ファイル本体」を割り当ててください',
@@ -476,6 +657,8 @@ export const ja = {
   'condition.matchAll': 'すべて満たす',
   'condition.matchAny': 'どれか満たす',
   'condition.valuePlaceholder': '比較する値',
+  'condition.confirmed': 'チェック済み',
+  'condition.notConfirmed': '未チェック',
   'condition.noEarlierQuestion': 'この設問より前に設問がありません。表示条件で参照できるのは前にある設問だけです。',
   'condition.earlierOnly': '選択できるのは、この設問より前にある設問だけです。',
   'condition.unknownChoice': 'この値は現在の選択肢にありません。条件が成立しないままになります。',
@@ -634,21 +817,38 @@ export const ja = {
   'autoReply.needsEmailQuestion':
     'メールアドレスの欄があるアンケートでだけ設定できます。記述式（1 行）の設問を足し、入力の形式を「メールアドレス」にしてください。',
   'autoReply.subject': '件名',
+  'autoReply.fromAddress': '差出人アドレス',
+  'autoReply.fromAddressHint':
+    '迷惑メール判定を避けるため、サーバの全体設定に固定されています。アンケートからは変更できません。',
+  'autoReply.fromName': '差出人の表示名',
+  'autoReply.fromNameHint': '未設定ならサーバの全体設定を使います。言語ごとに設定できます。',
+  'autoReply.fromNameAcsNote':
+    '送信に Azure Communication Services を使っている場合、表示名はここでは変わりません。'
+    + ' Azure 側の MailFrom アドレスに登録した表示名が使われます。',
+  'autoReply.replyToAddress': '返信先（Reply-To）',
+  'autoReply.replyToAddressHint': '未設定ならサーバの全体設定を使います。',
+  'autoReply.bccAddress': 'BCC',
+  'autoReply.bccWarning':
+    '注意: 回答者のメールアドレスが BCC の受取人に見えます。本文に {{answers}} があれば回答内容もそのまま届き、回答 1 件につき 1 通送られます。',
   'autoReply.body': '本文',
   'autoReply.bodyHint': '書式は付けられません。文字だけが送られます。',
   'autoReply.placeholders':
-    '差し込みを書けます。{{title}} はアンケートの題名、{{submittedAt}} は受付日時になります。知らない差し込みはそのまま残ります。',
+    '使うキーワードを押すと、本文のカーソル位置へ挿入します。書いていない内容はメールへ出ません。',
+  'autoReply.keywordList': '使えるキーワード',
+  'autoReply.keyword.title': 'アンケートの題名',
+  'autoReply.keyword.submittedAt': '受付日時',
+  'autoReply.keyword.acceptTo': '受付の終了日時（無ければ空）',
+  'autoReply.keyword.answers': '回答の写し（回答内容がメールとして外へ出ます）',
+  'autoReply.keyword.formUrl': '新しく回答するための URL',
+  'autoReply.keyword.editUrl': '自分の回答を直すリンク（知っている人は回答を変更できます）',
+  'autoReply.keyword.editUrlExpiresAt': '回答を直すリンクの期限',
+  'autoReply.keyword.assetsUrl': '資料の受け取りリンク',
+  'autoReply.keyword.assetsUrlExpiresAt': '資料の受け取りリンクの期限',
   'autoReply.defaultSubject': '{{title}} へのご回答ありがとうございました',
   'autoReply.defaultBody':
     '{{title}} へご回答いただき、ありがとうございました。\n\n受付日時: {{submittedAt}}\n\nこのメールは自動で送信しています。',
-  'autoReply.includeAnswers': '本文のあとに回答の写しを付ける',
-  'autoReply.includeAnswersHint':
-    '回答の中身がメールとして外へ出ます。受け取るのは回答者本人ですが、経路が暗号化されているとは限りません。',
   'autoReply.serverDisabled':
     'メールの送信がサーバ側で有効になっていません。この設定は保存できますが、有効にするまで 1 通も送られません。',
-  'autoReply.includeEditLink': '本文のあとに、回答を直すためのリンクを付ける',
-  'autoReply.includeEditLinkHint':
-    'このリンクを知っている人は、その回答を書き換えられます。転送や共有メールボックスでは他人でも直せます。',
   'autoReply.editLinkDays': 'リンクの有効日数',
   'autoReply.editLinkDaysHint':
     '受付期間の終了は超えません。受付を停止すると、その時点で使えなくなります。',
@@ -658,15 +858,36 @@ export const ja = {
   'autoReply.revokeEditLinksHint':
     '漏れたときに使います。押すと、これまでに送ったリンクはすべて開けなくなります（回答そのものは消えません）。',
   'autoReply.revokeEditLinksDone': '{count} 件のリンクを無効にしました。',
-  'autoReply.problem.EditLinkNotEditable':
-    '回答の編集を許可していないのに、再編集リンクを付けようとしています。',
+  'autoReply.problem.EditLinkKeywordUnavailable':
+    '回答の編集を許可していないため、再編集リンクのキーワードは使えません。',
+  'autoReply.problem.AssetsUrlKeywordUnavailable':
+    'メールで渡せる配布物が無いため、資料の受け取りリンクのキーワードは使えません。',
   'autoReply.problem.EditLinkDaysInvalid': 'リンクの有効日数は 1〜365 で指定してください。',
   'autoReply.problem.ToQuestionMissing': '宛先にする設問が選ばれていません。',
   'autoReply.problem.ToQuestionNotFound': '宛先にする設問が見つかりません（消された可能性があります）。',
   'autoReply.problem.ToQuestionNotEmail': '宛先にする設問が、メールアドレス形式ではありません。',
   'autoReply.problem.SubjectMissing': '件名が空です。',
   'autoReply.problem.BodyMissing': '本文が空です。',
+  'autoReply.problem.FromNameInvalid': '差出人の表示名に改行は使えません。',
+  'autoReply.problem.ReplyToInvalid': '返信先を正しいメールアドレスで入力してください。改行は使えません。',
+  'autoReply.problem.BccInvalid': 'BCC を正しいメールアドレスで入力してください。改行は使えません。',
   'autoReply.publishBlocked': '公開できません。自動返信メールの設定を直してください。',
+  'autoReply.preview': '届くメールのプレビュー',
+  'autoReply.previewFrom': 'From',
+  'autoReply.previewReplyTo': 'Reply-To',
+  'autoReply.previewBcc': 'BCC',
+  'autoReply.previewTo': '宛先',
+  'autoReply.previewNone': 'なし',
+  'autoReply.previewSubject': '件名',
+  'autoReply.previewBody': '本文（平文）',
+  'autoReply.unknownKeywords':
+    '使えないキーワードがあります: {keywords}。文字としてそのまま送られます。',
+  'autoReply.testSend': '自分へ試し送信する',
+  'autoReply.testSending': '送信待ちへ登録しています…',
+  'autoReply.testRecipient': '宛先はログイン中の管理者自身（{recipient}）に固定されます。',
+  'autoReply.testRecipientUnavailable':
+    'ログイン ID がメールアドレスではないため、試し送信できません。',
+  'autoReply.testQueued': '{recipient} 宛ての試し送信を送信待ちへ登録しました。',
   // ---- テーマ（Issue #56） ----
   'theme.title': '回答画面の見た目',
   'theme.lead': '色・書体・ヘッダ画像を設定できます。未設定の場合は既定の見た目になります。公開すると反映されます。',
@@ -747,6 +968,53 @@ export const en: Record<MessageKey, string> = {
   'app.language': 'Display language',
   'app.networkError': 'Could not reach the server.',
   'app.requestFailed': 'The request could not be processed ({status}).',
+  'app.version': 'Running version: {version}{commit}',
+  'app.insecureMode':
+    'This application is running in HTTP mode for closed networks. Traffic is not encrypted, including administrator passwords and survey passphrases. SAML may be unavailable because of IdP requirements.',
+  'breadcrumb.label': 'Breadcrumbs',
+  'breadcrumb.surveyEditor': 'Edit survey: {title}',
+  'breadcrumb.auditLogs': 'Activity log',
+  'breadcrumb.outbox': 'Delivery status',
+  'breadcrumb.notifications': 'Notifications',
+  'breadcrumb.users': 'Manage administrators',
+  'breadcrumb.account': 'My account',
+  'breadcrumb.samlSettings': 'SAML settings',
+  'breadcrumb.help': 'Help',
+
+  // ---- Help ---------------------------------------------------------------
+  'help.open': 'Help',
+  'help.title': 'Help',
+  'help.back': '← Back to surveys',
+  'help.lead':
+    'The basic steps from creating a survey to getting its responses into Pleasanter.',
+  'help.workflowTitle': 'Publishing a survey',
+  'help.create':
+    'On the survey list, select “Create”, then give the survey a title and the Pleasanter site ID that will store its responses.',
+  'help.questions':
+    'Open the new survey and create its questions, choices and descriptions. Use “Preview” to check how the response screen will look.',
+  'help.mapping':
+    'Under “Mapping”, choose which Pleasanter column receives each answer. A value that does not fit its target column prevents publication.',
+  'help.publish':
+    'Save the draft, use “Test publish” to confirm that it can send responses, then select “Publish”. Changes after publication do not reach the response screen until you publish again.',
+  'help.pleasanterTitle': 'Preparing Pleasanter',
+  'help.siteId':
+    'Give each survey the ID of the Pleasanter site that stores its responses. Do not share one site between multiple surveys.',
+  'help.apiKey':
+    'Configure a Pleasanter API key that can create records in the target site on this application’s server. The API key is never sent to respondents’ browsers.',
+  'help.columns':
+    'Prepare the Pleasanter columns used as mapping targets. Match each column type to its question’s answer format, and optionally choose a column that stores the response JSON.',
+  'help.deliveryTitle': 'Response URL and delivery',
+  'help.share':
+    'After publishing, share the response URL shown in the survey list. To share a QR code, save its image from “QR code” in the list.',
+  'help.arrival':
+    'When a respondent submits, this application accepts the response first and sends it to Pleasanter. A record is created in the target site and mapped answers are written to its columns.',
+  'help.troubleshootingTitle': 'When something goes wrong',
+  'help.backlog':
+    'If responses are waiting or intake is paused, open “Delivery” in the header. Check the backlog count, how long the oldest response has waited, and whether intake was stopped automatically.',
+  'help.failed':
+    'Responses that could not be delivered remain in “Delivery”. Fix the failure reason and the Pleasanter connection, API key or permissions, then put each response back into the queue.',
+  'help.mappingValidation':
+    'If test publication or publication rejects the mapping, check that every question is mapped and that the Pleasanter column name, column type and conversion settings agree.',
 
   'signIn.setupTitle': 'Register the first administrator',
   'signIn.title': 'Sign in to administration',
@@ -771,6 +1039,11 @@ export const en: Record<MessageKey, string> = {
   'signIn.recoveryLabel': 'Recovery code',
   'signIn.useRecovery': 'I cannot use my authenticator (use a recovery code)',
   'signIn.useTotp': 'Use my authenticator',
+  'signIn.captchaFailed': 'Could not complete the verification. Please try again.',
+  'invitation.title': 'Accept administrator invitation',
+  'invitation.lead': 'Choose the password you will use for administration.',
+  'invitation.accept': 'Accept invitation',
+  'invitation.accepting': 'Checking…',
   'users.open': 'Administrators',
   'users.title': 'Manage administrators',
   'users.lead':
@@ -804,6 +1077,7 @@ export const en: Record<MessageKey, string> = {
   'users.disable': 'Disable',
   'users.enable': 'Enable',
   'users.resetTwoFactor': 'Reset two-factor',
+  'users.sessions': 'Signed-in devices',
   'users.confirmDisable': 'Disable {loginId}? They are signed out immediately.',
   'users.confirmResetTwoFactor':
     'Reset two-factor for {loginId}? This removes a protection and is recorded in the audit log.',
@@ -845,12 +1119,66 @@ export const en: Record<MessageKey, string> = {
   'account.completeEnroll': 'Finish registration',
   'account.recoveryTitle': 'Save these recovery codes. They cannot be shown again.',
   'account.recoveryNote': 'Use one of them to sign in if you lose your device. Each works only once.',
+  'sessions.title': 'Signed-in devices',
+  'sessions.lead': 'You can end individual sessions. End any device you do not recognize immediately.',
+  'sessions.loading': 'Loading\u2026',
+  'sessions.empty': 'No signed-in devices.',
+  'sessions.device': 'Device',
+  'sessions.ipAddress': 'IP address',
+  'sessions.signedInAt': 'Signed in',
+  'sessions.expiresAt': 'Expires',
+  'sessions.action': 'Action',
+  'sessions.current': 'Current device',
+  'sessions.unknown': 'Unknown',
+  'sessions.revoke': 'End',
+  'sessions.revokeOthers': 'End all other devices',
+  'sessions.confirmRevoke': 'End this device session?',
+  'sessions.confirmRevokeOthers': 'End all sessions except the current device?',
   'signIn.samlOr': 'or',
   'signIn.samlButton': 'Sign in with single sign-on',
   'signIn.samlError.invalid': 'Could not complete single sign-on. Please try again.',
   'signIn.samlError.unknownUser':
     'This account is not registered in administration. Ask an administrator to add it.',
   'signIn.samlError.disabled': 'This account is disabled. Contact an administrator.',
+  'saml.open': 'SAML settings',
+  'saml.title': 'SAML settings',
+  'saml.back': '\u2190 Back to surveys',
+  'saml.lead':
+    'Values supplied by external configuration take precedence. Saving applies editable fields without restarting the application.',
+  'saml.fixed': 'Fixed by configuration',
+  'saml.passwordFallbackTitle': 'Password sign-in always remains available.',
+  'saml.passwordFallback':
+    'The person enabling SAML may not be able to sign in with that configuration. If it is incorrect, sign in again with your ID, password and two-factor authentication when required, then correct it.',
+  'saml.enabled': 'Enable SAML sign-in',
+  'saml.entityId': 'SP Entity ID',
+  'saml.idpEntityId': 'IdP Entity ID',
+  'saml.singleSignOnUrl': 'IdP single sign-on URL',
+  'saml.idpCertificate': 'IdP signing certificate',
+  'saml.idpCertificateHint':
+    'PEM or Base64-encoded DER. Keep both old and new certificates during rotation. Changes are recorded in the audit log.',
+  'saml.unknownUser': 'Unregistered users',
+  'saml.unknownUserReject': 'Reject',
+  'saml.unknownUserRegister': 'Register just in time (JIT)',
+  'saml.registerRole': 'Role assigned by JIT',
+  'saml.loginIdSource': 'Sign-in ID source',
+  'saml.loginIdSourceClaim': 'Claim',
+  'saml.loginIdClaim': 'Claim used as the sign-in ID',
+  'saml.buttonLabel': 'Sign-in button label',
+  'saml.singleLogoutUrl': 'IdP single logout URL',
+  'saml.singleLogoutUrlHint': 'Leave blank to sign out from this application only.',
+  'saml.save': 'Save',
+  'saml.saving': 'Working…',
+  'saml.saved': 'SAML settings saved.',
+  'saml.testTitle': 'Test connection',
+  'saml.testLead':
+    'This only checks that IdP metadata can be fetched from the URL. It does not redirect to the actual sign-in page.',
+  'saml.metadataUrl': 'IdP metadata URL',
+  'saml.test': 'Fetch metadata',
+  'saml.testInvalidUrl': 'Enter an absolute HTTP or HTTPS URL.',
+  'saml.testNotMetadata': 'The retrieved document is not SAML metadata.',
+  'saml.testFailed': 'Could not retrieve metadata. Check the URL and IdP status.',
+  'saml.testSucceeded': 'SAML metadata was retrieved.',
+  'saml.testSucceededWithEntityId': 'SAML metadata was retrieved (Entity ID: {entityId}).',
 
   'enroll.title': 'Register two-factor authentication',
   'enroll.lead': 'Administration reaches every survey definition and every response.',
@@ -928,6 +1256,17 @@ export const en: Record<MessageKey, string> = {
   'siteId.label': 'Pleasanter site ID',
   'siteId.warning': 'Changing it removes the test-response mappings for the old site. Records in Pleasanter are not deleted.',
   'siteId.submit': 'Change',
+  'siteId.create': 'Create a mapping target site',
+  'siteId.createHint': 'Creates a response site directly below the Pleasanter top site with the survey title.',
+  'siteId.layoutHint': 'Configure detailed layouts in Pleasanter.',
+  'siteId.sync': 'Review synchronization',
+  'siteId.syncConfirmTitle': 'Synchronize with these changes?',
+  'siteId.syncConfirmLead': 'The Pleasanter site settings are updated only after confirmation.',
+  'siteId.syncAdded': 'Columns to add: {columns}',
+  'siteId.syncGrid': 'List column order: {columns}',
+  'siteId.syncEditor': 'Edit column order: {columns}',
+  'siteId.syncHistory': 'History column order: {columns}',
+  'siteId.syncConfirm': 'Synchronize these changes',
 
   'editor.back': '← Back to the list',
   'editor.revision': 'Draft rev.{revision}',
@@ -942,9 +1281,26 @@ export const en: Record<MessageKey, string> = {
   'editor.conflictLead': 'Please reload it.',
   'editor.conflictDetail': 'Your changes here are not saved. Reloading discards them.',
   'editor.reload': 'Reload',
+  'editor.confirmDiscardChanges':
+    'There are unsaved changes. Moving away discards them. Do you want to continue?',
   'editor.title': 'Title',
   'editor.description': 'Description (optional)',
   'editor.confirmationMessage': 'Message shown after submitting (optional)',
+  'editor.confirmationMarkupHint':
+    'You can use the same markup as descriptions. Paste the asset: markup generated below for an image or link.',
+  'editor.assetTicketExpiration': 'File delivery method',
+  'editor.assetTicketCompletedOnly': 'Only when the response is completed',
+  'editor.assetTicketCompletedOnlyWarning':
+    'If a respondent closes the tab before downloading, they can never retrieve the file and there is no recovery method. A download link cannot be included in the auto-reply email.',
+  'editor.assetTicketAcceptTo': 'Use the survey closing date',
+  'editor.assetTicketDaysAfterResponse': 'Days after the response',
+  'editor.assetTicketDays': 'Days',
+  'editor.assetTicketExpirationHint':
+    'The default follows the survey closing date. Days after the response is limited to 365 days. If no closing date is set, the expiry is 30 days.',
+  'editor.contentAsset': 'Asset for descriptions or the completion screen',
+  'editor.contentAssetHint':
+    'Allowed types: {extensions}. Up to {megabytes} MB each and {count} assets per survey. Paste the generated markup into a description or completion message.',
+  'editor.contentAssetMarkup': 'Markup to paste',
   'editor.showProgress': 'Show a progress bar',
   'editor.allowEditingAfterSubmit': 'Allow editing after submitting',
   'editor.nextVersion': 'Publishing makes this version {version}',
@@ -965,6 +1321,9 @@ export const en: Record<MessageKey, string> = {
 
   'question.titlePlaceholder': 'Question text',
   'question.descriptionPlaceholder': 'Note (optional)',
+  'question.descriptionFormat': 'Description style',
+  'question.descriptionFormatPlain': 'Plain (line breaks only)',
+  'question.descriptionFormatMarkup': 'Markup',
   'question.markupPlaceholder':
     'Body (optional). A blank line starts a new paragraph\ne.g. **bold** *italic* [link text](https://example.com/)',
   'question.markupHint':
@@ -976,6 +1335,8 @@ export const en: Record<MessageKey, string> = {
   'question.displayOnly': 'This element is display-only and takes no answer.',
   'question.unmapped': 'Not assigned (nothing will be kept in Pleasanter)',
   'question.mapped': '→ {columns}',
+  'question.showAssignments': 'Show matching assignments',
+  'question.assign': 'Assign this question',
   'question.choiceLabelPlaceholder': 'Text shown on screen',
   'question.choiceValuePlaceholder': 'Value that is stored',
   'question.choiceIsOther': 'Other',
@@ -1032,6 +1393,14 @@ export const en: Record<MessageKey, string> = {
   'question.patternMessagePlaceholder': 'e.g. Enter the postal code as 123-4567',
   'question.patternHint':
     'The whole value must match (the start and end are anchored automatically). Respondents see the message above, never the expression itself. Lookaround, backreferences and atomic groups are not available: matching runs on a non-backtracking engine so that a single answer cannot stall the form. Unsupported expressions are rejected when you publish.',
+  'question.normalizationTitle': 'Automatic answer conversion',
+  'question.convertFullWidthAsciiToHalfWidth':
+    'Convert full-width letters, numbers, and symbols to half-width',
+  'question.convertHalfWidthKanaToFullWidth': 'Convert half-width kana to full-width',
+  'question.convertFullWidthSpacesToHalfWidth': 'Convert full-width spaces to half-width',
+  'question.trimWhitespace': 'Remove surrounding whitespace',
+  'question.normalizationHint':
+    'Each conversion can be enabled independently. All are off by default. The converted value is validated against the input format and regular expression, then stored in Pleasanter.',
   'question.patternInvalid': 'This is not a valid regular expression.',
   'question.shuffleChoices': 'Shuffle the options for each respondent',
   'question.shuffleChoicesHint':
@@ -1052,8 +1421,26 @@ export const en: Record<MessageKey, string> = {
   'questionType.Ranking': 'Ranking',
   'questionType.Note': 'Note (no answer)',
   'questionType.Embed': 'Embedded content (image, video, external page)',
+  'questionType.Confirm': 'Confirmation (single checkbox)',
 
   'mapping.title': 'Assignment to Pleasanter',
+  'history.title': 'Download history',
+  'history.lead': 'No history is recorded when the site ID is 0. To enable it, map each event to a separate site.',
+  'history.siteId': 'History destination site ID (0 disables)',
+  'history.mappingTitle': 'Download history mapping',
+  'history.referenceIdHint':
+    'Map the response record ReferenceId to a Pleasanter link column already configured to link to the response site. This screen does not change site settings.',
+  'history.referenceIdSetupHint':
+    'To make it a link column, put [[response site ID]] in the choices of that column in Pleasanter.'
+    + ' If you skip this, projection still succeeds: the value is stored but is not a link.'
+    + ' Pleasanter also drops the link silently when the API key user cannot see the response site.'
+    + ' After enabling this, check that a history record really links back to the response.',
+  'history.source.EventType': 'Event type',
+  'history.source.OccurredAt': 'Occurred at',
+  'history.source.AssetFileName': 'Asset file name',
+  'history.source.AssetId': 'Asset ID',
+  'history.source.ReferenceId': 'Response record ReferenceId',
+  'history.source.SurveyTitle': 'Survey title',
   'mapping.addColumn': 'Add a column',
   'mapping.addAttachmentColumn': 'Add an attachment column',
   'mapping.noFileQuestion': 'There is no file upload question',
@@ -1097,10 +1484,28 @@ export const en: Record<MessageKey, string> = {
   'mapping.selectRow': 'Choose a row',
   'mapping.selectPort': 'Choose a port',
   'mapping.selectConverter': 'Choose a converter',
+  'mapping.selectedQuestionAssignment': 'Assignment containing the selected question',
+  'mapping.config.separator': 'Separator',
+  'mapping.config.separatorPlaceholder': 'Default: ,',
+  'mapping.config.checkValue': 'Value that produces true',
+  'mapping.config.keyword': 'Text to look for',
+  'mapping.config.constantValue': 'Constant value',
+  'mapping.config.whenValue': 'Value to match',
+  'mapping.config.thenValue': 'Value when matched',
+  'mapping.config.elseValue': 'Value when not matched (empty produces no output)',
+  'mapping.config.script': 'Script',
+  'mapping.config.mapSource': 'Original value',
+  'mapping.config.mapTarget': 'Replacement (Manager / Owner requires a user ID)',
+  'mapping.config.mapDefault': 'Default when no value matches (empty means unanswered)',
+  'mapping.config.numberDefault': 'Default when input is not a number (empty means unanswered)',
+  'mapping.config.numberDecimals': 'Decimal places (leave empty to keep all digits)',
+  'mapping.config.addMapRow': 'Add a replacement',
+  'mapping.config.removeMapRow': 'Remove this replacement',
 
   'converter.none': '(no converter)',
   'converter.join': 'Join',
   'converter.map': 'Map values',
+  'converter.toNumber': 'Convert to a number',
   'converter.toCheck': 'To a check column',
   'converter.contains': 'Contains',
   'converter.constant': 'Constant',
@@ -1119,6 +1524,7 @@ export const en: Record<MessageKey, string> = {
   'problem.DisplayOnlyQuestionAsSource': 'A note block cannot be used as an input',
   'problem.ReservedColumn': 'A reserved column cannot be a target',
   'problem.EmptyScript': 'The script is empty',
+  'problem.MissingConverterConfig': 'A required converter setting is empty',
   'problem.InvalidAttachmentShape':
     'An attachment assignment needs exactly one input and no converter',
   'problem.NonFileQuestionAsAttachment':
@@ -1218,6 +1624,8 @@ export const en: Record<MessageKey, string> = {
   'condition.matchAll': 'All of them',
   'condition.matchAny': 'Any of them',
   'condition.valuePlaceholder': 'Value to compare',
+  'condition.confirmed': 'Checked',
+  'condition.notConfirmed': 'Not checked',
   'condition.noEarlierQuestion':
     'There is no question before this one. A condition can only look at earlier questions.',
   'condition.earlierOnly': 'Only questions before this one can be chosen.',
@@ -1389,21 +1797,39 @@ export const en: Record<MessageKey, string> = {
   'autoReply.needsEmailQuestion':
     'Available only when the form asks for an email address. Add a short answer question and set its input format to email address.',
   'autoReply.subject': 'Subject',
+  'autoReply.fromAddress': 'From address',
+  'autoReply.fromAddressHint':
+    'To protect mail authentication and deliverability, this address is fixed by the server-wide setting and cannot be changed per survey.',
+  'autoReply.fromName': 'From display name',
+  'autoReply.fromNameHint':
+    'Leave blank to use the server-wide setting. You can set it separately for each language.',
+  'autoReply.fromNameAcsNote':
+    'When sending through Azure Communication Services, this display name has no effect.'
+    + ' The display name registered for the MailFrom address in Azure is used instead.',
+  'autoReply.replyToAddress': 'Reply-To',
+  'autoReply.replyToAddressHint': 'Leave blank to use the server-wide setting.',
+  'autoReply.bccAddress': 'BCC',
+  'autoReply.bccWarning':
+    'Warning: The BCC recipient can see the respondent’s email address. If the body contains {{answers}}, the full answers are also delivered. One message is sent for every response.',
   'autoReply.body': 'Body',
   'autoReply.bodyHint': 'No formatting. Plain text only.',
   'autoReply.placeholders':
-    'You can use placeholders. {{title}} is the survey title and {{submittedAt}} is the time it was received. Unknown placeholders are left as they are.',
+    'Select a keyword to insert it at the cursor in the body. Content without a keyword is not added to the mail.',
+  'autoReply.keywordList': 'Available keywords',
+  'autoReply.keyword.title': 'Survey title',
+  'autoReply.keyword.submittedAt': 'Submission time',
+  'autoReply.keyword.acceptTo': 'Closing time (empty if none)',
+  'autoReply.keyword.answers': 'Copy of the answers (response data leaves the system as email)',
+  'autoReply.keyword.formUrl': 'URL for submitting a new response',
+  'autoReply.keyword.editUrl': 'Link for changing this response (anyone with it can make changes)',
+  'autoReply.keyword.editUrlExpiresAt': 'Expiry of the response-editing link',
+  'autoReply.keyword.assetsUrl': 'Link for receiving materials',
+  'autoReply.keyword.assetsUrlExpiresAt': 'Expiry of the materials link',
   'autoReply.defaultSubject': 'Thank you for responding to {{title}}',
   'autoReply.defaultBody':
     'Thank you for responding to {{title}}.\n\nReceived: {{submittedAt}}\n\nThis message was sent automatically.',
-  'autoReply.includeAnswers': 'Append a copy of the answers',
-  'autoReply.includeAnswersHint':
-    'The answers leave the system as email. Only the respondent receives it, but the route is not necessarily encrypted.',
   'autoReply.serverDisabled':
     'Mail sending is not enabled on the server. These settings can be saved, but nothing will be sent until it is.',
-  'autoReply.includeEditLink': 'Append a link for changing the response',
-  'autoReply.includeEditLinkHint':
-    'Anyone who knows this link can change that response. Forwarded mail and shared mailboxes let others change it too.',
   'autoReply.editLinkDays': 'Days the link stays valid',
   'autoReply.editLinkDaysHint':
     'It never outlives the closing date. Suspending the survey makes it unusable straight away.',
@@ -1413,15 +1839,38 @@ export const en: Record<MessageKey, string> = {
   'autoReply.revokeEditLinksHint':
     'Use this if a link leaks. Every link sent so far stops working (the responses themselves are kept).',
   'autoReply.revokeEditLinksDone': 'Revoked {count} links.',
-  'autoReply.problem.EditLinkNotEditable':
-    'A response-editing link is set, but editing after submission is turned off.',
+  'autoReply.problem.EditLinkKeywordUnavailable':
+    'Response editing is turned off, so response-editing link keywords cannot be used.',
+  'autoReply.problem.AssetsUrlKeywordUnavailable':
+    'No materials can be delivered by mail, so materials-link keywords cannot be used.',
   'autoReply.problem.EditLinkDaysInvalid': 'The link must stay valid for 1 to 365 days.',
   'autoReply.problem.ToQuestionMissing': 'No question is selected for the address.',
   'autoReply.problem.ToQuestionNotFound': 'The selected question no longer exists.',
   'autoReply.problem.ToQuestionNotEmail': 'The selected question is not validated as an email address.',
   'autoReply.problem.SubjectMissing': 'The subject is empty.',
   'autoReply.problem.BodyMissing': 'The body is empty.',
+  'autoReply.problem.FromNameInvalid': 'The From display name cannot contain a line break.',
+  'autoReply.problem.ReplyToInvalid':
+    'Enter a valid Reply-To email address. Line breaks are not allowed.',
+  'autoReply.problem.BccInvalid': 'Enter a valid BCC email address. Line breaks are not allowed.',
   'autoReply.publishBlocked': 'Cannot publish. Fix the auto-reply settings first.',
+  'autoReply.preview': 'Mail preview',
+  'autoReply.previewFrom': 'From',
+  'autoReply.previewReplyTo': 'Reply-To',
+  'autoReply.previewBcc': 'BCC',
+  'autoReply.previewTo': 'To',
+  'autoReply.previewNone': 'None',
+  'autoReply.previewSubject': 'Subject',
+  'autoReply.previewBody': 'Body (plain text)',
+  'autoReply.unknownKeywords':
+    'Unknown keywords: {keywords}. They will be sent unchanged as text.',
+  'autoReply.testSend': 'Send a test to me',
+  'autoReply.testSending': 'Queuing test message…',
+  'autoReply.testRecipient':
+    'The recipient is fixed to the signed-in administrator ({recipient}).',
+  'autoReply.testRecipientUnavailable':
+    'Your sign-in ID is not an email address, so a test message cannot be sent.',
+  'autoReply.testQueued': 'Queued a test message to {recipient}.',
   // ---- Theme ----
   'theme.title': 'Look of the answer screen',
   'theme.lead':
@@ -1496,7 +1945,7 @@ export const en: Record<MessageKey, string> = {
     + 'honeypot field in effect.',
 };
 
-const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };
+const CATALOGS: Partial<Record<Language, Record<MessageKey, string>>> = { ja, en };
 
 /** 文言を引く関数。 */
 export type Translate = (
@@ -1510,8 +1959,8 @@ export type Translate = (
  * **翻訳が無ければ既定の言語へ落ちる**（`_documents/多言語対応方針.md` 1 章）。
  */
 export function translator(language: Language): Translate {
-  const catalog = CATALOGS[language] ?? CATALOGS[DEFAULT_LANGUAGE];
+  const catalog = CATALOGS[language] ?? ja;
 
   return (key, parameters) =>
-    interpolate(catalog[key] || CATALOGS[DEFAULT_LANGUAGE][key], parameters, language);
+    interpolate(catalog[key] || ja[key], parameters, language);
 }

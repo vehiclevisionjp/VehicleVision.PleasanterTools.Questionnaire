@@ -41,7 +41,9 @@ public interface ISurveyDeletionStore
 }
 
 /// <inheritdoc />
-public sealed class SurveyDeletionStore(IDbConnectionFactory connectionFactory) : ISurveyDeletionStore
+public sealed class SurveyDeletionStore(
+    IDbConnectionFactory connectionFactory,
+    ISurveyAssetStore? assetStore = null) : ISurveyDeletionStore
 {
     private sealed class SurveyRow
     {
@@ -124,11 +126,28 @@ public sealed class SurveyDeletionStore(IDbConnectionFactory connectionFactory) 
             },
             transaction,
             cancellationToken)).ConfigureAwait(false);
+        var pendingAssetHistory = await connection.ExecuteScalarAsync<long>(Command(
+            "SELECT COUNT(*) FROM [AssetHistoryOutbox] "
+            + "WHERE [SurveyId] = @SurveyId AND [Status] <> @DeadLetterStatus",
+            new
+            {
+                SurveyId = surveyId,
+                DeadLetterStatus = (int)AssetHistoryStatus.DeadLetter,
+            },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
 
-        if (pendingResponses > 0 || pendingMail > 0)
+        if (pendingResponses > 0 || pendingMail > 0 || pendingAssetHistory > 0)
         {
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             return new(SurveyDeletionStatus.PendingDelivery);
+        }
+
+        // **DB の行より先に消す。** 外部保存先の削除に失敗したまま DB だけ消すと、
+        // 次の試行で対象を特定できず、実体が恒久的に残るため。
+        if (assetStore is not null)
+        {
+            await assetStore.DeleteSurveyAsync(surveyId, cancellationToken).ConfigureAwait(false);
         }
 
         await DeleteAsync(
@@ -148,6 +167,8 @@ public sealed class SurveyDeletionStore(IDbConnectionFactory connectionFactory) 
             "AttachmentRejections",
             "SurveyAssets",
             "AdminNotifications",
+            "AssetTickets",
+            "AssetHistoryOutbox",
             "ResponseEditTokens",
             "MailOutbox",
             "Responses",

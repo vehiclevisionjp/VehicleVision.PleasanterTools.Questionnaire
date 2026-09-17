@@ -2,10 +2,12 @@
   import SurveyPreview from './SurveyPreview.svelte';
   import {
     loadColumnAvailability,
+    loadAssetOptions,
     loadDraft,
     loadEmbedOptions,
     testPublish,
     saveDraft,
+    uploadContentAsset,
     type ColumnAvailabilityResponse,
   } from '../lib/api';
   import {
@@ -41,15 +43,31 @@
   import AutoReplyEditor from './AutoReplyEditor.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
   import { adminAssetUrl } from '../lib/api';
+  import { addQuestionAssignment } from '../lib/mappingSelection';
+  import { assetMarkup as markupForAsset } from '../lib/asset';
 
   interface Props {
     surveyId: string;
     /** サーバ側でメールを送れる状態か（Issue #189）。**自動返信の欄で知らせる。** */
     mailEnabled: boolean;
+    /** 試し送信の宛先。**ログイン中の管理者自身に固定する。** */
+    testRecipient: string;
+    /** ログイン ID をメールアドレスとして使えるか。 */
+    testRecipientAvailable: boolean;
     onback: () => void;
+    onbreadcrumbchange: (title: string | null) => void;
+    onnavigationguardchange: (guard: (() => boolean) | null) => void;
   }
 
-  let { surveyId, mailEnabled, onback }: Props = $props();
+  let {
+    surveyId,
+    mailEnabled,
+    testRecipient,
+    testRecipientAvailable,
+    onback,
+    onbreadcrumbchange,
+    onnavigationguardchange,
+  }: Props = $props();
 
   /**
     * 入力欄が書き込む言語。
@@ -63,6 +81,7 @@
   let editing = $state<Language>(language());
 
   let definition = $state<SurveyDefinition>();
+  let savedDefinition = $state<SurveyDefinition>();
 
   /** プレビューを開いているか。**保存前の下書きをそのまま見る。** */
   let previewing = $state(false);
@@ -92,6 +111,11 @@
     };
   });
   let mapping = $state<MappingDefinition>({ assignments: [] });
+  let savedMapping = $state<MappingDefinition>({ assignments: [] });
+  let assetHistorySiteId = $state(0);
+  let savedAssetHistorySiteId = $state(0);
+  let assetHistoryMapping = $state<MappingDefinition>({ assignments: [] });
+  let savedAssetHistoryMapping = $state<MappingDefinition>({ assignments: [] });
   let revision = $state(0);
   let columnAvailability = $state<ColumnAvailabilityResponse>({
     source: 'standard',
@@ -104,11 +128,58 @@
   let notice = $state('');
   let conflict = $state(false);
   let warnings = $state<MappingProblem[]>([]);
+  let selectedQuestionId = $state<string | null>(null);
+  let assetUploading = $state(false);
+  let assetMarkup = $state('');
+  let assetError = $state('');
+  let assetExtensions = $state([
+    '.pdf',
+    '.docx',
+    '.xlsx',
+    '.pptx',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+  ]);
+  let assetMaxBytes = $state(10 * 1024 * 1024);
+  let assetMaxCount = $state(20);
 
   /** 公開が断られたときにサーバが返した分岐の不備。**サーバが最後の判定者。** */
   let publishFlow = $state<FlowProblem[]>([]);
 
   const allQuestions = $derived(definition?.pages.flatMap((page) => page.questions) ?? []);
+  const hasUnsavedChanges = $derived(
+    definition !== undefined &&
+      (JSON.stringify(definition) !== JSON.stringify(savedDefinition) ||
+      JSON.stringify(mapping) !== JSON.stringify(savedMapping) ||
+      assetHistorySiteId !== savedAssetHistorySiteId ||
+      JSON.stringify(assetHistoryMapping) !== JSON.stringify(savedAssetHistoryMapping)),
+  );
+  const breadcrumbTitle = $derived(
+    definition ? displayText(definition.title, language()) || null : null,
+  );
+
+  $effect(() => {
+    onbreadcrumbchange(breadcrumbTitle);
+  });
+
+  $effect(() => {
+    void (async () => {
+      const result = await loadAssetOptions();
+      if (result.ok) {
+        assetExtensions = result.value.allowedExtensions;
+        assetMaxBytes = result.value.maxFileSizeBytes;
+        assetMaxCount = result.value.maxFileCount;
+      }
+    })();
+  });
+
+  $effect(() => {
+    onnavigationguardchange(confirmDiscardChanges);
+    return () => onnavigationguardchange(null);
+  });
 
   /**
    * 編集中の分岐の不備。
@@ -155,9 +226,33 @@
 
     error = '';
     definition = result.value.definition;
+    savedDefinition = result.value.definition;
     mapping = result.value.mapping;
+    savedMapping = result.value.mapping;
+    assetHistorySiteId = result.value.assetHistorySiteId ?? 0;
+    savedAssetHistorySiteId = assetHistorySiteId;
+    assetHistoryMapping = result.value.assetHistoryMapping ?? { assignments: [] };
+    savedAssetHistoryMapping = assetHistoryMapping;
+    selectedQuestionId = null;
     revision = result.value.revision;
     await refreshColumnAvailability(id);
+  }
+
+  async function uploadAsset(file: File | undefined) {
+    if (!file || assetUploading) return;
+
+    assetUploading = true;
+    assetError = '';
+    assetMarkup = '';
+    const result = await uploadContentAsset(surveyId, file);
+    assetUploading = false;
+
+    if (!result.ok) {
+      assetError = result.message;
+      return;
+    }
+
+    assetMarkup = markupForAsset(file.name, result.value.assetId, result.value.isImage);
   }
 
   async function refreshColumnAvailability(id = surveyId) {
@@ -228,7 +323,15 @@
   function removeQuestion(pageIndex: number, questionIndex: number) {
     const page = definition?.pages[pageIndex];
     if (!page) return;
+    if (page.questions[questionIndex]?.questionId === selectedQuestionId) {
+      selectedQuestionId = null;
+    }
     updatePage(pageIndex, { questions: page.questions.filter((_, i) => i !== questionIndex) });
+  }
+
+  function assignQuestion(questionId: string) {
+    selectedQuestionId = questionId;
+    mapping = addQuestionAssignment(mapping, questionId);
   }
 
   function moveQuestion(pageIndex: number, questionIndex: number, direction: -1 | 1) {
@@ -265,7 +368,14 @@
     error = '';
     notice = '';
 
-    const result = await saveDraft(surveyId, definition, mapping, revision);
+    const result = await saveDraft(
+      surveyId,
+      definition,
+      mapping,
+      revision,
+      assetHistorySiteId,
+      assetHistoryMapping,
+    );
     saving = false;
 
     if (!result.ok) {
@@ -278,7 +388,21 @@
     }
 
     revision = result.value.revision;
+    savedDefinition = definition;
+    savedMapping = mapping;
+    savedAssetHistorySiteId = assetHistorySiteId;
+    savedAssetHistoryMapping = assetHistoryMapping;
     notice = t('editor.saved');
+  }
+
+  function confirmDiscardChanges(): boolean {
+    return !hasUnsavedChanges || confirm(t('editor.confirmDiscardChanges'));
+  }
+
+  function back() {
+    if (confirmDiscardChanges()) {
+      onback();
+    }
   }
 
   async function doPublish() {
@@ -318,7 +442,11 @@
     const key = problemKey(problem.code);
     const base = key ? t(key) : problem.code;
     const where = problem.targetColumn ? `[${problem.targetColumn}] ` : '';
-    const detail = problem.detail ? `（${problem.detail}）` : '';
+
+    // ⚠️ **detail は設問の ID。そのまま出しても何のことか分からない**（Issue #248）。
+    // 「Pleasanter に保存されません」と言われても、どの設問かが分からなければ直せない。
+    // **分岐の不備と同じように、見出しへ直して出す**
+    const detail = problem.detail ? `（${questionLabel(problem.detail)}）` : '';
     return `${where}${base}${detail}`;
   }
 
@@ -381,14 +509,15 @@
   function whereOf(problem: FlowProblem): string {
     const pageIndex = definition?.pages.findIndex((page) => page.pageId === problem.pageId) ?? -1;
     const page = pageIndex >= 0 ? pageLabel(pageIndex) : (problem.pageId ?? '');
-    const question = problem.questionId ? flowQuestionLabel(problem.questionId) : '';
+    const question = problem.questionId ? questionLabel(problem.questionId) : '';
 
     if (page === '') return question;
     if (question === '') return page;
     return t('flow.where', { page, question });
   }
 
-  function flowQuestionLabel(questionId: string): string {
+  /** 設問の見出し。**見出しが無ければ ID で呼ぶ。** */
+  function questionLabel(questionId: string): string {
     const question = allQuestions.find((entry) => entry.questionId === questionId);
     return question
       ? displayText(question.title, editing) || questionId
@@ -397,7 +526,7 @@
 </script>
 
 <header class="bar">
-  <button type="button" class="link" onclick={onback}>{t('editor.back')}</button>
+  <button type="button" class="link" onclick={back}>{t('editor.back')}</button>
 
   <div class="right">
     <span class="revision">{t('editor.revision', { revision })}</span>
@@ -530,8 +659,9 @@
 
     <label>
       {t('editor.confirmationMessage')}
-      <input
-        type="text"
+      <textarea
+        rows="5"
+        maxlength="4000"
         value={text(definition.confirmationMessage, editing)}
         oninput={(event) =>
           (definition = {
@@ -542,8 +672,112 @@
               editing,
             ),
           })}
-      />
+      ></textarea>
     </label>
+    <p class="hint">{t('editor.confirmationMarkupHint')}</p>
+
+    <fieldset>
+      <legend>{t('editor.assetTicketExpiration')}</legend>
+      <label class="inline">
+        <input
+          type="radio"
+          name="asset-ticket-expiration"
+          checked={definition.assetDelivery?.expiration === 'CompletedOnly'}
+          onchange={() =>
+            (definition = {
+              ...definition!,
+              assetDelivery: {
+                expiration: 'CompletedOnly',
+                days: definition!.assetDelivery?.days ?? 30,
+              },
+            })}
+        />
+        {t('editor.assetTicketCompletedOnly')}
+      </label>
+      {#if definition.assetDelivery?.expiration === 'CompletedOnly'}
+        <p class="warning">{t('editor.assetTicketCompletedOnlyWarning')}</p>
+      {/if}
+      <label class="inline">
+        <input
+          type="radio"
+          name="asset-ticket-expiration"
+          checked={(definition.assetDelivery?.expiration ?? 'AcceptTo') === 'AcceptTo'}
+          onchange={() =>
+            (definition = {
+              ...definition!,
+              assetDelivery: {
+                expiration: 'AcceptTo',
+                days: definition!.assetDelivery?.days ?? 30,
+              },
+            })}
+        />
+        {t('editor.assetTicketAcceptTo')}
+      </label>
+      <label class="inline">
+        <input
+          type="radio"
+          name="asset-ticket-expiration"
+          checked={(definition.assetDelivery?.expiration ?? 'AcceptTo') === 'DaysAfterResponse'}
+          onchange={() =>
+            (definition = {
+              ...definition!,
+              assetDelivery: {
+                expiration: 'DaysAfterResponse',
+                days: definition!.assetDelivery?.days ?? 30,
+              },
+            })}
+        />
+        {t('editor.assetTicketDaysAfterResponse')}
+      </label>
+      {#if (definition.assetDelivery?.expiration ?? 'AcceptTo') === 'DaysAfterResponse'}
+        <label>
+          {t('editor.assetTicketDays')}
+          <input
+            type="number"
+            min="1"
+            max="365"
+            value={definition.assetDelivery?.days ?? 30}
+            oninput={(event) =>
+              (definition = {
+                ...definition!,
+                assetDelivery: {
+                  expiration: 'DaysAfterResponse',
+                  days: Number(event.currentTarget.value) || 30,
+                },
+              })}
+          />
+        </label>
+      {/if}
+      <p class="hint">{t('editor.assetTicketExpirationHint')}</p>
+    </fieldset>
+
+    <div class="asset-upload">
+      <label>
+        {t('editor.contentAsset')}
+        <input
+          type="file"
+          accept={assetExtensions.join(',')}
+          disabled={assetUploading}
+          onchange={(event) => void uploadAsset(event.currentTarget.files?.[0])}
+        />
+      </label>
+      <p class="hint">
+        {t('editor.contentAssetHint', {
+          extensions: assetExtensions.join(', '),
+          megabytes: Math.floor(assetMaxBytes / (1024 * 1024)),
+          count: assetMaxCount,
+        })}
+      </p>
+      {#if assetMarkup}
+        <label>
+          {t('editor.contentAssetMarkup')}
+          <input type="text" readonly value={assetMarkup} onclick={(event) => event.currentTarget.select()} />
+        </label>
+      {/if}
+      {#if assetError}
+        <p class="error" role="alert">{assetError}</p>
+      {/if}
+    </div>
 
     <div class="toggles">
       <label class="inline">
@@ -581,14 +815,19 @@
        ⚠️ **既定は送らない。** 明示的に有効にしたときだけ 1 通出る -->
   <AutoReplyEditor
     {surveyId}
+    {definition}
     allowEditing={definition.allowEditingAfterSubmit}
     autoReply={definition.autoReply}
     questions={definition.pages.flatMap((page) => page.questions)}
     {editing}
     {mailEnabled}
+    {testRecipient}
+    {testRecipientAvailable}
     onchange={(next) => (definition = { ...definition!, autoReply: next })}
   />
 
+  <div class="editor-columns">
+    <div class="question-column">
   {#each definition.pages as page, pageIndex (page.pageId)}
     {@const targets = jumpTargets(pageIndex)}
     {@const stale = staleTargetId(page.next, targets.map((target) => target.pageId))}
@@ -620,6 +859,7 @@
         <QuestionEditor
           {question}
           {editing}
+          selected={selectedQuestionId === question.questionId}
           mappedColumns={columnsFor(question.questionId)}
           canMoveUp={questionIndex > 0}
           canMoveDown={questionIndex < page.questions.length - 1}
@@ -627,6 +867,8 @@
           priorQuestions={priorQuestions(pageIndex, questionIndex)}
           branchTakenBy={branchTakenBy(pageIndex, questionIndex)}
           {allowedEmbedHosts}
+          onselect={() => (selectedQuestionId = question.questionId)}
+          onassign={() => assignQuestion(question.questionId)}
           onchange={(next) => updateQuestion(pageIndex, questionIndex, next)}
           onremove={() => removeQuestion(pageIndex, questionIndex)}
           onmove={(direction) => moveQuestion(pageIndex, questionIndex, direction)}
@@ -690,15 +932,59 @@
   {/each}
 
   <button type="button" class="secondary" onclick={addPage}>{t('editor.addPage')}</button>
+    </div>
 
-  <MappingEditor
-    {mapping}
-    questions={allQuestions}
-    {editing}
-    availability={columnAvailability}
-    onrefresh={() => refreshColumnAvailability()}
-    onchange={(next) => (mapping = next)}
-  />
+    <div class="mapping-column">
+      <MappingEditor
+        {mapping}
+        questions={allQuestions}
+        {editing}
+        {selectedQuestionId}
+        availability={columnAvailability}
+        onrefresh={() => refreshColumnAvailability()}
+        onchange={(next) => (mapping = next)}
+      />
+      <section class="history-settings">
+        <h2>{t('history.title')}</h2>
+        <p class="hint">{t('history.lead')}</p>
+        <label>
+          <span>{t('history.siteId')}</span>
+          <input
+            type="number"
+            min="0"
+            value={assetHistorySiteId || ''}
+            placeholder="0"
+            oninput={(event) => {
+              assetHistorySiteId = Math.max(0, Number(event.currentTarget.value) || 0);
+            }}
+          />
+        </label>
+        {#if assetHistorySiteId > 0}
+          <p class="hint">{t('history.referenceIdHint')}</p>
+          <!-- **忘れても投射は成功する。** 気付けないので設定方法まで書く -->
+          <p class="hint">{t('history.referenceIdSetupHint')}</p>
+          <MappingEditor
+            mapping={assetHistoryMapping}
+            questions={[]}
+            {editing}
+            selectedQuestionId={null}
+            availability={{ source: 'standard', availableByPrefix: {} }}
+            onrefresh={() => {}}
+            title={t('history.mappingTitle')}
+            systemSources={[
+              { value: 'EventType', label: t('history.source.EventType') },
+              { value: 'OccurredAt', label: t('history.source.OccurredAt') },
+              { value: 'AssetFileName', label: t('history.source.AssetFileName') },
+              { value: 'AssetId', label: t('history.source.AssetId') },
+              { value: 'ReferenceId', label: t('history.source.ReferenceId') },
+              { value: 'SurveyTitle', label: t('history.source.SurveyTitle') },
+            ]}
+            onchange={(next) => (assetHistoryMapping = next)}
+          />
+        {/if}
+      </section>
+    </div>
+  </div>
 {/if}
 
 <!--
@@ -713,6 +999,7 @@
            公開前の画像は回答画面の口からは出ない -->
       <SurveyPreview
         {definition}
+        assetUrl={(assetId) => adminAssetUrl(surveyId, assetId)}
         headerImageUrl={definition.theme?.headerImageId
           ? adminAssetUrl(surveyId, definition.theme.headerImageId)
           : null}
@@ -811,6 +1098,24 @@
 
   .page {
     background: var(--bg);
+  }
+
+  .editor-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .question-column,
+  .mapping-column {
+    min-width: 0;
+  }
+
+  @media (max-width: 75rem) {
+    .editor-columns {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   label {

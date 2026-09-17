@@ -1,12 +1,13 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using StackExchange.Redis;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
-/// <summary>ログイン済みの cookie を、要求のたびに DB と突き合わせる。</summary>
+/// <summary>セッション ID をストアと DB に突き合わせ、principal を復元する。</summary>
 /// <remarks>
 /// <para>
 /// **止めた管理者を、その場で追い出すため。** cookie は 8 時間有効なので、
@@ -25,10 +26,45 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 public static class AdminSessionGuard
 {
     public static async Task ValidateAsync(CookieValidatePrincipalContext context)
-    {
-        var principal = context.Principal;
+        => await ValidateAsync(context, AdminSessionKind.Session).ConfigureAwait(false);
 
-        if (!Guid.TryParse(principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var adminUserId))
+    public static async Task ValidatePendingAsync(CookieValidatePrincipalContext context)
+        => await ValidateAsync(context, AdminSessionKind.Pending).ConfigureAwait(false);
+
+    public static async Task ValidateReenrollAsync(CookieValidatePrincipalContext context)
+        => await ValidateAsync(context, AdminSessionKind.Reenroll).ConfigureAwait(false);
+
+    private static async Task ValidateAsync(
+        CookieValidatePrincipalContext context,
+        AdminSessionKind kind)
+    {
+        var manager = context.HttpContext.RequestServices.GetRequiredService<AdminSessionManager>();
+        (AdminSessionEntry Entry, ClaimsPrincipal Principal)? restored;
+        try
+        {
+            restored = await manager
+                .FindAsync(context.Principal, kind, context.HttpContext.RequestAborted)
+                .ConfigureAwait(false);
+        }
+        catch (RedisException exception)
+        {
+            // KVS 停止時も cookie だけで通さない。障害はログへ出し、認証は失敗させる。
+            var logger = context.HttpContext.RequestServices
+                .GetRequiredService<ILogger<AdminSessionManager>>();
+            logger.LogError(exception, "管理者セッションストアを読み取れなかった");
+            await RejectAsync(context).ConfigureAwait(false);
+            return;
+        }
+
+        if (restored is null)
+        {
+            await RejectAsync(context).ConfigureAwait(false);
+            return;
+        }
+
+        var principal = restored.Value.Principal;
+        if (!Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var adminUserId)
+            || adminUserId != restored.Value.Entry.AdminUserId)
         {
             await RejectAsync(context).ConfigureAwait(false);
             return;
@@ -45,8 +81,14 @@ public static class AdminSessionGuard
                 user.Role.ToString(),
                 StringComparison.Ordinal))
         {
+            await context.HttpContext.RequestServices.GetRequiredService<IAdminSessionStore>()
+                .DeleteAsync(restored.Value.Entry.AdminSessionId, context.HttpContext.RequestAborted)
+                .ConfigureAwait(false);
             await RejectAsync(context).ConfigureAwait(false);
+            return;
         }
+
+        context.ReplacePrincipal(principal);
     }
 
     private static async Task RejectAsync(CookieValidatePrincipalContext context)
@@ -54,6 +96,6 @@ public static class AdminSessionGuard
         context.RejectPrincipal();
 
         // **cookie も消す。** 残すと、要求のたびに DB を引き直すだけの死んだ cookie になる
-        await context.HttpContext.SignOutAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
+        await context.HttpContext.SignOutAsync(context.Scheme.Name).ConfigureAwait(false);
     }
 }

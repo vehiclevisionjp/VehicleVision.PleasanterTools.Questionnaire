@@ -155,6 +155,17 @@ public sealed class AltchaGuard
             return null;
         }
 
+        return await CheckRequiredAsync(solution, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>回答画面の有効設定にかかわらず、解答を確かめる。</summary>
+    /// <remarks>
+    /// 管理画面は別の設定で入り切りする。同じ署名鍵と使い回し防止表だけを共有する。
+    /// </remarks>
+    public async Task<AltchaRejection?> CheckRequiredAsync(
+        string? solution,
+        CancellationToken cancellationToken = default)
+    {
         if (string.IsNullOrWhiteSpace(solution))
         {
             return AltchaRejection.Missing;

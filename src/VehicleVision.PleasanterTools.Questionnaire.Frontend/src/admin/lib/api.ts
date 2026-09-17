@@ -1,8 +1,10 @@
 import { acceptLanguageHeader, t } from './i18n/state.svelte';
 import type { NoteBlock } from '../../lib/types';
+import type { AltchaChallenge } from '../../lib/altcha';
 import type {
   AdminNotificationPage,
   AdminSession,
+  AdminSessionRow,
   AdminUserRow,
   IssuedInvitation,
   AttachmentRejectionPage,
@@ -16,6 +18,7 @@ import type {
   SurveyDraft,
   SurveyPage,
   SurveyTemplateSummary,
+  SamlSettings,
 } from './types';
 
 /**
@@ -85,11 +88,33 @@ async function call<T>(
 
 export const getSession = () => call<AdminSession>('/api/admin/session');
 
+export interface ApplicationVersion {
+  version: string;
+  commit?: string | null;
+  allowInsecure: boolean;
+}
+
+/** 動作中の版を読む。**認証済みの管理者にだけサーバが返す。** */
+export const getApplicationVersion = () =>
+  call<ApplicationVersion>('/api/admin/application/version');
+
 export const setupFirstAdministrator = (loginId: string, password: string) =>
   call<{ next: string }>('/api/admin/setup', { method: 'POST', json: { loginId, password } });
 
-export const login = (loginId: string, password: string) =>
-  call<{ next: string }>('/api/admin/login', { method: 'POST', json: { loginId, password } });
+export const getAdminCaptchaChallenge = () =>
+  call<AltchaChallenge>('/api/admin/captcha/challenge');
+
+export const login = (loginId: string, password: string, altcha?: string) =>
+  call<{ next: string }>('/api/admin/login', {
+    method: 'POST',
+    json: { loginId, password, altcha },
+  });
+
+export const acceptInvitation = (token: string, password: string, altcha?: string) =>
+  call<{ next: string }>('/api/admin/invitations/accept', {
+    method: 'POST',
+    json: { token, password, altcha },
+  });
 
 export const verifyTotp = (code: string) =>
   call<{ authenticated: boolean }>('/api/admin/login/totp', { method: 'POST', json: { code } });
@@ -194,6 +219,27 @@ export const disableOwnTotp = (password: string) =>
 
 export const logout = () => call<{ signedOut: boolean }>('/api/admin/logout', { method: 'POST', json: {} });
 
+export const listAdminSessions = (adminUserId?: string) =>
+  call<{ sessions: AdminSessionRow[] }>(
+    adminUserId === undefined
+      ? '/api/admin/me/sessions'
+      : `/api/admin/users/${adminUserId}/sessions`,
+  );
+
+export const revokeAdminSession = (adminSessionId: string, adminUserId?: string) =>
+  call<{ revoked: boolean }>(
+    adminUserId === undefined
+      ? `/api/admin/me/sessions/${adminSessionId}/revoke`
+      : `/api/admin/users/${adminUserId}/sessions/${adminSessionId}/revoke`,
+    { method: 'POST', json: {} },
+  );
+
+export const revokeOtherOwnSessions = () =>
+  call<{ revoked: number }>('/api/admin/me/sessions/revoke-others', {
+    method: 'POST',
+    json: {},
+  });
+
 /**
  * 管理画面を出す言語を決める。
  *
@@ -203,6 +249,23 @@ export const saveLanguage = (language: string | null) =>
   call<{ language: string | null }>('/api/admin/me/language', {
     method: 'PUT',
     json: { language },
+  });
+
+// ---- SAML 設定（Issue #254）-------------------------------------------------
+
+export const getSamlSettings = () =>
+  call<SamlSettings>('/api/admin/saml/settings');
+
+export const saveSamlSettings = (settings: SamlSettings) =>
+  call<SamlSettings>('/api/admin/saml/settings', {
+    method: 'PUT',
+    json: settings,
+  });
+
+export const testSamlMetadata = (metadataUrl: string) =>
+  call<{ reachable: boolean; entityId?: string | null }>('/api/admin/saml/settings/test', {
+    method: 'POST',
+    json: { metadataUrl },
   });
 
 // ---- アンケート -------------------------------------------------------------
@@ -237,10 +300,15 @@ export const listSurveys = (
   return call<SurveyPage>(`/api/admin/surveys?${query}`);
 };
 
-export const createSurvey = (title: string, pleasanterSiteId: number, responseJsonColumn?: string) =>
+export const createSurvey = (
+  title: string,
+  pleasanterSiteId: number,
+  responseJsonColumn?: string,
+  createPleasanterSite = false,
+) =>
   call<{ surveyId: string; publicId: string }>('/api/admin/surveys', {
     method: 'POST',
-    json: { title, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
+    json: { title, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null, createPleasanterSite },
   });
 
 /**
@@ -331,10 +399,12 @@ export const saveDraft = (
   definition: SurveyDefinition,
   mapping: MappingDefinition,
   revision: number,
+  assetHistorySiteId: number,
+  assetHistoryMapping: MappingDefinition,
 ) =>
   call<{ revision: number }>(`/api/admin/surveys/${surveyId}`, {
     method: 'PUT',
-    json: { definition, mapping, revision },
+    json: { definition, mapping, revision, assetHistorySiteId, assetHistoryMapping },
   });
 
 /**
@@ -352,6 +422,26 @@ export const uploadHeaderImage = (surveyId: string, file: File) => {
   body.append('image', file);
 
   return call<{ assetId: string }>(`/api/admin/surveys/${surveyId}/theme/header-image`, {
+    method: 'POST',
+    body,
+  });
+};
+
+/** 説明文と完了画面で使う自前画像を上げる（Issue #266 / #269）。 */
+export interface AssetOptions {
+  allowedExtensions: string[];
+  maxFileSizeBytes: number;
+  maxFileCount: number;
+}
+
+export const loadAssetOptions = () =>
+  call<AssetOptions>('/api/admin/surveys/asset-options');
+
+export const uploadContentAsset = (surveyId: string, file: File) => {
+  const body = new FormData();
+  body.append('asset', file);
+
+  return call<{ assetId: string; isImage: boolean }>(`/api/admin/surveys/${surveyId}/assets`, {
     method: 'POST',
     body,
   });
@@ -391,6 +481,26 @@ export const updateSurveySiteId = (surveyId: string, pleasanterSiteId: number) =
   call<{ pleasanterSiteId: number }>(`/api/admin/surveys/${surveyId}/site-id`, {
     method: 'PUT',
     json: { pleasanterSiteId },
+  });
+
+export interface SiteSettingsSyncPreview {
+  addedColumns: string[];
+  gridColumns: string[];
+  editorColumns: string[];
+  historyColumns: string[];
+  unchanged: string[];
+}
+
+export const previewSiteSettingsSync = (surveyId: string) =>
+  call<SiteSettingsSyncPreview>(`/api/admin/surveys/${surveyId}/site-settings/preview`, {
+    method: 'POST',
+    json: {},
+  });
+
+export const syncSiteSettings = (surveyId: string) =>
+  call<{ synchronized: true }>(`/api/admin/surveys/${surveyId}/site-settings/sync`, {
+    method: 'POST',
+    json: {},
   });
 
 /**
@@ -555,4 +665,29 @@ export const previewNotes = (markups: (string | null)[]) =>
   call<{ results: NotePreviewResult[] }>('/api/admin/note/preview', {
     method: 'POST',
     json: { markups },
+  });
+
+export interface AutoReplyPreview {
+  fromAddress: string;
+  fromName: string | null;
+  toAddress: string;
+  replyToAddress: string | null;
+  bccAddress: string | null;
+  subject: string;
+  body: string;
+  unknownKeywords: string[];
+}
+
+/** 保存前の定義から、本番と同じ処理で自動返信を組み立てる（Issue #319）。 */
+export const previewAutoReply = (definition: SurveyDefinition, language: string) =>
+  call<AutoReplyPreview>('/api/admin/auto-reply/preview', {
+    method: 'POST',
+    json: { definition, language },
+  });
+
+/** 保存前の定義を、ログイン中の管理者本人へ試し送信する（Issue #319）。 */
+export const sendAutoReplyTest = (definition: SurveyDefinition, language: string) =>
+  call<{ queued: boolean }>('/api/admin/auto-reply/test-send', {
+    method: 'POST',
+    json: { definition, language },
   });

@@ -59,6 +59,20 @@ describe('validateQuestion', () => {
     expect(validateQuestion(question('q'), undefined, t, 'ja')).toBeNull();
   });
 
+  it('必須の確認はチェック済みだけを通す', () => {
+    const target = question('q', { type: 'Confirm', isRequired: true });
+
+    expect(validateQuestion(target, answer(['true']), t, 'ja')).toBeNull();
+    expect(validateQuestion(target, answer(['false']), t, 'ja')).toBe('validation.required');
+    expect(validateQuestion(target, undefined, t, 'ja')).toBe('validation.required');
+  });
+
+  it('確認は真偽値以外を受け取らない', () => {
+    const target = question('q', { type: 'Confirm' });
+
+    expect(validateQuestion(target, answer(['yes']), t, 'ja')).toBe('validation.boolean');
+  });
+
   it('文字数の上限を超えたら弾く', () => {
     const target = question('q', { settings: { maxLength: 3 } });
 

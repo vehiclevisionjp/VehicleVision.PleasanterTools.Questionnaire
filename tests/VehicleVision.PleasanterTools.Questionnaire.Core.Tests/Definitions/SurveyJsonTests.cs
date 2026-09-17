@@ -17,6 +17,11 @@ public class SurveyJsonTests
         Description = LocalizedText.Japanese("ご協力ください🙏"),
         DisplayMode = DisplayMode.OneQuestionPerPage,
         ShowProgress = false,
+        AssetDelivery = new AssetDeliverySettings
+        {
+            Expiration = AssetTicketExpiration.AcceptTo,
+            Days = 45,
+        },
         Pages =
         [
             new Page
@@ -39,6 +44,11 @@ public class SurveyJsonTests
                         Settings = new QuestionSettings
                         {
                             MaxLength = 100,
+                            DescriptionFormat = DescriptionFormat.Markup,
+                            ConvertFullWidthAsciiToHalfWidth = true,
+                            ConvertHalfWidthKanaToFullWidth = true,
+                            ConvertFullWidthSpacesToHalfWidth = true,
+                            TrimWhitespace = true,
                             Format = TextFormat.Email,
                             ScaleMinimum = 1,
                             ScaleMaximum = 5,
@@ -80,6 +90,8 @@ public class SurveyJsonTests
         Assert.Equal(7, restored.Version);
         Assert.Equal(DisplayMode.OneQuestionPerPage, restored.DisplayMode);
         Assert.False(restored.ShowProgress);
+        Assert.Equal(AssetTicketExpiration.AcceptTo, restored.AssetDelivery!.Expiration);
+        Assert.Equal(45, restored.AssetDelivery.Days);
         Assert.Equal("顧客満足度アンケート", restored.Title.Get("ja"));
         Assert.Equal("Customer Satisfaction", restored.Title.Get("en"));
         Assert.Equal("ご協力ください🙏", restored.Description!.Get("ja"));
@@ -91,6 +103,11 @@ public class SurveyJsonTests
         Assert.Equal(2, question.Choices.Length);
         Assert.True(question.Choices[1].IsOther);
         Assert.Equal(100, question.Settings.MaxLength);
+        Assert.Equal(DescriptionFormat.Markup, question.Settings.DescriptionFormat);
+        Assert.True(question.Settings.ConvertFullWidthAsciiToHalfWidth);
+        Assert.True(question.Settings.ConvertHalfWidthKanaToFullWidth);
+        Assert.True(question.Settings.ConvertFullWidthSpacesToHalfWidth);
+        Assert.True(question.Settings.TrimWhitespace);
         Assert.Equal(TextFormat.Email, question.Settings.Format);
         Assert.True(restored.FindQuestion("note1")!.IsDisplayOnly);
     }
@@ -125,6 +142,38 @@ public class SurveyJsonTests
         Assert.Contains("\"Radio\"", json);
         Assert.Contains("\"OneQuestionPerPage\"", json);
         Assert.DoesNotContain("\"type\":2", json);
+        Assert.Contains("\"descriptionFormat\":\"Markup\"", json);
+    }
+
+    [Fact]
+    public void 過去のJSONに書き方が無ければプレーンになる()
+    {
+        const string json =
+            """
+            {
+              "questionId": "q1",
+              "type": "Text",
+              "title": { "ja": "設問" },
+              "description": { "ja": "**そのまま**" },
+              "settings": {}
+            }
+            """;
+
+        var question = SurveyJson.Deserialize<Question>(json);
+
+        Assert.NotNull(question);
+        Assert.Equal(DescriptionFormat.Plain, question.Settings.DescriptionFormat);
+        Assert.Null(question.DescriptionBlocks);
+        Assert.False(question.Settings.ConvertFullWidthAsciiToHalfWidth);
+        Assert.False(question.Settings.ConvertHalfWidthKanaToFullWidth);
+        Assert.False(question.Settings.ConvertFullWidthSpacesToHalfWidth);
+        Assert.False(question.Settings.TrimWhitespace);
+    }
+
+    [Fact]
+    public void 確認は埋め込みの後ろへ追加されている()
+    {
+        Assert.Equal((int)QuestionType.Embed + 1, (int)QuestionType.Confirm);
     }
 
     [Fact]

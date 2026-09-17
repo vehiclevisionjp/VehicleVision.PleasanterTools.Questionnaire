@@ -19,6 +19,26 @@ public static class MailMessageFactory
     /// </remarks>
     public const string AutoSubmittedHeader = "Auto-Submitted";
 
+    /// <summary>全体設定と 1 通ごとの指定から、実際に使うヘッダを決める。</summary>
+    public static ResolvedMailHeaders ResolveHeaders(MailOptions options, OutgoingMail mail)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(mail);
+
+        var fromName = string.IsNullOrWhiteSpace(mail.FromName) ? options.FromName : mail.FromName;
+        var replyTo = string.IsNullOrWhiteSpace(mail.ReplyToAddress)
+            ? options.ReplyToAddress
+            : mail.ReplyToAddress;
+        var bcc = string.IsNullOrWhiteSpace(mail.BccAddress) ? null : mail.BccAddress;
+
+        return new ResolvedMailHeaders(
+            options.FromAddress,
+            fromName,
+            mail.ToAddress,
+            replyTo,
+            bcc);
+    }
+
     /// <summary>組み立てる。</summary>
     /// <exception cref="MailDeliveryException">
     /// アドレスの形が壊れている。**再送しても直らないので恒久の失敗として投げる。**
@@ -28,14 +48,21 @@ public static class MailMessageFactory
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(mail);
         mail.Validate();
+        var headers = ResolveHeaders(options, mail);
+        ValidateHeaders(headers);
 
         var message = new MimeMessage();
-        message.From.Add(Parse(options.FromAddress, options.FromName, "差出人"));
-        message.To.Add(Parse(mail.ToAddress, name: null, "宛先"));
+        message.From.Add(Parse(headers.FromAddress, headers.FromName));
+        message.To.Add(Parse(headers.ToAddress, name: null));
 
-        if (!string.IsNullOrWhiteSpace(options.ReplyToAddress))
+        if (headers.ReplyToAddress is not null)
         {
-            message.ReplyTo.Add(Parse(options.ReplyToAddress, name: null, "返信先"));
+            message.ReplyTo.Add(Parse(headers.ReplyToAddress, name: null));
+        }
+
+        if (headers.BccAddress is not null)
+        {
+            message.Bcc.Add(Parse(headers.BccAddress, name: null));
         }
 
         message.Subject = mail.Subject;
@@ -48,18 +75,8 @@ public static class MailMessageFactory
         return message;
     }
 
-    private static MailboxAddress Parse(string address, string? name, string role)
+    private static MailboxAddress Parse(string address, string? name)
     {
-        // ⚠️ **MimeKit の解析は緩く、`@` が無い文字列も通す。**
-        // 回答の検証と同じ `MailAddress.TryCreate` で先に落とす
-        // （`Core/Validation/AnswerValidator` の `TextFormat.Email`）。
-        // **画面が受け取った値と、送れる値の判定を割らない。**
-        if (!MailAddress.TryCreate(address, out _))
-        {
-            throw new MailDeliveryException(
-                $"{role}のアドレスの形が正しくない", isTransient: false);
-        }
-
         try
         {
             return string.IsNullOrWhiteSpace(name)
@@ -70,7 +87,40 @@ public static class MailMessageFactory
         {
             // ⚠️ **アドレスそのものを文言へ入れない。** この文言はデッドレターに残る
             throw new MailDeliveryException(
-                $"{role}のアドレスの形が正しくない", isTransient: false, exception);
+                "メールアドレスの形が正しくない", isTransient: false, exception);
+        }
+    }
+
+    private static void ValidateAddress(string address, string role)
+    {
+        // ⚠️ **MimeKit の解析は緩く、`@` が無い文字列も通す。**
+        if (!MailAddress.TryCreate(address, out _))
+        {
+            throw new MailDeliveryException(
+                $"{role}のアドレスの形が正しくない", isTransient: false);
+        }
+    }
+
+    internal static void ValidateHeaders(ResolvedMailHeaders headers)
+    {
+        ValidateAddress(headers.FromAddress, "差出人");
+        ValidateAddress(headers.ToAddress, "宛先");
+        if (headers.ReplyToAddress is not null)
+        {
+            ValidateAddress(headers.ReplyToAddress, "返信先");
+        }
+
+        if (headers.BccAddress is not null)
+        {
+            ValidateAddress(headers.BccAddress, "BCC");
         }
     }
 }
+
+/// <summary>全体設定へのフォールバックを済ませたメールヘッダ。</summary>
+public sealed record ResolvedMailHeaders(
+    string FromAddress,
+    string? FromName,
+    string ToAddress,
+    string? ReplyToAddress,
+    string? BccAddress);

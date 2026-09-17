@@ -1,5 +1,6 @@
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Text;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
@@ -225,6 +226,84 @@ public class SurveyThemeStoreTests
         var copiedAsset = await assets.FindAsync(target.SurveyId, copiedAssetId.Value);
         Assert.NotNull(copiedAsset);
         Assert.Equal(content, copiedAsset.Content);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 複製は本文画像と記法の参照先も複製先へ写す(
+        DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys, assets) = Create(provider, connectionString);
+        var sourceId = await CreateSurveyAsync(surveys);
+        var content = Png();
+        var assetId = await assets.AddAsync(sourceId, "image/png", "guide.png", content);
+        var definition = Definition(sourceId, null) with
+        {
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "page-1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "note-1",
+                            Type = QuestionType.Note,
+                            Title = LocalizedText.Japanese("案内"),
+                            Description = LocalizedText.Japanese(
+                                $"![案内](asset:{assetId:D})"),
+                        },
+                    ],
+                },
+            ],
+        };
+        await drafts.SaveAsync(
+            sourceId, definition, new MappingDefinition(), expectedRevision: 0);
+
+        var target = new SurveyDuplicationTarget(
+            Guid.NewGuid(), $"pub-{Guid.NewGuid():N}", PleasanterSiteId: 99, ResponseJsonColumn: null);
+
+        Assert.True(await drafts.DuplicateAsync(sourceId, target));
+
+        var copied = await drafts.LoadAsync(target.SurveyId);
+        var copiedMarkup = copied!.Definition.Pages[0].Questions[0].Description!.Get("ja");
+        var copiedAssetId = Assert.Single(NoteMarkup.AssetIds(copiedMarkup));
+
+        Assert.NotEqual(assetId, copiedAssetId);
+        var copiedAsset = await assets.FindAsync(target.SurveyId, copiedAssetId);
+        Assert.NotNull(copiedAsset);
+        Assert.Equal(content, copiedAsset.Content);
+        Assert.Equal("guide.png", copiedAsset.FileName);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 本文画像の上限はヘッダ画像と分けて原子的に確保する(
+        DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (_, surveys, assets) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+        await assets.AddAsync(surveyId, "image/png", "header.png", Png());
+
+        var first = await assets.TryAddContentAsync(
+            surveyId, "image/png", "first.png", Png(), maximumCount: 1);
+        var second = await assets.TryAddContentAsync(
+            surveyId, "image/png", "second.png", Png(), maximumCount: 1);
+
+        Assert.NotNull(first);
+        Assert.Null(second);
+        Assert.NotNull(await assets.FindAsync(surveyId, first.Value));
     }
 
     [Theory]

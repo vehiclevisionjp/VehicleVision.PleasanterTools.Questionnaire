@@ -30,6 +30,14 @@ public sealed record SurveyDefinition
     /// <summary>送信後に出す文言。</summary>
     public LocalizedText? ConfirmationMessage { get; init; }
 
+    /// <summary>送信後に出す本文を、安全な書式へ変換したもの。</summary>
+    /// <remarks>
+    /// **画面はこちらだけを記法として扱う。** 原文は
+    /// <see cref="ConfirmationMessage"/> だけに置き、構造との二重管理を避ける。
+    /// </remarks>
+    public IReadOnlyDictionary<string, ImmutableArray<NoteBlock>>? ConfirmationBlocks =>
+        ParseConfirmation();
+
     /// <summary>回答の編集を許すか。</summary>
     public bool AllowEditingAfterSubmit { get; init; } = true;
 
@@ -54,12 +62,38 @@ public sealed record SurveyDefinition
     /// </remarks>
     public AutoReplySettings? AutoReply { get; init; }
 
+    /// <summary>回答後に配る資産の引換券の期限（Issue #318）。</summary>
+    /// <remarks><c>null</c> は「回答から 30 日」の既定値として扱う。</remarks>
+    public AssetDeliverySettings? AssetDelivery { get; init; }
+
     /// <summary>全ページの設問を順に返す。</summary>
     public IEnumerable<Question> AllQuestions => Pages.SelectMany(page => page.Questions);
 
     /// <summary>指定した ID の設問を返す。無ければ <c>null</c>。</summary>
     public Question? FindQuestion(string questionId) =>
         AllQuestions.FirstOrDefault(question => question.QuestionId == questionId);
+
+    private IReadOnlyDictionary<string, ImmutableArray<NoteBlock>>? ParseConfirmation()
+    {
+        if (ConfirmationMessage is null)
+        {
+            return null;
+        }
+
+        var byLanguage = new Dictionary<string, ImmutableArray<NoteBlock>>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var language in ConfirmationMessage.Languages)
+        {
+            var blocks = Text.NoteMarkup.Parse(ConfirmationMessage.Get(language));
+            if (blocks.Length > 0)
+            {
+                byLanguage[language] = blocks;
+            }
+        }
+
+        return byLanguage.Count > 0 ? byLanguage : null;
+    }
+
 }
 
 /// <summary>回答画面の表示モード。</summary>

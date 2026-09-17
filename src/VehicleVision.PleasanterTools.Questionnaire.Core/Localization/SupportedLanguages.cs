@@ -19,7 +19,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 public static class SupportedLanguages
 {
     /// <summary>選べる言語。**先頭が既定。**</summary>
-    public static readonly ImmutableArray<string> All = [LocalizedText.DefaultLanguage, "en"];
+    public static readonly ImmutableArray<string> All =
+        [LocalizedText.DefaultLanguage, "en", "zh", "de", "ko", "es", "vi"];
 
     /// <summary>未翻訳・未指定のときに使う言語。</summary>
     public const string Default = LocalizedText.DefaultLanguage;
@@ -56,6 +57,40 @@ public static class SupportedLanguages
 
         return null;
     }
+
+    /// <summary>Pleasanter の言語コードを本アプリの言語コードへ読み替える。</summary>
+    /// <remarks>
+    /// Pleasanter はベトナム語を <c>vn</c> と表すが、ブラウザは ISO 639-1 の
+    /// <c>vi</c> を返す。**この境界以外では常に <c>vi</c> を使う。**
+    /// </remarks>
+    public static string? FromPleasanterLanguage(string? languageTag)
+    {
+        if (string.IsNullOrWhiteSpace(languageTag))
+        {
+            return null;
+        }
+
+        var primary = languageTag.Trim();
+        var separator = primary.IndexOfAny(['-', '_']);
+        if (separator >= 0)
+        {
+            primary = primary[..separator];
+        }
+
+        return string.Equals(primary, "vn", StringComparison.OrdinalIgnoreCase)
+            ? "vi"
+            : Normalize(languageTag);
+    }
+
+    /// <summary>本アプリの言語コードを Pleasanter の言語コードへ読み替える。</summary>
+    /// <remarks>
+    /// Pleasanter へ渡す直前だけ <c>vi</c> を <c>vn</c> にする。対応外の値を
+    /// Pleasanter へ渡さないため、正規化できない値は <c>null</c> を返す。
+    /// </remarks>
+    public static string? ToPleasanterLanguage(string? languageTag) =>
+        Normalize(languageTag) is { } language
+            ? language == "vi" ? "vn" : language
+            : null;
 
     /// <summary><c>Accept-Language</c> ヘッダから、対応している言語を 1 つ選ぶ。</summary>
     /// <remarks>

@@ -11,7 +11,9 @@
     restoreSurvey,
     saveAsTemplate,
     saveSurveySettings,
+    previewSiteSettingsSync,
     suspend,
+    syncSiteSettings,
     updateSurveySiteId,
   } from '../lib/api';
   import {
@@ -79,6 +81,7 @@
   let creating = $state(false);
   let newTitle = $state('');
   let newSiteId = $state('');
+  let createPleasanterSite = $state(false);
   let newJsonColumn = $state('');
 
   /** 複製を開いているアンケート。**1 度に 1 つだけ開く。** */
@@ -126,6 +129,7 @@
   let siteFor = $state<SurveySummary | null>(null);
   let siteId = $state('');
   let siteBusy = $state(false);
+  let siteSyncPreview = $state<import('../lib/api').SiteSettingsSyncPreview | null>(null);
 
   /** 完全削除の確認を開いているアーカイブ済みアンケート。 */
   let deleting = $state<SurveySummary | null>(null);
@@ -183,12 +187,12 @@
     error = '';
 
     const siteId = Number(newSiteId);
-    if (!Number.isInteger(siteId) || siteId <= 0) {
+    if (!createPleasanterSite && (!Number.isInteger(siteId) || siteId <= 0)) {
       error = t('list.newSiteIdInvalid');
       return;
     }
 
-    const result = await createSurvey(newTitle, siteId, newJsonColumn);
+    const result = await createSurvey(newTitle, siteId, newJsonColumn, createPleasanterSite);
     if (!result.ok) {
       error = result.message;
       return;
@@ -196,6 +200,7 @@
 
     newTitle = '';
     newSiteId = '';
+    createPleasanterSite = false;
     newJsonColumn = '';
     creating = false;
     onopen(result.value.surveyId);
@@ -294,6 +299,40 @@
     error = '';
     siteFor = survey;
     siteId = String(survey.pleasanterSiteId);
+    siteSyncPreview = null;
+  }
+
+  async function previewSiteSync() {
+    const target = siteFor;
+    if (target === null || siteBusy) return;
+
+    error = '';
+    siteBusy = true;
+    const result = await previewSiteSettingsSync(target.surveyId);
+    siteBusy = false;
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    siteSyncPreview = result.value;
+  }
+
+  async function syncSite() {
+    const target = siteFor;
+    if (target === null || siteBusy) return;
+
+    siteBusy = true;
+    const result = await syncSiteSettings(target.surveyId);
+    siteBusy = false;
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    siteSyncPreview = null;
+    siteFor = null;
+    await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
   async function saveSite(event: SubmitEvent) {
@@ -490,8 +529,13 @@
     </label>
     <label>
       {t('list.newSiteId')}
-      <input type="text" inputmode="numeric" bind:value={newSiteId} required />
+      <input type="text" inputmode="numeric" bind:value={newSiteId} required={!createPleasanterSite} disabled={createPleasanterSite} />
     </label>
+    <label class="check">
+      <input type="checkbox" bind:checked={createPleasanterSite} />
+      {t('siteId.create')}
+    </label>
+    {#if createPleasanterSite}<p class="hint">{t('siteId.createHint')}</p>{/if}
     <label>
       {t('list.newJsonColumn')}
       <input
@@ -514,13 +558,37 @@
       <input type="text" inputmode="numeric" bind:value={siteId} required />
     </label>
     <p class="warn">{t('siteId.warning')}</p>
+    <p class="hint">{t('siteId.layoutHint')}</p>
     <div class="actions">
       <button type="submit" disabled={siteBusy}>{t('siteId.submit')}</button>
+      <button type="button" class="secondary" disabled={siteBusy} onclick={previewSiteSync}>
+        {t('siteId.sync')}
+      </button>
       <button type="button" class="secondary" onclick={() => (siteFor = null)}>
         {t('settings.cancel')}
       </button>
     </div>
   </form>
+{/if}
+
+{#if siteSyncPreview && siteFor}
+  <section class="create" aria-live="polite">
+    <h2>{t('siteId.syncConfirmTitle')}</h2>
+    <p>{t('siteId.syncConfirmLead')}</p>
+    <p>{t('siteId.syncAdded', { columns: siteSyncPreview.addedColumns.join('、') || 'なし' })}</p>
+    <p>{t('siteId.syncGrid', { columns: siteSyncPreview.gridColumns.join('、') })}</p>
+    <p>{t('siteId.syncEditor', { columns: siteSyncPreview.editorColumns.join('、') })}</p>
+    <p>{t('siteId.syncHistory', { columns: siteSyncPreview.historyColumns.join('、') })}</p>
+    <ul>
+      {#each siteSyncPreview.unchanged as item (item)}<li>{item}</li>{/each}
+    </ul>
+    <div class="actions">
+      <button type="button" disabled={siteBusy} onclick={syncSite}>{t('siteId.syncConfirm')}</button>
+      <button type="button" class="secondary" onclick={() => (siteSyncPreview = null)}>
+        {t('settings.cancel')}
+      </button>
+    </div>
+  </section>
 {/if}
 
 {#if duplicating}
@@ -678,11 +746,11 @@
     <thead>
       <tr>
         <th>{t('list.columnTitle')}</th>
-        <th>{t('list.columnStatus')}</th>
-        <th>{t('list.columnVersion')}</th>
-        <th>{t('list.columnResponses')}</th>
-        <th>{t('list.columnUrl')}</th>
-        <th>{t('list.columnUpdated')}</th>
+        <th class="compact-column">{t('list.columnStatus')}</th>
+        <th class="compact-column">{t('list.columnVersion')}</th>
+        <th class="compact-column">{t('list.columnResponses')}</th>
+        <th class="url-column">{t('list.columnUrl')}</th>
+        <th class="compact-column">{t('list.columnUpdated')}</th>
         <th></th>
       </tr>
     </thead>
@@ -699,7 +767,7 @@
               <span class="reason">{t('archive.archived')}</span>
             {/if}
           </td>
-          <td>
+          <td class="compact-column">
             <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
             <!--
               **なぜ止まっているのかが分かること**（_documents/データモデル設計.md 2.1）。
@@ -712,15 +780,17 @@
               {/if}
             {/if}
           </td>
-          <td>{survey.publishedVersion ?? '—'}</td>
-          <td class="responses">
-            <div>{responses(survey)}</div>
-            <div>{t('list.testResponseCount', { count: survey.testResponseCount })}</div>
+          <td class="compact-column">{survey.publishedVersion ?? '—'}</td>
+          <td class="responses compact-column">
+            <span>{responses(survey)}</span>
+            <span class="test-response-count">
+              {t('list.testResponseCount', { count: survey.testResponseCount })}
+            </span>
             {#if survey.testResponseCount > 0}
-              <div class="hint">{t('list.testResponseCleanup')}</div>
+              <span class="test-response-cleanup" aria-hidden="true">※</span>
             {/if}
           </td>
-          <td>
+          <td class="url-column">
             {#if isPublished(survey)}
               <a href={formUrl(survey.publicId)} target="_blank" rel="noreferrer">
                 {survey.publicId}
@@ -732,7 +802,7 @@
               <span class="muted">{t('list.notPublished')}</span>
             {/if}
           </td>
-          <td class="muted">{formatDate(survey.updatedAt)}</td>
+          <td class="muted compact-column">{formatDate(survey.updatedAt)}</td>
           <td class="row-actions">
             <div class="row-actions-inner">
             {#if survey.archivedAt == null && (survey.status === 1 || survey.status === 2)}
@@ -789,6 +859,14 @@
       {/each}
     </tbody>
   </table>
+
+  <!--
+    ⚠️ **印だけにしない。** Pleasanter 側のテスト回答は本アプリから消せず、
+    運用側で消してもらうしかない。**やるべきことは文で残す**
+  -->
+  {#if surveys.some((survey) => survey.testResponseCount > 0)}
+    <p class="hint test-response-note">※ {t('list.testResponseCleanup')}</p>
+  {/if}
 
   <nav class="pager">
     <button
@@ -917,13 +995,38 @@
 
   /*
     停止と複製が並ぶ。**td は display: flex にしない**（表の桁が崩れる）ので、
-    中に入れ物を 1 枚はさんでそこを flex にする。
+    中に入れ物を 1 枚はさんでそこを格子にする。
     **横だけに余白を付けると、折り返した先の行が詰まる**（Issue #150）
+
+    ⚠️ **flex の折り返しにしないこと。** 釦の出る条件が行ごとに違うので、
+    文字数なりに並べると**折り返す位置が行ごとに変わって縦に揃わない。**
+    **格子なら幅が揃い、何個出ても桁の位置が動かない。**
   */
   .row-actions-inner {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    display: grid;
+    /* **等幅。** 入る数は桁の広さで決まり、余れば 1 行に収まる */
+    grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+    gap: 0.3rem;
+    /* 狭い画面で潰れないように、桁そのものの下限を決める */
+    min-width: 11.5rem;
+  }
+
+  /* **1 つぶんの高さを抑える。** 段が増えても伸びにくくする */
+  /*
+    ⚠️ **nowrap にしないこと。** 「テンプレートに保存」のような長い札が
+    枠からはみ出して切れる。**折り返せば、はみ出しようがない**
+  */
+  .row-actions-inner button {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    /* **文字数が違っても同じ大きさに見えるようにする** */
+    text-align: center;
+  }
+
+  /* **釦の桁は広めに取る。** 等幅にすると 1 個あたりの幅が要る */
+  .row-actions {
+    width: 18rem;
   }
 
   label {
@@ -987,6 +1090,46 @@
     font-weight: 600;
   }
 
+  .compact-column {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  /*
+    ⚠️ **題名に余りを取らせる。** これを書かないと、
+    中身の幅を要求する桁（とくに回答用 URL）に押されて**題名が 1 文字ずつ折り返す。**
+  */
+  th:first-child,
+  td:first-child {
+    width: 100%;
+    /*
+      ⚠️ **下限が要る。** 幅が足りないと、縮められるのは題名だけなので
+      **1 文字ずつ折り返すところまで潰れる**（実測。2026-09-16）
+    */
+    min-width: 12rem;
+  }
+
+  /*
+    **回答用 URL は長い。** 縮めない桁にすると幅を要求し、題名を潰す。
+    ⚠️ **折り返させる**
+  */
+  .url-column {
+    /*
+      ⚠️ **width: 1% にしないこと。** break-all と組むと
+      「最小幅＝1 文字」になり、桁が縦 1 列に潰れる。
+      **決め打ちの幅を与えて、その中で折り返させる**
+    */
+    width: 14rem;
+    /*
+      ⚠️ **min-width が要る。** 表の width は提案にすぎず、
+      題名の width:100% に押されて**最小の中身の幅**まで縮む。
+      break-all だとその最小が 1 文字になる
+    */
+    min-width: 14rem;
+    /* **必要なときだけ折る。** break-all は 1 文字ずつ折ってしまう */
+    overflow-wrap: anywhere;
+  }
+
   tbody tr:last-child td {
     border-bottom: none;
   }
@@ -1016,6 +1159,20 @@
 
   .responses {
     white-space: nowrap;
+  }
+
+  .test-response-count::before {
+    content: ' / ';
+  }
+
+  .test-response-cleanup {
+    margin-left: 0.2rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .test-response-note {
+    margin-top: 0.5rem;
   }
 
   .status-0 {

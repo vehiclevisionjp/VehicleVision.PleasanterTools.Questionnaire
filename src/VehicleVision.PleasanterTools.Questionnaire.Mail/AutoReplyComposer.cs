@@ -1,4 +1,3 @@
-using System.Text;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
@@ -29,7 +28,8 @@ public static class AutoReplyComposer
         SurveyDefinition definition,
         ResponsePayload payload,
         string? language,
-        DateTimeOffset? submittedAt = null)
+        DateTimeOffset? submittedAt = null,
+        AutoReplyPlaceholderValues? values = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(payload);
@@ -40,7 +40,7 @@ public static class AutoReplyComposer
             return null;
         }
 
-        var toAddress = FindAnswerValue(payload, settings.ToQuestionId);
+        var toAddress = FindRecipient(settings, payload);
         if (string.IsNullOrWhiteSpace(toAddress))
         {
             // **宛先の設問に答えていない。** 任意の設問を宛先にできる以上、普通に起きる
@@ -50,9 +50,13 @@ public static class AutoReplyComposer
         // **差し込みは件名にも効かせる。** 「{{title}} へのご回答」と書けること
         var title = definition.Title.Get(language);
         var filledAt = submittedAt ?? DateTimeOffset.UtcNow;
+        values = (values ?? new AutoReplyPlaceholderValues()) with
+        {
+            Answers = DescribeAnswers(definition, payload, language),
+        };
 
         var subject = MailPlaceholders.Fill(
-            settings.Subject?.Get(language) ?? string.Empty, title, filledAt);
+            settings.Subject?.Get(language) ?? string.Empty, title, filledAt, values);
         if (string.IsNullOrWhiteSpace(subject))
         {
             // **公開のときに弾いているはず**（AutoReplyValidator）。
@@ -60,18 +64,36 @@ public static class AutoReplyComposer
             return null;
         }
 
-        var body = new StringBuilder(MailPlaceholders.Fill(
-            settings.Body?.Get(language) ?? string.Empty, title, filledAt));
+        var body = MailPlaceholders.Fill(
+            settings.Body?.Get(language) ?? string.Empty, title, filledAt, values);
 
-        if (settings.IncludeAnswers)
-        {
-            AppendAnswers(body, definition, payload, language);
-        }
-
-        return new OutgoingMail(toAddress.Trim(), subject, body.ToString());
+        return new OutgoingMail(
+            toAddress.Trim(),
+            subject,
+            body,
+            settings.FromName?.Get(language),
+            settings.ReplyToAddress?.Trim(),
+            settings.BccAddress?.Trim());
     }
 
-    /// <summary>本文のあとに回答の写しを付ける。</summary>
+    /// <summary>設定された設問から宛先を得る。**送れないなら <c>null</c>。**</summary>
+    public static string? FindRecipient(AutoReplySettings settings, ResponsePayload payload)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(payload);
+
+        if (!settings.Enabled || string.IsNullOrWhiteSpace(settings.ToQuestionId))
+        {
+            return null;
+        }
+
+        return FindAnswerValue(payload, settings.ToQuestionId) is { } value
+            && !string.IsNullOrWhiteSpace(value)
+                ? value.Trim()
+                : null;
+    }
+
+    /// <summary>回答の写しを作る。</summary>
     /// <remarks>
     /// <para>
     /// ⚠️ **添付の中身は載せない。** ファイル名だけにする。
@@ -81,16 +103,14 @@ public static class AutoReplyComposer
     /// **定義の順に出す。** 回答の配列の順は、回答者が触った順に依存し得る。
     /// </para>
     /// </remarks>
-    private static void AppendAnswers(
-        StringBuilder body,
+    private static string DescribeAnswers(
         SurveyDefinition definition,
         ResponsePayload payload,
         string? language)
     {
         var answers = payload.Answers.ToDictionary(
             answer => answer.QuestionId, StringComparer.Ordinal);
-
-        body.AppendLine().AppendLine();
+        var lines = new List<string>();
 
         foreach (var question in definition.AllQuestions)
         {
@@ -111,8 +131,10 @@ public static class AutoReplyComposer
                 continue;
             }
 
-            body.Append(question.Title.Get(language)).Append(": ").AppendLine(text);
+            lines.Add($"{question.Title.Get(language)}: {text}");
         }
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     /// <summary>回答 1 件を 1 行の文字列にする。</summary>

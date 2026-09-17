@@ -143,9 +143,11 @@ public sealed class ResponseBacklogGuard(
     BacklogGuardOptions options,
     ILogger<ResponseBacklogGuard> logger,
     TimeProvider? timeProvider = null,
-    IAdminNotificationStore? notifications = null)
+    IAdminNotificationStore? notifications = null,
+    ISharedBacklogStateStore? sharedState = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly SharedStateWarning _sharedWarning = new(logger, timeProvider);
 
     /// <summary>数え直しを 1 本に絞る錠。**待たない。** 誰かが数えていれば古い値で答える。</summary>
     private readonly SemaphoreSlim _sampling = new(1, 1);
@@ -157,6 +159,7 @@ public sealed class ResponseBacklogGuard(
     private readonly ConcurrentDictionary<Guid, bool> _blocked = new();
 
     private PendingBacklog _sample = PendingBacklog.Empty;
+    private SharedBacklogState? _lastSharedState;
     private long _sampledAtTicks;
     private int _acceptedTotal;
     private int _totalBlocked;
@@ -169,6 +172,21 @@ public sealed class ResponseBacklogGuard(
         if (!options.Enabled)
         {
             return false;
+        }
+
+        if (sharedState is not null)
+        {
+            try
+            {
+                return await IsSharedBlockedAsync(surveyId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _lastSharedState = null;
+                _sharedWarning.Log(
+                    exception,
+                    "滞留の共有 KVS に接続できないため、プロセス内の見張りへ切り替えた");
+            }
         }
 
         await SampleIfStaleAsync(cancellationToken).ConfigureAwait(false);
@@ -242,6 +260,99 @@ public sealed class ResponseBacklogGuard(
         return blocked;
     }
 
+    private async ValueTask<bool> IsSharedBlockedAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken)
+    {
+        var atLeast = options.PerSurveyLimit > 0
+            ? Math.Max(1, options.PerSurveyResume)
+            : int.MaxValue;
+        var state = await sharedState!.GetOrSampleAsync(
+                options.SampleInterval,
+                atLeast,
+                token => outbox.CountBacklogAsync(atLeast, token),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var totalBlocked = Decide(
+            state.TotalBlocked,
+            state.Total,
+            options.TotalLimit,
+            options.TotalResume);
+        var totalChanged = await sharedState
+            .SetTotalBlockedAsync(totalBlocked, cancellationToken)
+            .ConfigureAwait(false);
+        if (totalChanged)
+        {
+            if (totalBlocked)
+            {
+                logger.LogError(
+                    "滞留が {Total} 件になったので、全アンケートの受付を止めた（上限 {Limit} 件）。"
+                    + "{Resume} 件まで捌けたら受け付け直す",
+                    state.Total,
+                    options.TotalLimit,
+                    options.TotalResume);
+                await NotifyAsync(
+                        AdminNotificationKind.BacklogBlockedTotal,
+                        Guid.Empty,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                logger.LogWarning(
+                    "滞留が {Total} 件まで減ったので、全体の受付を再開した",
+                    state.Total);
+            }
+        }
+
+        if (totalBlocked)
+        {
+            _lastSharedState = state with { TotalBlocked = true };
+            return true;
+        }
+
+        var was = state.BlockedSurveys.Contains(surveyId);
+        var count = state.For(surveyId);
+        var blocked = Decide(was, count, options.PerSurveyLimit, options.PerSurveyResume);
+        var changed = await sharedState
+            .SetSurveyBlockedAsync(surveyId, blocked, cancellationToken)
+            .ConfigureAwait(false);
+        if (changed)
+        {
+            if (blocked)
+            {
+                logger.LogError(
+                    "アンケート {SurveyId} の滞留が {Count} 件になったので受付を止めた（上限 {Limit} 件）",
+                    surveyId,
+                    count,
+                    options.PerSurveyLimit);
+                await NotifyAsync(
+                        AdminNotificationKind.BacklogBlockedSurvey,
+                        surveyId,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                logger.LogWarning(
+                    "アンケート {SurveyId} の滞留が {Count} 件まで減ったので受付を再開した",
+                    surveyId,
+                    count);
+            }
+        }
+
+        var blockedSurveys = blocked
+            ? state.BlockedSurveys.Add(surveyId)
+            : state.BlockedSurveys.Remove(surveyId);
+        _lastSharedState = state with
+        {
+            TotalBlocked = false,
+            BlockedSurveys = blockedSurveys,
+        };
+        return blocked;
+    }
+
     /// <summary>管理者への知らせを 1 件立てる（Issue #80）。</summary>
     /// <remarks>
     /// ⚠️ **知らせを書けなくても受付の結果を変えない。** 例外を投げると、
@@ -283,6 +394,41 @@ public sealed class ResponseBacklogGuard(
             return;
         }
 
+        RecordLocalAcceptance(surveyId);
+    }
+
+    /// <summary>1 件受け付けたことをプロセス内と共有 KVS の両方へ伝える。</summary>
+    public async Task OnAcceptedAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!options.Enabled)
+        {
+            return;
+        }
+
+        // KVS 障害へ切り替わる直前の受付も残すため、共有側が正常でもローカルで数える。
+        RecordLocalAcceptance(surveyId);
+        if (sharedState is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await sharedState.IncrementAcceptedAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _sharedWarning.Log(
+                exception,
+                "滞留の共有 KVS に受付数を書けないため、プロセス内の増分だけで続ける");
+        }
+    }
+
+    private void RecordLocalAcceptance(Guid surveyId)
+    {
         Interlocked.Increment(ref _acceptedTotal);
         _accepted.AddOrUpdate(surveyId, 1, static (_, count) => count + 1);
     }
@@ -290,6 +436,18 @@ public sealed class ResponseBacklogGuard(
     /// <summary>管理画面へ出す今の状態。**数え直しはしない。**</summary>
     public BacklogGuardStatus GetStatus()
     {
+        if (_lastSharedState is { } shared)
+        {
+            return new BacklogGuardStatus(
+                options.Enabled,
+                shared.Total,
+                options.TotalLimit,
+                shared.TotalBlocked,
+                options.PerSurveyLimit,
+                shared.BlockedSurveys.Count,
+                shared.SampledAt);
+        }
+
         var ticks = Interlocked.Read(ref _sampledAtTicks);
 
         return new BacklogGuardStatus(

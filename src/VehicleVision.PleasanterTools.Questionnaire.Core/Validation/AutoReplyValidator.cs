@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Net.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Validation;
@@ -24,14 +25,23 @@ public enum AutoReplyProblemCode
     /// <summary>本文が空。</summary>
     BodyMissing,
 
-    /// <summary>
-    /// 回答の編集を許していないのに、再編集リンクを付けようとしている（Issue #202）。
-    /// **開いても直せないリンクを送ることになる。**
-    /// </summary>
-    EditLinkNotEditable,
+    /// <summary>差出人の表示名に改行が含まれる。</summary>
+    FromNameInvalid,
+
+    /// <summary>返信先がメールアドレスとして読めないか、改行を含む。</summary>
+    ReplyToInvalid,
+
+    /// <summary>BCC がメールアドレスとして読めないか、改行を含む。</summary>
+    BccInvalid,
 
     /// <summary>再編集リンクの有効日数が範囲外（Issue #202）。</summary>
     EditLinkDaysInvalid,
+
+    /// <summary>再編集を許していないため、再編集リンクのキーワードを使えない。</summary>
+    EditLinkKeywordUnavailable,
+
+    /// <summary>メールで渡せる配布物が無いため、配布リンクのキーワードを使えない。</summary>
+    AssetsUrlKeywordUnavailable,
 }
 
 /// <summary>自動返信の設定の不備 1 件。</summary>
@@ -97,12 +107,31 @@ public static class AutoReplyValidator
             problems.Add(new AutoReplyProblem(AutoReplyProblemCode.BodyMissing));
         }
 
-        if (settings.IncludeEditLink)
+        if (ContainsNewLine(settings.FromName))
         {
-            // **開いても直せないリンクを送らない**（Issue #202）
+            problems.Add(new AutoReplyProblem(AutoReplyProblemCode.FromNameInvalid));
+        }
+
+        if (!IsOptionalAddress(settings.ReplyToAddress))
+        {
+            problems.Add(new AutoReplyProblem(AutoReplyProblemCode.ReplyToInvalid));
+        }
+
+        if (!IsOptionalAddress(settings.BccAddress))
+        {
+            problems.Add(new AutoReplyProblem(AutoReplyProblemCode.BccInvalid));
+        }
+
+        var usesEditLink =
+            AutoReplyKeywords.Contains(settings, AutoReplyKeywords.EditUrl)
+            || AutoReplyKeywords.Contains(settings, AutoReplyKeywords.EditUrlExpiresAt);
+        if (usesEditLink)
+        {
+            // 既知だが現在の設定では使えないキーワードは公開時に止める。
+            // 打ち間違いである未知のキーワードは、プレビューで警告しつつ本文へ残す。
             if (!definition.AllowEditingAfterSubmit)
             {
-                problems.Add(new AutoReplyProblem(AutoReplyProblemCode.EditLinkNotEditable));
+                problems.Add(new AutoReplyProblem(AutoReplyProblemCode.EditLinkKeywordUnavailable));
             }
 
             // **永久に生きるリンクを作らせない**
@@ -112,6 +141,16 @@ public static class AutoReplyValidator
                     AutoReplyProblemCode.EditLinkDaysInvalid,
                     settings.EditLinkDays.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             }
+        }
+
+        var usesAssetsLink =
+            AutoReplyKeywords.Contains(settings, AutoReplyKeywords.AssetsUrl)
+            || AutoReplyKeywords.Contains(settings, AutoReplyKeywords.AssetsUrlExpiresAt);
+        if (usesAssetsLink
+            && (!SurveyAssetReferences.HasTicketedAssets(definition)
+                || definition.AssetDelivery?.Expiration is AssetTicketExpiration.CompletedOnly))
+        {
+            problems.Add(new AutoReplyProblem(AutoReplyProblemCode.AssetsUrlKeywordUnavailable));
         }
 
         return problems.ToImmutable();
@@ -136,4 +175,12 @@ public static class AutoReplyValidator
         text is null
         || text.Languages.Count == 0
         || text.Languages.All(language => string.IsNullOrWhiteSpace(text.Get(language)));
+
+    private static bool ContainsNewLine(LocalizedText? text) =>
+        text is not null
+        && text.Languages.Any(language => text.Get(language).AsSpan().ContainsAny('\r', '\n'));
+
+    private static bool IsOptionalAddress(string? address) =>
+        string.IsNullOrWhiteSpace(address)
+        || (!address.AsSpan().ContainsAny('\r', '\n') && MailAddress.TryCreate(address, out _));
 }

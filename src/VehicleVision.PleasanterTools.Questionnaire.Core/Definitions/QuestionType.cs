@@ -65,4 +65,7 @@ public enum QuestionType
     /// **どこを許すかは運用側が設定で決める**（<c>EmbedPolicy</c>）。
     /// </remarks>
     Embed,
+
+    /// <summary>確認・同意（単一のチェックボックス）。</summary>
+    Confirm,
 }

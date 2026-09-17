@@ -2,20 +2,38 @@
   import AdminUserList from './components/AdminUserList.svelte';
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
+  import HelpPanel from './components/HelpPanel.svelte';
+  import InvitationAcceptPanel from './components/InvitationAcceptPanel.svelte';
   import MyAccountPanel from './components/MyAccountPanel.svelte';
   import NotificationList from './components/NotificationList.svelte';
   import OutboxStatusPanel from './components/OutboxStatusPanel.svelte';
   import SignInPanel from './components/SignInPanel.svelte';
+  import SamlSettingsPanel from './components/SamlSettingsPanel.svelte';
   import SurveyEditor from './components/SurveyEditor.svelte';
   import SurveyList from './components/SurveyList.svelte';
-  import { getSession, listNotifications, logout, saveLanguage } from './lib/api';
+  import {
+    getApplicationVersion,
+    getSession,
+    listNotifications,
+    logout,
+    saveLanguage,
+    type ApplicationVersion,
+  } from './lib/api';
   import type { AdminPermission, AdminSession } from './lib/types';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../lib/i18n/language';
   import { language, resolveLanguage, t } from './lib/i18n/state.svelte';
+  import {
+    buildBreadcrumbs,
+    truncateBreadcrumbTitle,
+    type AdminPage,
+  } from './lib/breadcrumbs';
 
   let session = $state<AdminSession>();
+  let applicationVersion = $state<ApplicationVersion>();
   let loading = $state(true);
   let failed = $state(false);
+  let surveyBreadcrumbTitle = $state<string | null>(null);
+  let navigationGuard = $state<(() => boolean) | null>(null);
 
   /** 開いているアンケート。**URL に出す**（再読み込みで戻れるように） */
   let openSurveyId = $state(readSurveyId());
@@ -34,6 +52,12 @@
 
   /** 自分のアカウントを開いているか。**これも URL に出す。**（Issue #156） */
   let openAccount = $state(readAccount());
+
+  /** SAML 設定を開いているか。**特権管理者だけに見せる。** */
+  let openSamlSettings = $state(readSamlSettings());
+
+  /** 使い方を開いているか。**これも URL に出す。** */
+  let openHelp = $state(readHelp());
 
   /**
    * 未読の件数。**ヘッダのバッジに出す。**
@@ -62,6 +86,8 @@
       openNotifications = readNotifications();
       openUsers = readUsers();
       openAccount = readAccount();
+      openSamlSettings = readSamlSettings();
+      openHelp = readHelp();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -92,6 +118,14 @@
     return /^\/admin\/me\/?$/.test(location.pathname);
   }
 
+  function readSamlSettings(): boolean {
+    return /^\/admin\/saml-settings\/?$/.test(location.pathname);
+  }
+
+  function readHelp(): boolean {
+    return /^\/admin\/help\/?$/.test(location.pathname);
+  }
+
   /** 画面を 1 つだけ開く。**出し分けの取りこぼしを防ぐ。** */
   function only(path: string, flags: Partial<Record<string, boolean>> = {}) {
     openSurveyId = null;
@@ -100,39 +134,98 @@
     openNotifications = false;
     openUsers = flags.users ?? false;
     openAccount = flags.account ?? false;
+    openSamlSettings = flags.samlSettings ?? false;
+    openHelp = flags.help ?? false;
     history.pushState(null, '', path);
   }
 
+  function navigate(path: string, flags: Partial<Record<string, boolean>> = {}) {
+    if (navigationGuard && !navigationGuard()) {
+      return false;
+    }
+
+    only(path, flags);
+    return true;
+  }
+
   function openUserList() {
-    only('/admin/users', { users: true });
+    if (navigate('/admin/users', { users: true })) {
+      openUsers = true;
+    }
   }
 
   function openMyAccount() {
-    only('/admin/me', { account: true });
+    if (navigate('/admin/me', { account: true })) {
+      openAccount = true;
+    }
+  }
+
+  function openSamlSettingsPanel() {
+    if (navigate('/admin/saml-settings', { samlSettings: true })) {
+      openSamlSettings = true;
+    }
+  }
+
+  function openHelpPanel() {
+    if (navigate('/admin/help', { help: true })) {
+      openHelp = true;
+    }
   }
 
   function open(surveyId: string) {
-    only(`/admin/surveys/${surveyId}`);
-    openSurveyId = surveyId;
+    if (navigate(`/admin/surveys/${surveyId}`)) {
+      openSurveyId = surveyId;
+    }
   }
 
   function openAudit() {
-    only('/admin/audit-logs');
-    openAuditLog = true;
+    if (navigate('/admin/audit-logs')) {
+      openAuditLog = true;
+    }
   }
 
   function openDelivery() {
-    only('/admin/outbox');
-    openOutbox = true;
+    if (navigate('/admin/outbox')) {
+      openOutbox = true;
+    }
   }
 
   function openNotificationList() {
-    only('/admin/notifications');
-    openNotifications = true;
+    if (navigate('/admin/notifications')) {
+      openNotifications = true;
+    }
   }
 
   function back() {
-    only('/admin');
+    navigate('/admin');
+  }
+
+  const breadcrumbPage = $derived.by<AdminPage>(() => {
+    if (openSurveyId) return 'survey-editor';
+    if (openAuditLog && canSeeAuditLog) return 'audit-logs';
+    if (openOutbox && canSeeOutbox) return 'outbox';
+    if (openNotifications && canSeeNotifications) return 'notifications';
+    if (openUsers && canSeeUsers) return 'users';
+    if (openAccount) return 'account';
+    if (openSamlSettings && canManageSaml) return 'saml-settings';
+    if (openHelp) return 'help';
+    return 'surveys';
+  });
+
+  function breadcrumbLabel(page: AdminPage): string {
+    if (page === 'surveys') return t('list.title');
+    if (page === 'survey-editor') {
+      return t('breadcrumb.surveyEditor', {
+        title: truncateBreadcrumbTitle(surveyBreadcrumbTitle ?? ''),
+      });
+    }
+    if (page === 'audit-logs') return t('breadcrumb.auditLogs');
+    if (page === 'outbox') return t('breadcrumb.outbox');
+    if (page === 'notifications') return t('breadcrumb.notifications');
+    if (page === 'users') return t('breadcrumb.users');
+    if (page === 'saml-settings') return t('breadcrumb.samlSettings');
+    if (page === 'help') return t('breadcrumb.help');
+    return t('breadcrumb.account');
   }
 
   async function refresh() {
@@ -146,10 +239,17 @@
 
     failed = false;
     session = result.value;
+    applicationVersion = undefined;
 
     // **利用者ごとの設定 → ブラウザの言語設定 → `ja`**
     // （`_documents/多言語対応方針.md` 2 章）
     resolveLanguage(session.language ?? null);
+
+    // **認証済みになってから読む。** 認証前の画面へ版を出さず、失敗してもログインを妨げない。
+    if (session.authenticated) {
+      const version = await getApplicationVersion();
+      applicationVersion = version.ok ? version.value : undefined;
+    }
 
     // **未読の件数だけ先に読む**（Issue #80）。
     // **失敗しても管理画面は使える。** 気付くための飾りであって、入口ではない
@@ -192,6 +292,8 @@
     openNotifications = false;
     openUsers = false;
     openAccount = false;
+    openSamlSettings = false;
+    openHelp = false;
     unreadCount = 0;
     history.replaceState(null, '', '/admin');
     await refresh();
@@ -246,12 +348,24 @@
    */
   const canSeeUsers = $derived(can('users.read'));
 
+  /** 認証の入口を変えられるのは Administrator だけ。 */
+  const canManageSaml = $derived(can('settings.saml'));
+
   const needsEnrollment = $derived(
     session !== undefined &&
       !session.authenticated &&
       session.pending === true &&
       session.needsEnrollment === true,
   );
+
+  let acceptingInvitation = $state(
+    /^\/admin\/invitations\/accept\/?$/.test(location.pathname),
+  );
+
+  function finishInvitation() {
+    acceptingInvitation = false;
+    void refresh();
+  }
 </script>
 
 <div class="shell">
@@ -299,11 +413,43 @@
         <button type="button" class="link" onclick={openUserList}>{t('users.open')}</button>
       {/if}
 
+      {#if canManageSaml}
+        <button type="button" class="link" onclick={openSamlSettingsPanel}>{t('saml.open')}</button>
+      {/if}
+
+      <button type="button" class="link" onclick={openHelpPanel}>{t('help.open')}</button>
+
       <!-- **自分の設定は誰でも開ける。** 役割を問わない -->
       <button type="button" class="link" onclick={openMyAccount}>{t('account.open')}</button>
 
       <button type="button" class="link" onclick={signOut}>{t('app.signOut')}</button>
     </header>
+
+    <nav class="breadcrumbs" aria-label={t('breadcrumb.label')}>
+      <ol>
+        {#each buildBreadcrumbs(breadcrumbPage) as breadcrumb, index (breadcrumb.page)}
+          <li>
+            {#if breadcrumb.path}
+              <button type="button" class="breadcrumb-link" onclick={() => navigate(breadcrumb.path!)}>
+                {breadcrumbLabel(breadcrumb.page)}
+              </button>
+            {:else}
+              <span aria-current="page">{breadcrumbLabel(breadcrumb.page)}</span>
+            {/if}
+            {#if index < buildBreadcrumbs(breadcrumbPage).length - 1}
+              <span class="breadcrumb-separator" aria-hidden="true">/</span>
+            {/if}
+          </li>
+        {/each}
+      </ol>
+    </nav>
+
+    {#if applicationVersion?.allowInsecure}
+      <aside class="insecure-warning" role="alert">
+        <span class="material-icons" aria-hidden="true">warning</span>
+        <span>{t('app.insecureMode')}</span>
+      </aside>
+    {/if}
 
     <!--
       **表を出す画面だけ広く使う。** 列が多くて識別子も入るので、
@@ -322,6 +468,10 @@
           canReset={can('users.resetTwoFactor')}
           onback={back}
         />
+      {:else if openSamlSettings && canManageSaml}
+        <SamlSettingsPanel onback={back} />
+      {:else if openHelp}
+        <HelpPanel onback={back} />
       {:else if openAccount}
         <MyAccountPanel {session} onchanged={refresh} onback={back} />
       {:else if openAuditLog && canSeeAuditLog}
@@ -334,7 +484,11 @@
         <SurveyEditor
           surveyId={openSurveyId}
           mailEnabled={session?.mailEnabled ?? false}
+          testRecipient={session?.loginId ?? ''}
+          testRecipientAvailable={session?.autoReplyTestRecipientAvailable ?? false}
           onback={back}
+          onbreadcrumbchange={(title) => (surveyBreadcrumbTitle = title)}
+          onnavigationguardchange={(guard) => (navigationGuard = guard)}
         />
       {:else}
         <!--
@@ -353,6 +507,16 @@
         />
       {/if}
     </main>
+    {#if applicationVersion}
+      <footer class="version">
+        {t('app.version', {
+          version: applicationVersion.version,
+          commit: applicationVersion.commit ? ` (${applicationVersion.commit})` : '',
+        })}
+      </footer>
+    {/if}
+  {:else if acceptingInvitation && session}
+    <InvitationAcceptPanel {session} onadvance={finishInvitation} />
   {:else if needsEnrollment}
     <EnrollPanel onadvance={refresh} />
   {:else if session}
@@ -444,6 +608,57 @@
     border-bottom: 1px solid var(--border);
   }
 
+  .breadcrumbs {
+    padding: 0.5rem 1.5rem;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .breadcrumbs ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    max-width: 80rem;
+    padding: 0;
+    margin: 0 auto;
+    list-style: none;
+  }
+
+  .breadcrumbs li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .insecure-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    max-width: 77rem;
+    margin: 1rem auto 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid #f79009;
+    border-radius: 6px;
+    background: #fff4e5;
+    color: #7a4b00;
+  }
+
+  .breadcrumb-link {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  .breadcrumb-separator {
+    color: var(--border);
+  }
+
   .brand {
     font-weight: 600;
   }
@@ -504,13 +719,26 @@
     padding: 2rem 1.5rem 4rem;
   }
 
+  /*
+    **桁の多い画面はここを使う**（アンケート一覧・2 カラムの編集）。
+    ⚠️ **80rem では足りない。** 一覧は 7 桁あり、行ごとに釦が最大 7 つ並ぶので、
+    **題名か回答用 URL のどちらかが 1 文字ずつ折り返す**（実測。2026-09-16）
+  */
   main.wide {
-    max-width: 80rem;
+    max-width: 100rem;
   }
 
   .status {
     text-align: center;
     color: var(--muted);
     margin-top: 4rem;
+  }
+
+  .version {
+    padding: 0 1.5rem 1.5rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-align: right;
   }
 </style>

@@ -9,9 +9,13 @@
     <!-- 管理画面の SAML 2.0 ログイン（Issue #166）。BSD-3-Clause -->
     <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.20.1" />
     <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.20.1" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.103.3" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageReference Include="nClam" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <PackageReference Include="Otp.NET" Version="1.4.1" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.17.4" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,5 +32,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="VehicleVision.PleasanterTools.Questionnaire.Web.Tests" />
+    <InternalsVisibleTo Include="VehicleVision.PleasanterTools.Questionnaire.Integration.Tests" />
+  </ItemGroup>
 
 </Project>

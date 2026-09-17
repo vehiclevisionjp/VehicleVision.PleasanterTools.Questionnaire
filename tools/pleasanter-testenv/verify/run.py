@@ -125,7 +125,7 @@ def write_report():
     os.makedirs("/results", exist_ok=True)
     with open("/results/検証結果.md", "w", encoding="utf-8") as f:
         f.write("# 検証結果（実機）\n\n")
-        f.write("Pleasanter 1.5.7.0 / SQL Server 2025 / `tools/pleasanter-testenv`\n\n")
+        f.write("Pleasanter 1.5.8.1 / SQL Server 2025 / `tools/pleasanter-testenv`\n\n")
         for t, ok, d in RESULTS:
             mark = {True: "OK", False: "NG", None: "不明"}[ok]
             f.write(f"## [{mark}] {t}\n\n```text\n{d}\n```\n\n")

@@ -128,6 +128,49 @@ public class AutoReplyValidatorTests
     }
 
     [Fact]
+    public void 差出人の表示名のどの言語にも改行を許さない()
+    {
+        var settings = Valid with
+        {
+            FromName = new LocalizedText(new Dictionary<string, string>
+            {
+                ["ja"] = "事務局",
+                ["en"] = "Desk\r\nBcc: injected@example.test",
+            }),
+        };
+
+        Assert.Equal(
+            [AutoReplyProblemCode.FromNameInvalid],
+            Codes(AutoReplyValidator.Validate(Definition(settings, Email()))));
+    }
+
+    [Theory]
+    [InlineData("not-an-address", AutoReplyProblemCode.ReplyToInvalid)]
+    [InlineData("reply@example.test\r\nBcc: injected@example.test", AutoReplyProblemCode.ReplyToInvalid)]
+    [InlineData("not-an-address", AutoReplyProblemCode.BccInvalid)]
+    [InlineData("bcc@example.test\r\nTo: injected@example.test", AutoReplyProblemCode.BccInvalid)]
+    public void 返信先とBCCはメールアドレスとして読めて改行が無い値だけ通す(
+        string address,
+        AutoReplyProblemCode expected)
+    {
+        var settings = expected is AutoReplyProblemCode.ReplyToInvalid
+            ? Valid with { ReplyToAddress = address }
+            : Valid with { BccAddress = address };
+
+        Assert.Equal(
+            [expected],
+            Codes(AutoReplyValidator.Validate(Definition(settings, Email()))));
+    }
+
+    [Fact]
+    public void 返信先とBCCが未設定なら通る()
+    {
+        var settings = Valid with { ReplyToAddress = " ", BccAddress = null };
+
+        Assert.Empty(AutoReplyValidator.Validate(Definition(settings, Email())));
+    }
+
+    [Fact]
     public void 不備は溜めて返す()
     {
         // **1 つ直しては公開し直す、を繰り返させない**
@@ -153,18 +196,18 @@ public class AutoReplyValidatorTests
             Title = LocalizedText.Japanese("検証用"),
             Pages = [new Page { PageId = "p1", Questions = [Email()] }],
             AllowEditingAfterSubmit = false,
-            AutoReply = Valid with { IncludeEditLink = true },
+            AutoReply = Valid with { Body = LocalizedText.Japanese("{{editUrl}}") },
         };
 
         Assert.Equal(
-            [AutoReplyProblemCode.EditLinkNotEditable],
+            [AutoReplyProblemCode.EditLinkKeywordUnavailable],
             Codes(AutoReplyValidator.Validate(definition)));
     }
 
     [Fact]
     public void 編集を許していれば再編集リンクは通る()
     {
-        var settings = Valid with { IncludeEditLink = true };
+        var settings = Valid with { Body = LocalizedText.Japanese("{{editUrl}}") };
 
         Assert.Empty(AutoReplyValidator.Validate(Definition(settings, Email())));
     }
@@ -176,7 +219,11 @@ public class AutoReplyValidatorTests
     public void 範囲外の有効日数は止める(int days)
     {
         // **永久に生きるリンクを作らせない**
-        var settings = Valid with { IncludeEditLink = true, EditLinkDays = days };
+        var settings = Valid with
+        {
+            Body = LocalizedText.Japanese("{{editUrlExpiresAt}}"),
+            EditLinkDays = days,
+        };
 
         Assert.Equal(
             [AutoReplyProblemCode.EditLinkDaysInvalid],
@@ -189,6 +236,50 @@ public class AutoReplyValidatorTests
         var settings = Valid with { EditLinkDays = 0 };
 
         Assert.Empty(AutoReplyValidator.Validate(Definition(settings, Email())));
+    }
+
+    [Fact]
+    public void 配布物が無ければ配布リンクを止める()
+    {
+        var settings = Valid with { Body = LocalizedText.Japanese("{{assetsUrl}}") };
+
+        Assert.Equal(
+            [AutoReplyProblemCode.AssetsUrlKeywordUnavailable],
+            Codes(AutoReplyValidator.Validate(Definition(settings, Email()))));
+    }
+
+    [Fact]
+    public void 完了時だけ配る設定では配布リンクを止める()
+    {
+        var definition = Definition(
+            Valid with { Body = LocalizedText.Japanese("{{assetsUrlExpiresAt}}") },
+            Email()) with
+        {
+            ConfirmationMessage = LocalizedText.Japanese(
+                "[資料](asset:11111111-1111-1111-1111-111111111111)"),
+            AssetDelivery = new AssetDeliverySettings
+            {
+                Expiration = AssetTicketExpiration.CompletedOnly,
+            },
+        };
+
+        Assert.Equal(
+            [AutoReplyProblemCode.AssetsUrlKeywordUnavailable],
+            Codes(AutoReplyValidator.Validate(definition)));
+    }
+
+    [Fact]
+    public void メールで配れる配布物があれば配布リンクは通る()
+    {
+        var definition = Definition(
+            Valid with { Body = LocalizedText.Japanese("{{assetsUrl}}") },
+            Email()) with
+        {
+            ConfirmationMessage = LocalizedText.Japanese(
+                "[資料](asset:11111111-1111-1111-1111-111111111111)"),
+        };
+
+        Assert.Empty(AutoReplyValidator.Validate(definition));
     }
 
     [Fact]

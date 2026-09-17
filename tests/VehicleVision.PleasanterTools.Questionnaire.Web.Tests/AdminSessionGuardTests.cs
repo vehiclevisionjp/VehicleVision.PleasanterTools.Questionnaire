@@ -15,6 +15,7 @@ public class AdminSessionGuardTests
     private sealed class FakeAuthenticationService : IAuthenticationService
     {
         public List<string?> SignedOutSchemes { get; } = [];
+        public ClaimsPrincipal? SignedInPrincipal { get; private set; }
 
         public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme) =>
             Task.FromResult(AuthenticateResult.NoResult());
@@ -29,13 +30,70 @@ public class AdminSessionGuardTests
             HttpContext context,
             string? scheme,
             ClaimsPrincipal principal,
-            AuthenticationProperties? properties) =>
-            Task.CompletedTask;
+            AuthenticationProperties? properties)
+        {
+            SignedInPrincipal = principal;
+            return Task.CompletedTask;
+        }
 
         public Task SignOutAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
         {
             SignedOutSchemes.Add(scheme);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeAdminSessionStore : IAdminSessionStore
+    {
+        private readonly Dictionary<Guid, AdminSessionEntry> _entries = [];
+
+        public Task CreateAsync(AdminSessionEntry entry, CancellationToken cancellationToken = default)
+        {
+            _entries.Add(entry.AdminSessionId, entry);
+            return Task.CompletedTask;
+        }
+
+        public Task<AdminSessionEntry?> FindAsync(
+            Guid adminSessionId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(_entries.GetValueOrDefault(adminSessionId));
+
+        public Task<IReadOnlyList<AdminSessionEntry>> ListAsync(
+            Guid adminUserId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<AdminSessionEntry>>(
+                _entries.Values.Where(entry => entry.AdminUserId == adminUserId).ToList());
+
+        public Task<bool> DeleteAsync(
+            Guid adminSessionId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(_entries.Remove(adminSessionId));
+
+        public Task<IReadOnlyList<Guid>> DeleteAllExceptAsync(
+            Guid adminUserId,
+            Guid? exceptSessionId,
+            CancellationToken cancellationToken = default)
+        {
+            var ids = _entries.Values
+                .Where(entry => entry.AdminUserId == adminUserId
+                    && (entry.AdminSessionId != exceptSessionId
+                        || entry.Kind is not AdminSessionKind.Session))
+                .Select(entry => entry.AdminSessionId)
+                .ToList();
+            ids.ForEach(id => _entries.Remove(id));
+            return Task.FromResult<IReadOnlyList<Guid>>(ids);
+        }
+
+        public Task<int> DeleteExpiredAsync(
+            DateTime nowUtc,
+            CancellationToken cancellationToken = default)
+        {
+            var ids = _entries.Values
+                .Where(entry => entry.ExpiresAt <= nowUtc)
+                .Select(entry => entry.AdminSessionId)
+                .ToList();
+            ids.ForEach(id => _entries.Remove(id));
+            return Task.FromResult(ids.Count);
         }
     }
 
@@ -85,19 +143,38 @@ public class AdminSessionGuardTests
         var auth = new FakeAuthenticationService();
         var services = new ServiceCollection()
             .AddSingleton<IAdminUserStore>(store)
+            .AddSingleton<IAdminSessionStore, FakeAdminSessionStore>()
             .AddSingleton<IAuthenticationService>(auth)
+            .AddSingleton(TimeProvider.System)
+            .AddDataProtection()
+            .Services
+            .AddLogging()
+            .AddSingleton<AdminSessionManager>()
             .BuildServiceProvider();
 
         var httpContext = new DefaultHttpContext
         {
             RequestServices = services,
         };
+        ClaimsPrincipal cookiePrincipal = principal;
+        if (principal.FindFirstValue(ClaimTypes.NameIdentifier) is not null)
+        {
+            await services.GetRequiredService<AdminSessionManager>().SignInAsync(
+                httpContext,
+                AdminAuthSchemes.Session,
+                AdminSessionKind.Session,
+                principal,
+                AdminAuthSchemes.SessionLifetime);
+            cookiePrincipal = auth.SignedInPrincipal!;
+            auth.SignedOutSchemes.Clear();
+        }
+
         var scheme = new AuthenticationScheme(
             AdminAuthSchemes.Session,
             AdminAuthSchemes.Session,
             typeof(CookieAuthenticationHandler));
         var ticket = new AuthenticationTicket(
-            principal,
+            cookiePrincipal,
             new AuthenticationProperties(),
             AdminAuthSchemes.Session);
         var context = new CookieValidatePrincipalContext(
@@ -118,6 +195,9 @@ public class AdminSessionGuardTests
         Assert.False(context.ShouldRenew);
         Assert.NotNull(context.Principal);
         Assert.Empty(auth.SignedOutSchemes);
+        Assert.Collection(
+            auth.SignedInPrincipal!.Claims,
+            claim => Assert.Equal(AdminSessionManager.SessionIdClaim, claim.Type));
     }
 
     [Fact]

@@ -31,4 +31,4 @@ RUN npm install --no-audit --no-fund
 
 COPY . .
 
-CMD ["npx", "playwright", "test"]
+CMD ["npm", "run", "shot"]

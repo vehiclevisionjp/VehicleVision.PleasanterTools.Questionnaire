@@ -71,7 +71,12 @@ public class AdminSurveyEndToEndTests
     }
 
     /// <summary>設問 1 問だけの下書き。</summary>
-    private static object DraftBody(string surveyId, int revision, bool withMapping) => new
+    private static object DraftBody(
+        string surveyId,
+        int revision,
+        bool withMapping,
+        long assetHistorySiteId = 0,
+        bool withAssetHistoryMapping = false) => new
     {
         revision,
         definition = new
@@ -112,6 +117,28 @@ public class AdminSurveyEndToEndTests
                     {
                         targetColumn = "ClassA",
                         sources = new[] { new { questionId = "q1", port = "Value" } },
+                    },
+                }
+                : [],
+        },
+        assetHistorySiteId,
+        assetHistoryMapping = new
+        {
+            assignments = withAssetHistoryMapping
+                ? new[]
+                {
+                    new
+                    {
+                        targetColumn = "ClassB",
+                        sources = new[]
+                        {
+                            new
+                            {
+                                questionId = "",
+                                port = "Value",
+                                systemValue = "ReferenceId",
+                            },
+                        },
                     },
                 }
                 : [],
@@ -180,12 +207,7 @@ public class AdminSurveyEndToEndTests
                 body!["definition"]!["pages"]![0]!["questions"]![0]!["title"]!["ja"]!.GetValue<string>());
         }
 
-        using (var publish = await http.PostAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}/publish", new { }))
-        {
-            publish.EnsureSuccessStatusCode();
-            Assert.Equal(1, (await ReadAsync(publish))!["version"]!.GetValue<int>());
-        }
+        Assert.Equal(1, (await PublishAsync(http, surveyId))!["version"]!.GetValue<int>());
 
         // **公開したら、次の下書きは 2 版目になる**
         using var afterPublish = await http.GetAsync($"/api/admin/surveys/{surveyId}");
@@ -247,14 +269,21 @@ public class AdminSurveyEndToEndTests
         await using var connection = new DbConnectionFactory(
             DatabaseProvider.SqlServer, ConnectionString).Create();
         await connection.OpenAsync();
-        var detail = await connection.QuerySingleAsync<string>(
+        // ⚠️ **1 行に絞らない。** 断られた 2 回ぶんも記録に残る
+        // （経路の値から TargetId が入るため、成功したものと同じ条件で当たる）。
+        // **見たいのは消えたときの 1 行**なので、値を載せている行を選ぶ
+        var details = (await connection.QueryAsync<string>(
             "SELECT [DetailJson] FROM [AuditLogs] "
             + "WHERE [Action] = @Action AND [TargetId] = @TargetId",
             new
             {
                 Action = "POST /api/admin/surveys/{surveyId}/delete",
                 TargetId = surveyId.ToString(),
-            });
+            })).ToList();
+
+        var detail = Assert.Single(
+            details,
+            json => json.Contains("\"publicId\"", StringComparison.Ordinal));
 
         Assert.Contains("\"surveyId\"", detail, StringComparison.Ordinal);
         Assert.Contains("\"publicId\"", detail, StringComparison.Ordinal);
@@ -417,11 +446,8 @@ public class AdminSurveyEndToEndTests
             save.EnsureSuccessStatusCode();
         }
 
-        using var publish = await http.PostAsJsonAsync($"/api/admin/surveys/{surveyId}/publish", new { });
-        publish.EnsureSuccessStatusCode();
-
         // **未割り当ては拒否しない。** ただし「Pleasanter に残らない」と伝える
-        var warnings = (await ReadAsync(publish))!["warnings"]!.AsArray();
+        var warnings = (await PublishAsync(http, surveyId))!["warnings"]!.AsArray();
         Assert.Contains(
             warnings,
             warning => warning!["code"]!.GetValue<string>() == "UnmappedQuestion");
@@ -438,9 +464,44 @@ public class AdminSurveyEndToEndTests
         using var http = await SignInAsync();
         var surveyId = await CreateSurveyAsync(http);
 
-        using var publish = await http.PostAsJsonAsync($"/api/admin/surveys/{surveyId}/publish", new { });
+        // **弾くのはテスト公開のとき。** 版を固める前に止める
+        using var publish = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { });
 
         Assert.Equal(HttpStatusCode.BadRequest, publish.StatusCode);
+    }
+
+    [Fact]
+    public async Task 履歴投射先が回答先と同じなら公開できない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                0,
+                withMapping: true,
+                assetHistorySiteId: 1,
+                withAssetHistoryMapping: true)))
+        {
+            save.EnsureSuccessStatusCode();
+        }
+
+        using var publish = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { });
+
+        Assert.Equal(HttpStatusCode.BadRequest, publish.StatusCode);
+        var body = await ReadAsync(publish);
+        Assert.Contains(
+            body!["problems"]!.AsArray(),
+            problem => problem!["detail"]!.GetValue<string>() == "assetHistorySiteIdMustDiffer");
     }
 
     [Fact]
@@ -485,16 +546,25 @@ public class AdminSurveyEndToEndTests
             save.EnsureSuccessStatusCode();
         }
 
-        using (var publish = await http.PostAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}/publish", new { }))
+        // **版を固めるのはテスト公開の側**（Issue #223）。ここで 1 版目ができる
+        using (var first = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { }))
         {
-            publish.EnsureSuccessStatusCode();
+            first.EnsureSuccessStatusCode();
+            Assert.Equal(1, (await ReadAsync(first))!["version"]!.GetValue<int>());
         }
 
-        // 下書きを変えずにもう一度押す。**版は不変なので上書きしない**
-        // 下書きの版が上がっていないため、次に公開される版は 2 版目になり、これは通る。
+        // 下書きへ戻して、変えずにもう一度固める。**版は不変なので上書きしない**
+        // 下書きの版が上がっていないため、次に固まる版は 2 版目になり、これは通る。
         // ここで見たいのは「1 版目を書き換えない」こと
-        using var again = await http.PostAsJsonAsync($"/api/admin/surveys/{surveyId}/publish", new { });
+        using (var reverted = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/revert-to-draft", new { }))
+        {
+            reverted.EnsureSuccessStatusCode();
+        }
+
+        using var again = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { });
         again.EnsureSuccessStatusCode();
         Assert.Equal(2, (await ReadAsync(again))!["version"]!.GetValue<int>());
     }
@@ -532,11 +602,7 @@ public class AdminSurveyEndToEndTests
             save.EnsureSuccessStatusCode();
         }
 
-        using (var publish = await http.PostAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}/publish", new { }))
-        {
-            publish.EnsureSuccessStatusCode();
-        }
+        await PublishAsync(http, surveyId);
 
         using (var suspend = await http.PostAsJsonAsync(
             $"/api/admin/surveys/{surveyId}/suspend", new { }))
@@ -573,11 +639,7 @@ public class AdminSurveyEndToEndTests
             save.EnsureSuccessStatusCode();
         }
 
-        using (var publish = await http.PostAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}/publish", new { }))
-        {
-            publish.EnsureSuccessStatusCode();
-        }
+        await PublishAsync(http, surveyId);
 
         // **認証していない回答者として読む**
         using var anonymous = CreateClient();
@@ -608,13 +670,31 @@ public class AdminSurveyEndToEndTests
             save.EnsureSuccessStatusCode();
         }
 
-        using (var publish = await http.PostAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}/publish", new { }))
-        {
-            publish.EnsureSuccessStatusCode();
-        }
+        await PublishAsync(http, surveyId);
 
         return surveyId;
+    }
+
+    /// <summary>下書きを公開する。**テスト公開を経由する**（Issue #223）。</summary>
+    /// <remarks>
+    /// ⚠️ **下書きから直接は公開できない。** 版を固めるのも検査を通すのも
+    /// テスト公開の側なので、**版や警告はそちらの応答に入る。**
+    /// </remarks>
+    private static async Task<JsonNode?> PublishAsync(HttpClient http, string surveyId)
+    {
+        JsonNode? body;
+        using (var testPublished = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { }))
+        {
+            testPublished.EnsureSuccessStatusCode();
+            body = await ReadAsync(testPublished);
+        }
+
+        using var published = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/publish", new { });
+        published.EnsureSuccessStatusCode();
+
+        return body;
     }
 
     /// <summary>一覧からその 1 行を読む。</summary>
@@ -847,8 +927,9 @@ public class AdminSurveyEndToEndTests
                 problem => problem!["code"]!.GetValue<string>() == "AttachmentColumnNeedsFilePort");
         }
 
-        // **拒否するのは公開のときだけ**
-        using var publish = await http.PostAsJsonAsync($"/api/admin/surveys/{surveyId}/publish", new { });
+        // **拒否するのはテスト公開のときだけ**
+        using var publish = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { });
         Assert.Equal(HttpStatusCode.BadRequest, publish.StatusCode);
     }
 

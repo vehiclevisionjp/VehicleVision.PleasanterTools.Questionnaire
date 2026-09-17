@@ -73,6 +73,16 @@ public class ResponsePayloadTests
     }
 
     [Fact]
+    public void 確認の真偽値は正本と再編集で往復する()
+    {
+        var json = ResponsePayload.Create("token1", [Answer.Of("confirm1", "true")]).ToJson();
+
+        var answer = Assert.Single(ResponsePayload.FromJson(json)!.ToAnswers());
+
+        Assert.Equal("true", answer.SingleValue);
+    }
+
+    [Fact]
     public void 添付は送信待ちの中身へBase64で載る()
     {
         var file = WithAttachment().Answers.Single().Files.Single();

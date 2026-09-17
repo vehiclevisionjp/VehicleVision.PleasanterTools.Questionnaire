@@ -4,7 +4,12 @@
   import { applyShuffle, createShuffleSeed } from '../../lib/shuffle';
   import { translator } from '../../lib/i18n/messages';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../../lib/i18n/language';
-  import type { AnswerState, NoteBlock, SurveyDefinition as AnswerDefinition } from '../../lib/types';
+  import type {
+    AnswerState,
+    NoteBlock,
+    Question as AnswerQuestion,
+    SurveyDefinition as AnswerDefinition,
+  } from '../../lib/types';
   import { text } from '../../lib/types';
   import { validatePage } from '../../lib/validation';
   import type { SurveyDefinition } from '../lib/types';
@@ -42,10 +47,12 @@
      * 返さないので、上げたばかりの画像はここからは見えない。
      */
     headerImageUrl?: string | null;
+    /** 本文用資産を管理画面の配信口へ変換する。 */
+    assetUrl?: (assetId: string) => string;
     onclose: () => void;
   }
 
-  let { definition, headerImageUrl = null, onclose }: Props = $props();
+  let { definition, headerImageUrl = null, assetUrl, onclose }: Props = $props();
 
   /**
    * テーマを写す枠（Issue #56）。
@@ -83,7 +90,10 @@
   const noteSources = $derived(
     definition.pages.flatMap((page) =>
       page.questions
-        .filter((question) => question.type === 'Note')
+        .filter(
+          (question) =>
+            question.type === 'Note' || question.settings.descriptionFormat === 'Markup',
+        )
         .flatMap((question) =>
           Object.entries(question.description ?? {})
             .filter(([, markup]) => markup !== '')
@@ -193,15 +203,18 @@
   }
 
   /**
-   * 説明文ブロックに、サーバへ読んでもらった書式を添える（Issue #108）。
+   * 記法を選んだ説明文に、サーバへ読んでもらった書式を添える（Issue #108 / #267）。
    *
    * **記法を読むのはサーバだけ。** ここで同じ実装を持つと、
    * プレビューでは付いた書式が公開後に付かない、という食い違いが起きる。
    */
-  function withNoteBlocks(question: { questionId: string; type: string }) {
-    return question.type === 'Note'
-      ? { ...question, noteBlocks: parsedNotes[question.questionId] ?? null }
-      : question;
+  function withNoteBlocks(question: AnswerQuestion) {
+    const blocks = parsedNotes[question.questionId] ?? null;
+    if (question.type === 'Note') return { ...question, noteBlocks: blocks };
+    if (question.settings.descriptionFormat === 'Markup') {
+      return { ...question, descriptionBlocks: blocks };
+    }
+    return question;
   }
 
   function goNext() {
@@ -290,6 +303,7 @@
         <QuestionField
           question={withNoteBlocks(question) as never}
           {language}
+          {assetUrl}
           bind:answer={
             () => ensure(question.questionId), (value) => (answers[question.questionId] = value)
           }

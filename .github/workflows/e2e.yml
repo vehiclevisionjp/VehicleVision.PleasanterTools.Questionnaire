@@ -184,3 +184,123 @@ jobs:
       - name: 後片付け
         if: always()
         run: docker compose --profile '*' down -v --remove-orphans
+
+  screenshots:
+    name: 写しの一式
+    runs-on: ubuntu-latest
+    # Pleasanter と本アプリのイメージ作成を含むため、E2E と同じ上限にする
+    timeout-minutes: 45
+
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: まっさらな検証環境にする
+        # **溜まった行があると Chromium が写しを撮れずに落ちる**（Issue #65）。
+        # runner の状態に頼らず、名前付き volume も含めて最初に消す
+        run: docker compose --profile sqlserver down -v --remove-orphans
+
+      - name: 写し用のイメージを組み直す
+        # spec はイメージへ焼き込まれるため、毎回現在のソースから作る
+        run: docker compose --profile screenshots build screenshots
+
+      - name: Pleasanter と本アプリを起動する
+        # アプリの変更も現在のソースから検証する
+        run: docker compose --profile sqlserver up -d --build --wait
+
+      - name: 写しの一式を実行する
+        # 初期設定を先に撮る順序と単発確認用 spec の除外は npm run shot に集約してある
+        run: docker compose --profile sqlserver --profile screenshots run --rm screenshots
+
+      - name: 失敗したときは写しの報告書を残す
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: 写しの一式の報告書
+          path: tools/screenshots/report
+          if-no-files-found: warn
+
+      - name: 後片付け
+        if: always()
+        run: docker compose --profile '*' down -v --remove-orphans
+
+  notify-failure:
+    name: 失敗を Issue で知らせる
+    needs:
+      - e2e
+      - screenshots
+    if: >-
+      always()
+      && (github.event_name == 'push' || github.event_name == 'schedule')
+      && contains(needs.*.result, 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+
+    steps:
+      - name: 失敗した job と実行 URL を Issue に記録する
+        uses: actions/github-script@v9
+        env:
+          E2E_RESULT: ${{ needs.e2e.result }}
+          SCREENSHOTS_RESULT: ${{ needs.screenshots.result }}
+        with:
+          script: |
+            const jobs = [
+              ['端から端まで通す試験', process.env.E2E_RESULT],
+              ['写しの一式', process.env.SCREENSHOTS_RESULT],
+            ];
+            const failedJobs = jobs
+              .filter(([, result]) => result === 'failure')
+              .map(([name]) => `- ${name}`)
+              .join('\n');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`
+              + `/actions/runs/${context.runId}`;
+            const marker = '<!-- e2e-workflow-failure -->';
+            const title = '端から端まで通す試験が失敗している';
+            // **行を配列で組む。** テンプレート文字列だと YAML の字下げが本文へ入り、
+            // 4 文字以上の字下げとして丸ごとコードブロックに描画される
+            const body = [
+              marker,
+              '## CI の失敗を検出しました',
+              '',
+              '**失敗した job**',
+              '',
+              failedJobs,
+              '',
+              '**実行 URL**',
+              '',
+              runUrl,
+              '',
+              '同じ失敗で Issue を重複させないため、この Issue が開いている間は'
+                + '最新の失敗内容へ更新します。',
+            ].join('\n');
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = issues.find((issue) =>
+              issue.pull_request === undefined && (issue.body ?? '').includes(marker));
+
+            if (existing !== undefined) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                title,
+                body,
+              });
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });

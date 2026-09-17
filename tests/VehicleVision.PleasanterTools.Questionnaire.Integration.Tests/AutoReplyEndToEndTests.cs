@@ -90,7 +90,7 @@ public class AutoReplyEndToEndTests
     /// <remarks>
     /// ⚠️ **自動返信は「メールアドレス形式の記述式」しか宛先にできない**（Issue #189）。
     /// </remarks>
-    private static object DraftBody(string surveyId, bool includeAnswers) => new
+    private static object DraftBody(string surveyId, bool withAnswers) => new
     {
         revision = 0,
         definition = new
@@ -106,8 +106,7 @@ public class AutoReplyEndToEndTests
                 enabled = true,
                 toQuestionId = "q-mail",
                 subject = new { ja = "ご回答ありがとうございました" },
-                body = new { ja = "受け付けました。" },
-                includeAnswers,
+                body = new { ja = withAnswers ? "受け付けました。\n\n{{answers}}" : "受け付けました。" },
             },
             pages = new[]
             {
@@ -142,7 +141,7 @@ public class AutoReplyEndToEndTests
     };
 
     /// <summary>自動返信つきのアンケートを 1 本公開する。</summary>
-    private static async Task<string> PublishAsync(HttpClient http, bool includeAnswers)
+    private static async Task<string> PublishAsync(HttpClient http, bool withAnswers)
     {
         string surveyId;
         string publicId;
@@ -158,9 +157,16 @@ public class AutoReplyEndToEndTests
         }
 
         using (var saved = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, includeAnswers)))
+            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, withAnswers)))
         {
             saved.EnsureSuccessStatusCode();
+        }
+
+        // **下書きから直接は公開できない。** テスト公開を経由する（Issue #223）
+        using (var testPublished = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { }))
+        {
+            testPublished.EnsureSuccessStatusCode();
         }
 
         using (var published = await http.PostAsJsonAsync(
@@ -262,7 +268,7 @@ public class AutoReplyEndToEndTests
         await ClearMailAsync(mailpit);
 
         using var http = await SignInAsync();
-        var publicId = await PublishAsync(http, includeAnswers: false);
+        var publicId = await PublishAsync(http, withAnswers: false);
 
         var address = $"respondent-{Guid.NewGuid():N}@example.test";
         await SubmitAsync(publicId, address, "よかった");
@@ -289,7 +295,7 @@ public class AutoReplyEndToEndTests
         await ClearMailAsync(mailpit);
 
         using var http = await SignInAsync();
-        var publicId = await PublishAsync(http, includeAnswers: true);
+        var publicId = await PublishAsync(http, withAnswers: true);
 
         var address = $"respondent-{Guid.NewGuid():N}@example.test";
         await SubmitAsync(publicId, address, "とてもよかった");
@@ -315,7 +321,7 @@ public class AutoReplyEndToEndTests
         await ClearMailAsync(mailpit);
 
         using var http = await SignInAsync();
-        var publicId = await PublishAsync(http, includeAnswers: false);
+        var publicId = await PublishAsync(http, withAnswers: false);
 
         var address = $"respondent-{Guid.NewGuid():N}@example.test";
         await SubmitAsync(publicId, address, "ふつう");

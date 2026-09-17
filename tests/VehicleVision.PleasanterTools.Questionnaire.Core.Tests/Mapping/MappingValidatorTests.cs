@@ -6,6 +6,28 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Mapping;
 
 public class MappingValidatorTests
 {
+    [Fact]
+    public void システム値だけのconstant変換を許す()
+    {
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Converted(
+                    "ClassA",
+                    MappingConverter.Of(ConverterOperations.Constant, ("value", "download")),
+                    MappingSource.System(MappingSystemValue.EventType)),
+            ],
+        };
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition(),
+            warnUnmappedQuestions: false);
+
+        Assert.Empty(problems);
+    }
+
     private static SurveyDefinition Definition(params string[] questionIds) => new()
     {
         SurveyId = "s1",
@@ -151,6 +173,198 @@ public class MappingValidatorTests
             Codes(MappingValidator.Validate(mapping, Definition("q1"))));
     }
 
+    [Theory]
+    [InlineData(ConverterOperations.Map)]
+    [InlineData(ConverterOperations.ToCheck)]
+    [InlineData(ConverterOperations.Contains)]
+    [InlineData(ConverterOperations.Constant)]
+    [InlineData(ConverterOperations.When)]
+    [InlineData(ConverterOperations.ToNumber)]
+    public void 必須の変換設定が空なら拒否する(string operation)
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(operation),
+            new MappingSource("q1")));
+
+        Assert.Contains(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
+    [Fact]
+    public void mapに置換元が一つあれば置換後が空でも拒否しない()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(ConverterOperations.Map, ("map.削除する", "")),
+            new MappingSource("q1")));
+
+        Assert.DoesNotContain(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
+    [Fact]
+    public void mapの置換後と既定値がすべて整数なら整数列へ割り当てられる()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(
+                ConverterOperations.Map,
+                ("map.未処理", "10"),
+                ("map.完了", "90"),
+                ("default", "0")),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: _ => MappingTargetValueKind.Integer);
+
+        Assert.DoesNotContain(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Theory]
+    [InlineData(null, "10")]
+    [InlineData("0", "処理中")]
+    public void mapの既定値がないか置換後が整数でなければ整数列を拒否する(
+        string? fallback,
+        string mapped)
+    {
+        var settings = new List<(string Key, string Value)> { ("map.未処理", mapped) };
+        if (fallback is not null)
+        {
+            settings.Add(("default", fallback));
+        }
+
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(ConverterOperations.Map, [.. settings]),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: _ => MappingTargetValueKind.Integer);
+
+        Assert.Contains(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+        if (fallback is null)
+        {
+            Assert.Contains(MappingProblemCode.MissingConverterConfig, Codes(problems));
+        }
+    }
+
+    [Theory]
+    [InlineData(MappingTargetValueKind.Decimal, null, "0")]
+    [InlineData(MappingTargetValueKind.Decimal, "2", "0.5")]
+    [InlineData(MappingTargetValueKind.Integer, "0", "0")]
+    public void toNumberが対象の数値型を確実に出せる設定なら割り当てられる(
+        MappingTargetValueKind kind,
+        string? decimals,
+        string fallback)
+    {
+        var settings = new List<(string Key, string Value)> { ("default", fallback) };
+        if (decimals is not null)
+        {
+            settings.Add(("decimals", decimals));
+        }
+
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(ConverterOperations.ToNumber, [.. settings]),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: _ => kind);
+
+        Assert.DoesNotContain(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+        Assert.DoesNotContain(MappingProblemCode.MissingConverterConfig, Codes(problems));
+    }
+
+    [Theory]
+    [InlineData(MappingTargetValueKind.Integer, null, "0")]
+    [InlineData(MappingTargetValueKind.Integer, "2", "0")]
+    [InlineData(MappingTargetValueKind.Decimal, null, "数値ではない")]
+    public void toNumberが対象の数値型を保証できなければ拒否する(
+        MappingTargetValueKind kind,
+        string? decimals,
+        string fallback)
+    {
+        var settings = new List<(string Key, string Value)> { ("default", fallback) };
+        if (decimals is not null)
+        {
+            settings.Add(("decimals", decimals));
+        }
+
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(ConverterOperations.ToNumber, [.. settings]),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: _ => kind);
+
+        Assert.Contains(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("29")]
+    [InlineData("小数")]
+    public void toNumberの小数桁が不正なら設定不足として拒否する(string decimals)
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "NumA",
+            MappingConverter.Of(
+                ConverterOperations.ToNumber,
+                ("default", ""),
+                ("decimals", decimals)),
+            new MappingSource("q1")));
+
+        Assert.Contains(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
+    [Fact]
+    public void joinは区切りが未指定でも拒否しない()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(ConverterOperations.Join),
+            new MappingSource("q1")));
+
+        Assert.DoesNotContain(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
+    [Fact]
+    public void whenはelseが空でも拒否しない()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "ClassA",
+            MappingConverter.Of(
+                ConverterOperations.When,
+                ("when", "対象"),
+                ("then", "変換後"),
+                ("else", "")),
+            new MappingSource("q1")));
+
+        Assert.DoesNotContain(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
     [Fact]
     public void Statusへ整数でない固定値を割り当てると拒否する()
     {
@@ -200,6 +414,39 @@ public class MappingValidatorTests
                 : null);
 
         Assert.Contains(MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Fact]
+    public void 確認は変換せず真偽値の列へ割り当てられる()
+    {
+        var definition = Definition("q1") with
+        {
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = QuestionType.Confirm,
+                            Title = LocalizedText.Japanese("同意"),
+                        },
+                    ],
+                },
+            ],
+        };
+        var assignment = ColumnAssignment.Direct("CheckA", new MappingSource("q1"));
+
+        var problems = MappingValidator.Validate(
+            Mapping(assignment),
+            definition,
+            targetValueKind: _ => MappingTargetValueKind.Boolean);
+
+        Assert.Null(assignment.Converter);
+        Assert.DoesNotContain(MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
     }
 
     [Theory]
@@ -287,5 +534,84 @@ public class MappingValidatorTests
         };
 
         Assert.Empty(MappingValidator.Validate(new MappingDefinition(), definition));
+    }
+
+    [Theory]
+    [InlineData(QuestionType.Text)]
+    [InlineData(QuestionType.Paragraph)]
+    [InlineData(QuestionType.Radio)]
+    [InlineData(QuestionType.Checkbox)]
+    [InlineData(QuestionType.Date)]
+    [InlineData(QuestionType.Scale)]
+    public void どの設問からでも文字列の列へ割り当てられる(QuestionType type)
+    {
+        // ⚠️ **文字列はどの設問からでも作れる。** ここを弾くと
+        // Title と Body へ何も割り当てられない（Issue #246）
+        var definition = Definition("q1") with
+        {
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "q1",
+                            Type = type,
+                            Title = LocalizedText.Japanese("q1"),
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var problems = MappingValidator.Validate(
+            Mapping(ColumnAssignment.Direct("Body", new MappingSource("q1", QuestionPort.Value))),
+            definition,
+            targetValueKind: _ => MappingTargetValueKind.String);
+
+        Assert.DoesNotContain(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Fact]
+    public void 自由記述は整数の列へは割り当てられない()
+    {
+        // **数値や日時は変換に失敗し得る。** そちらの検査は効いたままであること
+        var problems = MappingValidator.Validate(
+            Mapping(ColumnAssignment.Direct("Status", new MappingSource("q1", QuestionPort.Value))),
+            Definition("q1"),
+            targetValueKind: _ => MappingTargetValueKind.Integer);
+
+        Assert.Contains(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Theory]
+    [InlineData(ConverterOperations.Join)]
+    [InlineData(ConverterOperations.Coalesce)]
+    [InlineData(ConverterOperations.Map)]
+    [InlineData(ConverterOperations.Script)]
+    public void 変換を挟んでも文字列の列へ割り当てられる(string operation)
+    {
+        // ⚠️ **Issue #246 は変換の無い経路しか直していなかった。**
+        // join で 2 つの回答を題名にする、のような使い方が弾かれていた
+        var converter = new MappingConverter(
+            operation,
+            System.Collections.Immutable.ImmutableDictionary<string, string>.Empty
+                .Add("separator", " ")
+                .Add("script", "return 'x';")
+                .Add("map.はい", "Yes"));
+
+        var problems = MappingValidator.Validate(
+            Mapping(ColumnAssignment.Converted(
+                "Title", converter, new MappingSource("q1", QuestionPort.Value))),
+            Definition("q1"),
+            targetValueKind: _ => MappingTargetValueKind.String);
+
+        Assert.DoesNotContain(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
     }
 }

@@ -12,11 +12,31 @@
 docker compose --profile sqlserver down -v
 docker compose --profile sqlserver up -d --wait
 
-# 2. 撮る
+# 2. spec を焼き直す
+docker compose --profile screenshots build screenshots
+
+# 3. 撮る
 docker compose --profile sqlserver --profile screenshots run --rm screenshots
 ```
 
 写しは `tools/screenshots/shots/` に出る。
+
+### ⚠️ 変更したものに応じてイメージを作り直す
+
+**spec を直したら、撮る前に `docker compose --profile screenshots build screenshots` が要る。**
+spec は screenshots イメージへ焼き込まれ、容器へマウントしているのは
+`shots` と `report` だけなので、ビルドしない限り古い spec が走る。
+
+**アプリを直したら、検証環境を `up --build` で起動する。**
+
+```bash
+docker compose --profile sqlserver up -d --build --wait
+```
+
+`up` だけでは古いアプリのイメージが残り、直した画面を写しへ反映できない。
+
+**2 回目も必ず `down -v` から始める。** 1 回目に管理者を作るため、
+同じボリュームでもう一度走らせると初期設定の画面へ進めず、必ず落ちる。
 
 ### ⚠️ 「まっさら」を省くと、分からない形で落ちる（Issue #65）
 
@@ -47,20 +67,25 @@ Error: page.screenshot: Protocol error (Page.captureScreenshot):
 **今は撮り始める前に前提を確かめて落とす**（`lib/fresh.ts`）。
 「撮れない」より「撮れない理由が分からない」方が高く付く。
 
-### ほかの spec と混ぜて走らせない
+### 初期設定を撮る spec は先に分けて走らせる
 
 **`manual.spec.ts` は最初の管理者を自分で作る。**
 `branching.spec.ts` などを先に走らせると管理者が既に居るので、
 **初期設定の画面がもう出ない**（取説に要る画面）。
 
-まとめて走らせたいときは、**`manual.spec.ts` を別の実行に分ける。**
+既定の `npm run shot` は、`manual.spec.ts` を先に単独で通してから、
+そこで作った管理者の認証状態を引き継いで残りを走らせる。
+**単発確認用の `review.spec.ts` は既定の一式へ混ぜない。**
 
 ```bash
 # 写しを撮る（まっさらな環境で、これだけ）
 docker compose --profile sqlserver --profile screenshots run --rm     screenshots npx playwright test specs/manual.spec.ts
 
 # 製品の検証（写しは撮らない）
-docker compose --profile sqlserver --profile screenshots run --rm     screenshots npx playwright test --grep-invert 取説用の写し
+docker compose --profile sqlserver --profile screenshots run --rm     screenshots npx playwright test --grep-invert @standalone
+
+# 直した画面だけを確認する
+docker compose --profile sqlserver --profile screenshots run --rm     screenshots npx playwright test specs/review.spec.ts
 ```
 
 ## 豆腐（□）にしないために

@@ -20,7 +20,8 @@ export type QuestionType =
   | 'CheckboxGrid'
   | 'Ranking'
   | 'Note'
-  | 'Embed';
+  | 'Embed'
+  | 'Confirm';
 
 /**
  * 画面に出す並び。**説明文ブロックは最後**（回答を持たないため）
@@ -43,6 +44,7 @@ export const questionTypes: QuestionType[] = [
   'Ranking',
   'Note',
   'Embed',
+  'Confirm',
 ];
 
 /** 設問の形式の文言の鍵。**形式を足すと鍵が無くなり、型検査で落ちる。** */
@@ -192,8 +194,23 @@ export interface Choice {
 }
 
 export interface QuestionSettings {
+  /**
+   * 説明文の書き方（Issue #267）。
+   *
+   * **無ければプレーン。** 過去の説明文に含まれる `*` や `#` の見え方を変えない。
+   * `Note` は従来どおり常に記法として扱う。
+   */
+  descriptionFormat?: 'Plain' | 'Markup';
   maxLength?: number;
   placeholder?: LocalizedText;
+  /** 全角の ASCII 英数字・記号を半角へ変換する。既定は無効。 */
+  convertFullWidthAsciiToHalfWidth?: boolean;
+  /** 半角カナを全角へ変換する。既定は無効。 */
+  convertHalfWidthKanaToFullWidth?: boolean;
+  /** 全角空白を半角へ変換する。既定は無効。 */
+  convertFullWidthSpacesToHalfWidth?: boolean;
+  /** 前後の空白を取り除く。既定は無効。 */
+  trimWhitespace?: boolean;
   scaleMinimum?: number;
   scaleMaximum?: number;
   scaleMinimumLabel?: LocalizedText;
@@ -322,17 +339,21 @@ export interface AutoReplySettings {
   subject?: LocalizedText;
   /** 本文。**平文。** 書式は持たない。 */
   body?: LocalizedText;
-  /** 本文のあとに回答の写しを付けるか。**既定は付けない。** */
-  includeAnswers?: boolean;
-  /**
-   * 本文のあとに、回答を直すためのリンクを付けるか（Issue #202）。
-   *
-   * ⚠️ **このリンクを持つ人は、その回答を書き換えられる。**
-   * 回答の編集を許していないアンケートでは付けられない。
-   */
-  includeEditLink?: boolean;
+  /** 差出人の表示名。**アドレスはサーバの全体設定から変えない。** */
+  fromName?: LocalizedText;
+  /** 返信先。未設定ならサーバの全体設定を使う。 */
+  replyToAddress?: string | null;
+  /** BCC。未設定なら付けない。 */
+  bccAddress?: string | null;
   /** 再編集リンクの有効日数。**既定 7 日。** 受付期間の終了は超えない。 */
   editLinkDays?: number;
+}
+
+/** 回答後の配布資産に使う引換券の期限（Issue #318）。 */
+export interface AssetDeliverySettings {
+  expiration: 'AcceptTo' | 'DaysAfterResponse' | 'CompletedOnly';
+  /** 回答からの日数。受付終了が無い場合の既定日数にも使う。 */
+  days: number;
 }
 
 export interface SurveyDefinition {
@@ -357,10 +378,19 @@ export interface SurveyDefinition {
    * **無ければ送らない。** 件名と本文は定義の一部なので、**公開した版で固定される。**
    */
   autoReply?: AutoReplySettings | null;
+  /** 無ければ「アンケートの受付期間に合わせる」。 */
+  assetDelivery?: AssetDeliverySettings | null;
   pages: Page[];
 }
 
 export type QuestionPort = 'Value' | 'OtherText' | 'FileNames' | 'Files';
+export type MappingSystemValue =
+  | 'EventType'
+  | 'OccurredAt'
+  | 'AssetFileName'
+  | 'AssetId'
+  | 'ReferenceId'
+  | 'SurveyTitle';
 
 /**
  * 添付列か。
@@ -375,6 +405,7 @@ export function isAttachmentColumn(column: string): boolean {
 export interface MappingSource {
   questionId: string;
   port: QuestionPort;
+  systemValue?: MappingSystemValue | null;
   /**
    * どの行（または順位を付ける項目）から取るか（Issue #74）。
    *
@@ -410,6 +441,8 @@ export interface MappingDefinition {
 export interface SurveyDraft {
   definition: SurveyDefinition;
   mapping: MappingDefinition;
+  assetHistorySiteId?: number;
+  assetHistoryMapping?: MappingDefinition | null;
   /** **保存時に照合する版。** 合わなければ他の人が更新している */
   revision: number;
 }
@@ -572,7 +605,36 @@ export type AdminPermission =
   | 'audit.read'
   | 'users.read'
   | 'users.write'
-  | 'users.resetTwoFactor';
+  | 'users.resetTwoFactor'
+  | 'settings.saml';
+
+export interface SamlSettings {
+  enabled: boolean;
+  entityId: string;
+  idpEntityId: string;
+  singleSignOnUrl: string;
+  idpCertificate: string;
+  unknownUser: string;
+  registerRole: string;
+  loginIdSource: string;
+  loginIdClaim: string;
+  buttonLabel: string;
+  singleLogoutUrl: string;
+  fixedFields: Record<SamlSettingField, boolean>;
+}
+
+export type SamlSettingField =
+  | 'enabled'
+  | 'entityId'
+  | 'idpEntityId'
+  | 'singleSignOnUrl'
+  | 'idpCertificate'
+  | 'unknownUser'
+  | 'registerRole'
+  | 'loginIdSource'
+  | 'loginIdClaim'
+  | 'buttonLabel'
+  | 'singleLogoutUrl';
 
 /**
  * 管理者の一覧の 1 行（Issue #156）。
@@ -642,6 +704,9 @@ export interface AdminSession {
   /** SAML でのログインが使えるか（Issue #166）。**既定は無効** */
   samlEnabled?: boolean;
 
+  /** パスワードログインと招待受取に proof-of-work が必要か（Issue #252）。 */
+  captchaEnabled?: boolean;
+
   /** SAML の釦に出す文字。`null` なら決まった文言を使う */
   samlLabel?: string | null;
 
@@ -660,6 +725,8 @@ export interface AdminSession {
    * 接続先も資格情報も返らない。**認証済みのときだけ載る。**
    */
   mailEnabled?: boolean;
+  /** ログイン ID を、本人宛て試し送信のメールアドレスとして使えるか。 */
+  autoReplyTestRecipientAvailable?: boolean;
 
   /**
    * 利用者ごとの表示言語。`null` は「まだ選んでいない」。
@@ -667,6 +734,16 @@ export interface AdminSession {
    * **画面の初期値を決めるためのもの**（`_documents/多言語対応方針.md` 2 章）。
    */
   language?: string | null;
+}
+
+/** サーバ側に残っているログイン済み端末 1 件。 */
+export interface AdminSessionRow {
+  adminSessionId: string;
+  current: boolean;
+  createdAt: string;
+  expiresAt: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
 }
 
 /**

@@ -39,6 +39,7 @@ describe('文言の鍵', () => {
     for (const type of questionTypes) {
       expect(questionTypeKey(type) in ja, type).toBe(true);
     }
+    expect(questionTypes.at(-1)).toBe('Confirm');
   });
 
   it('すべての比べ方に文言がある', () => {

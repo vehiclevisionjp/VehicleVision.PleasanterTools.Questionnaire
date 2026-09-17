@@ -1,8 +1,16 @@
 <script lang="ts">
   import type { AnswerState, Question } from '../lib/types';
-  import { allowsMultiplePerRow, hasSelectionRange, rowValues, text } from '../lib/types';
+  import {
+    allowsMultiplePerRow,
+    confirmAnswer,
+    hasSelectionRange,
+    isConfirmed,
+    rowValues,
+    text,
+  } from '../lib/types';
   import type { Language } from '../lib/i18n/language';
   import { translator } from '../lib/i18n/messages';
+  import { hasAnswerNormalization, normalizeAnswer } from '../lib/answerNormalization';
   import { noteBlocks } from '../lib/note';
   import NoteContent from './NoteContent.svelte';
   import EmbedBlock from './EmbedBlock.svelte';
@@ -14,9 +22,11 @@
     /** **まだ初期化されていないことがある。** 辞書からそのまま渡ってくるため */
     answer: AnswerState | undefined;
     error?: string;
+    /** 記法に含まれる自前資産を、本アプリの配信口へ変換する。 */
+    assetUrl?: (assetId: string) => string;
   }
 
-  let { question, language, answer = $bindable(), error }: Props = $props();
+  let { question, language, answer = $bindable(), error, assetUrl }: Props = $props();
 
   const t = $derived(translator(language));
 
@@ -32,6 +42,10 @@
 
   function setSingle(value: string) {
     answer = { ...current, values: value === '' ? [] : [value] };
+  }
+
+  function normalizeSingle() {
+    setSingle(normalizeAnswer(current.values[0] ?? '', question.settings));
   }
 
   function toggleMultiple(value: string, checked: boolean) {
@@ -166,6 +180,16 @@
     if (maximum !== undefined) return t('question.selectionMaximum', { maximum });
     return '';
   });
+
+  const descriptionBlocks = $derived(
+    question.settings.descriptionFormat === 'Markup'
+      ? noteBlocks(question.descriptionBlocks, language)
+      : [],
+  );
+
+  const normalizationNotice = $derived(
+    hasAnswerNormalization(question.settings) ? t('question.normalizationNotice') : '',
+  );
 </script>
 
 <!-- 説明文ブロックは回答を持たない -->
@@ -176,7 +200,7 @@
     <!-- **書式の付いた本文があればそちらを出す**（Issue #108）。
          公開済みの古い版には noteBlocks が無いので、平文へ落とす -->
     {#if blocks.length > 0}
-      <NoteContent {blocks} />
+      <NoteContent {blocks} {assetUrl} />
     {:else if question.description}
       <p>{text(question.description, language)}</p>
     {/if}
@@ -185,14 +209,37 @@
   <EmbedBlock {question} {language} />
 {:else}
   <fieldset class="field" class:has-error={error !== undefined}>
-    <legend id={labelId}>
-      {text(question.title, language)}
-      {#if question.isRequired}
-        <span class="required" aria-label={t('question.required')}>*</span>
-      {/if}
-    </legend>
+    {#if question.type !== 'Confirm'}
+      <legend id={labelId}>
+        {text(question.title, language)}
+        {#if question.isRequired}
+          <span class="required" aria-label={t('question.required')}>*</span>
+        {/if}
+      </legend>
+    {/if}
 
-    {#if question.description}
+    {#if question.type === 'Confirm'}
+      <!-- **見出し全体をラベルにする。** 小さなチェック欄だけを狙わせない -->
+      <label class="choice confirm">
+        <input
+          type="checkbox"
+          checked={isConfirmed(current)}
+          aria-describedby={error ? errorId : undefined}
+          aria-invalid={error !== undefined}
+          onchange={(event) => (answer = confirmAnswer(current, event.currentTarget.checked))}
+        />
+        <span>
+          {text(question.title, language)}
+          {#if question.isRequired}
+            <span class="required" aria-label={t('question.required')}>*</span>
+          {/if}
+        </span>
+      </label>
+    {/if}
+
+    {#if descriptionBlocks.length > 0}
+      <div class="description"><NoteContent blocks={descriptionBlocks} {assetUrl} /></div>
+    {:else if question.description}
       <p class="description">{text(question.description, language)}</p>
     {/if}
 
@@ -201,27 +248,43 @@
       <p class="description">{selectionLimits}</p>
     {/if}
 
+    {#if normalizationNotice !== ''}
+      <p class="description" id={`normalization-${question.questionId}`}>{normalizationNotice}</p>
+    {/if}
+
     {#if question.type === 'Text'}
       <input
         type="text"
         aria-labelledby={labelId}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={[
+          normalizationNotice !== '' ? `normalization-${question.questionId}` : '',
+          error ? errorId : '',
+        ]
+          .filter(Boolean)
+          .join(' ') || undefined}
         aria-invalid={error !== undefined}
         maxlength={question.settings.maxLength}
         placeholder={text(question.settings.placeholder, language)}
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}
+        onblur={normalizeSingle}
       />
     {:else if question.type === 'Paragraph'}
       <textarea
         rows="4"
         aria-labelledby={labelId}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={[
+          normalizationNotice !== '' ? `normalization-${question.questionId}` : '',
+          error ? errorId : '',
+        ]
+          .filter(Boolean)
+          .join(' ') || undefined}
         aria-invalid={error !== undefined}
         maxlength={question.settings.maxLength}
         placeholder={text(question.settings.placeholder, language)}
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}
+        onblur={normalizeSingle}
       ></textarea>
     {:else if question.type === 'Radio'}
       {#each question.choices as choice (choice.value)}
@@ -425,6 +488,8 @@
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}
       />
+    {:else if question.type === 'Confirm'}
+      <!-- **同意文言を説明リンクより先に読めるよう、**チェックボックスは上で描画済み -->
     {:else}
       <p class="unsupported">{t('question.unsupported', { type: question.type })}</p>
     {/if}
@@ -474,6 +539,7 @@
     color: var(--muted);
     margin: 0.25rem 0 0.75rem;
     font-size: 0.9rem;
+    white-space: pre-line;
   }
 
   .choice {

@@ -1,9 +1,12 @@
 <script lang="ts">
   import QuestionField from './components/QuestionField.svelte';
+  import NoteContent from './components/NoteContent.svelte';
   import {
     forgetSubmission,
     hasSubmitted,
     loadForm,
+    activateAssetTicket,
+    redeemAssetTicket,
     redeemEditLink,
     loadPendingAnswers,
     requestTicket,
@@ -40,6 +43,7 @@
   import { serverValidationKey, translator, type MessageKey } from './lib/i18n/messages';
   import { applyTheme, headerImageUrl } from './lib/theme';
   import { clearDraft, hasDraft, readDraft, saveDraft } from './lib/draft';
+  import { noteBlocks } from './lib/note';
 
   type Screen = 'loading' | 'answering' | 'answered' | 'completed' | 'rejected' | 'error';
 
@@ -161,6 +165,7 @@
   let allowsDraft = $state(false);
   /** テスト公開中か。**回答者へ必ず明示する。** */
   let isTest = $state(false);
+  let recordsAssetHistory = $state(false);
   /** 端末に前回の下書きがあるか。**勝手には戻さない。** */
   let draftFound = $state(false);
   /** 下書きから戻したことの知らせ。 */
@@ -175,6 +180,8 @@
   let canEdit = $state(false);
   /** 添付を受け付けなかった理由。**どのファイルが駄目かを出す。** */
   let attachmentMessages = $state<string[]>([]);
+  /** 引換券のリンクから完了画面だけを開いたか。 */
+  let assetTicketVisit = $state(false);
 
   /**
    * 回答から辿る経路。**答えを変えると変わる。**
@@ -193,6 +200,8 @@
 
   /** ヘッダ画像の URL。**本アプリの口だけを指す**（外部へ取りに行かない）。 */
   const headerImage = $derived(definition ? headerImageUrl(publicId, definition.theme) : null);
+  const contentAssetUrl = (assetId: string) =>
+    `/api/forms/${encodeURIComponent(publicId)}/assets/${encodeURIComponent(assetId)}`;
 
   /** 画面に出す区切り。**1 問 1 ページ表示なら 1 設問で 1 区切り。** */
   const steps = $derived(toSteps(path, definition?.displayMode ?? 'Paged'));
@@ -284,6 +293,16 @@
       return;
     }
 
+    // **配布リンクは受付終了後も使える。** 通常の公開判定より先に引き換える
+    const ticketForm = await redeemAssetTicket(publicId);
+    if (ticketForm) {
+      definition = ticketForm.definition;
+      recordsAssetHistory = ticketForm.recordsAssetHistory ?? false;
+      assetTicketVisit = true;
+      screen = 'completed';
+      return;
+    }
+
     const result = await loadForm(publicId);
     if (!result.form) {
       rejection = result.rejection ?? 'notFound';
@@ -300,6 +319,7 @@
     // **分からなければ残さない側へ倒す**（Issue #59）
     allowsDraft = result.form.allowsDraft ?? false;
     isTest = result.form.isTest ?? false;
+    recordsAssetHistory = result.form.recordsAssetHistory ?? false;
 
     // **メールの再編集リンクから来たなら、先に引き換える**（Issue #202）。
     // ここで端末の回答トークンを差し替えてから、いつもの流れへ入る
@@ -520,6 +540,8 @@
         toAttachments(),
       );
       if (result.accepted) {
+        await activateAssetTicket(publicId, result.assetTicket);
+        assetTicketVisit = false;
         canEdit = true;
         // **送れたら下書きは要らない**（Issue #59）。端末へ残し続けない
         clearDraft(publicId);
@@ -649,15 +671,26 @@
     </button>
     <p class="note">{t('answered.answerAgainNote')}</p>
   {:else if screen === 'completed' && definition}
-    <!-- **管理者が入れた文言が先。** 無ければ本アプリの文言へ落とす -->
-    <h1>{text(definition.confirmationMessage, language) || t('completed.title')}</h1>
-    <p class="status">{t('completed.thanks')}</p>
-    {#if definition.allowEditingAfterSubmit}
+    <h1>{t('completed.title')}</h1>
+    {#if recordsAssetHistory}
+      <p class="status" role="note">{t('assetHistory.notice')}</p>
+    {/if}
+    {@const confirmation = noteBlocks(definition.confirmationBlocks, language)}
+    {#if confirmation.length > 0}
+      <div class="status"><NoteContent blocks={confirmation} assetUrl={contentAssetUrl} /></div>
+    {:else}
+      <p class="status">
+        {text(definition.confirmationMessage, language) || t('completed.thanks')}
+      </p>
+    {/if}
+    {#if definition.allowEditingAfterSubmit && !assetTicketVisit}
       <button type="button" onclick={() => (screen = 'answering')}>{t('completed.edit')}</button>
     {/if}
-    <button type="button" class="secondary" onclick={answerAgain}>
-      {t('completed.answerAgain')}
-    </button>
+    {#if !assetTicketVisit}
+      <button type="button" class="secondary" onclick={answerAgain}>
+        {t('completed.answerAgain')}
+      </button>
+    {/if}
   {:else if definition && currentPage}
     <header>
       <!-- **飾り。** 意味は題名が伝えるので `alt` は空にする
@@ -728,6 +761,7 @@
         <QuestionField
           {question}
           {language}
+          assetUrl={contentAssetUrl}
           bind:answer={answers[question.questionId]}
           error={errors[question.questionId]}
         />

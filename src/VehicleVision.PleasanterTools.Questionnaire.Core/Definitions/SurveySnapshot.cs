@@ -19,7 +19,13 @@ public sealed record SurveySnapshot(
     SurveyDefinition Definition,
     MappingDefinition Mapping,
     long PleasanterSiteId,
-    string? ResponseJsonColumn);
+    string? ResponseJsonColumn,
+    long AssetHistorySiteId = 0,
+    MappingDefinition? AssetHistoryMapping = null)
+{
+    public bool IsAssetHistoryEnabled =>
+        AssetHistorySiteId > 0 && AssetHistoryMapping is { Assignments.Length: > 0 };
+}
 
 /// <summary>版を指定してスナップショットを引く。</summary>
 public interface ISurveySnapshotStore

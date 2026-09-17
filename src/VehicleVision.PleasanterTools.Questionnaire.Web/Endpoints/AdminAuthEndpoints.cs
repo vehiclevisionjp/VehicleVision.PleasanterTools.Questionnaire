@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -33,7 +34,8 @@ public static class AdminAuthEndpoints
 
     public static IEndpointRouteBuilder MapAdminAuthEndpoints(this IEndpointRouteBuilder builder)
     {
-        var group = builder.MapGroup("/api/admin");
+        var group = builder.MapGroup("/api/admin")
+            .WithTags("管理 API");
         AdminAuthSchemes.AddNoStore(group);
 
         // **管理操作を残す**（Issue #19）。読み取りは残さない
@@ -43,12 +45,14 @@ public static class AdminAuthEndpoints
         group.MapGet("/session", async (
             HttpContext context,
             IAdminUserStore store,
-            SamlOptions saml,
+            ISamlOptionsProvider samlProvider,
             AdminAuthOptions options,
+            AdminCaptchaOptions captcha,
             MailOptions mail,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
+            var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
 
             // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
@@ -99,6 +103,7 @@ public static class AdminAuthEndpoints
                     hasTotp,
                     samlEnabled,
                     samlLabel,
+                    captchaEnabled = captcha.Enabled,
 
                     // **IdP へログアウトを頼めるか**（Issue #191）。
                     // 画面はこれを見て、ログアウトの行き先を決める
@@ -109,6 +114,12 @@ public static class AdminAuthEndpoints
                     // ⚠️ **接続先も資格情報も返さない**（送れるか否かだけ）。
                     // **認証済みの相手にだけ返す**（構成の情報を未認証へ出さない）
                     mailEnabled = mail.IsReady,
+
+                    // **試し送信の宛先は自分のログイン ID に固定する**（Issue #319）。
+                    // 画面で先に理由を出すため、メールアドレスとして読めるかだけ返す。
+                    autoReplyTestRecipientAvailable = MailAddress.TryCreate(
+                        session.Principal?.Identity?.Name,
+                        out _),
                 });
             }
 
@@ -136,8 +147,15 @@ public static class AdminAuthEndpoints
                 needsEnrollment,
                 samlEnabled,
                 samlLabel,
+                captchaEnabled = captcha.Enabled,
             });
         });
+
+        // **課題を出すだけでは利用者を調べない。** ログイン ID の実在を応答時間へ出さない。
+        group.MapGet("/captcha/challenge", (
+            AdminCaptchaOptions options,
+            AltchaGuard altcha) =>
+            options.Enabled ? Results.Ok(altcha.Issue()) : Results.NotFound());
 
         // ---- 最初の管理者 ----------------------------------------------------
         group.MapPost("/setup", async (
@@ -203,11 +221,24 @@ public static class AdminAuthEndpoints
             AdminCredentialRequest request,
             HttpContext context,
             AdminAuthenticator authenticator,
+            AdminCaptchaOptions captcha,
+            AltchaGuard altcha,
             CancellationToken cancellationToken) =>
         {
             // **誰が狙われているかは、記録に残っていないと分からない。**
             // パスワードは預けない（AuditNotes の但し書き）
             AuditNotes.Add(context, "loginId", request.LoginId);
+
+            // **この handler より先にレート制限 middleware が動く。**
+            // 無制限に署名検証だけをさせて、サーバの CPU を使わせない。
+            if (captcha.Enabled
+                && await altcha.CheckRequiredAsync(request.Altcha, cancellationToken)
+                    .ConfigureAwait(false) is not null)
+            {
+                return Results.Json(
+                    new { message = InvalidMessage(context) },
+                    statusCode: StatusCodes.Status401Unauthorized);
+            }
 
             if (string.IsNullOrWhiteSpace(request.LoginId) || string.IsNullOrEmpty(request.Password))
             {
@@ -367,12 +398,14 @@ public static class AdminAuthEndpoints
         // ---- ログアウト ------------------------------------------------------
         group.MapPost("/logout", async (HttpContext context) =>
         {
+            var sessions = context.RequestServices.GetRequiredService<AdminSessionManager>();
+
             // **途中状態も一緒に消す。** 残しておくと 2 要素から再開できてしまう
-            await context.SignOutAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
-            await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Session).ConfigureAwait(false);
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
 
             // 2 要素の登録し直しの途中も消す
-            await context.SignOutAsync(AdminAuthSchemes.Reenroll).ConfigureAwait(false);
+            await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Reenroll).ConfigureAwait(false);
             return Results.Ok(new { signedOut = true });
         });
 
@@ -400,7 +433,8 @@ public static class AdminAuthEndpoints
                 return Results.Ok(new { authenticated = true });
 
             case SecondFactorOutcome.LockedOut:
-                await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+                await context.RequestServices.GetRequiredService<AdminSessionManager>()
+                    .RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
                 return Results.Json(
                     new
                     {
@@ -434,7 +468,7 @@ public static class AdminAuthEndpoints
     };
 
     /// <summary>パスワードまで通った状態にする。**ここでは何も操作させない。**</summary>
-    internal static Task SignInPendingAsync(HttpContext context, AdminUser user, string? secret)
+    internal static async Task SignInPendingAsync(HttpContext context, AdminUser user, string? secret)
     {
         var claims = new List<Claim>
         {
@@ -449,7 +483,12 @@ public static class AdminAuthEndpoints
         }
 
         var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Pending);
-        return context.SignInAsync(AdminAuthSchemes.Pending, new ClaimsPrincipal(identity));
+        await context.RequestServices.GetRequiredService<AdminSessionManager>().SignInAsync(
+            context,
+            AdminAuthSchemes.Pending,
+            AdminSessionKind.Pending,
+            new ClaimsPrincipal(identity),
+            AdminAuthSchemes.PendingLifetime).ConfigureAwait(false);
     }
 
     /// <summary>2 要素まで通った状態にする。</summary>
@@ -464,8 +503,9 @@ public static class AdminAuthEndpoints
     internal static async Task SignInSessionAsync(
         HttpContext context, AdminUser user, SamlSessionKeys? samlSession = null)
     {
-        // **途中状態は必ず消す。** 共有鍵の claim を残さない
-        await context.SignOutAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
+        // **途中状態は必ず消す。** ストアにも共有鍵を残さない
+        await context.RequestServices.GetRequiredService<AdminSessionManager>()
+            .RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
 
         List<Claim> claims =
         [
@@ -488,14 +528,19 @@ public static class AdminAuthEndpoints
 
         var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Session);
 
-        await context.SignInAsync(
+        await context.RequestServices.GetRequiredService<AdminSessionManager>().SignInAsync(
+            context,
             AdminAuthSchemes.Session,
+            AdminSessionKind.Session,
             new ClaimsPrincipal(identity),
-            new AuthenticationProperties { IsPersistent = false }).ConfigureAwait(false);
+            AdminAuthSchemes.SessionLifetime).ConfigureAwait(false);
     }
 
     /// <summary>ログイン ID とパスワード。</summary>
-    public sealed record AdminCredentialRequest(string? LoginId, string? Password);
+    public sealed record AdminCredentialRequest(
+        string? LoginId,
+        string? Password,
+        string? Altcha = null);
 
     /// <summary>使い捨てパスワードか復旧コード。</summary>
     public sealed record AdminCodeRequest(string? Code);

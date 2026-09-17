@@ -40,6 +40,13 @@ describe('translator', () => {
     expect(translator('en')(key)).toBe(en[key]);
   });
 
+  it('未翻訳の言語は日本語の文言へ落ちる', () => {
+    const key = Object.keys(ja)[0] as MessageKey;
+
+    expect(translator('zh')(key)).toBe(ja[key]);
+    expect(translator('vi')(key)).toBe(ja[key]);
+  });
+
   it('差し込みのある文言を組み立てる', () => {
     // 差し込みを持つ鍵を 1 つ選び、置き換わることだけを見る
     const key = (Object.keys(ja) as MessageKey[]).find((candidate) =>

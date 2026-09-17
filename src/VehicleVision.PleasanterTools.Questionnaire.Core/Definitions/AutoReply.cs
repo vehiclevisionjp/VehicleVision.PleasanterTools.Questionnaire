@@ -38,19 +38,18 @@ public sealed record AutoReplySettings
     /// </remarks>
     public LocalizedText? Body { get; init; }
 
-    /// <summary>本文のあとに、回答を直すためのリンクを付けるか（Issue #202）。</summary>
+    /// <summary>差出人の表示名。**アドレスは全体設定から変えない。**</summary>
+    public LocalizedText? FromName { get; init; }
+
+    /// <summary>返信先。**未設定なら全体設定を使う。**</summary>
+    public string? ReplyToAddress { get; init; }
+
+    /// <summary>BCC。**未設定なら付けない。**</summary>
     /// <remarks>
-    /// <para>
-    /// ⚠️ **このリンクを持つ人は、その回答を書き換えられる。**
-    /// 転送・共有メールボックスでは他人でも直せる。**割り切って受け入れる**
-    /// （2026-09-14 決定。完全匿名の公開フォームで、それ以上の本人確認をする前提が無い）。
-    /// </para>
-    /// <para>
-    /// **回答の編集を許していないアンケートでは付けられない**
-    /// （<see cref="SurveyDefinition.AllowEditingAfterSubmit"/>。公開のときに弾く）。
-    /// </para>
+    /// 回答者の宛先と、本文へ差し込んだ回答の写しがこの宛先へ届く。
+    /// **完全匿名の回答から個人を指す値が外へ出る設定**なので、既定は無効。
     /// </remarks>
-    public bool IncludeEditLink { get; init; }
+    public string? BccAddress { get; init; }
 
     /// <summary>再編集リンクの有効日数。**既定は 7 日。**</summary>
     /// <remarks>
@@ -63,12 +62,4 @@ public sealed record AutoReplySettings
 
     /// <summary>指定できる有効日数の上限。**永久に生きるリンクを作らせない。**</summary>
     public const int MaxEditLinkDays = 365;
-
-    /// <summary>本文のあとに回答の写しを付けるか。</summary>
-    /// <remarks>
-    /// ⚠️ **付けると、回答の中身がメールとして外へ出る。**
-    /// 受け取るのは回答者本人だが、**経路は暗号化されているとは限らない。**
-    /// 既定は付けない。
-    /// </remarks>
-    public bool IncludeAnswers { get; init; }
 }

@@ -77,9 +77,25 @@ export function renderableInlines(inlines: NoteInline[] | undefined): NoteInline
   if (!inlines) return [];
   return inlines
     .filter((inline) => inline.text !== '')
-    .map((inline) =>
-      inline.kind === 'Link' && !isSafeHref(inline.href)
-        ? { kind: 'Text' as const, text: inline.text }
-        : inline,
-    );
+    .map((inline) => {
+      if (inline.kind === 'Link' && !isSafeHref(inline.href)) {
+        return { kind: 'Text' as const, text: inline.text };
+      }
+      if (
+        (inline.kind === 'AssetImage' || inline.kind === 'AssetLink') &&
+        !isAssetId(inline.assetId)
+      ) {
+        return { kind: 'Text' as const, text: inline.text };
+      }
+      return inline;
+    });
+}
+
+/** サーバが発行する資産 ID の形か。 */
+export function isAssetId(value: string | null | undefined): value is string {
+  return (
+    value !== undefined &&
+    value !== null &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  );
 }

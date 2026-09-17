@@ -57,6 +57,14 @@ export function validateQuestion(
     return question.isRequired ? t('validation.required') : null;
   }
 
+  if (question.type === 'Confirm') {
+    if (values.length > 1) return t('validation.singleValueOnly');
+
+    const value = values[0]?.toLowerCase();
+    if (value !== 'true' && value !== 'false') return t('validation.boolean');
+    return question.isRequired && value !== 'true' ? t('validation.required') : null;
+  }
+
   // **ランキングは並べた順そのものが答え。** 同じ項目が 2 回出ると順位が決まらない
   if (question.type === 'Ranking' && new Set(values).size !== values.length) {
     return t('validation.duplicateRank');

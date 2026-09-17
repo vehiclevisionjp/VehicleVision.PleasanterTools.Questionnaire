@@ -138,6 +138,49 @@ public sealed class NoteMarkupTests
         Assert.Equal("https://example.com/about", inline.Href);
     }
 
+    [Fact]
+    public void 自前資産の画像とリンクだけを構造へ変換する()
+    {
+        var imageId = Guid.NewGuid();
+        var linkId = Guid.NewGuid();
+
+        var blocks = NoteMarkup.Parse(
+            $"![案内図](asset:{imageId:D}) [大きく見る](asset:{linkId:D})");
+
+        Assert.Equal(3, blocks[0].Inlines.Length);
+        Assert.Equal(NoteInlineKind.AssetImage, blocks[0].Inlines[0].Kind);
+        Assert.Equal(imageId, blocks[0].Inlines[0].AssetId);
+        Assert.Equal(NoteInlineKind.AssetLink, blocks[0].Inlines[2].Kind);
+        Assert.Equal(linkId, blocks[0].Inlines[2].AssetId);
+        Assert.All(blocks[0].Inlines, inline => Assert.Null(inline.Href));
+    }
+
+    [Theory]
+    [InlineData("![外部](https://example.com/image.png)")]
+    [InlineData("![データ](data:image/png;base64,AAAA)")]
+    [InlineData("![不正](asset:not-a-guid)")]
+    public void 外部画像と不正な資産IDは画像にしない(string markup)
+    {
+        var blocks = NoteMarkup.Parse(markup);
+
+        Assert.DoesNotContain(
+            blocks.SelectMany(block => block.Inlines),
+            inline => inline.Kind == NoteInlineKind.AssetImage);
+    }
+
+    [Fact]
+    public void 資産IDを書き換えても他の原文は変えない()
+    {
+        var source = Guid.NewGuid();
+        var target = Guid.NewGuid();
+        var markup = $"前 ![画像](asset:{source:D}) 後";
+
+        var rewritten = NoteMarkup.RewriteAssetIds(
+            markup, new Dictionary<Guid, Guid> { [source] = target });
+
+        Assert.Equal($"前 ![画像](asset:{target:D}) 後", rewritten);
+    }
+
     [Theory]
     [InlineData("javascript:alert(1)")]
     [InlineData("JavaScript:alert(1)")]
@@ -210,7 +253,7 @@ public sealed class NoteMarkupTests
     }
 
     [Fact]
-    public void 説明文ブロックだけが書式を持つ()
+    public void 説明文ブロックと記法を選んだ設問だけが書式を持つ()
     {
         var note = new Question
         {
@@ -220,10 +263,48 @@ public sealed class NoteMarkupTests
             Description = LocalizedText.Japanese("**太字**"),
         };
         var text = note with { Type = QuestionType.Text };
+        var confirm = note with
+        {
+            Type = QuestionType.Confirm,
+            Settings = new QuestionSettings { DescriptionFormat = DescriptionFormat.Markup },
+        };
 
         Assert.NotNull(note.NoteBlocks);
         Assert.Equal(NoteInlineKind.Bold, note.NoteBlocks!["ja"][0].Inlines[0].Kind);
         Assert.Null(text.NoteBlocks);
+        Assert.Null(text.DescriptionBlocks);
+        Assert.Equal(
+            NoteInlineKind.Bold,
+            confirm.DescriptionBlocks!["ja"][0].Inlines[0].Kind);
+    }
+
+    [Fact]
+    public void 通常の設問は既定で説明文の記法を解釈しない()
+    {
+        var question = new Question
+        {
+            QuestionId = "q1",
+            Type = QuestionType.Text,
+            Title = LocalizedText.Japanese("設問"),
+            Description = LocalizedText.Japanese("**そのまま**"),
+        };
+
+        Assert.Null(question.DescriptionBlocks);
+    }
+
+    [Fact]
+    public void 説明文ブロックは設定がプレーンでも記法を解釈する()
+    {
+        var note = new Question
+        {
+            QuestionId = "n1",
+            Type = QuestionType.Note,
+            Title = LocalizedText.Japanese("ご案内"),
+            Description = LocalizedText.Japanese("**太字**"),
+            Settings = new QuestionSettings { DescriptionFormat = DescriptionFormat.Plain },
+        };
+
+        Assert.Equal(NoteInlineKind.Bold, note.NoteBlocks!["ja"][0].Inlines[0].Kind);
     }
 
     [Fact]
@@ -265,7 +346,7 @@ public sealed class NoteMarkupTests
     public void 既定のImmutableArrayは空として扱う()
     {
         // JSON から読んだ値がそのまま列挙されても落ちないこと
-        var block = new NoteBlock(NoteBlockKind.Paragraph);
+        var block = new NoteBlock(NoteBlockKind.Paragraph, [], []);
 
         Assert.Empty(block.Inlines);
         Assert.Empty(block.Items);
@@ -288,4 +369,63 @@ public sealed class NoteMarkupTests
         Assert.Contains("\"noteBlocks\"", json, StringComparison.Ordinal);
         Assert.Contains("\"Link\"", json, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void 完了画面も説明文と同じ安全な書式を持つ()
+    {
+        var assetId = Guid.NewGuid();
+        var definition = new SurveyDefinition
+        {
+            SurveyId = Guid.NewGuid().ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("調査"),
+            ConfirmationMessage = new LocalizedText(new Dictionary<string, string>
+            {
+                ["ja"] = $"![資料](asset:{assetId:D})",
+                ["en"] = $"[Download](asset:{assetId:D})",
+            }),
+        };
+
+        Assert.Equal(
+            NoteInlineKind.AssetImage,
+            definition.ConfirmationBlocks!["ja"][0].Inlines[0].Kind);
+        Assert.Equal(
+            NoteInlineKind.AssetLink,
+            definition.ConfirmationBlocks["en"][0].Inlines[0].Kind);
+        Assert.True(SurveyAssetReferences.Contains(definition, assetId));
+        Assert.True(SurveyAssetReferences.RequiresTicket(definition, assetId));
+    }
+
+    [Fact]
+    public void 設問でも使う画像には引換券を要求しない()
+    {
+        var assetId = Guid.NewGuid();
+        var definition = new SurveyDefinition
+        {
+            SurveyId = "s1",
+            Version = 1,
+            Title = LocalizedText.Japanese("調査"),
+            ConfirmationMessage = LocalizedText.Japanese($"[配布](asset:{assetId:D})"),
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions =
+                    [
+                        new Question
+                        {
+                            QuestionId = "note",
+                            Type = QuestionType.Note,
+                            Title = LocalizedText.Japanese("説明"),
+                            Description = LocalizedText.Japanese($"![画像](asset:{assetId:D})"),
+                        },
+                    ],
+                },
+            ],
+        };
+
+        Assert.False(SurveyAssetReferences.RequiresTicket(definition, assetId));
+    }
+
 }

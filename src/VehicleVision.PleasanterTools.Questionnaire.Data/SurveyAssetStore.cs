@@ -3,27 +3,32 @@ using Dapper;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 
-/// <summary>アンケートに紐づく画像 1 枚（Issue #56）。</summary>
+/// <summary>アンケートに紐づく資産 1 件（Issue #56 / #266）。</summary>
 /// <param name="AssetId">識別子。**行は上書きしないので、差し替えると別の値になる。**</param>
 /// <param name="ContentType">配信するときの型。**サーバが拡張子から決めた値。**</param>
+/// <param name="FileName">ダウンロード時のファイル名。**検査済みの値。**</param>
 /// <param name="Content">中身。</param>
-public sealed record SurveyAsset(Guid AssetId, string ContentType, byte[] Content);
+public sealed record SurveyAsset(
+    Guid AssetId,
+    string ContentType,
+    string FileName,
+    byte[] Content);
 
-/// <summary>アンケートに紐づく画像を読み書きする。</summary>
+/// <summary>アンケートに紐づく資産を読み書きする。</summary>
 /// <remarks>
 /// <para>
 /// **読み出しは必ずアンケートで絞る。** 識別子だけで引けるようにすると、
-/// 識別子を推し当てるだけで**下書きのままのアンケートの画像**まで取り出せる。
+/// 識別子を推し当てるだけで**下書きのままのアンケートの資産**まで取り出せる。
 /// </para>
 /// <para>
-/// **消す口は用意しない。** 差し替えても、
-/// **公開済みの版がまだその画像を指していることがある**（<c>SurveyVersions</c> は不変）。
-/// 消してよいかは版を全部見ないと決まらないので、ここでは判断しない。
+/// **資産 1 個だけを消す口は用意しない。** 差し替えても、
+/// **公開済みの版がまだその資産を指していることがある**（<c>SurveyVersions</c> は不変）。
+/// 完全削除では、複製先を含む他のアンケートから参照されない実体だけを消す。
 /// </para>
 /// </remarks>
 public interface ISurveyAssetStore
 {
-    /// <summary>画像を足して、その識別子を返す。**既にある行は触らない。**</summary>
+    /// <summary>資産を足して、その識別子を返す。**既にある行は触らない。**</summary>
     Task<Guid> AddAsync(
         Guid surveyId,
         string contentType,
@@ -31,17 +36,39 @@ public interface ISurveyAssetStore
         byte[] content,
         CancellationToken cancellationToken = default);
 
-    /// <summary>画像を読む。**そのアンケートのものでなければ <c>null</c>。**</summary>
+    /// <summary>資産を読む。**そのアンケートのものでなければ <c>null</c>。**</summary>
     Task<SurveyAsset?> FindAsync(
         Guid surveyId,
         Guid assetId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 本文・完了画面用資産の枠を原子的に確保して追加する。上限なら <c>null</c>。
+    /// </summary>
+    Task<Guid?> TryAddContentAsync(
+        Guid surveyId,
+        string contentType,
+        string fileName,
+        byte[] content,
+        int maximumCount,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// アンケートの完全削除に伴い、他のアンケートから参照されない実体を削除する。
+    /// </summary>
+    Task DeleteSurveyAsync(
+        Guid surveyId,
         CancellationToken cancellationToken = default);
 }
 
 /// <summary>Dapper を使った実装。</summary>
 public sealed class SurveyAssetStore(IDbConnectionFactory connectionFactory) : ISurveyAssetStore
 {
-    private sealed record Row(Guid AssetId, string ContentType, string ContentBase64);
+    private sealed record Row(
+        Guid AssetId,
+        string ContentType,
+        string FileName,
+        string ContentBase64);
 
     public async Task<Guid> AddAsync(
         Guid surveyId,
@@ -83,9 +110,9 @@ public sealed class SurveyAssetStore(IDbConnectionFactory connectionFactory) : I
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        // **アンケートと組で絞る。** 識別子だけでは他のアンケートの画像が引ける
+        // **アンケートと組で絞る。** 識別子だけでは他のアンケートの資産が引ける
         var row = await connection.QueryFirstOrDefaultAsync<Row>(Sql(
-            "SELECT [AssetId], [ContentType], [ContentBase64] FROM [SurveyAssets] "
+            "SELECT [AssetId], [ContentType], [FileName], [ContentBase64] FROM [SurveyAssets] "
             + "WHERE [SurveyId] = @SurveyId AND [AssetId] = @AssetId",
             new { SurveyId = surveyId, AssetId = assetId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -100,13 +127,69 @@ public sealed class SurveyAssetStore(IDbConnectionFactory connectionFactory) : I
         try
         {
             return new SurveyAsset(
-                row.AssetId, row.ContentType, Convert.FromBase64String(row.ContentBase64));
+                row.AssetId,
+                row.ContentType,
+                row.FileName,
+                Convert.FromBase64String(row.ContentBase64));
         }
         catch (FormatException)
         {
             return null;
         }
     }
+
+    public async Task<Guid?> TryAddContentAsync(
+        Guid surveyId,
+        string contentType,
+        string fileName,
+        byte[] content,
+        int maximumCount,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection
+            .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        var reserved = await connection.ExecuteAsync(Sql(
+            "UPDATE [Surveys] SET [ContentAssetCount] = [ContentAssetCount] + 1 "
+            + "WHERE [SurveyId] = @SurveyId AND [ContentAssetCount] < @MaximumCount",
+            new { SurveyId = surveyId, MaximumCount = maximumCount },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
+        if (reserved == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+
+        var assetId = Guid.NewGuid();
+        await connection.ExecuteAsync(Sql(
+            "INSERT INTO [SurveyAssets] "
+            + "  ([AssetId], [SurveyId], [ContentType], [FileName], [ByteSize], "
+            + "   [ContentBase64], [CreatedAt]) "
+            + "VALUES (@AssetId, @SurveyId, @ContentType, @FileName, @ByteSize, "
+            + "        @ContentBase64, @Now)",
+            new
+            {
+                AssetId = assetId,
+                SurveyId = surveyId,
+                ContentType = contentType,
+                FileName = fileName,
+                ByteSize = (long)content.Length,
+                ContentBase64 = Convert.ToBase64String(content),
+                Now = DbTime.UtcNowTruncated(),
+            },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return assetId;
+    }
+
+    public Task DeleteSurveyAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 
     private CommandDefinition Sql(
         string sql,

@@ -25,10 +25,16 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Data.SqlClient 7.0.3 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
+  StackExchange.Redis 3.2.1 / MIT / https://www.nuget.org/packages/StackExchange.Redis/3.2.1
+    （大規模構成で選択できる管理者セッションストア。既定は本アプリの DB）
   Microsoft.Extensions.DependencyInjection 10.0.12 / MIT
   Microsoft.Extensions.Configuration.Abstractions 10.0.11 / MIT
   Microsoft.Extensions.Hosting.Abstractions 10.0.11 / MIT
   Microsoft.Extensions.Logging.Abstractions 10.0.11 / MIT
+  Microsoft.AspNetCore.OpenApi 10.0.12 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.OpenApi
+  Scalar.AspNetCore 2.17.4 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.17.4
+    （OpenAPI 文書を読む画面。画面本体は埋め込みアセットで同梱し、CDN の既定フォントと
+      利用状況テレメトリーは無効化する）
   Jint 4.16.2 / BSD-2-Clause / https://github.com/sebastienros/jint
     （変換スクリプトの実行エンジン。Acornima などを推移的に伴う）
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
@@ -41,6 +47,8 @@ Copyright (C) PMC Co.,Ltd.
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
   AWSSDK.SimpleEmailV2 4.0.104.2 / Apache-2.0 / https://github.com/aws/aws-sdk-net
     （Amazon SES の送信経路。**IAM ロールで通るので、保管する秘密が 0 になる**。Issue #198）
+  AWSSDK.S3 4.0.103.3 / Apache-2.0 / https://github.com/aws/aws-sdk-net
+    （アンケート資産の S3 互換保存。既定の資格情報探索で IAM ロールを利用できる。Issue #271）
   Azure.Communication.Email 1.1.0 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure Communication Services の送信経路。**マネージド ID で通る**。Issue #198）
   Azure.Identity 1.21.0 / MIT / https://github.com/Azure/azure-sdk-for-net
@@ -93,6 +101,11 @@ Copyright (C) PMC Co.,Ltd.
   Mailpit 1.31.1 / MIT / https://github.com/axllent/mailpit
     （メールの検証用の受け。SMTP を受けて溜めるだけで外へは出さない。
       **別のコンテナとして立てるだけで、成果物には含まれない**）
+  Azurite 3.37.0 / MIT / https://github.com/Azure/Azurite
+    （Azure Blob Storage の検証用。**別のコンテナとして立てるだけで、成果物には含まれない**）
+  Valkey 9.1.2 / BSD-3-Clause / https://github.com/valkey-io/valkey
+    （Redis 互換セッションストアの検証用。
+      **別のコンテナとして立てるだけで、成果物には含まれない**）
   coverlet.collector 10.0.1 / MIT
   Microsoft.Extensions.Configuration 10.0.11 / MIT
     （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
@@ -103,6 +116,19 @@ Copyright (C) PMC Co.,Ltd.
       アプリ側は net10.0 の共有フレームワークが提供するため参照しない＝NU1510）
 
 **依存を追加したら、ここへ追記してからコミットすること。**
+
+--------------------------------------------------------------------------------
+MinIO について
+--------------------------------------------------------------------------------
+
+S3 互換ストレージの結合テストでは、MinIO
+（RELEASE.2025-09-07T16-13-09Z、GNU AGPL v3）を使用できます。
+
+  https://github.com/minio/minio
+
+**MinIO は本ソフトウェアの依存や配布物へ含めず、リンクもしません。**
+開発者が `minio` profile を明示したときだけ公式コンテナを取得し、
+検証用の別プロセスとして起動します。
 
 --------------------------------------------------------------------------------
 ClamAV について

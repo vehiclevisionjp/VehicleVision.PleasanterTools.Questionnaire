@@ -1,4 +1,4 @@
-import { DEFAULT_LANGUAGE, interpolate, type Language } from './language';
+import { interpolate, type Language } from './language';
 
 /**
  * 回答画面の文言。
@@ -42,6 +42,8 @@ export const ja = {
   'completed.thanks': 'ご協力ありがとうございました。',
   'completed.edit': '回答を編集する',
   'completed.answerAgain': '別の回答を送信する',
+  'assetHistory.notice':
+    '資料を受け取ると、受け取った資料と日時を回答に結び付けて記録します。送信元 IP や端末の情報は記録しません。',
 
   // ---- 回答 -----------------------------------------------------------------
   'form.progressLabel': '回答の進み具合',
@@ -91,6 +93,7 @@ export const ja = {
   'question.selectionRange': '{minimum} 個以上 {maximum} 個以下で選んでください',
   'question.selectionMinimum': '{minimum} 個以上選んでください',
   'question.selectionMaximum': '{maximum} 個まで選べます',
+  'question.normalizationNotice': '入力後、設定に従って文字の全角・半角や前後の空白を自動で変換します。',
 
   // ---- 送信できなかった -----------------------------------------------------
   'submit.tooManyRequests': '送信が混み合っています。少し時間を置いてもう一度お試しください。',
@@ -124,6 +127,7 @@ export const ja = {
   'validation.email': 'メールアドレスの形式で入力してください',
   'validation.url': 'http:// または https:// で始まる URL を入力してください',
   'validation.notANumber': '数値で入力してください',
+  'validation.boolean': 'チェックの状態が正しくありません',
   'validation.minimum': '{minimum} 以上で入力してください',
   'validation.maximum': '{maximum} 以下で入力してください',
   'validation.date': '日付を選んでください',
@@ -136,6 +140,7 @@ export const ja = {
   'serverValidation.UnknownChoice': '選択肢にない値が選ばれています',
   'serverValidation.MultipleValuesNotAllowed': '回答は 1 つだけ選んでください',
   'serverValidation.NotANumber': '数値で入力してください',
+  'serverValidation.NotABoolean': 'チェックの状態が正しくありません',
   'serverValidation.OutOfRange': '入力できる範囲を超えています',
   'serverValidation.NotADateTime': '日付・時刻の形式が正しくありません',
   'serverValidation.InvalidEmail': 'メールアドレスの形式で入力してください',
@@ -187,6 +192,8 @@ export const en: Record<MessageKey, string> = {
   'completed.thanks': 'Thank you for your time.',
   'completed.edit': 'Edit my response',
   'completed.answerAgain': 'Send another response',
+  'assetHistory.notice':
+    'When you receive a file, the file and time are recorded and linked to your response. Your IP address and device information are not recorded.',
 
   'form.progressLabel': 'Progress',
   'form.pageCount': 'Page {current} of {total}',
@@ -230,6 +237,8 @@ export const en: Record<MessageKey, string> = {
   'question.selectionRange': 'Choose between {minimum} and {maximum} options',
   'question.selectionMinimum': 'Choose at least {minimum} options',
   'question.selectionMaximum': 'Choose up to {maximum} options',
+  'question.normalizationNotice':
+    'After entry, character width and surrounding whitespace are converted automatically as configured.',
 
   'submit.tooManyRequests': 'The service is busy. Please wait a moment and submit again.',
   'submit.rejected': 'Your response was not accepted. Please press "Submit" again.',
@@ -261,6 +270,7 @@ export const en: Record<MessageKey, string> = {
   'validation.email': 'Enter a valid email address',
   'validation.url': 'Enter a URL starting with http:// or https://',
   'validation.notANumber': 'Enter a number',
+  'validation.boolean': 'The checkbox value is invalid',
   'validation.minimum': 'Enter {minimum} or more',
   'validation.maximum': 'Enter {maximum} or less',
   'validation.date': 'Please choose a date',
@@ -270,6 +280,7 @@ export const en: Record<MessageKey, string> = {
   'serverValidation.UnknownChoice': 'That option is not one of the choices',
   'serverValidation.MultipleValuesNotAllowed': 'Please choose only one answer',
   'serverValidation.NotANumber': 'Enter a number',
+  'serverValidation.NotABoolean': 'The checkbox value is invalid',
   'serverValidation.OutOfRange': 'That value is out of range',
   'serverValidation.NotADateTime': 'That is not a valid date or time',
   'serverValidation.InvalidEmail': 'Enter a valid email address',
@@ -287,7 +298,7 @@ export const en: Record<MessageKey, string> = {
   'serverValidation.unknown': 'Please check what you entered',
 };
 
-const CATALOGS: Record<Language, Record<MessageKey, string>> = { ja, en };
+const CATALOGS: Partial<Record<Language, Record<MessageKey, string>>> = { ja, en };
 
 /**
  * サーバが返した検証エラーの符号に対する鍵。
@@ -312,8 +323,8 @@ export type Translate = (
  * **翻訳が無ければ既定の言語へ落ちる**（`_documents/多言語対応方針.md` 1 章）。
  */
 export function translator(language: Language): Translate {
-  const catalog = CATALOGS[language] ?? CATALOGS[DEFAULT_LANGUAGE];
+  const catalog = CATALOGS[language] ?? ja;
 
   return (key, parameters) =>
-    interpolate(catalog[key] || CATALOGS[DEFAULT_LANGUAGE][key], parameters, language);
+    interpolate(catalog[key] || ja[key], parameters, language);
 }

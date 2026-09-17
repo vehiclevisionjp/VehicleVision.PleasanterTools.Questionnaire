@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
@@ -186,5 +188,98 @@ public class PleasanterApiClientTests
         var response = await client.CreateAsync(999999, new Dictionary<string, object?>());
 
         Assert.Equal(PleasanterErrorKind.Permanent, response.ErrorKind);
+    }
+
+    [Fact]
+    public async Task サイト設定の同期でリンク列と対象外の設定を保つ()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (client, http) = Create();
+        using var _ = http;
+        var linkedSiteId = await CreateSiteAsync(http, $"リンク先 {Guid.NewGuid():N}");
+        var created = await client.CreateSiteAsync(0, new Dictionary<string, object?>
+        {
+            ["Title"] = $"同期先 {Guid.NewGuid():N}",
+            ["ReferenceType"] = "Results",
+            ["SiteSettings"] = new
+            {
+                Columns = new object[]
+                {
+                    new { ColumnName = "ClassB", LabelText = "対象外" },
+                    new
+                    {
+                        ColumnName = "ClassA",
+                        LabelText = "リンク",
+                        ControlType = "ChoicesText",
+                        ChoicesText = $"[[{linkedSiteId}]]",
+                    },
+                },
+                GridColumns = new[] { "ClassB", "ClassA" },
+                EditorColumnHash = new Dictionary<string, string[]>
+                {
+                    ["General"] = ["ClassB", "ClassA"],
+                },
+                HistoryColumns = new[] { "ClassB", "ClassA" },
+                Scripts = new[]
+                {
+                    new { Title = "保持するスクリプト", All = true, Body = "console.log('keep');" },
+                },
+                Styles = new[]
+                {
+                    new { Title = "保持するスタイル", All = true, Body = ".keep { color: red; }" },
+                },
+            },
+        });
+        Assert.True(created.IsSuccess, $"サイト作成に失敗した: {created.StatusCode} {created.Message}");
+        Assert.NotNull(created.Id);
+
+        var mapping = new MappingDefinition
+        {
+            Assignments = [ColumnAssignment.Direct("ClassA", new MappingSource("q1"))],
+        };
+        var before = await client.GetSiteAsync(created.Id.Value);
+        Assert.True(before.IsSuccess, $"サイト設定の取得に失敗した: {before.StatusCode} {before.Message}");
+        var plan = SiteSettingsSynchronizer.Build(before.Body!, mapping);
+
+        var updated = await client.UpdateSiteAsync(
+            created.Id.Value,
+            new Dictionary<string, object?> { ["SiteSettings"] = plan.SiteSettings });
+        Assert.True(updated.IsSuccess, $"サイト設定の更新に失敗した: {updated.StatusCode} {updated.Message}");
+
+        var after = await client.GetSiteAsync(created.Id.Value);
+        Assert.True(after.IsSuccess, $"更新後のサイト設定取得に失敗した: {after.StatusCode} {after.Message}");
+        // ⚠️ **Links は返らない。** ChoicesText が往復することと、
+        // リンク先のサイト ID を読み出せることを確かめる
+        Assert.Equal(
+            [linkedSiteId],
+            SiteSettingsSynchronizer.LinkedSiteIds(after.Body!, ["ClassA"]));
+
+        // **リンクが成立する条件そのものを確かめる。**
+        // Pleasanter は相手サイトを引けないとリンクを黙って捨てる
+        var linkedSite = await client.GetSiteAsync(linkedSiteId);
+        Assert.True(linkedSite.IsSuccess, "リンク先のサイトを引けなかった");
+        Assert.Equal(
+            "対象外",
+            after.Body!["Response"]!["Data"]!["SiteSettings"]!["Columns"]![0]!["LabelText"]!.GetValue<string>());
+        Assert.Equal(
+            "保持するスクリプト",
+            after.Body!["Response"]!["Data"]!["SiteSettings"]!["Scripts"]![0]!["Title"]!.GetValue<string>());
+        Assert.Equal(
+            "保持するスタイル",
+            after.Body!["Response"]!["Data"]!["SiteSettings"]!["Styles"]![0]!["Title"]!.GetValue<string>());
+
+        var repeatedPlan = SiteSettingsSynchronizer.Build(after.Body!, mapping);
+        var repeated = await client.UpdateSiteAsync(
+            created.Id.Value,
+            new Dictionary<string, object?> { ["SiteSettings"] = repeatedPlan.SiteSettings });
+        Assert.True(repeated.IsSuccess, $"2 回目のサイト設定更新に失敗した: {repeated.StatusCode} {repeated.Message}");
+        var twice = await client.GetSiteAsync(created.Id.Value);
+        Assert.Equal(
+            after.Body!["Response"]!["Data"]!["SiteSettings"]!.ToJsonString(),
+            twice.Body!["Response"]!["Data"]!["SiteSettings"]!.ToJsonString());
     }
 }

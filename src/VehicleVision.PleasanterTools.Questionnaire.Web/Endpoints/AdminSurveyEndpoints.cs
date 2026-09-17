@@ -11,6 +11,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 
@@ -37,6 +38,7 @@ public static class AdminSurveyEndpoints
     {
         // **群には「閲覧」を掛ける**（Issue #160）。書き込み・公開は口ごとに足す
         var group = builder.MapGroup("/api/admin/surveys")
+            .WithTags("管理 API")
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysRead));
 
         // **管理操作を残す**（Issue #19）。読み取りは残さない
@@ -102,6 +104,7 @@ public static class AdminSurveyEndpoints
             CreateSurveyRequest request,
             HttpContext context,
             ISurveyRepository surveys,
+            PleasanterApiClient pleasanter,
             CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.Title))
@@ -113,7 +116,26 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            if (request.PleasanterSiteId <= 0)
+            var pleasanterSiteId = request.PleasanterSiteId;
+            if (request.CreatePleasanterSite)
+            {
+                var created = await pleasanter.CreateSiteAsync(
+                    request.ParentPleasanterSiteId,
+                    new Dictionary<string, object?>
+                    {
+                        ["Title"] = request.Title.Trim(),
+                        ["ReferenceType"] = "Results",
+                        ["SiteSettings"] = new JsonObject(),
+                    },
+                    cancellationToken).ConfigureAwait(false);
+                if (!created.IsSuccess || created.Id is not { } createdSiteId)
+                {
+                    return PleasanterFailure(created, context);
+                }
+
+                pleasanterSiteId = createdSiteId;
+            }
+            else if (pleasanterSiteId <= 0)
             {
                 return Results.BadRequest(new
                 {
@@ -127,7 +149,7 @@ public static class AdminSurveyEndpoints
                 surveyId,
                 SurveyPublicId.Generate(),
                 request.Title.Trim(),
-                request.PleasanterSiteId,
+                pleasanterSiteId,
                 request.ResponseJsonColumn,
                 (int)SurveyStatus.Draft,
                 PublishedVersion: null);
@@ -260,6 +282,139 @@ public static class AdminSurveyEndpoints
                 : new ColumnAvailabilityResponse("site", availableByPrefix));
         });
 
+        // ---- マッピング先サイトの同期 ---------------------------------------
+        group.MapPost("/{surveyId:guid}/site-settings/preview", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            ISurveyDraftStore drafts,
+            PleasanterApiClient pleasanter,
+            CancellationToken cancellationToken) =>
+        {
+            var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (survey is null || await drafts.LoadAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false) is not { } draft)
+            {
+                return Results.NotFound();
+            }
+
+            if (survey.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
+            var current = await pleasanter.GetSiteAsync(survey.PleasanterSiteId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!current.IsSuccess || current.Body is null)
+            {
+                return PleasanterFailure(current, context);
+            }
+
+            try
+            {
+                var plan = SiteSettingsSynchronizer.Build(current.Body, draft.Mapping);
+                return Results.Ok(new
+                {
+                    plan.AddedColumns,
+                    plan.GridColumns,
+                    plan.EditorColumns,
+                    plan.HistoryColumns,
+                    plan.Unchanged,
+                });
+            }
+            catch (InvalidOperationException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+        }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
+
+        group.MapPost("/{surveyId:guid}/site-settings/sync", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            ISurveyDraftStore drafts,
+            PleasanterApiClient pleasanter,
+            CancellationToken cancellationToken) =>
+        {
+            var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (survey is null || await drafts.LoadAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false) is not { } draft)
+            {
+                return Results.NotFound();
+            }
+
+            if (survey.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
+            var current = await pleasanter.GetSiteAsync(survey.PleasanterSiteId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!current.IsSuccess || current.Body is null)
+            {
+                return PleasanterFailure(current, context);
+            }
+
+            SiteSettingsSyncPlan plan;
+            try
+            {
+                plan = SiteSettingsSynchronizer.Build(current.Body, draft.Mapping);
+            }
+            catch (InvalidOperationException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+
+            var updated = await pleasanter.UpdateSiteAsync(
+                survey.PleasanterSiteId,
+                new Dictionary<string, object?> { ["SiteSettings"] = plan.SiteSettings },
+                cancellationToken).ConfigureAwait(false);
+            if (!updated.IsSuccess)
+            {
+                return PleasanterFailure(updated, context);
+            }
+
+            var after = await pleasanter.GetSiteAsync(survey.PleasanterSiteId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!after.IsSuccess || after.Body is null)
+            {
+                return PleasanterFailure(after, context);
+            }
+
+            // ⚠️ **GetSite は Links を返さない**（実機で確認）。読み直しても成立は分からない。
+            // Pleasanter の SetLinks は**相手サイトを引けるときだけ**リンクを作り、
+            // **できなければ黙って捨てる**ので、その条件そのものを確かめる
+            var linkedSiteIds = SiteSettingsSynchronizer.LinkedSiteIds(
+                after.Body,
+                draft.Mapping.Assignments.Select(assignment => assignment.TargetColumn));
+            var unreachable = new List<long>();
+            foreach (var linkedSiteId in linkedSiteIds)
+            {
+                var linked = await pleasanter.GetSiteAsync(linkedSiteId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (!linked.IsSuccess)
+                {
+                    unreachable.Add(linkedSiteId);
+                }
+            }
+
+            if (unreachable.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "リンク先のサイトを引けませんでした。"
+                        + "相手サイト ID か、API キーの利用者の権限を確認してください。",
+                    unreachableSiteIds = unreachable,
+                });
+            }
+
+            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+            AuditNotes.Add(context, "pleasanterSiteId", survey.PleasanterSiteId.ToString(CultureInfo.InvariantCulture));
+            return Results.Ok(new { synchronized = true });
+        }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
+
         // ---- 下書きを保存する ------------------------------------------------
         group.MapPut("/{surveyId:guid}", async (
             Guid surveyId,
@@ -333,7 +488,13 @@ public static class AdminSurveyEndpoints
             try
             {
                 var revision = await drafts.SaveAsync(
-                    surveyId, request.Definition, request.Mapping, request.Revision, cancellationToken)
+                    surveyId,
+                    request.Definition,
+                    request.Mapping,
+                    request.Revision,
+                    cancellationToken,
+                    request.AssetHistorySiteId,
+                    request.AssetHistoryMapping)
                     .ConfigureAwait(false);
 
                 return Results.Ok(new { revision });
@@ -439,20 +600,130 @@ public static class AdminSurveyEndpoints
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
-        // **編集中の画像を管理画面へ返す。** 公開前の画像は回答画面の口からは出ない
+        // ---- 説明文と完了画面の配布資産（Issue #266 / #269）-----------------
+        group.MapGet("/asset-options", (AssetOptions options) =>
+            Results.Ok(new
+            {
+                allowedExtensions = options.AllowedExtensions,
+                maxFileSizeBytes = options.MaxFileSizeBytes,
+                maxFileCount = options.MaxFileCount,
+            }));
+
+        group.MapPost("/{surveyId:guid}/assets", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            ISurveyAssetStore assets,
+            AssetOptions options,
+            AssetInspector inspector,
+            CancellationToken cancellationToken) =>
+        {
+            var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (survey is null)
+            {
+                return Results.NotFound();
+            }
+
+            var bodySize = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (bodySize is { IsReadOnly: false })
+            {
+                bodySize.MaxRequestBodySize = options.MaxRequestBodyBytes;
+            }
+
+            if (!context.Request.HasFormContentType)
+            {
+                return ContentAssetRejected(context);
+            }
+
+            IFormFile? file;
+            try
+            {
+                var form = await context.Request.ReadFormAsync(cancellationToken);
+                file = form.Files.GetFile("asset") ?? form.Files.FirstOrDefault();
+            }
+            catch (BadHttpRequestException exception)
+            {
+                return Results.StatusCode(exception.StatusCode);
+            }
+
+            if (file is null)
+            {
+                return ContentAssetRejected(context);
+            }
+
+            using var buffer = new MemoryStream((int)Math.Max(file.Length, 0));
+            await file.CopyToAsync(buffer, cancellationToken);
+            var incoming = new IncomingAttachment(file.FileName, buffer.ToArray());
+            // **回答添付と同じ検査器を通す。** 管理者の口を奪われても、
+            // 未検査のファイルを信頼されたドメインから配らせない
+            var rejections = await inspector.InspectAsync(incoming, cancellationToken);
+            var contentType = options.ContentTypeOf(file.FileName);
+            if (rejections.Any(
+                rejection => rejection.Reason is AttachmentRejectionReason.ScannerUnavailable))
+            {
+                return Results.Json(
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.AssetScannerUnavailable,
+                            RequestLanguage.Of(context)),
+                    },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            if (!rejections.IsEmpty || contentType is null)
+            {
+                return ContentAssetRejected(
+                    context,
+                    rejections.Select(rejection => rejection.Reason.ToString()));
+            }
+
+            var assetId = await assets.TryAddContentAsync(
+                surveyId,
+                contentType,
+                file.FileName,
+                incoming.Content.ToArray(),
+                options.MaxFileCount,
+                cancellationToken)
+                .ConfigureAwait(false);
+            if (assetId is null)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.ContentAssetLimitReached, RequestLanguage.Of(context)),
+                });
+            }
+
+            return Results.Ok(new
+            {
+                assetId,
+                isImage = ContentAsset.IsImage(contentType),
+            });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
+
+        // **編集中の資産を管理画面へ返す。** 公開前の資産は回答画面の口からは出ない
         group.MapGet("/{surveyId:guid}/assets/{assetId:guid}", async (
             Guid surveyId,
             Guid assetId,
             ISurveyAssetStore assets,
+            AssetOptions options,
             CancellationToken cancellationToken) =>
         {
             var asset = await assets.FindAsync(surveyId, assetId, cancellationToken)
                 .ConfigureAwait(false);
 
-            // **配る前に型を確かめる。** 画像以外を自分のドメインから配らない
-            return asset is null || !HeaderImage.IsAllowedContentType(asset.ContentType)
+            // **画面内で開かせない。** 管理画面のプレビューでも配布時と同じ扱いにする
+            return asset is null
+                || !(options.IsAllowed(asset.FileName, asset.ContentType)
+                    || HeaderImage.IsAllowedContentType(asset.ContentType))
                 ? Results.NotFound()
-                : Results.File(asset.Content, asset.ContentType);
+                : Results.File(
+                    asset.Content,
+                    asset.ContentType,
+                    fileDownloadName: asset.FileName);
         });
 
         // ---- 公開前の検査 ----------------------------------------------------
@@ -473,7 +744,16 @@ public static class AdminSurveyEndpoints
                 null,
                 PleasanterColumn.IsAttachment,
                 column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
-            return Results.Ok(problems.Select(Describe));
+            var historyProblems = draft.AssetHistorySiteId <= 0
+                ? []
+                : MappingValidator.Validate(
+                    draft.AssetHistoryMapping ?? new MappingDefinition(),
+                    draft.Definition,
+                    null,
+                    PleasanterColumn.IsAttachment,
+                    column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind,
+                    warnUnmappedQuestions: false);
+            return Results.Ok(problems.Concat(historyProblems).Select(Describe));
         });
 
         // ---- テスト公開 ------------------------------------------------------
@@ -534,6 +814,31 @@ public static class AdminSurveyEndpoints
                 PleasanterColumn.IsAttachment,
                 column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
             var blocking = problems.Where(problem => problem.IsBlocking).ToList();
+            if (draft.AssetHistorySiteId > 0)
+            {
+                if (draft.AssetHistorySiteId == beforePublish.PleasanterSiteId)
+                {
+                    blocking.Add(new MappingProblem(
+                        MappingProblemCode.InvalidShape,
+                        Detail: "assetHistorySiteIdMustDiffer"));
+                }
+
+                if (draft.AssetHistoryMapping is null
+                    || draft.AssetHistoryMapping.Assignments.IsDefaultOrEmpty)
+                {
+                    blocking.Add(new MappingProblem(
+                        MappingProblemCode.InvalidShape,
+                        Detail: "assetHistory"));
+                }
+
+                blocking.AddRange(MappingValidator.Validate(
+                    draft.AssetHistoryMapping ?? new MappingDefinition(),
+                    draft.Definition,
+                    null,
+                    PleasanterColumn.IsAttachment,
+                    column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind,
+                    warnUnmappedQuestions: false).Where(problem => problem.IsBlocking));
+            }
             if (blocking.Count > 0)
             {
                 return Results.BadRequest(new
@@ -582,6 +887,29 @@ public static class AdminSurveyEndpoints
                 });
             }
 
+            if (draft.Definition.AssetDelivery is
+                {
+                    Expiration: AssetTicketExpiration.DaysAfterResponse,
+                    Days: < 1 or > AssetDeliverySettings.MaxDays,
+                })
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PublishBlockedBySettings, RequestLanguage.Of(context)),
+                    settings = new[]
+                    {
+                        new
+                        {
+                            code = "AssetTicketDaysInvalid",
+                            questionId = (string?)null,
+                            detail = draft.Definition.AssetDelivery.Days.ToString(
+                                System.Globalization.CultureInfo.InvariantCulture),
+                        },
+                    },
+                });
+            }
+
             // **答えようのない設問のまま公開しない**（Issue #101）。
             // 「5 つの選択肢から 7 つ選べ」は回答者が何をしても通らない
             var settingsProblems = QuestionSettingsValidator.Validate(draft.Definition);
@@ -616,12 +944,14 @@ public static class AdminSurveyEndpoints
 
             try
             {
-                await surveys.PublishAsync(
+                await surveys.PublishWithAssetHistoryAsync(
                     surveyId,
                     draft.Definition.Version,
                     draft.Definition,
                     draft.Mapping,
                     publishedBy,
+                    draft.AssetHistorySiteId,
+                    draft.AssetHistoryMapping,
                     cancellationToken).ConfigureAwait(false);
             }
             catch (InvalidOperationException)
@@ -1012,6 +1342,16 @@ public static class AdminSurveyEndpoints
         return builder;
     }
 
+    private static IResult ContentAssetRejected(
+        HttpContext context,
+        IEnumerable<string>? reasons = null) =>
+        Results.BadRequest(new
+        {
+            message = ServerMessages.Get(
+                ServerMessageKeys.ContentAssetRejected, RequestLanguage.Of(context)),
+            reasons,
+        });
+
     private static async Task<IResult> ChangeArchiveAsync(
         Guid surveyId,
         bool archive,
@@ -1062,6 +1402,16 @@ public static class AdminSurveyEndpoints
             message = ServerMessages.Get(
                 ServerMessageKeys.SurveyArchived, RequestLanguage.Of(context)),
         });
+
+    private static IResult PleasanterFailure(PleasanterResponse response, HttpContext context) =>
+        Results.Json(
+            new
+            {
+                message = string.IsNullOrWhiteSpace(response.Message)
+                    ? "Pleasanter でサイトを作成または更新できませんでした。権限と設定を確認してください。"
+                    : response.Message,
+            },
+            statusCode: response.StatusCode ?? StatusCodes.Status502BadGateway);
 
     /// <summary>停止と再開。**理由を必ず書き換える。**</summary>
     /// <remarks>
@@ -1227,7 +1577,9 @@ public static class AdminSurveyEndpoints
     public sealed record CreateSurveyRequest(
         string? Title,
         long PleasanterSiteId,
-        string? ResponseJsonColumn);
+        string? ResponseJsonColumn,
+        bool CreatePleasanterSite = false,
+        long ParentPleasanterSiteId = 0);
 
     /// <summary>アンケートを複製する（Issue #46）。</summary>
     /// <param name="PleasanterSiteId">
@@ -1271,5 +1623,7 @@ public static class AdminSurveyEndpoints
     public sealed record SaveDraftRequest(
         SurveyDefinition? Definition,
         MappingDefinition? Mapping,
-        int Revision);
+        int Revision,
+        long AssetHistorySiteId = 0,
+        MappingDefinition? AssetHistoryMapping = null);
 }

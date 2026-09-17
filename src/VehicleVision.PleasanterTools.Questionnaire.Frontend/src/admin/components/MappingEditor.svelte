@@ -8,26 +8,48 @@
     type MappingDefinition,
     type Question,
     type QuestionPort,
+    type MappingSystemValue,
   } from '../lib/types';
   import { measure, STANDARD_COLUMNS_PER_TYPE } from '../lib/columnBudget';
   import type { ColumnAvailabilityResponse } from '../lib/api';
   import type { Language } from '../../lib/i18n/language';
   import { t } from '../lib/i18n/state.svelte';
   import type { MessageKey } from '../lib/i18n/messages';
+  import {
+    converterConfigFields,
+    converterForOperation,
+    setConfigValue,
+  } from '../lib/converterConfig';
+  import MapConfigEditor from './MapConfigEditor.svelte';
+  import { includesQuestion } from '../lib/mappingSelection';
 
   interface Props {
     mapping: MappingDefinition;
     questions: Question[];
     /** 設問の文言をどの言語で出すか。**設問エディタで選んでいる言語に揃える。** */
     editing: Language;
+    /** 左右を見比べられるよう、左で選んだ設問を入力に含む行を明示する。 */
+    selectedQuestionId: string | null;
     /** 列数の根拠。取得に失敗したときは標準の本数を使う。 */
     availability: ColumnAvailabilityResponse;
     /** 明示的に押したときだけ、Pleasanter の列定義を取り直す。 */
     onrefresh: () => void;
     onchange: (mapping: MappingDefinition) => void;
+    systemSources?: { value: MappingSystemValue; label: string }[];
+    title?: string;
   }
 
-  let { mapping, questions, editing, availability, onrefresh, onchange }: Props = $props();
+  let {
+    mapping,
+    questions,
+    editing,
+    selectedQuestionId,
+    availability,
+    onrefresh,
+    onchange,
+    systemSources = [],
+    title = '',
+  }: Props = $props();
 
   /**
    * 変換の種類。**入力が複数なら必ずどれかが要る。**
@@ -38,6 +60,7 @@
     { value: '', key: 'converter.none' },
     { value: 'join', key: 'converter.join' },
     { value: 'map', key: 'converter.map' },
+    { value: 'toNumber', key: 'converter.toNumber' },
     { value: 'toCheck', key: 'converter.toCheck' },
     { value: 'contains', key: 'converter.contains' },
     { value: 'constant', key: 'converter.constant' },
@@ -71,11 +94,16 @@
   }
 
   function add() {
+    const firstSystem = systemSources[0];
     update([
       ...mapping.assignments,
       {
         targetColumn: '',
-        sources: answerable[0] ? [{ questionId: answerable[0].questionId, port: 'Value' }] : [],
+        sources: firstSystem
+          ? [{ questionId: '', port: 'Value', systemValue: firstSystem.value }]
+          : answerable[0]
+            ? [{ questionId: answerable[0].questionId, port: 'Value' }]
+            : [],
       },
     ]);
   }
@@ -133,10 +161,16 @@
 
   function addSource(index: number) {
     const assignment = mapping.assignments[index];
-    if (!assignment || !answerable[0]) return;
+    const firstSystem = systemSources[0];
+    if (!assignment || (!answerable[0] && !firstSystem)) return;
 
     patch(index, {
-      sources: [...assignment.sources, { questionId: answerable[0].questionId, port: 'Value' }],
+      sources: [
+        ...assignment.sources,
+        firstSystem
+          ? { questionId: '', port: 'Value', systemValue: firstSystem.value }
+          : { questionId: answerable[0]!.questionId, port: 'Value' },
+      ],
       // **入力が複数なら変換が要る。** どうまとめるかが決まらないため既定を入れる
       converter: assignment.converter ?? { operation: 'join', config: { separator: '、' } },
     });
@@ -169,6 +203,17 @@
     return displayText(question.title, editing) || questionId;
   }
 
+  /** 入力につないだ設問から、map の元の値として選べる選択肢を集める。 */
+  function mapCandidates(assignment: ColumnAssignment): string[] {
+    const values = assignment.sources.flatMap(
+      (source) =>
+        questions.find((question) => question.questionId === source.questionId)?.choices.map(
+          (choice) => choice.value,
+        ) ?? [],
+    );
+    return [...new Set(values)];
+  }
+
   /** その割り当てが添付のものか。 */
   function isAttachment(assignment: ColumnAssignment): boolean {
     return (
@@ -180,16 +225,17 @@
 
 <section>
   <div class="bar">
-    <h2>{t('mapping.title')}</h2>
+    <h2>{title || t('mapping.title')}</h2>
     <div class="buttons">
       <button type="button" class="secondary small" onclick={add}>{t('mapping.addColumn')}</button>
-      <button
+      {#if systemSources.length === 0}<button
         type="button"
         class="secondary small"
         disabled={fileQuestions.length === 0}
         title={fileQuestions.length === 0 ? t('mapping.noFileQuestion') : ''}
         onclick={addAttachment}>{t('mapping.addAttachmentColumn')}</button
       >
+      {/if}
       <button type="button" class="secondary small" onclick={onrefresh}>
         {t('mapping.refreshColumnAvailability')}
       </button>
@@ -275,8 +321,16 @@
             {@const needsSingleSource =
               !attachment && assignment.converter == null && assignment.sources.length !== 1}
             {@const noAttachmentColumn = attachment && assignment.targetColumn === ''}
-            <tr class:attachment class:has-notes={needsSingleSource || noAttachmentColumn}>
+            {@const selectedAssignment = includesQuestion(assignment, selectedQuestionId)}
+            <tr
+              class:attachment
+              class:selected={selectedAssignment}
+              class:has-notes={needsSingleSource || noAttachmentColumn}
+            >
               <td class="source">
+                {#if selectedAssignment}
+                  <span class="selection-marker">{t('mapping.selectedQuestionAssignment')}</span>
+                {/if}
                 <!--
                   **入力が複数のときは 1 つの升の中で積み、番号を振る**（Issue #86）。
                   行を分けて結合すると、変換とターゲットがどの入力群に掛かるのか読めなくなる
@@ -286,26 +340,38 @@
                     <li>
                       <select
                         aria-label={t('mapping.selectQuestion')}
-                        value={source.questionId}
-                        onchange={(event) =>
+                        value={source.systemValue ? `system:${source.systemValue}` : source.questionId}
+                        onchange={(event) => {
+                          const value = event.currentTarget.value;
                           patch(index, {
                             sources: assignment.sources.map((s, i) =>
-                              i === sourceIndex
-                                ? { ...s, questionId: event.currentTarget.value }
-                                : s,
+                              i !== sourceIndex
+                                ? s
+                                : value.startsWith('system:')
+                                  ? {
+                                      questionId: '',
+                                      port: 'Value',
+                                      systemValue: value.slice('system:'.length) as MappingSystemValue,
+                                    }
+                                  : { questionId: value, port: 'Value' },
                             ),
-                          })}
+                          });
+                        }}
                       >
-                        {#each attachment ? fileQuestions : answerable as question (question.questionId)}
-                          <option value={question.questionId}
-                            >{questionLabel(question.questionId)}</option
-                          >
-                        {/each}
+                        {#if systemSources.length > 0}
+                          {#each systemSources as item (item.value)}
+                            <option value={`system:${item.value}`}>{item.label}</option>
+                          {/each}
+                        {:else}
+                          {#each attachment ? fileQuestions : answerable as question (question.questionId)}
+                            <option value={question.questionId}>{questionLabel(question.questionId)}</option>
+                          {/each}
+                        {/if}
                       </select>
 
                       {#if attachment}
                         <span class="fixed">{t('mapping.attachmentPort')}</span>
-                      {:else}
+                      {:else if !source.systemValue}
                         <!--
                           **グリッドとランキングは 1 設問が入力を複数出す**（Issue #74）。
                           どの行かを選ばないと、行をまたいだ値がまとめて 1 列へ入る
@@ -350,7 +416,8 @@
                             <option value={port.value}>{t(port.key)}</option>
                           {/each}
                         </select>
-
+                      {/if}
+                      {#if !attachment}
                         <button
                           type="button"
                           class="icon danger"
@@ -388,10 +455,7 @@
                     onchange={(event) => {
                       const operation = event.currentTarget.value;
                       patch(index, {
-                        converter:
-                          operation === ''
-                            ? null
-                            : { operation, config: assignment.converter?.config ?? {} },
+                        converter: converterForOperation(operation, assignment.converter),
                       });
                     }}
                   >
@@ -399,6 +463,61 @@
                       <option value={converter.value}>{t(converter.key)}</option>
                     {/each}
                   </select>
+
+                  {#if assignment.converter}
+                    {@const operation = assignment.converter.operation}
+                    {@const config = assignment.converter.config}
+                    {#if operation === 'map'}
+                      <MapConfigEditor
+                        {config}
+                        candidates={mapCandidates(assignment)}
+                        listId={`mapping-map-source-${index}`}
+                        onchange={(next) =>
+                          patch(index, { converter: { operation, config: next } })}
+                      />
+                    {/if}
+                    <div class="converter-config">
+                      {#each converterConfigFields[operation] ?? [] as field (field.key)}
+                          <label>
+                            <span>{t(field.label)}</span>
+                            {#if field.multiline}
+                              <textarea
+                                rows="6"
+                                value={config[field.key] ?? field.defaultValue ?? ''}
+                                oninput={(event) =>
+                                  patch(index, {
+                                    converter: {
+                                      operation,
+                                      config: setConfigValue(
+                                        config,
+                                        field.key,
+                                        event.currentTarget.value,
+                                      ),
+                                    },
+                                  })}
+                              ></textarea>
+                            {:else}
+                              <input
+                                type="text"
+                                placeholder={field.placeholder ? t(field.placeholder) : ''}
+                                value={config[field.key] ?? field.defaultValue ?? ''}
+                                oninput={(event) =>
+                                  patch(index, {
+                                    converter: {
+                                      operation,
+                                      config: setConfigValue(
+                                        config,
+                                        field.key,
+                                        event.currentTarget.value,
+                                      ),
+                                    },
+                                  })}
+                              />
+                            {/if}
+                          </label>
+                      {/each}
+                    </div>
+                  {/if}
                 {/if}
               </td>
 
@@ -468,7 +587,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 2rem 0 0.5rem;
+    margin: 0 0 0.5rem;
   }
 
   .buttons {
@@ -539,6 +658,22 @@
     padding: 0.6rem 0.75rem;
     vertical-align: top;
     border-top: 1px solid var(--border);
+  }
+
+  tr.selected > td {
+    background: color-mix(in srgb, var(--accent) 8%, #fff);
+  }
+
+  tr.selected > td:first-child {
+    box-shadow: inset 3px 0 var(--accent);
+  }
+
+  .selection-marker {
+    display: inline-block;
+    margin-bottom: 0.4rem;
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 600;
   }
 
   /* **不備の行は割り当ての行と地続きに見せる。** 別の行に見えると対応が切れる */
@@ -620,6 +755,7 @@
   }
 
   input,
+  textarea,
   select {
     display: block;
     width: 100%;
@@ -629,6 +765,23 @@
     font: inherit;
     color: #101828;
     box-sizing: border-box;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  .converter-config {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+
+    label > span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-bottom: 0.2rem;
+    }
   }
 
   .hint {

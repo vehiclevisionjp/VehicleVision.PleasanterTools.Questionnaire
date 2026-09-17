@@ -27,6 +27,9 @@ public enum MappingProblemCode
     /// <summary>スクリプト変換なのにスクリプトが空。</summary>
     EmptyScript,
 
+    /// <summary>変換に必要な設定が空。</summary>
+    MissingConverterConfig,
+
     /// <summary>添付の割り当てなのに、形が <c>1 : 0 : 1</c> になっていない。</summary>
     InvalidAttachmentShape,
 
@@ -85,7 +88,8 @@ public static class MappingValidator
         SurveyDefinition definition,
         IReadOnlyCollection<string>? reservedColumns = null,
         Func<string, bool>? isAttachmentColumn = null,
-        Func<string, MappingTargetValueKind?>? targetValueKind = null)
+        Func<string, MappingTargetValueKind?>? targetValueKind = null,
+        bool warnUnmappedQuestions = true)
     {
         ArgumentNullException.ThrowIfNull(mapping);
         ArgumentNullException.ThrowIfNull(definition);
@@ -146,8 +150,8 @@ public static class MappingValidator
                     MappingProblemCode.InvalidShape, assignment.TargetColumn));
             }
 
-            if (targetValueKind?.Invoke(assignment.TargetColumn) is { } kind
-                && !Produces(assignment, definition, kind))
+            var targetKind = targetValueKind?.Invoke(assignment.TargetColumn);
+            if (targetKind is { } kind && !Produces(assignment, definition, kind))
             {
                 problems.Add(new MappingProblem(
                     MappingProblemCode.TargetColumnNeedsCompatibleValue, assignment.TargetColumn));
@@ -159,9 +163,21 @@ public static class MappingValidator
                 problems.Add(new MappingProblem(
                     MappingProblemCode.EmptyScript, assignment.TargetColumn));
             }
+            else if (assignment.Converter is { } configuredConverter
+                && (HasMissingConfig(configuredConverter)
+                    || NeedsNumericMapDefault(configuredConverter, targetKind)))
+            {
+                problems.Add(new MappingProblem(
+                    MappingProblemCode.MissingConverterConfig, assignment.TargetColumn));
+            }
 
             foreach (var source in assignment.Sources)
             {
+                if (source.SystemValue is not null)
+                {
+                    continue;
+                }
+
                 var question = definition.FindQuestion(source.QuestionId);
                 if (question is null)
                 {
@@ -192,8 +208,37 @@ public static class MappingValidator
             }
         }
 
-        return Finish(problems, mapping, definition);
+        return warnUnmappedQuestions
+            ? Finish(problems, mapping, definition)
+            : problems.ToImmutable();
     }
+
+    /// <summary>既定値のない必須設定が欠けているか。</summary>
+    private static bool HasMissingConfig(MappingConverter converter) =>
+        converter.Operation switch
+        {
+            ConverterOperations.Map => !converter.Config.Keys.Any(key =>
+                key.StartsWith("map.", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(key["map.".Length..])),
+            ConverterOperations.ToNumber =>
+                !converter.Config.ContainsKey("default")
+                || !HasValidDecimals(converter.Config.GetValueOrDefault("decimals")),
+            ConverterOperations.ToCheck or ConverterOperations.Constant =>
+                string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("value")),
+            ConverterOperations.Contains =>
+                string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("keyword")),
+            ConverterOperations.When =>
+                string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("when"))
+                || string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("then")),
+            _ => false,
+        };
+
+    private static bool NeedsNumericMapDefault(
+        MappingConverter converter,
+        MappingTargetValueKind? target) =>
+        converter.Operation is ConverterOperations.Map
+        && target is MappingTargetValueKind.Integer or MappingTargetValueKind.Decimal
+        && !converter.Config.ContainsKey("default");
 
     /// <summary>割り当てが書き込み先の型または未設定を確実に出せるか。</summary>
     /// <remarks>
@@ -204,6 +249,15 @@ public static class MappingValidator
         SurveyDefinition definition,
         MappingTargetValueKind target)
     {
+        // **文字列はどの経路からでも作れる。** 変換は文字列を返すので、
+        // 文字列の列へ入れるときに変換へ失敗しようがない。
+        // ⚠️ **ここを通さないと、変換を挟んだ途端に Title と Body が弾かれる**
+        // （Issue #246 は変換の無い経路しか直していなかった）
+        if (target is MappingTargetValueKind.String)
+        {
+            return true;
+        }
+
         if (assignment.Converter is null)
         {
             if (assignment.Sources.Length != 1)
@@ -212,6 +266,17 @@ public static class MappingValidator
             }
 
             var source = assignment.Sources[0];
+            if (source.SystemValue is { } systemValue)
+            {
+                return systemValue switch
+                {
+                    MappingSystemValue.ReferenceId =>
+                        target is MappingTargetValueKind.Integer or MappingTargetValueKind.Decimal,
+                    MappingSystemValue.OccurredAt => target is MappingTargetValueKind.DateTime,
+                    _ => false,
+                };
+            }
+
             var question = definition.FindQuestion(source.QuestionId);
             if (question is null || source.Port is not QuestionPort.Value)
             {
@@ -223,6 +288,10 @@ public static class MappingValidator
 
         return assignment.Converter.Operation switch
         {
+            ConverterOperations.Map =>
+                ProducesMappedValues(assignment.Converter.Config, target),
+            ConverterOperations.ToNumber =>
+                ProducesNumber(assignment.Converter.Config, target),
             ConverterOperations.Constant =>
                 CanConvert(assignment.Converter.Config.GetValueOrDefault("value"), target),
             ConverterOperations.When =>
@@ -232,14 +301,75 @@ public static class MappingValidator
         };
     }
 
+    private static bool ProducesMappedValues(
+        ImmutableDictionary<string, string> config,
+        MappingTargetValueKind target) =>
+        target is MappingTargetValueKind.Integer or MappingTargetValueKind.Decimal
+        && config.TryGetValue("default", out var defaultValue)
+        && CanConvert(defaultValue, target)
+        && config
+            .Where(pair =>
+                pair.Key.StartsWith("map.", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(pair.Key["map.".Length..]))
+            .All(pair => CanConvert(pair.Value, target));
+
+    private static bool ProducesNumber(
+        ImmutableDictionary<string, string> config,
+        MappingTargetValueKind target)
+    {
+        if (!config.TryGetValue("default", out var defaultValue)
+            || !HasValidDecimals(config.GetValueOrDefault("decimals"))
+            || !CanConvert(defaultValue, target))
+        {
+            return false;
+        }
+
+        return target switch
+        {
+            MappingTargetValueKind.Decimal => true,
+            MappingTargetValueKind.Integer =>
+                int.TryParse(
+                    config.GetValueOrDefault("decimals"),
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var decimals)
+                && decimals == 0,
+            _ => false,
+        };
+    }
+
+    private static bool HasValidDecimals(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+        || int.TryParse(
+            value,
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var decimals)
+        && decimals is >= 0 and <= 28;
+
     private static bool ProducesDirectly(
         Question question,
         MappingSource source,
         MappingTargetValueKind target)
     {
+        // **文字列はどの設問からでも作れる。** ここを通さないと
+        // `Title` と `Body` へ何も割り当てられない（Issue #246）。
+        // ⚠️ **この検査は「確実に変換できるか」を見るもの**で、
+        // 数値や日時のように**変換に失敗し得る型だけが対象**である
+        if (target is MappingTargetValueKind.String)
+        {
+            return true;
+        }
+
         if (target is MappingTargetValueKind.DateTime)
         {
             return question.Type is QuestionType.Date;
+        }
+
+        if (target is MappingTargetValueKind.Boolean
+            && question.Type is QuestionType.Confirm)
+        {
+            return true;
         }
 
         if (question.Type is QuestionType.Scale or QuestionType.Rating)

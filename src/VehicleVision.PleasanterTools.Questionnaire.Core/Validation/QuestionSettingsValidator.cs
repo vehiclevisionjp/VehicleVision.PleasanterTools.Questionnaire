@@ -29,6 +29,9 @@ public enum SettingsProblemCode
 
     /// <summary>選択肢を持たない設問で、選択肢の入れ替えを指定している（Issue #103）。</summary>
     ShuffleWithoutChoices,
+
+    /// <summary>説明文が保存できる文字数の上限を超えている（Issue #267）。</summary>
+    DescriptionTooLong,
 }
 
 /// <summary>設問の設定の不備 1 件。</summary>
@@ -52,6 +55,16 @@ public static class QuestionSettingsValidator
         ArgumentNullException.ThrowIfNull(definition);
 
         var problems = ImmutableArray.CreateBuilder<SettingsProblem>();
+
+        // **公開版は版ごとに定義全体を保存する。** 説明文を無制限にすると、
+        // 文言を直して公開するたびに DB が際限なく膨らむ
+        foreach (var question in definition.AllQuestions.Where(question =>
+            question.Description?.Languages.Any(language =>
+                question.Description.Get(language).Length > Text.NoteMarkup.MaximumLength) is true))
+        {
+            problems.Add(new SettingsProblem(
+                SettingsProblemCode.DescriptionTooLong, question.QuestionId));
+        }
 
         // **組み立てられない正規表現は、何を書いても通らない検証になる**（Issue #102）。
         // 使えない構文（先読み・後方参照・原子グループ）もここで落ちる

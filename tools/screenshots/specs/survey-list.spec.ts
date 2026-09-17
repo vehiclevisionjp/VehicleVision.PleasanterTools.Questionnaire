@@ -129,6 +129,13 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
       });
       expect(saved.ok(), await saved.text()).toBe(true);
 
+      // **下書きから直接は公開できない**（Issue #223）
+      const testPublished = await context.request.post(
+        `/api/admin/surveys/${surveyId}/test-publish`,
+        { data: {} },
+      );
+      expect(testPublished.ok(), await testPublished.text()).toBe(true);
+
       const published = await context.request.post(
         `/api/admin/surveys/${surveyId}/publish`,
         { data: {} },

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -39,15 +41,19 @@ public class EndpointGraphTests
 
         app.MapAdminAuditLogEndpoints();
         app.MapAdminAuthEndpoints();
+        app.MapAdminSessionEndpoints();
         app.MapAdminNoteEndpoints();
+        app.MapAdminAutoReplyEndpoints();
         app.MapAdminNotificationEndpoints();
         app.MapAdminOutboxEndpoints();
         app.MapAdminSamlEndpoints();
         app.MapAdminSurveyEndpoints();
         app.MapAdminTemplateEndpoints();
         app.MapAdminUserEndpoints();
+        app.MapAdminVersionEndpoints(allowInsecure: false);
         app.MapAnalyticsEndpoints();
         app.MapFormEndpoints();
+        app.MapMonitoringEndpoints(new MonitoringToken("test-monitoring-token"));
 
         // **ここで初めて RequestDelegateFactory が走る。**
         // 引数の取り方が通らない宣言は、この列挙で例外になる
@@ -56,6 +62,33 @@ public class EndpointGraphTests
             .ToList();
 
         Assert.NotEmpty(endpoints);
+        Assert.Contains(
+            endpoints.OfType<RouteEndpoint>(),
+            endpoint => endpoint.RoutePattern.RawText == "/api/admin/saml/settings");
+        Assert.Contains(
+            endpoints.OfType<RouteEndpoint>(),
+            endpoint => endpoint.RoutePattern.RawText == "/api/admin/saml/settings/test");
+        Assert.Contains(
+            endpoints.OfType<RouteEndpoint>(),
+            endpoint => endpoint.RoutePattern.RawText == "/api/admin/captcha/challenge");
+
+        var autoReplyTest = Assert.Single(
+            endpoints.OfType<RouteEndpoint>(),
+            endpoint => endpoint.RoutePattern.RawText == "/api/admin/auto-reply/test-send");
+        Assert.NotEmpty(autoReplyTest.Metadata.GetOrderedMetadata<IAuthorizeData>());
+        Assert.Equal(
+            AdminAutoReplyEndpoints.TestSendRateLimitPolicy,
+            autoReplyTest.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName);
+
+        // **CAPTCHA の検証より前にレート制限を通す。**
+        // handler の中で検証するため、入口にこの metadata が無い変更を通さない。
+        foreach (var route in new[] { "/api/admin/login", "/api/admin/invitations/accept" })
+        {
+            var endpoint = Assert.Single(
+                endpoints.OfType<RouteEndpoint>(),
+                endpoint => endpoint.RoutePattern.RawText == route);
+            Assert.NotNull(endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>());
+        }
     }
 
     /// <summary>口が受け取るサービスを、型だけ DI へ置く。</summary>
@@ -76,6 +109,7 @@ public class EndpointGraphTests
         // **本体が DI へ入れている枠の型。** 自前の組み立て先には出てこない
         services.AddSingleton(TimeProvider.System);
         services.AddDataProtection();
+        services.AddHttpClient();
 
         var candidates = assemblies
             .SelectMany(TypesOf)

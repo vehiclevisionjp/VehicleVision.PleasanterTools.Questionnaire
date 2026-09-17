@@ -18,7 +18,8 @@ export type QuestionType =
   | 'CheckboxGrid'
   | 'Ranking'
   | 'Note'
-  | 'Embed';
+  | 'Embed'
+  | 'Confirm';
 
 /** 言語コードをキーにした表示文字列。 */
 export type LocalizedText = Record<string, string>;
@@ -66,9 +67,19 @@ export interface Choice {
 }
 
 export interface QuestionSettings {
+  /** 説明文の書き方。無ければ記法を解釈しない。 */
+  descriptionFormat?: 'Plain' | 'Markup';
   maxLength?: number;
   placeholder?: LocalizedText;
   defaultValue?: string;
+  /** 全角の ASCII 英数字・記号を半角へ変換する。 */
+  convertFullWidthAsciiToHalfWidth?: boolean;
+  /** 半角カナを全角へ変換する。 */
+  convertHalfWidthKanaToFullWidth?: boolean;
+  /** 全角空白を半角へ変換する。 */
+  convertFullWidthSpacesToHalfWidth?: boolean;
+  /** 前後の空白を取り除く。 */
+  trimWhitespace?: boolean;
   scaleMinimum?: number;
   scaleMaximum?: number;
   scaleMinimumLabel?: LocalizedText;
@@ -146,7 +157,7 @@ export interface GridRow {
 export type NoteBlockKind = 'Paragraph' | 'Heading' | 'BulletList' | 'NumberedList';
 
 /** 説明文ブロックの文字装飾の種類。 */
-export type NoteInlineKind = 'Text' | 'Bold' | 'Italic' | 'Link';
+export type NoteInlineKind = 'Text' | 'Bold' | 'Italic' | 'Link' | 'AssetImage' | 'AssetLink';
 
 /** 説明文ブロックの中の文字列 1 片。 */
 export interface NoteInline {
@@ -155,6 +166,8 @@ export interface NoteInline {
   text: string;
   /** リンク先。**サーバが `https:` だけを通している。** */
   href?: string | null;
+  /** 自前資産の識別子。**保存先 URL は受け取らない。** */
+  assetId?: string | null;
 }
 
 /** 箇条書きの項目 1 つ。 */
@@ -188,6 +201,8 @@ export interface Question {
    * **画面はこちらしか見ない。** 記法の解釈はサーバにしか無い。
    */
   noteBlocks?: Record<string, NoteBlock[]> | null;
+  /** 記法を選んだ説明文を安全な要素として描画するための構造。 */
+  descriptionBlocks?: Record<string, NoteBlock[]> | null;
 }
 
 export interface Page {
@@ -215,6 +230,8 @@ export interface SurveyDefinition {
   displayMode: 'Paged' | 'OneQuestionPerPage';
   showProgress: boolean;
   confirmationMessage?: LocalizedText;
+  /** 完了画面の本文を安全な要素として描画するための構造。 */
+  confirmationBlocks?: Record<string, NoteBlock[]> | null;
   allowEditingAfterSubmit: boolean;
   /** 回答画面の見た目（Issue #56）。**無ければ既定の見た目。** */
   theme?: SurveyTheme | null;
@@ -244,6 +261,8 @@ export interface FormResponse {
   allowsDraft?: boolean;
   /** テスト公開中か。**回答画面で明示するための印。** */
   isTest?: boolean;
+  /** 配布資料の受取履歴を回答と結び付けて記録するか。 */
+  recordsAssetHistory?: boolean;
 }
 
 /** 送信する回答 1 件。 */
@@ -364,6 +383,16 @@ export function hasSelectionRange(question: Question): boolean {
 /** その行で選ばれている値。**無ければ空。** */
 export function rowValues(answer: AnswerState | undefined, rowId: string): string[] {
   return answer?.rows?.[rowId] ?? [];
+}
+
+/** 確認・同意にチェックが入っているか。 */
+export function isConfirmed(answer: AnswerState | undefined): boolean {
+  return answer?.values[0]?.toLowerCase() === 'true';
+}
+
+/** 確認・同意のチェック状態を回答へ変換する。 */
+export function confirmAnswer(answer: AnswerState | undefined, checked: boolean): AnswerState {
+  return { ...(answer ?? { values: [], otherText: '' }), values: [String(checked)] };
 }
 
 /** 回答を持たない表示専用の要素か。 */

@@ -1,9 +1,13 @@
 using System.Threading.RateLimiting;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
+using Scalar.AspNetCore;
+using StackExchange.Redis;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -32,6 +36,17 @@ var builder = WebApplication.CreateBuilder(args);
 // （App_Data/Parameters/README.md。Issue #158）
 builder.Configuration.AddParameterFiles();
 
+// **CIDR の書き間違いは起動時に止める。** 無制限へ黙って落ちると、絞ったつもりの口が開く。
+var endpointNetworkRestrictions =
+    EndpointNetworkRestrictions.FromConfiguration(builder.Configuration);
+
+// **既定は閉じる。** 管理 API を含む仕様から下調べを済ませられるため、
+// 明示した環境だけで出す。
+var openApiExposure = OpenApiExposureOptions.FromConfiguration(builder.Configuration);
+
+// **HTTP を許す構成は運用者に明示させる。** 未設定や false では従来の保護を変えない。
+var transportSecurity = TransportSecurityOptions.FromConfiguration(builder.Configuration);
+
 // ---- 複数インスタンスの認証 --------------------------------------------------
 // 管理画面の Cookie は ASP.NET Core Data Protection で保護される。AKS で複数 Pod にすると、
 // 鍵束を共有しない限り「別 Pod へ振られた途端にログアウト」になる。
@@ -54,6 +69,35 @@ var provider = Enum.Parse<DatabaseProvider>(
     builder.Configuration["QUESTIONNAIRE_DB_PROVIDER"] ?? nameof(DatabaseProvider.SqlServer));
 var connectionString = builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"]
     ?? throw new InvalidOperationException("QUESTIONNAIRE_DB_CONNECTIONSTRING が設定されていない");
+var sharedStateOptions = SharedStateOptions.FromConfiguration(builder.Configuration);
+var sessionStoreKind =
+    builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_STORE"] ?? "Database";
+var useRedisSessionStore =
+    string.Equals(sessionStoreKind, "Redis", StringComparison.OrdinalIgnoreCase);
+
+// **接続設定と ConnectionMultiplexer は共有状態と管理者セッションで共用する。**
+// 別々に持つと、片方だけ接続先や資格情報を更新する事故が起きる。
+if (sharedStateOptions.UseRedis || useRedisSessionStore)
+{
+    var redisConnectionString =
+        builder.Configuration[SharedStateOptions.ConnectionStringKey]
+        ?? throw new InvalidOperationException(
+            $"{SharedStateOptions.ConnectionStringKey} is required when Redis is used.");
+    var redisConfiguration = ConfigurationOptions.Parse(redisConnectionString);
+
+    // **一時的に到達できなくてもアプリ自体は起動する。**
+    // 共有状態はプロセス内へ倒し、セッション照合はログアウト扱いにする。
+    redisConfiguration.AbortOnConnectFail = false;
+    builder.Services.AddSingleton<IConnectionMultiplexer>(
+        ConnectionMultiplexer.Connect(redisConfiguration));
+}
+
+builder.Services.AddSingleton(sharedStateOptions);
+if (sharedStateOptions.UseRedis)
+{
+    builder.Services.AddSingleton<ISharedRateLimitStore, RedisSharedRateLimitStore>();
+    builder.Services.AddSingleton<ISharedBacklogStateStore, RedisSharedBacklogStateStore>();
+}
 
 // **DB への通信が平文で流れていないかを起動時に見る。**
 // 接続文字列は運用者が与えるのでコードからは中身が見えず、
@@ -110,17 +154,21 @@ var pleasanterOptions = new PleasanterOptions
 };
 
 // ---- サービス --------------------------------------------------------------
+builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IDbConnectionFactory>(
     new DbConnectionFactory(provider, connectionString));
 builder.Services.AddSingleton<IResponseOutbox, ResponseOutbox>();
 builder.Services.AddSingleton<IResponseTokenStore, ResponseTokenStore>();
+builder.Services.AddSingleton<IAssetTicketStore, AssetTicketStore>();
+builder.Services.AddSingleton<IAssetHistoryOutbox, AssetHistoryOutbox>();
 builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
+builder.Services.AddSingleton<IMonitoringStore, MonitoringStore>();
 builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
+builder.Services.AddSurveyAssetStorage(builder.Configuration);
 builder.Services.AddSingleton<ISurveyDeletionStore, SurveyDeletionStore>();
-// **ヘッダ画像の置き場**（Issue #56）。外部のストレージへは置かない
-builder.Services.AddSingleton<ISurveyAssetStore, SurveyAssetStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
+builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
 
 // **添付を弾いた記録は監査ログと別の表**（Issue #39）。
 // あちらは IpAddress を持つ。**弾いた記録は回答者側の出来事**なので、
@@ -141,6 +189,7 @@ builder.Services.AddSingleton(serviceProvider => new AltchaGuard(
         ?? throw new InvalidOperationException("QUESTIONNAIRE_SECRET_KEY が設定されていない"),
     serviceProvider.GetRequiredService<AltchaOptions>(),
     serviceProvider.GetRequiredService<IAltchaChallengeStore>()));
+builder.Services.AddSingleton(AdminCaptchaOptions.FromConfiguration(builder.Configuration));
 
 builder.Services.AddSingleton(pleasanterOptions);
 builder.Services.AddSingleton(new PleasanterDateTime(pleasanterOptions.ApiKeyUserTimeZoneId));
@@ -181,14 +230,21 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // 1. 拡張子の許可リスト 2. 先頭バイトとの一致 は常に有効。3. ウイルススキャンは既定で無効
 var attachmentOptions = AttachmentOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(attachmentOptions);
+var assetOptions = AssetOptions.FromConfiguration(
+    builder.Configuration, attachmentOptions.VirusScan.Enabled);
+builder.Services.AddSingleton(assetOptions);
 
 // **埋め込みを許す配信元**（Issue #104 / #107）。**既定は空＝一切埋め込めない**
 var embedOptions = EmbedOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(embedOptions);
 
-// **添付は multipart で届く。上限を既定値に任せない**（_documents/非機能設計.md 1 章）
+// **添付と配布資産は multipart で届く。上限を既定値に任せない**
+// （_documents/非機能設計.md 1 章）。
+// 大きい方に合わせ、個別の入口ではそれぞれの上限まで絞る
 builder.Services.Configure<FormOptions>(options =>
-    options.MultipartBodyLengthLimit = attachmentOptions.MaxRequestBodyBytes);
+    options.MultipartBodyLengthLimit = Math.Max(
+        attachmentOptions.MaxRequestBodyBytes,
+        assetOptions.MaxRequestBodyBytes));
 
 // **ウイルススキャンは設定で有効にしたときだけ組み込む**（既定は無効）。
 // **ClamAV 本体は GPL-2.0 なので別プロセスとして呼ぶだけ**（LICENSING.md）
@@ -227,6 +283,8 @@ if (attachmentOptions.VirusScan.Enabled)
 // 「有効なのにスキャナが無い」場合は検査側が添付を拒否する（素通しにしない）
 builder.Services.AddSingleton(serviceProvider => new AttachmentInspector(
     attachmentOptions.ToPolicy(), serviceProvider.GetService<IVirusScanner>()));
+builder.Services.AddSingleton(serviceProvider => new AssetInspector(
+    assetOptions, serviceProvider.GetService<IVirusScanner>()));
 
 // ---- アクセス解析（Issue #162）----------------------------------------------
 // **既定は無効。** 設定しなければ、回答者の端末から第三者への要求は 1 つも出ない。
@@ -256,6 +314,29 @@ var secretKey = builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
 
 builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
 builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
+
+// **既定は DB。** 追加の基盤なしで、個別失効と端末一覧を使えるようにする。
+// 大規模構成では Redis を選べるが、停止時に cookie だけで通すことはしない。
+if (string.Equals(sessionStoreKind, "Database", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<IAdminSessionStore, DatabaseAdminSessionStore>();
+}
+else if (string.Equals(sessionStoreKind, "Redis", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<IAdminSessionStore>(serviceProvider =>
+        new RedisAdminSessionStore(
+            serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
+            builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX"]
+                ?? "questionnaire:admin-session:"));
+}
+else
+{
+    throw new InvalidOperationException(
+        "QUESTIONNAIRE_ADMIN_SESSION_STORE must be Database or Redis "
+        + $"(current value: {sessionStoreKind}).");
+}
+
+builder.Services.AddSingleton<AdminSessionManager>();
 // **パスワードの条件は設定で決める**（Issue #157）。
 // 実値は App_Data/Parameters/Security.json（Pleasanter 本体と同じ書き方）。
 // **積む場所は上の 1 か所にまとめてある。**
@@ -295,11 +376,23 @@ builder.Services.AddSingleton(new AdminAuthOptions { TwoFactor = twoFactorPolicy
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
 
-// **SAML は既定で無効**（Issue #166）。有効なのに設定が足りなければ、
-// ここで例外になって起動しない。**「有効にしたつもり」で動き続けさせない**
-var samlOptions = SamlOptions.FromConfiguration(builder.Configuration);
-builder.Services.AddSingleton(samlOptions);
+// **外部設定だけで有効にしている従来構成は、起動時の検証も保つ。**
+// 書き間違いを 500 応答になるまで見つけられない構成へ後退させない。
+_ = SamlOptions.FromConfiguration(builder.Configuration);
+
+// **要求ごとに DB を読む。** 管理画面で変えた設定を再起動なしで反映する（Issue #254）。
+// 外部設定に値があれば DB より優先し、動いている構成を更新で変えない。
+builder.Services.AddSingleton<ISamlOptionsProvider, SamlOptionsProvider>();
 builder.Services.AddSingleton<SamlAuthenticator>();
+builder.Services
+    .AddHttpClient("SamlMetadata", client => client.Timeout = TimeSpan.FromSeconds(10))
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        // **転送先も検査せず追わない。** 内部アドレスへの迂回路にしない。
+        AllowAutoRedirect = false,
+        UseProxy = false,
+        ConnectCallback = SamlMetadataConnection.ConnectAsync,
+    });
 builder.Services.AddSingleton<AdminUserService>();
 
 // ---- bot 対策 --------------------------------------------------------------
@@ -341,6 +434,23 @@ var requestPermitLimit = int.TryParse(
     ? configuredRequests
     : 60;
 
+// **1 画面で何本も出るもの（ビルド成果物・本文画像）の枠。**
+// ⚠️ **ここを固定値にすると、検証環境の緩和が効かない。**
+// 端から端まで通す試験と写しの一式は 1 つの IP から大量に叩くため、
+// 固定の 600 では自分で使い切る（Issue #322）
+var assetPermitLimit = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN"], out var configuredAssets)
+    ? configuredAssets
+    : 600;
+
+// **アンケート 1 本あたりの枠。** 他の枠と同じく検証環境でだけ緩められるようにする。
+// ⚠️ **`publicId` を持たない要求は 1 つの枠にまとめて数えられる**ので、
+// これは実質「回答画面以外すべての合計」の上限にもなる（Issue #311）
+var formPermitLimit = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_FORM_REQUESTS_PER_MIN"], out var configuredForm)
+    ? configuredForm
+    : 600;
+
 builder.Services
     .AddAuthentication(AdminAuthSchemes.Session)
     .AddCookie(AdminAuthSchemes.Session, options =>
@@ -355,6 +465,13 @@ builder.Services
         options, "q.admin.pending", AdminAuthSchemes.PendingLifetime))
     .AddCookie(AdminAuthSchemes.Reenroll, options => AdminAuthSchemes.Configure(
         options, "q.admin.reenroll", AdminAuthSchemes.ReenrollLifetime));
+
+builder.Services.Configure<CookieAuthenticationOptions>(
+    AdminAuthSchemes.Pending,
+    options => options.Events.OnValidatePrincipal = AdminSessionGuard.ValidatePendingAsync);
+builder.Services.Configure<CookieAuthenticationOptions>(
+    AdminAuthSchemes.Reenroll,
+    options => options.Events.OnValidatePrincipal = AdminSessionGuard.ValidateReenrollAsync);
 
 builder.Services.AddAuthorization(options =>
 {
@@ -389,6 +506,8 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddSingleton(ResponseSenderOptions.FromConfiguration(builder.Configuration));
 builder.Services.AddSingleton<ResponseSender>();
 builder.Services.AddHostedService<ResponseSenderHostedService>();
+builder.Services.AddSingleton<AssetHistorySender>();
+builder.Services.AddHostedService<AssetHistorySenderHostedService>();
 
 // **メールの送信ワーカー**（Issue #189）。**既定は無効で、設定したときだけ常駐する。**
 // 回答の送信ワーカーとは別に動く。**メールが詰まっても回答は送られ、
@@ -406,6 +525,7 @@ builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
 // ⚠️ **回答本体のトークンをメールへ載せないための表。** 漏れても失効させられる
 builder.Services.AddSingleton<IResponseEditTokenStore, ResponseEditTokenStore>();
 builder.Services.AddSingleton<AutoReplyDispatcher>();
+builder.Services.AddSingleton<AutoReplyTestMailer>();
 // **招待を本人へ直接送る**（Issue #189）。手渡しの途中で漏れる経路を減らす。
 // **送れない構成でも招待は出せる**（画面の URL は今までどおり返る）
 builder.Services.AddSingleton<AdminInvitationMailer>();
@@ -435,6 +555,23 @@ if (mailOptions.IsReady)
     builder.Services.AddHostedService<MailSenderHostedService>();
 }
 
+// **設定したときだけ監視の口を生やす。** 既定で外部から DB の状態を読める口を作らない。
+var monitoringTokenValue = builder.Configuration[MonitoringToken.Setting];
+MonitoringToken? monitoringToken = string.IsNullOrWhiteSpace(monitoringTokenValue)
+    ? null
+    : new MonitoringToken(monitoringTokenValue);
+if (monitoringToken is not null)
+{
+    builder.Services.AddSingleton(serviceProvider => new MonitoringService(
+        provider,
+        connectionString,
+        serviceProvider.GetRequiredService<IResponseOutbox>(),
+        serviceProvider.GetRequiredService<IMonitoringStore>(),
+        serviceProvider.GetRequiredService<IMailOutbox>(),
+        mailOptions,
+        serviceProvider.GetRequiredService<TimeProvider>()));
+}
+
 // **どの設定ファイルを読んだかを記録に残す**（Issue #158）。
 // **optional なので、置き場を間違えても黙って既定で動いてしまう。**
 // 「読めているつもりで読めていない」を起動時に見せる
@@ -450,40 +587,54 @@ builder.Services.AddHostedService<AuditLogRetentionService>();
 // ---- レート制限 ------------------------------------------------------------
 // **DB へ書く前に効かせる。** 書いてから弾いても消費は起きている
 // （_documents/非機能設計.md 1 章）
-builder.Services.AddRateLimiter(options =>
+builder.Services.AddRateLimiter();
+builder.Services
+    .AddOptions<RateLimiterOptions>()
+    .Configure<IServiceProvider, ILoggerFactory>((options, serviceProvider, loggerFactory) =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    var sharedRateLimits = serviceProvider.GetService<ISharedRateLimitStore>();
+    var rateLimitLogger = loggerFactory.CreateLogger("SharedRateLimit");
 
     // **複数の軸で掛ける。** 1 つの軸だけでは抜けられる
     options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
-            RateLimitPartition.GetFixedWindowLimiter(
-                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = requestPermitLimit,
-                    Window = TimeSpan.FromMinutes(1),
-                })),
+        {
+            // **本文画像とビルド成果物は 1 画面で複数要求される。**
+            // 通常 API の 60 件枠を食わせると、同じ NAT 配下の回答者が
+            // 数人開いただけでフォーム本体まで止まる（Issue #316）
+            var isAsset = RateLimitPartitions.IsBulkAsset(context.Request.Path);
+            var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var kind = isAsset ? "asset" : "api";
+            return RateLimitPartitions.FixedWindow(
+                $"{address}|{kind}",
+                "request",
+                isAsset ? assetPermitLimit : requestPermitLimit,
+                TimeSpan.FromMinutes(1),
+                sharedRateLimits,
+                rateLimitLogger);
+        }),
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
-            RateLimitPartition.GetFixedWindowLimiter(
-                context.Request.RouteValues["publicId"]?.ToString() ?? "none",
-                _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 600,
-                    Window = TimeSpan.FromMinutes(1),
-                })));
+            // ⚠️ **publicId を持たない要求はこの段で数えない**（Issue #311）。
+            // 経路の値は UseRouting が利用者のミドルウェアより前に入るため、ここで取れる
+            RateLimitPartitions.Survey(
+                context.Request.RouteValues["publicId"]?.ToString(),
+                formPermitLimit,
+                TimeSpan.FromMinutes(1),
+                sharedRateLimits,
+                rateLimitLogger)));
 
     // **回答の送信だけ別枠にする。** 書き込みは読み取りより高くつくので、
     // 画面を開くだけの要求と同じ枠で数えない。
     // **NAT の内側から大勢が答えることがある**ので、締めすぎないこと
     options.AddPolicy(FormEndpoints.SubmitRateLimitPolicy, context =>
-        RateLimitPartition.GetFixedWindowLimiter(
+        RateLimitPartitions.FixedWindow(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = submitPermitLimit,
-                Window = TimeSpan.FromMinutes(1),
-            }));
+            "submit",
+            submitPermitLimit,
+            TimeSpan.FromMinutes(1),
+            sharedRateLimits,
+            rateLimitLogger));
 
     // **ログインの試行だけは別枠で厳しくする。**
     // 全体の枠に紛れさせると、1 分に 60 回の総当たりが通ってしまう。
@@ -491,13 +642,24 @@ builder.Services.AddRateLimiter(options =>
     // **回数を設定で変えられるようにしてある。** 検証環境では端から端まで通す試験が
     // 既定の枠を使い切ってしまうため。**本番では既定のまま使うこと**
     options.AddPolicy(AdminAuthSchemes.LoginRateLimitPolicy, context =>
-        RateLimitPartition.GetFixedWindowLimiter(
+        RateLimitPartitions.FixedWindow(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = loginPermitLimit,
-                Window = TimeSpan.FromMinutes(5),
-            }));
+            "login",
+            loginPermitLimit,
+            TimeSpan.FromMinutes(5),
+            sharedRateLimits,
+            rateLimitLogger));
+
+    // **試し送信は 1 分に 3 通まで。** 任意の宛先へは送れないが、
+    // 管理者本人のメールボックスや送信基盤を連打で埋めさせない。
+    options.AddPolicy(AdminAutoReplyEndpoints.TestSendRateLimitPolicy, context =>
+        RateLimitPartitions.FixedWindow(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            "auto-reply-test-send",
+            3,
+            TimeSpan.FromMinutes(1),
+            sharedRateLimits,
+            rateLimitLogger));
 });
 
 // **スキーマが揃っていないまま起動しない。**
@@ -523,6 +685,16 @@ if (!string.Equals(
 
 var app = builder.Build();
 
+if (transportSecurity.AllowInsecure)
+{
+    // **英語で書く。** Azure の Kudu の Debug console で日本語が化ける（Issue #225）
+    app.Logger.LogWarning(
+        "Insecure HTTP mode is enabled by QUESTIONNAIRE_ALLOW_INSECURE. "
+        + "HTTPS redirection and HSTS are disabled. "
+        + "Use this mode only in a closed network because passwords are sent in plaintext "
+        + "and SAML may not work.");
+}
+
 // **CSP は起動時に 1 度だけ組み立てる**（Issue #104 / #107）。
 //
 // **アンケートごとには出し分けない。** 出し分けるには、回答画面の HTML を返す時点で
@@ -545,6 +717,7 @@ var analyticsSources = analyticsOptions.CspSources;
 // どのサービスも iframe で課題を出すので、script-src と frame-src の両方に要る
 var captchaSources = captchaOptions.CspSources;
 var externalScriptSources = analyticsSources.AddRange(captchaSources);
+const string scalarCspNonceKey = "ScalarCspNonce";
 var contentSecurityPolicy = string.Join("; ",
 [
     "default-src 'self'",
@@ -560,13 +733,8 @@ var contentSecurityPolicy = string.Join("; ",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "object-src 'none'",
-    .. externalScriptSources.IsEmpty
-        ? Array.Empty<string>()
-        :
-        [
-            "script-src 'self'" + Join(externalScriptSources),
-            "connect-src 'self'" + Join(externalScriptSources),
-        ],
+    "script-src 'self'" + Join(externalScriptSources),
+    "connect-src 'self'" + Join(externalScriptSources),
 ]);
 
 static string Join(System.Collections.Immutable.ImmutableArray<string> sources) =>
@@ -585,7 +753,11 @@ foreach (var network in ForwardedProxyNetworks.Parse(
 }
 app.UseForwardedHeaders(forwardedHeadersOptions);
 
-if (!app.Environment.IsDevelopment())
+// **転送ヘッダから本当の送信元へ直した後で照合する。**
+// 先に置くと、リバースプロキシ配下では全要求がプロキシ自身の IP に見える。
+app.UseEndpointNetworkRestrictions(endpointNetworkRestrictions);
+
+if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
 {
     app.UseHsts();
     // Kubelet の HTTP probe は 3xx も成功と扱う。probe をリダイレクトすると、
@@ -600,11 +772,23 @@ if (!app.Environment.IsDevelopment())
 app.Use(async (context, next) =>
 {
     var headers = context.Response.Headers;
+    var csp = contentSecurityPolicy;
+    if (context.Request.Path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase))
+    {
+        // Scalar は画面を組み立てる inline script を返す。要求ごとの nonce だけを許して CSP を緩めない。
+        var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        context.Items[scalarCspNonceKey] = nonce;
+        csp = csp.Replace(
+            "script-src 'self'",
+            $"script-src 'self' 'nonce-{nonce}'",
+            StringComparison.Ordinal);
+    }
+
     headers["X-Content-Type-Options"] = "nosniff";
     headers["Referrer-Policy"] = "no-referrer";
     headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()";
     // **2 要素の QR は data: URI で描く。** 外部から画像を取りに行かせない
-    headers["Content-Security-Policy"] = contentSecurityPolicy;
+    headers["Content-Security-Policy"] = csp;
     await next();
 });
 
@@ -620,20 +804,38 @@ app.UseStaticFiles();
 app.MapFormEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapAdminAuthEndpoints();
-// **SAML を使うときだけ受け口を生やす**（Issue #166）。
-// 使わない構成で認証の外の口を開けたままにしない（添付の検査の受け口と同じ考え方）。
-// **中で「無効なら 404」と書くより強い。** 無効なら経路そのものが無い
-if (samlOptions.Enabled)
-{
-    app.MapAdminSamlEndpoints();
-}
+app.MapAdminSessionEndpoints();
+// **経路は常に登録し、無効な間は各入口が 404 にする。**
+// ⚠️ **元は「有効なときだけ生やす」だった**（Issue #166。使わない構成で
+// 認証の外の口を開けたままにしないため）が、**管理画面から設定を変えられるように
+// した**ので、起動時に決めると変更のたびに再起動が要る。
+// **無効な間は各入口が 404 を返すことで、外から見た姿は変わらない**
+app.MapAdminSamlEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();
+app.MapAdminAutoReplyEndpoints();
 app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
+app.MapAdminVersionEndpoints(transportSecurity.AllowInsecure);
+if (monitoringToken is not null)
+{
+    app.MapMonitoringEndpoints(monitoringToken);
+}
+
+if (openApiExposure.Enabled)
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference((options, context) =>
+    {
+        // CDN の既定フォントと利用状況テレメトリーを止め、画面から第三者へ要求を出さない。
+        options.DisableDefaultFonts().DisableTelemetry().DisableAgent().WithNonce(
+            context.Items[scalarCspNonceKey] as string
+            ?? throw new InvalidOperationException("Scalar の CSP nonce を設定できなかった"));
+    });
+}
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
 app.MapGet("/admin", () => Results.File("admin.html", "text/html"));
@@ -655,7 +857,9 @@ if (attachmentOptions.VirusScan is
 app.MapFallbackToFile("/f/{**path}", "index.html");
 
 // 生存確認。**アンケートの情報を出さない**
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
+    .WithTags("生存確認")
+    .DisableRateLimiting();
 
 // 受付可能かの確認。Pleasanter が止まっても回答は DB に積んで再送できるため、
 // **ここで見る依存先は本アプリの DB だけ。** 例外の中身は接続先や資格情報を
@@ -671,7 +875,9 @@ app.MapGet("/ready", async (CancellationToken cancellationToken) =>
     return failure is null
         ? Results.Ok(new { status = "ready" })
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
-});
+})
+    .WithTags("生存確認")
+    .DisableRateLimiting();
 
 app.Run();
 

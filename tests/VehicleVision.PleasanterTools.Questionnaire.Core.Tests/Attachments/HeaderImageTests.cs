@@ -127,4 +127,5 @@ public class HeaderImageTests
         // **スキャナの生死に管理画面の保存を引きずらせない**
         Assert.False(HeaderImage.Policy.VirusScanEnabled);
     }
+
 }
