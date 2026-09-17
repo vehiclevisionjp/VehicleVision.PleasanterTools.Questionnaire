@@ -6,6 +6,28 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Mapping;
 
 public class MappingValidatorTests
 {
+    [Fact]
+    public void システム値だけのconstant変換を許す()
+    {
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Converted(
+                    "ClassA",
+                    MappingConverter.Of(ConverterOperations.Constant, ("value", "download")),
+                    MappingSource.System(MappingSystemValue.EventType)),
+            ],
+        };
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition(),
+            warnUnmappedQuestions: false);
+
+        Assert.Empty(problems);
+    }
+
     private static SurveyDefinition Definition(params string[] questionIds) => new()
     {
         SurveyId = "s1",

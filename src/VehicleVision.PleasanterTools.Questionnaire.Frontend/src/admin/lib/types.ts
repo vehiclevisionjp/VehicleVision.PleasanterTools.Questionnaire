@@ -384,6 +384,13 @@ export interface SurveyDefinition {
 }
 
 export type QuestionPort = 'Value' | 'OtherText' | 'FileNames' | 'Files';
+export type MappingSystemValue =
+  | 'EventType'
+  | 'OccurredAt'
+  | 'AssetFileName'
+  | 'AssetId'
+  | 'ReferenceId'
+  | 'SurveyTitle';
 
 /**
  * 添付列か。
@@ -398,6 +405,7 @@ export function isAttachmentColumn(column: string): boolean {
 export interface MappingSource {
   questionId: string;
   port: QuestionPort;
+  systemValue?: MappingSystemValue | null;
   /**
    * どの行（または順位を付ける項目）から取るか（Issue #74）。
    *
@@ -433,6 +441,8 @@ export interface MappingDefinition {
 export interface SurveyDraft {
   definition: SurveyDefinition;
   mapping: MappingDefinition;
+  assetHistorySiteId?: number;
+  assetHistoryMapping?: MappingDefinition | null;
   /** **保存時に照合する版。** 合わなければ他の人が更新している */
   revision: number;
 }

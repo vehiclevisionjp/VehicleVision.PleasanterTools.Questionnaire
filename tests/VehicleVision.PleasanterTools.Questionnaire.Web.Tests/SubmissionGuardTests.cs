@@ -224,7 +224,7 @@ public sealed class SubmissionGuardTests
     public void 完了時限定の資産アクセス許可は30分だけ通る()
     {
         var (guard, time) = Create();
-        var ticket = guard.IssueAssetAccess(PublicId);
+        var ticket = guard.IssueAssetAccess(PublicId, ResponseToken);
 
         Assert.True(guard.CheckAssetAccess(ticket, PublicId));
 
@@ -234,10 +234,23 @@ public sealed class SubmissionGuardTests
     }
 
     [Fact]
+    public void 完了時限定の資産アクセス許可は回答トークンを署名して取り出せる()
+    {
+        var (guard, _) = Create();
+        var ticket = guard.IssueAssetAccess(PublicId, ResponseToken);
+
+        Assert.Equal(ResponseToken, guard.ReadAssetAccess(ticket, PublicId));
+
+        var parts = ticket.Split('.');
+        parts[2] = "other-token";
+        Assert.Null(guard.ReadAssetAccess(string.Join('.', parts), PublicId));
+    }
+
+    [Fact]
     public void 完了時限定の資産アクセス許可は別のアンケートで通らない()
     {
         var (guard, _) = Create();
-        var ticket = guard.IssueAssetAccess(PublicId);
+        var ticket = guard.IssueAssetAccess(PublicId, ResponseToken);
 
         Assert.False(guard.CheckAssetAccess(ticket, "other-public-id"));
     }

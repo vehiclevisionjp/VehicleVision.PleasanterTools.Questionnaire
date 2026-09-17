@@ -458,6 +458,18 @@ export const ja = {
 
   // ---- マッピング ---------------------------------------------------------
   'mapping.title': 'Pleasanter への割り当て',
+  'history.title': '配布資料の受取履歴',
+  'history.lead': 'サイト ID が 0 のときは記録しません。有効にする場合は、出来事を別サイトへ投射する割り当てを設定します。',
+  'history.siteId': '履歴の投射先サイト ID（0 で無効）',
+  'history.mappingTitle': '受取履歴の割り当て',
+  'history.referenceIdHint':
+    '回答レコードの ReferenceId の割当先には、回答サイトをリンク先に設定済みの Pleasanter リンク列を指定してください。この画面からサイト設定は変更しません。',
+  'history.source.EventType': '出来事の種類',
+  'history.source.OccurredAt': '起きた日時',
+  'history.source.AssetFileName': '資料のファイル名',
+  'history.source.AssetId': '資料 ID',
+  'history.source.ReferenceId': '回答レコードの ReferenceId',
+  'history.source.SurveyTitle': 'アンケート題名',
   'mapping.addColumn': '列を追加',
   'mapping.addAttachmentColumn': '添付の列を追加',
   'mapping.noFileQuestion': '添付の設問がありません',
@@ -1384,6 +1396,18 @@ export const en: Record<MessageKey, string> = {
   'questionType.Confirm': 'Confirmation (single checkbox)',
 
   'mapping.title': 'Assignment to Pleasanter',
+  'history.title': 'Download history',
+  'history.lead': 'No history is recorded when the site ID is 0. To enable it, map each event to a separate site.',
+  'history.siteId': 'History destination site ID (0 disables)',
+  'history.mappingTitle': 'Download history mapping',
+  'history.referenceIdHint':
+    'Map the response record ReferenceId to a Pleasanter link column already configured to link to the response site. This screen does not change site settings.',
+  'history.source.EventType': 'Event type',
+  'history.source.OccurredAt': 'Occurred at',
+  'history.source.AssetFileName': 'Asset file name',
+  'history.source.AssetId': 'Asset ID',
+  'history.source.ReferenceId': 'Response record ReferenceId',
+  'history.source.SurveyTitle': 'Survey title',
   'mapping.addColumn': 'Add a column',
   'mapping.addAttachmentColumn': 'Add an attachment column',
   'mapping.noFileQuestion': 'There is no file upload question',

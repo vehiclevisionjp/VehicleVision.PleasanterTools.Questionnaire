@@ -88,7 +88,8 @@ public static class MappingValidator
         SurveyDefinition definition,
         IReadOnlyCollection<string>? reservedColumns = null,
         Func<string, bool>? isAttachmentColumn = null,
-        Func<string, MappingTargetValueKind?>? targetValueKind = null)
+        Func<string, MappingTargetValueKind?>? targetValueKind = null,
+        bool warnUnmappedQuestions = true)
     {
         ArgumentNullException.ThrowIfNull(mapping);
         ArgumentNullException.ThrowIfNull(definition);
@@ -172,6 +173,11 @@ public static class MappingValidator
 
             foreach (var source in assignment.Sources)
             {
+                if (source.SystemValue is not null)
+                {
+                    continue;
+                }
+
                 var question = definition.FindQuestion(source.QuestionId);
                 if (question is null)
                 {
@@ -202,7 +208,9 @@ public static class MappingValidator
             }
         }
 
-        return Finish(problems, mapping, definition);
+        return warnUnmappedQuestions
+            ? Finish(problems, mapping, definition)
+            : problems.ToImmutable();
     }
 
     /// <summary>既定値のない必須設定が欠けているか。</summary>
@@ -258,6 +266,17 @@ public static class MappingValidator
             }
 
             var source = assignment.Sources[0];
+            if (source.SystemValue is { } systemValue)
+            {
+                return systemValue switch
+                {
+                    MappingSystemValue.ReferenceId =>
+                        target is MappingTargetValueKind.Integer or MappingTargetValueKind.Decimal,
+                    MappingSystemValue.OccurredAt => target is MappingTargetValueKind.DateTime,
+                    _ => false,
+                };
+            }
+
             var question = definition.FindQuestion(source.QuestionId);
             if (question is null || source.Port is not QuestionPort.Value)
             {

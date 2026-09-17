@@ -6,6 +6,37 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Mapping;
 
 public class MappingEvaluatorTests
 {
+    [Fact]
+    public void システム値だけを入力にして評価できる()
+    {
+        var mapping = new MappingDefinition
+        {
+            Assignments =
+            [
+                ColumnAssignment.Direct(
+                    "NumA",
+                    MappingSource.System(MappingSystemValue.ReferenceId)),
+                ColumnAssignment.Converted(
+                    "ClassA",
+                    MappingConverter.Of(ConverterOperations.Constant, ("value", "download")),
+                    MappingSource.System(MappingSystemValue.EventType)),
+            ],
+        };
+
+        var result = new MappingEvaluator().Evaluate(
+            mapping,
+            [],
+            new Dictionary<MappingSystemValue, ImmutableArray<string>>
+            {
+                [MappingSystemValue.ReferenceId] = ["123"],
+                [MappingSystemValue.EventType] = ["Download"],
+            });
+
+        Assert.Empty(result.Problems);
+        Assert.Equal(["123"], result.Columns["NumA"].ToArray());
+        Assert.Equal(["download"], result.Columns["ClassA"].ToArray());
+    }
+
     private static MappingDefinition Mapping(params ColumnAssignment[] assignments) =>
         new() { Assignments = [.. assignments] };
 

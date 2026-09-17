@@ -16,7 +16,9 @@ public sealed class SurveySnapshotStore(IDbConnectionFactory connectionFactory) 
         string DefinitionJson,
         string MappingJson,
         long PleasanterSiteId,
-        string? ResponseJsonColumn);
+        string? ResponseJsonColumn,
+        long AssetHistorySiteId,
+        string? AssetHistoryMappingJson);
 
     /// <summary>SQL を組み立てる。**識別子は角括弧で囲む。**</summary>
     private CommandDefinition Sql(
@@ -37,6 +39,7 @@ public sealed class SurveySnapshotStore(IDbConnectionFactory connectionFactory) 
 
         var row = await connection.QueryFirstOrDefaultAsync<Row>(Sql(
             "SELECT v.[DefinitionJson], v.[MappingJson], "
+            + "       v.[AssetHistorySiteId], v.[AssetHistoryMappingJson], "
             + "       s.[PleasanterSiteId], s.[ResponseJsonColumn] "
             + "FROM [SurveyVersions] v "
             + "JOIN [Surveys] s ON s.[SurveyId] = v.[SurveyId] "
@@ -51,6 +54,9 @@ public sealed class SurveySnapshotStore(IDbConnectionFactory connectionFactory) 
 
         var definition = SurveyJson.Deserialize<SurveyDefinition>(row.DefinitionJson);
         var mapping = SurveyJson.Deserialize<MappingDefinition>(row.MappingJson);
+        var assetHistoryMapping = string.IsNullOrWhiteSpace(row.AssetHistoryMappingJson)
+            ? null
+            : SurveyJson.Deserialize<MappingDefinition>(row.AssetHistoryMappingJson);
 
         // **読めない版は「無い」として扱う。** 送信ワーカーがデッドレターへ回す
         if (definition is null || mapping is null)
@@ -66,7 +72,12 @@ public sealed class SurveySnapshotStore(IDbConnectionFactory connectionFactory) 
         definition = definition with { Theme = theme is null || theme.IsDefault ? null : theme };
 
         return new SurveySnapshot(
-            definition, mapping, row.PleasanterSiteId, row.ResponseJsonColumn);
+            definition,
+            mapping,
+            row.PleasanterSiteId,
+            row.ResponseJsonColumn,
+            row.AssetHistorySiteId,
+            assetHistoryMapping);
     }
 }
 
@@ -84,6 +95,17 @@ public interface ISurveyRepository
         MappingDefinition mapping,
         Guid? publishedBy,
         CancellationToken cancellationToken = default);
+
+    Task PublishWithAssetHistoryAsync(
+        Guid surveyId,
+        int version,
+        SurveyDefinition definition,
+        MappingDefinition mapping,
+        Guid? publishedBy,
+        long assetHistorySiteId,
+        MappingDefinition? assetHistoryMapping,
+        CancellationToken cancellationToken = default) =>
+        PublishAsync(surveyId, version, definition, mapping, publishedBy, cancellationToken);
 
     /// <summary>公開用 ID からアンケートを引く。回答画面が使う。</summary>
     Task<SurveyRecord?> FindByPublicIdAsync(
@@ -323,6 +345,25 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         SurveyDefinition definition,
         MappingDefinition mapping,
         Guid? publishedBy,
+        CancellationToken cancellationToken = default) =>
+        await PublishWithAssetHistoryAsync(
+            surveyId,
+            version,
+            definition,
+            mapping,
+            publishedBy,
+            0,
+            null,
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task PublishWithAssetHistoryAsync(
+        Guid surveyId,
+        int version,
+        SurveyDefinition definition,
+        MappingDefinition mapping,
+        Guid? publishedBy,
+        long assetHistorySiteId,
+        MappingDefinition? assetHistoryMapping,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -343,14 +384,19 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         await connection.ExecuteAsync(Sql(
             "INSERT INTO [SurveyVersions] "
             + "  ([SurveyId], [Version], [DefinitionJson], [MappingJson], "
-            + "   [PublishedAt], [PublishedBy]) "
-            + "VALUES (@SurveyId, @Version, @DefinitionJson, @MappingJson, @Now, @PublishedBy)",
+            + "   [AssetHistorySiteId], [AssetHistoryMappingJson], [PublishedAt], [PublishedBy]) "
+            + "VALUES (@SurveyId, @Version, @DefinitionJson, @MappingJson, "
+            + "        @AssetHistorySiteId, @AssetHistoryMappingJson, @Now, @PublishedBy)",
             new
             {
                 SurveyId = surveyId,
                 Version = version,
                 DefinitionJson = SurveyJson.Serialize(definition),
                 MappingJson = SurveyJson.Serialize(mapping),
+                AssetHistorySiteId = assetHistorySiteId,
+                AssetHistoryMappingJson = assetHistoryMapping is null
+                    ? null
+                    : SurveyJson.Serialize(assetHistoryMapping),
                 Now = DbTime.UtcNowTruncated(),
                 PublishedBy = publishedBy,
             },

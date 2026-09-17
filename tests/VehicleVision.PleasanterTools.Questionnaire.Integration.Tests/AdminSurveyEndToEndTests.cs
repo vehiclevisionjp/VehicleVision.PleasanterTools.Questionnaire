@@ -71,7 +71,12 @@ public class AdminSurveyEndToEndTests
     }
 
     /// <summary>設問 1 問だけの下書き。</summary>
-    private static object DraftBody(string surveyId, int revision, bool withMapping) => new
+    private static object DraftBody(
+        string surveyId,
+        int revision,
+        bool withMapping,
+        long assetHistorySiteId = 0,
+        bool withAssetHistoryMapping = false) => new
     {
         revision,
         definition = new
@@ -112,6 +117,28 @@ public class AdminSurveyEndToEndTests
                     {
                         targetColumn = "ClassA",
                         sources = new[] { new { questionId = "q1", port = "Value" } },
+                    },
+                }
+                : [],
+        },
+        assetHistorySiteId,
+        assetHistoryMapping = new
+        {
+            assignments = withAssetHistoryMapping
+                ? new[]
+                {
+                    new
+                    {
+                        targetColumn = "ClassB",
+                        sources = new[]
+                        {
+                            new
+                            {
+                                questionId = "",
+                                port = "Value",
+                                systemValue = "ReferenceId",
+                            },
+                        },
                     },
                 }
                 : [],
@@ -442,6 +469,39 @@ public class AdminSurveyEndToEndTests
             $"/api/admin/surveys/{surveyId}/test-publish", new { });
 
         Assert.Equal(HttpStatusCode.BadRequest, publish.StatusCode);
+    }
+
+    [Fact]
+    public async Task 履歴投射先が回答先と同じなら公開できない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                0,
+                withMapping: true,
+                assetHistorySiteId: 1,
+                withAssetHistoryMapping: true)))
+        {
+            save.EnsureSuccessStatusCode();
+        }
+
+        using var publish = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { });
+
+        Assert.Equal(HttpStatusCode.BadRequest, publish.StatusCode);
+        var body = await ReadAsync(publish);
+        Assert.Contains(
+            body!["problems"]!.AsArray(),
+            problem => problem!["detail"]!.GetValue<string>() == "assetHistorySiteIdMustDiffer");
     }
 
     [Fact]

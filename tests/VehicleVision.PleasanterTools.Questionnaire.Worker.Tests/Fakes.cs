@@ -99,6 +99,88 @@ public sealed class FakeOutbox : IResponseOutbox
         Task.FromResult<Guid?>(null);
 }
 
+/// <summary>配布資料履歴の送信待ちテーブルの代わり。</summary>
+public sealed class FakeAssetHistoryOutbox : IAssetHistoryOutbox
+{
+    private readonly ConcurrentQueue<PendingAssetHistory> _pending = new();
+
+    public List<Guid> Completed { get; } = [];
+
+    public List<(Guid EventId, DateTime NextAttemptAt)> Waited { get; } = [];
+
+    public List<(Guid EventId, DateTime NextAttemptAt, string Error)> Rescheduled { get; } = [];
+
+    public List<(Guid EventId, string Error)> DeadLettered { get; } = [];
+
+    public void Enqueue(PendingAssetHistory history) => _pending.Enqueue(history);
+
+    public Task EnqueueAsync(
+        Guid surveyId,
+        int surveyVersion,
+        string responseToken,
+        AssetHistoryEventType eventType,
+        Guid? assetId,
+        string? assetFileName,
+        DateTime occurredAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        Enqueue(new PendingAssetHistory(
+            Guid.NewGuid(),
+            surveyId,
+            surveyVersion,
+            responseToken,
+            (int)eventType,
+            assetId,
+            assetFileName,
+            occurredAtUtc,
+            0));
+        return Task.CompletedTask;
+    }
+
+    public Task<PendingAssetHistory?> ClaimAsync(
+        string lockedBy,
+        TimeSpan lockDuration,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(_pending.TryDequeue(out var next) ? next : null);
+
+    public Task CompleteAsync(Guid eventId, CancellationToken cancellationToken = default)
+    {
+        Completed.Add(eventId);
+        return Task.CompletedTask;
+    }
+
+    public Task WaitAsync(
+        Guid eventId,
+        DateTime nextAttemptAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        Waited.Add((eventId, nextAttemptAtUtc));
+        return Task.CompletedTask;
+    }
+
+    public Task RescheduleAsync(
+        Guid eventId,
+        DateTime nextAttemptAtUtc,
+        string error,
+        CancellationToken cancellationToken = default)
+    {
+        Rescheduled.Add((eventId, nextAttemptAtUtc, error));
+        return Task.CompletedTask;
+    }
+
+    public Task DeadLetterAsync(
+        Guid eventId,
+        string error,
+        CancellationToken cancellationToken = default)
+    {
+        DeadLettered.Add((eventId, error));
+        return Task.CompletedTask;
+    }
+
+    public Task<int> ReleaseExpiredLocksAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(0);
+}
+
 /// <summary>トークン対応表の代わり。</summary>
 public sealed class FakeTokenStore : IResponseTokenStore
 {

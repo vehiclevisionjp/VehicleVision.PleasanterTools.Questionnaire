@@ -85,7 +85,8 @@ public sealed record FormResponse(
     SurveyDefinition Definition,
     bool RequiresProofOfWork,
     bool AllowsDraft = false,
-    bool IsTest = false);
+    bool IsTest = false,
+    bool RecordsAssetHistory = false);
 
 /// <summary>回答画面向けの口。**認証は無い。**</summary>
 public static class FormEndpoints
@@ -121,7 +122,8 @@ public static class FormEndpoints
                     form.Definition,
                     form.RequiresProofOfWork,
                     form.AllowsDraft,
-                    form.IsTest));
+                    form.IsTest,
+                    form.RecordsAssetHistory));
         });
 
         // **ヘッダ画像を配る**（Issue #56）。
@@ -159,6 +161,7 @@ public static class FormEndpoints
             HttpContext context,
             ResponseIntake intake,
             IAssetTicketStore assetTickets,
+            IAssetHistoryOutbox assetHistory,
             SubmissionGuard guard,
             TimeProvider timeProvider,
             AssetOptions options,
@@ -174,19 +177,33 @@ public static class FormEndpoints
             if (published.RequiresTicket)
             {
                 var ticket = context.Request.Cookies[AssetTicket.CookieName];
-                if (!await AssetTicket.CanAccessAsync(
+                var grant = await AssetTicket.ResolveAccessAsync(
                     ticket,
                     publicId,
                     published.SurveyId,
                     guard,
                     assetTickets,
                     timeProvider.GetUtcNow().UtcDateTime,
-                    cancellationToken))
+                    cancellationToken);
+                if (grant is null)
                 {
                     return Results.NotFound();
                 }
 
                 context.Response.Headers.CacheControl = "private, no-store";
+
+                if (published.RecordsAssetHistory)
+                {
+                    await assetHistory.EnqueueAsync(
+                        published.SurveyId,
+                        published.SurveyVersion,
+                        grant.ResponseToken,
+                        AssetHistoryEventType.Download,
+                        assetId,
+                        published.Asset.FileName,
+                        timeProvider.GetUtcNow().UtcDateTime,
+                        cancellationToken).ConfigureAwait(false);
+                }
             }
             else
             {
@@ -284,6 +301,7 @@ public static class FormEndpoints
             HttpContext context,
             ResponseIntake intake,
             IAssetTicketStore assetTickets,
+            IAssetHistoryOutbox assetHistory,
             TimeProvider timeProvider,
             CancellationToken cancellationToken) =>
         {
@@ -309,6 +327,19 @@ public static class FormEndpoints
                 return Results.NotFound();
             }
 
+            if (form.RecordsAssetHistory)
+            {
+                await assetHistory.EnqueueAsync(
+                    form.SurveyId,
+                    form.SurveyVersion,
+                    grant.ResponseToken,
+                    AssetHistoryEventType.Revisit,
+                    assetId: null,
+                    assetFileName: null,
+                    timeProvider.GetUtcNow().UtcDateTime,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
             context.Response.Cookies.Append(
                 AssetTicket.CookieName,
                 request.AssetTicket,
@@ -325,7 +356,8 @@ public static class FormEndpoints
             return Results.Ok(new FormResponse(
                 publicId,
                 form.Definition,
-                RequiresProofOfWork: false));
+                RequiresProofOfWork: false,
+                RecordsAssetHistory: form.RecordsAssetHistory));
         }).RequireRateLimiting(SubmitRateLimitPolicy);
 
         forms.MapGet("/{publicId}/responses/{responseToken}", async (
@@ -491,7 +523,7 @@ public static class FormEndpoints
                     // DB へ引換券を保存せず、この送信直後の画面だけで使わせる。
                     context.Response.Cookies.Append(
                         AssetTicket.CookieName,
-                        guard.IssueAssetAccess(publicId),
+                        guard.IssueAssetAccess(publicId, responseToken),
                         new CookieOptions
                         {
                             HttpOnly = true,

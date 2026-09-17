@@ -14,7 +14,9 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 public sealed record SurveyDraft(
     SurveyDefinition Definition,
     MappingDefinition Mapping,
-    int Revision);
+    int Revision,
+    long AssetHistorySiteId = 0,
+    MappingDefinition? AssetHistoryMapping = null);
 
 /// <summary>一覧に出すアンケートの要約。</summary>
 /// <param name="SuspendedReason">
@@ -162,7 +164,9 @@ public interface ISurveyDraftStore
         SurveyDefinition definition,
         MappingDefinition mapping,
         int expectedRevision,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        long assetHistorySiteId = 0,
+        MappingDefinition? assetHistoryMapping = null);
 
     /// <summary>アンケートを丸ごと写して、新しい**下書き**を作る（Issue #46）。</summary>
     /// <param name="sourceSurveyId">写す元のアンケート。</param>
@@ -229,7 +233,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string? AutoReplyJson,
         string? AssetDeliveryJson,
         int? PublishedVersion,
-        int DraftRevision);
+        int DraftRevision,
+        long AssetHistorySiteId,
+        string? AssetHistoryMappingJson);
 
     private sealed record PageRow(
         string PageId,
@@ -442,7 +448,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "       [ConfirmationMessageJson], [DisplayMode], [ShowProgress], "
             + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], [AssetDeliveryJson], "
             + "       [PublishedVersion], "
-            + "       [DraftRevision] "
+            + "       [DraftRevision], [AssetHistorySiteId], [AssetHistoryMappingJson] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
@@ -585,7 +591,15 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 .ToImmutableArray(),
         };
 
-        return new SurveyDraft(definition, mapping, survey.DraftRevision);
+        var assetHistoryMapping = string.IsNullOrWhiteSpace(survey.AssetHistoryMappingJson)
+            ? null
+            : SurveyJson.Deserialize<MappingDefinition>(survey.AssetHistoryMappingJson);
+        return new SurveyDraft(
+            definition,
+            mapping,
+            survey.DraftRevision,
+            survey.AssetHistorySiteId,
+            assetHistoryMapping);
     }
 
     public async Task<int> SaveAsync(
@@ -593,7 +607,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         SurveyDefinition definition,
         MappingDefinition mapping,
         int expectedRevision,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        long assetHistorySiteId = 0,
+        MappingDefinition? assetHistoryMapping = null)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection
@@ -607,6 +623,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "  [ConfirmationMessageJson] = @ConfirmationMessageJson, "
             + "  [DisplayMode] = @DisplayMode, [ShowProgress] = @ShowProgress, "
             + "  [AllowEditingAfterSubmit] = @AllowEditingAfterSubmit, "
+            + "  [AssetHistorySiteId] = @AssetHistorySiteId, "
+            + "  [AssetHistoryMappingJson] = @AssetHistoryMappingJson, "
             + "  [ThemeJson] = @ThemeJson, [AutoReplyJson] = @AutoReplyJson, "
             + "  [AssetDeliveryJson] = @AssetDeliveryJson, "
             + "  [Title] = @Title, [UpdatedAt] = @Now "
@@ -621,6 +639,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 DisplayMode = (int)definition.DisplayMode,
                 definition.ShowProgress,
                 definition.AllowEditingAfterSubmit,
+                AssetHistorySiteId = Math.Max(0, assetHistorySiteId),
+                AssetHistoryMappingJson = assetHistorySiteId > 0 && assetHistoryMapping is not null
+                    ? SurveyJson.Serialize(assetHistoryMapping)
+                    : null,
                 ThemeJson = WriteTheme(definition.Theme),
                 AutoReplyJson = WriteAutoReply(definition.AutoReply),
                 AssetDeliveryJson = WriteAssetDelivery(definition.AssetDelivery),

@@ -335,7 +335,13 @@ public static class AdminSurveyEndpoints
             try
             {
                 var revision = await drafts.SaveAsync(
-                    surveyId, request.Definition, request.Mapping, request.Revision, cancellationToken)
+                    surveyId,
+                    request.Definition,
+                    request.Mapping,
+                    request.Revision,
+                    cancellationToken,
+                    request.AssetHistorySiteId,
+                    request.AssetHistoryMapping)
                     .ConfigureAwait(false);
 
                 return Results.Ok(new { revision });
@@ -585,7 +591,16 @@ public static class AdminSurveyEndpoints
                 null,
                 PleasanterColumn.IsAttachment,
                 column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
-            return Results.Ok(problems.Select(Describe));
+            var historyProblems = draft.AssetHistorySiteId <= 0
+                ? []
+                : MappingValidator.Validate(
+                    draft.AssetHistoryMapping ?? new MappingDefinition(),
+                    draft.Definition,
+                    null,
+                    PleasanterColumn.IsAttachment,
+                    column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind,
+                    warnUnmappedQuestions: false);
+            return Results.Ok(problems.Concat(historyProblems).Select(Describe));
         });
 
         // ---- テスト公開 ------------------------------------------------------
@@ -646,6 +661,31 @@ public static class AdminSurveyEndpoints
                 PleasanterColumn.IsAttachment,
                 column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
             var blocking = problems.Where(problem => problem.IsBlocking).ToList();
+            if (draft.AssetHistorySiteId > 0)
+            {
+                if (draft.AssetHistorySiteId == beforePublish.PleasanterSiteId)
+                {
+                    blocking.Add(new MappingProblem(
+                        MappingProblemCode.InvalidShape,
+                        Detail: "assetHistorySiteIdMustDiffer"));
+                }
+
+                if (draft.AssetHistoryMapping is null
+                    || draft.AssetHistoryMapping.Assignments.IsDefaultOrEmpty)
+                {
+                    blocking.Add(new MappingProblem(
+                        MappingProblemCode.InvalidShape,
+                        Detail: "assetHistory"));
+                }
+
+                blocking.AddRange(MappingValidator.Validate(
+                    draft.AssetHistoryMapping ?? new MappingDefinition(),
+                    draft.Definition,
+                    null,
+                    PleasanterColumn.IsAttachment,
+                    column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind,
+                    warnUnmappedQuestions: false).Where(problem => problem.IsBlocking));
+            }
             if (blocking.Count > 0)
             {
                 return Results.BadRequest(new
@@ -751,12 +791,14 @@ public static class AdminSurveyEndpoints
 
             try
             {
-                await surveys.PublishAsync(
+                await surveys.PublishWithAssetHistoryAsync(
                     surveyId,
                     draft.Definition.Version,
                     draft.Definition,
                     draft.Mapping,
                     publishedBy,
+                    draft.AssetHistorySiteId,
+                    draft.AssetHistoryMapping,
                     cancellationToken).ConfigureAwait(false);
             }
             catch (InvalidOperationException)
@@ -1416,5 +1458,7 @@ public static class AdminSurveyEndpoints
     public sealed record SaveDraftRequest(
         SurveyDefinition? Definition,
         MappingDefinition? Mapping,
-        int Revision);
+        int Revision,
+        long AssetHistorySiteId = 0,
+        MappingDefinition? AssetHistoryMapping = null);
 }

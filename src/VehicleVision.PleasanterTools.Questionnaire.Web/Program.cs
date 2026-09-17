@@ -160,6 +160,7 @@ builder.Services.AddSingleton<IDbConnectionFactory>(
 builder.Services.AddSingleton<IResponseOutbox, ResponseOutbox>();
 builder.Services.AddSingleton<IResponseTokenStore, ResponseTokenStore>();
 builder.Services.AddSingleton<IAssetTicketStore, AssetTicketStore>();
+builder.Services.AddSingleton<IAssetHistoryOutbox, AssetHistoryOutbox>();
 builder.Services.AddSingleton<ISurveySnapshotStore, SurveySnapshotStore>();
 builder.Services.AddSingleton<ISurveyRepository, SurveyRepository>();
 builder.Services.AddSingleton<IMonitoringStore, MonitoringStore>();
@@ -505,6 +506,8 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddSingleton(ResponseSenderOptions.FromConfiguration(builder.Configuration));
 builder.Services.AddSingleton<ResponseSender>();
 builder.Services.AddHostedService<ResponseSenderHostedService>();
+builder.Services.AddSingleton<AssetHistorySender>();
+builder.Services.AddHostedService<AssetHistorySenderHostedService>();
 
 // **メールの送信ワーカー**（Issue #189）。**既定は無効で、設定したときだけ常駐する。**
 // 回答の送信ワーカーとは別に動く。**メールが詰まっても回答は送られ、

@@ -88,13 +88,23 @@ public sealed record PublishedForm(
     SurveyDefinition Definition,
     bool RequiresProofOfWork,
     bool AllowsDraft = false,
-    bool IsTest = false);
+    bool IsTest = false,
+    bool RecordsAssetHistory = false);
 
 /// <summary>公開版から配る資産と、引換券が必要か。</summary>
-public sealed record PublishedAsset(SurveyAsset Asset, Guid SurveyId, bool RequiresTicket);
+public sealed record PublishedAsset(
+    SurveyAsset Asset,
+    Guid SurveyId,
+    int SurveyVersion,
+    bool RequiresTicket,
+    bool RecordsAssetHistory);
 
 /// <summary>引換券から完了画面を再表示するための公開版。</summary>
-public sealed record AssetTicketForm(Guid SurveyId, SurveyDefinition Definition);
+public sealed record AssetTicketForm(
+    Guid SurveyId,
+    int SurveyVersion,
+    SurveyDefinition Definition,
+    bool RecordsAssetHistory);
 
 /// <summary>回答を受け付けて送信待ちへ入れる。</summary>
 /// <remarks>
@@ -168,7 +178,8 @@ public sealed class ResponseIntake(
                     snapshot.Definition,
                     survey.RequireProofOfWork,
                     survey.AllowDraft,
-                    survey.Status == (int)SurveyStatus.TestPublished),
+                    survey.Status == (int)SurveyStatus.TestPublished,
+                    snapshot.IsAssetHistoryEnabled),
                 null);
     }
 
@@ -270,7 +281,9 @@ public sealed class ResponseIntake(
             : new PublishedAsset(
                 asset,
                 survey.SurveyId,
-                SurveyAssetReferences.RequiresTicket(snapshot.Definition, assetId));
+                survey.PublishedVersion.Value,
+                SurveyAssetReferences.RequiresTicket(snapshot.Definition, assetId),
+                snapshot.IsAssetHistoryEnabled);
     }
 
     /// <summary>受付状態に関係なく、引換券を使える公開版を返す。</summary>
@@ -289,7 +302,13 @@ public sealed class ResponseIntake(
         var snapshot = await snapshots
             .FindAsync(survey.SurveyId, survey.PublishedVersion.Value, cancellationToken)
             .ConfigureAwait(false);
-        return snapshot is null ? null : new AssetTicketForm(survey.SurveyId, snapshot.Definition);
+        return snapshot is null
+            ? null
+            : new AssetTicketForm(
+                survey.SurveyId,
+                survey.PublishedVersion.Value,
+                snapshot.Definition,
+                snapshot.IsAssetHistoryEnabled);
     }
 
     /// <summary>回答を受け付ける。</summary>

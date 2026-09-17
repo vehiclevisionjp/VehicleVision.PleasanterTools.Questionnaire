@@ -27,7 +27,7 @@ public static class AssetTicket
         + $"#{FragmentKey}={Uri.EscapeDataString(token)}";
 
     /// <summary>Cookie が資産へのアクセスを許可するか調べる。</summary>
-    public static async Task<bool> CanAccessAsync(
+    public static async Task<AssetTicketGrant?> ResolveAccessAsync(
         string? cookie,
         string publicId,
         Guid surveyId,
@@ -38,18 +38,33 @@ public static class AssetTicket
     {
         if (string.IsNullOrWhiteSpace(cookie))
         {
-            return false;
+            return null;
         }
 
         // 署名付きの値は DB 引換券と書式で区別し、期限を署名から検証する。
         // 壊れた署名を DB 側へ回すと、方式 A なのに表を引く経路ができてしまう。
         if (cookie.StartsWith(SubmissionGuard.AssetAccessVersion + '.', StringComparison.Ordinal))
         {
-            return guard.CheckAssetAccess(cookie, publicId);
+            var responseToken = guard.ReadAssetAccess(cookie, publicId);
+            return responseToken is null
+                ? null
+                : new AssetTicketGrant(surveyId, responseToken, nowUtc.Add(SubmissionGuard.AssetAccessLifetime));
         }
 
         return await tickets
             .RedeemAsync(HashOf(cookie), surveyId, nowUtc, cancellationToken)
-            .ConfigureAwait(false) is not null;
+            .ConfigureAwait(false);
     }
+
+    public static async Task<bool> CanAccessAsync(
+        string? cookie,
+        string publicId,
+        Guid surveyId,
+        SubmissionGuard guard,
+        IAssetTicketStore tickets,
+        DateTime nowUtc,
+        CancellationToken cancellationToken = default) =>
+        await ResolveAccessAsync(
+            cookie, publicId, surveyId, guard, tickets, nowUtc, cancellationToken)
+            .ConfigureAwait(false) is not null;
 }

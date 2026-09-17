@@ -33,9 +33,17 @@ public enum QuestionPort
     Files,
 }
 
-/// <summary>割り当ての入力 1 つ。</summary>
-/// <param name="QuestionId">設問。</param>
-/// <param name="Port">その設問のどの値を取るか。</param>
+/// <summary>回答ではなく、アプリが持つ出来事の値。</summary>
+public enum MappingSystemValue
+{
+    EventType,
+    OccurredAt,
+    AssetFileName,
+    AssetId,
+    ReferenceId,
+    SurveyTitle,
+}
+
 /// <summary>マッピングの入力 1 つ。</summary>
 /// <param name="QuestionId">どの設問から取るか。</param>
 /// <param name="Port">設問のどの口から取るか。</param>
@@ -52,7 +60,13 @@ public enum QuestionPort
 public sealed record MappingSource(
     string QuestionId,
     QuestionPort Port = QuestionPort.Value,
-    string? RowId = null);
+    string? RowId = null,
+    MappingSystemValue? SystemValue = null)
+{
+    /// <summary>システム値を入力にする。</summary>
+    public static MappingSource System(MappingSystemValue value) =>
+        new(string.Empty, SystemValue: value);
+}
 
 /// <summary>入力を加工する変換。</summary>
 /// <param name="Operation">変換の種別。<see cref="ConverterOperations"/>。</param>

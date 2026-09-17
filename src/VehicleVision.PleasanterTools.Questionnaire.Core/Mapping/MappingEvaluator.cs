@@ -101,7 +101,8 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
 {
     public MappingResult Evaluate(
         MappingDefinition mapping,
-        IReadOnlyCollection<Answer> answers)
+        IReadOnlyCollection<Answer> answers,
+        IReadOnlyDictionary<MappingSystemValue, ImmutableArray<string>>? systemValues = null)
     {
         ArgumentNullException.ThrowIfNull(mapping);
         ArgumentNullException.ThrowIfNull(answers);
@@ -154,6 +155,12 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
             var input = ImmutableArray.CreateBuilder<string>();
             foreach (var source in assignment.Sources)
             {
+                if (source.SystemValue is { } systemValue)
+                {
+                    input.AddRange(systemValues?.GetValueOrDefault(systemValue) ?? []);
+                    continue;
+                }
+
                 answerByQuestion.TryGetValue(source.QuestionId, out var answer);
                 input.AddRange(Read(answer, source.Port, source.RowId));
             }
