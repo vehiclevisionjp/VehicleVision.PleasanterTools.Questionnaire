@@ -49,3 +49,6 @@ tools/pleasanter-testenv/results/
 # （毎回変わるので、取り込むたびに衝突する）
 tools/screenshots/report/
 tools/screenshots/artifacts/
+
+# 手元の検証環境の控え（scripts/Backup-LocalDev.ps1）。**中身は検証環境の実データ**
+backups/
