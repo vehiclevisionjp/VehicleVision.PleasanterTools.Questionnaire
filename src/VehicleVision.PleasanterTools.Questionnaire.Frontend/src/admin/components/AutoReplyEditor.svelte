@@ -314,6 +314,8 @@
       />
     </label>
     <p class="hint">{t('autoReply.fromNameHint')}</p>
+    <!-- **踏むまで気付けない制約なので画面に出す。** ACS は送信ごとの表示名を変えられない -->
+    <p class="hint">{t('autoReply.fromNameAcsNote')}</p>
 
     <label>
       {t('autoReply.replyToAddress')}

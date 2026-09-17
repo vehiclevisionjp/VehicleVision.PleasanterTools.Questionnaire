@@ -793,6 +793,9 @@ export const ja = {
     '迷惑メール判定を避けるため、サーバの全体設定に固定されています。アンケートからは変更できません。',
   'autoReply.fromName': '差出人の表示名',
   'autoReply.fromNameHint': '未設定ならサーバの全体設定を使います。言語ごとに設定できます。',
+  'autoReply.fromNameAcsNote':
+    '送信に Azure Communication Services を使っている場合、表示名はここでは変わりません。'
+    + ' Azure 側の MailFrom アドレスに登録した表示名が使われます。',
   'autoReply.replyToAddress': '返信先（Reply-To）',
   'autoReply.replyToAddressHint': '未設定ならサーバの全体設定を使います。',
   'autoReply.bccAddress': 'BCC',
@@ -1743,6 +1746,9 @@ export const en: Record<MessageKey, string> = {
   'autoReply.fromName': 'From display name',
   'autoReply.fromNameHint':
     'Leave blank to use the server-wide setting. You can set it separately for each language.',
+  'autoReply.fromNameAcsNote':
+    'When sending through Azure Communication Services, this display name has no effect.'
+    + ' The display name registered for the MailFrom address in Azure is used instead.',
   'autoReply.replyToAddress': 'Reply-To',
   'autoReply.replyToAddressHint': 'Leave blank to use the server-wide setting.',
   'autoReply.bccAddress': 'BCC',
