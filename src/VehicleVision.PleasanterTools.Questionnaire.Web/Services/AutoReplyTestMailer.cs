@@ -56,7 +56,10 @@ public sealed class AutoReplyTestMailer(
                 loginId,
                 ServerMessages.Get(ServerMessageKeys.AutoReplyTestSubjectPrefix, language)
                     + preview.Subject,
-                preview.Body);
+                preview.Body,
+                preview.FromName,
+                preview.ReplyToAddress,
+                preview.BccAddress);
             var surveyId = Guid.TryParse(definition.SurveyId, out var parsed)
                 ? parsed
                 : Guid.Empty;

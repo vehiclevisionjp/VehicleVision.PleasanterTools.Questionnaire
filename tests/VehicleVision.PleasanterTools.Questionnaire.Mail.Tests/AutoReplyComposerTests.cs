@@ -113,6 +113,28 @@ public class AutoReplyComposerTests
     }
 
     [Fact]
+    public void アンケートのヘッダ設定を回答者の言語で組み立てる()
+    {
+        var settings = Enabled with
+        {
+            FromName = new LocalizedText(new Dictionary<string, string>
+            {
+                ["ja"] = "日本語窓口",
+                ["en"] = "English desk",
+            }),
+            ReplyToAddress = "reply@example.test",
+            BccAddress = "archive@example.test",
+        };
+
+        var mail = Compose(settings, Payload(Answer("mail", "a@example.test")), "en");
+
+        Assert.NotNull(mail);
+        Assert.Equal("English desk", mail.FromName);
+        Assert.Equal("reply@example.test", mail.ReplyToAddress);
+        Assert.Equal("archive@example.test", mail.BccAddress);
+    }
+
+    [Fact]
     public void 知らない言語は既定の言語へ落とす()
     {
         var mail = Compose(Enabled, Payload(Answer("mail", "a@example.test")), "fr");

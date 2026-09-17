@@ -788,6 +788,19 @@ export const ja = {
   'autoReply.needsEmailQuestion':
     'メールアドレスの欄があるアンケートでだけ設定できます。記述式（1 行）の設問を足し、入力の形式を「メールアドレス」にしてください。',
   'autoReply.subject': '件名',
+  'autoReply.fromAddress': '差出人アドレス',
+  'autoReply.fromAddressHint':
+    '迷惑メール判定を避けるため、サーバの全体設定に固定されています。アンケートからは変更できません。',
+  'autoReply.fromName': '差出人の表示名',
+  'autoReply.fromNameHint': '未設定ならサーバの全体設定を使います。言語ごとに設定できます。',
+  'autoReply.fromNameAcsNote':
+    '送信に Azure Communication Services を使っている場合、表示名はここでは変わりません。'
+    + ' Azure 側の MailFrom アドレスに登録した表示名が使われます。',
+  'autoReply.replyToAddress': '返信先（Reply-To）',
+  'autoReply.replyToAddressHint': '未設定ならサーバの全体設定を使います。',
+  'autoReply.bccAddress': 'BCC',
+  'autoReply.bccWarning':
+    '注意: 回答者のメールアドレスが BCC の受取人に見えます。本文に {{answers}} があれば回答内容もそのまま届き、回答 1 件につき 1 通送られます。',
   'autoReply.body': '本文',
   'autoReply.bodyHint': '書式は付けられません。文字だけが送られます。',
   'autoReply.placeholders':
@@ -826,8 +839,16 @@ export const ja = {
   'autoReply.problem.ToQuestionNotEmail': '宛先にする設問が、メールアドレス形式ではありません。',
   'autoReply.problem.SubjectMissing': '件名が空です。',
   'autoReply.problem.BodyMissing': '本文が空です。',
+  'autoReply.problem.FromNameInvalid': '差出人の表示名に改行は使えません。',
+  'autoReply.problem.ReplyToInvalid': '返信先を正しいメールアドレスで入力してください。改行は使えません。',
+  'autoReply.problem.BccInvalid': 'BCC を正しいメールアドレスで入力してください。改行は使えません。',
   'autoReply.publishBlocked': '公開できません。自動返信メールの設定を直してください。',
   'autoReply.preview': '届くメールのプレビュー',
+  'autoReply.previewFrom': 'From',
+  'autoReply.previewReplyTo': 'Reply-To',
+  'autoReply.previewBcc': 'BCC',
+  'autoReply.previewTo': '宛先',
+  'autoReply.previewNone': 'なし',
   'autoReply.previewSubject': '件名',
   'autoReply.previewBody': '本文（平文）',
   'autoReply.unknownKeywords':
@@ -1719,6 +1740,20 @@ export const en: Record<MessageKey, string> = {
   'autoReply.needsEmailQuestion':
     'Available only when the form asks for an email address. Add a short answer question and set its input format to email address.',
   'autoReply.subject': 'Subject',
+  'autoReply.fromAddress': 'From address',
+  'autoReply.fromAddressHint':
+    'To protect mail authentication and deliverability, this address is fixed by the server-wide setting and cannot be changed per survey.',
+  'autoReply.fromName': 'From display name',
+  'autoReply.fromNameHint':
+    'Leave blank to use the server-wide setting. You can set it separately for each language.',
+  'autoReply.fromNameAcsNote':
+    'When sending through Azure Communication Services, this display name has no effect.'
+    + ' The display name registered for the MailFrom address in Azure is used instead.',
+  'autoReply.replyToAddress': 'Reply-To',
+  'autoReply.replyToAddressHint': 'Leave blank to use the server-wide setting.',
+  'autoReply.bccAddress': 'BCC',
+  'autoReply.bccWarning':
+    'Warning: The BCC recipient can see the respondent’s email address. If the body contains {{answers}}, the full answers are also delivered. One message is sent for every response.',
   'autoReply.body': 'Body',
   'autoReply.bodyHint': 'No formatting. Plain text only.',
   'autoReply.placeholders':
@@ -1757,8 +1792,17 @@ export const en: Record<MessageKey, string> = {
   'autoReply.problem.ToQuestionNotEmail': 'The selected question is not validated as an email address.',
   'autoReply.problem.SubjectMissing': 'The subject is empty.',
   'autoReply.problem.BodyMissing': 'The body is empty.',
+  'autoReply.problem.FromNameInvalid': 'The From display name cannot contain a line break.',
+  'autoReply.problem.ReplyToInvalid':
+    'Enter a valid Reply-To email address. Line breaks are not allowed.',
+  'autoReply.problem.BccInvalid': 'Enter a valid BCC email address. Line breaks are not allowed.',
   'autoReply.publishBlocked': 'Cannot publish. Fix the auto-reply settings first.',
   'autoReply.preview': 'Mail preview',
+  'autoReply.previewFrom': 'From',
+  'autoReply.previewReplyTo': 'Reply-To',
+  'autoReply.previewBcc': 'BCC',
+  'autoReply.previewTo': 'To',
+  'autoReply.previewNone': 'None',
   'autoReply.previewSubject': 'Subject',
   'autoReply.previewBody': 'Body (plain text)',
   'autoReply.unknownKeywords':

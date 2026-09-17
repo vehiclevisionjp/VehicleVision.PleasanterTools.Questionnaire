@@ -299,6 +299,45 @@
     </label>
 
     <label>
+      {t('autoReply.fromAddress')}
+      <input type="text" value={preview?.fromAddress ?? ''} readonly />
+    </label>
+    <p class="hint">{t('autoReply.fromAddressHint')}</p>
+
+    <label>
+      {t('autoReply.fromName')}
+      <input
+        type="text"
+        value={text(autoReply?.fromName, editing)}
+        oninput={(event) =>
+          update({ fromName: withText(autoReply?.fromName, event.currentTarget.value, editing) })}
+      />
+    </label>
+    <p class="hint">{t('autoReply.fromNameHint')}</p>
+    <!-- **踏むまで気付けない制約なので画面に出す。** ACS は送信ごとの表示名を変えられない -->
+    <p class="hint">{t('autoReply.fromNameAcsNote')}</p>
+
+    <label>
+      {t('autoReply.replyToAddress')}
+      <input
+        type="email"
+        value={autoReply?.replyToAddress ?? ''}
+        oninput={(event) => update({ replyToAddress: event.currentTarget.value || null })}
+      />
+    </label>
+    <p class="hint">{t('autoReply.replyToAddressHint')}</p>
+
+    <label>
+      {t('autoReply.bccAddress')}
+      <input
+        type="email"
+        value={autoReply?.bccAddress ?? ''}
+        oninput={(event) => update({ bccAddress: event.currentTarget.value || null })}
+      />
+    </label>
+    <p class="warning">{t('autoReply.bccWarning')}</p>
+
+    <label>
       {t('autoReply.body')}
       <textarea
         bind:this={bodyInput}
@@ -357,6 +396,14 @@
             })}
           </p>
         {/if}
+        <p class="preview-label">{t('autoReply.previewFrom')}</p>
+        <pre>{preview.fromName ? `${preview.fromName} <${preview.fromAddress}>` : preview.fromAddress}</pre>
+        <p class="preview-label">{t('autoReply.previewReplyTo')}</p>
+        <pre>{preview.replyToAddress ?? t('autoReply.previewNone')}</pre>
+        <p class="preview-label">{t('autoReply.previewBcc')}</p>
+        <pre>{preview.bccAddress ?? t('autoReply.previewNone')}</pre>
+        <p class="preview-label">{t('autoReply.previewTo')}</p>
+        <pre>{preview.toAddress}</pre>
         <p class="preview-label">{t('autoReply.previewSubject')}</p>
         <pre>{preview.subject}</pre>
         <p class="preview-label">{t('autoReply.previewBody')}</p>
@@ -413,6 +460,7 @@
   }
 
   input[type='text'],
+  input[type='email'],
   textarea,
   select {
     display: block;

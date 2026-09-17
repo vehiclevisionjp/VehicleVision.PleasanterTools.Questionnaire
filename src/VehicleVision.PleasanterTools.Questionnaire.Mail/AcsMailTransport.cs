@@ -62,14 +62,27 @@ public sealed class AcsMailTransport : IMailTransport
 
         try
         {
+            var headers = MailMessageFactory.ResolveHeaders(_options, mail);
+            MailMessageFactory.ValidateHeaders(headers);
+            var recipients = new EmailRecipients([new EmailAddress(headers.ToAddress)]);
+            if (headers.BccAddress is not null)
+            {
+                recipients.BCC.Add(new EmailAddress(headers.BccAddress));
+            }
+
+            var message = new EmailMessage(
+                headers.FromAddress,
+                recipients,
+                new EmailContent(mail.Subject) { PlainText = mail.Body });
+            if (headers.ReplyToAddress is not null)
+            {
+                message.ReplyTo.Add(new EmailAddress(headers.ReplyToAddress));
+            }
+
             // **待たない**（WaitUntil.Started）。受け付けられた時点で送れたとする
             await _client.SendAsync(
                 WaitUntil.Started,
-                _options.FromAddress,
-                mail.ToAddress,
-                mail.Subject,
-                htmlContent: null,
-                plainTextContent: mail.Body,
+                message,
                 cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("メールを 1 通送った（Azure Communication Services）");

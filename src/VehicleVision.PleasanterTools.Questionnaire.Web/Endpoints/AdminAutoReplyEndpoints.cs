@@ -12,6 +12,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 public sealed record AutoReplyPreviewRequest(SurveyDefinition Definition, string? Language);
 
 public sealed record AutoReplyPreviewResponse(
+    string FromAddress,
+    string? FromName,
+    string ToAddress,
+    string? ReplyToAddress,
+    string? BccAddress,
     string Subject,
     string Body,
     ImmutableArray<string> UnknownKeywords);
@@ -149,7 +154,14 @@ public static class AdminAutoReplyEndpoints
             displayNow,
             values);
 
+        var composed = mail ?? new OutgoingMail(PreviewAddress, string.Empty, string.Empty);
+        var headers = MailMessageFactory.ResolveHeaders(options, composed);
         return new AutoReplyPreviewResponse(
+            headers.FromAddress,
+            headers.FromName,
+            headers.ToAddress,
+            headers.ReplyToAddress,
+            headers.BccAddress,
             mail?.Subject ?? string.Empty,
             mail?.Body ?? string.Empty,
             unknown);

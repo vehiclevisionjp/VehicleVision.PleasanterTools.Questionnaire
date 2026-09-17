@@ -50,6 +50,15 @@ export function validateAutoReply(definition: SurveyDefinition): AutoReplyProble
 
   if (isBlank(settings.subject)) problems.push({ code: 'SubjectMissing' });
   if (isBlank(settings.body)) problems.push({ code: 'BodyMissing' });
+  if (localizedContainsNewLine(settings.fromName)) {
+    problems.push({ code: 'FromNameInvalid' });
+  }
+  if (!isOptionalEmail(settings.replyToAddress)) {
+    problems.push({ code: 'ReplyToInvalid' });
+  }
+  if (!isOptionalEmail(settings.bccAddress)) {
+    problems.push({ code: 'BccInvalid' });
+  }
 
   const usesEditLink =
     usesKeyword(settings, 'editUrl') || usesKeyword(settings, 'editUrlExpiresAt');
@@ -114,4 +123,16 @@ function hasTicketedAssets(definition: SurveyDefinition): boolean {
 function isBlank(value: Record<string, string> | undefined): boolean {
   if (!value) return true;
   return Object.values(value).every((text) => text.trim() === '');
+}
+
+function localizedContainsNewLine(value: Record<string, string> | undefined): boolean {
+  return value ? Object.values(value).some((text) => /[\r\n]/.test(text)) : false;
+}
+
+function isOptionalEmail(value: string | null | undefined): boolean {
+  if (!value?.trim()) return true;
+  const normalized = value.trim();
+  if (/[\r\n ]/.test(normalized)) return false;
+  const at = normalized.indexOf('@');
+  return at > 0 && at < normalized.length - 1;
 }

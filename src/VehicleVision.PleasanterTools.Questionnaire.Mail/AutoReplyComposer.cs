@@ -67,7 +67,13 @@ public static class AutoReplyComposer
         var body = MailPlaceholders.Fill(
             settings.Body?.Get(language) ?? string.Empty, title, filledAt, values);
 
-        return new OutgoingMail(toAddress.Trim(), subject, body);
+        return new OutgoingMail(
+            toAddress.Trim(),
+            subject,
+            body,
+            settings.FromName?.Get(language),
+            settings.ReplyToAddress?.Trim(),
+            settings.BccAddress?.Trim());
     }
 
     /// <summary>設定された設問から宛先を得る。**送れないなら <c>null</c>。**</summary>

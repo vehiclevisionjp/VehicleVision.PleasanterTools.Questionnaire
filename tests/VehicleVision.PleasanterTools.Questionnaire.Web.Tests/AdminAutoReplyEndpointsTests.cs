@@ -140,6 +140,38 @@ public class AdminAutoReplyEndpointsTests
     }
 
     [Fact]
+    public void 実際に届くヘッダを全体設定へのフォールバック込みで返す()
+    {
+        var definition = Definition("本文") with
+        {
+            AutoReply = Definition("本文").AutoReply! with
+            {
+                FromName = LocalizedText.Japanese("満足度調査事務局"),
+                BccAddress = "archive@example.test",
+            },
+        };
+        var options = new MailOptions
+        {
+            FromAddress = "noreply@example.test",
+            FromName = "全体の名前",
+            ReplyToAddress = "default-reply@example.test",
+        };
+
+        var preview = AdminAutoReplyEndpoints.Preview(
+            definition,
+            "ja",
+            options,
+            Pleasanter,
+            Now);
+
+        Assert.Equal("noreply@example.test", preview.FromAddress);
+        Assert.Equal("満足度調査事務局", preview.FromName);
+        Assert.Equal("preview@example.invalid", preview.ToAddress);
+        Assert.Equal("default-reply@example.test", preview.ReplyToAddress);
+        Assert.Equal("archive@example.test", preview.BccAddress);
+    }
+
+    [Fact]
     public void メールで配る資産があればリンクをプレビューする()
     {
         var definition = Definition("{{assetsUrl}}\n{{assetsUrlExpiresAt}}") with
