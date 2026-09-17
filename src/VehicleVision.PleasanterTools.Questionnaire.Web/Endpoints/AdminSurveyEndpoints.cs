@@ -104,6 +104,7 @@ public static class AdminSurveyEndpoints
             CreateSurveyRequest request,
             HttpContext context,
             ISurveyRepository surveys,
+            PleasanterApiClient pleasanter,
             CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.Title))
@@ -115,7 +116,26 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            if (request.PleasanterSiteId <= 0)
+            var pleasanterSiteId = request.PleasanterSiteId;
+            if (request.CreatePleasanterSite)
+            {
+                var created = await pleasanter.CreateSiteAsync(
+                    request.ParentPleasanterSiteId,
+                    new Dictionary<string, object?>
+                    {
+                        ["Title"] = request.Title.Trim(),
+                        ["ReferenceType"] = "Results",
+                        ["SiteSettings"] = new JsonObject(),
+                    },
+                    cancellationToken).ConfigureAwait(false);
+                if (!created.IsSuccess || created.Id is not { } createdSiteId)
+                {
+                    return PleasanterFailure(created, context);
+                }
+
+                pleasanterSiteId = createdSiteId;
+            }
+            else if (pleasanterSiteId <= 0)
             {
                 return Results.BadRequest(new
                 {
@@ -129,7 +149,7 @@ public static class AdminSurveyEndpoints
                 surveyId,
                 SurveyPublicId.Generate(),
                 request.Title.Trim(),
-                request.PleasanterSiteId,
+                pleasanterSiteId,
                 request.ResponseJsonColumn,
                 (int)SurveyStatus.Draft,
                 PublishedVersion: null);
@@ -261,6 +281,139 @@ public static class AdminSurveyEndpoints
                 ? new ColumnAvailabilityResponse("standard", new Dictionary<string, int>())
                 : new ColumnAvailabilityResponse("site", availableByPrefix));
         });
+
+        // ---- マッピング先サイトの同期 ---------------------------------------
+        group.MapPost("/{surveyId:guid}/site-settings/preview", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            ISurveyDraftStore drafts,
+            PleasanterApiClient pleasanter,
+            CancellationToken cancellationToken) =>
+        {
+            var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (survey is null || await drafts.LoadAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false) is not { } draft)
+            {
+                return Results.NotFound();
+            }
+
+            if (survey.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
+            var current = await pleasanter.GetSiteAsync(survey.PleasanterSiteId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!current.IsSuccess || current.Body is null)
+            {
+                return PleasanterFailure(current, context);
+            }
+
+            try
+            {
+                var plan = SiteSettingsSynchronizer.Build(current.Body, draft.Mapping);
+                return Results.Ok(new
+                {
+                    plan.AddedColumns,
+                    plan.GridColumns,
+                    plan.EditorColumns,
+                    plan.HistoryColumns,
+                    plan.Unchanged,
+                });
+            }
+            catch (InvalidOperationException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+        }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
+
+        group.MapPost("/{surveyId:guid}/site-settings/sync", async (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyRepository surveys,
+            ISurveyDraftStore drafts,
+            PleasanterApiClient pleasanter,
+            CancellationToken cancellationToken) =>
+        {
+            var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (survey is null || await drafts.LoadAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false) is not { } draft)
+            {
+                return Results.NotFound();
+            }
+
+            if (survey.ArchivedAt is not null)
+            {
+                return ArchivedSurvey(context);
+            }
+
+            var current = await pleasanter.GetSiteAsync(survey.PleasanterSiteId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!current.IsSuccess || current.Body is null)
+            {
+                return PleasanterFailure(current, context);
+            }
+
+            SiteSettingsSyncPlan plan;
+            try
+            {
+                plan = SiteSettingsSynchronizer.Build(current.Body, draft.Mapping);
+            }
+            catch (InvalidOperationException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+
+            var updated = await pleasanter.UpdateSiteAsync(
+                survey.PleasanterSiteId,
+                new Dictionary<string, object?> { ["SiteSettings"] = plan.SiteSettings },
+                cancellationToken).ConfigureAwait(false);
+            if (!updated.IsSuccess)
+            {
+                return PleasanterFailure(updated, context);
+            }
+
+            var after = await pleasanter.GetSiteAsync(survey.PleasanterSiteId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!after.IsSuccess || after.Body is null)
+            {
+                return PleasanterFailure(after, context);
+            }
+
+            // ⚠️ **GetSite は Links を返さない**（実機で確認）。読み直しても成立は分からない。
+            // Pleasanter の SetLinks は**相手サイトを引けるときだけ**リンクを作り、
+            // **できなければ黙って捨てる**ので、その条件そのものを確かめる
+            var linkedSiteIds = SiteSettingsSynchronizer.LinkedSiteIds(
+                after.Body,
+                draft.Mapping.Assignments.Select(assignment => assignment.TargetColumn));
+            var unreachable = new List<long>();
+            foreach (var linkedSiteId in linkedSiteIds)
+            {
+                var linked = await pleasanter.GetSiteAsync(linkedSiteId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (!linked.IsSuccess)
+                {
+                    unreachable.Add(linkedSiteId);
+                }
+            }
+
+            if (unreachable.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "リンク先のサイトを引けませんでした。"
+                        + "相手サイト ID か、API キーの利用者の権限を確認してください。",
+                    unreachableSiteIds = unreachable,
+                });
+            }
+
+            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+            AuditNotes.Add(context, "pleasanterSiteId", survey.PleasanterSiteId.ToString(CultureInfo.InvariantCulture));
+            return Results.Ok(new { synchronized = true });
+        }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
         // ---- 下書きを保存する ------------------------------------------------
         group.MapPut("/{surveyId:guid}", async (
@@ -1250,6 +1403,16 @@ public static class AdminSurveyEndpoints
                 ServerMessageKeys.SurveyArchived, RequestLanguage.Of(context)),
         });
 
+    private static IResult PleasanterFailure(PleasanterResponse response, HttpContext context) =>
+        Results.Json(
+            new
+            {
+                message = string.IsNullOrWhiteSpace(response.Message)
+                    ? "Pleasanter でサイトを作成または更新できませんでした。権限と設定を確認してください。"
+                    : response.Message,
+            },
+            statusCode: response.StatusCode ?? StatusCodes.Status502BadGateway);
+
     /// <summary>停止と再開。**理由を必ず書き換える。**</summary>
     /// <remarks>
     /// **手で止めたのか、上限で自動停止したのかを残す**
@@ -1414,7 +1577,9 @@ public static class AdminSurveyEndpoints
     public sealed record CreateSurveyRequest(
         string? Title,
         long PleasanterSiteId,
-        string? ResponseJsonColumn);
+        string? ResponseJsonColumn,
+        bool CreatePleasanterSite = false,
+        long ParentPleasanterSiteId = 0);
 
     /// <summary>アンケートを複製する（Issue #46）。</summary>
     /// <param name="PleasanterSiteId">

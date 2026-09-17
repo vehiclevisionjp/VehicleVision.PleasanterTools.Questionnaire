@@ -102,6 +102,24 @@ public sealed class PleasanterApiClient(HttpClient httpClient, PleasanterOptions
         CancellationToken cancellationToken = default)
         => PostAsync($"api/items/{siteId}/GetSite", new Dictionary<string, object?>(), cancellationToken);
 
+    /// <summary>マッピング先にするサイトを作成する。</summary>
+    public Task<PleasanterResponse> CreateSiteAsync(
+        long parentSiteId,
+        IReadOnlyDictionary<string, object?> site,
+        CancellationToken cancellationToken = default)
+        => PostAsync($"api/items/{parentSiteId}/CreateSite", site, cancellationToken);
+
+    /// <summary>サイト設定を丸ごと更新する。</summary>
+    /// <remarks>
+    /// <c>UpdateSite</c> は差分更新ではない。呼び出し側は必ず <c>GetSite</c> の
+    /// <c>SiteSettings</c> を読み、必要な列だけを変更して渡す。
+    /// </remarks>
+    public Task<PleasanterResponse> UpdateSiteAsync(
+        long siteId,
+        IReadOnlyDictionary<string, object?> site,
+        CancellationToken cancellationToken = default)
+        => PostAsync($"api/items/{siteId}/UpdateSite", site, cancellationToken);
+
     /// <summary>回答トークンで既存レコードを探す。応答不明の <c>Create</c> の照合に使う。</summary>
     /// <remarks>
     /// **回答の正本 JSON にトークンを埋めておき、部分一致で引く**

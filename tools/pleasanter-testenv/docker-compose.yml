@@ -56,8 +56,8 @@ services:
     restart: "no"
 
   pleasanter:
-    # サブモジュール _reference/Implem.Pleasanter の固定位置（Pleasanter_1.5.7.0）に合わせる
-    image: implem/pleasanter:1.5.7.0
+    # サブモジュール _reference/Implem.Pleasanter の固定位置（Pleasanter_1.5.8.1）に合わせる
+    image: implem/pleasanter:1.5.8.1
     depends_on:
       codedefiner:
         condition: service_completed_successfully
