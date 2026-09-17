@@ -93,6 +93,9 @@ public class AdminInvitationMailerTests
 
         var mail = Single(outbox);
         Assert.Equal("hito@example.jp", mail.ToAddress);
+        Assert.Null(mail.FromName);
+        Assert.Null(mail.ReplyToAddress);
+        Assert.Null(mail.BccAddress);
         Assert.Equal((int)MailKind.AdminInvitation, outbox.Enqueued.Single().Kind);
     }
 

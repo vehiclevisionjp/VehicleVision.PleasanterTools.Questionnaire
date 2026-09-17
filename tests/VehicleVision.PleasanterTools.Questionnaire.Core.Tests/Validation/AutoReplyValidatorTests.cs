@@ -128,6 +128,49 @@ public class AutoReplyValidatorTests
     }
 
     [Fact]
+    public void 差出人の表示名のどの言語にも改行を許さない()
+    {
+        var settings = Valid with
+        {
+            FromName = new LocalizedText(new Dictionary<string, string>
+            {
+                ["ja"] = "事務局",
+                ["en"] = "Desk\r\nBcc: injected@example.test",
+            }),
+        };
+
+        Assert.Equal(
+            [AutoReplyProblemCode.FromNameInvalid],
+            Codes(AutoReplyValidator.Validate(Definition(settings, Email()))));
+    }
+
+    [Theory]
+    [InlineData("not-an-address", AutoReplyProblemCode.ReplyToInvalid)]
+    [InlineData("reply@example.test\r\nBcc: injected@example.test", AutoReplyProblemCode.ReplyToInvalid)]
+    [InlineData("not-an-address", AutoReplyProblemCode.BccInvalid)]
+    [InlineData("bcc@example.test\r\nTo: injected@example.test", AutoReplyProblemCode.BccInvalid)]
+    public void 返信先とBCCはメールアドレスとして読めて改行が無い値だけ通す(
+        string address,
+        AutoReplyProblemCode expected)
+    {
+        var settings = expected is AutoReplyProblemCode.ReplyToInvalid
+            ? Valid with { ReplyToAddress = address }
+            : Valid with { BccAddress = address };
+
+        Assert.Equal(
+            [expected],
+            Codes(AutoReplyValidator.Validate(Definition(settings, Email()))));
+    }
+
+    [Fact]
+    public void 返信先とBCCが未設定なら通る()
+    {
+        var settings = Valid with { ReplyToAddress = " ", BccAddress = null };
+
+        Assert.Empty(AutoReplyValidator.Validate(Definition(settings, Email())));
+    }
+
+    [Fact]
     public void 不備は溜めて返す()
     {
         // **1 つ直しては公開し直す、を繰り返させない**

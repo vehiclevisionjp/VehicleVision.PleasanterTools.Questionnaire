@@ -58,6 +58,74 @@ public class MailMessageFactoryTests
     }
 
     [Fact]
+    public void 完了メールのヘッダ指定は全体設定より優先する()
+    {
+        var message = MailMessageFactory.Build(
+            Options with { ReplyToAddress = "default@example.test" },
+            Sample() with
+            {
+                FromName = "満足度調査事務局",
+                ReplyToAddress = "survey@example.test",
+                BccAddress = "archive@example.test",
+            });
+
+        var from = Assert.IsType<MailboxAddress>(message.From.Single());
+        Assert.Equal("noreply@example.test", from.Address);
+        Assert.Equal("満足度調査事務局", from.Name);
+        Assert.Equal(
+            "survey@example.test",
+            Assert.IsType<MailboxAddress>(message.ReplyTo.Single()).Address);
+        Assert.Equal(
+            "archive@example.test",
+            Assert.IsType<MailboxAddress>(message.Bcc.Single()).Address);
+    }
+
+    [Fact]
+    public void 未設定のヘッダは全体設定へ戻りBCCは付けない()
+    {
+        var message = MailMessageFactory.Build(
+            Options with { ReplyToAddress = "default@example.test" },
+            Sample());
+
+        Assert.Equal("アンケート", Assert.IsType<MailboxAddress>(message.From.Single()).Name);
+        Assert.Equal(
+            "default@example.test",
+            Assert.IsType<MailboxAddress>(message.ReplyTo.Single()).Address);
+        Assert.Empty(message.Bcc);
+    }
+
+    [Theory]
+    [InlineData("FromName")]
+    [InlineData("ReplyToAddress")]
+    [InlineData("BccAddress")]
+    public void 利用者が指定するヘッダの改行は弾く(string property)
+    {
+        var mail = property switch
+        {
+            "FromName" => Sample() with { FromName = "事務局\r\nBcc: injected@example.test" },
+            "ReplyToAddress" => Sample() with
+            {
+                ReplyToAddress = "reply@example.test\r\nBcc: injected@example.test",
+            },
+            _ => Sample() with { BccAddress = "bcc@example.test\r\nTo: injected@example.test" },
+        };
+
+        Assert.Throws<ArgumentException>(() => Build(mail));
+    }
+
+    [Theory]
+    [InlineData("ReplyToAddress")]
+    [InlineData("BccAddress")]
+    public void 返信先とBCCの形が壊れていれば恒久の失敗にする(string property)
+    {
+        var mail = property == "ReplyToAddress"
+            ? Sample() with { ReplyToAddress = "返信先ではない" }
+            : Sample() with { BccAddress = "BCCではない" };
+
+        Assert.False(Assert.Throws<MailDeliveryException>(() => Build(mail)).IsTransient);
+    }
+
+    [Fact]
     public void 件名の改行は弾く()
     {
         // **ヘッダを 1 本増やされない**（メールヘッダインジェクション）

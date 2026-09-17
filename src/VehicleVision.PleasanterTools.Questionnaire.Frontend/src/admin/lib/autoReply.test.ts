@@ -92,6 +92,25 @@ describe('validateAutoReply', () => {
     const settings = { ...valid, subject: { en: 'Thank you' }, body: { en: 'Received.' } };
     expect(codes(definition(settings, email))).toEqual([]);
   });
+
+  it('差出人の表示名の改行を止める', () => {
+    const settings = { ...valid, fromName: { ja: '事務局\r\nBcc: injected@example.test' } };
+    expect(codes(definition(settings, email))).toEqual(['FromNameInvalid']);
+  });
+
+  it('返信先とBCCの不正な値を止める', () => {
+    const settings = {
+      ...valid,
+      replyToAddress: 'not-an-address',
+      bccAddress: 'bcc@example.test\r\nTo: injected@example.test',
+    };
+    expect(codes(definition(settings, email))).toEqual(['ReplyToInvalid', 'BccInvalid']);
+  });
+
+  it('返信先とBCCが未設定なら通る', () => {
+    const settings = { ...valid, replyToAddress: null, bccAddress: '' };
+    expect(codes(definition(settings, email))).toEqual([]);
+  });
 });
 
 describe('再編集リンク（Issue #202）', () => {

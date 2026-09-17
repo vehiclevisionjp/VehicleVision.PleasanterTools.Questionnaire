@@ -81,6 +81,9 @@ public class AutoReplyTestMailerTests
             ToQuestionId = "mail",
             Subject = LocalizedText.Japanese("{{title}} の受付"),
             Body = LocalizedText.Japanese("{{submittedAt}}\n{{answers}}\n{{formUrl}}"),
+            FromName = LocalizedText.Japanese("満足度調査事務局"),
+            ReplyToAddress = "reply@example.test",
+            BccAddress = "archive@example.test",
         },
         Pages =
         [
@@ -170,5 +173,8 @@ public class AutoReplyTestMailerTests
         Assert.Contains("満足度調査", protector.Protected.Subject, StringComparison.Ordinal);
         Assert.Contains("2026-09-17 00:00", protector.Protected.Body, StringComparison.Ordinal);
         Assert.Contains("https://survey.example.test/f/preview", protector.Protected.Body, StringComparison.Ordinal);
+        Assert.Equal("満足度調査事務局", protector.Protected.FromName);
+        Assert.Equal("reply@example.test", protector.Protected.ReplyToAddress);
+        Assert.Equal("archive@example.test", protector.Protected.BccAddress);
     }
 }

@@ -38,6 +38,19 @@ public sealed record AutoReplySettings
     /// </remarks>
     public LocalizedText? Body { get; init; }
 
+    /// <summary>差出人の表示名。**アドレスは全体設定から変えない。**</summary>
+    public LocalizedText? FromName { get; init; }
+
+    /// <summary>返信先。**未設定なら全体設定を使う。**</summary>
+    public string? ReplyToAddress { get; init; }
+
+    /// <summary>BCC。**未設定なら付けない。**</summary>
+    /// <remarks>
+    /// 回答者の宛先と、本文へ差し込んだ回答の写しがこの宛先へ届く。
+    /// **完全匿名の回答から個人を指す値が外へ出る設定**なので、既定は無効。
+    /// </remarks>
+    public string? BccAddress { get; init; }
+
     /// <summary>再編集リンクの有効日数。**既定は 7 日。**</summary>
     /// <remarks>
     /// **受付期間の終了を超えない。受付を止めたら即失効する**（送る側・引き換える側で担保）。

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Net.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Validation;
@@ -23,6 +24,15 @@ public enum AutoReplyProblemCode
 
     /// <summary>本文が空。</summary>
     BodyMissing,
+
+    /// <summary>差出人の表示名に改行が含まれる。</summary>
+    FromNameInvalid,
+
+    /// <summary>返信先がメールアドレスとして読めないか、改行を含む。</summary>
+    ReplyToInvalid,
+
+    /// <summary>BCC がメールアドレスとして読めないか、改行を含む。</summary>
+    BccInvalid,
 
     /// <summary>再編集リンクの有効日数が範囲外（Issue #202）。</summary>
     EditLinkDaysInvalid,
@@ -97,6 +107,21 @@ public static class AutoReplyValidator
             problems.Add(new AutoReplyProblem(AutoReplyProblemCode.BodyMissing));
         }
 
+        if (ContainsNewLine(settings.FromName))
+        {
+            problems.Add(new AutoReplyProblem(AutoReplyProblemCode.FromNameInvalid));
+        }
+
+        if (!IsOptionalAddress(settings.ReplyToAddress))
+        {
+            problems.Add(new AutoReplyProblem(AutoReplyProblemCode.ReplyToInvalid));
+        }
+
+        if (!IsOptionalAddress(settings.BccAddress))
+        {
+            problems.Add(new AutoReplyProblem(AutoReplyProblemCode.BccInvalid));
+        }
+
         var usesEditLink =
             AutoReplyKeywords.Contains(settings, AutoReplyKeywords.EditUrl)
             || AutoReplyKeywords.Contains(settings, AutoReplyKeywords.EditUrlExpiresAt);
@@ -150,4 +175,12 @@ public static class AutoReplyValidator
         text is null
         || text.Languages.Count == 0
         || text.Languages.All(language => string.IsNullOrWhiteSpace(text.Get(language)));
+
+    private static bool ContainsNewLine(LocalizedText? text) =>
+        text is not null
+        && text.Languages.Any(language => text.Get(language).AsSpan().ContainsAny('\r', '\n'));
+
+    private static bool IsOptionalAddress(string? address) =>
+        string.IsNullOrWhiteSpace(address)
+        || (!address.AsSpan().ContainsAny('\r', '\n') && MailAddress.TryCreate(address, out _));
 }

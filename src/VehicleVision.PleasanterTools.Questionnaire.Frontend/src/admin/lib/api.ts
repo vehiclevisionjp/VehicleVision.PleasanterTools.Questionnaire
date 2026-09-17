@@ -641,6 +641,11 @@ export const previewNotes = (markups: (string | null)[]) =>
   });
 
 export interface AutoReplyPreview {
+  fromAddress: string;
+  fromName: string | null;
+  toAddress: string;
+  replyToAddress: string | null;
+  bccAddress: string | null;
   subject: string;
   body: string;
   unknownKeywords: string[];

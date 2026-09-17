@@ -339,6 +339,12 @@ export interface AutoReplySettings {
   subject?: LocalizedText;
   /** 本文。**平文。** 書式は持たない。 */
   body?: LocalizedText;
+  /** 差出人の表示名。**アドレスはサーバの全体設定から変えない。** */
+  fromName?: LocalizedText;
+  /** 返信先。未設定ならサーバの全体設定を使う。 */
+  replyToAddress?: string | null;
+  /** BCC。未設定なら付けない。 */
+  bccAddress?: string | null;
   /** 再編集リンクの有効日数。**既定 7 日。** 受付期間の終了は超えない。 */
   editLinkDays?: number;
 }
