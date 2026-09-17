@@ -252,9 +252,7 @@ public class PleasanterApiClientTests
 
         var after = await client.GetSiteAsync(created.Id.Value);
         Assert.True(after.IsSuccess, $"更新後のサイト設定取得に失敗した: {after.StatusCode} {after.Message}");
-        Assert.True(
-            SiteSettingsSynchronizer.MissingLinks(after.Body!, ["ClassA"]).Count == 0,
-            after.Body!.ToJsonString());
+        Assert.Equal(["ClassA"], SiteSettingsSynchronizer.MissingLinks(after.Body!, ["ClassA"]));
         Assert.Equal(
             "対象外",
             after.Body!["Response"]!["Data"]!["SiteSettings"]!["Columns"]![0]!["LabelText"]!.GetValue<string>());

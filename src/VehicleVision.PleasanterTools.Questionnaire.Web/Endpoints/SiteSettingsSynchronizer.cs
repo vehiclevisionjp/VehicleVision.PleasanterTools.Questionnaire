@@ -143,8 +143,7 @@ public static class SiteSettingsSynchronizer
             .ToArray();
 
     private static bool HasLinkChoice(JsonObject column) =>
-        column["ControlType"]?.GetValue<string>() is "ChoicesText"
-        && column["ChoicesText"]?.GetValue<string>() is { } choicesText
+        column["ChoicesText"]?.GetValue<string>() is { } choicesText
         && choicesText.Contains("[[", StringComparison.Ordinal)
         && choicesText.Contains("]]", StringComparison.Ordinal);
 }

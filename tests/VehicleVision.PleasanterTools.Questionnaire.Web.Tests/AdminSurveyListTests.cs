@@ -159,7 +159,7 @@ public class AdminSurveyListTests
               "Response": {
                 "Data": {
                   "SiteSettings": {
-                    "Columns": [{ "ColumnName": "ClassA", "ControlType": "ChoicesText", "ChoicesText": "[[123]]" }],
+                    "Columns": [{ "ColumnName": "ClassA", "ChoicesText": "[[123]]" }],
                     "Links": []
                   }
                 }
