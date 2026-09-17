@@ -1,6 +1,11 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { previewAutoReply, revokeEditLinks, type AutoReplyPreview } from '../lib/api';
+  import {
+    previewAutoReply,
+    revokeEditLinks,
+    sendAutoReplyTest,
+    type AutoReplyPreview,
+  } from '../lib/api';
   import { t } from '../lib/i18n/state.svelte';
   import {
     text,
@@ -50,6 +55,10 @@
     editing: Language;
     /** サーバ側でメールの送信が有効か。**無効でも設定は保存できる。** */
     mailEnabled: boolean;
+    /** 試し送信の宛先。**ログイン中の管理者自身に固定する。** */
+    testRecipient: string;
+    /** ログイン ID をメールアドレスとして使えるか。 */
+    testRecipientAvailable: boolean;
     onchange: (next: AutoReplySettings | null) => void;
   }
 
@@ -61,6 +70,8 @@
     questions,
     editing,
     mailEnabled,
+    testRecipient,
+    testRecipientAvailable,
     onchange,
   }: Props = $props();
 
@@ -70,6 +81,9 @@
   let bodyInput = $state<HTMLTextAreaElement>();
   let preview = $state<AutoReplyPreview | null>(null);
   let previewError = $state('');
+  let testSending = $state(false);
+  let testResult = $state('');
+  let testFailed = $state(false);
 
   async function revoke() {
     revoking = true;
@@ -78,6 +92,21 @@
     revoked = result.ok
       ? t('autoReply.revokeEditLinksDone', { count: result.value.revoked })
       : result.message;
+  }
+
+  async function sendTest() {
+    testSending = true;
+    testResult = '';
+    testFailed = false;
+    const result = await sendAutoReplyTest({ ...definition, autoReply }, editing);
+    testSending = false;
+    if (result.ok) {
+      testResult = t('autoReply.testQueued', { recipient: testRecipient });
+      return;
+    }
+
+    testFailed = true;
+    testResult = result.message;
   }
 
   /**
@@ -333,6 +362,24 @@
         <p class="preview-label">{t('autoReply.previewBody')}</p>
         <pre>{preview.body}</pre>
       {/if}
+
+      <div class="test-send">
+        <button
+          type="button"
+          disabled={testSending || !mailEnabled || !testRecipientAvailable}
+          onclick={sendTest}
+        >
+          {testSending ? t('autoReply.testSending') : t('autoReply.testSend')}
+        </button>
+        {#if testRecipientAvailable}
+          <p class="hint">{t('autoReply.testRecipient', { recipient: testRecipient })}</p>
+        {:else}
+          <p class="warning">{t('autoReply.testRecipientUnavailable')}</p>
+        {/if}
+        {#if testResult}
+          <p class:warning={testFailed} class="hint" role="status">{testResult}</p>
+        {/if}
+      </div>
     </section>
   {/if}
 </section>
@@ -440,5 +487,9 @@
     background: var(--surface, #fff);
     color: inherit;
     font: inherit;
+  }
+
+  .test-send {
+    margin-block-start: 1rem;
   }
 </style>

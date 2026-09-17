@@ -220,6 +220,20 @@ public static class ServerMessages
             "公開できません。設問の設定に、回答できない指定があります。",
             "Cannot publish. Some questions have settings that no answer can satisfy.");
 
+        Add(ServerMessageKeys.AutoReplyTestSubjectPrefix, "【試し送信】", "[Test] ");
+        Add(
+            ServerMessageKeys.AutoReplyTestLoginIdNotEmail,
+            "ログイン ID がメールアドレスではないため、試し送信できません。",
+            "Your sign-in ID is not an email address, so a test message cannot be sent.");
+        Add(
+            ServerMessageKeys.AutoReplyTestMailDisabled,
+            "メールの送信がサーバ側で有効になっていないため、試し送信できません。",
+            "Mail sending is not enabled on the server, so a test message cannot be sent.");
+        Add(
+            ServerMessageKeys.AutoReplyTestQueueFailed,
+            "試し送信を送信待ちへ登録できませんでした。",
+            "The test message could not be queued.");
+
         // ---- 招待メール（Issue #189）----------------------------------------
         // **平文で送る。** 書式は持たない（OutgoingMail が text/plain）
         Add(

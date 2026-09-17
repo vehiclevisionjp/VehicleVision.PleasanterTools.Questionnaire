@@ -484,6 +484,8 @@
         <SurveyEditor
           surveyId={openSurveyId}
           mailEnabled={session?.mailEnabled ?? false}
+          testRecipient={session?.loginId ?? ''}
+          testRecipientAvailable={session?.autoReplyTestRecipientAvailable ?? false}
           onback={back}
           onbreadcrumbchange={(title) => (surveyBreadcrumbTitle = title)}
           onnavigationguardchange={(guard) => (navigationGuard = guard)}

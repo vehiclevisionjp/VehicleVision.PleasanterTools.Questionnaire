@@ -50,12 +50,24 @@
     surveyId: string;
     /** サーバ側でメールを送れる状態か（Issue #189）。**自動返信の欄で知らせる。** */
     mailEnabled: boolean;
+    /** 試し送信の宛先。**ログイン中の管理者自身に固定する。** */
+    testRecipient: string;
+    /** ログイン ID をメールアドレスとして使えるか。 */
+    testRecipientAvailable: boolean;
     onback: () => void;
     onbreadcrumbchange: (title: string | null) => void;
     onnavigationguardchange: (guard: (() => boolean) | null) => void;
   }
 
-  let { surveyId, mailEnabled, onback, onbreadcrumbchange, onnavigationguardchange }: Props = $props();
+  let {
+    surveyId,
+    mailEnabled,
+    testRecipient,
+    testRecipientAvailable,
+    onback,
+    onbreadcrumbchange,
+    onnavigationguardchange,
+  }: Props = $props();
 
   /**
     * 入力欄が書き込む言語。
@@ -790,6 +802,8 @@
     questions={definition.pages.flatMap((page) => page.questions)}
     {editing}
     {mailEnabled}
+    {testRecipient}
+    {testRecipientAvailable}
     onchange={(next) => (definition = { ...definition!, autoReply: next })}
   />
 

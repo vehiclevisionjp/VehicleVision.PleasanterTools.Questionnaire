@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -113,6 +114,12 @@ public static class AdminAuthEndpoints
                     // ⚠️ **接続先も資格情報も返さない**（送れるか否かだけ）。
                     // **認証済みの相手にだけ返す**（構成の情報を未認証へ出さない）
                     mailEnabled = mail.IsReady,
+
+                    // **試し送信の宛先は自分のログイン ID に固定する**（Issue #319）。
+                    // 画面で先に理由を出すため、メールアドレスとして読めるかだけ返す。
+                    autoReplyTestRecipientAvailable = MailAddress.TryCreate(
+                        session.Principal?.Identity?.Name,
+                        out _),
                 });
             }
 

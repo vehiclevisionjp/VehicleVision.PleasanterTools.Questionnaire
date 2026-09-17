@@ -1,8 +1,10 @@
 using System.Collections.Immutable;
+using System.Security.Claims;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -20,6 +22,8 @@ public sealed record AutoReplyPreviewResponse(
 /// </remarks>
 public static class AdminAutoReplyEndpoints
 {
+    public const string TestSendRateLimitPolicy = "auto-reply-test-send";
+
     private const string PreviewPublicId = "preview";
     private const string PreviewToken = "preview";
     private const string PreviewAddress = "preview@example.invalid";
@@ -45,6 +49,46 @@ public static class AdminAutoReplyEndpoints
                 timeProvider.GetUtcNow());
             return Results.Ok(response);
         });
+
+        group.MapPost("/test-send", async (
+            AutoReplyPreviewRequest request,
+            HttpContext context,
+            ClaimsPrincipal principal,
+            AutoReplyTestMailer mailer,
+            CancellationToken cancellationToken) =>
+        {
+            AuditNotes.SetTarget(context, "Survey", request.Definition.SurveyId);
+
+            var outcome = await mailer.TryEnqueueAsync(
+                request.Definition,
+                request.Language,
+                principal.Identity?.Name,
+                cancellationToken).ConfigureAwait(false);
+
+            return outcome switch
+            {
+                AutoReplyTestMailOutcome.Queued => Results.Ok(new { queued = true }),
+                AutoReplyTestMailOutcome.LoginIdNotEmail => Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.AutoReplyTestLoginIdNotEmail,
+                        RequestLanguage.Of(context)),
+                }),
+                AutoReplyTestMailOutcome.MailDisabled => Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.AutoReplyTestMailDisabled,
+                        RequestLanguage.Of(context)),
+                }),
+                _ => Results.Problem(
+                    ServerMessages.Get(
+                        ServerMessageKeys.AutoReplyTestQueueFailed,
+                        RequestLanguage.Of(context)),
+                    statusCode: StatusCodes.Status503ServiceUnavailable),
+            };
+        })
+            .AddEndpointFilter<AuditLogFilter>()
+            .RequireRateLimiting(TestSendRateLimitPolicy);
 
         return builder;
     }

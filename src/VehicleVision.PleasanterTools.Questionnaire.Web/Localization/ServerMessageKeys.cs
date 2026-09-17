@@ -96,6 +96,15 @@ public static class ServerMessageKeys
     /// <summary>設問の設定が矛盾していて公開できない（Issue #101）。</summary>
     public const string PublishBlockedBySettings = "surveys.publishBlockedBySettings";
 
+    /// <summary>完了メールの試し送信で件名へ付ける印（Issue #319）。</summary>
+    public const string AutoReplyTestSubjectPrefix = "autoReply.test.subjectPrefix";
+
+    public const string AutoReplyTestLoginIdNotEmail = "autoReply.test.loginIdNotEmail";
+
+    public const string AutoReplyTestMailDisabled = "autoReply.test.mailDisabled";
+
+    public const string AutoReplyTestQueueFailed = "autoReply.test.queueFailed";
+
     /// <summary>招待メールの件名（Issue #189）。</summary>
     public const string InvitationMailSubject = "invitation.mail.subject";
 

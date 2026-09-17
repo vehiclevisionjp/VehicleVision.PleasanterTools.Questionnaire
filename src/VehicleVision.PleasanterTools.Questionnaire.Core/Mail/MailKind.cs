@@ -19,4 +19,7 @@ public enum MailKind
 
     /// <summary>管理者の招待。**本人しか開けない URL を含む。**</summary>
     AdminInvitation = 2,
+
+    /// <summary>管理者自身へ送る自動返信の試し送信（Issue #319）。</summary>
+    AutoReplyTest = 3,
 }

@@ -832,6 +832,12 @@ export const ja = {
   'autoReply.previewBody': '本文（平文）',
   'autoReply.unknownKeywords':
     '使えないキーワードがあります: {keywords}。文字としてそのまま送られます。',
+  'autoReply.testSend': '自分へ試し送信する',
+  'autoReply.testSending': '送信待ちへ登録しています…',
+  'autoReply.testRecipient': '宛先はログイン中の管理者自身（{recipient}）に固定されます。',
+  'autoReply.testRecipientUnavailable':
+    'ログイン ID がメールアドレスではないため、試し送信できません。',
+  'autoReply.testQueued': '{recipient} 宛ての試し送信を送信待ちへ登録しました。',
   // ---- テーマ（Issue #56） ----
   'theme.title': '回答画面の見た目',
   'theme.lead': '色・書体・ヘッダ画像を設定できます。未設定の場合は既定の見た目になります。公開すると反映されます。',
@@ -1757,6 +1763,13 @@ export const en: Record<MessageKey, string> = {
   'autoReply.previewBody': 'Body (plain text)',
   'autoReply.unknownKeywords':
     'Unknown keywords: {keywords}. They will be sent unchanged as text.',
+  'autoReply.testSend': 'Send a test to me',
+  'autoReply.testSending': 'Queuing test message…',
+  'autoReply.testRecipient':
+    'The recipient is fixed to the signed-in administrator ({recipient}).',
+  'autoReply.testRecipientUnavailable':
+    'Your sign-in ID is not an email address, so a test message cannot be sent.',
+  'autoReply.testQueued': 'Queued a test message to {recipient}.',
   // ---- Theme ----
   'theme.title': 'Look of the answer screen',
   'theme.lead':

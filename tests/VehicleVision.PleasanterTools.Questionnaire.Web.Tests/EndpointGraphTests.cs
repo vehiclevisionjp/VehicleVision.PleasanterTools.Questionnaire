@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
@@ -70,6 +71,14 @@ public class EndpointGraphTests
         Assert.Contains(
             endpoints.OfType<RouteEndpoint>(),
             endpoint => endpoint.RoutePattern.RawText == "/api/admin/captcha/challenge");
+
+        var autoReplyTest = Assert.Single(
+            endpoints.OfType<RouteEndpoint>(),
+            endpoint => endpoint.RoutePattern.RawText == "/api/admin/auto-reply/test-send");
+        Assert.NotEmpty(autoReplyTest.Metadata.GetOrderedMetadata<IAuthorizeData>());
+        Assert.Equal(
+            AdminAutoReplyEndpoints.TestSendRateLimitPolicy,
+            autoReplyTest.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName);
 
         // **CAPTCHA の検証より前にレート制限を通す。**
         // handler の中で検証するため、入口にこの metadata が無い変更を通さない。

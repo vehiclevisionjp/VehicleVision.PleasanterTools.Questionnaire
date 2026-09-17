@@ -709,6 +709,8 @@ export interface AdminSession {
    * 接続先も資格情報も返らない。**認証済みのときだけ載る。**
    */
   mailEnabled?: boolean;
+  /** ログイン ID を、本人宛て試し送信のメールアドレスとして使えるか。 */
+  autoReplyTestRecipientAvailable?: boolean;
 
   /**
    * 利用者ごとの表示言語。`null` は「まだ選んでいない」。

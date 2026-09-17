@@ -522,6 +522,7 @@ builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
 // ⚠️ **回答本体のトークンをメールへ載せないための表。** 漏れても失効させられる
 builder.Services.AddSingleton<IResponseEditTokenStore, ResponseEditTokenStore>();
 builder.Services.AddSingleton<AutoReplyDispatcher>();
+builder.Services.AddSingleton<AutoReplyTestMailer>();
 // **招待を本人へ直接送る**（Issue #189）。手渡しの途中で漏れる経路を減らす。
 // **送れない構成でも招待は出せる**（画面の URL は今までどおり返る）
 builder.Services.AddSingleton<AdminInvitationMailer>();
@@ -643,6 +644,17 @@ builder.Services
             "login",
             loginPermitLimit,
             TimeSpan.FromMinutes(5),
+            sharedRateLimits,
+            rateLimitLogger));
+
+    // **試し送信は 1 分に 3 通まで。** 任意の宛先へは送れないが、
+    // 管理者本人のメールボックスや送信基盤を連打で埋めさせない。
+    options.AddPolicy(AdminAutoReplyEndpoints.TestSendRateLimitPolicy, context =>
+        RateLimitPartitions.FixedWindow(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            "auto-reply-test-send",
+            3,
+            TimeSpan.FromMinutes(1),
             sharedRateLimits,
             rateLimitLogger));
 });
