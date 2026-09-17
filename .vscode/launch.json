@@ -33,6 +33,10 @@
         "QUESTIONNAIRE_SECRET_KEY": "4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=",
         // **枠を緩めてある。** 手で触っていると既定（1 分 60 回）はすぐ尽きる
         "QUESTIONNAIRE_REQUESTS_PER_MIN": "6000",
+        // **書体とビルド成果物で枠を使い切る。** 既定の 600 だと画面が 429 で白くなる
+        // （Issue #316 / #320 / #322）。compose.yaml の検証環境と同じ値にする
+        "QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN": "60000",
+        "QUESTIONNAIRE_FORM_REQUESTS_PER_MIN": "60000",
         "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN": "2000"
       },
       "sourceFileMap": { "/Views": "${workspaceFolder}/Views" }
@@ -55,6 +59,10 @@
         "QUESTIONNAIRE_PLEASANTER_TIMEZONE": "Asia/Tokyo",
         "QUESTIONNAIRE_SECRET_KEY": "4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=",
         "QUESTIONNAIRE_REQUESTS_PER_MIN": "6000",
+        // **書体とビルド成果物で枠を使い切る。** 既定の 600 だと画面が 429 で白くなる
+        // （Issue #316 / #320 / #322）。compose.yaml の検証環境と同じ値にする
+        "QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN": "60000",
+        "QUESTIONNAIRE_FORM_REQUESTS_PER_MIN": "60000",
         "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN": "2000"
       }
     },
@@ -76,6 +84,10 @@
         "QUESTIONNAIRE_PLEASANTER_TIMEZONE": "Asia/Tokyo",
         "QUESTIONNAIRE_SECRET_KEY": "4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=",
         "QUESTIONNAIRE_REQUESTS_PER_MIN": "6000",
+        // **書体とビルド成果物で枠を使い切る。** 既定の 600 だと画面が 429 で白くなる
+        // （Issue #316 / #320 / #322）。compose.yaml の検証環境と同じ値にする
+        "QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN": "60000",
+        "QUESTIONNAIRE_FORM_REQUESTS_PER_MIN": "60000",
         "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN": "2000"
       }
     },
@@ -85,7 +97,8 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "ビルド",
-      "program": "${env:USERPROFILE}/.dotnet/dotnet.exe",
+      // **PATH の dotnet を使う。** 場所を決め打ちすると、既定の場所へ入れた環境で動かない
+      "program": "dotnet",
       "args": [
         "test",
         "${workspaceFolder}/tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests"
