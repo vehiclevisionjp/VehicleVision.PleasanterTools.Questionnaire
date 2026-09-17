@@ -433,6 +433,15 @@ var requestPermitLimit = int.TryParse(
     ? configuredRequests
     : 60;
 
+// **1 画面で何本も出るもの（ビルド成果物・本文画像）の枠。**
+// ⚠️ **ここを固定値にすると、検証環境の緩和が効かない。**
+// 端から端まで通す試験と写しの一式は 1 つの IP から大量に叩くため、
+// 固定の 600 では自分で使い切る（Issue #322）
+var assetPermitLimit = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN"], out var configuredAssets)
+    ? configuredAssets
+    : 600;
+
 // **アンケート 1 本あたりの枠。** 他の枠と同じく検証環境でだけ緩められるようにする。
 // ⚠️ **`publicId` を持たない要求は 1 つの枠にまとめて数えられる**ので、
 // これは実質「回答画面以外すべての合計」の上限にもなる（Issue #311）
@@ -596,7 +605,7 @@ builder.Services
             return RateLimitPartitions.FixedWindow(
                 $"{address}|{kind}",
                 "request",
-                isAsset ? 600 : requestPermitLimit,
+                isAsset ? assetPermitLimit : requestPermitLimit,
                 TimeSpan.FromMinutes(1),
                 sharedRateLimits,
                 rateLimitLogger);
