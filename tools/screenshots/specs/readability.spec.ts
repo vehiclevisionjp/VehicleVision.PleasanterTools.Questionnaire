@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ensureAdminStorageState } from '../lib/admin';
+import { prepareRequiredSurvey } from '../lib/required';
 import { prepareThemeSurvey } from '../lib/theme';
 import { findTofu, japaneseSamples } from '../lib/tofu';
 
@@ -85,6 +86,7 @@ test.describe.configure({ mode: 'serial' });
 test.describe('読みやすさ設定の写し', () => {
   let authFile = '';
   let publicId = '';
+  let requiredPublicId = '';
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -101,6 +103,7 @@ test.describe('読みやすさ設定の写し', () => {
           '読みやすさ設定の見本',
         )
       ).publicId;
+      requiredPublicId = (await prepareRequiredSurvey(context.request, demoSiteId)).publicId;
     } finally {
       await context.close();
     }
@@ -145,6 +148,21 @@ test.describe('読みやすさ設定の写し', () => {
     await expectColors(page, dark);
     expect(await cssVariable(page, '--bg')).not.toBe(forest.background);
     await shoot(page, answer, 'answer-09-readability-dark');
+  });
+
+  test('回答画面：高コントラストの必須エラーと単一選択', async ({ page }) => {
+    await page.goto(`/f/${requiredPublicId}`);
+    await expect(page.getByRole('heading', { name: '必須とページ送りの見本' })).toBeVisible();
+    await page.locator('#answer-readability-color-mode').selectOption('highContrast');
+    await expectColors(page, highContrast);
+
+    await page.getByLabel('メール').check();
+    await page.getByRole('button', { name: '次へ' }).click();
+
+    await expect(page.getByRole('alert').filter({ hasText: '回答してください' })).toBeVisible();
+    await expect(page.getByLabel('お名前')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByLabel('メール')).toBeChecked();
+    await shoot(page, page.locator('main'), 'answer-10-readability-required-error');
   });
 
   async function openAdmin(
