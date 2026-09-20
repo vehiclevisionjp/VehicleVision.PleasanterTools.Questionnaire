@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import SurveyPreview from './SurveyPreview.svelte';
+  import SurveyFlowchart from './SurveyFlowchart.svelte';
   import {
     loadColumnAvailability,
     loadAssetOptions,
@@ -85,11 +87,13 @@
 
   /** プレビューを開いているか。**保存前の下書きをそのまま見る。** */
   let previewing = $state(false);
+  /** 分岐の全体図を開いているか。**保存前の下書きを読み取り専用で見る。** */
+  let flowcharting = $state(false);
 
   $effect(() => {
     // **開いている間は下敷きを巻き取らせない。**
     // 重ねて出しているのに背後が動くと、どちらを操作しているのか分からなくなる
-    if (!previewing) {
+    if (!previewing && !flowcharting) {
       return;
     }
 
@@ -100,6 +104,7 @@
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         previewing = false;
+        flowcharting = false;
       }
     };
 
@@ -523,6 +528,15 @@
       ? displayText(question.title, editing) || questionId
       : t('mapping.missingQuestion', { questionId });
   }
+
+  /** 全体図から該当ページの編集位置へ戻る。 */
+  async function editPageFromFlowchart(pageId: string) {
+    flowcharting = false;
+    await tick();
+    const page = document.getElementById(`page-${pageId}`);
+    page?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    page?.focus();
+  }
 </script>
 
 <header class="bar">
@@ -537,6 +551,14 @@
       disabled={loading || definition === undefined}
     >
       {t('preview.open')}
+    </button>
+    <button
+      type="button"
+      class="secondary"
+      onclick={() => (flowcharting = true)}
+      disabled={loading || definition === undefined}
+    >
+      {t('flowchart.open')}
     </button>
     <button type="button" class="secondary" onclick={save} disabled={saving || loading}>
       {saving ? t('editor.working') : t('editor.saveDraft')}
@@ -832,7 +854,7 @@
     {@const targets = jumpTargets(pageIndex)}
     {@const stale = staleTargetId(page.next, targets.map((target) => target.pageId))}
     {@const hasVisibility = page.questions.some((question) => question.visibleWhen)}
-    <section class="page">
+    <section class="page" id={`page-${page.pageId}`} tabindex="-1">
       <div class="page-head">
         <!-- **ページの区切りがそのまま改ページになる** -->
         <input
@@ -1004,6 +1026,20 @@
           ? adminAssetUrl(surveyId, definition.theme.headerImageId)
           : null}
         onclose={() => (previewing = false)}
+      />
+    </div>
+  </div>
+{/if}
+
+{#if flowcharting && definition}
+  <div class="overlay" role="dialog" aria-modal="true" aria-label={t('flowchart.title')}>
+    <div class="sheet">
+      <SurveyFlowchart
+        {definition}
+        {flowProblems}
+        language={editing}
+        onclose={() => (flowcharting = false)}
+        onpage={editPageFromFlowchart}
       />
     </div>
   </div>
