@@ -1199,7 +1199,7 @@
 <style lang="scss">
   .question {
     padding: 1rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 0.75rem;
@@ -1280,11 +1280,11 @@
   }
 
   .unmapped {
-    color: #b54708;
+    color: var(--warning-text);
   }
 
   .mapped {
-    color: #067647;
+    color: var(--success);
   }
 
   .select {
@@ -1412,7 +1412,7 @@
   }
 
   .warn {
-    color: #b54708;
+    color: var(--warning-text);
     font-size: 0.8rem;
     margin: 0.25rem 0 0.5rem;
   }
@@ -1465,7 +1465,7 @@
     height: 1.9rem;
     padding: 0;
     line-height: 1;
-    background: #fff;
+    background: var(--surface);
     color: var(--muted);
     border: 1px solid var(--border);
     border-radius: 4px;

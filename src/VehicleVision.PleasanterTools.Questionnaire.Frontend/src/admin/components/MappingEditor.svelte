@@ -612,7 +612,7 @@
     overflow-x: auto;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: #fff;
+    background: var(--surface);
   }
 
   table {
@@ -763,7 +763,7 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font: inherit;
-    color: #101828;
+    color: var(--text);
     box-sizing: border-box;
   }
 
@@ -791,7 +791,7 @@
   }
 
   .warn {
-    color: #b54708;
+    color: var(--warning-text);
     font-size: 0.82rem;
     margin: 0 0 0.4rem;
   }
@@ -802,7 +802,7 @@
     flex: none;
     padding: 0;
     line-height: 1;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
     cursor: pointer;

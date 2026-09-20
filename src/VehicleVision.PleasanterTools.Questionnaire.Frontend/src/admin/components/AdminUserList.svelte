@@ -365,7 +365,7 @@
     align-items: flex-end;
     gap: 0.75rem;
     padding: 1rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 1rem;
@@ -392,7 +392,7 @@
     padding: 0.75rem 1rem;
     border: 1px solid var(--accent);
     border-radius: 6px;
-    background: #f5f9ff;
+    background: var(--info-surface);
     margin-bottom: 1rem;
   }
 
@@ -420,7 +420,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 0.9rem;
-    background: #fff;
+    background: var(--surface);
   }
 
   th,
@@ -467,18 +467,18 @@
   }
 
   .badge.active {
-    background: #ecfdf3;
-    color: #027a48;
+    background: var(--success-surface);
+    color: var(--success);
   }
 
   .badge.pending {
-    background: #fffaeb;
-    color: #b54708;
+    background: var(--warning-surface);
+    color: var(--warning-text);
   }
 
   .badge.stopped {
-    background: #f2f4f7;
-    color: var(--muted);
+    background: var(--disabled-surface);
+    color: var(--disabled-text);
   }
 
   button[type='submit'] {
@@ -486,7 +486,7 @@
     border: 0;
     border-radius: 4px;
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-text);
     font: inherit;
     cursor: pointer;
   }

@@ -292,7 +292,7 @@
 <style lang="scss">
   .theme {
     padding: 1.25rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     margin-bottom: 1rem;
@@ -419,7 +419,7 @@
     padding: 0;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: #fff;
+    background: var(--surface);
     cursor: pointer;
   }
 
@@ -430,8 +430,8 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font: inherit;
-    background: #fff;
-    color: #101828;
+    background: var(--surface);
+    color: var(--text);
   }
 
   .caption {
@@ -463,7 +463,7 @@
     padding: 0.35rem 0.75rem;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: #fff;
+    background: var(--surface);
     color: var(--accent);
     cursor: pointer;
 

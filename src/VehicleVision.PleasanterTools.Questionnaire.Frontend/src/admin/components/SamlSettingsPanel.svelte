@@ -248,7 +248,7 @@
     padding: 1.25rem;
     border: 1px solid var(--border);
     border-radius: 8px;
-    background: #fff;
+    background: var(--surface);
   }
   .test {
     margin-top: 1.5rem;
@@ -278,8 +278,8 @@
   input:disabled,
   select:disabled,
   textarea:disabled {
-    background: #f2f4f7;
-    color: #475467;
+    background: var(--disabled-surface);
+    color: var(--disabled-text);
   }
   .row {
     display: grid;
@@ -287,7 +287,7 @@
     gap: 1rem;
   }
   .fixed {
-    color: #b54708;
+    color: var(--warning-text);
     font-size: 0.85rem;
     font-weight: 400;
   }
@@ -295,16 +295,16 @@
     display: grid;
     gap: 0.25rem;
     padding: 0.9rem 1rem;
-    border: 1px solid #f79009;
+    border: 1px solid var(--warning-border);
     border-radius: 6px;
-    background: #fff4e5;
-    color: #7a4b00;
+    background: var(--warning-surface);
+    color: var(--warning-text);
   }
   .error {
     color: var(--error);
   }
   .done {
-    color: #067647;
+    color: var(--success);
   }
   h2 {
     margin: 0;

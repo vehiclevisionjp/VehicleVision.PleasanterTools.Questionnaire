@@ -97,7 +97,7 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font: inherit;
-    color: #101828;
+    color: var(--text);
     box-sizing: border-box;
   }
 
@@ -106,7 +106,7 @@
     height: 1.9rem;
     padding: 0;
     line-height: 1;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
     cursor: pointer;

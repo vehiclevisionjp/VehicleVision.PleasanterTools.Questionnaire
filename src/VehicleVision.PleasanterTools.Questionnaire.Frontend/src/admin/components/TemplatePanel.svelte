@@ -194,7 +194,7 @@
   .panel {
     padding: 1.25rem;
     margin-bottom: 1.5rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
   }

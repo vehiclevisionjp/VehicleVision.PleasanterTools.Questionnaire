@@ -997,7 +997,7 @@
     gap: 0.75rem;
     padding: 1.25rem;
     margin-bottom: 1.5rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
   }
@@ -1118,7 +1118,7 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
@@ -1227,7 +1227,7 @@
   }
 
   .status-1 {
-    color: #067647;
+    color: var(--success);
     font-weight: 600;
   }
 
@@ -1237,7 +1237,7 @@
   }
 
   .status-3 {
-    color: #9a6700;
+    color: var(--warning-text);
     font-weight: 600;
   }
 
@@ -1250,7 +1250,7 @@
   }
 
   .saved {
-    color: #067647;
+    color: var(--success);
     font-size: 0.9rem;
   }
 </style>
