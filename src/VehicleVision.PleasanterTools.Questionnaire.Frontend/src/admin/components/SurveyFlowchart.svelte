@@ -15,10 +15,10 @@
 
   let { definition, flowProblems, language, onclose, onpage }: Props = $props();
 
-  const nodeHeight = 120;
+  const nodeHeight = 168;
   const nodeWidth = 360;
   const nodeX = 110;
-  const rowHeight = 180;
+  const rowHeight = 228;
   const nodeY = 30;
   const edgeLabelX = nodeX + nodeWidth + 18;
 
@@ -97,8 +97,18 @@
   }
 
   function problemText(problem: FlowProblem): string {
+    if (problem.code === 'UnreachablePage') {
+      return t('flowchart.unreachable');
+    }
+
     const key = flowKey(problem.code);
     return key ? t(key) : problem.code;
+  }
+
+  function nodeProblemTexts(problems: readonly FlowProblem[]): string[] {
+    const texts = problems.slice(0, 2).map(problemText);
+    const remaining = problems.length - texts.length;
+    return remaining > 0 ? [...texts, t('flowchart.moreProblems', { count: remaining })] : texts;
   }
 
   function destination(edgeId: string): string {
@@ -130,6 +140,10 @@
   {#if definition.pages.length === 0}
     <p class="empty">{t('flowchart.empty')}</p>
   {:else}
+    {#if flowProblems.length === 0}
+      <p class="healthy" role="status">✓ {t('flowchart.noProblems')}</p>
+    {/if}
+
     <div class="diagram-wrap">
       <svg
         class="diagram"
@@ -178,6 +192,7 @@
         {#each chart.nodes as node (node.id)}
           {@const point = position(node.id)}
           {#if node.kind === 'Page'}
+            {@const problems = nodeProblemTexts(node.problems)}
             <a
               class:problem-node={node.problems.length > 0}
               class:unreachable-node={node.problems.some((problem) => problem.code === 'UnreachablePage')}
@@ -198,11 +213,11 @@
                 <text class="node-detail" x="16" y="78">
                   {t('flowchart.conditions', { count: node.conditionalQuestionCount })}
                 </text>
-                {#if node.problems.length > 0}
-                  <text class="problem-mark" x="16" y="102">
-                    ! {t('flowchart.problems', { count: node.problems.length })}
+                {#each problems as problem, index (problem)}
+                  <text class="problem-mark" x="16" y={104 + index * 20}>
+                    ! {short(problem)}
                   </text>
-                {/if}
+                {/each}
               </g>
             </a>
           {:else}
@@ -214,6 +229,42 @@
         {/each}
       </svg>
     </div>
+
+    <section class="legend" aria-labelledby="flowchart-legend">
+      <h2 id="flowchart-legend">{t('flowchart.legend')}</h2>
+      <ul>
+        <li>
+          <svg viewBox="0 0 48 16" aria-hidden="true">
+            <path class="edge default-edge" d="M 2 8 L 44 8"></path>
+          </svg>
+          {t('flowchart.defaultEdge')}
+        </li>
+        <li>
+          <svg viewBox="0 0 48 16" aria-hidden="true">
+            <path class="edge page-edge" d="M 2 8 L 44 8"></path>
+          </svg>
+          {t('flowchart.pageEdge')}
+        </li>
+        <li>
+          <svg viewBox="0 0 48 16" aria-hidden="true">
+            <path class="edge choice-edge" d="M 2 8 L 44 8"></path>
+          </svg>
+          {t('flowchart.choiceEdge')}
+        </li>
+        <li>
+          <svg viewBox="0 0 48 16" aria-hidden="true">
+            <rect class="legend-unreachable" x="4" y="2" width="40" height="12" rx="2"></rect>
+          </svg>
+          {t('flowchart.unreachable')}
+        </li>
+        <li>
+          <svg viewBox="0 0 48 16" aria-hidden="true">
+            <path class="edge missing-edge" d="M 2 8 L 44 8"></path>
+          </svg>
+          {t('flowchart.missingDestinationLegend')}
+        </li>
+      </ul>
+    </section>
 
     <section class="destinations" aria-labelledby="flowchart-destinations">
       <h2 id="flowchart-destinations">{t('flowchart.destinations')}</h2>
@@ -258,6 +309,12 @@
   .lead,
   .empty {
     color: var(--muted);
+  }
+
+  .healthy {
+    margin: 0 0 1rem;
+    color: #067647;
+    font-weight: 700;
   }
 
   .diagram-wrap {
@@ -333,6 +390,43 @@
   }
 
   .unreachable-node rect {
+    stroke-dasharray: 7 4;
+  }
+
+  .legend {
+    margin-top: 1rem;
+  }
+
+  .legend h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+  }
+
+  .legend ul {
+    display: flex;
+    gap: 0.75rem 1.25rem;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+  }
+
+  .legend svg {
+    width: 3rem;
+    height: 1rem;
+  }
+
+  .legend-unreachable {
+    fill: #fff;
+    stroke: #b42318;
+    stroke-width: 2;
     stroke-dasharray: 7 4;
   }
 
