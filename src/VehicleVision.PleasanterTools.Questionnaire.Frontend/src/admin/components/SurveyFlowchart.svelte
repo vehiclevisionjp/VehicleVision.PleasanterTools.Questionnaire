@@ -15,10 +15,11 @@
 
   let { definition, flowProblems, language, onclose, onpage }: Props = $props();
 
-  const nodeHeight = 168;
+  const pageNodeHeight = 168;
+  const submitNodeHeight = 64;
   const nodeWidth = 360;
   const nodeX = 110;
-  const rowHeight = 228;
+  const nodeGap = 60;
   const nodeY = 30;
   const edgeLabelX = nodeX + nodeWidth + 18;
 
@@ -47,11 +48,27 @@
         30,
     ),
   );
-  const diagramHeight = $derived(Math.max(220, nodeY + chart.nodes.length * rowHeight));
+  const diagramHeight = $derived(
+    Math.max(
+      220,
+      nodeY +
+        chart.nodes.reduce((height, node) => height + nodeHeight(node.id) + nodeGap, 0) -
+        nodeGap +
+        30,
+    ),
+  );
 
   function position(nodeId: string) {
     const index = chart.nodes.findIndex((node) => node.id === nodeId);
-    return { x: nodeX, y: nodeY + Math.max(index, 0) * rowHeight };
+    const preceding = chart.nodes.slice(0, Math.max(index, 0));
+    return {
+      x: nodeX,
+      y: nodeY + preceding.reduce((height, node) => height + nodeHeight(node.id) + nodeGap, 0),
+    };
+  }
+
+  function nodeHeight(nodeId: string): number {
+    return nodeById.get(nodeId)?.kind === 'Submit' ? submitNodeHeight : pageNodeHeight;
   }
 
   function edgePath(sourceId: string, targetId: string, edgeIndex: number): string {
@@ -59,7 +76,7 @@
     const target = position(targetId);
     const offset = ((edgeIndex % 5) - 2) * 12;
     const startX = source.x + nodeWidth / 2 + offset;
-    const startY = source.y + nodeHeight;
+    const startY = source.y + nodeHeight(sourceId);
     const endX = target.x + nodeWidth / 2 + offset;
     const endY = target.y;
     const bendY = Math.max(startY + 28, (startY + endY) / 2);
@@ -70,7 +87,7 @@
     const source = position(sourceId);
     const offset = edgeOffset(sourceId, edgeIndex);
     const startX = source.x + nodeWidth / 2 + offset;
-    const startY = source.y + nodeHeight;
+    const startY = source.y + nodeHeight(sourceId);
     const endX = nodeX + nodeWidth + 58;
     const endY = startY + 42;
     return `M ${startX} ${startY} C ${startX} ${endY}, ${endX - 24} ${endY}, ${endX} ${endY}`;
@@ -80,7 +97,10 @@
     const source = position(sourceId);
     const target = position(targetId);
     return (
-      Math.max(source.y + nodeHeight + 16, (source.y + nodeHeight + target.y) / 2) +
+      Math.max(
+        source.y + nodeHeight(sourceId) + 16,
+        (source.y + nodeHeight(sourceId) + target.y) / 2,
+      ) +
       edgeOffset(sourceId, edgeIndex)
     );
   }
@@ -182,7 +202,12 @@
             <text
               class="missing-label"
               x={edgeLabelX}
-              y={position(edge.sourceId).y + nodeHeight + 48 + edgeOffset(edge.sourceId, edgeIndex)}
+              y={
+                position(edge.sourceId).y +
+                nodeHeight(edge.sourceId) +
+                48 +
+                edgeOffset(edge.sourceId, edgeIndex)
+              }
             >
               ! {destination(edge.id)}
             </text>
@@ -205,7 +230,7 @@
               }}
             >
               <g transform={`translate(${point.x} ${point.y})`}>
-                <rect width={nodeWidth} height={nodeHeight} rx="8"></rect>
+                <rect width={nodeWidth} height={pageNodeHeight} rx="8"></rect>
                 <text class="node-title" x="16" y="30">{short(node.title)}</text>
                 <text class="node-detail" x="16" y="56">
                   {t('flowchart.questions', { count: node.questionCount })}
@@ -222,7 +247,7 @@
             </a>
           {:else}
             <g class="node submit-node" transform={`translate(${point.x} ${point.y})`}>
-              <rect width={nodeWidth} height={nodeHeight} rx="8"></rect>
+              <rect width={nodeWidth} height={submitNodeHeight} rx="8"></rect>
               <text class="node-title" x="16" y="30">{short(node.title)}</text>
             </g>
           {/if}

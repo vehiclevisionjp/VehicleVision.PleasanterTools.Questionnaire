@@ -40,7 +40,7 @@ test.describe('分岐の全体図の写し', { tag: '@standalone' }, () => {
       await expect(dialog.getByRole('heading', { name: '凡例' })).toBeVisible();
       await expect(dialog.getByRole('heading', { name: 'ページと行き先' })).toBeVisible();
 
-      await shoot(page, 'admin-15-flowchart');
+      await shoot(page, dialog.locator('section.flowchart'), 'admin-15-flowchart');
     } finally {
       await context.close();
     }
@@ -63,7 +63,7 @@ test.describe('分岐の全体図の写し', { tag: '@standalone' }, () => {
       await expect(dialog.getByRole('heading', { name: '凡例' })).toBeVisible();
       await expect(dialog.getByRole('heading', { name: 'ページと行き先' })).toBeVisible();
 
-      await shoot(page, 'admin-16-flowchart-problems');
+      await shoot(page, dialog.locator('section.flowchart'), 'admin-16-flowchart-problems');
     } finally {
       await context.close();
     }
@@ -81,12 +81,16 @@ async function signedInContext(
   });
 }
 
-async function shoot(page: import('@playwright/test').Page, name: string): Promise<void> {
+async function shoot(
+  page: import('@playwright/test').Page,
+  flowchart: import('@playwright/test').Locator,
+  name: string,
+): Promise<void> {
   const report = await findTofu(page, japaneseSamples);
   expect(
     report.tofu,
     `${name} を撮る前に日本語が描けていない。豆腐: ${report.tofu.join('')} / 書体: ${report.fontFamily}`,
   ).toEqual([]);
 
-  await page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
+  await flowchart.screenshot({ path: `${shots}/${name}.png` });
 }
