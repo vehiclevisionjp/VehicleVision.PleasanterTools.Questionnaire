@@ -20,7 +20,7 @@
   const nodeX = 110;
   const rowHeight = 180;
   const nodeY = 30;
-  const diagramWidth = 580;
+  const edgeLabelX = nodeX + nodeWidth + 18;
 
   const chart = $derived(
     buildFlowchart(definition, flowProblems, {
@@ -33,6 +33,20 @@
     }),
   );
   const nodeById = $derived(new Map(chart.nodes.map((node) => [node.id, node])));
+  const diagramWidth = $derived(
+    Math.max(
+      580,
+      edgeLabelX +
+        Math.max(
+          ...chart.edges.map((edge) =>
+            edge.missingTargetId ? `! ${destination(edge.id)}`.length : short(edge.label ?? '').length,
+          ),
+          0,
+        ) *
+          12 +
+        30,
+    ),
+  );
   const diagramHeight = $derived(Math.max(220, nodeY + chart.nodes.length * rowHeight));
 
   function position(nodeId: string) {
@@ -52,10 +66,30 @@
     return `M ${startX} ${startY} C ${startX} ${bendY}, ${endX} ${bendY}, ${endX} ${endY}`;
   }
 
-  function edgeLabelY(sourceId: string, targetId: string): number {
+  function missingEdgePath(sourceId: string, edgeIndex: number): string {
+    const source = position(sourceId);
+    const offset = edgeOffset(sourceId, edgeIndex);
+    const startX = source.x + nodeWidth / 2 + offset;
+    const startY = source.y + nodeHeight;
+    const endX = nodeX + nodeWidth + 58;
+    const endY = startY + 42;
+    return `M ${startX} ${startY} C ${startX} ${endY}, ${endX - 24} ${endY}, ${endX} ${endY}`;
+  }
+
+  function edgeLabelY(sourceId: string, targetId: string, edgeIndex: number): number {
     const source = position(sourceId);
     const target = position(targetId);
-    return Math.max(source.y + nodeHeight + 16, (source.y + nodeHeight + target.y) / 2);
+    return (
+      Math.max(source.y + nodeHeight + 16, (source.y + nodeHeight + target.y) / 2) +
+      edgeOffset(sourceId, edgeIndex)
+    );
+  }
+
+  function edgeOffset(sourceId: string, edgeIndex: number): number {
+    const indexAtSource = chart.edges
+      .slice(0, edgeIndex)
+      .filter((edge) => edge.sourceId === sourceId).length;
+    return (indexAtSource - 2) * 14;
   }
 
   function short(label: string): string {
@@ -121,8 +155,22 @@
             >
               <title>{`${edge.label ?? ''}: ${destination(edge.id)}`}</title>
             </path>
-            <text class="edge-label" x="488" y={edgeLabelY(edge.sourceId, edge.targetId)}>
+            <text class="edge-label" x={edgeLabelX} y={edgeLabelY(edge.sourceId, edge.targetId, edgeIndex)}>
               {short(edge.label ?? '')}
+            </text>
+          {:else}
+            <path
+              class="edge missing-edge"
+              d={missingEdgePath(edge.sourceId, edgeIndex)}
+            >
+              <title>{`${edge.label ?? ''}: ${destination(edge.id)}`}</title>
+            </path>
+            <text
+              class="missing-label"
+              x={edgeLabelX}
+              y={position(edge.sourceId).y + nodeHeight + 48 + edgeOffset(edge.sourceId, edgeIndex)}
+            >
+              ! {destination(edge.id)}
             </text>
           {/if}
         {/each}
@@ -243,9 +291,20 @@
     stroke: #067647;
   }
 
+  .missing-edge {
+    stroke: #b42318;
+    stroke-dasharray: 7 4;
+  }
+
   .edge-label {
     fill: #344054;
     font-size: 12px;
+  }
+
+  .missing-label {
+    fill: #b42318;
+    font-size: 12px;
+    font-weight: 700;
   }
 
   .node rect {

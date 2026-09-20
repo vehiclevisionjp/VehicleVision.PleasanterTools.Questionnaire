@@ -103,13 +103,20 @@ describe('buildFlowchart', () => {
     expect(result.nodes[1]!.problems).toEqual([problem]);
   });
 
-  it('存在しない飛び先を辺とノード上の不備で追えるようにする', () => {
+  it('存在しない飛び先の辺を図のデータに残す', () => {
     const result = chart(
       [page('p1', { next: { kind: 'Page', pageId: 'p9' } })],
       [{ code: 'UnknownPage', pageId: 'p1', detail: 'p9' }],
     );
 
-    expect(result.edges[0]).toMatchObject({ targetId: 'p9', missingTargetId: 'p9' });
+    expect(result.edges).toContainEqual(
+      expect.objectContaining({
+        sourceId: 'p1',
+        targetId: 'p9',
+        kind: 'Page',
+        missingTargetId: 'p9',
+      }),
+    );
     expect(result.nodes[0]!.problems[0]!.code).toBe('UnknownPage');
   });
 });
