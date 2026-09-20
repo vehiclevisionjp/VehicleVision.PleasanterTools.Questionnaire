@@ -63,6 +63,12 @@ public static class AdminSurveyEndpoints
             allowedHosts = embeds.AllowedHosts,
         }));
 
+        group.MapGet("/embed-parent-options", (EmbedParentOptions parents) => Results.Ok(new
+        {
+            enabled = parents.Enabled,
+            allowedParents = parents.AllowedParents,
+        }));
+
         // ---- 一覧 ------------------------------------------------------------
         // **全件は返さない**（Issue #79）。アンケートは消さずに溜まるので、
         // 上限が無いと増えるほど画面が重くなり、探すこともできない。
@@ -1202,6 +1208,7 @@ public static class AdminSurveyEndpoints
             // 既定値の false を書き込むと、項目を知らない相手が保存しただけで
             // 下書きが黙って切れる
             var allowDraft = request.AllowDraft ?? record.AllowDraft;
+            var allowEmbedding = request.AllowEmbedding ?? record.AllowEmbedding;
 
             // **上限を引き上げても勝手に再開しない**（_documents/データモデル設計.md 2.1）。
             // 再開するかどうかは人が決める
@@ -1212,12 +1219,19 @@ public static class AdminSurveyEndpoints
                         ResponseLimit = request.ResponseLimit,
                         RequireProofOfWork = requireProofOfWork,
                         AllowDraft = allowDraft,
+                        AllowEmbedding = allowEmbedding,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
 
             return Results.Ok(
-                new { responseLimit = request.ResponseLimit, requireProofOfWork, allowDraft });
+                new
+                {
+                    responseLimit = request.ResponseLimit,
+                    requireProofOfWork,
+                    allowDraft,
+                    allowEmbedding,
+                });
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
@@ -1609,8 +1623,15 @@ public static class AdminSurveyEndpoints
     /// ⚠️ **入れると、回答の途中が端末に残る。** 共有の端末では、
     /// 次に使う人が前の人の回答を見ることになる。**既定は無効。**
     /// </param>
+    /// <param name="AllowEmbedding">
+    /// 回答画面を運用側が許可した親サイトへ埋め込んでよいか（Issue #334）。
+    /// **<c>null</c> は「変えない」。既定は無効。**
+    /// </param>
     public sealed record SurveySettingsRequest(
-        int? ResponseLimit, bool? RequireProofOfWork = null, bool? AllowDraft = null);
+        int? ResponseLimit,
+        bool? RequireProofOfWork = null,
+        bool? AllowDraft = null,
+        bool? AllowEmbedding = null);
 
     /// <summary>テスト公開まで変更できる Pleasanter サイト ID。</summary>
     public sealed record UpdateSiteIdRequest(long PleasanterSiteId);

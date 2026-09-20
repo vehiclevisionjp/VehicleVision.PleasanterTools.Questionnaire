@@ -190,6 +190,10 @@ public enum PleasanterSiteUpdateResult
 ///
 /// **サーバへは送らない。** 下書きは端末の中だけに置く。
 /// </param>
+/// <param name="AllowEmbedding">
+/// 回答画面を、運用側が許可した親サイトへ埋め込んでよいか（Issue #334）。
+/// **既定は無効。** 公開し直さずに停止できる可変の運用設定。
+/// </param>
 /// <param name="ArchivedAt">アーカイブした時刻（UTC）。アーカイブしていなければ <c>null</c>。</param>
 public sealed record SurveyRecord(
     Guid SurveyId,
@@ -207,6 +211,7 @@ public sealed record SurveyRecord(
     DateTime? SuspendedAt = null,
     bool RequireProofOfWork = true,
     bool AllowDraft = false,
+    bool AllowEmbedding = false,
     DateTime? ArchivedAt = null);
 
 /// <summary>アンケートの状態。</summary>
@@ -279,6 +284,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             // **旗も書く**（Issue #66）。管理画面の公開設定はここを通る
             + "  [RequireProofOfWork] = @RequireProofOfWork, "
             + "  [AllowDraft] = @AllowDraft, "
+            + "  [AllowEmbedding] = @AllowEmbedding, "
             + "  [ArchivedAt] = @ArchivedAt, "
             + "  [UpdatedAt] = @Now "
             + "WHERE [SurveyId] = @SurveyId",
@@ -298,6 +304,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.SuspendedAt,
                 survey.RequireProofOfWork,
                 survey.AllowDraft,
+                survey.AllowEmbedding,
                 survey.ArchivedAt,
                 Now = now,
             },
@@ -313,12 +320,14 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             + "  ([SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "   [AcceptFrom], [AcceptTo], [ResponseLimit], "
-            + "   [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], [ArchivedAt], "
+            + "   [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], "
+            + "   [AllowEmbedding], [ArchivedAt], "
             + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, @PublishedVersion, "
             + "        @AcceptFrom, @AcceptTo, @ResponseLimit, "
-            + "        @SuspendedReason, @SuspendedAt, @RequireProofOfWork, @AllowDraft, @ArchivedAt, "
+            + "        @SuspendedReason, @SuspendedAt, @RequireProofOfWork, @AllowDraft, "
+            + "        @AllowEmbedding, @ArchivedAt, "
             + "        @Now, @Now)",
             new
             {
@@ -336,6 +345,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
                 survey.SuspendedAt,
                 survey.RequireProofOfWork,
                 survey.AllowDraft,
+                survey.AllowEmbedding,
                 survey.ArchivedAt,
                 Now = now,
             },
@@ -421,7 +431,8 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate], "
-            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], [ArchivedAt] "
+            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], "
+            + "       [AllowEmbedding], [ArchivedAt] "
             + "FROM [Surveys] WHERE [PublicId] = @PublicId",
             new { PublicId = publicId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -436,7 +447,8 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             "SELECT [SurveyId], [PublicId], [Title], [PleasanterSiteId], "
             + "       [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "       [AcceptFrom], [AcceptTo], [ResponseLimit], [IsTemplate], "
-            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], [ArchivedAt] "
+            + "       [SuspendedReason], [SuspendedAt], [RequireProofOfWork], [AllowDraft], "
+            + "       [AllowEmbedding], [ArchivedAt] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);

@@ -37,6 +37,9 @@ public sealed record SurveyDraft(
 /// <param name="AllowDraft">
 /// 回答の下書きを端末へ残すか（Issue #59）。**既定は無効。**
 /// </param>
+/// <param name="AllowEmbedding">
+/// 回答画面を許可済みの親サイトへ埋め込んでよいか（Issue #334）。**既定は無効。**
+/// </param>
 /// <param name="ArchivedAt">アーカイブした時刻（UTC）。アーカイブしていなければ <c>null</c>。</param>
 public sealed record SurveySummary(
     Guid SurveyId,
@@ -52,6 +55,7 @@ public sealed record SurveySummary(
     int ResponseCount = 0,
     bool RequireProofOfWork = true,
     bool AllowDraft = false,
+    bool AllowEmbedding = false,
     int TestResponseCount = 0,
     DateTime? ArchivedAt = null);
 
@@ -313,6 +317,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
         public bool AllowDraft { get; set; }
 
+        public bool AllowEmbedding { get; set; }
+
         public long ResponseCount { get; set; }
 
         public long TestResponseCount { get; set; }
@@ -375,7 +381,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             "SELECT s.[SurveyId], s.[PublicId], s.[Title], s.[PleasanterSiteId], "
             + "       s.[Status], s.[PublishedVersion], s.[UpdatedAt], s.[ArchivedAt], "
             + "       s.[SuspendedReason], s.[SuspendedAt], s.[ResponseLimit], "
-            + "       s.[RequireProofOfWork], s.[AllowDraft], "
+            + "       s.[RequireProofOfWork], s.[AllowDraft], s.[AllowEmbedding], "
             + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
             + "        WHERE t.[SurveyId] = s.[SurveyId] AND t.[IsTest] = @IsTest) AS [ResponseCount], "
             + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
@@ -403,6 +409,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 (int)row.ResponseCount,
                 row.RequireProofOfWork,
                 row.AllowDraft,
+                row.AllowEmbedding,
                 (int)row.TestResponseCount,
                 row.ArchivedAt)),
         ];
