@@ -789,21 +789,23 @@
     {titleFilter !== '' || statusFilter !== null ? t('list.emptyFiltered') : t('list.empty')}
   </p>
 {:else}
-  <table>
-    <thead>
-      <tr>
-        <th>{t('list.columnTitle')}</th>
-        <th class="compact-column">{t('list.columnStatus')}</th>
-        <th class="compact-column">{t('list.columnVersion')}</th>
-        <th class="compact-column">{t('list.columnResponses')}</th>
-        <th class="url-column">{t('list.columnUrl')}</th>
-        <th class="compact-column">{t('list.columnUpdated')}</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each surveys as survey (survey.surveyId)}
+  <!-- **表だけを横へ流す。** 文字を特大にしても画面全体を広げない -->
+  <div class="table-scroll">
+    <table>
+      <thead>
         <tr>
+          <th>{t('list.columnTitle')}</th>
+          <th class="compact-column">{t('list.columnStatus')}</th>
+          <th class="compact-column">{t('list.columnVersion')}</th>
+          <th class="compact-column">{t('list.columnResponses')}</th>
+          <th class="url-column">{t('list.columnUrl')}</th>
+          <th class="compact-column">{t('list.columnUpdated')}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each surveys as survey (survey.surveyId)}
+          <tr>
           <td>
             {#if survey.archivedAt == null}
               <button type="button" class="link" onclick={() => onopen(survey.surveyId)}>
@@ -902,10 +904,11 @@
             {/if}
             </div>
           </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
 
   <!--
     ⚠️ **印だけにしない。** Pleasanter 側のテスト回答は本アプリから消せず、
@@ -1122,6 +1125,11 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
+  }
+
+  .table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
   }
 
   th,
