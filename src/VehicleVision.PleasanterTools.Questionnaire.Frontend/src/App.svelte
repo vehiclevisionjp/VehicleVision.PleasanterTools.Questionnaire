@@ -616,6 +616,7 @@
     notStarted: 'rejected.notStarted',
     closed: 'rejected.closed',
     suspended: 'rejected.suspended',
+    embeddingNotAllowed: 'rejected.embeddingNotAllowed',
     notFound: 'rejected.notFound',
     rejected: 'rejected.rejected',
     tooManyRequests: 'rejected.tooManyRequests',
@@ -647,8 +648,19 @@
     <p class="status">{t('status.loading')}</p>
   {:else if screen === 'rejected'}
     <!-- **理由を明示する。「エラー」で済ませない** -->
-    <h1>{rejection === 'notFound' ? t('rejected.notFound.title') : t('rejected.closed.title')}</h1>
+    <h1>
+      {rejection === 'notFound'
+        ? t('rejected.notFound.title')
+        : rejection === 'embeddingNotAllowed'
+          ? t('rejected.embeddingNotAllowed.title')
+          : t('rejected.closed.title')}
+    </h1>
     <p class="status">{t(REJECTION_MESSAGES[rejection ?? 'notFound'])}</p>
+    {#if rejection === 'embeddingNotAllowed'}
+      <a href={location.href} target="_blank" rel="noreferrer">
+        {t('rejected.embeddingNotAllowed.open')}
+      </a>
+    {/if}
   {:else if screen === 'error'}
     <h1>{t('error.badUrl.title')}</h1>
     <p class="status">{t('error.badUrl')}</p>

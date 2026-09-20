@@ -408,7 +408,9 @@ public class AdminSurveyEndToEndTests
 
         Assert.Contains("frame-src https://www.example.com https://*.example.net", csp);
         Assert.Contains("img-src 'self' data: https://www.example.com https://*.example.net", csp);
-        Assert.Contains("frame-ancestors 'none'", csp);
+        Assert.Contains(
+            "frame-ancestors https://www.parent.example.com https://*.parent.example.net",
+            csp);
     }
 
     [Fact]
@@ -657,6 +659,49 @@ public class AdminSurveyEndToEndTests
 
         // **列挙も文字列で届くこと。** 数値だと画面側の分岐が全部外れる
         Assert.Equal("Radio", definition["pages"]![0]!["questions"]![0]!["type"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task 埋め込みを許可していないアンケートは枠内申告付きで読めない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+        var publicId = (await SummaryAsync(http, surveyId))["publicId"]!.GetValue<string>();
+
+        using var anonymous = CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/forms/{publicId}");
+        request.Headers.Add("X-Questionnaire-Framed", "1");
+        using var response = await anonymous.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            "embeddingNotAllowed",
+            (await ReadAsync(response))!["reason"]!.GetValue<string>());
+
+        using (var settings = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings",
+            new { responseLimit = (int?)null, allowEmbedding = true }))
+        {
+            settings.EnsureSuccessStatusCode();
+        }
+
+        using (var unchanged = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings",
+            new { responseLimit = 10 }))
+        {
+            unchanged.EnsureSuccessStatusCode();
+        }
+        Assert.True((await SummaryAsync(http, surveyId))["allowEmbedding"]!.GetValue<bool>());
+
+        using var allowedRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/forms/{publicId}");
+        allowedRequest.Headers.Add("X-Questionnaire-Framed", "1");
+        using var allowed = await anonymous.SendAsync(allowedRequest);
+        allowed.EnsureSuccessStatusCode();
     }
 
     /// <summary>公開済みのアンケートを 1 つ用意する。</summary>

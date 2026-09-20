@@ -1,4 +1,5 @@
 import type { FormResponse, PayloadAnswer, RejectionReason, Ticket } from './types';
+import { framedHeaders } from './framed';
 
 /** 回答トークンの保存先。**URL には載せない。** */
 const TOKEN_STORAGE_PREFIX = 'questionnaire.token.';
@@ -211,7 +212,7 @@ export interface LoadResult {
 /** 公開中のアンケートを取りに行く。 */
 export async function loadForm(publicId: string): Promise<LoadResult> {
   const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}`, {
-    headers: { accept: 'application/json' },
+    headers: { accept: 'application/json', ...framedHeaders() },
   });
 
   if (response.ok) {
@@ -295,7 +296,7 @@ export async function submitAnswers(
   if (attachments.length === 0) {
     request = {
       method: 'PUT',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...framedHeaders() },
       body: JSON.stringify({
         answers,
         ticket: context.ticket,
@@ -320,7 +321,7 @@ export async function submitAnswers(
       form.append(attachment.questionId, attachment.file, attachment.file.name);
     }
     // **content-type を自分で付けない。** 境界文字列はブラウザが決める
-    request = { method: 'PUT', body: form };
+    request = { method: 'PUT', headers: framedHeaders(), body: form };
   }
 
   const response = await fetch(url, request);

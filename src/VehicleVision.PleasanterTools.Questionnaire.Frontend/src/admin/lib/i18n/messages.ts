@@ -960,6 +960,11 @@ export const ja = {
   'settings.allowDraft': '回答の下書きを端末に保存する',
   'settings.allowDraftHint': '回答者が書きかけの内容を端末に保存し、後から続きを入力できるようになります。サーバへは送信しません。',
   'settings.allowDraftWarning': '共有端末（店頭のタブレット、共用 PC）では、次に使う人が前の人の回答を見られる可能性があります。再開するかどうかは回答者が選びますが、内容は端末に残ります。',
+  'settings.allowEmbedding': '回答画面を他サイトへの埋め込みで利用できるようにする',
+  'settings.allowEmbeddingHint': '運用側が許可した親サイトからだけ利用できます。変更は公開し直さなくても直ちに反映されます。',
+  'settings.allowEmbeddingUnavailable': '運用側で埋め込み元が許可されていないため、この設定を有効にしても埋め込めません。',
+  'settings.iframeTag': '貼り付け用 iframe タグ',
+  'settings.iframeTagHint': '埋め込み先のレイアウトに合わせて幅と高さを指定してください。',
   'settings.proofOfWorkHint':
     '回答者のブラウザに短い計算をさせ、機械的な大量送信のコストを上げます。一般公開するアンケートでは有効のままにしてください。社内向けなど、URL を知る人が限られる場合は無効にしても構いません。',
   'settings.proofOfWorkKeepsOthers': '無効にしても、送信チケット・最短送信時間・ハニーポットは有効なままです。',
@@ -1964,6 +1969,13 @@ export const en: Record<MessageKey, string> = {
     'Respondents can keep what they have written on their device and come back later. Nothing is sent to the server.',
   'settings.allowDraftWarning':
     'On a shared device (a showroom tablet, a shared PC) the next person can see the previous answer. They choose whether to resume, but the content stays on the device.',
+  'settings.allowEmbedding': 'Allow this survey to be answered when embedded in another site',
+  'settings.allowEmbeddingHint':
+    'Only parent sites allowed by the operator can use it. Changes take effect immediately without republishing.',
+  'settings.allowEmbeddingUnavailable':
+    'No parent site is allowed by the operator, so enabling this setting will not make embedding available.',
+  'settings.iframeTag': 'iframe tag to paste',
+  'settings.iframeTagHint': 'Set the width and height to suit the layout of the parent site.',
   'settings.proofOfWorkHint':
     "The respondent's browser solves a short puzzle, which raises the cost of bulk automated "
     + 'submissions. Keep it on for surveys open to the public. You may turn it off for internal '

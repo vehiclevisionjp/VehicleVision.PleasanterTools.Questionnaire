@@ -91,6 +91,9 @@ public sealed record FormResponse(
 /// <summary>回答画面向けの口。**認証は無い。**</summary>
 public static class FormEndpoints
 {
+    /// <summary>回答画面が枠内で動いていることを申告するヘッダ。</summary>
+    public const string FramedHeader = "X-Questionnaire-Framed";
+
     /// <summary>回答の送信だけに掛けるレート制限の名前。</summary>
     /// <remarks>
     /// **書き込みは読み取りより高くつく。** 全体の枠に紛れさせない
@@ -111,10 +114,17 @@ public static class FormEndpoints
 
         forms.MapGet("/{publicId}", async (
             string publicId,
+            HttpContext context,
             ResponseIntake intake,
             CancellationToken cancellationToken) =>
         {
-            var (form, rejection) = await intake.GetPublishedAsync(publicId, cancellationToken);
+            // **同じ URL でも枠内申告で応答が変わる。**
+            // 枠外で得た 200 を共有キャッシュが枠内へ使い回さないようにする
+            context.Response.Headers.Vary = FramedHeader;
+            var (form, rejection) = await intake.GetPublishedAsync(
+                publicId,
+                cancellationToken,
+                IsFramed(context));
             return form is null
                 ? ToProblem(rejection)
                 : Results.Ok(new FormResponse(
@@ -343,15 +353,12 @@ public static class FormEndpoints
             context.Response.Cookies.Append(
                 AssetTicket.CookieName,
                 request.AssetTicket,
-                new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = context.Request.IsHttps,
-                    SameSite = SameSiteMode.Lax,
-                    Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
-                    Expires = new DateTimeOffset(DateTime.SpecifyKind(
-                        grant.ExpiresAtUtc, DateTimeKind.Utc)),
-                });
+                AssetCookieOptions(
+                    form.AllowEmbedding,
+                    context.Request.IsHttps,
+                    publicId,
+                    new DateTimeOffset(DateTime.SpecifyKind(
+                        grant.ExpiresAtUtc, DateTimeKind.Utc))));
 
             return Results.Ok(new FormResponse(
                 publicId,
@@ -513,7 +520,8 @@ public static class FormEndpoints
                 answers,
                 attachments,
                 RequestLanguage.Of(context),
-                cancellationToken);
+                cancellationToken,
+                IsFramed(context));
 
             if (result.Accepted)
             {
@@ -524,13 +532,10 @@ public static class FormEndpoints
                     context.Response.Cookies.Append(
                         AssetTicket.CookieName,
                         guard.IssueAssetAccess(publicId, responseToken),
-                        new CookieOptions
-                        {
-                            HttpOnly = true,
-                            Secure = context.Request.IsHttps,
-                            SameSite = SameSiteMode.Lax,
-                            Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
-                        });
+                        AssetCookieOptions(
+                            result.AllowEmbedding,
+                            context.Request.IsHttps,
+                            publicId));
                 }
 
                 // **受付完了。** Pleasanter へはこの後ワーカーが送る
@@ -658,8 +663,37 @@ public static class FormEndpoints
             new { reason = "closed" }, statusCode: StatusCodes.Status403Forbidden),
         IntakeRejection.Suspended => Results.Json(
             new { reason = "suspended" }, statusCode: StatusCodes.Status403Forbidden),
+        IntakeRejection.EmbeddingNotAllowed => Results.Json(
+            new { reason = "embeddingNotAllowed" }, statusCode: StatusCodes.Status403Forbidden),
         _ => Results.NotFound(),
     };
+
+    /// <summary>回答画面からの枠内申告が付いているか。</summary>
+    private static bool IsFramed(HttpContext context) =>
+        context.Request.Headers[FramedHeader]
+            .Any(value => string.Equals(value, "1", StringComparison.Ordinal));
+
+    /// <summary>配布資産の Cookie 属性を、アンケートと通信方式に合わせて決める。</summary>
+    /// <remarks>
+    /// **埋め込みを許可したアンケートかつ HTTPS のときだけ cross-site へ送る。**
+    /// それ以外は従来の Lax を保ち、平文 HTTP 運用でも Cookie を保存できるようにする。
+    /// </remarks>
+    public static CookieOptions AssetCookieOptions(
+        bool allowEmbedding,
+        bool isHttps,
+        string publicId,
+        DateTimeOffset? expires = null)
+    {
+        var crossSite = allowEmbedding && isHttps;
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = isHttps,
+            SameSite = crossSite ? SameSiteMode.None : SameSiteMode.Lax,
+            Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
+            Expires = expires,
+        };
+    }
 
     private static Dictionary<string, string[]> ToValidationErrors(IntakeResult result) =>
         result.Errors

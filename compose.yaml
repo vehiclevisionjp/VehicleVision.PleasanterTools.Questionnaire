@@ -122,6 +122,7 @@ x-app-environment: &app-environment
     # **埋め込みを許す配信元**（Issue #104 / #107）。**製品の既定は空。**
     # 検証環境では、許した／許していないの両方を試せるように 2 つだけ入れる
     QUESTIONNAIRE_EMBED_ALLOWEDHOSTS: ${DEV_EMBED_ALLOWEDHOSTS:-www.example.com,*.example.net}
+    QUESTIONNAIRE_EMBED_ALLOWEDPARENTS: ${DEV_EMBED_ALLOWEDPARENTS:-www.parent.example.com,*.parent.example.net}
 
 include:
   - path: tools/pleasanter-testenv/docker-compose.yml
