@@ -332,6 +332,7 @@
         <button
           type="button"
           class:active={designTarget === page.pageIndex}
+          aria-pressed={designTarget === page.pageIndex}
           onclick={() => selectDesignPage(page.pageIndex)}
         >
           {page.title}
@@ -340,6 +341,7 @@
       <button
         type="button"
         class:active={designTarget === 'completed'}
+        aria-pressed={designTarget === 'completed'}
         onclick={() => (designTarget = 'completed')}
       >
         {t('preview.completed')}

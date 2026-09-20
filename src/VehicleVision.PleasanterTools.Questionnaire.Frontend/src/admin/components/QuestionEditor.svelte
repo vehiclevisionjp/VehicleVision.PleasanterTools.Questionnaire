@@ -418,7 +418,7 @@
   }
 </script>
 
-<article class="question" class:selected>
+<article class="question" class:selected aria-current={selected ? 'true' : undefined}>
   <div class="head">
     <input
       class="title"
