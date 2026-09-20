@@ -229,7 +229,7 @@ jobs:
     needs: plan
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
-    # PR の必須チェック（3 RDBMS 結合テストを含む）の通過を 2 本待つ
+    # PR の必須チェック（4 RDBMS 結合テストを含む）の通過を 2 本待つ
     timeout-minutes: 90
     steps:
       - name: my-repo-automation-bot のトークンを作る
