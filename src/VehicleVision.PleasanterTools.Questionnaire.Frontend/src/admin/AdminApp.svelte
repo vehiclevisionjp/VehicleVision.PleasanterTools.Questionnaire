@@ -450,6 +450,12 @@
         <span>{t('app.insecureMode')}</span>
       </aside>
     {/if}
+    {#if applicationVersion?.usesSqlite}
+      <aside class="insecure-warning" role="alert">
+        <span class="material-icons" aria-hidden="true">warning</span>
+        <span>{t('app.sqliteMode')}</span>
+      </aside>
+    {/if}
 
     <!--
       **表を出す画面だけ広く使う。** 列が多くて識別子も入るので、

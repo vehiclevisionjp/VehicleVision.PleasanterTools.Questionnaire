@@ -219,7 +219,11 @@ public class AdminOutboxTests
     // ---- SQL の書き方 -------------------------------------------------------
 
     public static TheoryData<DatabaseProvider> Providers() =>
-        new(DatabaseProvider.SqlServer, DatabaseProvider.PostgreSql, DatabaseProvider.MySql);
+        new(
+            DatabaseProvider.SqlServer,
+            DatabaseProvider.PostgreSql,
+            DatabaseProvider.MySql,
+            DatabaseProvider.Sqlite);
 
     [Theory]
     [MemberData(nameof(Providers))]
@@ -251,13 +255,18 @@ public class AdminOutboxTests
     [Fact]
     public void 件数を絞る句は方言ごとに変わる()
     {
-        // **MySQL は OFFSET/FETCH を解さない。** 3 者で書き分ける
+        // **MySQL と SQLite は OFFSET/FETCH を解さない。**
         Assert.Contains(
             "OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY",
             SqlDialect.ListDeadLetters(DatabaseProvider.SqlServer),
             StringComparison.Ordinal);
 
-        foreach (var provider in new[] { DatabaseProvider.PostgreSql, DatabaseProvider.MySql })
+        foreach (var provider in new[]
+        {
+            DatabaseProvider.PostgreSql,
+            DatabaseProvider.MySql,
+            DatabaseProvider.Sqlite,
+        })
         {
             Assert.Contains(
                 "LIMIT @Limit OFFSET @Offset",

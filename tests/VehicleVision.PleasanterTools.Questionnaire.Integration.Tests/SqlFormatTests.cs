@@ -28,6 +28,16 @@ public class SqlFormatTests
     }
 
     [Fact]
+    public void SQLiteでは二重引用符になる()
+    {
+        Assert.Equal(
+            "SELECT \"PublicId\" FROM \"Surveys\" WHERE \"SurveyId\" = @SurveyId",
+            SqlDialect.Format(
+                DatabaseProvider.Sqlite,
+                "SELECT [PublicId] FROM [Surveys] WHERE [SurveyId] = @SurveyId"));
+    }
+
+    [Fact]
     public void MySqlでは逆引用符になる()
     {
         Assert.Equal(

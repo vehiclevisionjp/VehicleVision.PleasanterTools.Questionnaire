@@ -6,7 +6,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// **DB に入れる時刻は必ずここを通す。** <c>DateTime.UtcNow</c> をそのまま渡さない。
 /// </para>
 /// <para>
-/// 理由は 2 つあり、**どちらも実機で踏んでいる**
+/// 理由は 2 つあり、**いずれも対応 RDBMS の実機で踏んでいる**
 /// （<c>_documents/データモデル設計.md</c> 4 章）。
 /// </para>
 /// </remarks>
@@ -30,7 +30,7 @@ public static class DbTime
     /// 種別を外せば <c>timestamp</c> と判断され、渡した値がそのまま入る。
     /// </para>
     /// <para>
-    /// **列に入っているのは常に UTC。** 3 つの RDBMS のいずれも時間帯を持たない列なので、
+    /// **列に入っているのは常に UTC。** 4 つの RDBMS のいずれも時間帯を持たない列なので、
     /// 読み出した値の <see cref="DateTimeKind"/> は <see cref="DateTimeKind.Unspecified"/> になる。
     /// 表示のための変換は <c>PleasanterDateTime</c> が一手に引き受ける。
     /// </para>

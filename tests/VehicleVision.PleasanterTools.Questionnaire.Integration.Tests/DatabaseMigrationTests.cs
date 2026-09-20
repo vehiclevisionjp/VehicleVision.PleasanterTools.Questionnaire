@@ -4,7 +4,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Web;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>3 RDBMS へ同じスキーマを流せることを確かめる。</summary>
+/// <summary>4 RDBMS へ同じスキーマを流せることを確かめる。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**
@@ -17,11 +17,34 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 public class DatabaseMigrationTests
 {
     private const string Password = "Questionnaire#Test1";
+    private const string ProviderSetting = "QUESTIONNAIRE_INTEGRATION_PROVIDER";
+    private static readonly string SqliteConnectionString =
+        $"Data Source={Path.Combine(
+            AppContext.BaseDirectory,
+            $"questionnaire-integration-{Environment.ProcessId}.db")};Pooling=False";
 
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
-    public static TheoryData<DatabaseProvider, string> Providers() => new()
+    public static TheoryData<DatabaseProvider, string> Providers()
+    {
+        if (string.Equals(
+            Environment.GetEnvironmentVariable(ProviderSetting),
+            nameof(DatabaseProvider.Sqlite),
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return new TheoryData<DatabaseProvider, string>
+            {
+                { DatabaseProvider.Sqlite, SqliteConnectionString },
+            };
+        }
+
+        var providers = ServerProviders();
+        providers.Add(DatabaseProvider.Sqlite, SqliteConnectionString);
+        return providers;
+    }
+
+    private static TheoryData<DatabaseProvider, string> ServerProviders() => new()
     {
         {
             DatabaseProvider.SqlServer,
@@ -39,7 +62,7 @@ public class DatabaseMigrationTests
 
     [Theory]
     [MemberData(nameof(Providers))]
-    public void 同じ定義から三つのRDBMSへスキーマを流せる(
+    public void 同じ定義から四つのRDBMSへスキーマを流せる(
         DatabaseProvider provider,
         string connectionString)
     {
@@ -57,6 +80,48 @@ public class DatabaseMigrationTests
 
         // **足りないものを名前で言えること。** 「当て忘れている」だけでは直せない
         Assert.Empty(DatabaseMigrator.PendingMigrations(provider, connectionString));
+    }
+
+    [Fact]
+    public async Task SQLiteはWALで書き込みの解放を待てる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        DatabaseMigrator.MigrateUp(DatabaseProvider.Sqlite, SqliteConnectionString);
+        var factory = new DbConnectionFactory(DatabaseProvider.Sqlite, SqliteConnectionString);
+        await using var first = factory.Create();
+        await using var second = factory.Create();
+        await first.OpenAsync();
+        await second.OpenAsync();
+
+        Assert.True(
+            Version.Parse(first.ServerVersion) >= new Version(3, 35),
+            $"SQLite {first.ServerVersion} does not support RETURNING.");
+        Assert.Equal("wal", await first.ExecuteScalarAsync<string>("PRAGMA journal_mode"));
+        Assert.Equal(30_000, await second.ExecuteScalarAsync<int>("PRAGMA busy_timeout"));
+        Assert.Equal(1, await second.ExecuteScalarAsync<int>("PRAGMA foreign_keys"));
+
+        await using var transaction = await first.BeginTransactionAsync();
+        var now = DbTime.UtcNowTruncated();
+        await first.ExecuteAsync(
+            "INSERT INTO \"AuditLogs\" "
+            + "(\"AuditLogId\", \"OccurredAt\", \"Action\") VALUES (@Id, @Now, @Action)",
+            new { Id = Guid.NewGuid(), Now = now, Action = "sqlite-lock-1" },
+            transaction);
+
+        var waitingWrite = Task.Run(() => second.Execute(
+            "INSERT INTO \"AuditLogs\" "
+            + "(\"AuditLogId\", \"OccurredAt\", \"Action\") VALUES (@Id, @Now, @Action)",
+            new { Id = Guid.NewGuid(), Now = now, Action = "sqlite-lock-2" }));
+
+        await Task.Delay(100);
+        Assert.False(waitingWrite.IsCompleted);
+
+        await transaction.CommitAsync();
+        Assert.Equal(1, await waitingWrite);
     }
 
     [Fact]

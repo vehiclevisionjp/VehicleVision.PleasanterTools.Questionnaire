@@ -3,7 +3,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>管理操作の記録を 3 RDBMS へ書けること。</summary>
+/// <summary>管理操作の記録を 4 RDBMS へ書けること。</summary>
 /// <remarks>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**
 /// 設定していない場合は何も検証せずに終わる。**緑を「通った」と読まないこと。**
@@ -15,7 +15,10 @@ public class AuditLogStoreTests
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
-    public static TheoryData<DatabaseProvider, string> Providers() => new()
+    public static TheoryData<DatabaseProvider, string> Providers() =>
+        DatabaseMigrationTests.Providers();
+
+    private static TheoryData<DatabaseProvider, string> ServerProviders() => new()
     {
         {
             DatabaseProvider.SqlServer,

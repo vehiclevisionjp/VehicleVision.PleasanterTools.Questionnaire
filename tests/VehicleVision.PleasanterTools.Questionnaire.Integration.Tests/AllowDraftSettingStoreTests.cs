@@ -2,7 +2,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>アンケートごとの下書きの可否を、3 RDBMS で確かめる（Issue #59）。</summary>
+/// <summary>アンケートごとの下書きの可否を、4 RDBMS で確かめる（Issue #59）。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**

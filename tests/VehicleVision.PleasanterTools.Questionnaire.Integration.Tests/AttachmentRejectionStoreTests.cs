@@ -3,7 +3,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>添付を弾いた記録の読み書きを 3 RDBMS で確かめる（Issue #39）。</summary>
+/// <summary>添付を弾いた記録の読み書きを 4 RDBMS で確かめる（Issue #39）。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**

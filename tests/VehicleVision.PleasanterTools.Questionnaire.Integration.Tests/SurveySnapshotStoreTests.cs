@@ -4,7 +4,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>公開した版を 3 RDBMS へ保存して読み戻せることを確かめる。</summary>
+/// <summary>公開した版を 4 RDBMS へ保存して読み戻せることを確かめる。</summary>
 /// <remarks>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**
 /// </remarks>

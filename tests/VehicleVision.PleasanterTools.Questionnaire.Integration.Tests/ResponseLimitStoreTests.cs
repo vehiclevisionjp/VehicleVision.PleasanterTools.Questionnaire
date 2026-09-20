@@ -2,7 +2,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>回答数の上限と停止の理由を、3 RDBMS で確かめる（Issue #53）。</summary>
+/// <summary>回答数の上限と停止の理由を、4 RDBMS で確かめる（Issue #53）。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**

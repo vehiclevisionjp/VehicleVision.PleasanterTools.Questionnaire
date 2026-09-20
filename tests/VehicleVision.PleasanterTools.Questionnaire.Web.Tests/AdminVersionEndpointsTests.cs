@@ -31,6 +31,7 @@ public class AdminVersionEndpointsTests
         Assert.Equal("0.2.0", response.Version);
         Assert.Null(response.Commit);
         Assert.False(response.AllowInsecure);
+        Assert.False(response.UsesSqlite);
     }
 
     [Fact]
@@ -39,5 +40,13 @@ public class AdminVersionEndpointsTests
         var response = AdminVersionEndpoints.ToResponse("0.2.0", allowInsecure: true);
 
         Assert.True(response.AllowInsecure);
+    }
+
+    [Fact]
+    public void SQLite運用の宣言を管理画面へ返す()
+    {
+        var response = AdminVersionEndpoints.ToResponse("0.2.0", usesSqlite: true);
+
+        Assert.True(response.UsesSqlite);
     }
 }

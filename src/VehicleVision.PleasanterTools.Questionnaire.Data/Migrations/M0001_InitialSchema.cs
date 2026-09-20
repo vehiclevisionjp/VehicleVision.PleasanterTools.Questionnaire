@@ -5,7 +5,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// <summary>最初のスキーマ。</summary>
 /// <remarks>
 /// <para>
-/// **1 つの定義から SQL Server / PostgreSQL / MySQL の 3 つへ適用する。**
+/// **1 つの定義から SQL Server / PostgreSQL / MySQL / SQLite の 4 つへ適用する。**
 /// 方言差は FluentMigrator が吸収する（<c>_documents/データモデル設計.md</c> 5 章）。
 /// </para>
 /// <para>
@@ -44,15 +44,12 @@ public sealed class M0001_InitialSchema : Migration
 
         // **公開時に固める不変のスナップショット。** 消さない
         Create.Table("SurveyVersions")
-            .WithColumn("SurveyId").AsGuid().NotNullable()
-            .WithColumn("Version").AsInt32().NotNullable()
+            .WithColumn("SurveyId").AsGuid().NotNullable().PrimaryKey("PK_SurveyVersions")
+            .WithColumn("Version").AsInt32().NotNullable().PrimaryKey("PK_SurveyVersions")
             .WithColumn("DefinitionJson").AsString(int.MaxValue).NotNullable()
             .WithColumn("MappingJson").AsString(int.MaxValue).NotNullable()
             .WithColumn("PublishedAt").AsDateTime2().NotNullable()
             .WithColumn("PublishedBy").AsGuid().Nullable();
-
-        Create.PrimaryKey("PK_SurveyVersions")
-            .OnTable("SurveyVersions").Columns("SurveyId", "Version");
 
         // ---- 回答 ----------------------------------------------------------
         // **送信後も残す。** 回答の編集で ReferenceId を引くために要る

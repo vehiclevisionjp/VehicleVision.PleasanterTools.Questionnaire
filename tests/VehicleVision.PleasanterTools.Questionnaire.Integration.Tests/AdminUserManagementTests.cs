@@ -5,7 +5,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>管理者の管理を 3 RDBMS で確かめる。</summary>
+/// <summary>管理者の管理を 4 RDBMS で確かめる。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**

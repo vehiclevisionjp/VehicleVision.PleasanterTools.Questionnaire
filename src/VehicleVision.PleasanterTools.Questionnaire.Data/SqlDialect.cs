@@ -56,14 +56,14 @@ public static partial class SqlDialect
     public static string Quote(DatabaseProvider provider, string identifier) => provider switch
     {
         DatabaseProvider.SqlServer => $"[{identifier}]",
-        DatabaseProvider.PostgreSql => $"\"{identifier}\"",
+        DatabaseProvider.PostgreSql or DatabaseProvider.Sqlite => $"\"{identifier}\"",
         DatabaseProvider.MySql => $"`{identifier}`",
         _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
     };
 
     /// <summary><c>RETURNING</c> 相当が使えるか。</summary>
     public static bool SupportsReturning(DatabaseProvider provider) =>
-        provider is DatabaseProvider.SqlServer or DatabaseProvider.PostgreSql;
+        provider is DatabaseProvider.SqlServer or DatabaseProvider.PostgreSql or DatabaseProvider.Sqlite;
 
     /// <summary>
     /// 送信待ちの行を 1 件だけ確保する SQL。
@@ -96,8 +96,18 @@ public static partial class SqlDialect
             "  SELECT c.\"ResponseToken\" FROM \"Responses\" AS c " +
             "  WHERE c.\"Status\" = @PendingStatus AND c.\"NextAttemptAt\" <= @Now " +
             "  ORDER BY c.\"NextAttemptAt\" FOR UPDATE SKIP LOCKED LIMIT 1) " +
-            "RETURNING r.\"ResponseToken\", r.\"SurveyId\", r.\"SurveyVersion\", " +
-            "          r.\"PayloadJson\", r.\"RetryCount\"",
+            "RETURNING \"ResponseToken\", \"SurveyId\", \"SurveyVersion\", " +
+            "          \"PayloadJson\", \"RetryCount\"",
+
+        DatabaseProvider.Sqlite =>
+            "UPDATE \"Responses\" AS r " +
+            "SET \"Status\" = @SendingStatus, \"LockedBy\" = @LockedBy, \"LockedUntil\" = @LockedUntil " +
+            "WHERE r.rowid = (" +
+            "  SELECT c.rowid FROM \"Responses\" AS c " +
+            "  WHERE c.\"Status\" = @PendingStatus AND c.\"NextAttemptAt\" <= @Now " +
+            "  ORDER BY c.\"NextAttemptAt\" LIMIT 1) " +
+            "RETURNING \"ResponseToken\", \"SurveyId\", \"SurveyVersion\", " +
+            "          \"PayloadJson\", \"RetryCount\"",
 
         // MySQL は RETURNING が無いので、確保してから読み直す
         DatabaseProvider.MySql =>
@@ -119,7 +129,8 @@ public static partial class SqlDialect
     public static string Page(DatabaseProvider provider) => provider switch
     {
         DatabaseProvider.SqlServer => "OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY",
-        DatabaseProvider.PostgreSql or DatabaseProvider.MySql => "LIMIT @Limit OFFSET @Offset",
+        DatabaseProvider.PostgreSql or DatabaseProvider.MySql or DatabaseProvider.Sqlite =>
+            "LIMIT @Limit OFFSET @Offset",
         _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
     };
 
@@ -306,7 +317,7 @@ public static partial class SqlDialect
             "VALUES (@ResponseToken, @SurveyId, @SurveyVersion, @PayloadJson, @PendingStatus, " +
             "        0, @Now, @IsTest, @Now, @Now);",
 
-        DatabaseProvider.PostgreSql =>
+        DatabaseProvider.PostgreSql or DatabaseProvider.Sqlite =>
             "INSERT INTO \"Responses\" " +
             "  (\"ResponseToken\", \"SurveyId\", \"SurveyVersion\", \"PayloadJson\", \"Status\", " +
             "   \"RetryCount\", \"NextAttemptAt\", \"IsTest\", \"CreatedAt\", \"UpdatedAt\") " +
@@ -373,7 +384,7 @@ public static partial class SqlDialect
             "  ([ResponseToken], [SurveyId], [PleasanterReferenceId], [IsTest], [CreatedAt], [UpdatedAt]) " +
             "VALUES (@ResponseToken, @SurveyId, @ReferenceId, @IsTest, @Now, @Now);",
 
-        DatabaseProvider.PostgreSql =>
+        DatabaseProvider.PostgreSql or DatabaseProvider.Sqlite =>
             "INSERT INTO \"ResponseTokens\" " +
             "  (\"ResponseToken\", \"SurveyId\", \"PleasanterReferenceId\", \"IsTest\", \"CreatedAt\", \"UpdatedAt\") " +
             "VALUES (@ResponseToken, @SurveyId, @ReferenceId, @IsTest, @Now, @Now) " +
