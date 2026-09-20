@@ -28,6 +28,9 @@ public enum IntakeRejection
     /// <summary>停止中。</summary>
     Suspended,
 
+    /// <summary>このアンケートは枠内での回答を許していない。</summary>
+    EmbeddingNotAllowed,
+
     /// <summary>回答の中身が定義に合わない。</summary>
     Invalid,
 
@@ -138,7 +141,8 @@ public sealed class ResponseIntake(
     /// <remarks>**下書きは絶対に返さない。** 公開済みの版だけを返す。</remarks>
     public async Task<(PublishedForm? Form, IntakeRejection? Rejection)> GetPublishedAsync(
         string publicId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isFramed = false)
     {
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
             .ConfigureAwait(false);
@@ -147,6 +151,11 @@ public sealed class ResponseIntake(
         if (rejection is not null || survey?.PublishedVersion is null)
         {
             return (null, rejection ?? IntakeRejection.NotFound);
+        }
+
+        if (isFramed && !survey.AllowEmbedding)
+        {
+            return (null, IntakeRejection.EmbeddingNotAllowed);
         }
 
         // **溜まりすぎているなら、そもそも画面を出さない**（Issue #72）。
@@ -331,7 +340,8 @@ public sealed class ResponseIntake(
         IReadOnlyCollection<Answer> answers,
         IReadOnlyList<AnsweredAttachment>? attachments = null,
         string? language = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isFramed = false)
     {
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
             .ConfigureAwait(false);
@@ -340,6 +350,11 @@ public sealed class ResponseIntake(
         if (rejection is not null || survey?.PublishedVersion is null)
         {
             return IntakeResult.Reject(rejection ?? IntakeRejection.NotFound);
+        }
+
+        if (isFramed && !survey.AllowEmbedding)
+        {
+            return IntakeResult.Reject(IntakeRejection.EmbeddingNotAllowed);
         }
 
         // **溜まりすぎているなら、ここで断る**（Issue #72）。

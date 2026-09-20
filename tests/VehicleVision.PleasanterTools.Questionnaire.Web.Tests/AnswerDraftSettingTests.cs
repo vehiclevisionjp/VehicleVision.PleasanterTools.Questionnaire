@@ -84,13 +84,14 @@ public class AnswerDraftSettingTests
         ],
     };
 
-    private static ResponseIntake Intake(bool allowDraft)
+    private static ResponseIntake Intake(bool allowDraft, bool allowEmbedding = false)
     {
         var survey = new SurveyRecord(
             SurveyId, PublicId, "下書きの検証", 1, "DescriptionA",
             (int)SurveyStatus.Published, 1)
         {
             AllowDraft = allowDraft,
+            AllowEmbedding = allowEmbedding,
         };
 
         return new ResponseIntake(
@@ -127,6 +128,39 @@ public class AnswerDraftSettingTests
             SurveyId, PublicId, "既定", 1, null, (int)SurveyStatus.Published, 1);
 
         Assert.False(record.AllowDraft);
+        Assert.False(record.AllowEmbedding);
+    }
+
+    [Fact]
+    public async Task 埋め込み不可なら枠内で定義を返さない()
+    {
+        var (form, rejection) = await Intake(allowDraft: false)
+            .GetPublishedAsync(PublicId, isFramed: true);
+
+        Assert.Null(form);
+        Assert.Equal(IntakeRejection.EmbeddingNotAllowed, rejection);
+    }
+
+    [Fact]
+    public async Task 埋め込み可なら枠内でも定義を返す()
+    {
+        var (form, rejection) = await Intake(allowDraft: false, allowEmbedding: true)
+            .GetPublishedAsync(PublicId, isFramed: true);
+
+        Assert.NotNull(form);
+        Assert.Null(rejection);
+    }
+
+    [Fact]
+    public async Task 埋め込み不可なら枠内からの回答送信も断る()
+    {
+        var result = await Intake(allowDraft: false).SubmitAsync(
+            PublicId,
+            "response-token",
+            [],
+            isFramed: true);
+
+        Assert.Equal(IntakeRejection.EmbeddingNotAllowed, result.Rejection);
     }
 
     /// <summary>使わない口。**定義を読むだけの試験なので呼ばれない。**</summary>
