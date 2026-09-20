@@ -353,15 +353,12 @@ public static class FormEndpoints
             context.Response.Cookies.Append(
                 AssetTicket.CookieName,
                 request.AssetTicket,
-                new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.None,
-                    Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
-                    Expires = new DateTimeOffset(DateTime.SpecifyKind(
-                        grant.ExpiresAtUtc, DateTimeKind.Utc)),
-                });
+                AssetCookieOptions(
+                    form.AllowEmbedding,
+                    context.Request.IsHttps,
+                    publicId,
+                    new DateTimeOffset(DateTime.SpecifyKind(
+                        grant.ExpiresAtUtc, DateTimeKind.Utc))));
 
             return Results.Ok(new FormResponse(
                 publicId,
@@ -535,13 +532,10 @@ public static class FormEndpoints
                     context.Response.Cookies.Append(
                         AssetTicket.CookieName,
                         guard.IssueAssetAccess(publicId, responseToken),
-                        new CookieOptions
-                        {
-                            HttpOnly = true,
-                            Secure = true,
-                            SameSite = SameSiteMode.None,
-                            Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
-                        });
+                        AssetCookieOptions(
+                            result.AllowEmbedding,
+                            context.Request.IsHttps,
+                            publicId));
                 }
 
                 // **受付完了。** Pleasanter へはこの後ワーカーが送る
@@ -678,6 +672,28 @@ public static class FormEndpoints
     private static bool IsFramed(HttpContext context) =>
         context.Request.Headers[FramedHeader]
             .Any(value => string.Equals(value, "1", StringComparison.Ordinal));
+
+    /// <summary>配布資産の Cookie 属性を、アンケートと通信方式に合わせて決める。</summary>
+    /// <remarks>
+    /// **埋め込みを許可したアンケートかつ HTTPS のときだけ cross-site へ送る。**
+    /// それ以外は従来の Lax を保ち、平文 HTTP 運用でも Cookie を保存できるようにする。
+    /// </remarks>
+    public static CookieOptions AssetCookieOptions(
+        bool allowEmbedding,
+        bool isHttps,
+        string publicId,
+        DateTimeOffset? expires = null)
+    {
+        var crossSite = allowEmbedding && isHttps;
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = isHttps,
+            SameSite = crossSite ? SameSiteMode.None : SameSiteMode.Lax,
+            Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
+            Expires = expires,
+        };
+    }
 
     private static Dictionary<string, string[]> ToValidationErrors(IntakeResult result) =>
         result.Errors

@@ -50,7 +50,8 @@ public sealed record IntakeResult(
     ImmutableArray<ValidationError> Errors = default,
     ImmutableArray<AttachmentRejection> Attachments = default,
     string? AssetTicket = null,
-    bool GrantsInstantAssetAccess = false)
+    bool GrantsInstantAssetAccess = false,
+    bool AllowEmbedding = false)
 {
     public bool Accepted => Rejection is null;
 
@@ -92,7 +93,8 @@ public sealed record PublishedForm(
     bool RequiresProofOfWork,
     bool AllowsDraft = false,
     bool IsTest = false,
-    bool RecordsAssetHistory = false);
+    bool RecordsAssetHistory = false,
+    bool AllowEmbedding = false);
 
 /// <summary>公開版から配る資産と、引換券が必要か。</summary>
 public sealed record PublishedAsset(
@@ -107,7 +109,8 @@ public sealed record AssetTicketForm(
     Guid SurveyId,
     int SurveyVersion,
     SurveyDefinition Definition,
-    bool RecordsAssetHistory);
+    bool RecordsAssetHistory,
+    bool AllowEmbedding);
 
 /// <summary>回答を受け付けて送信待ちへ入れる。</summary>
 /// <remarks>
@@ -188,7 +191,8 @@ public sealed class ResponseIntake(
                     survey.RequireProofOfWork,
                     survey.AllowDraft,
                     survey.Status == (int)SurveyStatus.TestPublished,
-                    snapshot.IsAssetHistoryEnabled),
+                    snapshot.IsAssetHistoryEnabled,
+                    survey.AllowEmbedding),
                 null);
     }
 
@@ -317,7 +321,8 @@ public sealed class ResponseIntake(
                 survey.SurveyId,
                 survey.PublishedVersion.Value,
                 snapshot.Definition,
-                snapshot.IsAssetHistoryEnabled);
+                snapshot.IsAssetHistoryEnabled,
+                survey.AllowEmbedding);
     }
 
     /// <summary>回答を受け付ける。</summary>
@@ -543,7 +548,8 @@ public sealed class ResponseIntake(
 
         return new IntakeResult(
             AssetTicket: assetTicket,
-            GrantsInstantAssetAccess: grantsInstantAssetAccess);
+            GrantsInstantAssetAccess: grantsInstantAssetAccess,
+            AllowEmbedding: survey.AllowEmbedding);
     }
 
     /// <summary>回答数の上限に届いたことを管理者へ知らせる（Issue #80）。</summary>
