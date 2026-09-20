@@ -200,13 +200,6 @@
   const confirmation = $derived(
     noteBlocks(parsedNotes[CONFIRMATION_NOTE_ID] ?? null, language),
   );
-  const assetDeliveryMessage = $derived.by(() => {
-    const delivery = definition.assetDelivery ?? { expiration: 'AcceptTo', days: 30 };
-    if (delivery.expiration === 'DaysAfterResponse') {
-      return t('preview.assetDelivery.DaysAfterResponse', { days: delivery.days });
-    }
-    return t(`preview.assetDelivery.${delivery.expiration}`);
-  });
 
   const progress = $derived(
     steps.length === 0
@@ -350,13 +343,15 @@
   {/if}
 
   <div class="paper {previewWidth}" bind:this={paper}>
-    <!-- **飾り。** 回答画面と同じく `alt` は空にする -->
-    {#if headerImageUrl}
-      <img class="header-image" src={headerImageUrl} alt="" />
-    {/if}
-    <h2>{text(definition.title, language)}</h2>
-    {#if definition.description}
-      <p class="lead">{text(definition.description, language)}</p>
+    {#if previewMode !== 'design' || designTarget !== 'completed'}
+      <!-- **飾り。** 回答画面と同じく `alt` は空にする -->
+      {#if headerImageUrl}
+        <img class="header-image" src={headerImageUrl} alt="" />
+      {/if}
+      <h2>{text(definition.title, language)}</h2>
+      {#if definition.description}
+        <p class="lead">{text(definition.description, language)}</p>
+      {/if}
     {/if}
 
     {#if previewMode === 'response' && definition.showProgress && steps.length > 1}
@@ -388,9 +383,9 @@
           </p>
         {/if}
         {#if definition.allowEditingAfterSubmit}
-          <button type="button">{t('preview.edit')}</button>
+          <button type="button" disabled>{t('preview.edit')}</button>
         {/if}
-        <p class="asset-delivery" role="note">{assetDeliveryMessage}</p>
+        <button type="button" class="secondary" disabled>{t('preview.answerAgain')}</button>
       </section>
     {:else if previewMode === 'design' && designPage}
       {#if designPage.title}
@@ -601,12 +596,6 @@
 
   .empty {
     color: var(--muted);
-  }
-
-  .asset-delivery {
-    margin-top: 1rem;
-    color: var(--muted);
-    font-size: 0.9rem;
   }
 
   .visually-hidden {

@@ -786,10 +786,7 @@ export const ja = {
   'preview.completedTitle': '回答を受け付けました',
   'preview.completedThanks': 'ご協力ありがとうございました。',
   'preview.edit': '回答を編集する',
-  'preview.assetDelivery.CompletedOnly': 'この画面に配布物がある場合、送信直後だけ受け取れます。',
-  'preview.assetDelivery.AcceptTo': 'この画面に配布物がある場合、受付終了まで受け取れます。',
-  'preview.assetDelivery.DaysAfterResponse':
-    'この画面に配布物がある場合、回答から {days} 日間受け取れます。',
+  'preview.answerAgain': '別の回答を送信する',
   // ---- 回答用 URL の QR コード（Issue #57） ----
   'qr.open': 'QR コード',
   'qr.title': '「{title}」の QR コード',
@@ -1779,12 +1776,7 @@ export const en: Record<MessageKey, string> = {
   'preview.completedTitle': 'Your response has been received',
   'preview.completedThanks': 'Thank you for your time.',
   'preview.edit': 'Edit my response',
-  'preview.assetDelivery.CompletedOnly':
-    'If this screen has materials, recipients can get them only immediately after submitting.',
-  'preview.assetDelivery.AcceptTo':
-    'If this screen has materials, recipients can get them until the survey closes.',
-  'preview.assetDelivery.DaysAfterResponse':
-    'If this screen has materials, recipients can get them for {days} days after responding.',
+  'preview.answerAgain': 'Send another response',
   // ---- 回答用 URL の QR コード（Issue #57） ----
   'qr.open': 'QR code',
   'qr.title': 'QR code for "{title}"',
