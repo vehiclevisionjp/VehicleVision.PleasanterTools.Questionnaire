@@ -298,7 +298,7 @@
   .card {
     max-width: 28rem;
     padding: 1.25rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 1.25rem;
@@ -306,7 +306,7 @@
 
   .session-card {
     padding: 1.25rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 1.25rem;
@@ -355,7 +355,7 @@
   .secret code {
     display: inline-block;
     padding: 0.4rem 0.6rem;
-    background: #f2f4f7;
+    background: var(--disabled-surface);
     border-radius: 4px;
     /* **写し間違いを減らす。** 桁が揃う書体で出す */
     font-family: var(--font-mono, monospace);
@@ -381,7 +381,7 @@
     border: 0;
     border-radius: 4px;
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-text);
     font: inherit;
     cursor: pointer;
   }
@@ -411,7 +411,7 @@
   }
 
   .done {
-    color: #027a48;
+    color: var(--success);
     font-size: 0.9rem;
   }
 </style>

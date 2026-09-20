@@ -242,7 +242,7 @@
     gap: 0.75rem 1rem;
     padding: 1rem;
     margin-bottom: 1rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
   }
@@ -276,7 +276,7 @@
 
   .scroll {
     overflow-x: auto;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
   }

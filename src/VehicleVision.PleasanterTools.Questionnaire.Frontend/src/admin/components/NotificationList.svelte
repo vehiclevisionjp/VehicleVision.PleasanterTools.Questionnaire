@@ -201,7 +201,7 @@
     padding: 0.15rem 0.5rem;
     border-radius: 999px;
     background: var(--error);
-    color: #fff;
+    color: var(--accent-text);
     font-size: 0.8rem;
   }
 
@@ -212,7 +212,7 @@
 
   .scroll {
     overflow-x: auto;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
   }

@@ -1096,7 +1096,7 @@
     flex-wrap: wrap;
     padding: 0.75rem 1.25rem;
     margin-bottom: 1rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 0.85rem;
@@ -1113,8 +1113,8 @@
       padding: 0.25rem 0.4rem;
       border: 1px solid var(--border);
       border-radius: 4px;
-      background: #fff;
-      color: #101828;
+      background: var(--surface);
+      color: var(--text);
     }
 
     .hint {
@@ -1126,7 +1126,7 @@
   .survey,
   .page {
     padding: 1.25rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     margin-bottom: 1rem;
@@ -1174,7 +1174,8 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font: inherit;
-    color: #101828;
+    background: var(--surface);
+    color: var(--text);
     box-sizing: border-box;
   }
 
@@ -1214,7 +1215,7 @@
   .conflict {
     padding: 1rem;
     margin-bottom: 1rem;
-    background: #fef3f2;
+    background: var(--error-surface);
     border: 1px solid var(--error);
     border-radius: 6px;
 
@@ -1231,7 +1232,7 @@
   .flow-problems {
     margin: 0 0 1rem;
     padding: 0.75rem 1rem;
-    background: #fef3f2;
+    background: var(--error-surface);
     border: 1px solid var(--error);
     border-radius: 6px;
     font-size: 0.85rem;
@@ -1246,8 +1247,8 @@
     }
 
     &.from-server {
-      background: #fffaeb;
-      border-color: #fec84b;
+      background: var(--warning-surface);
+      border-color: var(--warning-border);
     }
   }
 
@@ -1267,8 +1268,8 @@
       padding: 0.3rem 0.4rem;
       border: 1px solid var(--border);
       border-radius: 4px;
-      background: #fff;
-      color: #101828;
+      background: var(--surface);
+      color: var(--text);
     }
 
     .hint {
@@ -1293,8 +1294,8 @@
   .problems {
     margin: 0 0 1rem;
     padding: 0.75rem 1rem 0.75rem 2rem;
-    background: #fffaeb;
-    border: 1px solid #fec84b;
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
     border-radius: 6px;
     font-size: 0.85rem;
 
@@ -1305,7 +1306,7 @@
   }
 
   .notice {
-    color: #067647;
+    color: var(--success);
   }
 
   .error {
@@ -1322,7 +1323,7 @@
     flex: none;
     padding: 0;
     line-height: 1;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
     cursor: pointer;

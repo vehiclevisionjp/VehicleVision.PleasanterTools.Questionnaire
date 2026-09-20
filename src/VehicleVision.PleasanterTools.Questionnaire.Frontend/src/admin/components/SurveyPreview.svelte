@@ -85,6 +85,11 @@
   let previewMode = $state<'response' | 'design'>('response');
   let designTarget = $state<number | 'completed'>(0);
   let previewWidth = $state<'desktop' | 'tablet' | 'mobile'>('desktop');
+  let progressBar = $state<HTMLElement | null>(null);
+
+  $effect(() => {
+    progressBar?.style.setProperty('width', `${progress}%`);
+  });
 
   /**
    * 説明文ブロックの記法を読んだ結果（Issue #108）。
@@ -327,6 +332,7 @@
         <button
           type="button"
           class:active={designTarget === page.pageIndex}
+          aria-pressed={designTarget === page.pageIndex}
           onclick={() => selectDesignPage(page.pageIndex)}
         >
           {page.title}
@@ -335,6 +341,7 @@
       <button
         type="button"
         class:active={designTarget === 'completed'}
+        aria-pressed={designTarget === 'completed'}
         onclick={() => (designTarget = 'completed')}
       >
         {t('preview.completed')}
@@ -362,7 +369,7 @@
         aria-valuemin="0"
         aria-valuemax="100"
       >
-        <div class="bar" style={`width:${progress}%`}></div>
+        <div class="bar" bind:this={progressBar}></div>
       </div>
       <p class="progress-text">
         {t('preview.stepCount', {
@@ -466,7 +473,7 @@
     padding: 0.2rem 0.35rem;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: #fff;
+    background: var(--surface);
   }
 
   /* **本物と見分けが付くようにする** */
@@ -474,8 +481,8 @@
     margin: 0.75rem 0 1rem;
     padding: 0.5rem 0.75rem;
     border-left: 3px solid var(--accent);
-    background: #eef4ff;
-    color: #1f2a44;
+    background: var(--info-surface);
+    color: var(--info-text);
     font-size: 0.9rem;
   }
 
@@ -567,7 +574,7 @@
   .progress {
     height: 6px;
     border-radius: 3px;
-    background: #eaecf0;
+    background: var(--border);
     overflow: hidden;
   }
 

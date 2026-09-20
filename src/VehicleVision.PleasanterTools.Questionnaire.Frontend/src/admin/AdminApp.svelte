@@ -11,6 +11,7 @@
   import SamlSettingsPanel from './components/SamlSettingsPanel.svelte';
   import SurveyEditor from './components/SurveyEditor.svelte';
   import SurveyList from './components/SurveyList.svelte';
+  import ReadabilityControls from '../components/ReadabilityControls.svelte';
   import {
     getApplicationVersion,
     getSession,
@@ -27,6 +28,15 @@
     truncateBreadcrumbTitle,
     type AdminPage,
   } from './lib/breadcrumbs';
+  import {
+    applyReadability,
+    readReadabilityPreferences,
+    resolveReadabilityPreferences,
+    saveReadabilityPreferences,
+    systemReadabilityPreferences,
+    type ReadabilityPreferenceName,
+    type ReadabilityPreferences,
+  } from '../lib/readability';
 
   let session = $state<AdminSession>();
   let applicationVersion = $state<ApplicationVersion>();
@@ -34,6 +44,21 @@
   let failed = $state(false);
   let surveyBreadcrumbTitle = $state<string | null>(null);
   let navigationGuard = $state<(() => boolean) | null>(null);
+  let readability = $state<ReadabilityPreferences>(
+    resolveReadabilityPreferences(readReadabilityPreferences(), systemReadabilityPreferences()),
+  );
+
+  $effect(() => {
+    applyReadability(document.documentElement, readability);
+  });
+
+  function changeReadability(
+    next: ReadabilityPreferences,
+    changed: ReadabilityPreferenceName,
+  ) {
+    readability = next;
+    saveReadabilityPreferences(next, changed);
+  }
 
   /** 開いているアンケート。**URL に出す**（再読み込みで戻れるように） */
   let openSurveyId = $state(readSurveyId());
@@ -391,6 +416,29 @@
         </select>
       </label>
 
+      <div class="readability">
+        <ReadabilityControls
+          id="admin-readability"
+          preferences={readability}
+          onchange={changeReadability}
+          labels={{
+            group: t('readability.group'),
+            fontSize: t('readability.fontSize'),
+            fontSizes: {
+              standard: t('readability.fontSize.standard'),
+              large: t('readability.fontSize.large'),
+              extraLarge: t('readability.fontSize.extraLarge'),
+            },
+            colorMode: t('readability.colorMode'),
+            colorModes: {
+              default: t('readability.colorMode.standard'),
+              highContrast: t('readability.colorMode.highContrast'),
+              dark: t('readability.colorMode.dark'),
+            },
+          }}
+        />
+      </div>
+
       {#if canSeeNotifications}
         <button type="button" class="link" onclick={openNotificationList}>
           {t('notifications.open')}
@@ -531,6 +579,19 @@
     --error: #b42318;
     --accent: #175cd3;
     --bg: #f9fafb;
+    --text: #101828;
+    --surface: #fff;
+    --accent-text: #fff;
+    --success: #067647;
+    --success-surface: #ecfdf3;
+    --warning-text: #7a4b00;
+    --warning-surface: #fff4e5;
+    --warning-border: #f79009;
+    --error-surface: #fef3f2;
+    --disabled-surface: #f2f4f7;
+    --disabled-text: #475467;
+    --info-surface: #eef4ff;
+    --info-text: #1f2a44;
     /* **書体は同梱している**（Issue #152）。等幅は日本語も等幅になる */
     --font-mono: 'M PLUS 1 Code Variable', ui-monospace, Consolas, monospace;
   }
@@ -540,7 +601,7 @@
     background: var(--bg);
     /* **同梱した書体を使う**（Issue #152）。端末の書体に依存させない */
     font-family: 'Noto Sans JP Variable', system-ui, sans-serif;
-    color: #101828;
+    color: var(--text);
     line-height: 1.6;
   }
 
@@ -550,7 +611,7 @@
     border-radius: 6px;
     border: 1px solid var(--accent);
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-text);
     cursor: pointer;
   }
 
@@ -595,22 +656,23 @@
   }
 
   :global(button.secondary) {
-    background: #fff;
+    background: var(--surface);
     color: var(--accent);
   }
 
   .top {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 1rem;
     padding: 0.75rem 1.5rem;
-    background: #fff;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
   }
 
   .breadcrumbs {
     padding: 0.5rem 1.5rem;
-    background: #fff;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
     color: var(--muted);
     font-size: 0.85rem;
@@ -640,10 +702,10 @@
     max-width: 77rem;
     margin: 1rem auto 0;
     padding: 0.75rem 1rem;
-    border: 1px solid #f79009;
+    border: 1px solid var(--warning-border);
     border-radius: 6px;
-    background: #fff4e5;
-    color: #7a4b00;
+    background: var(--warning-surface);
+    color: var(--warning-text);
   }
 
   .breadcrumb-link {
@@ -675,8 +737,13 @@
     padding: 0.2rem 0.35rem;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: #fff;
-    color: #101828;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .readability {
+    color: var(--muted);
+    font-size: 0.85rem;
   }
 
   /* **読み上げには残す。** 目で見れば分かるが、耳では分からない */
@@ -708,7 +775,7 @@
     margin-left: 0.25rem;
     border-radius: 999px;
     background: var(--error);
-    color: #fff;
+    color: var(--accent-text);
     font-size: 0.75rem;
     text-align: center;
   }

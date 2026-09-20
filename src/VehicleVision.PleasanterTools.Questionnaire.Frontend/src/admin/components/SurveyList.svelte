@@ -478,6 +478,26 @@
         });
   }
 
+  /** 状態を色なしでも一覧で見分けられるようにする。 */
+  function statusMarker(survey: SurveySummary): string {
+    if (survey.archivedAt != null) {
+      return '□';
+    }
+
+    switch (survey.status) {
+      case 0:
+        return '○';
+      case 1:
+        return '◆';
+      case 2:
+        return '■';
+      case 3:
+        return '△';
+      default:
+        return '?';
+    }
+  }
+
   /** 回答用 URL。**公開用 ID しか出さない。** */
   function formUrl(publicId: string): string {
     return `${location.origin}/f/${publicId}`;
@@ -789,21 +809,23 @@
     {titleFilter !== '' || statusFilter !== null ? t('list.emptyFiltered') : t('list.empty')}
   </p>
 {:else}
-  <table>
-    <thead>
-      <tr>
-        <th>{t('list.columnTitle')}</th>
-        <th class="compact-column">{t('list.columnStatus')}</th>
-        <th class="compact-column">{t('list.columnVersion')}</th>
-        <th class="compact-column">{t('list.columnResponses')}</th>
-        <th class="url-column">{t('list.columnUrl')}</th>
-        <th class="compact-column">{t('list.columnUpdated')}</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each surveys as survey (survey.surveyId)}
+  <!-- **表だけを横へ流す。** 文字を特大にしても画面全体を広げない -->
+  <div class="table-scroll">
+    <table>
+      <thead>
         <tr>
+          <th>{t('list.columnTitle')}</th>
+          <th class="compact-column">{t('list.columnStatus')}</th>
+          <th class="compact-column">{t('list.columnVersion')}</th>
+          <th class="compact-column">{t('list.columnResponses')}</th>
+          <th class="url-column">{t('list.columnUrl')}</th>
+          <th class="compact-column">{t('list.columnUpdated')}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each surveys as survey (survey.surveyId)}
+          <tr>
           <td>
             {#if survey.archivedAt == null}
               <button type="button" class="link" onclick={() => onopen(survey.surveyId)}>
@@ -815,7 +837,10 @@
             {/if}
           </td>
           <td class="compact-column">
-            <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
+            <span class:status-archived={survey.archivedAt != null} class="status-{survey.status}">
+              <span class="status-marker" aria-hidden="true">{statusMarker(survey)}</span>
+              {survey.archivedAt == null ? t(surveyStatusKey(survey.status)) : t('archive.archived')}
+            </span>
             <!--
               **なぜ止まっているのかが分かること**（_documents/データモデル設計.md 2.1）。
               理由の付いていない古い停止では、鍵が無いので何も出さない
@@ -902,10 +927,11 @@
             {/if}
             </div>
           </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
 
   <!--
     ⚠️ **印だけにしない。** Pleasanter 側のテスト回答は本アプリから消せず、
@@ -997,7 +1023,7 @@
     gap: 0.75rem;
     padding: 1.25rem;
     margin-bottom: 1.5rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
   }
@@ -1118,10 +1144,15 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
+  }
+
+  .table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
   }
 
   th,
@@ -1227,7 +1258,7 @@
   }
 
   .status-1 {
-    color: #067647;
+    color: var(--success);
     font-weight: 600;
   }
 
@@ -1237,8 +1268,18 @@
   }
 
   .status-3 {
-    color: #9a6700;
+    color: var(--warning-text);
     font-weight: 600;
+  }
+
+  .status-archived {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .status-marker {
+    display: inline-block;
+    width: 1.25em;
   }
 
   .status {
@@ -1250,7 +1291,7 @@
   }
 
   .saved {
-    color: #067647;
+    color: var(--success);
     font-size: 0.9rem;
   }
 </style>

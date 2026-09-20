@@ -457,7 +457,7 @@
   .card {
     flex: 1 1 16rem;
     padding: 1rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     /* **色だけに頼らない。** 左端の太い線でも状態が分かるようにする */
     border-left-width: 4px;
@@ -493,7 +493,7 @@
 
   .scroll {
     overflow-x: auto;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
   }
@@ -556,7 +556,7 @@
   .backlog {
     margin-top: 1.5rem;
     padding: 1rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     /* **色だけに頼らない。** 左端の太い線でも状態が分かるようにする */
     border-left: 4px solid var(--border);
