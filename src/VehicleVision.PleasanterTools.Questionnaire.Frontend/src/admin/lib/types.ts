@@ -485,6 +485,11 @@ export interface SurveySummary {
    */
   allowDraft?: boolean;
   /**
+   * 回答画面を運用側が許可した親サイトへ埋め込んでよいか（Issue #334）。
+   * **既定は無効。**
+   */
+  allowEmbedding?: boolean;
+  /**
    * 受け付けた回答の件数。
    *
    * **まだ Pleasanter へ届いていない分も含む。**

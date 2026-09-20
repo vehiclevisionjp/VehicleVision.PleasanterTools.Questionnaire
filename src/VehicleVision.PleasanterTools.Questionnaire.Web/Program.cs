@@ -238,6 +238,11 @@ builder.Services.AddSingleton(assetOptions);
 var embedOptions = EmbedOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(embedOptions);
 
+// **回答画面を埋め込める親サイト**（Issue #334）。
+// 配信元を許す `EmbedOptions` とは逆方向なので混ぜない
+var embedParentOptions = EmbedParentOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(embedParentOptions);
+
 // **添付と配布資産は multipart で届く。上限を既定値に任せない**
 // （_documents/非機能設計.md 1 章）。
 // 大きい方に合わせ、個別の入口ではそれぞれの上限まで絞る
@@ -705,6 +710,7 @@ if (transportSecurity.AllowInsecure)
 // 既定は空なので、設定しなければ従来と同じ CSP になる。
 // **`frame-src https:` のようには絶対に広げない**
 var embedSources = embedOptions.CspSources;
+var embedParentSources = embedParentOptions.CspSources;
 
 // **アクセス解析を有効にしたときだけ広げる**（Issue #162）。
 // 既定では 1 つも足さないので、今までと同じ CSP になる。
@@ -730,7 +736,8 @@ var contentSecurityPolicy = string.Join("; ",
         + (embedSources.IsEmpty && captchaSources.IsEmpty
             ? "'none'"
             : string.Join(' ', embedSources.AddRange(captchaSources))),
-    "frame-ancestors 'none'",
+    "frame-ancestors "
+        + (embedParentSources.IsEmpty ? "'none'" : string.Join(' ', embedParentSources)),
     "base-uri 'self'",
     "object-src 'none'",
     "script-src 'self'" + Join(externalScriptSources),

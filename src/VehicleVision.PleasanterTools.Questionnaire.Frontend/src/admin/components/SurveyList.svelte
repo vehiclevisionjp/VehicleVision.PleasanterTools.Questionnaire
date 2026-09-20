@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     archiveSurvey,
     createSurvey,
     deleteSurvey,
     duplicateSurvey,
     listSurveys,
+    loadEmbedParentOptions,
     publish,
     revertToDraft,
     resume,
@@ -125,6 +127,10 @@
    * 端末は共有され得るため、こちらは「分からないなら残さない」が安全側。
    */
   let settingsAllowDraft = $state(false);
+  /** 回答画面を許可済みの親サイトへ埋め込んでよいか。 */
+  let settingsAllowEmbedding = $state(false);
+  /** 運用側が親サイトを 1 つ以上許可しているか。 */
+  let embedParentsEnabled = $state(false);
   let settingsBusy = $state(false);
   let siteFor = $state<SurveySummary | null>(null);
   let siteId = $state('');
@@ -139,6 +145,13 @@
   // **絞り込みとページを変えたら読み直す。** $effect が依存を拾う
   $effect(() => {
     void reload(offset, titleFilter, statusFilter, includeArchived);
+  });
+
+  onMount(async () => {
+    const result = await loadEmbedParentOptions();
+    if (result.ok) {
+      embedParentsEnabled = result.value.enabled;
+    }
   });
 
   async function reload(
@@ -370,6 +383,7 @@
     settingsLimit = survey.responseLimit == null ? '' : String(survey.responseLimit);
     settingsProofOfWork = survey.requireProofOfWork ?? true;
     settingsAllowDraft = survey.allowDraft ?? false;
+    settingsAllowEmbedding = survey.allowEmbedding ?? false;
   }
 
   async function saveSettings(event: SubmitEvent) {
@@ -394,7 +408,12 @@
 
     settingsBusy = true;
     const result = await saveSurveySettings(
-      target.surveyId, limit, settingsProofOfWork, settingsAllowDraft);
+      target.surveyId,
+      limit,
+      settingsProofOfWork,
+      settingsAllowDraft,
+      settingsAllowEmbedding,
+    );
     settingsBusy = false;
 
     if (!result.ok) {
@@ -462,6 +481,20 @@
   /** 回答用 URL。**公開用 ID しか出さない。** */
   function formUrl(publicId: string): string {
     return `${location.origin}/f/${publicId}`;
+  }
+
+  /** HTML 属性へ安全に埋め込める文字列へ直す。 */
+  function htmlAttribute(value: string): string {
+    return value
+      .replaceAll('&', '&amp;')
+      .replaceAll('"', '&quot;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
+  }
+
+  /** 貼り付け用の最小限の iframe タグ。 */
+  function iframeTag(survey: SurveySummary): string {
+    return `<iframe src="${htmlAttribute(formUrl(survey.publicId))}" title="${htmlAttribute(survey.title)}" loading="lazy"></iframe>`;
   }
 
   function formatDate(value: string): string {
@@ -683,6 +716,20 @@
     <p class="hint">{t('settings.allowDraftHint')}</p>
     {#if settingsAllowDraft}
       <p class="warn">{t('settings.allowDraftWarning')}</p>
+    {/if}
+    <label class="check">
+      <input type="checkbox" bind:checked={settingsAllowEmbedding} />
+      {t('settings.allowEmbedding')}
+    </label>
+    <p class="hint">{t('settings.allowEmbeddingHint')}</p>
+    {#if !embedParentsEnabled}
+      <p class="warn">{t('settings.allowEmbeddingUnavailable')}</p>
+    {:else if settingsAllowEmbedding}
+      <label>
+        {t('settings.iframeTag')}
+        <textarea readonly rows="3" value={iframeTag(settingsFor)}></textarea>
+      </label>
+      <p class="hint">{t('settings.iframeTagHint')}</p>
     {/if}
     <p class="hint">{t('settings.proofOfWorkKeepsOthers')}</p>
     <div class="actions">

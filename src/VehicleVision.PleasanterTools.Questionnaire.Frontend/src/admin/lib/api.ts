@@ -394,6 +394,16 @@ export interface EmbedOptions {
 export const loadEmbedOptions = () =>
   call<EmbedOptions>('/api/admin/surveys/embed-options');
 
+/** 回答画面を埋め込める親サイト（Issue #334）。**運用側の設定なので変わらない。** */
+export interface EmbedParentOptions {
+  enabled: boolean;
+  /** `www.example.com` か `*.example.net` の形。 */
+  allowedParents: string[];
+}
+
+export const loadEmbedParentOptions = () =>
+  call<EmbedParentOptions>('/api/admin/surveys/embed-parent-options');
+
 export const saveDraft = (
   surveyId: string,
   definition: SurveyDefinition,
@@ -518,10 +528,19 @@ export const saveSurveySettings = (
   responseLimit: number | null,
   requireProofOfWork: boolean,
   allowDraft: boolean,
+  allowEmbedding: boolean,
 ) =>
-  call<{ responseLimit: number | null; requireProofOfWork: boolean; allowDraft: boolean }>(
+  call<{
+    responseLimit: number | null;
+    requireProofOfWork: boolean;
+    allowDraft: boolean;
+    allowEmbedding: boolean;
+  }>(
     `/api/admin/surveys/${surveyId}/settings`,
-    { method: 'PUT', json: { responseLimit, requireProofOfWork, allowDraft } },
+    {
+      method: 'PUT',
+      json: { responseLimit, requireProofOfWork, allowDraft, allowEmbedding },
+    },
   );
 
 export const suspend = (surveyId: string) =>

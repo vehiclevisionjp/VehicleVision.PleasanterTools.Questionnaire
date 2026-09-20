@@ -28,6 +28,9 @@ public enum IntakeRejection
     /// <summary>停止中。</summary>
     Suspended,
 
+    /// <summary>このアンケートは枠内での回答を許していない。</summary>
+    EmbeddingNotAllowed,
+
     /// <summary>回答の中身が定義に合わない。</summary>
     Invalid,
 
@@ -47,7 +50,8 @@ public sealed record IntakeResult(
     ImmutableArray<ValidationError> Errors = default,
     ImmutableArray<AttachmentRejection> Attachments = default,
     string? AssetTicket = null,
-    bool GrantsInstantAssetAccess = false)
+    bool GrantsInstantAssetAccess = false,
+    bool AllowEmbedding = false)
 {
     public bool Accepted => Rejection is null;
 
@@ -89,7 +93,8 @@ public sealed record PublishedForm(
     bool RequiresProofOfWork,
     bool AllowsDraft = false,
     bool IsTest = false,
-    bool RecordsAssetHistory = false);
+    bool RecordsAssetHistory = false,
+    bool AllowEmbedding = false);
 
 /// <summary>公開版から配る資産と、引換券が必要か。</summary>
 public sealed record PublishedAsset(
@@ -104,7 +109,8 @@ public sealed record AssetTicketForm(
     Guid SurveyId,
     int SurveyVersion,
     SurveyDefinition Definition,
-    bool RecordsAssetHistory);
+    bool RecordsAssetHistory,
+    bool AllowEmbedding);
 
 /// <summary>回答を受け付けて送信待ちへ入れる。</summary>
 /// <remarks>
@@ -138,7 +144,8 @@ public sealed class ResponseIntake(
     /// <remarks>**下書きは絶対に返さない。** 公開済みの版だけを返す。</remarks>
     public async Task<(PublishedForm? Form, IntakeRejection? Rejection)> GetPublishedAsync(
         string publicId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isFramed = false)
     {
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
             .ConfigureAwait(false);
@@ -147,6 +154,11 @@ public sealed class ResponseIntake(
         if (rejection is not null || survey?.PublishedVersion is null)
         {
             return (null, rejection ?? IntakeRejection.NotFound);
+        }
+
+        if (isFramed && !survey.AllowEmbedding)
+        {
+            return (null, IntakeRejection.EmbeddingNotAllowed);
         }
 
         // **溜まりすぎているなら、そもそも画面を出さない**（Issue #72）。
@@ -179,7 +191,8 @@ public sealed class ResponseIntake(
                     survey.RequireProofOfWork,
                     survey.AllowDraft,
                     survey.Status == (int)SurveyStatus.TestPublished,
-                    snapshot.IsAssetHistoryEnabled),
+                    snapshot.IsAssetHistoryEnabled,
+                    survey.AllowEmbedding),
                 null);
     }
 
@@ -308,7 +321,8 @@ public sealed class ResponseIntake(
                 survey.SurveyId,
                 survey.PublishedVersion.Value,
                 snapshot.Definition,
-                snapshot.IsAssetHistoryEnabled);
+                snapshot.IsAssetHistoryEnabled,
+                survey.AllowEmbedding);
     }
 
     /// <summary>回答を受け付ける。</summary>
@@ -331,7 +345,8 @@ public sealed class ResponseIntake(
         IReadOnlyCollection<Answer> answers,
         IReadOnlyList<AnsweredAttachment>? attachments = null,
         string? language = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isFramed = false)
     {
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
             .ConfigureAwait(false);
@@ -340,6 +355,11 @@ public sealed class ResponseIntake(
         if (rejection is not null || survey?.PublishedVersion is null)
         {
             return IntakeResult.Reject(rejection ?? IntakeRejection.NotFound);
+        }
+
+        if (isFramed && !survey.AllowEmbedding)
+        {
+            return IntakeResult.Reject(IntakeRejection.EmbeddingNotAllowed);
         }
 
         // **溜まりすぎているなら、ここで断る**（Issue #72）。
@@ -528,7 +548,8 @@ public sealed class ResponseIntake(
 
         return new IntakeResult(
             AssetTicket: assetTicket,
-            GrantsInstantAssetAccess: grantsInstantAssetAccess);
+            GrantsInstantAssetAccess: grantsInstantAssetAccess,
+            AllowEmbedding: survey.AllowEmbedding);
     }
 
     /// <summary>回答数の上限に届いたことを管理者へ知らせる（Issue #80）。</summary>
