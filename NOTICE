@@ -27,30 +27,30 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Data.Sqlite 10.0.12 / MIT / https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12
     （Apache-2.0 の SQLitePCLRaw 2.1.12 と、パブリックドメインの SQLite 3.53.3 を推移的に伴う。
       https://github.com/ericsink/SQLitePCL.raw/releases/tag/v2.1.12、参照日 2026-09-21）
-  Microsoft.Data.SqlClient 7.0.3 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
+  Microsoft.Data.SqlClient 7.1.0 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
-  StackExchange.Redis 3.2.1 / MIT / https://www.nuget.org/packages/StackExchange.Redis/3.2.1
+  StackExchange.Redis 3.3.0 / MIT / https://www.nuget.org/packages/StackExchange.Redis/3.3.0
     （大規模構成で選択できる管理者セッションストア。既定は本アプリの DB）
   Microsoft.Extensions.DependencyInjection 10.0.12 / MIT
-  Microsoft.Extensions.Configuration.Abstractions 10.0.11 / MIT
-  Microsoft.Extensions.Hosting.Abstractions 10.0.11 / MIT
-  Microsoft.Extensions.Logging.Abstractions 10.0.11 / MIT
+  Microsoft.Extensions.Configuration.Abstractions 10.0.12 / MIT
+  Microsoft.Extensions.Hosting.Abstractions 10.0.12 / MIT
+  Microsoft.Extensions.Logging.Abstractions 10.0.12 / MIT
   Microsoft.AspNetCore.OpenApi 10.0.12 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.OpenApi
-  Scalar.AspNetCore 2.17.4 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.17.4
+  Scalar.AspNetCore 2.17.6 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.17.6
     （OpenAPI 文書を読む画面。画面本体は埋め込みアセットで同梱し、CDN の既定フォントと
       利用状況テレメトリーは無効化する）
-  Jint 4.16.2 / BSD-2-Clause / https://github.com/sebastienros/jint
+  Jint 4.16.3 / BSD-2-Clause / https://github.com/sebastienros/jint
     （変換スクリプトの実行エンジン。Acornima などを推移的に伴う）
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
   nClam 9.0.0 / Apache-2.0 / https://github.com/tekmaven/nClam
   Ixnas.AltchaNet 1.2.1 / BSD-2-Clause / https://github.com/ixnas/altcha-dotnet
-  ITfoxtec.Identity.Saml2 4.20.1 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
-  ITfoxtec.Identity.Saml2.MvcCore 4.20.1 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+  ITfoxtec.Identity.Saml2 4.21.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+  ITfoxtec.Identity.Saml2.MvcCore 4.21.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
     （Microsoft.IdentityModel.* と Newtonsoft.Json を推移的に伴う。いずれも MIT）
   Azure.Storage.Blobs 12.29.2 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
-  AWSSDK.SimpleEmailV2 4.0.104.2 / Apache-2.0 / https://github.com/aws/aws-sdk-net
+  AWSSDK.SimpleEmailV2 4.0.105.1 / Apache-2.0 / https://github.com/aws/aws-sdk-net
     （Amazon SES の送信経路。**IAM ロールで通るので、保管する秘密が 0 になる**。Issue #198）
   AWSSDK.S3 4.0.103.3 / Apache-2.0 / https://github.com/aws/aws-sdk-net
     （アンケート資産の S3 互換保存。既定の資格情報探索で IAM ロールを利用できる。Issue #271）
@@ -58,11 +58,11 @@ Copyright (C) PMC Co.,Ltd.
     （Azure Communication Services の送信経路。**マネージド ID で通る**。Issue #198）
   Azure.Identity 1.21.0 / MIT / https://github.com/Azure/azure-sdk-for-net
     （マネージド ID から資格情報を取る。Azure.Core などを推移的に伴う）
-  MailKit 4.17.0 / MIT / https://github.com/jstedfast/MailKit
+  MailKit 4.18.0 / MIT / https://github.com/jstedfast/MailKit
     （メールの送信。**認証付きリレーの 587 番は Azure でブロックされない**ので、
       これ 1 本で SendGrid・Amazon SES・Azure Communication Services・
       Microsoft 365 へ送れる。**送信先ごとの純正 SDK は足さない**）
-  MimeKit 4.17.0 / MIT / https://github.com/jstedfast/MimeKit
+  MimeKit 4.18.0 / MIT / https://github.com/jstedfast/MimeKit
     （MailKit が推移的に伴う。メールの組み立て）
   BouncyCastle.Cryptography 2.6.2 / MIT / https://github.com/bcgit/bc-csharp
     （MimeKit が推移的に伴う）
@@ -70,12 +70,12 @@ Copyright (C) PMC Co.,Ltd.
 フロントエンド（**成果物へ含まれるのは svelte のランタイム・qrcode・同梱した書体のみ。**
 残りはビルド時だけ使う）
 
-  svelte 5.57.0 / MIT / https://www.npmjs.com/package/svelte
+  svelte 5.57.1 / MIT / https://www.npmjs.com/package/svelte
   vite 8.3.0 / MIT / https://www.npmjs.com/package/vite
   @sveltejs/vite-plugin-svelte 7.3.0 / MIT
   svelte-check 4.7.6 / MIT
-  vitest 5.0.0 / MIT / https://www.npmjs.com/package/vitest
-  sass 1.104.0 / MIT
+  vitest 5.0.1 / MIT / https://www.npmjs.com/package/vitest
+  sass 1.104.1 / MIT
   typescript 6.0.3 / Apache-2.0
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
   @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://github.com/DefinitelyTyped/DefinitelyTyped
@@ -98,7 +98,7 @@ Copyright (C) PMC Co.,Ltd.
 
   xunit 2.9.3 / Apache-2.0
   xunit.runner.visualstudio 4.0.0 / Apache-2.0
-  Microsoft.NET.Test.Sdk 18.10.0 / MIT
+  Microsoft.NET.Test.Sdk 18.10.1 / MIT
   @playwright/test 1.62.1 / Apache-2.0 / https://github.com/microsoft/playwright
   Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。成果物へ入るのは上記の書体）
   Keycloak 26.7.3 / Apache-2.0 / https://github.com/keycloak/keycloak
@@ -112,10 +112,10 @@ Copyright (C) PMC Co.,Ltd.
     （Redis 互換セッションストアの検証用。
       **別のコンテナとして立てるだけで、成果物には含まれない**）
   coverlet.collector 10.0.1 / MIT
-  Microsoft.Extensions.Configuration 10.0.11 / MIT
+  Microsoft.Extensions.Configuration 10.0.12 / MIT
     （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
-  Microsoft.Extensions.TimeProvider.Testing 10.9.0 / MIT
-  System.Security.Cryptography.Xml 10.0.11 / MIT / https://github.com/dotnet/runtime
+  Microsoft.Extensions.TimeProvider.Testing 10.10.0 / MIT
+  System.Security.Cryptography.Xml 10.0.12 / MIT / https://github.com/dotnet/runtime
     （ITfoxtec.Identity.Saml2 が推移的に伴う版に既知の脆弱性があるため、
       テストプロジェクトでは修正済みの版を明示して固定している。
       アプリ側は net10.0 の共有フレームワークが提供するため参照しない＝NU1510）
