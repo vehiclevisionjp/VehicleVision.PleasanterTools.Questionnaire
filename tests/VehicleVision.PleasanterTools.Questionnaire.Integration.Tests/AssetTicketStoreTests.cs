@@ -2,7 +2,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>配布資産の引換券を 3 RDBMS で確かめる（Issue #318）。</summary>
+/// <summary>配布資産の引換券を 4 RDBMS で確かめる（Issue #318）。</summary>
 public class AssetTicketStoreTests
 {
     private static bool Enabled =>

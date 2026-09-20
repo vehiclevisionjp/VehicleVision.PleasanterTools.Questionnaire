@@ -32,6 +32,8 @@ export const ja = {
   'app.version': '動作中の版: {version}{commit}',
   'app.insecureMode':
     '閉じた環境向けの HTTP 設定で動作しています。通信は暗号化されず、管理者のパスワードとアンケートの合言葉が平文で流れます。SAML は IdP 側の制約により利用できないことがあります。',
+  'app.sqliteMode':
+    '簡易セットアップ・デバッグ用の SQLite で動作しています。本番運用には使用せず、Pleasanter とデータベースを共有しないでください。',
   'breadcrumb.label': 'パンくずリスト',
   'breadcrumb.surveyEditor': 'アンケートの編集: {title}',
   'breadcrumb.auditLogs': '操作の記録',
@@ -1031,6 +1033,8 @@ export const en: Record<MessageKey, string> = {
   'app.version': 'Running version: {version}{commit}',
   'app.insecureMode':
     'This application is running in HTTP mode for closed networks. Traffic is not encrypted, including administrator passwords and survey passphrases. SAML may be unavailable because of IdP requirements.',
+  'app.sqliteMode':
+    'This application is using SQLite for simple setup and debugging. Do not use it in production or try to share this database with Pleasanter.',
   'breadcrumb.label': 'Breadcrumbs',
   'breadcrumb.surveyEditor': 'Edit survey: {title}',
   'breadcrumb.auditLogs': 'Activity log',

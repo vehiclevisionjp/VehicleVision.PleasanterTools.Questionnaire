@@ -92,6 +92,7 @@ export interface ApplicationVersion {
   version: string;
   commit?: string | null;
   allowInsecure: boolean;
+  usesSqlite: boolean;
 }
 
 /** 動作中の版を読む。**認証済みの管理者にだけサーバが返す。** */

@@ -22,6 +22,11 @@ Copyright (C) PMC Co.,Ltd.
   FluentMigrator.Runner.SqlServer 8.0.1 / Apache-2.0
   FluentMigrator.Runner.Postgres 8.0.1 / Apache-2.0
   FluentMigrator.Runner.MySql 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.SQLite 8.0.1 / Apache-2.0 / https://www.nuget.org/packages/FluentMigrator.Runner.SQLite/8.0.1
+    （参照日 2026-09-21）
+  Microsoft.Data.Sqlite 10.0.12 / MIT / https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12
+    （Apache-2.0 の SQLitePCLRaw 2.1.12 と、パブリックドメインの SQLite 3.53.3 を推移的に伴う。
+      https://github.com/ericsink/SQLitePCL.raw/releases/tag/v2.1.12、参照日 2026-09-21）
   Microsoft.Data.SqlClient 7.0.3 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector

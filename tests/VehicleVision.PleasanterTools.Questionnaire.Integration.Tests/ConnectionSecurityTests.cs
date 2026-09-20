@@ -103,6 +103,41 @@ public class ConnectionSecurityTests
         Assert.Empty(problems);
     }
 
+    [Fact]
+    public void SQLiteは通信暗号化の検査対象にしない()
+    {
+        var problems = ConnectionSecurity.Inspect(
+            DatabaseProvider.Sqlite,
+            "Data Source=App_Data/questionnaire.db");
+
+        Assert.Empty(problems);
+    }
+
+    [Fact]
+    public void SQLiteだけはAppData配下の接続文字列を補える()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var resolved = DatabaseConnectionString.Resolve(DatabaseProvider.Sqlite, null, root);
+
+            Assert.Equal(
+                Path.Combine(root, "App_Data", DatabaseConnectionString.DefaultSqliteFileName),
+                Setting(resolved, "DataSource"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void SQLite以外は接続文字列を必須にする()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            DatabaseConnectionString.Resolve(DatabaseProvider.PostgreSql, null, AppContext.BaseDirectory));
+    }
+
     // ---- 起動時の扱い -------------------------------------------------------
 
     [Fact]

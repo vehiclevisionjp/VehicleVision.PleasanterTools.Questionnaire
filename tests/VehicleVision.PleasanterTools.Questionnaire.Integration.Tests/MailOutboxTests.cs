@@ -2,7 +2,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>メールの送信待ちの読み書きを 3 RDBMS で確かめる（Issue #189）。</summary>
+/// <summary>メールの送信待ちの読み書きを 4 RDBMS で確かめる（Issue #189）。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**

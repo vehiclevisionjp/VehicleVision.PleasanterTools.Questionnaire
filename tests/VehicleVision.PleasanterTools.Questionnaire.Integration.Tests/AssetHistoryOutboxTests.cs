@@ -2,7 +2,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>配布資料履歴の送信待ちを 3 RDBMS で確かめる。</summary>
+/// <summary>配布資料履歴の送信待ちを 4 RDBMS で確かめる。</summary>
 public class AssetHistoryOutboxTests
 {
     private static bool Enabled =>

@@ -121,6 +121,11 @@ public static class ConnectionSecurity
                 break;
             }
 
+            case DatabaseProvider.Sqlite:
+                // SQLite は同一プロセスがローカルファイルを直接読むため、
+                // DB サーバとの通信暗号化やサーバ証明書の検査という概念が当てはまらない。
+                break;
+
             default:
                 problems.Add(new Problem($"対応していない RDBMS: {provider}"));
                 break;

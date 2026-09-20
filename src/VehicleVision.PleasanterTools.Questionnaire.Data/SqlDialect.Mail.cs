@@ -25,8 +25,18 @@ public static partial class SqlDialect
             "  SELECT c.\"MailId\" FROM \"MailOutbox\" AS c " +
             "  WHERE c.\"Status\" = @PendingStatus AND c.\"NextAttemptAt\" <= @Now " +
             "  ORDER BY c.\"NextAttemptAt\" FOR UPDATE SKIP LOCKED LIMIT 1) " +
-            "RETURNING m.\"MailId\", m.\"Kind\", m.\"SurveyId\", " +
-            "          m.\"PayloadProtected\", m.\"RetryCount\"",
+            "RETURNING \"MailId\", \"Kind\", \"SurveyId\", " +
+            "          \"PayloadProtected\", \"RetryCount\"",
+
+        DatabaseProvider.Sqlite =>
+            "UPDATE \"MailOutbox\" AS m " +
+            "SET \"Status\" = @SendingStatus, \"LockedBy\" = @LockedBy, \"LockedUntil\" = @LockedUntil " +
+            "WHERE m.rowid = (" +
+            "  SELECT c.rowid FROM \"MailOutbox\" AS c " +
+            "  WHERE c.\"Status\" = @PendingStatus AND c.\"NextAttemptAt\" <= @Now " +
+            "  ORDER BY c.\"NextAttemptAt\" LIMIT 1) " +
+            "RETURNING \"MailId\", \"Kind\", \"SurveyId\", " +
+            "          \"PayloadProtected\", \"RetryCount\"",
 
         DatabaseProvider.MySql =>
             "UPDATE `MailOutbox` " +

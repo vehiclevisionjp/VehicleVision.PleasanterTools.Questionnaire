@@ -42,6 +42,11 @@ temp/
 ## Parameters のローカル上書き（実値。コミットしない）
 App_Data/Parameters/*.local.json
 
+## 簡易セットアップ用 SQLite DB（本体・WAL・共有メモリを配布物や Git へ混ぜない）
+**/App_Data/*.db
+**/App_Data/*.db-wal
+**/App_Data/*.db-shm
+
 ## 検証環境の出力
 tools/pleasanter-testenv/results/
 

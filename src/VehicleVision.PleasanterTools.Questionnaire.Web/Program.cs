@@ -67,8 +67,11 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 // （App_Data/Parameters/README.md）
 var provider = Enum.Parse<DatabaseProvider>(
     builder.Configuration["QUESTIONNAIRE_DB_PROVIDER"] ?? nameof(DatabaseProvider.SqlServer));
-var connectionString = builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"]
-    ?? throw new InvalidOperationException("QUESTIONNAIRE_DB_CONNECTIONSTRING が設定されていない");
+var usesSqlite = provider is DatabaseProvider.Sqlite;
+var connectionString = DatabaseConnectionString.Resolve(
+    provider,
+    builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"],
+    builder.Environment.ContentRootPath);
 var sharedStateOptions = SharedStateOptions.FromConfiguration(builder.Configuration);
 var sessionStoreKind =
     builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_STORE"] ?? "Database";
@@ -700,6 +703,15 @@ if (transportSecurity.AllowInsecure)
         + "and SAML may not work.");
 }
 
+if (usesSqlite)
+{
+    // **英語で書く。** Azure の Kudu の Debug console で日本語が化ける（Issue #225）
+    app.Logger.LogWarning(
+        "SQLite mode is enabled by QUESTIONNAIRE_DB_PROVIDER=Sqlite. "
+        + "Use SQLite only for simple setup and debugging, not for production. "
+        + "Pleasanter cannot share this database.");
+}
+
 // **CSP は起動時に 1 度だけ組み立てる**（Issue #104 / #107）。
 //
 // **アンケートごとには出し分けない。** 出し分けるには、回答画面の HTML を返す時点で
@@ -826,7 +838,7 @@ app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
-app.MapAdminVersionEndpoints(transportSecurity.AllowInsecure);
+app.MapAdminVersionEndpoints(transportSecurity.AllowInsecure, usesSqlite);
 if (monitoringToken is not null)
 {
     app.MapMonitoringEndpoints(monitoringToken);

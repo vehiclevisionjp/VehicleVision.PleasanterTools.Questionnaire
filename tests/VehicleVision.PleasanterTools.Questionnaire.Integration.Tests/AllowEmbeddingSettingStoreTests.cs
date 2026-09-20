@@ -2,7 +2,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>アンケートごとの回答画面埋め込み可否を、3 RDBMS で確かめる（Issue #334）。</summary>
+/// <summary>アンケートごとの回答画面埋め込み可否を、4 RDBMS で確かめる（Issue #334）。</summary>
 public class AllowEmbeddingSettingStoreTests
 {
     private static bool Enabled =>

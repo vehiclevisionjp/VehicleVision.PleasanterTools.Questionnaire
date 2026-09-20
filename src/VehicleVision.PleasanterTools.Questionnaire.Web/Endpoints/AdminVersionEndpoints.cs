@@ -20,7 +20,8 @@ public static class AdminVersionEndpoints
 
     public static IEndpointRouteBuilder MapAdminVersionEndpoints(
         this IEndpointRouteBuilder builder,
-        bool allowInsecure)
+        bool allowInsecure,
+        bool usesSqlite = false)
     {
         var group = builder.MapGroup("/api/admin/application")
             .WithTags("管理 API")
@@ -28,23 +29,25 @@ public static class AdminVersionEndpoints
 
         AdminAuthSchemes.AddNoStore(group);
 
-        group.MapGet("/version", () => Results.Ok(ReadVersion(allowInsecure)));
+        group.MapGet("/version", () => Results.Ok(ReadVersion(allowInsecure, usesSqlite)));
 
         return builder;
     }
 
     /// <summary>この Web アセンブリの情報版を、画面へ返す形にする。</summary>
-    public static ApplicationVersionResponse ReadVersion(bool allowInsecure) =>
+    public static ApplicationVersionResponse ReadVersion(bool allowInsecure, bool usesSqlite) =>
         ToResponse(typeof(AdminVersionEndpoints).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? typeof(AdminVersionEndpoints).Assembly.GetName().Version?.ToString()
             ?? string.Empty,
-            allowInsecure);
+            allowInsecure,
+            usesSqlite);
 
     /// <summary>情報版を表示用の版と短いコミット ID に分ける。</summary>
     public static ApplicationVersionResponse ToResponse(
         string informationalVersion,
-        bool allowInsecure = false)
+        bool allowInsecure = false,
+        bool usesSqlite = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(informationalVersion);
 
@@ -53,7 +56,7 @@ public static class AdminVersionEndpoints
             ? parts[1][..CommitLength].ToLowerInvariant()
             : null;
 
-        return new ApplicationVersionResponse(parts[0], commit, allowInsecure);
+        return new ApplicationVersionResponse(parts[0], commit, allowInsecure, usesSqlite);
     }
 }
 
@@ -61,7 +64,9 @@ public static class AdminVersionEndpoints
 /// <param name="Version">`Directory.Build.props` の <c>VersionPrefix</c> から作られた版。</param>
 /// <param name="Commit">情報版に含まれるコミット ID の先頭 12 桁。含まれない場合は null。</param>
 /// <param name="AllowInsecure">閉じたネットワーク向けの HTTP 運用を明示的に許しているか。</param>
+/// <param name="UsesSqlite">簡易セットアップ用の SQLite を使っているか。</param>
 public sealed record ApplicationVersionResponse(
     string Version,
     string? Commit,
-    bool AllowInsecure);
+    bool AllowInsecure,
+    bool UsesSqlite);

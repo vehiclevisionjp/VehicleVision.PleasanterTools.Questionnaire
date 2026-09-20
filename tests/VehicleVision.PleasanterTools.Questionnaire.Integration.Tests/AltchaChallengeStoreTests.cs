@@ -2,7 +2,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>使い終えた proof-of-work の課題を 3 RDBMS で覚えられること。</summary>
+/// <summary>使い終えた proof-of-work の課題を 4 RDBMS で覚えられること。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**

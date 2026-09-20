@@ -118,6 +118,7 @@ public static class DatabaseMigrator
                     DatabaseProvider.SqlServer => builder.AddSqlServer(),
                     DatabaseProvider.PostgreSql => builder.AddPostgres(),
                     DatabaseProvider.MySql => builder.AddMySql8(),
+                    DatabaseProvider.Sqlite => builder.AddSQLite(),
                     _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
                 };
 

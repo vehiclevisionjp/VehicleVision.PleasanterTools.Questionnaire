@@ -54,8 +54,8 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 
 | 変数 | 内容 |
 |---|---|
-| `QUESTIONNAIRE_DB_PROVIDER` | `SqlServer` / `PostgreSql` / `MySql` |
-| `QUESTIONNAIRE_DB_CONNECTIONSTRING` | 本アプリの DB への接続文字列 |
+| `QUESTIONNAIRE_DB_PROVIDER` | `SqlServer` / `PostgreSql` / `MySql` / `Sqlite`。`Sqlite` は簡易セットアップ・デバッグ専用 |
+| `QUESTIONNAIRE_DB_CONNECTIONSTRING` | 本アプリの DB への接続文字列。`Sqlite` だけは省略でき、`App_Data/questionnaire.db` を使う |
 | `QUESTIONNAIRE_PLEASANTER_BASEURL` | 接続先 Pleasanter の URL |
 | `QUESTIONNAIRE_PLEASANTER_APIKEY` | Pleasanter の API キー |
 | `QUESTIONNAIRE_PLEASANTER_APIVERSION` | Pleasanter の API バージョン（既定 1.1）。**読めない値は既定へ落とす** |

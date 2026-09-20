@@ -3,7 +3,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>管理者への知らせの読み書きを 3 RDBMS で確かめる（Issue #80）。</summary>
+/// <summary>管理者への知らせの読み書きを 4 RDBMS で確かめる（Issue #80）。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**
