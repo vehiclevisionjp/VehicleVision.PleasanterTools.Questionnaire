@@ -77,7 +77,7 @@
 
   .description {
     margin: 0 0 0.5rem;
-    color: var(--color-muted, #555);
+    color: var(--muted);
   }
 
   img {
@@ -98,6 +98,6 @@
 
   .blocked {
     margin: 0;
-    color: var(--color-muted, #555);
+    color: var(--muted);
   }
 </style>

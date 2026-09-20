@@ -34,6 +34,7 @@
     resolveReadabilityPreferences,
     saveReadabilityPreferences,
     systemReadabilityPreferences,
+    type ReadabilityPreferenceName,
     type ReadabilityPreferences,
   } from '../lib/readability';
 
@@ -51,9 +52,12 @@
     applyReadability(document.documentElement, readability);
   });
 
-  function changeReadability(next: ReadabilityPreferences) {
+  function changeReadability(
+    next: ReadabilityPreferences,
+    changed: ReadabilityPreferenceName,
+  ) {
     readability = next;
-    saveReadabilityPreferences(next);
+    saveReadabilityPreferences(next, changed);
   }
 
   /** 開いているアンケート。**URL に出す**（再読み込みで戻れるように） */

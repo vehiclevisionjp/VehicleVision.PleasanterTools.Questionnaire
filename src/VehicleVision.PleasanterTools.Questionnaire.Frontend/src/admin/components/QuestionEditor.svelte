@@ -1327,7 +1327,7 @@
 
   .embed-warning {
     margin: 0;
-    color: var(--danger, #b3261e);
+    color: var(--error);
     font-size: 0.85rem;
   }
 

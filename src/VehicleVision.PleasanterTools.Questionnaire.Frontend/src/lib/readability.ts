@@ -16,9 +16,11 @@ export interface SystemReadabilityPreferences {
 }
 
 interface StoredReadabilityPreferences {
-  fontSize: FontSize;
-  colorMode: ColorMode;
+  fontSize?: FontSize;
+  colorMode?: ColorMode;
 }
+
+export type ReadabilityPreferenceName = 'fontSize' | 'colorMode';
 
 export const FONT_SIZES: FontSize[] = ['standard', 'large', 'extraLarge'];
 export const COLOR_MODES: ColorMode[] = ['default', 'highContrast', 'dark'];
@@ -158,20 +160,22 @@ export function systemReadabilityPreferences(): SystemReadabilityPreferences {
 export function readReadabilityPreferences(): StoredReadabilityPreferences | null {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(READABILITY_STORAGE_KEY) ?? 'null');
-    if (
-      typeof value !== 'object' ||
-      value === null ||
-      !('fontSize' in value) ||
-      !FONT_SIZES.includes(value.fontSize as FontSize) ||
-      !('colorMode' in value) ||
-      !COLOR_MODES.includes(value.colorMode as ColorMode)
-    ) {
+    if (typeof value !== 'object' || value === null) {
       return null;
     }
 
+    const candidate = value as { fontSize?: unknown; colorMode?: unknown };
+    const fontSize = FONT_SIZES.includes(candidate.fontSize as FontSize)
+      ? (candidate.fontSize as FontSize)
+      : undefined;
+    const colorMode = COLOR_MODES.includes(candidate.colorMode as ColorMode)
+      ? (candidate.colorMode as ColorMode)
+      : undefined;
+    if (fontSize === undefined && colorMode === undefined) return null;
+
     return {
-      fontSize: value.fontSize as FontSize,
-      colorMode: value.colorMode as ColorMode,
+      fontSize,
+      colorMode,
     };
   } catch {
     return null;
@@ -181,12 +185,17 @@ export function readReadabilityPreferences(): StoredReadabilityPreferences | nul
 /**
  * 明示した設定を端末だけに保存する。保存できなくても表示の切り替えは続ける。
  */
-export function saveReadabilityPreferences(preferences: ReadabilityPreferences): void {
+export function saveReadabilityPreferences(
+  preferences: ReadabilityPreferences,
+  changed: ReadabilityPreferenceName,
+): void {
   try {
-    const stored: StoredReadabilityPreferences = {
-      fontSize: preferences.fontSize,
-      colorMode: preferences.colorMode,
-    };
+    const stored = readReadabilityPreferences() ?? {};
+    if (changed === 'fontSize') {
+      stored.fontSize = preferences.fontSize;
+    } else {
+      stored.colorMode = preferences.colorMode;
+    }
     localStorage.setItem(READABILITY_STORAGE_KEY, JSON.stringify(stored));
   } catch {
     // 保存領域を使えなくても、その場の表示は変えられる。

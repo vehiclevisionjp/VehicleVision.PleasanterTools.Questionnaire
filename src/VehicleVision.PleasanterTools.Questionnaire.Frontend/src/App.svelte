@@ -51,6 +51,7 @@
     resolveReadabilityPreferences,
     saveReadabilityPreferences,
     systemReadabilityPreferences,
+    type ReadabilityPreferenceName,
     type ReadabilityPreferences,
   } from './lib/readability';
 
@@ -116,9 +117,12 @@
     resolveReadabilityPreferences(readReadabilityPreferences(), systemReadabilityPreferences()),
   );
 
-  function changeReadability(next: ReadabilityPreferences) {
+  function changeReadability(
+    next: ReadabilityPreferences,
+    changed: ReadabilityPreferenceName,
+  ) {
     readability = next;
-    saveReadabilityPreferences(next);
+    saveReadabilityPreferences(next, changed);
   }
 
   let screen = $state<Screen>('loading');

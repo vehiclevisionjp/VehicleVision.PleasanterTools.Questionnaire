@@ -36,6 +36,15 @@ describe('resolveReadabilityPreferences', () => {
       }).colorMode,
     ).toBe('dark');
   });
+
+  it('文字寸法だけを保存した場合は配色に OS の設定を使う', () => {
+    expect(
+      resolveReadabilityPreferences(
+        { fontSize: 'large' },
+        { dark: true, highContrast: false, reducedMotion: false },
+      ),
+    ).toEqual({ fontSize: 'large', colorMode: 'dark', reducedMotion: false });
+  });
 });
 
 describe('readabilityCssProperties', () => {

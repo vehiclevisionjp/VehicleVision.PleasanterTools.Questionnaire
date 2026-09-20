@@ -661,7 +661,7 @@
   }
 
   tr.selected > td {
-    background: color-mix(in srgb, var(--accent) 8%, #fff);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
   }
 
   tr.selected > td:first-child {
@@ -763,6 +763,7 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font: inherit;
+    background: var(--surface);
     color: var(--text);
     box-sizing: border-box;
   }

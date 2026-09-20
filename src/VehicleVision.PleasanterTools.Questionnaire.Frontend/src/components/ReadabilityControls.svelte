@@ -4,6 +4,7 @@
     FONT_SIZES,
     type ColorMode,
     type FontSize,
+    type ReadabilityPreferenceName,
     type ReadabilityPreferences,
   } from '../lib/readability';
 
@@ -19,7 +20,10 @@
     id: string;
     preferences: ReadabilityPreferences;
     labels: Labels;
-    onchange: (preferences: ReadabilityPreferences) => void;
+    onchange: (
+      preferences: ReadabilityPreferences,
+      changed: ReadabilityPreferenceName,
+    ) => void;
   }
 
   let { id, preferences, labels, onchange }: Props = $props();
@@ -33,7 +37,10 @@
       id={`${id}-font-size`}
       value={preferences.fontSize}
       onchange={(event) =>
-        onchange({ ...preferences, fontSize: event.currentTarget.value as FontSize })}
+        onchange(
+          { ...preferences, fontSize: event.currentTarget.value as FontSize },
+          'fontSize',
+        )}
     >
       {#each FONT_SIZES as fontSize (fontSize)}
         <option value={fontSize}>{labels.fontSizes[fontSize]}</option>
@@ -46,7 +53,10 @@
       id={`${id}-color-mode`}
       value={preferences.colorMode}
       onchange={(event) =>
-        onchange({ ...preferences, colorMode: event.currentTarget.value as ColorMode })}
+        onchange(
+          { ...preferences, colorMode: event.currentTarget.value as ColorMode },
+          'colorMode',
+        )}
     >
       {#each COLOR_MODES as colorMode (colorMode)}
         <option value={colorMode}>{labels.colorModes[colorMode]}</option>

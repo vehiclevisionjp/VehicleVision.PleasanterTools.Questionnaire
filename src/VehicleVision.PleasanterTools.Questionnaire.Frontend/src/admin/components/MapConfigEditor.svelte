@@ -97,6 +97,7 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font: inherit;
+    background: var(--surface);
     color: var(--text);
     box-sizing: border-box;
   }
