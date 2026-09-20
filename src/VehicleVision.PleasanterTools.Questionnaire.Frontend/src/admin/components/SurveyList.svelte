@@ -478,6 +478,26 @@
         });
   }
 
+  /** 状態を色なしでも一覧で見分けられるようにする。 */
+  function statusMarker(survey: SurveySummary): string {
+    if (survey.archivedAt != null) {
+      return '□';
+    }
+
+    switch (survey.status) {
+      case 0:
+        return '○';
+      case 1:
+        return '◆';
+      case 2:
+        return '■';
+      case 3:
+        return '△';
+      default:
+        return '?';
+    }
+  }
+
   /** 回答用 URL。**公開用 ID しか出さない。** */
   function formUrl(publicId: string): string {
     return `${location.origin}/f/${publicId}`;
@@ -817,7 +837,10 @@
             {/if}
           </td>
           <td class="compact-column">
-            <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
+            <span class:status-archived={survey.archivedAt != null} class="status-{survey.status}">
+              <span class="status-marker" aria-hidden="true">{statusMarker(survey)}</span>
+              {survey.archivedAt == null ? t(surveyStatusKey(survey.status)) : t('archive.archived')}
+            </span>
             <!--
               **なぜ止まっているのかが分かること**（_documents/データモデル設計.md 2.1）。
               理由の付いていない古い停止では、鍵が無いので何も出さない
@@ -1247,6 +1270,16 @@
   .status-3 {
     color: var(--warning-text);
     font-weight: 600;
+  }
+
+  .status-archived {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .status-marker {
+    display: inline-block;
+    width: 1.25em;
   }
 
   .status {
