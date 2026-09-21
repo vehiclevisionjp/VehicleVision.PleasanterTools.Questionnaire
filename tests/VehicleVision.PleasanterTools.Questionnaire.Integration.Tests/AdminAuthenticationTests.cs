@@ -83,6 +83,33 @@ public class AdminAuthenticationTests
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public async Task 回答通知メールは本人が有効にするまで送らない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var harness = Create(provider, connectionString);
+        var user = await harness.Authenticator
+            .TryCreateFirstAdministratorAsync("admin@example.test", "long-enough-password");
+
+        Assert.NotNull(user);
+        Assert.False(user.ResponseNotificationEnabled);
+        Assert.Empty(await harness.Store.ListResponseNotificationRecipientsAsync());
+
+        await harness.Store.SetResponseNotificationEnabledAsync(user.AdminUserId, true);
+
+        var recipient = Assert.Single(
+            await harness.Store.ListResponseNotificationRecipientsAsync());
+        Assert.Equal(user.AdminUserId, recipient.AdminUserId);
+        Assert.Equal("admin@example.test", recipient.LoginId);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public async Task 最初の管理者は一度だけ作れる(DatabaseProvider provider, string connectionString)
     {
         if (!Enabled)

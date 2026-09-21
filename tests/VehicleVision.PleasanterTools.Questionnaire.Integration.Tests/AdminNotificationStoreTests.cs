@@ -252,4 +252,56 @@ public class AdminNotificationStoreTests
         Assert.Empty(first.Select(row => row.AdminNotificationId)
             .Intersect(second.Select(row => row.AdminNotificationId)));
     }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 回答通知メールは既読状態にかかわらず一日ごとに未送信分をまとめる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var store = (AdminNotificationStore)await CreateAsync(provider, connectionString);
+        var surveyId = Guid.NewGuid();
+        await store.RaiseAsync(7, surveyId, Now.AddDays(-2)).ConfigureAwait(true);
+        await store.MarkAllReadAsync(Now.AddDays(-2).AddMinutes(1)).ConfigureAwait(true);
+        await store.RaiseAsync(7, surveyId, Now.AddDays(-1).AddMinutes(-1)).ConfigureAwait(true);
+
+        var digest = Assert.Single(await store
+            .ListDueResponseDigestsAsync(Now.AddDays(-1))
+            .ConfigureAwait(true));
+        Assert.Equal(2, digest.Count);
+        Assert.Equal(0, digest.MailQueuedCount);
+
+        var mail = new ProtectedResponseNotificationMail(Guid.NewGuid(), "protected");
+        Assert.True(await store
+            .TryQueueResponseDigestAsync(digest, [mail], Now)
+            .ConfigureAwait(true));
+        Assert.False(await store
+            .TryQueueResponseDigestAsync(digest, [mail], Now)
+            .ConfigureAwait(true));
+
+        await using var connection = new DbConnectionFactory(provider, connectionString).Create();
+        await connection.OpenAsync().ConfigureAwait(true);
+        var queued = await connection.ExecuteScalarAsync<long>(
+            SqlDialect.Format(
+                provider,
+                "SELECT COUNT(*) FROM [MailOutbox] WHERE [MailId] = @MailId"),
+            new { mail.MailId }).ConfigureAwait(true);
+        Assert.Equal(1, queued);
+
+        await store.RaiseAsync(7, surveyId, Now.AddMinutes(1)).ConfigureAwait(true);
+        Assert.Empty(await store
+            .ListDueResponseDigestsAsync(Now.AddMinutes(-1))
+            .ConfigureAwait(true));
+
+        var next = Assert.Single(await store
+            .ListDueResponseDigestsAsync(Now)
+            .ConfigureAwait(true));
+        Assert.Equal(3, next.Count);
+        Assert.Equal(2, next.MailQueuedCount);
+    }
 }

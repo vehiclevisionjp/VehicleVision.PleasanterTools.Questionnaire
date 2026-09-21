@@ -730,6 +730,8 @@ export interface AdminSession {
    * 接続先も資格情報も返らない。**認証済みのときだけ載る。**
    */
   mailEnabled?: boolean;
+  /** 新しい回答の 24 時間ごとのまとめ通知をメールで受け取るか。**既定は無効。** */
+  responseNotificationEnabled?: boolean;
   /** ログイン ID を、本人宛て試し送信のメールアドレスとして使えるか。 */
   autoReplyTestRecipientAvailable?: boolean;
 

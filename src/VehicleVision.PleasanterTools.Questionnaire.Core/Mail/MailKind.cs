@@ -22,4 +22,7 @@ public enum MailKind
 
     /// <summary>管理者自身へ送る自動返信の試し送信（Issue #319）。</summary>
     AutoReplyTest = 3,
+
+    /// <summary>管理者へ送る、新しい回答のまとめ通知（Issue #357）。</summary>
+    ResponseNotification = 4,
 }

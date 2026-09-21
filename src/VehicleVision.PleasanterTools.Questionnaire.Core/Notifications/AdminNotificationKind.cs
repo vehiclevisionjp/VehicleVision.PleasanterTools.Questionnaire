@@ -39,4 +39,8 @@ public enum AdminNotificationKind
     /// 同じ知らせにすると、慌てて回答を探しに行くことになる。
     /// </remarks>
     MailDeadLettered = 6,
+
+    /// <summary>新しい回答を受け付けた（Issue #357）。</summary>
+    /// <remarks>⚠️ **回答の中身は持たない。** 件数・時刻・アンケートだけを知らせる。</remarks>
+    ResponseReceived = 7,
 }

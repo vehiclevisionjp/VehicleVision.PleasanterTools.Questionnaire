@@ -557,8 +557,8 @@ public class ResponseLimitTests
 
         Assert.True((await SubmitAsync(intake, "t2")).Accepted);
 
-        Assert.Equal(
-            [((int)AdminNotificationKind.ResponseLimitReached, SurveyId)],
+        Assert.Contains(
+            ((int)AdminNotificationKind.ResponseLimitReached, SurveyId),
             notifications.Raised);
     }
 
@@ -573,7 +573,36 @@ public class ResponseLimitTests
         await SubmitAsync(intake, "t2");
         await SubmitAsync(intake, "t3");
 
-        Assert.Single(notifications.Raised);
+        Assert.Single(
+            notifications.Raised,
+            raised => raised.Kind == (int)AdminNotificationKind.ResponseLimitReached);
+    }
+
+    [Fact]
+    public async Task 新しい本番回答だけを知らせる()
+    {
+        var notifications = new FakeAdminNotificationStore();
+        var (intake, _, _) = Intake(notifications: notifications);
+
+        Assert.True((await SubmitAsync(intake, "new")).Accepted);
+        Assert.True((await SubmitAsync(intake, "new")).Accepted);
+
+        Assert.Equal(
+            [((int)AdminNotificationKind.ResponseReceived, SurveyId)],
+            notifications.Raised);
+    }
+
+    [Fact]
+    public async Task テスト回答は新しい回答として知らせない()
+    {
+        var notifications = new FakeAdminNotificationStore();
+        var (intake, _, _) = Intake(
+            status: (int)SurveyStatus.TestPublished,
+            notifications: notifications);
+
+        Assert.True((await SubmitAsync(intake, "test")).Accepted);
+
+        Assert.Empty(notifications.Raised);
     }
 
     [Fact]

@@ -181,7 +181,11 @@ builder.Services.AddSingleton<IAttachmentRejectionStore, AttachmentRejectionStor
 // **異常はログにしか出ていなかった**（Issue #80）。
 // **Pleasanter を経由せず本アプリの DB へ溜める。**
 // 知らせの多くは「Pleasanter へ届かない」事象そのもので、届け先にはできない
-builder.Services.AddSingleton<IAdminNotificationStore, AdminNotificationStore>();
+builder.Services.AddSingleton<AdminNotificationStore>();
+builder.Services.AddSingleton<IAdminNotificationStore>(
+    serviceProvider => serviceProvider.GetRequiredService<AdminNotificationStore>());
+builder.Services.AddSingleton<IResponseNotificationStore>(
+    serviceProvider => serviceProvider.GetRequiredService<AdminNotificationStore>());
 builder.Services.AddSingleton<IAltchaChallengeStore, AltchaChallengeStore>();
 
 // **bot 対策の 4 枚目**（Issue #55）。送信チケット・最短時間・honeypot と重ねる。
@@ -561,6 +565,9 @@ if (mailOptions.IsReady)
     builder.Services.AddSingleton(MailSenderOptions.FromConfiguration(builder.Configuration));
     builder.Services.AddSingleton<MailSender>();
     builder.Services.AddHostedService<MailSenderHostedService>();
+    builder.Services.AddSingleton(ResponseNotificationMailerOptions.FromConfiguration(builder.Configuration));
+    builder.Services.AddSingleton<ResponseNotificationMailer>();
+    builder.Services.AddHostedService<ResponseNotificationMailerHostedService>();
 }
 
 // **設定したときだけ監視の口を生やす。** 既定で外部から DB の状態を読める口を作らない。

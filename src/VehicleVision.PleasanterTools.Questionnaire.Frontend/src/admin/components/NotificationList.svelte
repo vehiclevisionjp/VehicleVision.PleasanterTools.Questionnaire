@@ -22,6 +22,8 @@
     BacklogBlockedTotal: 'notifications.kind.BacklogBlockedTotal',
     PleasanterUnauthorized: 'notifications.kind.PleasanterUnauthorized',
     ResponseLimitReached: 'notifications.kind.ResponseLimitReached',
+    MailDeadLettered: 'notifications.kind.MailDeadLettered',
+    ResponseReceived: 'notifications.kind.ResponseReceived',
   };
 
   let items = $state<AdminNotification[]>([]);

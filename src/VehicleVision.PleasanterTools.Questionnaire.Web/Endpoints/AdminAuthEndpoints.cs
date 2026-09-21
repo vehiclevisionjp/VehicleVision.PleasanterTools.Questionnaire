@@ -66,6 +66,7 @@ public static class AdminAuthEndpoints
                 // 画面はブラウザの言語設定へ落とす（_documents/多言語対応方針.md 2 章）
                 string? language = null;
                 var hasTotp = false;
+                var responseNotificationEnabled = false;
                 if (session.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) is { } sessionId
                     && Guid.TryParse(sessionId, out var sessionUserId))
                 {
@@ -73,15 +74,16 @@ public static class AdminAuthEndpoints
                         .ConfigureAwait(false);
                     language = SupportedLanguages.Normalize(user?.Language);
                     hasTotp = user?.HasTotp ?? false;
+                    responseNotificationEnabled = user?.ResponseNotificationEnabled ?? false;
                 }
 
                 var role = session.Principal?.FindFirstValue(ClaimTypes.Role);
 
-            // **この人が SAML で入ったか**（Issue #191）。
-            // **IdP へログアウトを頼めるのは、SAML で入った人だけ。**
-            // ⚠️ **NameID そのものは返さない。** 画面には要らない値
-            var samlSingleLogout = saml.SingleLogoutEnabled
-                && session.Principal?.FindFirstValue(AdminAuthSchemes.SamlNameIdClaim) is { Length: > 0 };
+                // **この人が SAML で入ったか**（Issue #191）。
+                // **IdP へログアウトを頼めるのは、SAML で入った人だけ。**
+                // ⚠️ **NameID そのものは返さない。** 画面には要らない値
+                var samlSingleLogout = saml.SingleLogoutEnabled
+                    && session.Principal?.FindFirstValue(AdminAuthSchemes.SamlNameIdClaim) is { Length: > 0 };
 
                 return Results.Ok(new
                 {
@@ -114,6 +116,7 @@ public static class AdminAuthEndpoints
                     // ⚠️ **接続先も資格情報も返さない**（送れるか否かだけ）。
                     // **認証済みの相手にだけ返す**（構成の情報を未認証へ出さない）
                     mailEnabled = mail.IsReady,
+                    responseNotificationEnabled,
 
                     // **試し送信の宛先は自分のログイン ID に固定する**（Issue #319）。
                     // 画面で先に理由を出すため、メールアドレスとして読めるかだけ返す。

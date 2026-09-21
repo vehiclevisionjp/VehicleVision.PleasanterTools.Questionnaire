@@ -252,6 +252,13 @@ export const saveLanguage = (language: string | null) =>
     json: { language },
   });
 
+/** 新しい回答のまとめ通知をメールで受け取るかを保存する。 */
+export const saveResponseNotification = (enabled: boolean) =>
+  call<{ enabled: boolean }>('/api/admin/me/response-notification', {
+    method: 'PUT',
+    json: { enabled },
+  });
+
 // ---- SAML 設定（Issue #254）-------------------------------------------------
 
 export const getSamlSettings = () =>

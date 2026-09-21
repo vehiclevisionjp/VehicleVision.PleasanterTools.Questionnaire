@@ -184,6 +184,15 @@ export const ja = {
   'account.completeEnroll': '登録を完了する',
   'account.recoveryTitle': '復旧コードを控えてください。この画面を閉じると再表示できません。',
   'account.recoveryNote': '端末を失ったときは、このコードでログインします。1 つ使うと無効になります。',
+  'account.responseNotificationTitle': '新しい回答のメール通知',
+  'account.responseNotificationEnabled': '新しい回答をメールで受け取る',
+  'account.responseNotificationHint':
+    '回答の中身は載せず、アンケート名・件数・時刻を 24 時間ごとにまとめて送ります。',
+  'account.responseNotificationMailDisabled':
+    'サーバ側でメール送信が無効です。画面のお知らせには引き続き表示されます。',
+  'account.responseNotificationAddressUnavailable':
+    'ログイン ID がメールアドレスではないため、メールは届きません。',
+  'account.responseNotificationSaved': 'メール通知の設定を保存しました。',
   'sessions.title': 'ログイン中の端末',
   'sessions.lead': 'セッションごとに終了できます。心当たりのない端末はすぐに終了してください。',
   'sessions.loading': '読み込んでいます…',
@@ -643,6 +652,8 @@ export const ja = {
   'notifications.kind.BacklogBlockedTotal': '送信の滞留で全アンケートの受付を止めました',
   'notifications.kind.PleasanterUnauthorized': 'Pleasanter の認証に失敗しました',
   'notifications.kind.ResponseLimitReached': '回答数の上限に達したので受付を止めました',
+  'notifications.kind.MailDeadLettered': 'メールを送れず保留にしました',
+  'notifications.kind.ResponseReceived': '新しい回答が届きました',
   'notifications.kind.Unknown': '不明なお知らせ',
 
   // ---- 分岐（ジャンプ） ---------------------------------------------------
@@ -1184,6 +1195,15 @@ export const en: Record<MessageKey, string> = {
   'account.completeEnroll': 'Finish registration',
   'account.recoveryTitle': 'Save these recovery codes. They cannot be shown again.',
   'account.recoveryNote': 'Use one of them to sign in if you lose your device. Each works only once.',
+  'account.responseNotificationTitle': 'Email notifications for new responses',
+  'account.responseNotificationEnabled': 'Email me about new responses',
+  'account.responseNotificationHint':
+    'Messages include only the survey name, count, and time, grouped once every 24 hours.',
+  'account.responseNotificationMailDisabled':
+    'Email delivery is disabled on the server. Notifications still appear in the admin screen.',
+  'account.responseNotificationAddressUnavailable':
+    'Your sign-in ID is not an email address, so email notifications cannot be delivered.',
+  'account.responseNotificationSaved': 'Email notification setting saved.',
   'sessions.title': 'Signed-in devices',
   'sessions.lead': 'You can end individual sessions. End any device you do not recognize immediately.',
   'sessions.loading': 'Loading\u2026',
@@ -1661,6 +1681,8 @@ export const en: Record<MessageKey, string> = {
   'notifications.kind.BacklogBlockedTotal': 'Intake for all surveys was stopped by the backlog',
   'notifications.kind.PleasanterUnauthorized': 'Authentication with Pleasanter failed',
   'notifications.kind.ResponseLimitReached': 'Intake stopped because the response limit was reached',
+  'notifications.kind.MailDeadLettered': 'An email could not be delivered and is on hold',
+  'notifications.kind.ResponseReceived': 'New responses were received',
   'notifications.kind.Unknown': 'Unknown notification',
 
   // ---- Branching (jumps) --------------------------------------------------
