@@ -45,6 +45,7 @@
   import { applyTheme, headerImageUrl } from './lib/theme';
   import { clearDraft, hasDraft, readDraft, saveDraft } from './lib/draft';
   import { noteBlocks } from './lib/note';
+  import { heightReportTargetOrigin, isFramed, shouldReportHeight } from './lib/framed';
   import {
     applyReadability,
     readReadabilityPreferences,
@@ -130,6 +131,30 @@
   let definition = $state<SurveyDefinition>();
   let publicId = $state('');
   let responseToken = $state('');
+
+  $effect(() => {
+    const targetOrigin = heightReportTargetOrigin(isFramed(), document.referrer);
+    if (publicId === '' || targetOrigin === null) {
+      return;
+    }
+
+    let previousHeight: number | null = null;
+    const reportHeight = () => {
+      const height = document.documentElement.scrollHeight;
+      if (!shouldReportHeight(previousHeight, height)) {
+        return;
+      }
+
+      window.parent.postMessage({ type: 'questionnaire:height', publicId, height }, targetOrigin);
+      previousHeight = height;
+    };
+
+    const observer = new ResizeObserver(reportHeight);
+    observer.observe(document.documentElement);
+    reportHeight();
+
+    return () => observer.disconnect();
+  });
   /** 送信チケット。**画面を開いたときにサーバから受け取る。** */
   let ticket = $state('');
   /** ハニーポット項目。**人が触らない場所に置いてあるので、空のままのはず。** */
