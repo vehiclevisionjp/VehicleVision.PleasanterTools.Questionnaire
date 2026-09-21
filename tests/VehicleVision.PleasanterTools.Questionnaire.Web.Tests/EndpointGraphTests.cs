@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
@@ -50,7 +51,10 @@ public class EndpointGraphTests
         app.MapAdminSurveyEndpoints();
         app.MapAdminTemplateEndpoints();
         app.MapAdminUserEndpoints();
-        app.MapAdminVersionEndpoints(allowInsecure: false);
+        app.MapAdminVersionEndpoints(
+            allowInsecure: false,
+            usesSqlite: true,
+            new DatabaseStartupState());
         app.MapAnalyticsEndpoints();
         app.MapFormEndpoints();
         app.MapMonitoringEndpoints(new MonitoringToken("test-monitoring-token"));

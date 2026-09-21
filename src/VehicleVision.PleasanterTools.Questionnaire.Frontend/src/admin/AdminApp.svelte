@@ -22,7 +22,7 @@
   } from './lib/api';
   import type { AdminPermission, AdminSession } from './lib/types';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../lib/i18n/language';
-  import { language, resolveLanguage, t } from './lib/i18n/state.svelte';
+  import { formatDateTime, language, resolveLanguage, t } from './lib/i18n/state.svelte';
   import {
     buildBreadcrumbs,
     truncateBreadcrumbTitle,
@@ -563,10 +563,27 @@
     </main>
     {#if applicationVersion}
       <footer class="version">
-        {t('app.version', {
-          version: applicationVersion.version,
-          commit: applicationVersion.commit ? ` (${applicationVersion.commit})` : '',
-        })}
+        <div>
+          {t('app.version', {
+            version: applicationVersion.version,
+            commit: applicationVersion.commit ? ` (${applicationVersion.commit})` : '',
+          })}
+        </div>
+        {#if applicationVersion.databaseMigration}
+          <div>
+            {t('app.databaseMigration', {
+              applied: applicationVersion.databaseMigration.appliedVersion ?? '—',
+              latest: applicationVersion.databaseMigration.latestVersion,
+              pending: applicationVersion.databaseMigration.pendingCount,
+              at: applicationVersion.databaseMigration.lastAppliedAt
+                ? formatDateTime(new Date(applicationVersion.databaseMigration.lastAppliedAt))
+                : '—',
+              result: t(
+                `app.databaseMigrationResult.${applicationVersion.databaseMigration.lastResult}`,
+              ),
+            })}
+          </div>
+        {/if}
       </footer>
     {/if}
   {:else if acceptingInvitation && session}

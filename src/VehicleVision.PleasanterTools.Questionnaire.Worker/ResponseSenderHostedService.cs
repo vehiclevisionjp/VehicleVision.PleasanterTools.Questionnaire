@@ -19,13 +19,19 @@ public sealed class ResponseSenderHostedService(
     IResponseOutbox outbox,
     ResponseSenderOptions options,
     ILogger<ResponseSenderHostedService> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    DatabaseStartupState? startupState = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (startupState is not null)
+        {
+            await startupState.WaitUntilReadyAsync(stoppingToken).ConfigureAwait(false);
+        }
+
         logger.LogInformation("送信ワーカーを開始した（{Worker}）", options.WorkerName);
 
         if (options.MaxSendsPerMinute > 0)

@@ -164,13 +164,19 @@ public sealed class AuditLogRetentionService(
     IResponseOutbox? outbox = null,
     IResponseEditTokenStore? editTokens = null,
     IAdminSessionStore? adminSessions = null,
-    IAssetTicketStore? assetTickets = null)
+    IAssetTicketStore? assetTickets = null,
+    DatabaseStartupState? startupState = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (startupState is not null)
+        {
+            await startupState.WaitUntilReadyAsync(stoppingToken).ConfigureAwait(false);
+        }
+
         if (!options.Enabled)
         {
             // **黙って何もしない、にはしない。** 増え続ける設定で動いていると分かるようにする

@@ -93,6 +93,13 @@ export interface ApplicationVersion {
   commit?: string | null;
   allowInsecure: boolean;
   usesSqlite: boolean;
+  databaseMigration?: {
+    appliedVersion?: number | null;
+    latestVersion: number;
+    pendingCount: number;
+    lastAppliedAt?: string | null;
+    lastResult: 'none' | 'succeeded';
+  } | null;
 }
 
 /** 動作中の版を読む。**認証済みの管理者にだけサーバが返す。** */

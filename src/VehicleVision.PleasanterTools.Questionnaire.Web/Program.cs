@@ -68,6 +68,8 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 var provider = Enum.Parse<DatabaseProvider>(
     builder.Configuration["QUESTIONNAIRE_DB_PROVIDER"] ?? nameof(DatabaseProvider.SqlServer));
 var usesSqlite = provider is DatabaseProvider.Sqlite;
+var databaseStartupState = new DatabaseStartupState();
+builder.Services.AddSingleton(databaseStartupState);
 var connectionString = DatabaseConnectionString.Resolve(
     provider,
     builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"],
@@ -114,8 +116,7 @@ ConnectionSecurity.EnsureSecure(
         "true",
         StringComparison.OrdinalIgnoreCase));
 
-// **マイグレーションを当てる口。** アプリ起動時の自動適用はしない
-// （_documents/データモデル設計.md 5 章。スケールアウト時に同時実行され得る）。
+// **マイグレーションを手動で当てる口も残す。**
 // **当てる道具を別に作らない。** 接続文字列の読み方が二重になり、片方だけ直す事故が起きる
 if (MigrationCommand.IsRequested(args))
 {
@@ -677,27 +678,6 @@ builder.Services
             rateLimitLogger));
 });
 
-// **スキーマが揃っていないまま起動しない。**
-// 列の無い状態で動くと `Invalid column name` としか出ず、
-// 「マイグレーションを当て忘れている」とは分からない（Issue #32。実際に 21 件落ちた）。
-// **自動では当てない。** 何が足りないかを言って止まる
-if (!string.Equals(
-    builder.Configuration["QUESTIONNAIRE_DB_SKIP_MIGRATION_CHECK"],
-    "true",
-    StringComparison.OrdinalIgnoreCase))
-{
-    var pendingMigrations = DatabaseMigrator.PendingMigrations(provider, connectionString);
-    if (pendingMigrations.Count > 0)
-    {
-        throw new InvalidOperationException(
-            // **英語で書く。** Azure の Kudu の Debug console で日本語が化ける（Issue #225）
-            "The database schema is out of date. Pending migrations: "
-            + string.Join(" / ", pendingMigrations)
-            + ". Run this executable with --migrate to apply them"
-            + " (see _documents/導入-更新運用手順書.md).");
-    }
-}
-
 var app = builder.Build();
 
 if (transportSecurity.AllowInsecure)
@@ -783,6 +763,20 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 // 先に置くと、リバースプロキシ配下では全要求がプロキシ自身の IP に見える。
 app.UseEndpointNetworkRestrictions(endpointNetworkRestrictions);
 
+// **DB スキーマが揃うまでは生存確認と readiness 以外へ通さない。**
+// ロードバランサを経由しない直接アクセスでも、移行途中の表を読み書きさせない。
+app.Use(async (context, next) =>
+{
+    if (!databaseStartupState.IsReady
+        && !DatabaseStartupMigration.IsAvailableBeforeMigration(context.Request.Path))
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        return;
+    }
+
+    await next();
+});
+
 if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
 {
     app.UseHsts();
@@ -845,7 +839,10 @@ app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
-app.MapAdminVersionEndpoints(transportSecurity.AllowInsecure, usesSqlite);
+app.MapAdminVersionEndpoints(
+    transportSecurity.AllowInsecure,
+    usesSqlite,
+    databaseStartupState);
 if (monitoringToken is not null)
 {
     app.MapMonitoringEndpoints(monitoringToken);
@@ -892,6 +889,11 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
 // 含み得るので応答へ出さない。
 app.MapGet("/ready", async (CancellationToken cancellationToken) =>
 {
+    if (!databaseStartupState.IsReady)
+    {
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+
     var failure = await DatabaseMigrator.WaitForDatabaseAsync(
         provider,
         connectionString,
@@ -905,7 +907,25 @@ app.MapGet("/ready", async (CancellationToken cancellationToken) =>
     .WithTags("生存確認")
     .DisableRateLimiting();
 
-app.Run();
+await app.StartAsync();
+try
+{
+    await DatabaseStartupMigration.RunAsync(
+        builder.Configuration,
+        provider,
+        connectionString,
+        databaseStartupState,
+        app.Logger,
+        app.Lifetime.ApplicationStopping);
+    await app.WaitForShutdownAsync();
+}
+catch (OperationCanceledException) when (app.Lifetime.ApplicationStopping.IsCancellationRequested)
+{
+}
+finally
+{
+    await app.StopAsync();
+}
 
 /// <summary>結合テストから参照するための入口。</summary>
 public partial class Program;

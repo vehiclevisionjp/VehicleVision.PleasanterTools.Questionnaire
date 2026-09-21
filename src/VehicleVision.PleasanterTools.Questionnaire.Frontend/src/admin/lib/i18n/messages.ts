@@ -30,6 +30,10 @@ export const ja = {
   'app.networkError': '通信できませんでした。',
   'app.requestFailed': '処理できませんでした（{status}）。',
   'app.version': '動作中の版: {version}{commit}',
+  'app.databaseMigration':
+    'DB マイグレーション: 適用済み {applied} / 最新 {latest}、未適用 {pending} 件、最終適用 {at}（{result}）',
+  'app.databaseMigrationResult.none': '適用履歴なし',
+  'app.databaseMigrationResult.succeeded': '成功',
   'app.insecureMode':
     '閉じた環境向けの HTTP 設定で動作しています。通信は暗号化されず、管理者のパスワードとアンケートの合言葉が平文で流れます。SAML は IdP 側の制約により利用できないことがあります。',
   'app.sqliteMode':
@@ -1043,6 +1047,10 @@ export const en: Record<MessageKey, string> = {
   'app.networkError': 'Could not reach the server.',
   'app.requestFailed': 'The request could not be processed ({status}).',
   'app.version': 'Running version: {version}{commit}',
+  'app.databaseMigration':
+    'DB migrations: applied {applied} / latest {latest}, {pending} pending, last applied {at} ({result})',
+  'app.databaseMigrationResult.none': 'No migration history',
+  'app.databaseMigrationResult.succeeded': 'Succeeded',
   'app.insecureMode':
     'This application is running in HTTP mode for closed networks. Traffic is not encrypted, including administrator passwords and survey passphrases. SAML may be unavailable because of IdP requirements.',
   'app.sqliteMode':

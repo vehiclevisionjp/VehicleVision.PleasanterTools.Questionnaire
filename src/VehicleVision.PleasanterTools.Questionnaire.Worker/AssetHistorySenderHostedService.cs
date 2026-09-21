@@ -9,12 +9,18 @@ public sealed class AssetHistorySenderHostedService(
     IAssetHistoryOutbox outbox,
     ResponseSenderOptions options,
     ILogger<AssetHistorySenderHostedService> logger,
-    TimeProvider? timeProvider = null) : BackgroundService
+    TimeProvider? timeProvider = null,
+    DatabaseStartupState? startupState = null) : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (startupState is not null)
+        {
+            await startupState.WaitUntilReadyAsync(stoppingToken).ConfigureAwait(false);
+        }
+
         var nextRelease = _time.GetUtcNow();
         while (!stoppingToken.IsCancellationRequested)
         {
