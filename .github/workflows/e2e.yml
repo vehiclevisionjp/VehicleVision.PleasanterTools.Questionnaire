@@ -110,6 +110,7 @@ jobs:
           echo "OK   CodeDefiner は完走した（全文検索のエラーは想定内）"
 
       - name: 検証用の API キーを設定する
+        id: pleasanter-api-key
         # Pleasanter は Users.ApiKey をそのまま比較するので、DB へ直接入れれば通る。
         # **キャッシュされた利用者情報を捨てるため、入れた後に再起動する**
         run: |
@@ -117,12 +118,16 @@ jobs:
           docker compose cp tools/pleasanter-testenv/seed/01_apikey.sql db:/tmp/01_apikey.sql
           docker compose exec -T db /opt/mssql-tools18/bin/sqlcmd \
               -S localhost -U sa -P "$TESTENV_SA_PASSWORD" -C -b -i /tmp/01_apikey.sql
+          started_at=$(date --iso-8601=ns)
+          echo "started-at=$started_at" >> "$GITHUB_OUTPUT"
           docker compose restart pleasanter
           docker compose up -d --wait pleasanter
 
       - name: Pleasanter と本アプリが応答するか確かめる
         # **待受だけでは足りない。** Kestrel は初期化の途中でも接続を受ける。
-        # 画面が返るまで待たないと、試験の 1 件目だけが落ちる
+        # 試験が使う API が JSON オブジェクトを返すまで待つ。
+        env:
+          PLEASANTER_STARTED_AT: ${{ steps.pleasanter-api-key.outputs.started-at }}
         run: |
           set -euo pipefail
 
@@ -130,18 +135,80 @@ jobs:
               local label="$1" url="$2"
               for i in $(seq 1 60); do
                   if curl -fsS -o /dev/null "$url"; then
-                      echo "OK   $label が応答した（${i} 回目）"
+                      echo "OK   $label responded (attempt $i)"
                       return 0
                   fi
                   sleep 5
               done
-              echo "NG   $label が応答しない" >&2
+              echo "NG   $label did not respond" >&2
               return 1
           }
 
-          wait_for "Pleasanter" http://localhost:8080/
+          wait_for_pleasanter_api() {
+              local response=/tmp/pleasanter-api-response.json
+              for i in $(seq 1 60); do
+                  # GetLicenseInfo は API キーで認証し、データを変更せず JSON オブジェクトを返す。
+                  if curl -fsS --max-time 10 \
+                      -H 'Content-Type: application/json' \
+                      -d '{"ApiKey":"6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6","ApiVersion":1.1}' \
+                      -o "$response" \
+                      http://localhost:8080/api/utility/GetLicenseInfo \
+                      && jq -e 'type == "object"' "$response" > /dev/null; then
+                      echo "OK   Pleasanter API returned a JSON object (attempt $i)"
+                      return 0
+                  fi
+                  sleep 5
+              done
+              echo "NG   Pleasanter API did not return a JSON object" >&2
+              return 1
+          }
+
+          fail_with_pleasanter_logs() {
+              local title="$1" message="$2" log="$3"
+              echo "===== Pleasanter logs ====="
+              tail -n 100 "$log"
+              echo "::error title=$title::$message"
+              exit 1
+          }
+          initial_log=/tmp/pleasanter-initial.log
+          initial_log=/tmp/pleasanter-initial.log
+          api_ready=true
+          if ! wait_for_pleasanter_api; then
+              api_ready=false
+          fi
+          docker compose logs --no-color --since "$PLEASANTER_STARTED_AT" pleasanter > "$initial_log"
+
+          if grep -q 'Application Warmup Failed' "$initial_log"; then
+              retry_started_at=$(date --iso-8601=ns)
+              echo "Application warmup failed. Restarting Pleasanter once."
+              docker compose restart pleasanter
+              docker compose up -d --wait pleasanter
+
+              if ! wait_for_pleasanter_api; then
+                  docker compose logs --no-color --since "$retry_started_at" pleasanter > /tmp/pleasanter-retry.log
+                  fail_with_pleasanter_logs \
+                      "Pleasanter API readiness failed after restart" \
+                      "The API did not return a JSON object after the single restart." \
+                      /tmp/pleasanter-retry.log
+              fi
+              docker compose logs --no-color --since "$retry_started_at" pleasanter > /tmp/pleasanter-retry.log
+              if grep -q 'Application Warmup Failed' /tmp/pleasanter-retry.log; then
+                  fail_with_pleasanter_logs \
+                      "Pleasanter warmup failed after restart" \
+                      "Application Warmup Failed was logged again after the single restart." \
+                      /tmp/pleasanter-retry.log
+              fi
+          elif [ "$api_ready" = false ]; then
+              fail_with_pleasanter_logs \
+                  "Pleasanter API readiness failed" \
+                  "The API did not return a JSON object." \
+                  "$initial_log"
+          else
+              echo "OK   Pleasanter warmup completed"
+          fi
+
           # **Admin*EndToEndTests の当て先**（QUESTIONNAIRE_BASE_URL の既定）
-          wait_for "本アプリ" http://localhost:8081/healthz
+          wait_for "Questionnaire app" http://localhost:8081/healthz
 
       - name: 端から端まで通す試験を実行する
         env:
