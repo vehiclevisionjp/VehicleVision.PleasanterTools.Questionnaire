@@ -454,6 +454,114 @@ public class ResponseSenderTests
         await service.StopAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task メンテナンス中は送信待ちを確保せず解除後に再開する()
+    {
+        var handler = new StubHandler();
+        var options = new ResponseSenderOptions
+        {
+            MaxSendsPerMinute = 0,
+            IdleDelay = TimeSpan.FromSeconds(1),
+        };
+        var (sender, outbox, _) = Build(handler, options: options);
+        outbox.Enqueue(Pending());
+
+        var store = new FakeMaintenanceStore { Enabled = true };
+        var maintenance = new MaintenanceMode(
+            store,
+            new MaintenanceModeOptions(
+                false,
+                MaintenanceModeOptions.DefaultMessageJa,
+                MaintenanceModeOptions.DefaultMessageEn));
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero));
+        var service = new ResponseSenderHostedService(
+            sender,
+            outbox,
+            options,
+            NullLogger<ResponseSenderHostedService>.Instance,
+            time,
+            maintenance: maintenance);
+
+        using var stopping = new CancellationTokenSource();
+        await service.StartAsync(stopping.Token);
+        await Task.Yield();
+        Assert.Empty(outbox.Completed);
+
+        store.Enabled = false;
+        time.Advance(options.IdleDelay);
+        await WaitForAsync(() => outbox.Completed.Count == 1);
+
+        await stopping.CancelAsync();
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task 流量制限の待機中にメンテナンスが始まったら次を送らない()
+    {
+        var handler = new StubHandler();
+        var options = new ResponseSenderOptions
+        {
+            MaxSendsPerMinute = 60,
+            IdleDelay = TimeSpan.FromSeconds(1),
+        };
+        var (sender, outbox, _) = Build(handler, options: options);
+        outbox.Enqueue(Pending());
+        outbox.Enqueue(new PendingResponse($"{Token}-2", SurveyId, 1, Payload(), 0));
+
+        var store = new FakeMaintenanceStore();
+        var maintenance = new MaintenanceMode(
+            store,
+            new MaintenanceModeOptions(
+                false,
+                MaintenanceModeOptions.DefaultMessageJa,
+                MaintenanceModeOptions.DefaultMessageEn));
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero));
+        var service = new ResponseSenderHostedService(
+            sender,
+            outbox,
+            options,
+            NullLogger<ResponseSenderHostedService>.Instance,
+            time,
+            maintenance: maintenance);
+
+        using var stopping = new CancellationTokenSource();
+        await service.StartAsync(stopping.Token);
+        await WaitForAsync(() => outbox.Completed.Count == 1);
+
+        store.Enabled = true;
+        time.Advance(TimeSpan.FromSeconds(1));
+        await Task.Yield();
+        Assert.Single(outbox.Completed);
+
+        store.Enabled = false;
+        time.Advance(options.IdleDelay);
+        await WaitForAsync(() => outbox.Completed.Count == 2);
+
+        await stopping.CancelAsync();
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    private sealed class FakeMaintenanceStore : IMaintenanceModeStore
+    {
+        public bool Enabled { get; set; }
+
+        public Task<MaintenanceModeRecord> GetAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MaintenanceModeRecord(Enabled, null, null, null, null));
+
+        public Task SetAsync(
+            bool enabled,
+            string? messageJa,
+            string? messageEn,
+            Guid adminUserId,
+            DateTime changedAt,
+            CancellationToken cancellationToken = default)
+        {
+            Enabled = enabled;
+            return Task.CompletedTask;
+        }
+    }
+
     /// <summary>条件が満たされるまで待つ。**満たされなければ落とす。**</summary>
     /// <remarks>
     /// **偽の時計を使っていても、常駐処理が次の待ちへ入るのは実時間で起きる。**
