@@ -26,6 +26,7 @@
   } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
   import { canConfirmSurveyDeletion, deletionResponseCount } from '../lib/surveyDeletion';
+  import { iframeTag } from '../lib/iframeTag';
   import SurveyQrCode from './SurveyQrCode.svelte';
   import TemplatePanel from './TemplatePanel.svelte';
 
@@ -503,58 +504,6 @@
     return `${location.origin}/f/${publicId}`;
   }
 
-  /** HTML 属性へ安全に埋め込める文字列へ直す。 */
-  function htmlAttribute(value: string): string {
-    return value
-      .replaceAll('&', '&amp;')
-      .replaceAll('"', '&quot;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;');
-  }
-
-  /** script 内の文字列を閉じる文字列として解釈させない。 */
-  function scriptValue(value: string): string {
-    return JSON.stringify(value).replaceAll('<', '\\u003C');
-  }
-
-  /** 高さを親サイトへ通知する iframe と受信側の組。 */
-  function iframeTag(survey: SurveySummary): string {
-    const url = formUrl(survey.publicId);
-    const applicationOrigin = new URL(url).origin;
-    const publicId = scriptValue(survey.publicId);
-    const origin = scriptValue(applicationOrigin);
-
-    return `<iframe src="${htmlAttribute(url)}" title="${htmlAttribute(survey.title)}" loading="lazy" height="800" data-questionnaire-public-id="${htmlAttribute(survey.publicId)}"></iframe>
-<script>
-(() => {
-  const iframe = document.currentScript?.previousElementSibling;
-  if (!(iframe instanceof HTMLIFrameElement)) return;
-
-  const applicationOrigin = ${origin};
-  const publicId = ${publicId};
-  const maximumHeight = 10000;
-
-  window.addEventListener('message', (event) => {
-    if (event.origin !== applicationOrigin || event.source !== iframe.contentWindow) return;
-
-    const message = event.data;
-    if (
-      message === null ||
-      typeof message !== 'object' ||
-      Array.isArray(message) ||
-      message.type !== 'questionnaire:height' ||
-      message.publicId !== publicId ||
-      !Number.isSafeInteger(message.height) ||
-      message.height < 0 ||
-      message.height > maximumHeight
-    ) return;
-
-    iframe.style.height = message.height + 'px';
-  });
-})();
-<\/script>`;
-  }
-
   function formatDate(value: string): string {
     // **保存されているのは UTC。** 見る人の時間帯で、見る人の言語の書式で出す
     // （`_documents/多言語対応方針.md` 4 章）
@@ -785,7 +734,11 @@
     {:else if settingsAllowEmbedding}
       <label>
         {t('settings.iframeTag')}
-        <textarea readonly rows="3" value={iframeTag(settingsFor)}></textarea>
+        <textarea
+          readonly
+          rows="3"
+          value={iframeTag(formUrl(settingsFor.publicId), settingsFor.title, settingsFor.publicId)}
+        ></textarea>
       </label>
       <p class="hint">{t('settings.iframeTagHint')}</p>
     {/if}

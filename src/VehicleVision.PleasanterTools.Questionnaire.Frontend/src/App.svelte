@@ -140,7 +140,7 @@
 
     let previousHeight: number | null = null;
     const reportHeight = () => {
-      const height = document.documentElement.scrollHeight;
+      const height = Math.ceil(document.body.getBoundingClientRect().height);
       if (!shouldReportHeight(previousHeight, height)) {
         return;
       }
@@ -150,7 +150,7 @@
     };
 
     const observer = new ResizeObserver(reportHeight);
-    observer.observe(document.documentElement);
+    observer.observe(document.body);
     reportHeight();
 
     return () => observer.disconnect();
