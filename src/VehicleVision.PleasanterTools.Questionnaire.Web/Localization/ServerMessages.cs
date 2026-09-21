@@ -184,6 +184,25 @@ public static class ServerMessages
             "現在使っているセッションはここから終了できません。ログアウトしてください。",
             "The current session cannot be ended here. Sign out instead.");
 
+        Add(
+            ServerMessageKeys.ResponseNotificationMailSubject,
+            "アンケートに新しい回答があります",
+            "New survey responses");
+
+        Add(
+            ServerMessageKeys.ResponseNotificationMailBody,
+            "アンケート「{0}」に新しい回答が {1} 件届きました。\n"
+            + "集計期間（UTC）: {2} ～ {3}\n\n"
+            + "回答内容は Pleasanter で確認してください。",
+            "The survey \"{0}\" received {1} new response(s).\n"
+            + "Period (UTC): {2} to {3}\n\n"
+            + "View the response content in Pleasanter.");
+
+        Add(
+            ServerMessageKeys.RemovedSurvey,
+            "削除されたアンケート",
+            "Deleted survey");
+
         // ---- アンケート -----------------------------------------------------
         Add(
             ServerMessageKeys.SurveyTitleRequired,

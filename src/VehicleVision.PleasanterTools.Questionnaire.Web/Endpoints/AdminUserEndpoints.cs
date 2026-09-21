@@ -324,6 +324,20 @@ public static class AdminUserEndpoints
             return Results.Ok(new { language });
         });
 
+        // ---- 回答通知メール --------------------------------------------------
+        // **自分の設定だけを変える。** 既定は無効で、他人が一括で有効にはできない
+        me.MapPut("/response-notification", async (
+            AdminResponseNotificationRequest request,
+            ClaimsPrincipal principal,
+            IAdminUserStore store,
+            CancellationToken cancellationToken) =>
+        {
+            await store.SetResponseNotificationEnabledAsync(
+                ActorId(principal), request.Enabled, cancellationToken).ConfigureAwait(false);
+
+            return Results.Ok(new { enabled = request.Enabled });
+        });
+
         // ---- 自分の 2 要素を解除する（Issue #154）----------------------------
         //
         // **必須のときは通さない。** 通すと設定を無視して保護を外せる。
@@ -682,6 +696,9 @@ public static class AdminUserEndpoints
 
     /// <summary>管理画面を出す言語。**空なら「選んでいない」に戻す。**</summary>
     public sealed record AdminLanguageRequest(string? Language);
+
+    /// <summary>新しい回答のまとめ通知をメールで受け取るか。</summary>
+    public sealed record AdminResponseNotificationRequest(bool Enabled);
 
     /// <summary>使い捨てパスワード。</summary>
     public sealed record AdminCodeRequest(string? Code);
