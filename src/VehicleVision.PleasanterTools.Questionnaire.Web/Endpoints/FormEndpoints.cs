@@ -116,6 +116,7 @@ public static class FormEndpoints
             string publicId,
             HttpContext context,
             ResponseIntake intake,
+            MaintenanceMode maintenance,
             CancellationToken cancellationToken) =>
         {
             // **同じ URL でも枠内申告で応答が変わる。**
@@ -125,9 +126,14 @@ public static class FormEndpoints
                 publicId,
                 cancellationToken,
                 IsFramed(context));
-            return form is null
-                ? ToProblem(rejection)
-                : Results.Ok(new FormResponse(
+            if (form is null)
+            {
+                return rejection is IntakeRejection.Maintenance
+                    ? await ToMaintenanceProblemAsync(context, maintenance, cancellationToken)
+                    : ToProblem(rejection);
+            }
+
+            return Results.Ok(new FormResponse(
                     publicId,
                     form.Definition,
                     form.RequiresProofOfWork,
@@ -388,6 +394,7 @@ public static class FormEndpoints
             string publicId,
             string responseToken,
             ResponseIntake intake,
+            MaintenanceMode maintenance,
             SubmissionGuard guard,
             AltchaGuard altcha,
             CaptchaOptions captchaOptions,
@@ -542,6 +549,11 @@ public static class FormEndpoints
                 return Results.Accepted(value: new { assetTicket = result.AssetTicket });
             }
 
+            if (result.Rejection is IntakeRejection.Maintenance)
+            {
+                return await ToMaintenanceProblemAsync(context, maintenance, cancellationToken);
+            }
+
             return result.Rejection switch
             {
                 IntakeRejection.Invalid => Results.ValidationProblem(ToValidationErrors(result)),
@@ -667,6 +679,23 @@ public static class FormEndpoints
             new { reason = "embeddingNotAllowed" }, statusCode: StatusCodes.Status403Forbidden),
         _ => Results.NotFound(),
     };
+
+    /// <summary>メンテナンスの案内と再試行の目安を返す。</summary>
+    private static async Task<IResult> ToMaintenanceProblemAsync(
+        HttpContext context,
+        MaintenanceMode maintenance,
+        CancellationToken cancellationToken)
+    {
+        var status = await maintenance.GetPublicStatusAsync(cancellationToken).ConfigureAwait(false);
+        context.Response.Headers.RetryAfter = "300";
+        return Results.Json(
+            new
+            {
+                reason = "maintenance",
+                message = MaintenanceMode.MessageOf(status, RequestLanguage.Of(context)),
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
 
     /// <summary>回答画面からの枠内申告が付いているか。</summary>
     private static bool IsFramed(HttpContext context) =>

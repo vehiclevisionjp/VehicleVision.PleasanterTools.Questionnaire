@@ -17,6 +17,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Scripting;
 using VehicleVision.PleasanterTools.Questionnaire.Web;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Worker;
@@ -46,6 +47,17 @@ var openApiExposure = OpenApiExposureOptions.FromConfiguration(builder.Configura
 
 // **HTTP を許す構成は運用者に明示させる。** 未設定や false では従来の保護を変えない。
 var transportSecurity = TransportSecurityOptions.FromConfiguration(builder.Configuration);
+
+// **環境変数側は画面から変更しない。** DB の保守中にも確実に受付を止めるための運用者の指定。
+var maintenanceOptions = new MaintenanceModeOptions(
+    string.Equals(
+        builder.Configuration["QUESTIONNAIRE_MAINTENANCE_MODE"],
+        "true",
+        StringComparison.OrdinalIgnoreCase),
+    builder.Configuration["QUESTIONNAIRE_MAINTENANCE_MESSAGE_JA"]
+        ?? MaintenanceModeOptions.DefaultMessageJa,
+    builder.Configuration["QUESTIONNAIRE_MAINTENANCE_MESSAGE_EN"]
+        ?? MaintenanceModeOptions.DefaultMessageEn);
 
 // ---- 複数インスタンスの認証 --------------------------------------------------
 // 管理画面の Cookie は ASP.NET Core Data Protection で保護される。AKS で複数 Pod にすると、
@@ -172,6 +184,9 @@ builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
 builder.Services.AddSurveyAssetStorage(builder.Configuration);
 builder.Services.AddSingleton<ISurveyDeletionStore, SurveyDeletionStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
+builder.Services.AddSingleton<IMaintenanceModeStore, MaintenanceModeStore>();
+builder.Services.AddSingleton(maintenanceOptions);
+builder.Services.AddSingleton<MaintenanceMode>();
 builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
 
 // **添付を弾いた記録は監査ログと別の表**（Issue #39）。
@@ -699,6 +714,16 @@ if (usesSqlite)
         + "Pleasanter cannot share this database.");
 }
 
+if (maintenanceOptions.EnvironmentEnabled)
+{
+    // **HTTP 平文運用と SQLite と同じ場所・同じ英語で警告する。**
+    // Azure の Kudu の Debug console で日本語が化ける（Issue #225）
+    app.Logger.LogWarning(
+        "Maintenance mode is enabled by QUESTIONNAIRE_MAINTENANCE_MODE. "
+        + "Public forms and Pleasanter delivery workers are stopped. "
+        + "This mode cannot be disabled from the administration screen.");
+}
+
 // **CSP は起動時に 1 度だけ組み立てる**（Issue #104 / #107）。
 //
 // **アンケートごとには出し分けない。** 出し分けるには、回答画面の HTML を返す時点で
@@ -762,6 +787,72 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 // **転送ヘッダから本当の送信元へ直した後で照合する。**
 // 先に置くと、リバースプロキシ配下では全要求がプロキシ自身の IP に見える。
 app.UseEndpointNetworkRestrictions(endpointNetworkRestrictions);
+
+// **回答者側だけを止める。** `/admin` と `/api/admin` は解除のため常に通す。
+// `/healthz` と `/ready` も対象外。メンテナンスはプロセスや DB の異常ではなく、
+// readiness を落とすと Kubernetes が Pod を再起動し続けて管理操作まで不安定になる。
+app.Use(async (context, next) =>
+{
+    var isFormApi = context.Request.Path.StartsWithSegments(
+        "/api/forms",
+        StringComparison.OrdinalIgnoreCase);
+    var isFormPage = context.Request.Path.StartsWithSegments(
+        "/f",
+        StringComparison.OrdinalIgnoreCase);
+    if (!isFormApi && !isFormPage)
+    {
+        await next();
+        return;
+    }
+
+    // DB マイグレーション前は DB 側の状態を読めない。環境変数で止めている場合だけ、
+    // DB に依存せずメンテナンス画面を返し、それ以外は後続の起動時ゲートへ任せる。
+    var maintenance = context.RequestServices.GetRequiredService<MaintenanceMode>();
+    if (!databaseStartupState.IsReady && !maintenance.EnvironmentEnabled)
+    {
+        await next();
+        return;
+    }
+
+    var status = await maintenance.GetPublicStatusAsync(context.RequestAborted);
+    if (!status.IsActive)
+    {
+        await next();
+        return;
+    }
+
+    context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+    context.Response.Headers.RetryAfter = "300";
+    var message = MaintenanceMode.MessageOf(status, RequestLanguage.Of(context));
+    if (isFormApi)
+    {
+        await context.Response.WriteAsJsonAsync(
+            new { reason = "maintenance", message },
+            context.RequestAborted);
+        return;
+    }
+
+    var encoded = System.Text.Encodings.Web.HtmlEncoder.Default.Encode(message);
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.WriteAsync(
+        $$"""
+        <!doctype html>
+        <html lang="{{RequestLanguage.Of(context)}}">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>{{encoded}}</title>
+          <style>
+            body { margin: 0; font-family: system-ui, sans-serif; background: #f5f7fa; color: #1d2939; }
+            main { max-width: 42rem; margin: 12vh auto; padding: 2rem; background: #fff;
+              border-radius: .75rem; box-shadow: 0 4px 18px rgb(16 24 40 / 12%); text-align: center; }
+          </style>
+        </head>
+        <body><main><h1>{{encoded}}</h1></main></body>
+        </html>
+        """,
+        context.RequestAborted);
+});
 
 // **DB スキーマが揃うまでは生存確認と readiness 以外へ通さない。**
 // ロードバランサを経由しない直接アクセスでも、移行途中の表を読み書きさせない。
@@ -839,6 +930,7 @@ app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
+app.MapAdminMaintenanceEndpoints();
 app.MapAdminVersionEndpoints(
     transportSecurity.AllowInsecure,
     usesSqlite,

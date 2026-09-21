@@ -28,6 +28,9 @@ public enum IntakeRejection
     /// <summary>停止中。</summary>
     Suspended,
 
+    /// <summary>システム全体がメンテナンス中。</summary>
+    Maintenance,
+
     /// <summary>このアンケートは枠内での回答を許していない。</summary>
     EmbeddingNotAllowed,
 
@@ -136,7 +139,8 @@ public sealed class ResponseIntake(
     ILogger<ResponseIntake>? logger = null,
     IAdminNotificationStore? notifications = null,
     AutoReplyDispatcher? autoReply = null,
-    IAssetTicketStore? assetTickets = null)
+    IAssetTicketStore? assetTickets = null,
+    MaintenanceMode? maintenance = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -147,6 +151,12 @@ public sealed class ResponseIntake(
         CancellationToken cancellationToken = default,
         bool isFramed = false)
     {
+        if (maintenance is not null
+            && await maintenance.IsActiveAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return (null, IntakeRejection.Maintenance);
+        }
+
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -348,6 +358,12 @@ public sealed class ResponseIntake(
         CancellationToken cancellationToken = default,
         bool isFramed = false)
     {
+        if (maintenance is not null
+            && await maintenance.IsActiveAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return IntakeResult.Reject(IntakeRejection.Maintenance);
+        }
+
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
             .ConfigureAwait(false);
 
