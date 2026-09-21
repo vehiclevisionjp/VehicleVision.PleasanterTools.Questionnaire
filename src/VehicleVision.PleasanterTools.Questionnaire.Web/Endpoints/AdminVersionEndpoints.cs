@@ -1,4 +1,5 @@
 using System.Reflection;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -21,7 +22,8 @@ public static class AdminVersionEndpoints
     public static IEndpointRouteBuilder MapAdminVersionEndpoints(
         this IEndpointRouteBuilder builder,
         bool allowInsecure,
-        bool usesSqlite = false)
+        bool usesSqlite = false,
+        DatabaseStartupState? startupState = null)
     {
         var group = builder.MapGroup("/api/admin/application")
             .WithTags("管理 API")
@@ -29,25 +31,33 @@ public static class AdminVersionEndpoints
 
         AdminAuthSchemes.AddNoStore(group);
 
-        group.MapGet("/version", () => Results.Ok(ReadVersion(allowInsecure, usesSqlite)));
+        group.MapGet("/version", () => Results.Ok(ReadVersion(
+            allowInsecure,
+            usesSqlite,
+            startupState?.MigrationStatus)));
 
         return builder;
     }
 
     /// <summary>この Web アセンブリの情報版を、画面へ返す形にする。</summary>
-    public static ApplicationVersionResponse ReadVersion(bool allowInsecure, bool usesSqlite) =>
+    public static ApplicationVersionResponse ReadVersion(
+        bool allowInsecure,
+        bool usesSqlite,
+        MigrationStatus? migrationStatus) =>
         ToResponse(typeof(AdminVersionEndpoints).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? typeof(AdminVersionEndpoints).Assembly.GetName().Version?.ToString()
             ?? string.Empty,
             allowInsecure,
-            usesSqlite);
+            usesSqlite,
+            migrationStatus);
 
     /// <summary>情報版を表示用の版と短いコミット ID に分ける。</summary>
     public static ApplicationVersionResponse ToResponse(
         string informationalVersion,
         bool allowInsecure = false,
-        bool usesSqlite = false)
+        bool usesSqlite = false,
+        MigrationStatus? migrationStatus = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(informationalVersion);
 
@@ -56,7 +66,19 @@ public static class AdminVersionEndpoints
             ? parts[1][..CommitLength].ToLowerInvariant()
             : null;
 
-        return new ApplicationVersionResponse(parts[0], commit, allowInsecure, usesSqlite);
+        return new ApplicationVersionResponse(
+            parts[0],
+            commit,
+            allowInsecure,
+            usesSqlite,
+            migrationStatus is null
+                ? null
+                : new DatabaseMigrationStatusResponse(
+                    migrationStatus.AppliedVersion,
+                    migrationStatus.LatestVersion,
+                    migrationStatus.PendingCount,
+                    migrationStatus.LastAppliedAt,
+                    migrationStatus.AppliedVersion is null ? "none" : "succeeded"));
     }
 }
 
@@ -65,8 +87,18 @@ public static class AdminVersionEndpoints
 /// <param name="Commit">情報版に含まれるコミット ID の先頭 12 桁。含まれない場合は null。</param>
 /// <param name="AllowInsecure">閉じたネットワーク向けの HTTP 運用を明示的に許しているか。</param>
 /// <param name="UsesSqlite">簡易セットアップ用の SQLite を使っているか。</param>
+/// <param name="DatabaseMigration">DB マイグレーションの適用状況。</param>
 public sealed record ApplicationVersionResponse(
     string Version,
     string? Commit,
     bool AllowInsecure,
-    bool UsesSqlite);
+    bool UsesSqlite,
+    DatabaseMigrationStatusResponse? DatabaseMigration);
+
+/// <summary>管理画面へ返す DB マイグレーションの適用状況。</summary>
+public sealed record DatabaseMigrationStatusResponse(
+    long? AppliedVersion,
+    long LatestVersion,
+    int PendingCount,
+    DateTime? LastAppliedAt,
+    string LastResult);
