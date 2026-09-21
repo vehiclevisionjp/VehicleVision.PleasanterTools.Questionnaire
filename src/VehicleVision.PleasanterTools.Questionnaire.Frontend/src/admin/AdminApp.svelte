@@ -5,6 +5,7 @@
   import HelpPanel from './components/HelpPanel.svelte';
   import InvitationAcceptPanel from './components/InvitationAcceptPanel.svelte';
   import MyAccountPanel from './components/MyAccountPanel.svelte';
+  import MaintenanceModePanel from './components/MaintenanceModePanel.svelte';
   import NotificationList from './components/NotificationList.svelte';
   import OutboxStatusPanel from './components/OutboxStatusPanel.svelte';
   import SignInPanel from './components/SignInPanel.svelte';
@@ -14,11 +15,13 @@
   import ReadabilityControls from '../components/ReadabilityControls.svelte';
   import {
     getApplicationVersion,
+    getMaintenanceMode,
     getSession,
     listNotifications,
     logout,
     saveLanguage,
     type ApplicationVersion,
+    type MaintenanceModeStatus,
   } from './lib/api';
   import type { AdminPermission, AdminSession } from './lib/types';
   import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from '../lib/i18n/language';
@@ -40,6 +43,7 @@
 
   let session = $state<AdminSession>();
   let applicationVersion = $state<ApplicationVersion>();
+  let maintenance = $state<MaintenanceModeStatus>();
   let loading = $state(true);
   let failed = $state(false);
   let surveyBreadcrumbTitle = $state<string | null>(null);
@@ -272,8 +276,12 @@
 
     // **認証済みになってから読む。** 認証前の画面へ版を出さず、失敗してもログインを妨げない。
     if (session.authenticated) {
-      const version = await getApplicationVersion();
+      const [version, maintenanceResult] = await Promise.all([
+        getApplicationVersion(),
+        getMaintenanceMode(),
+      ]);
       applicationVersion = version.ok ? version.value : undefined;
+      maintenance = maintenanceResult.ok ? maintenanceResult.value : undefined;
     }
 
     // **未読の件数だけ先に読む**（Issue #80）。
@@ -503,6 +511,13 @@
         <span class="material-icons" aria-hidden="true">warning</span>
         <span>{t('app.sqliteMode')}</span>
       </aside>
+    {/if}
+    {#if maintenance}
+      <MaintenanceModePanel
+        status={maintenance}
+        canManage={can('maintenance.manage')}
+        onchanged={(status) => (maintenance = status)}
+      />
     {/if}
 
     <!--

@@ -20,7 +20,8 @@ public sealed class ResponseSenderHostedService(
     ResponseSenderOptions options,
     ILogger<ResponseSenderHostedService> logger,
     TimeProvider? timeProvider = null,
-    DatabaseStartupState? startupState = null)
+    DatabaseStartupState? startupState = null,
+    MaintenanceMode? maintenance = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -49,6 +50,13 @@ public sealed class ResponseSenderHostedService(
         {
             try
             {
+                if (maintenance is not null
+                    && await maintenance.IsActiveAsync(stoppingToken).ConfigureAwait(false))
+                {
+                    await Task.Delay(options.IdleDelay, _time, stoppingToken).ConfigureAwait(false);
+                    continue;
+                }
+
                 // **確保したまま落ちた行を戻す。** ワーカーが落ちても回答は失われない
                 if (_time.GetUtcNow() >= nextRelease)
                 {
@@ -76,6 +84,14 @@ public sealed class ResponseSenderHostedService(
                     // **今の時刻から数える。** 前回の予定時刻に足すと、
                     // 送信が遅れたぶんを「借り」として溜め込み、後で一気に取り返してしまう
                     nextSend = _time.GetUtcNow().Add(options.MinSendInterval);
+                }
+
+                // 待っている間にメンテナンスが始まることがある。確保する直前にも見直す。
+                if (maintenance is not null
+                    && await maintenance.IsActiveAsync(stoppingToken).ConfigureAwait(false))
+                {
+                    await Task.Delay(options.IdleDelay, _time, stoppingToken).ConfigureAwait(false);
+                    continue;
                 }
 
                 var outcome = await sender.SendOnceAsync(stoppingToken).ConfigureAwait(false);

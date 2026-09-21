@@ -38,6 +38,23 @@ export const ja = {
     '閉じた環境向けの HTTP 設定で動作しています。通信は暗号化されず、管理者のパスワードとアンケートの合言葉が平文で流れます。SAML は IdP 側の制約により利用できないことがあります。',
   'app.sqliteMode':
     '簡易セットアップ・デバッグ用の SQLite で動作しています。本番運用には使用せず、Pleasanter とデータベースを共有しないでください。',
+  'maintenance.active': 'システムメンテナンス中です',
+  'maintenance.inactive': 'システムメンテナンスは解除されています',
+  'maintenance.sourceBoth': '環境変数と管理画面の両方で停止しています。',
+  'maintenance.sourceEnvironment': '環境変数で停止しています。',
+  'maintenance.sourceDatabase': '管理画面から停止しています。',
+  'maintenance.sourceNone': '回答受付と Pleasanter への送信は動作します。',
+  'maintenance.environmentLocked':
+    '環境変数による停止は、この画面から解除できません。サーバ設定を変更してください。',
+  'maintenance.environmentRemains':
+    '管理画面側を解除しても、環境変数による停止は続きます。',
+  'maintenance.settings': 'メンテナンス設定',
+  'maintenance.messageJa': '回答者向けメッセージ（日本語）',
+  'maintenance.messageEn': '回答者向けメッセージ（英語）',
+  'maintenance.messageHint':
+    '停止理由や内部事情は書かず、回答者に必要な案内だけを入力してください。',
+  'maintenance.enable': 'メンテナンスを開始',
+  'maintenance.disable': '管理画面からのメンテナンスを解除',
   'breadcrumb.label': 'パンくずリスト',
   'breadcrumb.surveyEditor': 'アンケートの編集: {title}',
   'breadcrumb.auditLogs': '操作の記録',
@@ -1055,6 +1072,24 @@ export const en: Record<MessageKey, string> = {
     'This application is running in HTTP mode for closed networks. Traffic is not encrypted, including administrator passwords and survey passphrases. SAML may be unavailable because of IdP requirements.',
   'app.sqliteMode':
     'This application is using SQLite for simple setup and debugging. Do not use it in production or try to share this database with Pleasanter.',
+  'maintenance.active': 'System maintenance is active',
+  'maintenance.inactive': 'System maintenance is not active',
+  'maintenance.sourceBoth':
+    'Intake is stopped by both the environment setting and the administration screen.',
+  'maintenance.sourceEnvironment': 'Intake is stopped by the environment setting.',
+  'maintenance.sourceDatabase': 'Intake is stopped from the administration screen.',
+  'maintenance.sourceNone': 'Response intake and delivery to Pleasanter are running.',
+  'maintenance.environmentLocked':
+    'Maintenance enabled by the environment setting cannot be disabled here. Change the server configuration.',
+  'maintenance.environmentRemains':
+    'The environment setting will keep maintenance active after the administration setting is disabled.',
+  'maintenance.settings': 'Maintenance settings',
+  'maintenance.messageJa': 'Message for respondents (Japanese)',
+  'maintenance.messageEn': 'Message for respondents (English)',
+  'maintenance.messageHint':
+    'Do not include the reason or internal details. Enter only the guidance respondents need.',
+  'maintenance.enable': 'Start maintenance',
+  'maintenance.disable': 'Disable administration maintenance',
   'breadcrumb.label': 'Breadcrumbs',
   'breadcrumb.surveyEditor': 'Edit survey: {title}',
   'breadcrumb.auditLogs': 'Activity log',

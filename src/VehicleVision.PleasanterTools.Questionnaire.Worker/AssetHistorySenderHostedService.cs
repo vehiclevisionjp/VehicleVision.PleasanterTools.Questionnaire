@@ -10,7 +10,8 @@ public sealed class AssetHistorySenderHostedService(
     ResponseSenderOptions options,
     ILogger<AssetHistorySenderHostedService> logger,
     TimeProvider? timeProvider = null,
-    DatabaseStartupState? startupState = null) : BackgroundService
+    DatabaseStartupState? startupState = null,
+    MaintenanceMode? maintenance = null) : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -26,6 +27,13 @@ public sealed class AssetHistorySenderHostedService(
         {
             try
             {
+                if (maintenance is not null
+                    && await maintenance.IsActiveAsync(stoppingToken).ConfigureAwait(false))
+                {
+                    await Task.Delay(options.IdleDelay, _time, stoppingToken).ConfigureAwait(false);
+                    continue;
+                }
+
                 if (_time.GetUtcNow() >= nextRelease)
                 {
                     await outbox.ReleaseExpiredLocksAsync(stoppingToken).ConfigureAwait(false);

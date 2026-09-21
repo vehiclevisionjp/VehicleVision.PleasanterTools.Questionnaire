@@ -54,6 +54,17 @@ public class AdminPermissionsTests
     }
 
     [Fact]
+    public void メンテナンス操作は特権管理者だけが持つ()
+    {
+        foreach (var role in Enum.GetValues<AdminRole>())
+        {
+            Assert.Equal(
+                role == AdminRole.Administrator,
+                AdminPermissions.Of(role).Contains(AdminPermissions.MaintenanceManage));
+        }
+    }
+
+    [Fact]
     public void アンケート管理者は人に触れない()
     {
         var permissions = AdminPermissions.Of(AdminRole.SurveyAdministrator);
