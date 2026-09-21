@@ -122,6 +122,43 @@ public class DatabaseMigrationTests
         Assert.NotNull(status.LastAppliedAt);
     }
 
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task メンテナンス状態を保存して読み直せる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        DatabaseMigrator.MigrateUp(provider, connectionString);
+        var store = new MaintenanceModeStore(new DbConnectionFactory(provider, connectionString));
+        var adminUserId = Guid.NewGuid();
+        var changedAt = DbTime.UtcNowTruncated();
+
+        await store.SetAsync(
+            true,
+            "ただいま作業中です",
+            "Maintenance in progress",
+            adminUserId,
+            changedAt);
+        var enabled = await store.GetAsync();
+
+        Assert.True(enabled.IsEnabled);
+        Assert.Equal("ただいま作業中です", enabled.MessageJa);
+        Assert.Equal("Maintenance in progress", enabled.MessageEn);
+        Assert.Equal(changedAt, enabled.EnabledAt);
+        Assert.Equal(adminUserId, enabled.EnabledByAdminUserId);
+
+        await store.SetAsync(false, enabled.MessageJa, enabled.MessageEn, adminUserId, changedAt);
+        var disabled = await store.GetAsync();
+        Assert.False(disabled.IsEnabled);
+        Assert.Null(disabled.EnabledAt);
+        Assert.Null(disabled.EnabledByAdminUserId);
+    }
+
     [Fact]
     public async Task SQLiteはWALで書き込みの解放を待てる()
     {
