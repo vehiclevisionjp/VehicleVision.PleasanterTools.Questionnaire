@@ -128,8 +128,11 @@ internal sealed class DatabaseMigrationLock : IAsyncDisposable
             {
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
                 await using var command = connection.CreateCommand();
-                command.CommandText = "BEGIN IMMEDIATE;";
                 command.CommandTimeout = 1;
+                // 空の SQLite ファイルを有効な DB に初期化してから、書き込み予約を取る。
+                command.CommandText = "PRAGMA user_version = 1;";
+                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                command.CommandText = "BEGIN IMMEDIATE;";
                 await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
                 return new DatabaseMigrationLock(DatabaseProvider.Sqlite, connection, true);
             }

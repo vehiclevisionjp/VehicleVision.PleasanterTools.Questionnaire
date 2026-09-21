@@ -139,7 +139,7 @@ public class DatabaseMigrationTests
 
         var databasePath = Path.Combine(
             AppContext.BaseDirectory,
-            $"questionnaire-concurrent-migration-{Guid.NewGuid():N}.db");
+            $"cm-{Guid.NewGuid():N}"[..11] + ".db");
         var connectionString = $"Data Source={databasePath};Pooling=False";
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -182,7 +182,7 @@ public class DatabaseMigrationTests
 
         var databasePath = Path.Combine(
             AppContext.BaseDirectory,
-            $"questionnaire-migration-timeout-{Guid.NewGuid():N}.db");
+            $"mt-{Guid.NewGuid():N}"[..11] + ".db");
         var connectionString = $"Data Source={databasePath};Pooling=False";
         using var acquired = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
@@ -200,9 +200,9 @@ public class DatabaseMigrationTests
                 }
             }));
 
-        Assert.True(acquired.Wait(TimeSpan.FromSeconds(5)));
         try
         {
+            Assert.True(acquired.Wait(TimeSpan.FromSeconds(5)));
             await Assert.ThrowsAsync<TimeoutException>(() =>
                 DatabaseMigrator.MigrateUpWithLockAsync(
                     DatabaseProvider.Sqlite,
