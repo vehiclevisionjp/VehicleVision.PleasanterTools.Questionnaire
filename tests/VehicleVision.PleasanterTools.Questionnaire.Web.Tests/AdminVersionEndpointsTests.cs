@@ -1,4 +1,5 @@
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
@@ -48,5 +49,20 @@ public class AdminVersionEndpointsTests
         var response = AdminVersionEndpoints.ToResponse("0.2.0", usesSqlite: true);
 
         Assert.True(response.UsesSqlite);
+    }
+
+    [Fact]
+    public void DBマイグレーションの適用状況を管理画面へ返す()
+    {
+        var appliedAt = new DateTime(2026, 9, 21, 5, 30, 0, DateTimeKind.Utc);
+        var response = AdminVersionEndpoints.ToResponse(
+            "0.2.0",
+            migrationStatus: new MigrationStatus(27, 27, 0, appliedAt));
+
+        Assert.Equal(27, response.DatabaseMigration?.AppliedVersion);
+        Assert.Equal(27, response.DatabaseMigration?.LatestVersion);
+        Assert.Equal(0, response.DatabaseMigration?.PendingCount);
+        Assert.Equal(appliedAt, response.DatabaseMigration?.LastAppliedAt);
+        Assert.Equal("succeeded", response.DatabaseMigration?.LastResult);
     }
 }
