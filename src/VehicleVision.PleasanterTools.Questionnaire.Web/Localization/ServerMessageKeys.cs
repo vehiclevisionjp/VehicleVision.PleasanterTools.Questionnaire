@@ -86,6 +86,10 @@ public static class ServerMessageKeys
 
     public const string SurveyUpdatedByOther = "surveys.updatedByOther";
 
+    public const string QuestionImportSourceInvalid = "surveys.questionImportSourceInvalid";
+
+    public const string QuestionImportSelectionRequired = "surveys.questionImportSelectionRequired";
+
     public const string PublishBlockedByMapping = "surveys.publishBlockedByMapping";
 
     public const string NoAnswerableQuestion = "surveys.noAnswerableQuestion";

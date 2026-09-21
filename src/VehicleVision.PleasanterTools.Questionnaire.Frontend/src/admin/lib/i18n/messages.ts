@@ -409,6 +409,23 @@ export const ja = {
   'editor.editingLanguage': '編集する言語',
   'editor.editingLanguageHint': '入力したテキストはこの言語に保存されます。他の言語のテキストはそのまま残ります。',
   'editor.fallbackNotice': 'この言語のテキストが未入力の項目は、回答画面では日本語で表示されます。',
+  'questionImport.open': 'ほかのアンケートから取り込む',
+  'questionImport.title': '設問を取り込む',
+  'questionImport.close': '閉じる',
+  'questionImport.cancel': '取り消す',
+  'questionImport.lead': '開けるアンケートまたはテンプレートから設問を複数選び、このページの末尾へ写します。',
+  'questionImport.source': '取り込み元',
+  'questionImport.chooseSource': 'アンケートを選ぶ',
+  'questionImport.templateSuffix': '（テンプレート）',
+  'questionImport.empty': '取り込める設問がありません。',
+  'questionImport.pageNumber': '{number} ページ目',
+  'questionImport.submit': '{count} 件を取り込む',
+  'questionImport.warning': '設問 ID は付け直し、分岐・表示条件・Pleasanter への割り当ては持ち込みません。asset: の画像・配布リンクは参照切れを防ぐため表示文だけを残します。',
+  'questionImport.done': '{count} 件をページ末尾へ取り込みました。すべて未割り当てです。必要な列の見積もりは {columns} 本です。',
+  'questionImport.changedTitle': '取り込み時に変更した内容',
+  'questionImport.removedBranching': '選択肢の分岐 {transitions} 件と表示条件 {conditions} 件を除去しました。',
+  'questionImport.removedAssets': 'asset: の画像・配布リンク {count} 件を除去し、表示文だけを残しました。',
+  'questionImport.columnEstimate': '現在の設問を行ごとに割り当てる場合、必要な列の見積もりは {count} 本です。',
 
   // ---- 設問 ---------------------------------------------------------------
   'question.titlePlaceholder': '設問文',
@@ -1446,6 +1463,29 @@ export const en: Record<MessageKey, string> = {
     'What you type goes into this language. Text in other languages is kept as it is.',
   'editor.fallbackNotice':
     'Fields with no text in this language fall back to Japanese on the response screen.',
+  'questionImport.open': 'Import from another survey',
+  'questionImport.title': 'Import questions',
+  'questionImport.close': 'Close',
+  'questionImport.cancel': 'Cancel',
+  'questionImport.lead':
+    'Select multiple questions from a survey or template you can open. Copies are added to the end of this page.',
+  'questionImport.source': 'Source',
+  'questionImport.chooseSource': 'Choose a survey',
+  'questionImport.templateSuffix': ' (template)',
+  'questionImport.empty': 'There are no questions to import.',
+  'questionImport.pageNumber': 'Page {number}',
+  'questionImport.submit': 'Import {count}',
+  'questionImport.warning':
+    'Question IDs are regenerated. Branching, display conditions, and Pleasanter assignments are not imported. Images and download links using asset: keep only their labels to avoid broken references.',
+  'questionImport.done':
+    'Imported {count} question(s) at the end of the page. All are unassigned. The estimated requirement is now {columns} column(s).',
+  'questionImport.changedTitle': 'Changes made during import',
+  'questionImport.removedBranching':
+    'Removed {transitions} choice transition(s) and {conditions} display condition(s).',
+  'questionImport.removedAssets':
+    'Removed {count} image or download link(s) using asset: and kept only their labels.',
+  'questionImport.columnEstimate':
+    'If each current input is assigned separately, the estimated requirement is {count} column(s).',
 
   'question.titlePlaceholder': 'Question text',
   'question.descriptionPlaceholder': 'Note (optional)',

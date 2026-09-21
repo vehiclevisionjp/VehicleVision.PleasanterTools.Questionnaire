@@ -16,6 +16,8 @@ import type {
   MappingProblem,
   SurveyDefinition,
   SurveyDraft,
+  QuestionImportResult,
+  QuestionImportSource,
   SurveyPage,
   SurveyTemplateSummary,
   SamlSettings,
@@ -414,6 +416,31 @@ export const deleteTemplate = (templateId: string) =>
 // ---- アンケートの下書き -----------------------------------------------------
 
 export const loadDraft = (surveyId: string) => call<SurveyDraft>(`/api/admin/surveys/${surveyId}`);
+
+/** 取り込み元のページと設問を読む。**マッピングは返さない。** */
+export const loadQuestionImportSource = (surveyId: string, sourceSurveyId: string) =>
+  call<QuestionImportSource>(
+    `/api/admin/surveys/${surveyId}/question-import/${sourceSurveyId}`,
+  );
+
+/**
+ * 選んだ設問を取り込み先用に写す。
+ *
+ * **ID の再採番と、分岐・表示条件・資産参照の除去はサーバが行う。**
+ */
+export const importQuestions = (
+  surveyId: string,
+  sourceSurveyId: string,
+  questionIds: string[],
+  existingQuestionIds: string[],
+) =>
+  call<QuestionImportResult>(
+    `/api/admin/surveys/${surveyId}/question-import/${sourceSurveyId}`,
+    {
+      method: 'POST',
+      json: { questionIds, existingQuestionIds },
+    },
+  );
 
 /** マッピング先サイトの列数。取得できないときは標準の本数を使う。 */
 export interface ColumnAvailabilityResponse {

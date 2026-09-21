@@ -76,6 +76,15 @@ public class EndpointGraphTests
             endpoints.OfType<RouteEndpoint>(),
             endpoint => endpoint.RoutePattern.RawText == "/api/admin/captcha/challenge");
 
+        var questionImport = endpoints.OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.RoutePattern.RawText
+                == "/api/admin/surveys/{surveyId:guid}/question-import/{sourceSurveyId:guid}")
+            .ToList();
+        Assert.Equal(2, questionImport.Count);
+        Assert.All(
+            questionImport,
+            endpoint => Assert.NotEmpty(endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()));
+
         var autoReplyTest = Assert.Single(
             endpoints.OfType<RouteEndpoint>(),
             endpoint => endpoint.RoutePattern.RawText == "/api/admin/auto-reply/test-send");

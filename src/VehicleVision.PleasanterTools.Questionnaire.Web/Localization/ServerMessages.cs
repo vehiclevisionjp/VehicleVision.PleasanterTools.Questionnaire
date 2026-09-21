@@ -225,6 +225,16 @@ public static class ServerMessages
             "Someone else updated this survey. Reload it.");
 
         Add(
+            ServerMessageKeys.QuestionImportSourceInvalid,
+            "取り込み元のアンケートを開けません。削除・アーカイブ・変更されていないか確認してください。",
+            "The source survey cannot be opened. Check whether it was deleted, archived, or changed.");
+
+        Add(
+            ServerMessageKeys.QuestionImportSelectionRequired,
+            "取り込む設問を 1 つ以上選んでください。",
+            "Select at least one question to import.");
+
+        Add(
             ServerMessageKeys.PublishBlockedByMapping,
             "公開できません。割り当ての不備を修正してください。",
             "Cannot publish. Fix the problems in the mapping first.");

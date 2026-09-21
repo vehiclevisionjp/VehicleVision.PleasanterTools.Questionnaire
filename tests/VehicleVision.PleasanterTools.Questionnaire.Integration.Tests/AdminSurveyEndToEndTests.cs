@@ -1079,6 +1079,133 @@ public class AdminSurveyEndToEndTests
         Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
     }
 
+    [Fact]
+    public async Task 選んだ設問を安全な写しとして取り込める()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var sourceId = await CreateSurveyAsync(http);
+        var targetId = await CreateSurveyAsync(http);
+        var sourceDraft = new
+        {
+            revision = 0,
+            definition = new
+            {
+                surveyId = sourceId,
+                version = 1,
+                title = new { ja = "取り込み元" },
+                pages = new[]
+                {
+                    new
+                    {
+                        pageId = "page-source",
+                        questions = new object[]
+                        {
+                            new
+                            {
+                                questionId = "q-branch",
+                                type = "Radio",
+                                title = new { ja = "分岐する設問" },
+                                description = new
+                                {
+                                    ja = "[資料](asset:11111111-1111-4111-8111-111111111111)",
+                                },
+                                isRequired = false,
+                                choices = new[]
+                                {
+                                    new
+                                    {
+                                        value = "yes",
+                                        label = new { ja = "はい" },
+                                        next = new { kind = "Submit" },
+                                    },
+                                },
+                                settings = new { descriptionFormat = "Markup" },
+                            },
+                            new
+                            {
+                                questionId = "q-condition",
+                                type = "Text",
+                                title = new { ja = "条件付き設問" },
+                                isRequired = false,
+                                choices = Array.Empty<object>(),
+                                visibleWhen = new
+                                {
+                                    match = "All",
+                                    rules = new[]
+                                    {
+                                        new
+                                        {
+                                            questionId = "q-branch",
+                                            @operator = "Equals",
+                                            value = "yes",
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            mapping = new
+            {
+                assignments = new[]
+                {
+                    new
+                    {
+                        targetColumn = "ClassA",
+                        sources = new[] { new { questionId = "q-branch", port = "Value" } },
+                    },
+                },
+            },
+        };
+
+        using (var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{sourceId}", sourceDraft))
+        {
+            save.EnsureSuccessStatusCode();
+        }
+
+        using (var candidates = await http.GetAsync(
+            $"/api/admin/surveys/{targetId}/question-import/{sourceId}"))
+        {
+            candidates.EnsureSuccessStatusCode();
+            Assert.Equal(
+                2,
+                (await ReadAsync(candidates))!["pages"]![0]!["questions"]!.AsArray().Count);
+        }
+
+        using var importedResponse = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{targetId}/question-import/{sourceId}",
+            new
+            {
+                questionIds = new[] { "q-branch", "q-condition" },
+                existingQuestionIds = new[] { "q-existing" },
+            });
+        importedResponse.EnsureSuccessStatusCode();
+        var imported = (await ReadAsync(importedResponse))!;
+        var questions = imported["questions"]!.AsArray();
+
+        Assert.Equal(2, questions.Count);
+        Assert.All(questions, question =>
+        {
+            Assert.NotEqual("q-branch", question!["questionId"]!.GetValue<string>());
+            Assert.NotEqual("q-condition", question["questionId"]!.GetValue<string>());
+            Assert.NotEqual("q-existing", question["questionId"]!.GetValue<string>());
+            Assert.Null(question["visibleWhen"]);
+        });
+        Assert.Null(questions[0]!["choices"]![0]!["next"]);
+        Assert.Equal("資料", questions[0]!["description"]!["ja"]!.GetValue<string>());
+        Assert.Equal(1, imported["removedChoiceTransitions"]!.GetValue<int>());
+        Assert.Equal(1, imported["removedVisibilityConditions"]!.GetValue<int>());
+        Assert.Equal(1, imported["removedAssetReferences"]!.GetValue<int>());
+        Assert.Null(imported["mapping"]);
+    }
+
     /// <summary>
     /// 複製が下書きとして作られ、**公開用 ID を使い回さない**こと（Issue #46）。
     /// </summary>
