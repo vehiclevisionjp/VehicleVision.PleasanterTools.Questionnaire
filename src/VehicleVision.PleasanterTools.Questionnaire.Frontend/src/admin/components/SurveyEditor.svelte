@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import SurveyPreview from './SurveyPreview.svelte';
   import SurveyFlowchart from './SurveyFlowchart.svelte';
+  import QuestionImportPanel from './QuestionImportPanel.svelte';
   import {
     loadColumnAvailability,
     loadAssetOptions,
@@ -21,6 +22,7 @@
     type MappingProblem,
     type Page,
     type Question,
+    type QuestionImportResult,
     type SurveyDefinition,
   } from '../lib/types';
   import {
@@ -47,6 +49,7 @@
   import { adminAssetUrl } from '../lib/api';
   import { addQuestionAssignment } from '../lib/mappingSelection';
   import { assetMarkup as markupForAsset } from '../lib/asset';
+  import { requiredPortCount } from '../lib/columnBudget';
 
   interface Props {
     surveyId: string;
@@ -131,6 +134,7 @@
   let saving = $state(false);
   let error = $state('');
   let notice = $state('');
+  let importWarnings = $state<string[]>([]);
   let conflict = $state(false);
   let warnings = $state<MappingProblem[]>([]);
   let selectedQuestionId = $state<string | null>(null);
@@ -164,6 +168,9 @@
   );
   const breadcrumbTitle = $derived(
     definition ? displayText(definition.title, language()) || null : null,
+  );
+  const estimatedRequiredColumns = $derived(
+    definition ? requiredPortCount(definition) : 0,
   );
 
   $effect(() => {
@@ -239,6 +246,7 @@
     assetHistoryMapping = result.value.assetHistoryMapping ?? { assignments: [] };
     savedAssetHistoryMapping = assetHistoryMapping;
     selectedQuestionId = null;
+    importWarnings = [];
     revision = result.value.revision;
     await refreshColumnAvailability(id);
   }
@@ -315,6 +323,43 @@
     };
 
     updatePage(pageIndex, { questions: [...page.questions, question] });
+  }
+
+  function addImportedQuestions(pageIndex: number, result: QuestionImportResult) {
+    const page = definition?.pages[pageIndex];
+    if (!page || !definition) return;
+
+    const nextDefinition = {
+      ...definition,
+      pages: definition.pages.map((entry, index) =>
+        index === pageIndex
+          ? { ...entry, questions: [...entry.questions, ...result.questions] }
+          : entry,
+      ),
+    };
+    definition = nextDefinition;
+    selectedQuestionId = result.questions.at(-1)?.questionId ?? null;
+    notice = t('questionImport.done', {
+      count: result.questions.length,
+      columns: requiredPortCount(nextDefinition),
+    });
+    importWarnings = [
+      ...(result.removedChoiceTransitions > 0 || result.removedVisibilityConditions > 0
+        ? [
+            t('questionImport.removedBranching', {
+              transitions: result.removedChoiceTransitions,
+              conditions: result.removedVisibilityConditions,
+            }),
+          ]
+        : []),
+      ...(result.removedAssetReferences > 0
+        ? [
+            t('questionImport.removedAssets', {
+              count: result.removedAssetReferences,
+            }),
+          ]
+        : []),
+    ];
   }
 
   function updateQuestion(pageIndex: number, questionIndex: number, next: Question) {
@@ -581,6 +626,17 @@
 
 {#if error && !conflict}<p class="error" role="alert">{error}</p>{/if}
 {#if notice}<p class="notice">{notice}</p>{/if}
+
+{#if importWarnings.length > 0}
+  <section class="import-warnings" role="status">
+    <strong>{t('questionImport.changedTitle')}</strong>
+    <ul>
+      {#each importWarnings as warning (warning)}
+        <li>{warning}</li>
+      {/each}
+    </ul>
+  </section>
+{/if}
 
 {#if warnings.length > 0}
   <ul class="problems">
@@ -897,9 +953,17 @@
         />
       {/each}
 
-      <button type="button" class="secondary small" onclick={() => addQuestion(pageIndex)}>
-        {t('editor.addQuestion')}
-      </button>
+      <div class="question-actions">
+        <button type="button" class="secondary small" onclick={() => addQuestion(pageIndex)}>
+          {t('editor.addQuestion')}
+        </button>
+        <QuestionImportPanel
+          {surveyId}
+          existingQuestionIds={allQuestions.map((entry) => entry.questionId)}
+          {editing}
+          onimport={(result) => addImportedQuestions(pageIndex, result)}
+        />
+      </div>
 
       <!-- **選択肢の行き先が優先される。** そちらが無いときにここへ落ちる -->
       <div class="page-next">
@@ -957,6 +1021,9 @@
     </div>
 
     <div class="mapping-column">
+      <p class="column-estimate" role="status">
+        {t('questionImport.columnEstimate', { count: estimatedRequiredColumns })}
+      </p>
       <MappingEditor
         {mapping}
         questions={allQuestions}
@@ -1250,6 +1317,37 @@
       background: var(--warning-surface);
       border-color: var(--warning-border);
     }
+  }
+
+  .import-warnings {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+
+    ul {
+      margin: 0.4rem 0 0;
+      padding-left: 1.25rem;
+    }
+  }
+
+  .question-actions {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .column-estimate {
+    margin: 0 0 0.75rem;
+    padding: 0.65rem 0.8rem;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
   }
 
   .page-next {
