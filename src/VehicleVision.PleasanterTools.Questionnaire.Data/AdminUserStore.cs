@@ -66,6 +66,8 @@ public sealed record AdminUser
     /// </remarks>
     public string? Language { get; init; }
 
+    /// <summary>新しい回答のまとめ通知をメールで受け取るか。**既定は無効。**</summary>
+    public bool ResponseNotificationEnabled { get; init; }
 
     public DateTime? LockedUntil { get; init; }
     public DateTime CreatedAt { get; init; }
@@ -81,6 +83,12 @@ public sealed record RecoveryCodeRow
     public required Guid RecoveryCodeId { get; init; }
     public required string CodeHash { get; init; }
 }
+
+/// <summary>回答通知メールを受け取る管理者。**秘密は含めない。**</summary>
+public sealed record ResponseNotificationRecipient(
+    Guid AdminUserId,
+    string LoginId,
+    string? Language);
 
 /// <summary>管理者と復旧コードの読み書き。</summary>
 public interface IAdminUserStore
@@ -116,6 +124,16 @@ public interface IAdminUserStore
     Task SetLanguageAsync(
         Guid adminUserId,
         string? language,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>新しい回答のまとめ通知をメールで受け取るかを設定する。</summary>
+    Task SetResponseNotificationEnabledAsync(
+        Guid adminUserId,
+        bool enabled,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>回答通知メールを受け取る、有効な管理者を読む。</summary>
+    Task<IReadOnlyList<ResponseNotificationRecipient>> ListResponseNotificationRecipientsAsync(
         CancellationToken cancellationToken = default);
 
     /// <summary>止める。**最後の <see cref="AdminRole.Administrator"/> は止めさせない。**</summary>
@@ -177,7 +195,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
     [
         "AdminUserId", "LoginId", "PasswordHash", "Role", "IsDisabled", "TotpSecretEncrypted",
         "TotpEnabledAt", "LastLoginAt", "FailedLoginCount", "TotpLastTimeStep", "LockedUntil",
-        "Language", "CreatedAt", "UpdatedAt",
+        "Language", "ResponseNotificationEnabled", "CreatedAt", "UpdatedAt",
     ];
 
     private DatabaseProvider Provider => connectionFactory.Provider;
@@ -298,6 +316,29 @@ public sealed class AdminUserStore(IDbConnectionFactory connectionFactory) : IAd
             + "[UpdatedAt] = @Now WHERE [AdminUserId] = @AdminUserId",
             new { AdminUserId = adminUserId, Language = language, Now = DbTime.UtcNowTruncated() },
             cancellationToken);
+
+    public Task SetResponseNotificationEnabledAsync(
+        Guid adminUserId,
+        bool enabled,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(
+            "UPDATE [AdminUsers] SET [ResponseNotificationEnabled] = @Enabled, "
+            + "[UpdatedAt] = @Now WHERE [AdminUserId] = @AdminUserId",
+            new { AdminUserId = adminUserId, Enabled = enabled, Now = DbTime.UtcNowTruncated() },
+            cancellationToken);
+
+    public async Task<IReadOnlyList<ResponseNotificationRecipient>>
+        ListResponseNotificationRecipientsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await connection.QueryAsync<ResponseNotificationRecipient>(Sql(
+            "SELECT [AdminUserId], [LoginId], [Language] FROM [AdminUsers] "
+            + "WHERE [ResponseNotificationEnabled] = @Enabled AND [IsDisabled] = @Disabled "
+            + "ORDER BY [AdminUserId]",
+            new { Enabled = true, Disabled = false },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return rows.ToList();
+    }
 
     public Task<bool> TryDisableAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
         // **最後の 1 人でなければ止める。** 既に止まっている相手は、人数を減らさないので通す
