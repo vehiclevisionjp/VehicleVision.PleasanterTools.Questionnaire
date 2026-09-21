@@ -519,6 +519,14 @@ public sealed class ResponseIntake(
                 .ConfigureAwait(false);
         }
 
+        // **新しい本番回答だけを知らせる。** 編集やテスト回答では件数を増やさない。
+        // ⚠️ **回答本文は渡さない。** アンケートと受付時刻だけを通知へ渡す。
+        if (isNewResponse && !responseIsTest)
+        {
+            await NotifyResponseReceivedAsync(survey.SurveyId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         // **書けた後で数える。** 断られた回答を滞留に数えない。
         // **同じトークンの上書きも 1 件として数えてしまう**が、
         // 数え直しのたびに実際の件数へ戻るので、多く見えるのは次の計測までに限られる
@@ -550,6 +558,33 @@ public sealed class ResponseIntake(
             AssetTicket: assetTicket,
             GrantsInstantAssetAccess: grantsInstantAssetAccess,
             AllowEmbedding: survey.AllowEmbedding);
+    }
+
+    /// <summary>新しい回答を受け付けたことだけを管理者へ知らせる（Issue #357）。</summary>
+    /// <remarks>⚠️ **知らせを書けなくても、確定済みの回答受付を失敗にしない。**</remarks>
+    private async Task NotifyResponseReceivedAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken)
+    {
+        if (notifications is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await notifications
+                .RaiseAsync(
+                    (int)AdminNotificationKind.ResponseReceived,
+                    surveyId,
+                    _time.GetUtcNow().UtcDateTime,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger?.LogError(exception, "管理者への知らせを書けなかった: 新しい回答");
+        }
     }
 
     /// <summary>回答数の上限に届いたことを管理者へ知らせる（Issue #80）。</summary>
