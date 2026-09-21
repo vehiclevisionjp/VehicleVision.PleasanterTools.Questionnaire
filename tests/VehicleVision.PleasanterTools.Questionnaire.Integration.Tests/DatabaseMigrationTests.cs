@@ -80,6 +80,11 @@ public class DatabaseMigrationTests
 
         // **足りないものを名前で言えること。** 「当て忘れている」だけでは直せない
         Assert.Empty(DatabaseMigrator.PendingMigrations(provider, connectionString));
+
+        var status = DatabaseMigrator.GetStatus(provider, connectionString);
+        Assert.Equal(status.LatestVersion, status.AppliedVersion);
+        Assert.Equal(0, status.PendingCount);
+        Assert.NotNull(status.LastAppliedAt);
     }
 
     [Fact]
@@ -122,6 +127,94 @@ public class DatabaseMigrationTests
 
         await transaction.CommitAsync();
         Assert.Equal(1, await waitingWrite);
+    }
+
+    [Fact]
+    public async Task SQLiteの同時起動では一つだけがマイグレーションを適用する()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var databasePath = Path.Combine(
+            AppContext.BaseDirectory,
+            $"questionnaire-concurrent-migration-{Guid.NewGuid():N}.db");
+        var connectionString = $"Data Source={databasePath};Pooling=False";
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        async Task<MigrationApplyResult> MigrateAsync()
+        {
+            await start.Task;
+            return await DatabaseMigrator.MigrateUpWithLockAsync(
+                DatabaseProvider.Sqlite,
+                connectionString,
+                TimeSpan.FromSeconds(10));
+        }
+
+        try
+        {
+            var first = Task.Run(MigrateAsync);
+            var second = Task.Run(MigrateAsync);
+            start.SetResult();
+
+            var results = await Task.WhenAll(first, second);
+
+            Assert.Single(results, result => result.AppliedCount > 0);
+            Assert.Single(results, result => result.AppliedCount == 0);
+            Assert.False(DatabaseMigrator.HasPendingMigrations(
+                DatabaseProvider.Sqlite,
+                connectionString));
+        }
+        finally
+        {
+            DeleteSqliteFiles(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task SQLiteのマイグレーションロック待ちは上限で失敗する()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var databasePath = Path.Combine(
+            AppContext.BaseDirectory,
+            $"questionnaire-migration-timeout-{Guid.NewGuid():N}.db");
+        var connectionString = $"Data Source={databasePath};Pooling=False";
+        using var acquired = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+
+        var holder = Task.Run(() => DatabaseMigrator.MigrateUpWithLockAsync(
+            DatabaseProvider.Sqlite,
+            connectionString,
+            TimeSpan.FromSeconds(10),
+            progress =>
+            {
+                if (progress.Kind is MigrationProgressKind.LockAcquired)
+                {
+                    acquired.Set();
+                    release.Wait();
+                }
+            }));
+
+        Assert.True(acquired.Wait(TimeSpan.FromSeconds(5)));
+        try
+        {
+            await Assert.ThrowsAsync<TimeoutException>(() =>
+                DatabaseMigrator.MigrateUpWithLockAsync(
+                    DatabaseProvider.Sqlite,
+                    connectionString,
+                    TimeSpan.FromMilliseconds(250)));
+        }
+        finally
+        {
+            release.Set();
+            await holder;
+            DeleteSqliteFiles(databasePath);
+        }
     }
 
     [Fact]
@@ -239,5 +332,24 @@ public class DatabaseMigrationTests
             ? null
             : connection.QueryFirstOrDefault<string>(
                 SqlDialect.ReadClaimedResponseForMySql, parameters);
+    }
+
+    private static void DeleteSqliteFiles(string databasePath)
+    {
+        foreach (var path in new[]
+        {
+            databasePath,
+            databasePath + "-shm",
+            databasePath + "-wal",
+            databasePath + ".migration-lock.sqlite",
+            databasePath + ".migration-lock.sqlite-shm",
+            databasePath + ".migration-lock.sqlite-wal",
+        })
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
     }
 }

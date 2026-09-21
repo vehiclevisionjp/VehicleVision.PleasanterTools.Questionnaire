@@ -5,9 +5,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web;
 /// <summary>コマンドラインからマイグレーションを当てる／状態を見る。</summary>
 /// <remarks>
 /// <para>
-/// **アプリ起動時に自動適用しない**と決めてある
-/// （<c>_documents/データモデル設計.md</c> 5 章。スケールアウト時に同時実行され得る）。
-/// **その代わり、当てる口をアプリ本体と同じ実行ファイルに持たせる。**
+/// 自動適用を無効にした導入先のため、当てる口をアプリ本体と同じ実行ファイルに持たせる。
 /// 別の道具にすると接続文字列の読み方が二重になり、片方だけ直す事故が起きる。
 /// </para>
 /// <para>
@@ -85,8 +83,12 @@ public static class MigrationCommand
             return 1;
         }
 
-        DatabaseMigrator.MigrateUp(provider, connectionString);
-        Console.WriteLine($"Applied {pending.Count} migration(s).");
+        var result = await DatabaseMigrator.MigrateUpWithLockAsync(
+            provider,
+            connectionString,
+            TimeSpan.FromSeconds(DatabaseStartupMigration.DefaultLockTimeoutSeconds),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        Console.WriteLine($"Applied {result.AppliedCount} migration(s).");
         return 0;
     }
 

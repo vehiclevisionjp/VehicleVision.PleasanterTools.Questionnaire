@@ -1,4 +1,4 @@
-﻿namespace VehicleVision.PleasanterTools.Questionnaire.Data;
+namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 
 /// <summary>RDBMS ごとに書き方が違う部分を閉じ込める。</summary>
 /// <remarks>
@@ -7,6 +7,57 @@
 /// </remarks>
 public static partial class SqlDialect
 {
+    /// <summary>起動時マイグレーションのロックを直ちに取得する SQL。</summary>
+    /// <remarks>
+    /// 待機は呼び出し側で有限時間だけ繰り返す。接続を閉じれば DB 側でも自動解放される。
+    /// SQLite は名前付きロックを持たないため、この SQL は使わない。
+    /// </remarks>
+    public static string TryAcquireMigrationLock(DatabaseProvider provider) => provider switch
+    {
+        DatabaseProvider.SqlServer =>
+            "DECLARE @Result int; "
+            + "EXEC @Result = sp_getapplock "
+            + "@Resource = @Name, @LockMode = 'Exclusive', "
+            + "@LockOwner = 'Session', @LockTimeout = 0; "
+            + "SELECT @Result;",
+        DatabaseProvider.PostgreSql => "SELECT pg_try_advisory_lock(@Key);",
+        DatabaseProvider.MySql => "SELECT GET_LOCK(@Name, 0);",
+        DatabaseProvider.Sqlite => throw new NotSupportedException(
+            "SQLite のマイグレーション排他にはファイルロックを使う"),
+        _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
+    };
+
+    /// <summary>起動時マイグレーションのロックを解放する SQL。</summary>
+    public static string ReleaseMigrationLock(DatabaseProvider provider) => provider switch
+    {
+        DatabaseProvider.SqlServer =>
+            "EXEC sp_releaseapplock @Resource = @Name, @LockOwner = 'Session';",
+        DatabaseProvider.PostgreSql => "SELECT pg_advisory_unlock(@Key);",
+        DatabaseProvider.MySql => "SELECT RELEASE_LOCK(@Name);",
+        DatabaseProvider.Sqlite => throw new NotSupportedException(
+            "SQLite のマイグレーション排他にはファイルロックを使う"),
+        _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
+    };
+
+    /// <summary>ロック取得 SQL の戻り値が成功を表すか。</summary>
+    public static bool MigrationLockAcquired(DatabaseProvider provider, object? result) => provider switch
+    {
+        DatabaseProvider.SqlServer => result is not null
+            && result is not DBNull
+            && Convert.ToInt32(result, System.Globalization.CultureInfo.InvariantCulture) >= 0,
+        DatabaseProvider.PostgreSql => result is true,
+        DatabaseProvider.MySql => result is not null
+            && result is not DBNull
+            && Convert.ToInt32(result, System.Globalization.CultureInfo.InvariantCulture) == 1,
+        DatabaseProvider.Sqlite => throw new NotSupportedException(
+            "SQLite のマイグレーション排他にはファイルロックを使う"),
+        _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
+    };
+
+    /// <summary>最後に適用したマイグレーションの時刻を読む SQL。</summary>
+    public const string LastMigrationAppliedAt =
+        "SELECT MAX([AppliedOn]) FROM [VersionInfo]";
+
     /// <summary>SQL の中の識別子を、その RDBMS の引用符へ書き換える。</summary>
     /// <remarks>
     /// <para>
