@@ -253,6 +253,103 @@ public static class AdminSurveyEndpoints
             return draft is null ? Results.NotFound() : Results.Ok(draft);
         });
 
+        // ---- ほかのアンケートから設問を取り込む（Issue #358）----------------
+        // **読み取りにも取り込み先を含める。** URL の surveyId を変えて、
+        // アーカイブ済みやテンプレートを編集先にできないようにする。
+        group.MapGet("/{surveyId:guid}/question-import/{sourceSurveyId:guid}", async (
+            Guid surveyId,
+            Guid sourceSurveyId,
+            HttpContext context,
+            ISurveyDraftStore drafts,
+            ISurveyRepository surveys,
+            CancellationToken cancellationToken) =>
+        {
+            var target = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            var source = await surveys.FindBySurveyIdAsync(sourceSurveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!CanImportQuestions(target, source, surveyId, sourceSurveyId))
+            {
+                return QuestionImportSourceInvalid(context);
+            }
+
+            var draft = await drafts.LoadAsync(sourceSurveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (draft is null)
+            {
+                return QuestionImportSourceInvalid(context);
+            }
+
+            return Results.Ok(new QuestionImportSourceResponse(
+            [
+                .. draft.Definition.Pages.Select(page => new QuestionImportPageResponse(
+                    page.PageId,
+                    page.Title,
+                    [
+                        .. page.Questions.Select(question => new QuestionImportQuestionResponse(
+                            question.QuestionId,
+                            question.Type,
+                            question.Title)),
+                    ])),
+            ]));
+        }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
+
+        group.MapPost("/{surveyId:guid}/question-import/{sourceSurveyId:guid}", async (
+            Guid surveyId,
+            Guid sourceSurveyId,
+            QuestionImportRequest request,
+            HttpContext context,
+            ISurveyDraftStore drafts,
+            ISurveyRepository surveys,
+            CancellationToken cancellationToken) =>
+        {
+            var target = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            var source = await surveys.FindBySurveyIdAsync(sourceSurveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!CanImportQuestions(target, source, surveyId, sourceSurveyId))
+            {
+                return QuestionImportSourceInvalid(context);
+            }
+
+            var requested = (request.QuestionIds ?? [])
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToHashSet(StringComparer.Ordinal);
+            if (requested.Count == 0)
+            {
+                return QuestionImportSelectionRequired(context);
+            }
+
+            var sourceDraft = await drafts.LoadAsync(sourceSurveyId, cancellationToken)
+                .ConfigureAwait(false);
+            var targetDraft = await drafts.LoadAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            if (sourceDraft is null || targetDraft is null)
+            {
+                return QuestionImportSourceInvalid(context);
+            }
+
+            var questions = sourceDraft.Definition.AllQuestions
+                .Where(question => requested.Contains(question.QuestionId))
+                .ToList();
+            if (questions.Count != requested.Count)
+            {
+                return QuestionImportSourceInvalid(context);
+            }
+
+            // **画面にまだ保存していない設問 ID も避ける。**
+            // 連続して取り込んでも、次の保存まで ID が衝突しない。
+            var existingQuestionIds = targetDraft.Definition.AllQuestions
+                .Select(question => question.QuestionId)
+                .Concat(request.ExistingQuestionIds ?? []);
+            var imported = QuestionImport.Copy(
+                questions,
+                existingQuestionIds,
+                () => $"q-{Guid.NewGuid():N}");
+
+            return Results.Ok(imported);
+        }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
+
         // ---- 実サイトの列数 --------------------------------------------------
         // **編集を開くときと、明示した取り直しだけで呼ぶ。** 入力のたびに Pleasanter へ
         // 問い合わせると、編集画面が外部サービスの遅延と可用性に引きずられる。
@@ -1572,6 +1669,31 @@ public static class AdminSurveyEndpoints
         isBlocking = problem.IsBlocking,
     };
 
+    private static bool CanImportQuestions(
+        SurveyRecord? target,
+        SurveyRecord? source,
+        Guid targetSurveyId,
+        Guid sourceSurveyId) =>
+        target is { ArchivedAt: null, IsTemplate: false }
+        && source is { ArchivedAt: null }
+        && targetSurveyId != sourceSurveyId;
+
+    private static IResult QuestionImportSourceInvalid(HttpContext context) =>
+        Results.BadRequest(new
+        {
+            message = ServerMessages.Get(
+                ServerMessageKeys.QuestionImportSourceInvalid,
+                RequestLanguage.Of(context)),
+        });
+
+    private static IResult QuestionImportSelectionRequired(HttpContext context) =>
+        Results.BadRequest(new
+        {
+            message = ServerMessages.Get(
+                ServerMessageKeys.QuestionImportSelectionRequired,
+                RequestLanguage.Of(context)),
+        });
+
     /// <summary>一覧の 1 ページ（Issue #79）。</summary>
     /// <param name="Items">このページに出すアンケート。</param>
     /// <param name="HasMore">
@@ -1586,6 +1708,31 @@ public static class AdminSurveyEndpoints
     public sealed record ColumnAvailabilityResponse(
         string Source,
         IReadOnlyDictionary<string, int> AvailableByPrefix);
+
+    /// <summary>取り込み元のページ。**ページそのものは取り込まない。**</summary>
+    public sealed record QuestionImportPageResponse(
+        string PageId,
+        LocalizedText? Title,
+        IReadOnlyList<QuestionImportQuestionResponse> Questions);
+
+    /// <summary>取り込み候補として見せる設問。</summary>
+    public sealed record QuestionImportQuestionResponse(
+        string QuestionId,
+        QuestionType Type,
+        LocalizedText Title);
+
+    /// <summary>取り込み元から選べる設問。</summary>
+    public sealed record QuestionImportSourceResponse(
+        IReadOnlyList<QuestionImportPageResponse> Pages);
+
+    /// <summary>選んだ設問を取り込む。</summary>
+    /// <param name="QuestionIds">取り込み元で選んだ設問 ID。</param>
+    /// <param name="ExistingQuestionIds">
+    /// 取り込み先の画面にある設問 ID。**未保存の設問も含めて衝突を避ける。**
+    /// </param>
+    public sealed record QuestionImportRequest(
+        IReadOnlyList<string>? QuestionIds,
+        IReadOnlyList<string>? ExistingQuestionIds);
 
     /// <summary>アンケートを新しく作る。</summary>
     public sealed record CreateSurveyRequest(
