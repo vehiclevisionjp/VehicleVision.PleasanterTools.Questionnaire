@@ -89,6 +89,14 @@ export async function prepareKeyboardSurvey(
     throw new Error(`下書きを保存できなかった: ${saved.status()} ${await saved.text()}`);
   }
 
+  // **キーボード操作だけを測る。** proof-of-work の計算時間を試験結果へ混ぜない
+  const settings = await request.put(`/api/admin/surveys/${surveyId}/settings`, {
+    data: { responseLimit: null, requireProofOfWork: false },
+  });
+  if (!settings.ok()) {
+    throw new Error(`公開設定を保存できなかった: ${settings.status()} ${await settings.text()}`);
+  }
+
   const testPublished = await request.post(
     `/api/admin/surveys/${surveyId}/test-publish`,
     { data: {} },

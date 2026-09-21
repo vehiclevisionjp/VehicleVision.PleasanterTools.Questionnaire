@@ -6,6 +6,8 @@ import { prepareKeyboardSurvey } from '../lib/keyboard';
 const baseUrl = process.env['QUESTIONNAIRE_BASE_URL'] ?? 'http://questionnaire-app:8080';
 const demoSiteId = Number(process.env['SHOT_SITE_ID'] ?? '1');
 const authFile = '.auth.json';
+/** 送信チケットの最短時間（既定 3 秒）を確実に超える待機。 */
+const submissionMinimumElapsedMilliseconds = 4000;
 
 let publicId = '';
 
@@ -63,7 +65,7 @@ test.describe('キーボードだけで操作する', () => {
     await expect(page.getByRole('checkbox', { name: '内容を確認しました' })).toBeChecked();
 
     await tabTo(page, page.getByRole('button', { name: '送信する' }));
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(submissionMinimumElapsedMilliseconds);
     await page.keyboard.press('Enter');
 
     await expect(page.getByRole('heading', { name: '回答を受け付けました' })).toBeVisible();
