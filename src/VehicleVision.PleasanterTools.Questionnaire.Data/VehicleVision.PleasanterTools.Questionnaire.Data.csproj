@@ -26,4 +26,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="VehicleVision.PleasanterTools.Questionnaire.Integration.Tests" />
+  </ItemGroup>
+
 </Project>

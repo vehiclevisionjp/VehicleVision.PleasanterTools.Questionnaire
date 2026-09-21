@@ -28,21 +28,56 @@ public class DatabaseMigrationTests
 
     public static TheoryData<DatabaseProvider, string> Providers()
     {
-        if (string.Equals(
-            Environment.GetEnvironmentVariable(ProviderSetting),
-            nameof(DatabaseProvider.Sqlite),
-            StringComparison.OrdinalIgnoreCase))
+        var selectedProvider = Environment.GetEnvironmentVariable(ProviderSetting);
+        if (!string.IsNullOrWhiteSpace(selectedProvider))
         {
-            return new TheoryData<DatabaseProvider, string>
+            if (!Enum.TryParse<DatabaseProvider>(
+                selectedProvider,
+                ignoreCase: true,
+                out var provider))
             {
-                { DatabaseProvider.Sqlite, SqliteConnectionString },
-            };
+                throw new InvalidOperationException(
+                    $"{ProviderSetting} has an unsupported provider: {selectedProvider}");
+            }
+
+            return Provider(provider);
         }
 
         var providers = ServerProviders();
         providers.Add(DatabaseProvider.Sqlite, SqliteConnectionString);
         return providers;
     }
+
+    private static TheoryData<DatabaseProvider, string> Provider(DatabaseProvider provider) =>
+        provider switch
+        {
+            DatabaseProvider.SqlServer => new()
+            {
+                {
+                    DatabaseProvider.SqlServer,
+                    $"Server=localhost,11433;Database=Questionnaire;UID=sa;******;TrustServerCertificate=True"
+                },
+            },
+            DatabaseProvider.PostgreSql => new()
+            {
+                {
+                    DatabaseProvider.PostgreSql,
+                    $"Host=localhost;Port=15432;Database=questionnaire;Username=postgres;******"
+                },
+            },
+            DatabaseProvider.MySql => new()
+            {
+                {
+                    DatabaseProvider.MySql,
+                    $"Server=localhost;Port=13306;Database=questionnaire;Uid=root;******"
+                },
+            },
+            DatabaseProvider.Sqlite => new()
+            {
+                { DatabaseProvider.Sqlite, SqliteConnectionString },
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null),
+        };
 
     private static TheoryData<DatabaseProvider, string> ServerProviders() => new()
     {
@@ -215,6 +250,55 @@ public class DatabaseMigrationTests
             await holder;
             DeleteSqliteFiles(databasePath);
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task マイグレーションロックは他の接続を待たせ解放後に取得できる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var first = await DatabaseMigrationLock.AcquireAsync(
+            provider,
+            connectionString,
+            TimeSpan.FromSeconds(5),
+            CancellationToken.None);
+        try
+        {
+            var waiting = DatabaseMigrationLock.AcquireAsync(
+                provider,
+                connectionString,
+                TimeSpan.FromSeconds(5),
+                CancellationToken.None);
+
+            await Task.Delay(250);
+            Assert.False(waiting.IsCompleted);
+
+            await first.DisposeAsync();
+            await using var second = await waiting.WaitAsync(
+                TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            await first.DisposeAsync();
+        }
+
+        await using var holder = await DatabaseMigrationLock.AcquireAsync(
+            provider,
+            connectionString,
+            TimeSpan.FromSeconds(5),
+            CancellationToken.None);
+        await Assert.ThrowsAsync<TimeoutException>(() =>
+            DatabaseMigrationLock.AcquireAsync(
+                provider,
+                connectionString,
+                TimeSpan.FromMilliseconds(250),
+                CancellationToken.None));
     }
 
     [Fact]
