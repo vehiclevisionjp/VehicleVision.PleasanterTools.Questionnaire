@@ -71,6 +71,10 @@ public static class AdminPermissions
     /// <remarks>認証の入口を変えるため、特権管理者だけに持たせる。</remarks>
     public const string SamlSettings = "settings.saml";
 
+    /// <summary>システム全体のメンテナンス状態の変更。</summary>
+    /// <remarks>回答受付と外部送信を一括で止めるため、特権管理者だけに持たせる。</remarks>
+    public const string MaintenanceManage = "maintenance.manage";
+
     /// <summary>すべての権限。**役割の対応表を作るときに使う。**</summary>
     public static readonly ImmutableArray<string> All =
     [
@@ -88,6 +92,7 @@ public static class AdminPermissions
         UsersWrite,
         UsersResetTwoFactor,
         SamlSettings,
+        MaintenanceManage,
     ];
 
     /// <summary>役割ごとに持つ権限。</summary>

@@ -611,7 +611,8 @@ export type AdminPermission =
   | 'users.read'
   | 'users.write'
   | 'users.resetTwoFactor'
-  | 'settings.saml';
+  | 'settings.saml'
+  | 'maintenance.manage';
 
 export interface SamlSettings {
   enabled: boolean;

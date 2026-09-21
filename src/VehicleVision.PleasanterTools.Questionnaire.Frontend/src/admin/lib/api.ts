@@ -106,6 +106,31 @@ export interface ApplicationVersion {
 export const getApplicationVersion = () =>
   call<ApplicationVersion>('/api/admin/application/version');
 
+export interface MaintenanceModeStatus {
+  isActive: boolean;
+  environmentEnabled: boolean;
+  databaseEnabled: boolean;
+  messageJa: string;
+  messageEn: string;
+  enabledAt?: string | null;
+  enabledByAdminUserId?: string | null;
+}
+
+/** 環境変数と DB の両方を含むメンテナンス状態を読む。 */
+export const getMaintenanceMode = () =>
+  call<MaintenanceModeStatus>('/api/admin/maintenance/');
+
+/** DB 側のメンテナンス状態だけを変更する。環境変数側は変更できない。 */
+export const setMaintenanceMode = (
+  enabled: boolean,
+  messageJa: string,
+  messageEn: string,
+) =>
+  call<MaintenanceModeStatus>('/api/admin/maintenance/', {
+    method: 'PUT',
+    json: { enabled, messageJa, messageEn },
+  });
+
 export const setupFirstAdministrator = (loginId: string, password: string) =>
   call<{ next: string }>('/api/admin/setup', { method: 'POST', json: { loginId, password } });
 
