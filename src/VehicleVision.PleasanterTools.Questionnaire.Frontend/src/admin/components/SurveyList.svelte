@@ -512,9 +512,47 @@
       .replaceAll('>', '&gt;');
   }
 
-  /** 貼り付け用の最小限の iframe タグ。 */
+  /** script 内の文字列を閉じる文字列として解釈させない。 */
+  function scriptValue(value: string): string {
+    return JSON.stringify(value).replaceAll('<', '\\u003C');
+  }
+
+  /** 高さを親サイトへ通知する iframe と受信側の組。 */
   function iframeTag(survey: SurveySummary): string {
-    return `<iframe src="${htmlAttribute(formUrl(survey.publicId))}" title="${htmlAttribute(survey.title)}" loading="lazy"></iframe>`;
+    const url = formUrl(survey.publicId);
+    const applicationOrigin = new URL(url).origin;
+    const publicId = scriptValue(survey.publicId);
+    const origin = scriptValue(applicationOrigin);
+
+    return `<iframe src="${htmlAttribute(url)}" title="${htmlAttribute(survey.title)}" loading="lazy" height="800" data-questionnaire-public-id="${htmlAttribute(survey.publicId)}"></iframe>
+<script>
+(() => {
+  const iframe = document.currentScript?.previousElementSibling;
+  if (!(iframe instanceof HTMLIFrameElement)) return;
+
+  const applicationOrigin = ${origin};
+  const publicId = ${publicId};
+  const maximumHeight = 10000;
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== applicationOrigin || event.source !== iframe.contentWindow) return;
+
+    const message = event.data;
+    if (
+      message === null ||
+      typeof message !== 'object' ||
+      Array.isArray(message) ||
+      message.type !== 'questionnaire:height' ||
+      message.publicId !== publicId ||
+      !Number.isSafeInteger(message.height) ||
+      message.height < 0 ||
+      message.height > maximumHeight
+    ) return;
+
+    iframe.style.height = message.height + 'px';
+  });
+})();
+<\/script>`;
   }
 
   function formatDate(value: string): string {
