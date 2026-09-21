@@ -26,6 +26,7 @@
   } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
   import { canConfirmSurveyDeletion, deletionResponseCount } from '../lib/surveyDeletion';
+  import { iframeTag } from '../lib/iframeTag';
   import SurveyQrCode from './SurveyQrCode.svelte';
   import TemplatePanel from './TemplatePanel.svelte';
 
@@ -503,20 +504,6 @@
     return `${location.origin}/f/${publicId}`;
   }
 
-  /** HTML 属性へ安全に埋め込める文字列へ直す。 */
-  function htmlAttribute(value: string): string {
-    return value
-      .replaceAll('&', '&amp;')
-      .replaceAll('"', '&quot;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;');
-  }
-
-  /** 貼り付け用の最小限の iframe タグ。 */
-  function iframeTag(survey: SurveySummary): string {
-    return `<iframe src="${htmlAttribute(formUrl(survey.publicId))}" title="${htmlAttribute(survey.title)}" loading="lazy"></iframe>`;
-  }
-
   function formatDate(value: string): string {
     // **保存されているのは UTC。** 見る人の時間帯で、見る人の言語の書式で出す
     // （`_documents/多言語対応方針.md` 4 章）
@@ -747,7 +734,11 @@
     {:else if settingsAllowEmbedding}
       <label>
         {t('settings.iframeTag')}
-        <textarea readonly rows="3" value={iframeTag(settingsFor)}></textarea>
+        <textarea
+          readonly
+          rows="3"
+          value={iframeTag(formUrl(settingsFor.publicId), settingsFor.title, settingsFor.publicId)}
+        ></textarea>
       </label>
       <p class="hint">{t('settings.iframeTagHint')}</p>
     {/if}

@@ -997,8 +997,9 @@ export const ja = {
   'settings.allowEmbedding': '回答画面を他サイトへの埋め込みで利用できるようにする',
   'settings.allowEmbeddingHint': '運用側が許可した親サイトからだけ利用できます。変更は公開し直さなくても直ちに反映されます。',
   'settings.allowEmbeddingUnavailable': '運用側で埋め込み元が許可されていないため、この設定を有効にしても埋め込めません。',
-  'settings.iframeTag': '貼り付け用 iframe タグ',
-  'settings.iframeTagHint': '埋め込み先のレイアウトに合わせて幅と高さを指定してください。',
+  'settings.iframeTag': '貼り付け用コード',
+  'settings.iframeTagHint':
+    '回答画面の高さは自動で調整されます。iframe だけを貼る場合は、高さ 800 px のまま枠内でスクロールします。',
   'settings.proofOfWorkHint':
     '回答者のブラウザに短い計算をさせ、機械的な大量送信のコストを上げます。一般公開するアンケートでは有効のままにしてください。社内向けなど、URL を知る人が限られる場合は無効にしても構いません。',
   'settings.proofOfWorkKeepsOthers': '無効にしても、送信チケット・最短送信時間・ハニーポットは有効なままです。',
@@ -2042,8 +2043,9 @@ export const en: Record<MessageKey, string> = {
     'Only parent sites allowed by the operator can use it. Changes take effect immediately without republishing.',
   'settings.allowEmbeddingUnavailable':
     'No parent site is allowed by the operator, so enabling this setting will not make embedding available.',
-  'settings.iframeTag': 'iframe tag to paste',
-  'settings.iframeTagHint': 'Set the width and height to suit the layout of the parent site.',
+  'settings.iframeTag': 'Code to paste',
+  'settings.iframeTagHint':
+    'The response screen height is adjusted automatically. If you paste only the iframe, it remains 800 px high and scrolls inside the frame.',
   'settings.proofOfWorkHint':
     "The respondent's browser solves a short puzzle, which raises the cost of bulk automated "
     + 'submissions. Keep it on for surveys open to the public. You may turn it off for internal '
