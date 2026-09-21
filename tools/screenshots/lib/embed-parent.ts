@@ -47,6 +47,7 @@ const parentPage = `<!doctype html>
 </head>
 <body>
   <h1>埋め込み回答の検証用親ページ</h1>
+  <p data-testid="embed-parent-ready">親ページの準備ができました。</p>
   <script>
     (() => {
       const parameters = new URLSearchParams(window.location.search);

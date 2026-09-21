@@ -100,12 +100,21 @@ test('許した別生成元の枠内から回答し、Cookie 付きで配布資�
 test('許していない別生成元では frame-ancestors が表示を止める', async ({ page }) => {
   const formUrl = `${applicationUrl}/f/${embeddedPublicId}`;
   await page.goto(parentPageUrl(deniedParentUrl, formUrl, embeddedPublicId));
-  await page.waitForTimeout(1000);
+  await expect(page.getByTestId('embed-parent-ready')).toBeVisible();
 
-  expect(page.frames().some((frame) => frame.url() === formUrl)).toBe(false);
-  await expect(page.frameLocator('iframe').getByRole('heading', {
-    name: '埋め込み回答の見本',
-  })).toHaveCount(0);
+  // 親ページの組み立て完了後も、回答画面のフレームが現れないことを観測する。
+  // 先に枠を表示できたか待つ許可側と対になる。固定時間だけ待つと、遅い環境で
+  // frame-ancestors の壊れを見逃すため、途中で 1 回でも現れたらその場で失敗させる。
+  const observeUntil = Date.now() + 3000;
+  await expect.poll(
+    () => {
+      if (page.frames().some((frame) => frame.url() === formUrl)) {
+        return '回答画面を表示した';
+      }
+      return Date.now() >= observeUntil ? '表示されなかった' : '観測中';
+    },
+    { timeout: 3500, intervals: [100, 250, 500] },
+  ).toBe('表示されなかった');
 });
 
 test('埋め込みを許していないアンケートは枠内で断る', async ({ page }) => {
@@ -126,6 +135,7 @@ async function openEmbeddedForm(
   await page.goto(parentPageUrl(parentUrl, formUrl, publicId));
   const iframe = page.locator('iframe');
   const form = page.frameLocator('iframe');
+  await expect(page.getByTestId('embed-parent-ready')).toBeVisible();
   await expect(iframe).toBeVisible();
   return { iframe, form };
 }
