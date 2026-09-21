@@ -409,7 +409,7 @@ public class AdminSurveyEndToEndTests
         Assert.Contains("frame-src https://www.example.com https://*.example.net", csp);
         Assert.Contains("img-src 'self' data: https://www.example.com https://*.example.net", csp);
         Assert.Contains(
-            "frame-ancestors https://www.parent.example.com https://*.parent.example.net",
+            "frame-ancestors https://localhost:9443 https://www.parent.example.com https://*.parent.example.net",
             csp);
     }
 

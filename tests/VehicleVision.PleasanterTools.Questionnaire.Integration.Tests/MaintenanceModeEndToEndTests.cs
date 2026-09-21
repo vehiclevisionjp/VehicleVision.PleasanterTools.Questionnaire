@@ -10,8 +10,10 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 public class MaintenanceModeEndToEndTests
 {
     private const string Password = "long-enough-password";
-    private const string SqlServerConnectionString =
-        "Server=localhost,11433;Database=Questionnaire;UID=sa;******;TrustServerCertificate=True";
+    private static string SqlServerConnectionString =>
+        $"Server=localhost,11433;Database=Questionnaire;UID=sa;Password={
+            Environment.GetEnvironmentVariable("TESTENV_SA_PASSWORD") ?? "Questionnaire#Test1"
+        };TrustServerCertificate=True";
 
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
