@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
@@ -73,6 +74,19 @@ public class ResponseNotificationMailerTests
     }
 
     [Fact]
+    public async Task 設定した集約間隔までメールを積まない()
+    {
+        var notifications = new FakeNotificationStore();
+        notifications.Due.Add(Digest() with { FirstOccurredAt = Now.AddMinutes(-90) });
+        var users = await UsersAsync("admin@example.test", "ja");
+        var options = ResponseNotificationMailerOptions.FromConfiguration(Configuration(
+            (ResponseNotificationMailerOptions.DigestIntervalMinutesKey, "120")));
+
+        Assert.Equal(0, await Create(notifications, users, options).QueueDueAsync());
+        Assert.Empty(notifications.Queued);
+    }
+
+    [Fact]
     public async Task 希望した管理者へ未送信件数だけをまとめる()
     {
         var notifications = new FakeNotificationStore();
@@ -121,15 +135,62 @@ public class ResponseNotificationMailerTests
         Assert.Empty(Assert.Single(notifications.Queued).Mails);
     }
 
+    [Fact]
+    public void 集約間隔の既定は24時間()
+    {
+        Assert.Equal(
+            TimeSpan.FromDays(1),
+            ResponseNotificationMailerOptions.FromConfiguration(
+                new ConfigurationBuilder().Build()).DigestInterval);
+    }
+
+    [Fact]
+    public void 集約間隔を分単位で設定できる()
+    {
+        var options = ResponseNotificationMailerOptions.FromConfiguration(Configuration(
+            (ResponseNotificationMailerOptions.DigestIntervalMinutesKey, "120")));
+
+        Assert.Equal(TimeSpan.FromHours(2), options.DigestInterval);
+    }
+
+    [Theory]
+    [InlineData("59")]
+    [InlineData("0")]
+    [InlineData("-1")]
+    public void 一時間未満の集約間隔は起動時に断る(string minutes)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ResponseNotificationMailerOptions.FromConfiguration(Configuration(
+                (ResponseNotificationMailerOptions.DigestIntervalMinutesKey, minutes))));
+
+        Assert.Contains("60 分以上", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 読めない集約間隔は起動時に断る()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            ResponseNotificationMailerOptions.FromConfiguration(Configuration(
+                (ResponseNotificationMailerOptions.DigestIntervalMinutesKey, "一時間"))));
+    }
+
     private static ResponseNotificationMailer Create(
         FakeNotificationStore notifications,
-        IAdminUserStore users) =>
+        IAdminUserStore users,
+        ResponseNotificationMailerOptions? options = null) =>
         new(
             notifications,
             users,
             new FakeProtector(),
             NullLogger<ResponseNotificationMailer>.Instance,
+            options ?? new ResponseNotificationMailerOptions(),
             new FakeTimeProvider(new DateTimeOffset(Now)));
+
+    private static IConfiguration Configuration(params (string Key, string Value)[] settings) =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(settings.Select(setting =>
+                new KeyValuePair<string, string?>(setting.Key, setting.Value)))
+            .Build();
 
     private static async Task<IAdminUserStore> UsersAsync(string loginId, string language)
     {

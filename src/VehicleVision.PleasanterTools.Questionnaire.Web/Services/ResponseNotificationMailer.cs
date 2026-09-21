@@ -9,7 +9,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
-/// <summary>新しい回答を 24 時間ごとにまとめ、希望した管理者へ知らせる（Issue #357）。</summary>
+/// <summary>新しい回答を設定した間隔でまとめ、希望した管理者へ知らせる（Issue #357）。</summary>
 /// <remarks>
 /// <para>
 /// ⚠️ **回答本文は受け取らない。** 件数・時刻・アンケート名だけでメールを作る。
@@ -24,11 +24,9 @@ public sealed class ResponseNotificationMailer(
     IAdminUserStore users,
     IMailPayloadProtector protector,
     ILogger<ResponseNotificationMailer> logger,
+    ResponseNotificationMailerOptions options,
     TimeProvider? timeProvider = null)
 {
-    /// <summary>回答をまとめる時間。**1 日 1 回を上限にする。**</summary>
-    public static readonly TimeSpan DigestInterval = TimeSpan.FromDays(1);
-
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     /// <summary>期限を迎えたまとめ通知を送信待ちへ積む。</summary>
@@ -37,7 +35,7 @@ public sealed class ResponseNotificationMailer(
     {
         var now = _time.GetUtcNow().UtcDateTime;
         var due = await notifications
-            .ListDueResponseDigestsAsync(now.Subtract(DigestInterval), cancellationToken)
+            .ListDueResponseDigestsAsync(now.Subtract(options.DigestInterval), cancellationToken)
             .ConfigureAwait(false);
 
         if (due.Count == 0)

@@ -565,6 +565,7 @@ if (mailOptions.IsReady)
     builder.Services.AddSingleton(MailSenderOptions.FromConfiguration(builder.Configuration));
     builder.Services.AddSingleton<MailSender>();
     builder.Services.AddHostedService<MailSenderHostedService>();
+    builder.Services.AddSingleton(ResponseNotificationMailerOptions.FromConfiguration(builder.Configuration));
     builder.Services.AddSingleton<ResponseNotificationMailer>();
     builder.Services.AddHostedService<ResponseNotificationMailerHostedService>();
 }
