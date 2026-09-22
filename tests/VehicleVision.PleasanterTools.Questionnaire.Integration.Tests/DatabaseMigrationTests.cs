@@ -26,9 +26,11 @@ public class DatabaseMigrationTests
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
-    public static TheoryData<DatabaseProvider, string> Providers()
+    public static TheoryData<DatabaseProvider, string> Providers() =>
+        Providers(Environment.GetEnvironmentVariable(ProviderSetting));
+
+    private static TheoryData<DatabaseProvider, string> Providers(string? selectedProvider)
     {
-        var selectedProvider = Environment.GetEnvironmentVariable(ProviderSetting);
         if (!string.IsNullOrWhiteSpace(selectedProvider))
         {
             if (!Enum.TryParse<DatabaseProvider>(
@@ -48,36 +50,47 @@ public class DatabaseMigrationTests
         return providers;
     }
 
-    private static TheoryData<DatabaseProvider, string> Provider(DatabaseProvider provider) =>
-        provider switch
+    [Theory]
+    [InlineData("SqlServer", DatabaseProvider.SqlServer)]
+    [InlineData("PostgreSql", DatabaseProvider.PostgreSql)]
+    [InlineData("MySql", DatabaseProvider.MySql)]
+    [InlineData("Sqlite", DatabaseProvider.Sqlite)]
+    public void 指定したRDBMSだけの接続設定を返す(
+        string providerSetting,
+        DatabaseProvider expectedProvider)
+    {
+        var providers = Providers(providerSetting);
+        var selected = Assert.Single(providers);
+
+        Assert.Equal(expectedProvider, selected[0]);
+        if (expectedProvider is DatabaseProvider.Sqlite)
         {
-            DatabaseProvider.SqlServer => new()
-            {
-                {
-                    DatabaseProvider.SqlServer,
-                    $"Server=localhost,11433;Database=Questionnaire;UID=sa;******;TrustServerCertificate=True"
-                },
-            },
-            DatabaseProvider.PostgreSql => new()
-            {
-                {
-                    DatabaseProvider.PostgreSql,
-                    $"Host=localhost;Port=15432;Database=questionnaire;Username=postgres;******"
-                },
-            },
-            DatabaseProvider.MySql => new()
-            {
-                {
-                    DatabaseProvider.MySql,
-                    $"Server=localhost;Port=13306;Database=questionnaire;Uid=root;******"
-                },
-            },
-            DatabaseProvider.Sqlite => new()
+            Assert.Equal(SqliteConnectionString, selected[1]);
+            return;
+        }
+
+        Assert.Equal(
+            Assert.Single(ServerProviders(), values => Equals(values[0], expectedProvider))[1],
+            selected[1]);
+    }
+
+    private static TheoryData<DatabaseProvider, string> Provider(DatabaseProvider provider)
+    {
+        if (provider is DatabaseProvider.Sqlite)
+        {
+            return new()
             {
                 { DatabaseProvider.Sqlite, SqliteConnectionString },
-            },
-            _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null),
+            };
+        }
+
+        var selectedProvider = ServerProviders().Single(values => values[0] is DatabaseProvider value
+            && value == provider);
+        return new()
+        {
+            { (DatabaseProvider)selectedProvider[0], (string)selectedProvider[1] },
         };
+    }
 
     private static TheoryData<DatabaseProvider, string> ServerProviders() => new()
     {
