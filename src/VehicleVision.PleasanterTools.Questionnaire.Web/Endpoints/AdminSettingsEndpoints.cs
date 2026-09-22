@@ -26,32 +26,37 @@ public static class AdminSettingsEndpoints
             IAppSettingsProvider provider,
             CancellationToken cancellationToken) =>
         {
-            if ((request.AdminNotice?.Length ?? 0) > 1000)
+            if (request.Values is null)
             {
-                return Results.BadRequest(new { message = "管理者向けのお知らせは 1000 文字以内で入力してください。" });
+                return Results.BadRequest(new { message = "設定値を指定してください。" });
             }
 
-            var before = await provider.GetAsync(cancellationToken).ConfigureAwait(false);
-            if (!before.FixedKeys.Contains(AppSettingsProvider.AdminNoticeKey)
-                && !string.Equals(
-                    before[AppSettingsProvider.AdminNoticeKey],
-                    request.AdminNotice?.Trim() ?? string.Empty,
-                    StringComparison.Ordinal))
+            try
             {
-                AuditNotes.SetTarget(context, "AppSetting", AppSettingsProvider.AdminNoticeKey);
-                AuditNotes.Add(context, "changedKeys", AppSettingsProvider.AdminNoticeKey);
-            }
-
-            var adminUserId = Guid.Parse(
-                context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var snapshot = await provider.SaveAsync(
-                new Dictionary<string, string?>
+                var before = await provider.GetAsync(cancellationToken).ConfigureAwait(false);
+                var changedKeys = request.Values
+                    .Where(value => before.Values.TryGetValue(value.Key, out var current)
+                        && !string.Equals(current, value.Value?.Trim(), StringComparison.Ordinal))
+                    .Select(value => value.Key)
+                    .ToArray();
+                if (changedKeys.Length > 0)
                 {
-                    [AppSettingsProvider.AdminNoticeKey] = request.AdminNotice,
-                },
-                adminUserId,
-                cancellationToken).ConfigureAwait(false);
-            return Results.Ok(Body(snapshot));
+                    AuditNotes.SetTarget(context, "AppSetting", string.Join(",", changedKeys));
+                    AuditNotes.Add(context, "changedKeys", string.Join(",", changedKeys));
+                }
+
+                var adminUserId = Guid.Parse(
+                    context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+                var snapshot = await provider.SaveAsync(
+                    request.Values,
+                    adminUserId,
+                    cancellationToken).ConfigureAwait(false);
+                return Results.Ok(Body(snapshot));
+            }
+            catch (AppSettingValidationException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
         });
 
         return builder;
@@ -59,12 +64,22 @@ public static class AdminSettingsEndpoints
 
     private static object Body(AppSettingsSnapshot snapshot) => new
     {
-        adminNotice = snapshot[AppSettingsProvider.AdminNoticeKey],
-        fixedFields = new
+        fields = snapshot.Definitions.Select(definition => new
         {
-            adminNotice = snapshot.FixedKeys.Contains(AppSettingsProvider.AdminNoticeKey),
-        },
+            key = definition.Key,
+            type = definition.Type.ToString().ToLowerInvariant(),
+            value = snapshot[definition.Key],
+            isFixed = snapshot.FixedKeys.Contains(definition.Key),
+            definition.LabelJa,
+            definition.LabelEn,
+            definition.DescriptionJa,
+            definition.DescriptionEn,
+            definition.Minimum,
+            definition.Maximum,
+            definition.MaximumLength,
+            definition.ShowPreview,
+        }),
     };
 
-    public sealed record AppSettingsRequest(string? AdminNotice);
+    public sealed record AppSettingsRequest(IReadOnlyDictionary<string, string?>? Values);
 }

@@ -319,7 +319,9 @@ export const getAppSettings = () =>
 export const saveAppSettings = (settings: AppSettings) =>
   call<AppSettings>('/api/admin/settings', {
     method: 'PUT',
-    json: { adminNotice: settings.adminNotice },
+    json: {
+      values: Object.fromEntries(settings.fields.map((field) => [field.key, field.value])),
+    },
   });
 
 // ---- アンケート -------------------------------------------------------------

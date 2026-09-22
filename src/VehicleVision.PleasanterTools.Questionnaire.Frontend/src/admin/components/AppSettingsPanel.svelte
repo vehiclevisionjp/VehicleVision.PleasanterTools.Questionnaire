@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getAppSettings, saveAppSettings } from '../lib/api';
-  import type { AppSettings } from '../lib/types';
-  import { t } from '../lib/i18n/state.svelte';
+  import type { AppSettingField, AppSettings } from '../lib/types';
+  import { language, t } from '../lib/i18n/state.svelte';
 
   interface Props {
     onback: () => void;
@@ -26,6 +26,18 @@
       return;
     }
     settings = result.value;
+  }
+
+  function label(field: AppSettingField): string {
+    return language() === 'ja' ? field.labelJa : field.labelEn;
+  }
+
+  function description(field: AppSettingField): string {
+    return language() === 'ja' ? field.descriptionJa : field.descriptionEn;
+  }
+
+  function setBoolean(field: AppSettingField, checked: boolean) {
+    field.value = checked ? 'true' : 'false';
   }
 
   async function save(event: SubmitEvent) {
@@ -62,29 +74,46 @@
     <p class="lead">{t('appSettings.lead')}</p>
 
     <form onsubmit={save}>
-      <label>
-        {t('appSettings.adminNotice')}
-        {#if settings.fixedFields.adminNotice}
-          <span class="fixed">{t('appSettings.fixed')}</span>
-        {/if}
-        <textarea
-          rows="4"
-          maxlength="1000"
-          bind:value={settings.adminNotice}
-          disabled={settings.fixedFields.adminNotice}
-        ></textarea>
-        <span class="hint">{t('appSettings.adminNoticeHint')}</span>
-      </label>
-
-      {#if settings.adminNotice.trim() !== ''}
-        <aside class="preview" aria-label={t('appSettings.preview')}>
-          {settings.adminNotice}
-        </aside>
-      {/if}
+      {#each settings.fields as field (field.key)}
+        <label class:check={field.type === 'boolean'}>
+          {#if field.type === 'boolean'}
+            <input
+              type="checkbox"
+              checked={field.value === 'true'}
+              disabled={field.isFixed}
+              onchange={(event) => setBoolean(field, event.currentTarget.checked)}
+            />
+          {/if}
+          <span>
+            {label(field)}
+            {#if field.isFixed}<span class="fixed">{t('appSettings.fixed')}</span>{/if}
+          </span>
+          {#if field.type === 'string'}
+            <textarea
+              rows="4"
+              maxlength={field.maximumLength ?? undefined}
+              bind:value={field.value}
+              disabled={field.isFixed}
+            ></textarea>
+          {:else if field.type === 'integer'}
+            <input
+              type="number"
+              min={field.minimum ?? undefined}
+              max={field.maximum ?? undefined}
+              bind:value={field.value}
+              disabled={field.isFixed}
+            />
+          {/if}
+          <span class="hint">{description(field)}</span>
+          {#if field.showPreview && field.value.trim() !== ''}
+            <aside class="preview">{field.value}</aside>
+          {/if}
+        </label>
+      {/each}
 
       {#if error}<p class="error" role="alert">{error}</p>{/if}
       {#if done}<p class="done" role="status">{done}</p>{/if}
-      <button type="submit" disabled={busy || settings.fixedFields.adminNotice}>
+      <button type="submit" disabled={busy || settings.fields.every((field) => field.isFixed)}>
         {busy ? t('appSettings.saving') : t('appSettings.save')}
       </button>
     </form>
@@ -124,6 +153,14 @@
     gap: 0.35rem;
     font-weight: 600;
   }
+  .check {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+  .check .hint {
+    grid-column: 2;
+  }
+  input[type='number'],
   textarea {
     box-sizing: border-box;
     width: 100%;
@@ -132,11 +169,13 @@
     border-radius: 5px;
     font: inherit;
   }
+  input:disabled,
   textarea:disabled {
     background: var(--disabled-surface);
     color: var(--disabled-text);
   }
   .fixed {
+    margin-left: 0.5rem;
     color: var(--warning-text);
     font-size: 0.85rem;
     font-weight: 400;
@@ -146,6 +185,7 @@
     padding: 0.9rem 1rem;
     border: 1px solid var(--border);
     border-radius: 6px;
+    font-weight: 400;
   }
   .error {
     color: var(--error);

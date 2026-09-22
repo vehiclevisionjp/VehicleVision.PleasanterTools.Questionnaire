@@ -636,10 +636,22 @@ export type AdminPermission =
   | 'maintenance.manage';
 
 export interface AppSettings {
-  adminNotice: string;
-  fixedFields: {
-    adminNotice: boolean;
-  };
+  fields: AppSettingField[];
+}
+
+export interface AppSettingField {
+  key: string;
+  type: 'string' | 'boolean' | 'integer';
+  value: string;
+  isFixed: boolean;
+  labelJa: string;
+  labelEn: string;
+  descriptionJa: string;
+  descriptionEn: string;
+  minimum: number | null;
+  maximum: number | null;
+  maximumLength: number | null;
+  showPreview: boolean;
 }
 
 export interface SamlSettings {

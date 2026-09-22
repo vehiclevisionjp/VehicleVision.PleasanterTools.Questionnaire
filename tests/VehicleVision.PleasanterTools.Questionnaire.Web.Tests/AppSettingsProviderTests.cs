@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Time.Testing;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -50,8 +51,7 @@ public class AppSettingsProviderTests
                 [AppSettingsProvider.AdminNoticeKey] = "外部設定のお知らせ",
             })
             .Build();
-        var store = new FakeStore(Record("DB のお知らせ"));
-        var provider = new AppSettingsProvider(configuration, store, Protector);
+        var provider = Create(configuration, new FakeStore(Record("DB のお知らせ")));
 
         var snapshot = await provider.GetAsync();
 
@@ -62,10 +62,9 @@ public class AppSettingsProviderTests
     [Fact]
     public async Task 外部設定が無ければDBの値を使う()
     {
-        var provider = new AppSettingsProvider(
+        var provider = Create(
             new ConfigurationBuilder().Build(),
-            new FakeStore(Record("DB のお知らせ")),
-            Protector);
+            new FakeStore(Record("DB のお知らせ")));
 
         var snapshot = await provider.GetAsync();
 
@@ -76,24 +75,41 @@ public class AppSettingsProviderTests
     [Fact]
     public async Task 外部設定もDBも無ければ既定値を使う()
     {
-        var provider = new AppSettingsProvider(
+        var snapshot = await Create(
             new ConfigurationBuilder().Build(),
-            new FakeStore(),
-            Protector);
-
-        var snapshot = await provider.GetAsync();
+            new FakeStore()).GetAsync();
 
         Assert.Equal(string.Empty, snapshot[AppSettingsProvider.AdminNoticeKey]);
     }
 
     [Fact]
-    public async Task 読み取りはスナップショットを再利用し保存後に読み直す()
+    public async Task TTL内はスナップショットを再利用し期限後に別インスタンスの保存を読む()
+    {
+        var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-09-22T00:00:00Z"));
+        var store = new FakeStore();
+        var first = Create(new ConfigurationBuilder().Build(), store, time);
+        var second = Create(new ConfigurationBuilder().Build(), store, time);
+
+        Assert.Equal(string.Empty, (await first.GetAsync())[AppSettingsProvider.AdminNoticeKey]);
+        await second.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.AdminNoticeKey] = "別インスタンスから保存",
+            },
+            Guid.NewGuid());
+
+        Assert.Equal(string.Empty, (await first.GetAsync())[AppSettingsProvider.AdminNoticeKey]);
+        time.Advance(AppSettingsProvider.CacheLifetime);
+        Assert.Equal(
+            "別インスタンスから保存",
+            (await first.GetAsync())[AppSettingsProvider.AdminNoticeKey]);
+    }
+
+    [Fact]
+    public async Task 自分で保存した後は期限を待たず読み直す()
     {
         var store = new FakeStore();
-        var provider = new AppSettingsProvider(
-            new ConfigurationBuilder().Build(),
-            store,
-            Protector);
+        var provider = Create(new ConfigurationBuilder().Build(), store);
 
         await provider.GetAsync();
         await provider.GetAsync();
@@ -114,7 +130,7 @@ public class AppSettingsProviderTests
     }
 
     [Fact]
-    public async Task 固定項目は画面から保存してもDBを変えない()
+    public async Task 固定項目を変更しようとすると理由を示して拒否する()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -123,24 +139,73 @@ public class AppSettingsProviderTests
             })
             .Build();
         var store = new FakeStore(Record("退避値"));
-        var provider = new AppSettingsProvider(configuration, store, Protector);
+        var provider = Create(configuration, store);
 
-        await provider.SaveAsync(
+        var exception = await Assert.ThrowsAsync<AppSettingValidationException>(() =>
+            provider.SaveAsync(
+                new Dictionary<string, string?>
+                {
+                    [AppSettingsProvider.AdminNoticeKey] = "画面の値",
+                },
+                Guid.NewGuid()));
+
+        Assert.Contains("外部設定で固定されているため", exception.Message);
+        configuration[AppSettingsProvider.AdminNoticeKey] = null;
+        Assert.Equal(
+            "退避値",
+            (await Create(configuration, store).GetAsync())[AppSettingsProvider.AdminNoticeKey]);
+    }
+
+    [Fact]
+    public async Task 固定項目と同じ値を含む保存要求は受け付ける()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.AdminNoticeKey] = "外部設定",
+            })
+            .Build();
+        var provider = Create(configuration, new FakeStore());
+
+        var snapshot = await provider.SaveAsync(
             new Dictionary<string, string?>
             {
-                [AppSettingsProvider.AdminNoticeKey] = "画面の値",
+                [AppSettingsProvider.AdminNoticeKey] = "外部設定",
             },
             Guid.NewGuid());
 
-        Assert.Equal(
-            "外部設定",
-            (await provider.GetAsync())[AppSettingsProvider.AdminNoticeKey]);
-        configuration[AppSettingsProvider.AdminNoticeKey] = null;
-        var reloaded = new AppSettingsProvider(configuration, store, Protector);
-        Assert.Equal(
-            "退避値",
-            (await reloaded.GetAsync())[AppSettingsProvider.AdminNoticeKey]);
+        Assert.Equal("外部設定", snapshot[AppSettingsProvider.AdminNoticeKey]);
     }
+
+    [Fact]
+    public void 定義が文字列真偽整数を検証できる()
+    {
+        var text = Definition(AppSettingValueType.String, maximumLength: 3);
+        var boolean = Definition(AppSettingValueType.Boolean);
+        var integer = Definition(AppSettingValueType.Integer, minimum: 1, maximum: 10);
+
+        Assert.Equal("abc", text.Normalize(" abc "));
+        Assert.Throws<AppSettingValidationException>(() => text.Normalize("abcd"));
+        Assert.Equal("true", boolean.Normalize("TRUE"));
+        Assert.Throws<AppSettingValidationException>(() => boolean.Normalize("yes"));
+        Assert.Equal("5", integer.Normalize("05"));
+        Assert.Throws<AppSettingValidationException>(() => integer.Normalize("0"));
+        Assert.Throws<AppSettingValidationException>(() => integer.Normalize("11"));
+    }
+
+    private static AppSettingsProvider Create(
+        IConfiguration configuration,
+        IAppSettingStore store,
+        TimeProvider? timeProvider = null) =>
+        new(configuration, store, Protector, timeProvider ?? TimeProvider.System);
+
+    private static AppSettingDefinition Definition(
+        AppSettingValueType type,
+        int? minimum = null,
+        int? maximum = null,
+        int? maximumLength = null) =>
+        new("TEST", type, string.Empty, "テスト", "Test", string.Empty, string.Empty,
+            Minimum: minimum, Maximum: maximum, MaximumLength: maximumLength);
 
     private static AppSettingRecord Record(string value) => new(
         AppSettingsProvider.AdminNoticeKey,

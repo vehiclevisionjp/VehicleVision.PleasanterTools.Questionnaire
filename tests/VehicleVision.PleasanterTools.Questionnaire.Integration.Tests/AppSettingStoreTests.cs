@@ -1,4 +1,7 @@
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Time.Testing;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
@@ -57,5 +60,46 @@ public class AppSettingStoreTests
         Assert.True(updated.IsSecret);
         Assert.Equal(secondAdminUserId, updated.UpdatedByAdminUserId);
         Assert.True(updated.UpdatedAt >= first.UpdatedAt);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 別インスタンスの設定キャッシュはTTL後にDBの更新へ追いつく(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        DatabaseMigrator.MigrateUp(provider, connectionString);
+        var store = new AppSettingStore(new DbConnectionFactory(provider, connectionString));
+        var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-09-22T00:00:00Z"));
+        var configuration = new ConfigurationBuilder().Build();
+        var protector = new SecretProtector(Convert.ToBase64String(new byte[32]));
+        var first = new AppSettingsProvider(configuration, store, protector, time);
+        var second = new AppSettingsProvider(configuration, store, protector, time);
+        var initial = $"初期値-{Guid.NewGuid():N}";
+        var changed = $"更新値-{Guid.NewGuid():N}";
+
+        await second.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.AdminNoticeKey] = initial,
+            },
+            Guid.NewGuid());
+        Assert.Equal(initial, (await first.GetAsync())[AppSettingsProvider.AdminNoticeKey]);
+
+        await second.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.AdminNoticeKey] = changed,
+            },
+            Guid.NewGuid());
+        Assert.Equal(initial, (await first.GetAsync())[AppSettingsProvider.AdminNoticeKey]);
+
+        time.Advance(AppSettingsProvider.CacheLifetime);
+        Assert.Equal(changed, (await first.GetAsync())[AppSettingsProvider.AdminNoticeKey]);
     }
 }
