@@ -67,7 +67,8 @@ public static class AdminSettingsEndpoints
                         string.Join(
                             ";",
                             changedKeys
-                                .Where(key => !definitions[key].IsSecret)
+                                .Where(key => !definitions[key].IsSecret
+                                    && !key.StartsWith(MailOptions.Prefix, StringComparison.Ordinal))
                                 .Select(key =>
                                 $"{key}:{before[key]}->{definitions[key].Normalize(request.Values[key])}")));
                 }
