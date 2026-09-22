@@ -11,10 +11,11 @@ public class SecurityHeadersMiddlewareTests
     public async Task 設定変更後の要求から埋め込み先をCSPへ反映する()
     {
         var provider = new FakeProvider(Snapshot(string.Empty, string.Empty));
+        var builder = new CountingContentSecurityPolicyBuilder();
         var middleware = new SecurityHeadersMiddleware(
             _ => Task.CompletedTask,
             provider,
-            new ContentSecurityPolicyBuilder([], []));
+            builder);
 
         var before = new DefaultHttpContext();
         await middleware.InvokeAsync(before);
@@ -29,24 +30,39 @@ public class SecurityHeadersMiddlewareTests
         Assert.Contains("img-src 'self' data: https://media.example.com", Csp(after));
         Assert.Contains("frame-ancestors https://portal.example.com", Csp(after));
         Assert.DoesNotContain("frame-src https:;", Csp(after));
+        Assert.Equal(2, builder.BuildCount);
     }
 
     [Fact]
-    public async Task Scalarだけ要求ごとのnonceをCSPへ設定する()
+    public async Task 同じ設定スナップショットではCSPの土台を使い回しScalarだけnonceを変える()
     {
-        var context = new DefaultHttpContext();
-        context.Request.Path = "/scalar";
+        var builder = new CountingContentSecurityPolicyBuilder();
         var middleware = new SecurityHeadersMiddleware(
             _ => Task.CompletedTask,
             new FakeProvider(Snapshot(string.Empty, string.Empty)),
-            new ContentSecurityPolicyBuilder([], []));
+            builder);
+        var first = ScalarContext();
+        var second = ScalarContext();
 
-        await middleware.InvokeAsync(context);
+        await middleware.InvokeAsync(first);
+        await middleware.InvokeAsync(second);
 
-        var nonce = Assert.IsType<string>(
-            context.Items[SecurityHeadersMiddleware.ScalarCspNonceKey]);
-        Assert.Contains($"script-src 'self' 'nonce-{nonce}'", Csp(context));
+        var firstNonce = NonceOf(first);
+        var secondNonce = NonceOf(second);
+        Assert.NotEqual(firstNonce, secondNonce);
+        Assert.Contains($"script-src 'self' 'nonce-{firstNonce}'", Csp(first));
+        Assert.Contains($"script-src 'self' 'nonce-{secondNonce}'", Csp(second));
+        Assert.Equal(1, builder.BuildCount);
     }
+
+    private static DefaultHttpContext ScalarContext() =>
+        new()
+        {
+            Request = { Path = "/scalar" },
+        };
+
+    private static string NonceOf(HttpContext context) =>
+        Assert.IsType<string>(context.Items[SecurityHeadersMiddleware.ScalarCspNonceKey]);
 
     private static string Csp(HttpContext context) =>
         context.Response.Headers.ContentSecurityPolicy.ToString();
@@ -73,5 +89,17 @@ public class SecurityHeadersMiddlewareTests
             Guid updatedByAdminUserId,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class CountingContentSecurityPolicyBuilder() :
+        ContentSecurityPolicyBuilder([], [])
+    {
+        public int BuildCount { get; private set; }
+
+        public override string BuildBase(AppSettingsSnapshot snapshot)
+        {
+            BuildCount++;
+            return base.BuildBase(snapshot);
+        }
     }
 }
