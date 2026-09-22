@@ -5,6 +5,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 using System.Collections.Frozen;
 using System.Text.Json;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
@@ -385,6 +386,55 @@ public class AppSettingsProviderTests
         Assert.Contains(BotMitigationOptionsProvider.MitigationEnabledKey, snapshot.FixedKeys);
     }
 
+    /// <summary>検証環境は proof-of-work を軽くするため、既定より低い値を渡す（Issue #383）。</summary>
+    [Fact]
+    public async Task 外部設定は下限を下回っていてもそのまま使う()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotMitigationOptionsProvider.AltchaMinimumNumberKey] = "1000",
+                [BotMitigationOptionsProvider.AltchaMaximumNumberKey] = "5000",
+            })
+            .Build();
+
+        var snapshot = await Create(configuration, new FakeStore()).GetAsync();
+
+        Assert.Equal("1000", snapshot[BotMitigationOptionsProvider.AltchaMinimumNumberKey]);
+        Assert.Equal("5000", snapshot[BotMitigationOptionsProvider.AltchaMaximumNumberKey]);
+    }
+
+    /// <summary>⚠️ 起動を止めると、設定を直す手立てごと失う（Issue #383）。</summary>
+    [Fact]
+    public async Task 書式が壊れた外部設定は既定値へ落として起動を続ける()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotMitigationOptionsProvider.AltchaMinimumNumberKey] = "たくさん",
+            })
+            .Build();
+
+        var snapshot = await Create(configuration, new FakeStore()).GetAsync();
+
+        Assert.Equal("50000", snapshot[BotMitigationOptionsProvider.AltchaMinimumNumberKey]);
+    }
+
+    /// <summary>画面からは今までどおり下限を割れない（Issue #383）。</summary>
+    [Fact]
+    public async Task 画面からは下限を下回る値を保存できない()
+    {
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+
+        await Assert.ThrowsAsync<AppSettingValidationException>(() =>
+            provider.SaveAsync(
+                new Dictionary<string, string?>
+                {
+                    [BotMitigationOptionsProvider.AltchaMinimumNumberKey] = "1000",
+                },
+                Guid.NewGuid()));
+    }
+
     [Fact]
     public async Task bot対策の数値設定は安全な範囲外を拒否する()
     {
@@ -575,7 +625,12 @@ public class AppSettingsProviderTests
         IConfiguration configuration,
         IAppSettingStore store,
         TimeProvider? timeProvider = null) =>
-        new(configuration, store, Protector, timeProvider ?? TimeProvider.System);
+        new(
+            configuration,
+            store,
+            Protector,
+            timeProvider ?? TimeProvider.System,
+            NullLogger<AppSettingsProvider>.Instance);
 
     private static AppSettingDefinition Definition(
         AppSettingValueType type,
