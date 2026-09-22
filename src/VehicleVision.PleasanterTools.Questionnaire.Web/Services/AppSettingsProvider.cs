@@ -728,7 +728,9 @@ public sealed class AppSettingsProvider(
         {
             if (configuration[definition.Key] is { } external)
             {
-                values[definition.Key] = definition.Normalize(external);
+                // ⚠️ **外部設定をここで直に正規化しないこと**（Issue #395）。
+                // 上限・下限を課してしまい、検証環境の設定で起動できなくなる
+                values[definition.Key] = NormalizeExternal(definition, external, logger: null);
                 fixedKeys.Add(definition.Key);
             }
             else
@@ -1041,7 +1043,22 @@ public sealed class AppSettingsProvider(
     /// 打ち間違いは既定値へ落とし、**落としたことを起動時の記録へ出す。**
     /// 黙って既定へ戻るのが一番まずい。
     /// </remarks>
-    private string NormalizeExternal(AppSettingDefinition definition, string value)
+    private string NormalizeExternal(AppSettingDefinition definition, string value) =>
+        NormalizeExternal(definition, value, logger);
+
+    /// <summary>
+    /// 外部設定の値をそろえる。**外部設定を読む入口はここ 1 つにする**（Issue #395）。
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ **同じ判断を 2 か所へ書かないこと。** `InitialSnapshot` が別に
+    /// <see cref="AppSettingDefinition.Normalize(string?)"/> を呼んでいたため、
+    /// #390 で直したはずの「外部設定に上限・下限を課さない」が起動時だけ効かず、
+    /// **検証環境の設定で本アプリが起動しなくなった**（Issue #395）。
+    /// </remarks>
+    private static string NormalizeExternal(
+        AppSettingDefinition definition,
+        string value,
+        ILogger? logger)
     {
         try
         {
@@ -1050,7 +1067,7 @@ public sealed class AppSettingsProvider(
         catch (AppSettingValidationException exception)
         {
             // **コンソールへ出す文字列は英語**（Azure の Kudu で日本語が化けるため）
-            logger.LogWarning(
+            logger?.LogWarning(
                 "The value of {Setting} is invalid and the default value is used instead. {Reason}",
                 definition.Key,
                 exception.Message);

@@ -495,6 +495,40 @@ public class AppSettingsProviderTests
         Assert.Contains(BotMitigationOptionsProvider.MitigationEnabledKey, snapshot.FixedKeys);
     }
 
+    /// <summary>⚠️ 起動時のスナップショットにも同じことが要る（Issue #395）。</summary>
+    [Fact]
+    public void 起動時スナップショットも外部設定の下限を下回る値をそのまま使う()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotMitigationOptionsProvider.AltchaMinimumNumberKey] = "1000",
+                [BotMitigationOptionsProvider.AltchaMaximumNumberKey] = "5000",
+            })
+            .Build();
+
+        var snapshot = AppSettingsProvider.InitialSnapshot(configuration);
+
+        Assert.Equal("1000", snapshot[BotMitigationOptionsProvider.AltchaMinimumNumberKey]);
+        Assert.Equal("5000", snapshot[BotMitigationOptionsProvider.AltchaMaximumNumberKey]);
+    }
+
+    /// <summary>⚠️ 起動を止めると、設定を直す手立てごと失う（Issue #395）。</summary>
+    [Fact]
+    public void 起動時スナップショットは書式が壊れた外部設定を既定値へ落とす()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotMitigationOptionsProvider.AltchaMinimumNumberKey] = "たくさん",
+            })
+            .Build();
+
+        var snapshot = AppSettingsProvider.InitialSnapshot(configuration);
+
+        Assert.Equal("50000", snapshot[BotMitigationOptionsProvider.AltchaMinimumNumberKey]);
+    }
+
     /// <summary>検証環境は proof-of-work を軽くするため、既定より低い値を渡す（Issue #383）。</summary>
     [Fact]
     public async Task 外部設定は下限を下回っていてもそのまま使う()
