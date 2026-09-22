@@ -212,8 +212,19 @@ public sealed class SubmissionGuard
     /// </param>
     public SubmissionGuardRejection? Check(
         string? ticket, string? trap, string publicId, string responseToken)
+        => Check(ticket, trap, publicId, responseToken, options);
+
+    /// <summary>指定した実行時設定で送信を受け付けてよいかを見る。</summary>
+    public SubmissionGuardRejection? Check(
+        string? ticket,
+        string? trap,
+        string publicId,
+        string responseToken,
+        SubmissionGuardOptions runtimeOptions)
     {
-        if (!options.Enabled)
+        ArgumentNullException.ThrowIfNull(runtimeOptions);
+
+        if (!runtimeOptions.Enabled)
         {
             return null;
         }
@@ -255,12 +266,12 @@ public sealed class SubmissionGuard
             return SubmissionGuardRejection.InvalidTicket;
         }
 
-        if (elapsed > options.Lifetime)
+        if (elapsed > runtimeOptions.Lifetime)
         {
             return SubmissionGuardRejection.ExpiredTicket;
         }
 
-        return elapsed < options.MinimumElapsed ? SubmissionGuardRejection.TooFast : null;
+        return elapsed < runtimeOptions.MinimumElapsed ? SubmissionGuardRejection.TooFast : null;
     }
 
     private string Sign(string publicId, string responseToken, long issuedAt)

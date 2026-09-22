@@ -496,14 +496,15 @@ public static class AdminUserEndpoints
             AdminUserService service,
             AdminAuthenticator authenticator,
             AdminAuthOptions options,
-            AdminCaptchaOptions captcha,
+            BotMitigationOptionsProvider botOptionsProvider,
             AltchaGuard altcha,
             CancellationToken cancellationToken) =>
         {
             // **この handler より先にログイン用のレート制限が動く。**
             // CAPTCHA の成否は招待トークンの当たり外れと同じ応答に隠す。
-            if (captcha.Enabled
-                && await altcha.CheckRequiredAsync(request.Altcha, cancellationToken)
+            var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
+            if (botOptions.AdminCaptcha.Enabled
+                && await altcha.CheckRequiredAsync(request.Altcha, botOptions.Altcha, cancellationToken)
                     .ConfigureAwait(false) is not null)
             {
                 return Failure(
