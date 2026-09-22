@@ -214,6 +214,55 @@ public class AppSettingsProviderTests
     }
 
     [Fact]
+    public async Task 埋め込み設定を正規化して不正なホスト源を拒否する()
+    {
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+
+        var snapshot = await provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [EmbedParentOptions.AllowedParentsKey] =
+                    "www.example.com, *.example.net, WWW.EXAMPLE.COM",
+                [EmbedOptions.AllowedHostsKey] = "media.example.com:8443",
+            },
+            Guid.NewGuid());
+
+        Assert.Equal(
+            "www.example.com, *.example.net",
+            snapshot[EmbedParentOptions.AllowedParentsKey]);
+        Assert.Equal("media.example.com:8443", snapshot[EmbedOptions.AllowedHostsKey]);
+        await Assert.ThrowsAsync<AppSettingValidationException>(() =>
+            provider.SaveAsync(
+                new Dictionary<string, string?>
+                {
+                    [EmbedOptions.AllowedHostsKey] = "www.example.com' https:",
+                },
+                Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task 埋め込みの外部設定はDBより優先され固定項目になる()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [EmbedParentOptions.AllowedParentsKey] = "portal.example.com",
+            })
+            .Build();
+        var provider = Create(configuration, new FakeStore(new AppSettingRecord(
+            EmbedParentOptions.AllowedParentsKey,
+            "db.example.com",
+            false,
+            DateTime.UtcNow,
+            Guid.NewGuid())));
+
+        var snapshot = await provider.GetAsync();
+
+        Assert.Equal("portal.example.com", snapshot[EmbedParentOptions.AllowedParentsKey]);
+        Assert.Contains(EmbedParentOptions.AllowedParentsKey, snapshot.FixedKeys);
+    }
+
+    [Fact]
     public void 秘密の設定値は管理画面の応答へ含めない()
     {
         const string secret = "smtp-password-must-not-leak";

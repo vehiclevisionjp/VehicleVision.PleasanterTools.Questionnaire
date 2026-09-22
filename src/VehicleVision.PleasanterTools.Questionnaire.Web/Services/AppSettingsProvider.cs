@@ -25,7 +25,8 @@ public sealed record AppSettingDefinition(
     int? Minimum = null,
     int? Maximum = null,
     int? MaximumLength = null,
-    bool ShowPreview = false)
+    bool ShowPreview = false,
+    Func<string, string>? StringNormalizer = null)
 {
     /// <summary>入力を検証し、DB へ保存する表現へそろえる。</summary>
     public string Normalize(string? requestedValue)
@@ -48,7 +49,7 @@ public sealed record AppSettingDefinition(
                 $"{LabelJa}は {maximumLength} 文字以内で入力してください。");
         }
 
-        return value;
+        return StringNormalizer?.Invoke(value) ?? value;
     }
 
     private string NormalizeBoolean(string value)
@@ -132,6 +133,26 @@ public sealed class AppSettingsProvider(
             "This field demonstrates saving and applying settings. The text is previewed below.",
             MaximumLength: 1000,
             ShowPreview: true),
+        new(
+            EmbedParentOptions.AllowedParentsKey,
+            AppSettingValueType.String,
+            string.Empty,
+            "回答画面を埋め込める親サイト",
+            "Parent sites allowed to embed forms",
+            "ホストをカンマ区切りで指定します。www.example.net はそのホストだけ、*.example.net はその配下だけを許可します。",
+            "Enter comma-separated hosts. www.example.net allows only that host; *.example.net allows only its subdomains.",
+            MaximumLength: 2000,
+            StringNormalizer: EmbedHostSettings.Normalize),
+        new(
+            EmbedOptions.AllowedHostsKey,
+            AppSettingValueType.String,
+            string.Empty,
+            "回答画面へ埋め込める配信元",
+            "Sources allowed in forms",
+            "ホストをカンマ区切りで指定します。www.example.net はそのホストだけ、*.example.net はその配下だけを許可します。",
+            "Enter comma-separated hosts. www.example.net allows only that host; *.example.net allows only its subdomains.",
+            MaximumLength: 2000,
+            StringNormalizer: EmbedHostSettings.Normalize),
     ];
 
     private static readonly FrozenDictionary<string, AppSettingDefinition> Definitions =

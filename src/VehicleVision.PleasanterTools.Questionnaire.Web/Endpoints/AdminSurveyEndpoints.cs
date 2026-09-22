@@ -57,17 +57,31 @@ public static class AdminSurveyEndpoints
         // **管理画面に「何が許されているか」を出すため。**
         // 出さないと、保存して断られるまで分からず、書き直しの繰り返しになる。
         // **設定そのもの（既に運用側が知っている値）なので、管理者へ見せて困らない**
-        group.MapGet("/embed-options", (EmbedOptions embeds) => Results.Ok(new
+        group.MapGet("/embed-options", async (
+            IAppSettingsProvider provider,
+            CancellationToken cancellationToken) =>
         {
-            enabled = embeds.Enabled,
-            allowedHosts = embeds.AllowedHosts,
-        }));
+            var embeds = EmbedOptions.FromSnapshot(
+                await provider.GetAsync(cancellationToken).ConfigureAwait(false));
+            return Results.Ok(new
+            {
+                enabled = embeds.Enabled,
+                allowedHosts = embeds.AllowedHosts,
+            });
+        });
 
-        group.MapGet("/embed-parent-options", (EmbedParentOptions parents) => Results.Ok(new
+        group.MapGet("/embed-parent-options", async (
+            IAppSettingsProvider provider,
+            CancellationToken cancellationToken) =>
         {
-            enabled = parents.Enabled,
-            allowedParents = parents.AllowedParents,
-        }));
+            var parents = EmbedParentOptions.FromSnapshot(
+                await provider.GetAsync(cancellationToken).ConfigureAwait(false));
+            return Results.Ok(new
+            {
+                enabled = parents.Enabled,
+                allowedParents = parents.AllowedParents,
+            });
+        });
 
         // ---- 一覧 ------------------------------------------------------------
         // **全件は返さない**（Issue #79）。アンケートは消さずに溜まるので、
@@ -525,7 +539,7 @@ public static class AdminSurveyEndpoints
             HttpContext context,
             ISurveyDraftStore drafts,
             ISurveyRepository surveys,
-            EmbedOptions embeds,
+            IAppSettingsProvider appSettings,
             CancellationToken cancellationToken) =>
         {
             var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
@@ -571,6 +585,8 @@ public static class AdminSurveyEndpoints
             // **公開のときではなく保存のときに弾く。** 設問の不備と違い、
             // これは直せば通る類ではなく、**運用側が許していない相手**なので、
             // 「保存はできたが公開できない」より、その場で断る方が早く分かる
+            var embeds = EmbedOptions.FromSnapshot(
+                await appSettings.GetAsync(cancellationToken).ConfigureAwait(false));
             var blockedEmbeds = request.Definition.AllQuestions
                 .Where(question => question.Type == QuestionType.Embed)
                 .Where(question => !embeds.IsAllowed(question.Settings.Embed?.Url))
