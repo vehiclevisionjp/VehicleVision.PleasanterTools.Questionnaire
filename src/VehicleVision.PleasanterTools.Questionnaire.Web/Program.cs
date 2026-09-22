@@ -188,6 +188,7 @@ builder.Services.AddSingleton<IMaintenanceModeStore, MaintenanceModeStore>();
 builder.Services.AddSingleton(maintenanceOptions);
 builder.Services.AddSingleton<MaintenanceMode>();
 builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
+builder.Services.AddSingleton<IAppSettingStore, AppSettingStore>();
 
 // **添付を弾いた記録は監査ログと別の表**（Issue #39）。
 // あちらは IpAddress を持つ。**弾いた記録は回答者側の出来事**なので、
@@ -385,6 +386,7 @@ builder.Services.AddSingleton(new AdminPasswordPolicy(passwordPolicyOptions));
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton(new SecretProtector(secretKey));
+builder.Services.AddSingleton<IAppSettingsProvider, AppSettingsProvider>();
 // **2 要素認証をどこまで求めるか**（Issue #154）。**既定は任意。**
 //
 // **知らない値は落とす。** 黙って既定へ落ちると、必須にしたつもりで任意のまま動く。
@@ -931,6 +933,7 @@ app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
 app.MapAdminMaintenanceEndpoints();
+app.MapAdminSettingsEndpoints();
 app.MapAdminVersionEndpoints(
     transportSecurity.AllowInsecure,
     usesSqlite,

@@ -21,6 +21,7 @@ import type {
   SurveyPage,
   SurveyTemplateSummary,
   SamlSettings,
+  AppSettings,
 } from './types';
 
 /**
@@ -308,6 +309,24 @@ export const testSamlMetadata = (metadataUrl: string) =>
   call<{ reachable: boolean; entityId?: string | null }>('/api/admin/saml/settings/test', {
     method: 'POST',
     json: { metadataUrl },
+  });
+
+// ---- アプリケーション設定（Issue #372）-------------------------------------
+
+export const getAppSettings = () =>
+  call<AppSettings>('/api/admin/settings');
+
+export const saveAppSettings = (settings: AppSettings) =>
+  call<AppSettings>('/api/admin/settings', {
+    method: 'PUT',
+    json: {
+      // 秘密欄は空なら送らず、既存値を保つ。入力した値だけを置き換える。
+      values: Object.fromEntries(
+        settings.fields
+          .filter((field) => !field.isSecret || (field.value?.trim() ?? '') !== '')
+          .map((field) => [field.key, field.value]),
+      ),
+    },
   });
 
 // ---- アンケート -------------------------------------------------------------

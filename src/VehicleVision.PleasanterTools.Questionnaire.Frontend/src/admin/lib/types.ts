@@ -632,7 +632,29 @@ export type AdminPermission =
   | 'users.write'
   | 'users.resetTwoFactor'
   | 'settings.saml'
+  | 'settings.manage'
   | 'maintenance.manage';
+
+export interface AppSettings {
+  fields: AppSettingField[];
+}
+
+export interface AppSettingField {
+  key: string;
+  type: 'string' | 'boolean' | 'integer';
+  value: string | null;
+  hasValue: boolean;
+  isSecret: boolean;
+  isFixed: boolean;
+  labelJa: string;
+  labelEn: string;
+  descriptionJa: string;
+  descriptionEn: string;
+  minimum: number | null;
+  maximum: number | null;
+  maximumLength: number | null;
+  showPreview: boolean;
+}
 
 export interface SamlSettings {
   enabled: boolean;
