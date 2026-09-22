@@ -38,7 +38,7 @@ public sealed class VirusScanOptions
     public int ClamAvPort { get; init; } = 3310;
 
     /// <summary>1 件あたりのスキャンに待つ上限。</summary>
-    public TimeSpan ClamAvTimeout { get; init; } = TimeSpan.FromSeconds(30);
+    public TimeSpan ClamAvTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>DMZ（未検査用）のストレージアカウントへの接続文字列。</summary>
     /// <remarks>
@@ -59,7 +59,7 @@ public sealed class VirusScanOptions
     /// （<c>_documents/添付ファイル検査-運用手順書.md</c> 4 章）。
     /// 回答者を待たせる時間なので、長くしすぎないこと。
     /// </remarks>
-    public TimeSpan DefenderResultTimeout { get; init; } = TimeSpan.FromMinutes(5);
+    public TimeSpan DefenderResultTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>Event Grid の受け口を守るパスワード。</summary>
     /// <remarks>
@@ -88,16 +88,16 @@ public sealed class AttachmentOptions
     ];
 
     /// <summary>許可する拡張子。</summary>
-    public ImmutableArray<string> AllowedExtensions { get; init; } = DefaultAllowedExtensions;
+    public ImmutableArray<string> AllowedExtensions { get; set; } = DefaultAllowedExtensions;
 
     /// <summary>1 件あたりのサイズ上限（バイト）。</summary>
-    public long MaxFileSizeBytes { get; init; } = 5 * 1024 * 1024;
+    public long MaxFileSizeBytes { get; set; } = 5 * 1024 * 1024;
 
     /// <summary>1 設問あたりの個数上限。</summary>
-    public int MaxFileCount { get; init; } = 5;
+    public int MaxFileCount { get; set; } = 5;
 
     /// <summary>1 回の送信の合計サイズ上限（バイト）。</summary>
-    public long MaxTotalBytes { get; init; } = 20 * 1024 * 1024;
+    public long MaxTotalBytes { get; set; } = 20 * 1024 * 1024;
 
     /// <summary>ウイルススキャンの設定。</summary>
     public VirusScanOptions VirusScan { get; init; } = new();
@@ -176,6 +176,22 @@ public sealed class AttachmentOptions
         return extensions.IsEmpty
             ? throw Invalid("QUESTIONNAIRE_ATTACHMENT_ALLOWEDEXTENSIONS", raw)
             : extensions;
+    }
+
+    /// <summary>管理画面から受け取った許可拡張子を正規化する。</summary>
+    public static string NormalizeAllowedExtensions(string raw)
+    {
+        var extensions = raw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(AttachmentPolicy.NormalizeExtension)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToImmutableArray();
+        if (extensions.IsEmpty)
+        {
+            throw new AppSettingValidationException("回答添付の許可拡張子は空にできません。");
+        }
+
+        return string.Join(", ", extensions);
     }
 
     private static VirusScanProvider? ReadProvider(IConfiguration configuration)
