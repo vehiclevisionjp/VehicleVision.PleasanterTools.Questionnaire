@@ -339,6 +339,12 @@ export const testAppSettingsMail = (settings: AppSettings) =>
     json: { values: appSettingValues(settings) },
   });
 
+export const testAppSettings = (settings: AppSettings) =>
+  call<{ connected: boolean }>('/api/admin/settings/test', {
+    method: 'POST',
+    json: { values: appSettingValues(settings) },
+  });
+
 // ---- アンケート -------------------------------------------------------------
 
 /**

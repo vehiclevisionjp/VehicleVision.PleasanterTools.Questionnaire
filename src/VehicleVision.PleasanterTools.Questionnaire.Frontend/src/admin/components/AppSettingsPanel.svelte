@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { getAppSettings, saveAppSettings, testAppSettingsMail } from '../lib/api';
+  import {
+    getAppSettings,
+    saveAppSettings,
+    testAppSettings,
+    testAppSettingsMail,
+  } from '../lib/api';
   import type { AppSettingField, AppSettings } from '../lib/types';
   import { language, t } from '../lib/i18n/state.svelte';
 
@@ -13,6 +18,10 @@
   let busy = $state(false);
   let error = $state('');
   let done = $state('');
+  let connectionDone = $state('');
+  let initialPleasanterBaseUrl = $state('');
+
+  const pleasanterBaseUrlKey = 'QUESTIONNAIRE_PLEASANTER_BASEURL';
 
   const mailTransportKey = 'QUESTIONNAIRE_MAIL_TRANSPORT';
   const mailEnabledKey = 'QUESTIONNAIRE_MAIL_ENABLED';
@@ -30,6 +39,8 @@
       return;
     }
     settings = result.value;
+    initialPleasanterBaseUrl =
+      settings.fields.find((field) => field.key === pleasanterBaseUrlKey)?.value ?? '';
   }
 
   function label(field: AppSettingField): string {
@@ -46,6 +57,32 @@
 
   function setValue(field: AppSettingField, value: string) {
     field.value = value;
+    connectionDone = '';
+  }
+
+  function pleasanterDestinationChanged(): boolean {
+    if (!settings || settings.publishedSurveyCount === 0) return false;
+    const current =
+      settings.fields.find((field) => field.key === pleasanterBaseUrlKey)?.value ?? '';
+    return current.trim().replace(/\/+$/, '') !== initialPleasanterBaseUrl.trim().replace(/\/+$/, '');
+  }
+
+  async function testConnection() {
+    if (!settings) return;
+
+    error = '';
+    done = '';
+    connectionDone = '';
+    busy = true;
+    const result = await testAppSettings(settings);
+    busy = false;
+
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    connectionDone = t('appSettings.connectionSucceeded');
   }
 
   function fieldValue(key: string): string {
@@ -95,6 +132,8 @@
     }
 
     settings = result.value;
+    initialPleasanterBaseUrl =
+      settings.fields.find((field) => field.key === pleasanterBaseUrlKey)?.value ?? '';
     done = t('appSettings.saved');
   }
 
@@ -103,6 +142,7 @@
 
     error = '';
     done = '';
+    connectionDone = '';
     busy = true;
     const result = await testAppSettingsMail(settings);
     busy = false;
@@ -199,9 +239,24 @@
       {#if mailBaseUrlMissing()}
         <p class="warning" role="alert">{t('appSettings.mailBaseUrlRequired')}</p>
       {/if}
+      {#if pleasanterDestinationChanged()}
+        <p class="warning" role="alert">
+          {t('appSettings.publishedDestinationWarning').replace(
+            '{count}',
+            String(settings.publishedSurveyCount),
+          )}
+        </p>
+      {/if}
+      {#if !settings.isPleasanterConfigured}
+        <p class="warning" role="alert">{t('appSettings.pleasanterNotConfigured')}</p>
+      {/if}
       {#if error}<p class="error" role="alert">{error}</p>{/if}
       {#if done}<p class="done" role="status">{done}</p>{/if}
+      {#if connectionDone}<p class="done" role="status">{connectionDone}</p>{/if}
       <div class="actions">
+        <button type="button" disabled={busy} onclick={testConnection}>
+          {busy ? t('appSettings.testingConnection') : t('appSettings.testConnection')}
+        </button>
         <button type="button" disabled={busy} onclick={testMail}>
           {t('appSettings.testMail')}
         </button>
@@ -290,6 +345,7 @@
   }
   .warning {
     color: var(--warning-text);
+    font-weight: 600;
   }
   .done {
     color: var(--success);
