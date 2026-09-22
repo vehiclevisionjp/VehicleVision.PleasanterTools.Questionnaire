@@ -1,4 +1,4 @@
-using System.Threading.RateLimiting;
+﻿using System.Threading.RateLimiting;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
@@ -135,13 +135,6 @@ if (MigrationCommand.IsRequested(args))
     return;
 }
 
-var pleasanterTimeout = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS"],
-    out var timeoutSeconds)
-    && timeoutSeconds > 0
-        ? TimeSpan.FromSeconds(timeoutSeconds)
-        : PleasanterOptions.DefaultTimeout;
-
 // ---- サービス --------------------------------------------------------------
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IDbConnectionFactory>(
@@ -199,13 +192,14 @@ builder.Services.AddSingleton<PleasanterRecordBuilder>();
 // **変換スクリプトは上限付きで走らせる**（Issue #83、_documents/アーキテクチャ方針.md 8 章）。
 // **上限が無いと、書き間違えた `while (true)` 1 つで送信ワーカーが永久に固まる。**
 // 打ち切ったものはマッピングの不備になり、回答はデッドレターへ回る
-builder.Services.AddSingleton(ScriptConverterOptions.FromConfiguration(builder.Configuration));
+var scriptConverterOptions = ScriptConverterOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(scriptConverterOptions);
 builder.Services.AddSingleton<IScriptConverter>(serviceProvider =>
     new JintScriptConverter(serviceProvider.GetRequiredService<ScriptConverterOptions>()));
 builder.Services.AddSingleton(serviceProvider =>
     new MappingEvaluator(serviceProvider.GetRequiredService<IScriptConverter>()));
 builder.Services.AddHttpClient("pleasanter", client =>
-    client.Timeout = pleasanterTimeout);
+    client.Timeout = Timeout.InfiniteTimeSpan);
 builder.Services.AddTransient(serviceProvider => new PleasanterApiClient(
     serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter"),
     serviceProvider.GetRequiredService<IPleasanterOptionsProvider>()));
@@ -213,7 +207,8 @@ builder.Services.AddTransient(serviceProvider => new PleasanterApiClient(
 // **溜まりすぎたら受付を止める**（Issue #72、_documents/非機能設計.md 2 章）。
 // **WAF が無い導入先を想定した最後の壁。** 分散した相手にはレート制限が効かない。
 // 攻撃が無くても、Pleasanter が長く落ちれば同じように溜まる
-builder.Services.AddSingleton(BacklogGuardOptions.FromConfiguration(builder.Configuration));
+var backlogGuardOptions = BacklogGuardOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(backlogGuardOptions);
 builder.Services.AddSingleton<ResponseBacklogGuard>();
 
 builder.Services.AddSingleton<ResponseIntake>();
@@ -243,9 +238,7 @@ builder.Services.AddSingleton(assetOptions);
 // （_documents/非機能設計.md 1 章）。
 // 大きい方に合わせ、個別の入口ではそれぞれの上限まで絞る
 builder.Services.Configure<FormOptions>(options =>
-    options.MultipartBodyLengthLimit = Math.Max(
-        attachmentOptions.MaxRequestBodyBytes,
-        assetOptions.MaxRequestBodyBytes));
+    options.MultipartBodyLengthLimit = int.MaxValue);
 
 // **ウイルススキャンは設定で有効にしたときだけ組み込む**（既定は無効）。
 // **ClamAV 本体は GPL-2.0 なので別プロセスとして呼ぶだけ**（LICENSING.md）
@@ -283,7 +276,7 @@ if (attachmentOptions.VirusScan.Enabled)
 // **スキャナが登録されていなければ 3 層目は無効。**
 // 「有効なのにスキャナが無い」場合は検査側が添付を拒否する（素通しにしない）
 builder.Services.AddSingleton(serviceProvider => new AttachmentInspector(
-    attachmentOptions.ToPolicy(), serviceProvider.GetService<IVirusScanner>()));
+    attachmentOptions.ToPolicy, serviceProvider.GetService<IVirusScanner>()));
 builder.Services.AddSingleton(serviceProvider => new AssetInspector(
     assetOptions, serviceProvider.GetService<IVirusScanner>()));
 
@@ -366,6 +359,9 @@ builder.Services.AddSingleton(new SecretProtector(secretKey));
 builder.Services.AddSingleton<AppSettingsProvider>();
 builder.Services.AddSingleton<IAppSettingsProvider>(services =>
     services.GetRequiredService<AppSettingsProvider>());
+builder.Services.AddSingleton<AppSettingsMonitor>();
+builder.Services.AddHostedService(
+    serviceProvider => serviceProvider.GetRequiredService<AppSettingsMonitor>());
 // **2 要素認証をどこまで求めるか**（Issue #154）。**既定は任意。**
 //
 // **知らない値は落とす。** 黙って既定へ落ちると、必須にしたつもりで任意のまま動く。
@@ -429,37 +425,6 @@ builder.Services.AddSingleton(serviceProvider => new SubmissionGuard(
 
 // **既定は厳しく。** 緩めるのは検証環境だけにすること。
 // 端から端まで通す試験は 1 つの IP から大量に叩くので、既定のままだと自分で枠を使い切る
-var loginPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"], out var configuredLogin)
-    ? configuredLogin
-    : 10;
-
-var submitPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_SUBMITS_PER_MIN"], out var configuredSubmits)
-    ? configuredSubmits
-    : 20;
-var requestPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_REQUESTS_PER_MIN"], out var configuredRequests)
-    ? configuredRequests
-    : 60;
-
-// **1 画面で何本も出るもの（ビルド成果物・本文画像）の枠。**
-// ⚠️ **ここを固定値にすると、検証環境の緩和が効かない。**
-// 端から端まで通す試験と写しの一式は 1 つの IP から大量に叩くため、
-// 固定の 600 では自分で使い切る（Issue #322）
-var assetPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN"], out var configuredAssets)
-    ? configuredAssets
-    : 600;
-
-// **アンケート 1 本あたりの枠。** 他の枠と同じく検証環境でだけ緩められるようにする。
-// ⚠️ **`publicId` を持たない要求は 1 つの枠にまとめて数えられる**ので、
-// これは実質「回答画面以外すべての合計」の上限にもなる（Issue #311）
-var formPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_FORM_REQUESTS_PER_MIN"], out var configuredForm)
-    ? configuredForm
-    : 600;
-
 builder.Services
     .AddAuthentication(AdminAuthSchemes.Session)
     .AddCookie(AdminAuthSchemes.Session, options =>
@@ -512,7 +477,8 @@ builder.Services.AddAuthorization(options =>
 
 // **送信ワーカーは .Web に同居させる**（_documents/アプリケーション設計.md 8 章）。
 // Azure App Service では別プロセス常駐の手段が限られるため。**Always On を有効にすること**
-builder.Services.AddSingleton(ResponseSenderOptions.FromConfiguration(builder.Configuration));
+var responseSenderOptions = ResponseSenderOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(responseSenderOptions);
 builder.Services.AddSingleton<ResponseSender>();
 builder.Services.AddHostedService<ResponseSenderHostedService>();
 builder.Services.AddSingleton<AssetHistorySender>();
@@ -575,7 +541,9 @@ builder.Services.AddHostedService(serviceProvider => new ParameterFilesReport(
 
 // **管理操作の記録は放っておくと増え続ける**（_documents/データモデル設計.md）。
 // 期限を過ぎた分を消す係を常駐させる。**既定は 365 日残す**
-builder.Services.AddSingleton(AuditLogRetentionOptions.FromConfiguration(builder.Configuration));
+var auditLogRetentionOptions =
+    AuditLogRetentionOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(auditLogRetentionOptions);
 builder.Services.AddHostedService<AuditLogRetentionService>();
 
 // ---- レート制限 ------------------------------------------------------------
@@ -588,6 +556,7 @@ builder.Services
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     var sharedRateLimits = serviceProvider.GetService<ISharedRateLimitStore>();
+    var settings = serviceProvider.GetRequiredService<AppSettingsMonitor>();
     var rateLimitLogger = loggerFactory.CreateLogger("SharedRateLimit");
 
     // **複数の軸で掛ける。** 1 つの軸だけでは抜けられる
@@ -603,7 +572,9 @@ builder.Services
             return RateLimitPartitions.FixedWindow(
                 $"{address}|{kind}",
                 "request",
-                isAsset ? assetPermitLimit : requestPermitLimit,
+                settings.GetInt32(isAsset
+                    ? "QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN"
+                    : "QUESTIONNAIRE_REQUESTS_PER_MIN"),
                 TimeSpan.FromMinutes(1),
                 sharedRateLimits,
                 rateLimitLogger);
@@ -613,7 +584,7 @@ builder.Services
             // 経路の値は UseRouting が利用者のミドルウェアより前に入るため、ここで取れる
             RateLimitPartitions.Survey(
                 context.Request.RouteValues["publicId"]?.ToString(),
-                formPermitLimit,
+                settings.GetInt32("QUESTIONNAIRE_FORM_REQUESTS_PER_MIN"),
                 TimeSpan.FromMinutes(1),
                 sharedRateLimits,
                 rateLimitLogger)));
@@ -625,7 +596,7 @@ builder.Services
         RateLimitPartitions.FixedWindow(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             "submit",
-            submitPermitLimit,
+            settings.GetInt32("QUESTIONNAIRE_SUBMITS_PER_MIN"),
             TimeSpan.FromMinutes(1),
             sharedRateLimits,
             rateLimitLogger));
@@ -639,7 +610,7 @@ builder.Services
         RateLimitPartitions.FixedWindow(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             "login",
-            loginPermitLimit,
+            settings.GetInt32("QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"),
             TimeSpan.FromMinutes(5),
             sharedRateLimits,
             rateLimitLogger));
@@ -657,6 +628,75 @@ builder.Services
 });
 
 var app = builder.Build();
+
+var runtimeSettings = app.Services.GetRequiredService<AppSettingsMonitor>();
+runtimeSettings.Register(snapshot =>
+{
+    static int Integer(AppSettingsSnapshot current, string key) =>
+        int.Parse(current[key], System.Globalization.CultureInfo.InvariantCulture);
+
+    auditLogRetentionOptions.RetentionDays =
+        Integer(snapshot, AuditLogRetentionOptions.RetentionDaysKey);
+    auditLogRetentionOptions.DeadLetterRetentionDays =
+        Integer(snapshot, AuditLogRetentionOptions.DeadLetterRetentionDaysKey);
+    auditLogRetentionOptions.NotificationRetentionDays =
+        Integer(snapshot, AuditLogRetentionOptions.NotificationRetentionDaysKey);
+    auditLogRetentionOptions.AttachmentRejectionRetentionDays =
+        Integer(snapshot, AuditLogRetentionOptions.AttachmentRejectionRetentionDaysKey);
+
+    responseSenderOptions.MaxSendsPerMinute =
+        Integer(snapshot, ResponseSenderOptions.MaxSendsPerMinuteKey);
+    backlogGuardOptions.PerSurveyLimit =
+        Integer(snapshot, BacklogGuardOptions.PerSurveyLimitKey);
+    backlogGuardOptions.TotalLimit =
+        Integer(snapshot, BacklogGuardOptions.TotalLimitKey);
+
+    attachmentOptions.MaxFileSizeBytes =
+        Integer(snapshot, "QUESTIONNAIRE_ATTACHMENT_MAXFILESIZEBYTES");
+    attachmentOptions.MaxFileCount =
+        Integer(snapshot, "QUESTIONNAIRE_ATTACHMENT_MAXFILECOUNT");
+    attachmentOptions.MaxTotalBytes =
+        Integer(snapshot, "QUESTIONNAIRE_ATTACHMENT_MAXTOTALBYTES");
+    attachmentOptions.AllowedExtensions =
+        [.. snapshot["QUESTIONNAIRE_ATTACHMENT_ALLOWEDEXTENSIONS"]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+    assetOptions.MaxFileSizeBytes =
+        Integer(snapshot, "QUESTIONNAIRE_ASSET_MAXFILESIZEBYTES");
+    assetOptions.MaxFileCount =
+        Integer(snapshot, "QUESTIONNAIRE_ASSET_MAXFILECOUNT");
+    assetOptions.AllowedExtensions =
+        [.. snapshot["QUESTIONNAIRE_ASSET_ALLOWEDEXTENSIONS"]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+
+    scriptConverterOptions.TimeLimit = TimeSpan.FromMilliseconds(
+        Integer(snapshot, ScriptConverterOptions.TimeLimitKey));
+    scriptConverterOptions.MemoryLimitBytes =
+        Integer(snapshot, ScriptConverterOptions.MemoryLimitKey);
+    scriptConverterOptions.RecursionLimit =
+        Integer(snapshot, ScriptConverterOptions.RecursionLimitKey);
+
+    attachmentOptions.VirusScan.ClamAvTimeout = TimeSpan.FromSeconds(
+        Integer(snapshot, "QUESTIONNAIRE_VIRUSSCAN_TIMEOUTSECONDS"));
+    attachmentOptions.VirusScan.DefenderResultTimeout = TimeSpan.FromSeconds(
+        Integer(snapshot, "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_RESULTTIMEOUTSECONDS"));
+
+    app.Services.GetRequiredService<PleasanterDateTime>()
+        .SetTimeZone(snapshot[AppSettingsProvider.PleasanterTimeZoneKey]);
+
+    var mailSender = app.Services.GetService<MailSenderOptions>();
+    if (mailSender is not null)
+    {
+        mailSender.MaxSendsPerMinute =
+            Integer(snapshot, MailSenderOptions.MaxSendsPerMinuteKey);
+    }
+
+    var notificationOptions = app.Services.GetService<ResponseNotificationMailerOptions>();
+    if (notificationOptions is not null)
+    {
+        notificationOptions.DigestInterval = TimeSpan.FromMinutes(
+            Integer(snapshot, ResponseNotificationMailerOptions.DigestIntervalMinutesKey));
+    }
+});
 
 if (transportSecurity.AllowInsecure)
 {

@@ -77,21 +77,20 @@ public class AuditLogRetentionTests
         Assert.True(options.NotificationEnabled);
     }
 
-    [Theory]
-    [InlineData("0", false)]
-    [InlineData("30", true)]
-    public void 知らせの保持日数を設定から読む(string value, bool enabled)
+    [Fact]
+    public void 知らせの保持日数を設定から読む()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [AuditLogRetentionOptions.NotificationRetentionDaysKey] = value,
+                [AuditLogRetentionOptions.NotificationRetentionDaysKey] = "30",
             })
             .Build();
 
         var options = AuditLogRetentionOptions.FromConfiguration(configuration);
 
-        Assert.Equal(enabled, options.NotificationEnabled);
+        Assert.Equal(30, options.NotificationRetentionDays);
+        Assert.True(options.NotificationEnabled);
     }
 
     [Fact]
@@ -105,32 +104,42 @@ public class AuditLogRetentionTests
         Assert.False(options.DeadLetterEnabled);
     }
 
-    [Theory]
-    [InlineData("0", false)]
-    [InlineData("-1", false)]
-    [InlineData("180", true)]
-    public void デッドレターの保持日数を設定から読む(string value, bool enabled)
+    [Fact]
+    public void デッドレターの保持日数を設定から読む()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [AuditLogRetentionOptions.DeadLetterRetentionDaysKey] = value,
+                [AuditLogRetentionOptions.DeadLetterRetentionDaysKey] = "180",
             })
             .Build();
 
         var options = AuditLogRetentionOptions.FromConfiguration(configuration);
 
-        Assert.Equal(enabled, options.DeadLetterEnabled);
+        Assert.Equal(180, options.DeadLetterRetentionDays);
+        Assert.True(options.DeadLetterEnabled);
     }
 
     [Theory]
     [InlineData("0")]
     [InlineData("-1")]
-    public void 零以下にすると消さない(string value)
+    public void 零以下は拒否する(string value)
     {
-        var options = AuditLogRetentionOptions.FromConfiguration(Configuration(value));
+        Assert.Throws<InvalidOperationException>(
+            () => AuditLogRetentionOptions.FromConfiguration(Configuration(value)));
+    }
 
-        Assert.False(options.Enabled);
+    [Theory]
+    [InlineData(AuditLogRetentionOptions.NotificationRetentionDaysKey)]
+    [InlineData(AuditLogRetentionOptions.DeadLetterRetentionDaysKey)]
+    public void 個別の保持日数も零を拒否する(string key)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [key] = "0" })
+            .Build();
+
+        Assert.Throws<InvalidOperationException>(
+            () => AuditLogRetentionOptions.FromConfiguration(configuration));
     }
 
     [Fact]

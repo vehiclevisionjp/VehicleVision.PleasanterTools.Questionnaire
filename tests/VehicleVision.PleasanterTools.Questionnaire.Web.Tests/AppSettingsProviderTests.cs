@@ -124,6 +124,115 @@ public class AppSettingsProviderTests
     }
 
     [Fact]
+    public async Task 値系設定を定義し既定値と上下限を管理画面へ返す()
+    {
+        var snapshot = await Create(
+            new ConfigurationBuilder().Build(),
+            new FakeStore()).GetAsync();
+
+        var response = AdminSettingsEndpoints.Body(snapshot);
+        var field = Assert.Single(
+            response.Fields,
+            value => value.Key == "QUESTIONNAIRE_SUBMITS_PER_MIN");
+
+        Assert.Equal("20", field.Value);
+        Assert.Equal("20", field.DefaultValue);
+        Assert.True(field.IsDefault);
+        Assert.Equal(1, field.Minimum);
+        Assert.Equal(1000000, field.Maximum);
+    }
+
+    [Theory]
+    [InlineData("QUESTIONNAIRE_AUDITLOG_RETENTION_DAYS")]
+    [InlineData("QUESTIONNAIRE_SEND_PER_MINUTE")]
+    [InlineData("QUESTIONNAIRE_BACKLOG_TOTAL")]
+    [InlineData("QUESTIONNAIRE_ATTACHMENT_MAXFILECOUNT")]
+    [InlineData("QUESTIONNAIRE_SCRIPT_TIMEOUT_MS")]
+    [InlineData("QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS")]
+    public async Task 値系設定へ0を保存できない(string key)
+    {
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+
+        var exception = await Assert.ThrowsAsync<AppSettingValidationException>(() =>
+            provider.SaveAsync(
+                new Dictionary<string, string?> { [key] = "0" },
+                Guid.NewGuid()));
+
+        Assert.Contains("1 以上", exception.Message);
+    }
+
+    [Fact]
+    public async Task デッドレターは無期限の既定値を表示するが0へ変更できない()
+    {
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+        var snapshot = await provider.GetAsync();
+
+        Assert.Equal("0", snapshot["QUESTIONNAIRE_DEADLETTER_RETENTION_DAYS"]);
+        await Assert.ThrowsAsync<AppSettingValidationException>(() =>
+            provider.SaveAsync(
+                new Dictionary<string, string?>
+                {
+                    ["QUESTIONNAIRE_DEADLETTER_RETENTION_DAYS"] = "0",
+                },
+                Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task 許可拡張子を正規化し配布できない形式を拒否する()
+    {
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+
+        var snapshot = await provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                ["QUESTIONNAIRE_ATTACHMENT_ALLOWEDEXTENSIONS"] = "pdf, .PNG, PDF",
+                ["QUESTIONNAIRE_ASSET_ALLOWEDEXTENSIONS"] = "pdf, .jpg",
+            },
+            Guid.NewGuid());
+
+        Assert.Equal(
+            ".pdf, .png",
+            snapshot["QUESTIONNAIRE_ATTACHMENT_ALLOWEDEXTENSIONS"]);
+        await Assert.ThrowsAsync<AppSettingValidationException>(() =>
+            provider.SaveAsync(
+                new Dictionary<string, string?>
+                {
+                    ["QUESTIONNAIRE_ASSET_ALLOWEDEXTENSIONS"] = ".pdf, .svg",
+                },
+                Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void 監視サービスへ渡したスナップショットを登録先へ直ちに反映する()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        var provider = Create(configuration, new FakeStore());
+        var monitor = new AppSettingsMonitor(
+            provider,
+            configuration,
+            new DatabaseStartupState(),
+            NullLogger<AppSettingsMonitor>.Instance,
+            TimeProvider.System);
+        var snapshot = AppSettingsProvider.InitialSnapshot(configuration);
+        var observed = string.Empty;
+
+        monitor.Register(current =>
+            observed = current["QUESTIONNAIRE_SUBMITS_PER_MIN"]);
+        var changedValues = snapshot.Values.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.Ordinal);
+        changedValues["QUESTIONNAIRE_SUBMITS_PER_MIN"] = "42";
+        monitor.Apply(snapshot with
+        {
+            Values = changedValues.ToFrozenDictionary(StringComparer.Ordinal),
+        });
+
+        Assert.Equal("42", observed);
+        Assert.Equal(42, monitor.GetInt32("QUESTIONNAIRE_SUBMITS_PER_MIN"));
+    }
+
+    [Fact]
     public async Task TTL内はスナップショットを再利用し期限後に別インスタンスの保存を読む()
     {
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-09-22T00:00:00Z"));

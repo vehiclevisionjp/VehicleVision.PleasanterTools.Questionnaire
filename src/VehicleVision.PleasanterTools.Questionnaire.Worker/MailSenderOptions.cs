@@ -43,12 +43,12 @@ public sealed class MailSenderOptions
     /// <summary>期限切れの確保を解放する間隔。</summary>
     public TimeSpan ReleaseExpiredLocksInterval { get; init; } = TimeSpan.FromMinutes(1);
 
-    /// <summary>1 分あたりに送る件数の上限。**0 以下で無制限。**</summary>
+    /// <summary>1 分あたりに送る件数の上限。</summary>
     /// <remarks>
     /// ⚠️ **上限はインスタンスごと。** スケールアウトすると台数ぶん増える。
     /// 送信元の上限に合わせて割り算して設定すること。
     /// </remarks>
-    public int MaxSendsPerMinute { get; init; } = 60;
+    public int MaxSendsPerMinute { get; set; } = 60;
 
     /// <summary>送信と送信の間に最低限あける時間。</summary>
     /// <remarks>**まとめて撃たせない**（回答の送信と同じ理由）。</remarks>
@@ -72,10 +72,10 @@ public sealed class MailSenderOptions
             return new MailSenderOptions();
         }
 
-        return int.TryParse(raw, CultureInfo.InvariantCulture, out var value)
+        return int.TryParse(raw, CultureInfo.InvariantCulture, out var value) && value > 0
             ? new MailSenderOptions { MaxSendsPerMinute = value }
             : throw new InvalidOperationException(
-                $"{MaxSendsPerMinuteKey} は整数で指定する（今の値: {raw}）。0 以下で無制限");
+                $"{MaxSendsPerMinuteKey} は 1 以上の整数で指定する（今の値: {raw}）");
     }
 
     /// <summary>指数バックオフで次に送る時刻を決める。</summary>

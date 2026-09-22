@@ -33,6 +33,7 @@ public static class AdminSettingsEndpoints
             HttpContext context,
             IAppSettingsProvider provider,
             IMonitoringStore monitoring,
+            AppSettingsMonitor monitor,
             CancellationToken cancellationToken) =>
         {
             if (request.Values is null)
@@ -79,6 +80,7 @@ public static class AdminSettingsEndpoints
                     request.Values,
                     adminUserId,
                     cancellationToken).ConfigureAwait(false);
+                monitor.Apply(snapshot);
                 var published = await monitoring.CountPublishedSurveysAsync(cancellationToken)
                     .ConfigureAwait(false);
                 return Results.Ok(Body(snapshot, published));
@@ -218,6 +220,8 @@ public static class AdminSettingsEndpoints
             definition.IsSecret && snapshot[definition.Key].Length > 0,
             definition.IsSecret,
             snapshot.FixedKeys.Contains(definition.Key),
+            definition.DefaultValue,
+            string.Equals(snapshot[definition.Key], definition.DefaultValue, StringComparison.Ordinal),
             definition.LabelJa,
             definition.LabelEn,
             definition.DescriptionJa,
@@ -289,6 +293,8 @@ public static class AdminSettingsEndpoints
         bool HasValue,
         bool IsSecret,
         bool IsFixed,
+        string DefaultValue,
+        bool IsDefault,
         string LabelJa,
         string LabelEn,
         string DescriptionJa,
