@@ -648,6 +648,8 @@ export interface AppSettingField {
   hasValue: boolean;
   isSecret: boolean;
   isFixed: boolean;
+  defaultValue: string;
+  isDefault: boolean;
   labelJa: string;
   labelEn: string;
   descriptionJa: string;

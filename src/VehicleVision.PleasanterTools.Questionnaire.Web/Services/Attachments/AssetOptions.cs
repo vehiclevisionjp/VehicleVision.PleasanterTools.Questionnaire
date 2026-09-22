@@ -39,11 +39,11 @@ public sealed class AssetOptions
         new[] { ".html", ".htm", ".svg", ".exe", ".bat", ".cmd", ".ps1" }
             .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    public ImmutableArray<string> AllowedExtensions { get; init; } = DefaultAllowedExtensions;
+    public ImmutableArray<string> AllowedExtensions { get; set; } = DefaultAllowedExtensions;
 
-    public long MaxFileSizeBytes { get; init; } = ContentAsset.DefaultMaxBytes;
+    public long MaxFileSizeBytes { get; set; } = ContentAsset.DefaultMaxBytes;
 
-    public int MaxFileCount { get; init; } = ContentAsset.DefaultMaxAssetsPerSurvey;
+    public int MaxFileCount { get; set; } = ContentAsset.DefaultMaxAssetsPerSurvey;
 
     public bool VirusScanEnabled { get; init; }
 
@@ -117,6 +117,30 @@ public sealed class AssetOptions
             : extensions;
     }
 
+    /// <summary>管理画面から受け取った許可拡張子を正規化して検証する。</summary>
+    public static string NormalizeAllowedExtensions(string raw)
+    {
+        var extensions = raw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(AttachmentPolicy.NormalizeExtension)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToImmutableArray();
+        if (extensions.IsEmpty)
+        {
+            throw new AppSettingValidationException("配布資産の許可拡張子は空にできません。");
+        }
+
+        foreach (var extension in extensions)
+        {
+            if (ForbiddenExtensions.Contains(extension) || !ContentTypes.ContainsKey(extension))
+            {
+                throw new AppSettingValidationException($"配布資産へ許可できない拡張子です: {extension}");
+            }
+        }
+
+        return string.Join(", ", extensions);
+    }
+
     private static int? ReadInt32(IConfiguration configuration, string key)
     {
         var raw = configuration[key];
@@ -153,7 +177,6 @@ public sealed class AssetOptions
 public sealed class AssetInspector(AssetOptions options, IVirusScanner? scanner = null)
 {
     private const int MaximumFileNameLength = 256;
-    private readonly AttachmentInspector _inner = new(options.ToPolicy(), scanner);
 
     public Task<ImmutableArray<AttachmentRejection>> InspectAsync(
         IncomingAttachment asset,
@@ -169,6 +192,7 @@ public sealed class AssetInspector(AssetOptions options, IVirusScanner? scanner 
                     asset.FileName, AttachmentRejectionReason.InvalidFileName)));
         }
 
-        return _inner.InspectAsync([asset], cancellationToken);
+        return new AttachmentInspector(options.ToPolicy(), scanner)
+            .InspectAsync([asset], cancellationToken);
     }
 }
