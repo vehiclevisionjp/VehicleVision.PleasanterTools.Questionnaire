@@ -48,11 +48,12 @@ public static class AdminAuthEndpoints
             ISamlOptionsProvider samlProvider,
             AdminAuthOptions options,
             AdminCaptchaOptions captcha,
-            MailOptions mail,
+            IMailSettingsProvider mailSettings,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
             var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+            var mail = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
 
             // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）

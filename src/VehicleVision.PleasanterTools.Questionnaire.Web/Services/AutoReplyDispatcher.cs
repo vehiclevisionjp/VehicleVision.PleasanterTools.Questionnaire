@@ -29,13 +29,32 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 public sealed class AutoReplyDispatcher(
     IMailOutbox outbox,
     IMailPayloadProtector protector,
-    MailOptions options,
+    IMailSettingsProvider mailSettings,
     ILogger<AutoReplyDispatcher> logger,
     PleasanterOptions? pleasanter = null,
     IResponseEditTokenStore? editTokens = null,
     TimeProvider? timeProvider = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
+    public AutoReplyDispatcher(
+        IMailOutbox outbox,
+        IMailPayloadProtector protector,
+        MailOptions options,
+        ILogger<AutoReplyDispatcher> logger,
+        PleasanterOptions? pleasanter = null,
+        IResponseEditTokenStore? editTokens = null,
+        TimeProvider? timeProvider = null)
+        : this(
+            outbox,
+            protector,
+            new FixedMailSettingsProvider(options),
+            logger,
+            pleasanter,
+            editTokens,
+            timeProvider)
+    {
+    }
 
     /// <summary>差し込みの日時を出す時間帯（Issue #209）。</summary>
     /// <remarks>
@@ -94,6 +113,7 @@ public sealed class AutoReplyDispatcher(
             return false;
         }
 
+        var options = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
         if (!options.IsReady)
         {
             // **設定だけ有効で、送る口が無い。** 積むと送れないまま溜まる
@@ -114,12 +134,13 @@ public sealed class AutoReplyDispatcher(
             var now = _time.GetUtcNow();
             var values = new AutoReplyPlaceholderValues(
                 AcceptTo: ToDisplayTime(acceptTo),
-                FormUrl: FormUrl(publicId));
+                FormUrl: FormUrl(options, publicId));
 
             // **再編集リンクの値を作る**（Issue #202 / #319）。
             // ⚠️ **回答本体のトークンは載せない。** 専用のトークンを 1 本発行する
             values = await WithEditLinkAsync(
                     values,
+                    options,
                     definition,
                     payload,
                     publicId,
@@ -129,7 +150,7 @@ public sealed class AutoReplyDispatcher(
                     cancellationToken)
                 .ConfigureAwait(false);
             values = WithAssetTicketLink(
-                values, publicId, assetTicket, assetTicketExpiresAt);
+                values, options, publicId, assetTicket, assetTicketExpiresAt);
 
             var submittedAt = TimeZoneInfo.ConvertTime(now, DisplayTimeZone);
             var mail = AutoReplyComposer.Compose(
@@ -159,6 +180,7 @@ public sealed class AutoReplyDispatcher(
 
     private AutoReplyPlaceholderValues WithAssetTicketLink(
         AutoReplyPlaceholderValues values,
+        MailOptions options,
         string? publicId,
         string? assetTicket,
         DateTime? expiresAt)
@@ -192,6 +214,7 @@ public sealed class AutoReplyDispatcher(
     /// </remarks>
     private async Task<AutoReplyPlaceholderValues> WithEditLinkAsync(
         AutoReplyPlaceholderValues values,
+        MailOptions options,
         SurveyDefinition definition,
         ResponsePayload payload,
         string? publicId,
@@ -247,7 +270,7 @@ public sealed class AutoReplyDispatcher(
         };
     }
 
-    private string? FormUrl(string? publicId) =>
+    private static string? FormUrl(MailOptions options, string? publicId) =>
         options.BaseUrl is { Length: > 0 } baseUrl && !string.IsNullOrWhiteSpace(publicId)
             ? $"{baseUrl.TrimEnd('/')}/f/{Uri.EscapeDataString(publicId)}"
             : null;

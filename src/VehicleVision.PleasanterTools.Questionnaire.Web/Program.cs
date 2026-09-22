@@ -381,7 +381,9 @@ builder.Services.AddSingleton(new AdminPasswordPolicy(passwordPolicyOptions));
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton(new SecretProtector(secretKey));
-builder.Services.AddSingleton<IAppSettingsProvider, AppSettingsProvider>();
+builder.Services.AddSingleton<AppSettingsProvider>();
+builder.Services.AddSingleton<IAppSettingsProvider>(services =>
+    services.GetRequiredService<AppSettingsProvider>());
 // **2 要素認証をどこまで求めるか**（Issue #154）。**既定は任意。**
 //
 // **知らない値は落とす。** 黙って既定へ落ちると、必須にしたつもりで任意のまま動く。
@@ -534,11 +536,9 @@ builder.Services.AddHostedService<ResponseSenderHostedService>();
 builder.Services.AddSingleton<AssetHistorySender>();
 builder.Services.AddHostedService<AssetHistorySenderHostedService>();
 
-// **メールの送信ワーカー**（Issue #189）。**既定は無効で、設定したときだけ常駐する。**
+// **メールの送信ワーカー**（Issue #189）。メール設定の変更へ再起動なしで追従できるよう常駐する。
 // 回答の送信ワーカーとは別に動く。**メールが詰まっても回答は送られ、
 // 回答が詰まってもメールは出る。** どちらかの不調がもう一方を止めない
-var mailOptions = MailOptions.FromConfiguration(builder.Configuration);
-builder.Services.AddSingleton(mailOptions);
 builder.Services.AddSingleton<IMailOutbox, MailOutbox>();
 // ⚠️ **宛先も本文も暗号化して置く。** 完全匿名の前提で、個人を指す値が
 // DB に載る唯一の場所（Issue #189）
@@ -551,37 +551,21 @@ builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
 builder.Services.AddSingleton<IResponseEditTokenStore, ResponseEditTokenStore>();
 builder.Services.AddSingleton<AutoReplyDispatcher>();
 builder.Services.AddSingleton<AutoReplyTestMailer>();
+builder.Services.AddSingleton<IMailSettingsProvider, MailSettingsProvider>();
+builder.Services.AddSingleton<MailSettingsTestMailer>();
 // **招待を本人へ直接送る**（Issue #189）。手渡しの途中で漏れる経路を減らす。
 // **送れない構成でも招待は出せる**（画面の URL は今までどおり返る）
 builder.Services.AddSingleton<AdminInvitationMailer>();
 
-if (mailOptions.IsReady)
-{
-    // **送信経路は設定で選ぶ**（Issue #198）。
-    // ⚠️ **SES と ACS はマネージド ID で通るので、保管する秘密が 0 になる。**
-    // SMTP は必ずパスワードを 1 つ持つことになる
-    switch (mailOptions.Transport)
-    {
-        case MailTransportKind.AmazonSes:
-            builder.Services.AddSingleton<IMailTransport, SesMailTransport>();
-            break;
-
-        case MailTransportKind.AzureCommunicationServices:
-            builder.Services.AddSingleton<IMailTransport, AcsMailTransport>();
-            break;
-
-        default:
-            builder.Services.AddSingleton<IMailTransport, SmtpMailTransport>();
-            break;
-    }
-
-    builder.Services.AddSingleton(MailSenderOptions.FromConfiguration(builder.Configuration));
-    builder.Services.AddSingleton<MailSender>();
-    builder.Services.AddHostedService<MailSenderHostedService>();
-    builder.Services.AddSingleton(ResponseNotificationMailerOptions.FromConfiguration(builder.Configuration));
-    builder.Services.AddSingleton<ResponseNotificationMailer>();
-    builder.Services.AddHostedService<ResponseNotificationMailerHostedService>();
-}
+// **送信直前に設定を読み直す。** Web で保存した値は同じ設定プロバイダーを通じて
+// 同居ワーカーへ最大 30 秒で届き、再起動なしで送信方式も切り替わる。
+builder.Services.AddSingleton<IMailTransport, DynamicMailTransport>();
+builder.Services.AddSingleton(MailSenderOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<MailSender>();
+builder.Services.AddHostedService<MailSenderHostedService>();
+builder.Services.AddSingleton(ResponseNotificationMailerOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<ResponseNotificationMailer>();
+builder.Services.AddHostedService<ResponseNotificationMailerHostedService>();
 
 // **設定したときだけ監視の口を生やす。** 既定で外部から DB の状態を読める口を作らない。
 var monitoringTokenValue = builder.Configuration[MonitoringToken.Setting];
@@ -596,7 +580,7 @@ if (monitoringToken is not null)
         serviceProvider.GetRequiredService<IResponseOutbox>(),
         serviceProvider.GetRequiredService<IMonitoringStore>(),
         serviceProvider.GetRequiredService<IMailOutbox>(),
-        mailOptions,
+        serviceProvider.GetRequiredService<IMailSettingsProvider>(),
         serviceProvider.GetRequiredService<TimeProvider>()));
 }
 
