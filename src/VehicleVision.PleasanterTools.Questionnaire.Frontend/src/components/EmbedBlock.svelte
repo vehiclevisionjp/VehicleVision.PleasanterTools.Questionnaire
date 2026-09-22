@@ -26,6 +26,11 @@
   );
 
   const ratio = $derived(embed ? embedAspectRatio(embed) : 1);
+  let frame = $state<HTMLElement | null>(null);
+
+  $effect(() => {
+    frame?.style.setProperty('aspect-ratio', String(ratio));
+  });
 </script>
 
 <section class="embed">
@@ -48,7 +53,7 @@
       付けると埋め込み先が本アプリと同じ生成元として扱われ、
       **回答画面の Cookie や localStorage（下書き）へ届いてしまう。**
     -->
-    <div class="frame" style="aspect-ratio: {ratio};">
+    <div class="frame" bind:this={frame}>
       <iframe
         src={embed.url}
         title={label}
@@ -72,7 +77,7 @@
 
   .description {
     margin: 0 0 0.5rem;
-    color: var(--color-muted, #555);
+    color: var(--muted);
   }
 
   img {
@@ -93,6 +98,6 @@
 
   .blocked {
     margin: 0;
-    color: var(--color-muted, #555);
+    color: var(--muted);
   }
 </style>

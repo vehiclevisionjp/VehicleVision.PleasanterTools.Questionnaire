@@ -1,6 +1,6 @@
-# 3 RDBMS（SQL Server / PostgreSQL / MySQL）へ実際に当てる結合テスト。
+# 4 RDBMS（SQL Server / PostgreSQL / MySQL / SQLite）へ実際に当てる結合テスト。
 #
-# **1 ジョブにまとめて直列で回す。** 3 つの DB を分けたジョブで並列に回すと、
+# **1 ジョブにまとめて直列で回す。** DB ごとに分けたジョブで並列に回すと、
 # 同じテーブルを触るテストが互いの行を消し合う（実際に踏んだ）。xUnit 側でも
 # テストクラスの並列実行を止めてある
 # （tests/.../Integration.Tests/AssemblyInfo.cs の CollectionBehavior）。
@@ -22,7 +22,7 @@
 #   - job.services.<id>.id でコンテナ ID を取れる
 #     https://docs.github.com/en/actions/reference/workflows-and-actions/contexts
 #   - イメージのタグはレジストリで実在を確認して固定した（compose.yaml と同じ版）
-name: 3 RDBMS 結合テスト
+name: 4 RDBMS 結合テスト
 
 on:
   # 根幹ブランチへの push と、根幹ブランチを対象とする PR
@@ -53,7 +53,7 @@ env:
 
 jobs:
   integration:
-    name: 3 RDBMS 結合テスト
+    name: 4 RDBMS 結合テスト
     runs-on: ubuntu-latest
 
     services:
@@ -176,6 +176,8 @@ jobs:
           QUESTIONNAIRE_MAIL_INTEGRATION: "1"
           # 実行環境の時間帯は既定 UTC。検証環境（compose.yaml）に合わせる
           TZ: Asia/Tokyo
+          # SQLite はサービスコンテナ不要。Theory の表示名へ RDBMS 名が出るため、
+          # 失敗時にどの方言かを判別できる
         # Pleasanter 本体・本アプリのコンテナが要るものは除く。
         # AdminAuthEndToEndTests も名前に EndToEndTests を含むため、この 2 条件で外れる
         run: >-

@@ -2,7 +2,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>再編集リンクのトークンを 3 RDBMS で確かめる（Issue #202）。</summary>
+/// <summary>再編集リンクのトークンを 4 RDBMS で確かめる（Issue #202）。</summary>
 /// <remarks>**環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**</remarks>
 public class ResponseEditTokenStoreTests
 {

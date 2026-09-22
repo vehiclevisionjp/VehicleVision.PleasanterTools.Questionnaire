@@ -17,8 +17,16 @@ public static partial class SqlDialect
             + "WHERE h.\"EventId\" = (SELECT c.\"EventId\" FROM \"AssetHistoryOutbox\" AS c "
             + "WHERE c.\"Status\" = @PendingStatus AND c.\"NextAttemptAt\" <= @Now "
             + "ORDER BY c.\"NextAttemptAt\" FOR UPDATE SKIP LOCKED LIMIT 1) "
-            + "RETURNING h.\"EventId\", h.\"SurveyId\", h.\"SurveyVersion\", h.\"ResponseToken\", "
-            + "h.\"EventType\", h.\"AssetId\", h.\"AssetFileName\", h.\"OccurredAt\", h.\"RetryCount\"",
+            + "RETURNING \"EventId\", \"SurveyId\", \"SurveyVersion\", \"ResponseToken\", "
+            + "\"EventType\", \"AssetId\", \"AssetFileName\", \"OccurredAt\", \"RetryCount\"",
+        DatabaseProvider.Sqlite =>
+            "UPDATE \"AssetHistoryOutbox\" AS h "
+            + "SET \"Status\" = @SendingStatus, \"LockedBy\" = @LockedBy, \"LockedUntil\" = @LockedUntil "
+            + "WHERE h.rowid = (SELECT c.rowid FROM \"AssetHistoryOutbox\" AS c "
+            + "WHERE c.\"Status\" = @PendingStatus AND c.\"NextAttemptAt\" <= @Now "
+            + "ORDER BY c.\"NextAttemptAt\" LIMIT 1) "
+            + "RETURNING \"EventId\", \"SurveyId\", \"SurveyVersion\", \"ResponseToken\", "
+            + "\"EventType\", \"AssetId\", \"AssetFileName\", \"OccurredAt\", \"RetryCount\"",
         DatabaseProvider.MySql =>
             "UPDATE `AssetHistoryOutbox` SET `Status` = @SendingStatus, `LockedBy` = @LockedBy, "
             + "`LockedUntil` = @LockedUntil WHERE `Status` = @PendingStatus "

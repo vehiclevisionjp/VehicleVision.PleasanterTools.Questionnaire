@@ -4,7 +4,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>アンケートの完全削除を 3 RDBMS で確かめる。</summary>
+/// <summary>アンケートの完全削除を 4 RDBMS で確かめる。</summary>
 public class SurveyDeletionStoreTests
 {
     private static bool Enabled =>

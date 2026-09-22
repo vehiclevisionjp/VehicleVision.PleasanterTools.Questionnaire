@@ -86,6 +86,10 @@ public static class ServerMessageKeys
 
     public const string SurveyUpdatedByOther = "surveys.updatedByOther";
 
+    public const string QuestionImportSourceInvalid = "surveys.questionImportSourceInvalid";
+
+    public const string QuestionImportSelectionRequired = "surveys.questionImportSelectionRequired";
+
     public const string PublishBlockedByMapping = "surveys.publishBlockedByMapping";
 
     public const string NoAnswerableQuestion = "surveys.noAnswerableQuestion";
@@ -110,6 +114,18 @@ public static class ServerMessageKeys
 
     /// <summary>招待メールの本文（Issue #189）。**{0} が URL、{1} が期限。**</summary>
     public const string InvitationMailBody = "invitation.mail.body";
+
+    /// <summary>回答通知メールの件名（Issue #357）。</summary>
+    public const string ResponseNotificationMailSubject = "responseNotification.mail.subject";
+
+    /// <summary>
+    /// 回答通知メールの本文（Issue #357）。
+    /// **{0} がアンケート名、{1} が件数、{2} と {3} が UTC の集計期間。**
+    /// </summary>
+    public const string ResponseNotificationMailBody = "responseNotification.mail.body";
+
+    /// <summary>削除済みで題名を取得できないアンケートの表示名。</summary>
+    public const string RemovedSurvey = "responseNotification.mail.removedSurvey";
 
     /// <summary>自動返信の設定が送れる形になっていなくて公開できない（Issue #189）。</summary>
     public const string PublishBlockedByAutoReply = "surveys.publishBlockedByAutoReply";

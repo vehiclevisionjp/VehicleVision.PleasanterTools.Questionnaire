@@ -92,6 +92,43 @@
       }
     },
     {
+      // **DB サーバを起こさずに動かす**（Issue #342）。
+      // **接続文字列を与えないので、cwd の `App_Data/questionnaire.db` が作られる。**
+      // ⚠️ **簡易セットアップとデバッグ専用。本番では使わないこと**
+      //
+      // **Pleasanter は別に要る。** 画面を触るだけなら無くても動くが、
+      // 回答の送信まで試すなら「検証環境を起動」で Pleasanter を先に起こすこと
+      "name": "アプリ（SQLite・DB サーバ不要）",
+      "type": "coreclr",
+      "request": "launch",
+      // **マイグレーションを当ててから起こす。**
+      // 起動時には当たらないので、当てずに F5 すると「足りない」と言って止まる
+      "preLaunchTask": "SQLite にマイグレーションを当てる",
+      "program": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
+      "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web",
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5067",
+        "TZ": "Asia/Tokyo",
+        "QUESTIONNAIRE_DB_PROVIDER": "Sqlite",
+        "QUESTIONNAIRE_PLEASANTER_BASEURL": "http://localhost:8080",
+        "QUESTIONNAIRE_PLEASANTER_APIKEY": "6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6",
+        "QUESTIONNAIRE_PLEASANTER_TIMEZONE": "Asia/Tokyo",
+        // 検証環境用の固定値。**本番では必ず作り直すこと**
+        "QUESTIONNAIRE_SECRET_KEY": "4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs=",
+        "QUESTIONNAIRE_REQUESTS_PER_MIN": "6000",
+        // **書体とビルド成果物で枠を使い切る。** 既定の 600 だと画面が 429 で白くなる
+        // （Issue #316 / #320 / #322）。compose.yaml の検証環境と同じ値にする
+        "QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN": "60000",
+        "QUESTIONNAIRE_FORM_REQUESTS_PER_MIN": "60000",
+        "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN": "2000"
+      }
+    },
+    {
       // **結合テストは既定で走らない。** ここから起こすときだけ環境変数を渡す
       "name": "結合テストをデバッグ",
       "type": "coreclr",

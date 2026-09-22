@@ -130,7 +130,7 @@
     max-width: 26rem;
     margin: 4rem auto;
     padding: 2rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     text-align: center;
@@ -166,7 +166,7 @@
       background: var(--bg);
       border-radius: 4px;
       letter-spacing: 0.08em;
-      color: #101828;
+      color: var(--text);
       word-break: break-all;
     }
   }

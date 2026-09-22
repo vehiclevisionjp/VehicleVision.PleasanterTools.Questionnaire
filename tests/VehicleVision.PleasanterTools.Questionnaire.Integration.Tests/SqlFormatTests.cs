@@ -8,6 +8,33 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 /// </remarks>
 public class SqlFormatTests
 {
+    [Theory]
+    [InlineData(DatabaseProvider.SqlServer, "sp_getapplock")]
+    [InlineData(DatabaseProvider.PostgreSql, "pg_try_advisory_lock")]
+    [InlineData(DatabaseProvider.MySql, "GET_LOCK")]
+    public void マイグレーションロックはRDBMS固有のセッションロックを使う(
+        DatabaseProvider provider,
+        string expected)
+    {
+        Assert.Contains(expected, SqlDialect.TryAcquireMigrationLock(provider));
+    }
+
+    [Theory]
+    [InlineData(DatabaseProvider.SqlServer, 0, true)]
+    [InlineData(DatabaseProvider.SqlServer, 1, true)]
+    [InlineData(DatabaseProvider.SqlServer, -1, false)]
+    [InlineData(DatabaseProvider.PostgreSql, true, true)]
+    [InlineData(DatabaseProvider.PostgreSql, false, false)]
+    [InlineData(DatabaseProvider.MySql, 1L, true)]
+    [InlineData(DatabaseProvider.MySql, 0L, false)]
+    public void マイグレーションロックの戻り値を方言ごとに判定する(
+        DatabaseProvider provider,
+        object result,
+        bool expected)
+    {
+        Assert.Equal(expected, SqlDialect.MigrationLockAcquired(provider, result));
+    }
+
     [Fact]
     public void SqlServerでは書き換えない()
     {
@@ -24,6 +51,16 @@ public class SqlFormatTests
             "SELECT \"PublicId\" FROM \"Surveys\" WHERE \"SurveyId\" = @SurveyId",
             SqlDialect.Format(
                 DatabaseProvider.PostgreSql,
+                "SELECT [PublicId] FROM [Surveys] WHERE [SurveyId] = @SurveyId"));
+    }
+
+    [Fact]
+    public void SQLiteでは二重引用符になる()
+    {
+        Assert.Equal(
+            "SELECT \"PublicId\" FROM \"Surveys\" WHERE \"SurveyId\" = @SurveyId",
+            SqlDialect.Format(
+                DatabaseProvider.Sqlite,
                 "SELECT [PublicId] FROM [Surveys] WHERE [SurveyId] = @SurveyId"));
     }
 

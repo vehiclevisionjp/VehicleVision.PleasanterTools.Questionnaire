@@ -107,8 +107,8 @@ public class EmbedPolicyTests
 
     [Fact]
     public void CSPのホスト源はポートを許す()
-        => Assert.Equal(["https://www.example.com:8443"],
-            ToSources(["www.example.com:8443"]));
+        => Assert.Equal(["https://localhost:9443"],
+            ToSources(["localhost:9443"]));
 
     [Fact]
     public void CSPのホスト源は重複を畳む()
@@ -142,4 +142,3 @@ public class EmbedPolicyTests
         Assert.True(question.IsDisplayOnly);
     }
 }
-

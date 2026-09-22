@@ -166,6 +166,28 @@
 
     update({ headerImageId: result.value.assetId });
   }
+
+  /**
+   * 配色見本を CSSOM で描く。
+   *
+   * 値は決め打ちの配色だけだが、CSP で拒否される `style` 属性は使わない。
+   */
+  function applySwatchColors(
+    node: HTMLElement,
+    colors: { background: string; border?: string },
+  ) {
+    function updateColors(next: { background: string; border?: string }) {
+      node.style.setProperty('background', next.background);
+      if (next.border) {
+        node.style.setProperty('border-color', next.border);
+      } else {
+        node.style.removeProperty('border-color');
+      }
+    }
+
+    updateColors(colors);
+    return { update: updateColors };
+  }
 </script>
 
 <section class="theme">
@@ -187,16 +209,20 @@
             onchange={() => update({ preset })}
           />
           <!-- **色そのものを見せる。** 名前だけでは何色か分からない。
-               style へ入るのは THEME_PRESET_COLORS の決め打ちの値だけで、
+               CSSOM へ入るのは THEME_PRESET_COLORS の決め打ちの値だけで、
                利用者が書いた文字列は 1 文字も入らない -->
           <span
             class="swatch"
-            style:background={colors.backgroundColor ?? DEFAULT_COLORS.backgroundColor}
-            style:border-color={colors.accentColor ?? DEFAULT_COLORS.accentColor}
+            use:applySwatchColors={{
+              background: colors.backgroundColor ?? DEFAULT_COLORS.backgroundColor,
+              border: colors.accentColor ?? DEFAULT_COLORS.accentColor,
+            }}
           >
             <span
               class="swatch-accent"
-              style:background={colors.accentColor ?? DEFAULT_COLORS.accentColor}
+              use:applySwatchColors={{
+                background: colors.accentColor ?? DEFAULT_COLORS.accentColor,
+              }}
             ></span>
           </span>
           {t(`themePreset.${preset}` as MessageKey)}
@@ -292,7 +318,7 @@
 <style lang="scss">
   .theme {
     padding: 1.25rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     margin-bottom: 1rem;
@@ -419,7 +445,7 @@
     padding: 0;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: #fff;
+    background: var(--surface);
     cursor: pointer;
   }
 
@@ -430,8 +456,8 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font: inherit;
-    background: #fff;
-    color: #101828;
+    background: var(--surface);
+    color: var(--text);
   }
 
   .caption {
@@ -463,7 +489,7 @@
     padding: 0.35rem 0.75rem;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: #fff;
+    background: var(--surface);
     color: var(--accent);
     cursor: pointer;
 

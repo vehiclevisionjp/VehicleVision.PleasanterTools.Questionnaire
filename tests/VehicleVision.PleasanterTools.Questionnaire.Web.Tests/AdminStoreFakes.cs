@@ -85,6 +85,22 @@ internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUser
         CancellationToken cancellationToken = default) =>
         UpdateAsync(adminUserId, user => user with { Language = language });
 
+    public Task SetResponseNotificationEnabledAsync(
+        Guid adminUserId,
+        bool enabled,
+        CancellationToken cancellationToken = default) =>
+        UpdateAsync(adminUserId, user => user with { ResponseNotificationEnabled = enabled });
+
+    public Task<IReadOnlyList<ResponseNotificationRecipient>>
+        ListResponseNotificationRecipientsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ResponseNotificationRecipient>>(
+            users.Values
+                .Where(user => user.ResponseNotificationEnabled && !user.IsDisabled)
+                .OrderBy(user => user.AdminUserId)
+                .Select(user => new ResponseNotificationRecipient(
+                    user.AdminUserId, user.LoginId, user.Language))
+                .ToList());
+
     public Task<bool> TryDisableAsync(Guid adminUserId, CancellationToken cancellationToken = default)
     {
         if (!users.TryGetValue(adminUserId, out var user))

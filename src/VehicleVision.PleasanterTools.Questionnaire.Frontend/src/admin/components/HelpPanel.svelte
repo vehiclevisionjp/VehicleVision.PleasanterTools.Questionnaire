@@ -79,7 +79,7 @@
     padding: 1.25rem;
     border: 1px solid var(--border);
     border-radius: 8px;
-    background: #fff;
+    background: var(--surface);
   }
 
   ol,

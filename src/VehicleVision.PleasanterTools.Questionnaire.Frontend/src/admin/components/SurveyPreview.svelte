@@ -1,5 +1,6 @@
 <script lang="ts">
   import QuestionField from '../../components/QuestionField.svelte';
+  import NoteContent from '../../components/NoteContent.svelte';
   import { toSteps, tracePath } from '../../lib/flow';
   import { applyShuffle, createShuffleSeed } from '../../lib/shuffle';
   import { translator } from '../../lib/i18n/messages';
@@ -12,13 +13,16 @@
   } from '../../lib/types';
   import { text } from '../../lib/types';
   import { validatePage } from '../../lib/validation';
+  import { noteBlocks } from '../../lib/note';
   import type { SurveyDefinition } from '../lib/types';
   import { language as adminLanguage, t } from '../lib/i18n/state.svelte';
   import { applyTheme } from '../../lib/theme';
   import { previewNotes } from '../lib/api';
+  import { listDesignPreviewPages } from '../lib/preview';
 
   /** 1 度に読んでもらう記法の上限。**サーバ側の上限と揃える。** */
   const MAX_NOTE_PREVIEWS = 100;
+  const CONFIRMATION_NOTE_ID = '__confirmation__';
 
   /** 打鍵が止まるのを待つ時間（ミリ秒）。 */
   const NOTE_PREVIEW_DELAY_MS = 300;
@@ -78,6 +82,14 @@
   let stepIndex = $state(0);
   let answers = $state<Record<string, AnswerState>>({});
   let errors = $state<Record<string, string>>({});
+  let previewMode = $state<'response' | 'design'>('response');
+  let designTarget = $state<number | 'completed'>(0);
+  let previewWidth = $state<'desktop' | 'tablet' | 'mobile'>('desktop');
+  let progressBar = $state<HTMLElement | null>(null);
+
+  $effect(() => {
+    progressBar?.style.setProperty('width', `${progress}%`);
+  });
 
   /**
    * 説明文ブロックの記法を読んだ結果（Issue #108）。
@@ -88,22 +100,31 @@
 
   /** 読んでもらう記法の一覧。**言語ごとに 1 件。** */
   const noteSources = $derived(
-    definition.pages.flatMap((page) =>
-      page.questions
-        .filter(
-          (question) =>
-            question.type === 'Note' || question.settings.descriptionFormat === 'Markup',
-        )
-        .flatMap((question) =>
-          Object.entries(question.description ?? {})
-            .filter(([, markup]) => markup !== '')
-            .map(([lang, markup]) => ({
-              questionId: question.questionId,
-              language: lang,
-              markup,
-            })),
-        ),
-    ),
+    [
+      ...Object.entries(definition.confirmationMessage ?? {})
+        .filter(([, markup]) => markup !== '')
+        .map(([language, markup]) => ({
+          noteId: CONFIRMATION_NOTE_ID,
+          language,
+          markup,
+        })),
+      ...definition.pages.flatMap((page) =>
+        page.questions
+          .filter(
+            (question) =>
+              question.type === 'Note' || question.settings.descriptionFormat === 'Markup',
+          )
+          .flatMap((question) =>
+            Object.entries(question.description ?? {})
+              .filter(([, markup]) => markup !== '')
+              .map(([language, markup]) => ({
+                noteId: question.questionId,
+                language,
+                markup,
+              })),
+          ),
+      ),
+    ],
   );
 
   let lastRequested = '';
@@ -138,7 +159,7 @@
           return;
         }
 
-        (next[source.questionId] ??= {})[source.language] = blocks;
+        (next[source.noteId] ??= {})[source.language] = blocks;
       });
       parsedNotes = next;
     }, NOTE_PREVIEW_DELAY_MS);
@@ -169,6 +190,20 @@
 
   const currentQuestions = $derived(
     currentStep ? applyShuffle(currentStep.page, currentStep.questions, previewSeed) : [],
+  );
+  const designPages = $derived(
+    listDesignPreviewPages(definition.pages, language, (number) =>
+      t('preview.page', { number }),
+    ),
+  );
+  const designPage = $derived(
+    typeof designTarget === 'number' ? answerDefinition.pages[designTarget] : null,
+  );
+  const designQuestions = $derived(
+    designPage ? applyShuffle(designPage, designPage.questions, previewSeed) : [],
+  );
+  const confirmation = $derived(
+    noteBlocks(parsedNotes[CONFIRMATION_NOTE_ID] ?? null, language),
   );
 
   const progress = $derived(
@@ -239,6 +274,10 @@
     answers = {};
     errors = {};
   }
+
+  function selectDesignPage(pageIndex: number): void {
+    designTarget = pageIndex;
+  }
 </script>
 
 <section class="preview">
@@ -255,23 +294,74 @@
       </select>
     </label>
 
-    <button type="button" class="secondary" onclick={restart}>{t('preview.restart')}</button>
+    {#if previewMode === 'response'}
+      <button type="button" class="secondary" onclick={restart}>{t('preview.restart')}</button>
+    {/if}
   </header>
 
   <!-- **保存されないことを画面に出す。** 本物と見分けが付かないと事故になる -->
   <p class="notice" role="status">{t('preview.notice')}</p>
 
-  <div class="paper" bind:this={paper}>
-    <!-- **飾り。** 回答画面と同じく `alt` は空にする -->
-    {#if headerImageUrl}
-      <img class="header-image" src={headerImageUrl} alt="" />
+  <div class="preview-options">
+    <fieldset>
+      <legend>{t('preview.mode')}</legend>
+      <label>
+        <input type="radio" name="preview-mode" value="response" bind:group={previewMode} />
+        {t('preview.mode.response')}
+      </label>
+      <label>
+        <input type="radio" name="preview-mode" value="design" bind:group={previewMode} />
+        {t('preview.mode.design')}
+      </label>
+    </fieldset>
+    {#if previewMode === 'design'}
+      <label>
+        {t('preview.width')}
+        <select bind:value={previewWidth}>
+          <option value="desktop">{t('preview.width.desktop')}</option>
+          <option value="tablet">{t('preview.width.tablet')}</option>
+          <option value="mobile">{t('preview.width.mobile')}</option>
+        </select>
+      </label>
     {/if}
-    <h2>{text(definition.title, language)}</h2>
-    {#if definition.description}
-      <p class="lead">{text(definition.description, language)}</p>
+  </div>
+
+  {#if previewMode === 'design'}
+    <nav class="design-pages" aria-label={t('preview.pages')}>
+      {#each designPages as page (page.pageId)}
+        <button
+          type="button"
+          class:active={designTarget === page.pageIndex}
+          aria-pressed={designTarget === page.pageIndex}
+          onclick={() => selectDesignPage(page.pageIndex)}
+        >
+          {page.title}
+        </button>
+      {/each}
+      <button
+        type="button"
+        class:active={designTarget === 'completed'}
+        aria-pressed={designTarget === 'completed'}
+        onclick={() => (designTarget = 'completed')}
+      >
+        {t('preview.completed')}
+      </button>
+    </nav>
+  {/if}
+
+  <div class="paper {previewWidth}" bind:this={paper}>
+    {#if previewMode !== 'design' || designTarget !== 'completed'}
+      <!-- **飾り。** 回答画面と同じく `alt` は空にする -->
+      {#if headerImageUrl}
+        <img class="header-image" src={headerImageUrl} alt="" />
+      {/if}
+      <h2>{text(definition.title, language)}</h2>
+      {#if definition.description}
+        <p class="lead">{text(definition.description, language)}</p>
+      {/if}
     {/if}
 
-    {#if definition.showProgress && steps.length > 1}
+    {#if previewMode === 'response' && definition.showProgress && steps.length > 1}
       <div
         class="progress"
         role="progressbar"
@@ -279,7 +369,7 @@
         aria-valuemin="0"
         aria-valuemax="100"
       >
-        <div class="bar" style={`width:${progress}%`}></div>
+        <div class="bar" bind:this={progressBar}></div>
       </div>
       <p class="progress-text">
         {t('preview.stepCount', {
@@ -289,7 +379,42 @@
       </p>
     {/if}
 
-    {#if steps.length === 0}
+    {#if previewMode === 'design' && designTarget === 'completed'}
+      <section class="completed">
+        <h3>{t('preview.completedTitle')}</h3>
+        {#if confirmation.length > 0}
+          <div class="status"><NoteContent blocks={confirmation} {assetUrl} /></div>
+        {:else}
+          <p class="status">
+            {text(definition.confirmationMessage, language) || t('preview.completedThanks')}
+          </p>
+        {/if}
+        {#if definition.allowEditingAfterSubmit}
+          <button type="button" disabled>{t('preview.edit')}</button>
+        {/if}
+        <button type="button" class="secondary" disabled>{t('preview.answerAgain')}</button>
+      </section>
+    {:else if previewMode === 'design' && designPage}
+      {#if designPage.title}
+        <h3>{text(designPage.title, language)}</h3>
+      {/if}
+      {#if designPage.description}
+        <p class="lead">{text(designPage.description, language)}</p>
+      {/if}
+
+      {#each designQuestions as question (question.questionId)}
+        <QuestionField
+          question={withNoteBlocks(question) as never}
+          {language}
+          {assetUrl}
+          bind:answer={
+            () => ensure(question.questionId), (value) => (answers[question.questionId] = value)
+          }
+        />
+      {/each}
+    {:else if previewMode === 'design'}
+      <p class="empty">{t('preview.empty')}</p>
+    {:else if steps.length === 0}
       <p class="empty">{t('preview.empty')}</p>
     {:else}
       {#if currentStep?.page.title}
@@ -348,7 +473,7 @@
     padding: 0.2rem 0.35rem;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: #fff;
+    background: var(--surface);
   }
 
   /* **本物と見分けが付くようにする** */
@@ -356,8 +481,8 @@
     margin: 0.75rem 0 1rem;
     padding: 0.5rem 0.75rem;
     border-left: 3px solid var(--accent);
-    background: #eef4ff;
-    color: #1f2a44;
+    background: var(--info-surface);
+    color: var(--info-text);
     font-size: 0.9rem;
   }
 
@@ -380,6 +505,47 @@
     font-family: var(--font);
     border: 1px solid var(--border);
     border-radius: 8px;
+  }
+
+  .paper.tablet {
+    max-width: 32rem;
+  }
+
+  .paper.mobile {
+    max-width: 22rem;
+  }
+
+  .preview-options {
+    display: flex;
+    align-items: end;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .preview-options fieldset {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .preview-options label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .design-pages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .design-pages button.active {
+    background: var(--accent);
+    color: var(--accent-text);
   }
 
   .header-image {
@@ -408,7 +574,7 @@
   .progress {
     height: 6px;
     border-radius: 3px;
-    background: #eaecf0;
+    background: var(--border);
     overflow: hidden;
   }
 

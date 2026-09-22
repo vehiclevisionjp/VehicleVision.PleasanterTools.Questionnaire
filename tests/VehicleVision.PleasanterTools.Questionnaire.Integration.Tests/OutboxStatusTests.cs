@@ -3,7 +3,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>送信状況とデッドレターの読み書きを 3 RDBMS で確かめる。</summary>
+/// <summary>送信状況とデッドレターの読み書きを 4 RDBMS で確かめる。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**

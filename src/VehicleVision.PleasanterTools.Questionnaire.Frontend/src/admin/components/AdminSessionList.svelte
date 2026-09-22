@@ -143,7 +143,7 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    background: #fff;
+    background: var(--surface);
     font-size: 0.8rem;
   }
   th,
@@ -163,7 +163,7 @@
   }
   .device strong {
     display: block;
-    color: #027a48;
+    color: var(--success);
   }
   .link {
     background: none;

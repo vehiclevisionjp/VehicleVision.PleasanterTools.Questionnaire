@@ -1,6 +1,7 @@
 <script lang="ts">
   import QuestionField from './components/QuestionField.svelte';
   import NoteContent from './components/NoteContent.svelte';
+  import ReadabilityControls from './components/ReadabilityControls.svelte';
   import {
     forgetSubmission,
     hasSubmitted,
@@ -44,6 +45,16 @@
   import { applyTheme, headerImageUrl } from './lib/theme';
   import { clearDraft, hasDraft, readDraft, saveDraft } from './lib/draft';
   import { noteBlocks } from './lib/note';
+  import { heightReportTargetOrigin, isFramed, shouldReportHeight } from './lib/framed';
+  import {
+    applyReadability,
+    readReadabilityPreferences,
+    resolveReadabilityPreferences,
+    saveReadabilityPreferences,
+    systemReadabilityPreferences,
+    type ReadabilityPreferenceName,
+    type ReadabilityPreferences,
+  } from './lib/readability';
 
   type Screen = 'loading' | 'answering' | 'answered' | 'completed' | 'rejected' | 'error';
 
@@ -103,11 +114,47 @@
     history.replaceState(null, '', url);
   }
 
+  let readability = $state<ReadabilityPreferences>(
+    resolveReadabilityPreferences(readReadabilityPreferences(), systemReadabilityPreferences()),
+  );
+
+  function changeReadability(
+    next: ReadabilityPreferences,
+    changed: ReadabilityPreferenceName,
+  ) {
+    readability = next;
+    saveReadabilityPreferences(next, changed);
+  }
+
   let screen = $state<Screen>('loading');
   let rejection = $state<RejectionReason>();
   let definition = $state<SurveyDefinition>();
   let publicId = $state('');
   let responseToken = $state('');
+
+  $effect(() => {
+    const targetOrigin = heightReportTargetOrigin(isFramed(), document.referrer);
+    if (publicId === '' || targetOrigin === null) {
+      return;
+    }
+
+    let previousHeight: number | null = null;
+    const reportHeight = () => {
+      const height = Math.ceil(document.body.getBoundingClientRect().height);
+      if (!shouldReportHeight(previousHeight, height)) {
+        return;
+      }
+
+      window.parent.postMessage({ type: 'questionnaire:height', publicId, height }, targetOrigin);
+      previousHeight = height;
+    };
+
+    const observer = new ResizeObserver(reportHeight);
+    observer.observe(document.body);
+    reportHeight();
+
+    return () => observer.disconnect();
+  });
   /** 送信チケット。**画面を開いたときにサーバから受け取る。** */
   let ticket = $state('');
   /** ハニーポット項目。**人が触らない場所に置いてあるので、空のままのはず。** */
@@ -192,10 +239,17 @@
   const path = $derived(tracePath(definition, answers));
 
   $effect(() => {
-    // **管理者が決めた見た目を反映する**（Issue #56）。
-    // **CSS のカスタムプロパティへ入れるだけ**で、スタイル表は組み立てない
-    // （`lib/theme.ts`）。設定が無ければ何も入らず、今までの見た目のまま
-    applyTheme(document.documentElement, definition?.theme);
+    const target = document.documentElement;
+
+    if (readability.colorMode === 'default') {
+      // **先に前回の上書きを消し、その後で作成者のテーマを戻す。**
+      applyReadability(target, readability);
+      applyTheme(target, definition?.theme);
+    } else {
+      // **見る人の選択を最後に当てる。** 作成者のテーマより必ず優先する。
+      applyTheme(target, definition?.theme);
+      applyReadability(target, readability);
+    }
   });
 
   /** ヘッダ画像の URL。**本アプリの口だけを指す**（外部へ取りに行かない）。 */
@@ -244,6 +298,11 @@
   const progress = $derived(
     steps.length === 0 ? 0 : Math.round(((Math.min(stepIndex, steps.length - 1) + 1) / steps.length) * 100),
   );
+  let progressBar = $state<HTMLElement | null>(null);
+
+  $effect(() => {
+    progressBar?.style.setProperty('width', `${progress}%`);
+  });
 
   /** URL の `/f/{publicId}` から公開 ID を取る。 */
   function readPublicId(): string {
@@ -616,6 +675,7 @@
     notStarted: 'rejected.notStarted',
     closed: 'rejected.closed',
     suspended: 'rejected.suspended',
+    embeddingNotAllowed: 'rejected.embeddingNotAllowed',
     notFound: 'rejected.notFound',
     rejected: 'rejected.rejected',
     tooManyRequests: 'rejected.tooManyRequests',
@@ -626,17 +686,39 @@
   <!-- **言語の切り替えは URL を書き換えるだけ。**
        どこにも保存しないので、回答者を追う材料にならない
        （`_documents/多言語対応方針.md` 3 章） -->
-  <div class="language">
-    <label for="language">{t('form.languageLabel')}</label>
-    <select
-      id="language"
-      value={language}
-      onchange={(event) => changeLanguage(event.currentTarget.value as Language)}
-    >
-      {#each SUPPORTED_LANGUAGES as option (option)}
-        <option value={option}>{LANGUAGE_NAMES[option]}</option>
-      {/each}
-    </select>
+  <div class="display-settings">
+    <div class="language">
+      <label for="language">{t('form.languageLabel')}</label>
+      <select
+        id="language"
+        value={language}
+        onchange={(event) => changeLanguage(event.currentTarget.value as Language)}
+      >
+        {#each SUPPORTED_LANGUAGES as option (option)}
+          <option value={option}>{LANGUAGE_NAMES[option]}</option>
+        {/each}
+      </select>
+    </div>
+    <ReadabilityControls
+      id="answer-readability"
+      preferences={readability}
+      onchange={changeReadability}
+      labels={{
+        group: t('readability.group'),
+        fontSize: t('readability.fontSize'),
+        fontSizes: {
+          standard: t('readability.fontSize.standard'),
+          large: t('readability.fontSize.large'),
+          extraLarge: t('readability.fontSize.extraLarge'),
+        },
+        colorMode: t('readability.colorMode'),
+        colorModes: {
+          default: t('readability.colorMode.creator'),
+          highContrast: t('readability.colorMode.highContrast'),
+          dark: t('readability.colorMode.dark'),
+        },
+      }}
+    />
   </div>
 
   {#if isTest}
@@ -647,8 +729,19 @@
     <p class="status">{t('status.loading')}</p>
   {:else if screen === 'rejected'}
     <!-- **理由を明示する。「エラー」で済ませない** -->
-    <h1>{rejection === 'notFound' ? t('rejected.notFound.title') : t('rejected.closed.title')}</h1>
+    <h1>
+      {rejection === 'notFound'
+        ? t('rejected.notFound.title')
+        : rejection === 'embeddingNotAllowed'
+          ? t('rejected.embeddingNotAllowed.title')
+          : t('rejected.closed.title')}
+    </h1>
     <p class="status">{t(REJECTION_MESSAGES[rejection ?? 'notFound'])}</p>
+    {#if rejection === 'embeddingNotAllowed'}
+      <a href={location.href} target="_blank" rel="noreferrer">
+        {t('rejected.embeddingNotAllowed.open')}
+      </a>
+    {/if}
   {:else if screen === 'error'}
     <h1>{t('error.badUrl.title')}</h1>
     <p class="status">{t('error.badUrl')}</p>
@@ -712,7 +805,7 @@
           aria-valuemax="100"
           aria-label={t('form.progressLabel')}
         >
-          <div class="bar" style={`width:${progress}%`}></div>
+          <div class="bar" bind:this={progressBar}></div>
         </div>
         <p class="progress-text">
           {t('form.pageCount', { current: Math.min(stepIndex, steps.length - 1) + 1, total: steps.length })}
@@ -839,6 +932,7 @@
        今までは #fff を直に書いていた。既定値は変えていないので見た目は同じ */
     --accent-text: #fff;
     --surface: #fff;
+    --motion-duration: 0.2s;
     /* **同梱した書体を既定にする**（Issue #152）。テーマで変えられる */
     --font: 'Noto Sans JP Variable', system-ui, sans-serif;
     --font-mono: 'M PLUS 1 Code Variable', ui-monospace, Consolas, monospace;
@@ -931,7 +1025,7 @@
   .bar {
     height: 100%;
     background: var(--accent);
-    transition: width 0.2s ease;
+    transition: width var(--motion-duration) ease;
   }
 
   .progress-text {
@@ -957,14 +1051,21 @@
     margin-bottom: 1rem;
   }
 
-  .language {
+  .display-settings {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: 0.75rem 1rem;
     margin-bottom: 1rem;
     font-size: 0.85rem;
     color: var(--muted);
+  }
+
+  .language {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 
     select {
       font: inherit;

@@ -28,6 +28,12 @@ public enum IntakeRejection
     /// <summary>停止中。</summary>
     Suspended,
 
+    /// <summary>システム全体がメンテナンス中。</summary>
+    Maintenance,
+
+    /// <summary>このアンケートは枠内での回答を許していない。</summary>
+    EmbeddingNotAllowed,
+
     /// <summary>回答の中身が定義に合わない。</summary>
     Invalid,
 
@@ -47,7 +53,8 @@ public sealed record IntakeResult(
     ImmutableArray<ValidationError> Errors = default,
     ImmutableArray<AttachmentRejection> Attachments = default,
     string? AssetTicket = null,
-    bool GrantsInstantAssetAccess = false)
+    bool GrantsInstantAssetAccess = false,
+    bool AllowEmbedding = false)
 {
     public bool Accepted => Rejection is null;
 
@@ -89,7 +96,8 @@ public sealed record PublishedForm(
     bool RequiresProofOfWork,
     bool AllowsDraft = false,
     bool IsTest = false,
-    bool RecordsAssetHistory = false);
+    bool RecordsAssetHistory = false,
+    bool AllowEmbedding = false);
 
 /// <summary>公開版から配る資産と、引換券が必要か。</summary>
 public sealed record PublishedAsset(
@@ -104,7 +112,8 @@ public sealed record AssetTicketForm(
     Guid SurveyId,
     int SurveyVersion,
     SurveyDefinition Definition,
-    bool RecordsAssetHistory);
+    bool RecordsAssetHistory,
+    bool AllowEmbedding);
 
 /// <summary>回答を受け付けて送信待ちへ入れる。</summary>
 /// <remarks>
@@ -130,7 +139,8 @@ public sealed class ResponseIntake(
     ILogger<ResponseIntake>? logger = null,
     IAdminNotificationStore? notifications = null,
     AutoReplyDispatcher? autoReply = null,
-    IAssetTicketStore? assetTickets = null)
+    IAssetTicketStore? assetTickets = null,
+    MaintenanceMode? maintenance = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -138,8 +148,15 @@ public sealed class ResponseIntake(
     /// <remarks>**下書きは絶対に返さない。** 公開済みの版だけを返す。</remarks>
     public async Task<(PublishedForm? Form, IntakeRejection? Rejection)> GetPublishedAsync(
         string publicId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isFramed = false)
     {
+        if (maintenance is not null
+            && await maintenance.IsActiveAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return (null, IntakeRejection.Maintenance);
+        }
+
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -147,6 +164,11 @@ public sealed class ResponseIntake(
         if (rejection is not null || survey?.PublishedVersion is null)
         {
             return (null, rejection ?? IntakeRejection.NotFound);
+        }
+
+        if (isFramed && !survey.AllowEmbedding)
+        {
+            return (null, IntakeRejection.EmbeddingNotAllowed);
         }
 
         // **溜まりすぎているなら、そもそも画面を出さない**（Issue #72）。
@@ -179,7 +201,8 @@ public sealed class ResponseIntake(
                     survey.RequireProofOfWork,
                     survey.AllowDraft,
                     survey.Status == (int)SurveyStatus.TestPublished,
-                    snapshot.IsAssetHistoryEnabled),
+                    snapshot.IsAssetHistoryEnabled,
+                    survey.AllowEmbedding),
                 null);
     }
 
@@ -308,7 +331,8 @@ public sealed class ResponseIntake(
                 survey.SurveyId,
                 survey.PublishedVersion.Value,
                 snapshot.Definition,
-                snapshot.IsAssetHistoryEnabled);
+                snapshot.IsAssetHistoryEnabled,
+                survey.AllowEmbedding);
     }
 
     /// <summary>回答を受け付ける。</summary>
@@ -331,8 +355,15 @@ public sealed class ResponseIntake(
         IReadOnlyCollection<Answer> answers,
         IReadOnlyList<AnsweredAttachment>? attachments = null,
         string? language = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isFramed = false)
     {
+        if (maintenance is not null
+            && await maintenance.IsActiveAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return IntakeResult.Reject(IntakeRejection.Maintenance);
+        }
+
         var survey = await surveys.FindByPublicIdAsync(publicId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -340,6 +371,11 @@ public sealed class ResponseIntake(
         if (rejection is not null || survey?.PublishedVersion is null)
         {
             return IntakeResult.Reject(rejection ?? IntakeRejection.NotFound);
+        }
+
+        if (isFramed && !survey.AllowEmbedding)
+        {
+            return IntakeResult.Reject(IntakeRejection.EmbeddingNotAllowed);
         }
 
         // **溜まりすぎているなら、ここで断る**（Issue #72）。
@@ -499,6 +535,14 @@ public sealed class ResponseIntake(
                 .ConfigureAwait(false);
         }
 
+        // **新しい本番回答だけを知らせる。** 編集やテスト回答では件数を増やさない。
+        // ⚠️ **回答本文は渡さない。** アンケートと受付時刻だけを通知へ渡す。
+        if (isNewResponse && !responseIsTest)
+        {
+            await NotifyResponseReceivedAsync(survey.SurveyId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         // **書けた後で数える。** 断られた回答を滞留に数えない。
         // **同じトークンの上書きも 1 件として数えてしまう**が、
         // 数え直しのたびに実際の件数へ戻るので、多く見えるのは次の計測までに限られる
@@ -528,7 +572,35 @@ public sealed class ResponseIntake(
 
         return new IntakeResult(
             AssetTicket: assetTicket,
-            GrantsInstantAssetAccess: grantsInstantAssetAccess);
+            GrantsInstantAssetAccess: grantsInstantAssetAccess,
+            AllowEmbedding: survey.AllowEmbedding);
+    }
+
+    /// <summary>新しい回答を受け付けたことだけを管理者へ知らせる（Issue #357）。</summary>
+    /// <remarks>⚠️ **知らせを書けなくても、確定済みの回答受付を失敗にしない。**</remarks>
+    private async Task NotifyResponseReceivedAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken)
+    {
+        if (notifications is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await notifications
+                .RaiseAsync(
+                    (int)AdminNotificationKind.ResponseReceived,
+                    surveyId,
+                    _time.GetUtcNow().UtcDateTime,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger?.LogError(exception, "管理者への知らせを書けなかった: 新しい回答");
+        }
     }
 
     /// <summary>回答数の上限に届いたことを管理者へ知らせる（Issue #80）。</summary>

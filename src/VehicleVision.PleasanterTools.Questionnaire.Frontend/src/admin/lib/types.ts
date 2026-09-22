@@ -485,6 +485,11 @@ export interface SurveySummary {
    */
   allowDraft?: boolean;
   /**
+   * 回答画面を運用側が許可した親サイトへ埋め込んでよいか（Issue #334）。
+   * **既定は無効。**
+   */
+  allowEmbedding?: boolean;
+  /**
    * 受け付けた回答の件数。
    *
    * **まだ Pleasanter へ届いていない分も含む。**
@@ -529,6 +534,26 @@ export interface SurveyTemplateSummary {
   templateId: string;
   title: string;
   updatedAt: string;
+}
+
+/** 設問の取り込み元にあるページ。**ページ自体は取り込まない。** */
+export interface QuestionImportPage {
+  pageId: string;
+  title?: LocalizedText | null;
+  questions: Pick<Question, 'questionId' | 'type' | 'title'>[];
+}
+
+/** 取り込み元から選べる設問。 */
+export interface QuestionImportSource {
+  pages: QuestionImportPage[];
+}
+
+/** 設問を取り込み用に写した結果。 */
+export interface QuestionImportResult {
+  questions: Question[];
+  removedChoiceTransitions: number;
+  removedVisibilityConditions: number;
+  removedAssetReferences: number;
 }
 
 /** アンケートの状態の文言の鍵。 */
@@ -606,7 +631,8 @@ export type AdminPermission =
   | 'users.read'
   | 'users.write'
   | 'users.resetTwoFactor'
-  | 'settings.saml';
+  | 'settings.saml'
+  | 'maintenance.manage';
 
 export interface SamlSettings {
   enabled: boolean;
@@ -725,6 +751,8 @@ export interface AdminSession {
    * 接続先も資格情報も返らない。**認証済みのときだけ載る。**
    */
   mailEnabled?: boolean;
+  /** 新しい回答の 24 時間ごとのまとめ通知をメールで受け取るか。**既定は無効。** */
+  responseNotificationEnabled?: boolean;
   /** ログイン ID を、本人宛て試し送信のメールアドレスとして使えるか。 */
   autoReplyTestRecipientAvailable?: boolean;
 

@@ -408,7 +408,9 @@ public class AdminSurveyEndToEndTests
 
         Assert.Contains("frame-src https://www.example.com https://*.example.net", csp);
         Assert.Contains("img-src 'self' data: https://www.example.com https://*.example.net", csp);
-        Assert.Contains("frame-ancestors 'none'", csp);
+        Assert.Contains(
+            "frame-ancestors https://localhost:9443 https://www.parent.example.com https://*.parent.example.net",
+            csp);
     }
 
     [Fact]
@@ -657,6 +659,49 @@ public class AdminSurveyEndToEndTests
 
         // **列挙も文字列で届くこと。** 数値だと画面側の分岐が全部外れる
         Assert.Equal("Radio", definition["pages"]![0]!["questions"]![0]!["type"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task 埋め込みを許可していないアンケートは枠内申告付きで読めない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+        var publicId = (await SummaryAsync(http, surveyId))["publicId"]!.GetValue<string>();
+
+        using var anonymous = CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/forms/{publicId}");
+        request.Headers.Add("X-Questionnaire-Framed", "1");
+        using var response = await anonymous.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            "embeddingNotAllowed",
+            (await ReadAsync(response))!["reason"]!.GetValue<string>());
+
+        using (var settings = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings",
+            new { responseLimit = (int?)null, allowEmbedding = true }))
+        {
+            settings.EnsureSuccessStatusCode();
+        }
+
+        using (var unchanged = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings",
+            new { responseLimit = 10 }))
+        {
+            unchanged.EnsureSuccessStatusCode();
+        }
+        Assert.True((await SummaryAsync(http, surveyId))["allowEmbedding"]!.GetValue<bool>());
+
+        using var allowedRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/forms/{publicId}");
+        allowedRequest.Headers.Add("X-Questionnaire-Framed", "1");
+        using var allowed = await anonymous.SendAsync(allowedRequest);
+        allowed.EnsureSuccessStatusCode();
     }
 
     /// <summary>公開済みのアンケートを 1 つ用意する。</summary>
@@ -1032,6 +1077,133 @@ public class AdminSurveyEndToEndTests
         // **知らない状態は断る。** 黙って 0 件にすると「消えた」と見える
         using var unknown = await http.GetAsync("/api/admin/surveys?status=99");
         Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
+    }
+
+    [Fact]
+    public async Task 選んだ設問を安全な写しとして取り込める()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var sourceId = await CreateSurveyAsync(http);
+        var targetId = await CreateSurveyAsync(http);
+        var sourceDraft = new
+        {
+            revision = 0,
+            definition = new
+            {
+                surveyId = sourceId,
+                version = 1,
+                title = new { ja = "取り込み元" },
+                pages = new[]
+                {
+                    new
+                    {
+                        pageId = "page-source",
+                        questions = new object[]
+                        {
+                            new
+                            {
+                                questionId = "q-branch",
+                                type = "Radio",
+                                title = new { ja = "分岐する設問" },
+                                description = new
+                                {
+                                    ja = "[資料](asset:11111111-1111-4111-8111-111111111111)",
+                                },
+                                isRequired = false,
+                                choices = new[]
+                                {
+                                    new
+                                    {
+                                        value = "yes",
+                                        label = new { ja = "はい" },
+                                        next = new { kind = "Submit" },
+                                    },
+                                },
+                                settings = new { descriptionFormat = "Markup" },
+                            },
+                            new
+                            {
+                                questionId = "q-condition",
+                                type = "Text",
+                                title = new { ja = "条件付き設問" },
+                                isRequired = false,
+                                choices = Array.Empty<object>(),
+                                visibleWhen = new
+                                {
+                                    match = "All",
+                                    rules = new[]
+                                    {
+                                        new
+                                        {
+                                            questionId = "q-branch",
+                                            @operator = "Equals",
+                                            value = "yes",
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            mapping = new
+            {
+                assignments = new[]
+                {
+                    new
+                    {
+                        targetColumn = "ClassA",
+                        sources = new[] { new { questionId = "q-branch", port = "Value" } },
+                    },
+                },
+            },
+        };
+
+        using (var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{sourceId}", sourceDraft))
+        {
+            save.EnsureSuccessStatusCode();
+        }
+
+        using (var candidates = await http.GetAsync(
+            $"/api/admin/surveys/{targetId}/question-import/{sourceId}"))
+        {
+            candidates.EnsureSuccessStatusCode();
+            Assert.Equal(
+                2,
+                (await ReadAsync(candidates))!["pages"]![0]!["questions"]!.AsArray().Count);
+        }
+
+        using var importedResponse = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{targetId}/question-import/{sourceId}",
+            new
+            {
+                questionIds = new[] { "q-branch", "q-condition" },
+                existingQuestionIds = new[] { "q-existing" },
+            });
+        importedResponse.EnsureSuccessStatusCode();
+        var imported = (await ReadAsync(importedResponse))!;
+        var questions = imported["questions"]!.AsArray();
+
+        Assert.Equal(2, questions.Count);
+        Assert.All(questions, question =>
+        {
+            Assert.NotEqual("q-branch", question!["questionId"]!.GetValue<string>());
+            Assert.NotEqual("q-condition", question["questionId"]!.GetValue<string>());
+            Assert.NotEqual("q-existing", question["questionId"]!.GetValue<string>());
+            Assert.Null(question["visibleWhen"]);
+        });
+        Assert.Null(questions[0]!["choices"]![0]!["next"]);
+        Assert.Equal("資料", questions[0]!["description"]!["ja"]!.GetValue<string>());
+        Assert.Equal(1, imported["removedChoiceTransitions"]!.GetValue<int>());
+        Assert.Equal(1, imported["removedVisibilityConditions"]!.GetValue<int>());
+        Assert.Equal(1, imported["removedAssetReferences"]!.GetValue<int>());
+        Assert.Null(imported["mapping"]);
     }
 
     /// <summary>

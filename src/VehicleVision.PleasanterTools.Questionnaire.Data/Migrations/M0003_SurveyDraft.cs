@@ -36,13 +36,11 @@ public sealed class M0003_SurveyDraft : Migration
         // **識別子はアンケートの中でだけ一意。** 全体で一意にすると、
         // アンケートを複製したときに必ず衝突する
         Create.Table("Pages")
-            .WithColumn("SurveyId").AsGuid().NotNullable()
-            .WithColumn("PageId").AsString(64).NotNullable()
+            .WithColumn("SurveyId").AsGuid().NotNullable().PrimaryKey("PK_Pages")
+            .WithColumn("PageId").AsString(64).NotNullable().PrimaryKey("PK_Pages")
             .WithColumn("SortOrder").AsInt32().NotNullable()
             .WithColumn("TitleJson").AsString(int.MaxValue).Nullable()
             .WithColumn("DescriptionJson").AsString(int.MaxValue).Nullable();
-
-        Create.PrimaryKey("PK_Pages").OnTable("Pages").Columns("SurveyId", "PageId");
 
         Create.Index("IX_Pages_SurveyId_SortOrder")
             .OnTable("Pages")
@@ -50,8 +48,8 @@ public sealed class M0003_SurveyDraft : Migration
             .OnColumn("SortOrder").Ascending();
 
         Create.Table("Questions")
-            .WithColumn("SurveyId").AsGuid().NotNullable()
-            .WithColumn("QuestionId").AsString(64).NotNullable()
+            .WithColumn("SurveyId").AsGuid().NotNullable().PrimaryKey("PK_Questions")
+            .WithColumn("QuestionId").AsString(64).NotNullable().PrimaryKey("PK_Questions")
             .WithColumn("PageId").AsString(64).NotNullable()
             .WithColumn("SortOrder").AsInt32().NotNullable()
             .WithColumn("QuestionType").AsInt32().NotNullable()
@@ -60,8 +58,6 @@ public sealed class M0003_SurveyDraft : Migration
             .WithColumn("IsRequired").AsBoolean().NotNullable().WithDefaultValue(false)
             // 形式ごとの固有設定（尺度の上下限・検証規則・添付の上限など）
             .WithColumn("SettingsJson").AsString(int.MaxValue).Nullable();
-
-        Create.PrimaryKey("PK_Questions").OnTable("Questions").Columns("SurveyId", "QuestionId");
 
         Create.Index("IX_Questions_SurveyId_PageId_SortOrder")
             .OnTable("Questions")

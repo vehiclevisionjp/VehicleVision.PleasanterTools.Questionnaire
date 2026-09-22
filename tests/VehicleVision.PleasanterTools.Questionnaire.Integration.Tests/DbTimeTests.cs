@@ -3,7 +3,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>時刻が入れたとおりに戻ることを 3 RDBMS で確かめる。</summary>
+/// <summary>時刻が入れたとおりに戻ることを 4 RDBMS で確かめる。</summary>
 /// <remarks>
 /// <para>
 /// **PostgreSQL で 9 時間ずれる事故を踏んでいる。**

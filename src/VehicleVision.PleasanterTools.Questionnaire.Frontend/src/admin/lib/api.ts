@@ -16,6 +16,8 @@ import type {
   MappingProblem,
   SurveyDefinition,
   SurveyDraft,
+  QuestionImportResult,
+  QuestionImportSource,
   SurveyPage,
   SurveyTemplateSummary,
   SamlSettings,
@@ -92,11 +94,44 @@ export interface ApplicationVersion {
   version: string;
   commit?: string | null;
   allowInsecure: boolean;
+  usesSqlite: boolean;
+  databaseMigration?: {
+    appliedVersion?: number | null;
+    latestVersion: number;
+    pendingCount: number;
+    lastAppliedAt?: string | null;
+    lastResult: 'none' | 'succeeded';
+  } | null;
 }
 
 /** 動作中の版を読む。**認証済みの管理者にだけサーバが返す。** */
 export const getApplicationVersion = () =>
   call<ApplicationVersion>('/api/admin/application/version');
+
+export interface MaintenanceModeStatus {
+  isActive: boolean;
+  environmentEnabled: boolean;
+  databaseEnabled: boolean;
+  messageJa: string;
+  messageEn: string;
+  enabledAt?: string | null;
+  enabledByAdminUserId?: string | null;
+}
+
+/** 環境変数と DB の両方を含むメンテナンス状態を読む。 */
+export const getMaintenanceMode = () =>
+  call<MaintenanceModeStatus>('/api/admin/maintenance/');
+
+/** DB 側のメンテナンス状態だけを変更する。環境変数側は変更できない。 */
+export const setMaintenanceMode = (
+  enabled: boolean,
+  messageJa: string,
+  messageEn: string,
+) =>
+  call<MaintenanceModeStatus>('/api/admin/maintenance/', {
+    method: 'PUT',
+    json: { enabled, messageJa, messageEn },
+  });
 
 export const setupFirstAdministrator = (loginId: string, password: string) =>
   call<{ next: string }>('/api/admin/setup', { method: 'POST', json: { loginId, password } });
@@ -251,6 +286,13 @@ export const saveLanguage = (language: string | null) =>
     json: { language },
   });
 
+/** 新しい回答のまとめ通知をメールで受け取るかを保存する。 */
+export const saveResponseNotification = (enabled: boolean) =>
+  call<{ enabled: boolean }>('/api/admin/me/response-notification', {
+    method: 'PUT',
+    json: { enabled },
+  });
+
 // ---- SAML 設定（Issue #254）-------------------------------------------------
 
 export const getSamlSettings = () =>
@@ -375,6 +417,31 @@ export const deleteTemplate = (templateId: string) =>
 
 export const loadDraft = (surveyId: string) => call<SurveyDraft>(`/api/admin/surveys/${surveyId}`);
 
+/** 取り込み元のページと設問を読む。**マッピングは返さない。** */
+export const loadQuestionImportSource = (surveyId: string, sourceSurveyId: string) =>
+  call<QuestionImportSource>(
+    `/api/admin/surveys/${surveyId}/question-import/${sourceSurveyId}`,
+  );
+
+/**
+ * 選んだ設問を取り込み先用に写す。
+ *
+ * **ID の再採番と、分岐・表示条件・資産参照の除去はサーバが行う。**
+ */
+export const importQuestions = (
+  surveyId: string,
+  sourceSurveyId: string,
+  questionIds: string[],
+  existingQuestionIds: string[],
+) =>
+  call<QuestionImportResult>(
+    `/api/admin/surveys/${surveyId}/question-import/${sourceSurveyId}`,
+    {
+      method: 'POST',
+      json: { questionIds, existingQuestionIds },
+    },
+  );
+
 /** マッピング先サイトの列数。取得できないときは標準の本数を使う。 */
 export interface ColumnAvailabilityResponse {
   source: 'site' | 'standard';
@@ -393,6 +460,16 @@ export interface EmbedOptions {
 
 export const loadEmbedOptions = () =>
   call<EmbedOptions>('/api/admin/surveys/embed-options');
+
+/** 回答画面を埋め込める親サイト（Issue #334）。**運用側の設定なので変わらない。** */
+export interface EmbedParentOptions {
+  enabled: boolean;
+  /** `www.example.com` か `*.example.net` の形。 */
+  allowedParents: string[];
+}
+
+export const loadEmbedParentOptions = () =>
+  call<EmbedParentOptions>('/api/admin/surveys/embed-parent-options');
 
 export const saveDraft = (
   surveyId: string,
@@ -518,10 +595,19 @@ export const saveSurveySettings = (
   responseLimit: number | null,
   requireProofOfWork: boolean,
   allowDraft: boolean,
+  allowEmbedding: boolean,
 ) =>
-  call<{ responseLimit: number | null; requireProofOfWork: boolean; allowDraft: boolean }>(
+  call<{
+    responseLimit: number | null;
+    requireProofOfWork: boolean;
+    allowDraft: boolean;
+    allowEmbedding: boolean;
+  }>(
     `/api/admin/surveys/${surveyId}/settings`,
-    { method: 'PUT', json: { responseLimit, requireProofOfWork, allowDraft } },
+    {
+      method: 'PUT',
+      json: { responseLimit, requireProofOfWork, allowDraft, allowEmbedding },
+    },
   );
 
 export const suspend = (surveyId: string) =>

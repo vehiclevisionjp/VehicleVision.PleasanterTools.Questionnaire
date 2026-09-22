@@ -6,7 +6,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
-/// <summary>管理者の認証を 3 RDBMS で確かめる。</summary>
+/// <summary>管理者の認証を 4 RDBMS で確かめる。</summary>
 /// <remarks>
 /// <para>
 /// **環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する。**
@@ -80,6 +80,33 @@ public class AdminAuthenticationTests
     /// </remarks>
     private static async Task EnrollDirectlyAsync(Harness harness, Guid adminUserId, string secret) =>
         await harness.Store.EnableTotpAsync(adminUserId, harness.Protector.Protect(secret));
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 回答通知メールは本人が有効にするまで送らない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var harness = Create(provider, connectionString);
+        var user = await harness.Authenticator
+            .TryCreateFirstAdministratorAsync("admin@example.test", "long-enough-password");
+
+        Assert.NotNull(user);
+        Assert.False(user.ResponseNotificationEnabled);
+        Assert.Empty(await harness.Store.ListResponseNotificationRecipientsAsync());
+
+        await harness.Store.SetResponseNotificationEnabledAsync(user.AdminUserId, true);
+
+        var recipient = Assert.Single(
+            await harness.Store.ListResponseNotificationRecipientsAsync());
+        Assert.Equal(user.AdminUserId, recipient.AdminUserId);
+        Assert.Equal("admin@example.test", recipient.LoginId);
+    }
 
     [Theory]
     [MemberData(nameof(Providers))]

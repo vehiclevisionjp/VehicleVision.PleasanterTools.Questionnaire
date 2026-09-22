@@ -6,7 +6,8 @@ import type { APIRequestContext } from '@playwright/test';
  * **形はこう。**
  *
  * ```text
- * ページ1  q-name「お名前」（必須）
+ * ページ1  q-channel「希望する連絡方法」（任意・単一選択）
+ *          q-name「お名前」（必須）
  *          q-memo「ひとこと」（任意）
  * ページ2  q-mail「連絡先」（必須・メール）
  * ```
@@ -45,6 +46,17 @@ export async function prepareRequiredSurvey(
         pageId: 'page-1',
         title: { ja: 'お客様について' },
         questions: [
+          {
+            questionId: 'q-channel',
+            type: 'Radio',
+            title: { ja: '希望する連絡方法' },
+            isRequired: false,
+            choices: [
+              { value: 'email', label: { ja: 'メール' } },
+              { value: 'phone', label: { ja: '電話' } },
+            ],
+            settings: {},
+          },
           {
             questionId: 'q-name',
             type: 'Text',

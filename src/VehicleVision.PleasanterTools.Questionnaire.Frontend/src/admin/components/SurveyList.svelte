@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     archiveSurvey,
     createSurvey,
     deleteSurvey,
     duplicateSurvey,
     listSurveys,
+    loadEmbedParentOptions,
     publish,
     revertToDraft,
     resume,
@@ -24,6 +26,7 @@
   } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
   import { canConfirmSurveyDeletion, deletionResponseCount } from '../lib/surveyDeletion';
+  import { iframeTag } from '../lib/iframeTag';
   import SurveyQrCode from './SurveyQrCode.svelte';
   import TemplatePanel from './TemplatePanel.svelte';
 
@@ -125,6 +128,10 @@
    * 端末は共有され得るため、こちらは「分からないなら残さない」が安全側。
    */
   let settingsAllowDraft = $state(false);
+  /** 回答画面を許可済みの親サイトへ埋め込んでよいか。 */
+  let settingsAllowEmbedding = $state(false);
+  /** 運用側が親サイトを 1 つ以上許可しているか。 */
+  let embedParentsEnabled = $state(false);
   let settingsBusy = $state(false);
   let siteFor = $state<SurveySummary | null>(null);
   let siteId = $state('');
@@ -139,6 +146,13 @@
   // **絞り込みとページを変えたら読み直す。** $effect が依存を拾う
   $effect(() => {
     void reload(offset, titleFilter, statusFilter, includeArchived);
+  });
+
+  onMount(async () => {
+    const result = await loadEmbedParentOptions();
+    if (result.ok) {
+      embedParentsEnabled = result.value.enabled;
+    }
   });
 
   async function reload(
@@ -370,6 +384,7 @@
     settingsLimit = survey.responseLimit == null ? '' : String(survey.responseLimit);
     settingsProofOfWork = survey.requireProofOfWork ?? true;
     settingsAllowDraft = survey.allowDraft ?? false;
+    settingsAllowEmbedding = survey.allowEmbedding ?? false;
   }
 
   async function saveSettings(event: SubmitEvent) {
@@ -394,7 +409,12 @@
 
     settingsBusy = true;
     const result = await saveSurveySettings(
-      target.surveyId, limit, settingsProofOfWork, settingsAllowDraft);
+      target.surveyId,
+      limit,
+      settingsProofOfWork,
+      settingsAllowDraft,
+      settingsAllowEmbedding,
+    );
     settingsBusy = false;
 
     if (!result.ok) {
@@ -457,6 +477,26 @@
           count: survey.responseCount,
           limit: survey.responseLimit,
         });
+  }
+
+  /** 状態を色なしでも一覧で見分けられるようにする。 */
+  function statusMarker(survey: SurveySummary): string {
+    if (survey.archivedAt != null) {
+      return '□';
+    }
+
+    switch (survey.status) {
+      case 0:
+        return '○';
+      case 1:
+        return '◆';
+      case 2:
+        return '■';
+      case 3:
+        return '△';
+      default:
+        return '?';
+    }
   }
 
   /** 回答用 URL。**公開用 ID しか出さない。** */
@@ -684,6 +724,24 @@
     {#if settingsAllowDraft}
       <p class="warn">{t('settings.allowDraftWarning')}</p>
     {/if}
+    <label class="check">
+      <input type="checkbox" bind:checked={settingsAllowEmbedding} />
+      {t('settings.allowEmbedding')}
+    </label>
+    <p class="hint">{t('settings.allowEmbeddingHint')}</p>
+    {#if !embedParentsEnabled}
+      <p class="warn">{t('settings.allowEmbeddingUnavailable')}</p>
+    {:else if settingsAllowEmbedding}
+      <label>
+        {t('settings.iframeTag')}
+        <textarea
+          readonly
+          rows="3"
+          value={iframeTag(formUrl(settingsFor.publicId), settingsFor.title, settingsFor.publicId)}
+        ></textarea>
+      </label>
+      <p class="hint">{t('settings.iframeTagHint')}</p>
+    {/if}
     <p class="hint">{t('settings.proofOfWorkKeepsOthers')}</p>
     <div class="actions">
       <button type="submit" disabled={settingsBusy}>{t('settings.submit')}</button>
@@ -742,21 +800,23 @@
     {titleFilter !== '' || statusFilter !== null ? t('list.emptyFiltered') : t('list.empty')}
   </p>
 {:else}
-  <table>
-    <thead>
-      <tr>
-        <th>{t('list.columnTitle')}</th>
-        <th class="compact-column">{t('list.columnStatus')}</th>
-        <th class="compact-column">{t('list.columnVersion')}</th>
-        <th class="compact-column">{t('list.columnResponses')}</th>
-        <th class="url-column">{t('list.columnUrl')}</th>
-        <th class="compact-column">{t('list.columnUpdated')}</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each surveys as survey (survey.surveyId)}
+  <!-- **表だけを横へ流す。** 文字を特大にしても画面全体を広げない -->
+  <div class="table-scroll">
+    <table>
+      <thead>
         <tr>
+          <th>{t('list.columnTitle')}</th>
+          <th class="compact-column">{t('list.columnStatus')}</th>
+          <th class="compact-column">{t('list.columnVersion')}</th>
+          <th class="compact-column">{t('list.columnResponses')}</th>
+          <th class="url-column">{t('list.columnUrl')}</th>
+          <th class="compact-column">{t('list.columnUpdated')}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each surveys as survey (survey.surveyId)}
+          <tr>
           <td>
             {#if survey.archivedAt == null}
               <button type="button" class="link" onclick={() => onopen(survey.surveyId)}>
@@ -768,7 +828,10 @@
             {/if}
           </td>
           <td class="compact-column">
-            <span class="status-{survey.status}">{t(surveyStatusKey(survey.status))}</span>
+            <span class:status-archived={survey.archivedAt != null} class="status-{survey.status}">
+              <span class="status-marker" aria-hidden="true">{statusMarker(survey)}</span>
+              {survey.archivedAt == null ? t(surveyStatusKey(survey.status)) : t('archive.archived')}
+            </span>
             <!--
               **なぜ止まっているのかが分かること**（_documents/データモデル設計.md 2.1）。
               理由の付いていない古い停止では、鍵が無いので何も出さない
@@ -855,10 +918,11 @@
             {/if}
             </div>
           </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
 
   <!--
     ⚠️ **印だけにしない。** Pleasanter 側のテスト回答は本アプリから消せず、
@@ -950,7 +1014,7 @@
     gap: 0.75rem;
     padding: 1.25rem;
     margin-bottom: 1.5rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
   }
@@ -1071,10 +1135,15 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
+  }
+
+  .table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
   }
 
   th,
@@ -1180,7 +1249,7 @@
   }
 
   .status-1 {
-    color: #067647;
+    color: var(--success);
     font-weight: 600;
   }
 
@@ -1190,8 +1259,18 @@
   }
 
   .status-3 {
-    color: #9a6700;
+    color: var(--warning-text);
     font-weight: 600;
+  }
+
+  .status-archived {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .status-marker {
+    display: inline-block;
+    width: 1.25em;
   }
 
   .status {
@@ -1203,7 +1282,7 @@
   }
 
   .saved {
-    color: #067647;
+    color: var(--success);
     font-size: 0.9rem;
   }
 </style>

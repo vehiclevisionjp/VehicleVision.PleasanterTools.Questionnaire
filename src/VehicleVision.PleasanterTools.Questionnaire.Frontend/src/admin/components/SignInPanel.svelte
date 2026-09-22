@@ -249,7 +249,7 @@
     max-width: 24rem;
     margin: 4rem auto;
     padding: 2rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
   }
@@ -309,7 +309,7 @@
     display: block;
     width: 100%;
     padding: 0.6rem;
-    background: #fff;
+    background: var(--surface);
     color: inherit;
     border: 1px solid var(--border);
     border-radius: 4px;

@@ -17,6 +17,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Scripting;
 using VehicleVision.PleasanterTools.Questionnaire.Web;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Worker;
@@ -47,6 +48,17 @@ var openApiExposure = OpenApiExposureOptions.FromConfiguration(builder.Configura
 // **HTTP を許す構成は運用者に明示させる。** 未設定や false では従来の保護を変えない。
 var transportSecurity = TransportSecurityOptions.FromConfiguration(builder.Configuration);
 
+// **環境変数側は画面から変更しない。** DB の保守中にも確実に受付を止めるための運用者の指定。
+var maintenanceOptions = new MaintenanceModeOptions(
+    string.Equals(
+        builder.Configuration["QUESTIONNAIRE_MAINTENANCE_MODE"],
+        "true",
+        StringComparison.OrdinalIgnoreCase),
+    builder.Configuration["QUESTIONNAIRE_MAINTENANCE_MESSAGE_JA"]
+        ?? MaintenanceModeOptions.DefaultMessageJa,
+    builder.Configuration["QUESTIONNAIRE_MAINTENANCE_MESSAGE_EN"]
+        ?? MaintenanceModeOptions.DefaultMessageEn);
+
 // ---- 複数インスタンスの認証 --------------------------------------------------
 // 管理画面の Cookie は ASP.NET Core Data Protection で保護される。AKS で複数 Pod にすると、
 // 鍵束を共有しない限り「別 Pod へ振られた途端にログアウト」になる。
@@ -67,8 +79,13 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 // （App_Data/Parameters/README.md）
 var provider = Enum.Parse<DatabaseProvider>(
     builder.Configuration["QUESTIONNAIRE_DB_PROVIDER"] ?? nameof(DatabaseProvider.SqlServer));
-var connectionString = builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"]
-    ?? throw new InvalidOperationException("QUESTIONNAIRE_DB_CONNECTIONSTRING が設定されていない");
+var usesSqlite = provider is DatabaseProvider.Sqlite;
+var databaseStartupState = new DatabaseStartupState();
+builder.Services.AddSingleton(databaseStartupState);
+var connectionString = DatabaseConnectionString.Resolve(
+    provider,
+    builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"],
+    builder.Environment.ContentRootPath);
 var sharedStateOptions = SharedStateOptions.FromConfiguration(builder.Configuration);
 var sessionStoreKind =
     builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_STORE"] ?? "Database";
@@ -111,8 +128,7 @@ ConnectionSecurity.EnsureSecure(
         "true",
         StringComparison.OrdinalIgnoreCase));
 
-// **マイグレーションを当てる口。** アプリ起動時の自動適用はしない
-// （_documents/データモデル設計.md 5 章。スケールアウト時に同時実行され得る）。
+// **マイグレーションを手動で当てる口も残す。**
 // **当てる道具を別に作らない。** 接続文字列の読み方が二重になり、片方だけ直す事故が起きる
 if (MigrationCommand.IsRequested(args))
 {
@@ -168,6 +184,9 @@ builder.Services.AddSingleton<ISurveyDraftStore, SurveyDraftStore>();
 builder.Services.AddSurveyAssetStorage(builder.Configuration);
 builder.Services.AddSingleton<ISurveyDeletionStore, SurveyDeletionStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
+builder.Services.AddSingleton<IMaintenanceModeStore, MaintenanceModeStore>();
+builder.Services.AddSingleton(maintenanceOptions);
+builder.Services.AddSingleton<MaintenanceMode>();
 builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
 
 // **添付を弾いた記録は監査ログと別の表**（Issue #39）。
@@ -178,7 +197,11 @@ builder.Services.AddSingleton<IAttachmentRejectionStore, AttachmentRejectionStor
 // **異常はログにしか出ていなかった**（Issue #80）。
 // **Pleasanter を経由せず本アプリの DB へ溜める。**
 // 知らせの多くは「Pleasanter へ届かない」事象そのもので、届け先にはできない
-builder.Services.AddSingleton<IAdminNotificationStore, AdminNotificationStore>();
+builder.Services.AddSingleton<AdminNotificationStore>();
+builder.Services.AddSingleton<IAdminNotificationStore>(
+    serviceProvider => serviceProvider.GetRequiredService<AdminNotificationStore>());
+builder.Services.AddSingleton<IResponseNotificationStore>(
+    serviceProvider => serviceProvider.GetRequiredService<AdminNotificationStore>());
 builder.Services.AddSingleton<IAltchaChallengeStore, AltchaChallengeStore>();
 
 // **bot 対策の 4 枚目**（Issue #55）。送信チケット・最短時間・honeypot と重ねる。
@@ -237,6 +260,11 @@ builder.Services.AddSingleton(assetOptions);
 // **埋め込みを許す配信元**（Issue #104 / #107）。**既定は空＝一切埋め込めない**
 var embedOptions = EmbedOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(embedOptions);
+
+// **回答画面を埋め込める親サイト**（Issue #334）。
+// 配信元を許す `EmbedOptions` とは逆方向なので混ぜない
+var embedParentOptions = EmbedParentOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(embedParentOptions);
 
 // **添付と配布資産は multipart で届く。上限を既定値に任せない**
 // （_documents/非機能設計.md 1 章）。
@@ -553,6 +581,9 @@ if (mailOptions.IsReady)
     builder.Services.AddSingleton(MailSenderOptions.FromConfiguration(builder.Configuration));
     builder.Services.AddSingleton<MailSender>();
     builder.Services.AddHostedService<MailSenderHostedService>();
+    builder.Services.AddSingleton(ResponseNotificationMailerOptions.FromConfiguration(builder.Configuration));
+    builder.Services.AddSingleton<ResponseNotificationMailer>();
+    builder.Services.AddHostedService<ResponseNotificationMailerHostedService>();
 }
 
 // **設定したときだけ監視の口を生やす。** 既定で外部から DB の状態を読める口を作らない。
@@ -662,27 +693,6 @@ builder.Services
             rateLimitLogger));
 });
 
-// **スキーマが揃っていないまま起動しない。**
-// 列の無い状態で動くと `Invalid column name` としか出ず、
-// 「マイグレーションを当て忘れている」とは分からない（Issue #32。実際に 21 件落ちた）。
-// **自動では当てない。** 何が足りないかを言って止まる
-if (!string.Equals(
-    builder.Configuration["QUESTIONNAIRE_DB_SKIP_MIGRATION_CHECK"],
-    "true",
-    StringComparison.OrdinalIgnoreCase))
-{
-    var pendingMigrations = DatabaseMigrator.PendingMigrations(provider, connectionString);
-    if (pendingMigrations.Count > 0)
-    {
-        throw new InvalidOperationException(
-            // **英語で書く。** Azure の Kudu の Debug console で日本語が化ける（Issue #225）
-            "The database schema is out of date. Pending migrations: "
-            + string.Join(" / ", pendingMigrations)
-            + ". Run this executable with --migrate to apply them"
-            + " (see _documents/導入-更新運用手順書.md).");
-    }
-}
-
 var app = builder.Build();
 
 if (transportSecurity.AllowInsecure)
@@ -695,6 +705,25 @@ if (transportSecurity.AllowInsecure)
         + "and SAML may not work.");
 }
 
+if (usesSqlite)
+{
+    // **英語で書く。** Azure の Kudu の Debug console で日本語が化ける（Issue #225）
+    app.Logger.LogWarning(
+        "SQLite mode is enabled by QUESTIONNAIRE_DB_PROVIDER=Sqlite. "
+        + "Use SQLite only for simple setup and debugging, not for production. "
+        + "Pleasanter cannot share this database.");
+}
+
+if (maintenanceOptions.EnvironmentEnabled)
+{
+    // **HTTP 平文運用と SQLite と同じ場所・同じ英語で警告する。**
+    // Azure の Kudu の Debug console で日本語が化ける（Issue #225）
+    app.Logger.LogWarning(
+        "Maintenance mode is enabled by QUESTIONNAIRE_MAINTENANCE_MODE. "
+        + "Public forms and Pleasanter delivery workers are stopped. "
+        + "This mode cannot be disabled from the administration screen.");
+}
+
 // **CSP は起動時に 1 度だけ組み立てる**（Issue #104 / #107）。
 //
 // **アンケートごとには出し分けない。** 出し分けるには、回答画面の HTML を返す時点で
@@ -705,6 +734,7 @@ if (transportSecurity.AllowInsecure)
 // 既定は空なので、設定しなければ従来と同じ CSP になる。
 // **`frame-src https:` のようには絶対に広げない**
 var embedSources = embedOptions.CspSources;
+var embedParentSources = embedParentOptions.CspSources;
 
 // **アクセス解析を有効にしたときだけ広げる**（Issue #162）。
 // 既定では 1 つも足さないので、今までと同じ CSP になる。
@@ -730,7 +760,8 @@ var contentSecurityPolicy = string.Join("; ",
         + (embedSources.IsEmpty && captchaSources.IsEmpty
             ? "'none'"
             : string.Join(' ', embedSources.AddRange(captchaSources))),
-    "frame-ancestors 'none'",
+    "frame-ancestors "
+        + (embedParentSources.IsEmpty ? "'none'" : string.Join(' ', embedParentSources)),
     "base-uri 'self'",
     "object-src 'none'",
     "script-src 'self'" + Join(externalScriptSources),
@@ -756,6 +787,86 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 // **転送ヘッダから本当の送信元へ直した後で照合する。**
 // 先に置くと、リバースプロキシ配下では全要求がプロキシ自身の IP に見える。
 app.UseEndpointNetworkRestrictions(endpointNetworkRestrictions);
+
+// **回答者側だけを止める。** `/admin` と `/api/admin` は解除のため常に通す。
+// `/healthz` と `/ready` も対象外。メンテナンスはプロセスや DB の異常ではなく、
+// readiness を落とすと Kubernetes が Pod を再起動し続けて管理操作まで不安定になる。
+app.Use(async (context, next) =>
+{
+    var isFormApi = context.Request.Path.StartsWithSegments(
+        "/api/forms",
+        StringComparison.OrdinalIgnoreCase);
+    var isFormPage = context.Request.Path.StartsWithSegments(
+        "/f",
+        StringComparison.OrdinalIgnoreCase);
+    if (!isFormApi && !isFormPage)
+    {
+        await next();
+        return;
+    }
+
+    // DB マイグレーション前は DB 側の状態を読めない。環境変数で止めている場合だけ、
+    // DB に依存せずメンテナンス画面を返し、それ以外は後続の起動時ゲートへ任せる。
+    var maintenance = context.RequestServices.GetRequiredService<MaintenanceMode>();
+    if (!databaseStartupState.IsReady && !maintenance.EnvironmentEnabled)
+    {
+        await next();
+        return;
+    }
+
+    var status = await maintenance.GetPublicStatusAsync(context.RequestAborted);
+    if (!status.IsActive)
+    {
+        await next();
+        return;
+    }
+
+    context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+    context.Response.Headers.RetryAfter = "300";
+    var message = MaintenanceMode.MessageOf(status, RequestLanguage.Of(context));
+    if (isFormApi)
+    {
+        await context.Response.WriteAsJsonAsync(
+            new { reason = "maintenance", message },
+            context.RequestAborted);
+        return;
+    }
+
+    var encoded = System.Text.Encodings.Web.HtmlEncoder.Default.Encode(message);
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.WriteAsync(
+        $$"""
+        <!doctype html>
+        <html lang="{{RequestLanguage.Of(context)}}">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>{{encoded}}</title>
+          <style>
+            body { margin: 0; font-family: system-ui, sans-serif; background: #f5f7fa; color: #1d2939; }
+            main { max-width: 42rem; margin: 12vh auto; padding: 2rem; background: #fff;
+              border-radius: .75rem; box-shadow: 0 4px 18px rgb(16 24 40 / 12%); text-align: center; }
+          </style>
+        </head>
+        <body><main><h1>{{encoded}}</h1></main></body>
+        </html>
+        """,
+        context.RequestAborted);
+});
+
+// **DB スキーマが揃うまでは生存確認と readiness 以外へ通さない。**
+// ロードバランサを経由しない直接アクセスでも、移行途中の表を読み書きさせない。
+app.Use(async (context, next) =>
+{
+    if (!databaseStartupState.IsReady
+        && !DatabaseStartupMigration.IsAvailableBeforeMigration(context.Request.Path))
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        return;
+    }
+
+    await next();
+});
 
 if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
 {
@@ -819,7 +930,11 @@ app.MapAdminTemplateEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
-app.MapAdminVersionEndpoints(transportSecurity.AllowInsecure);
+app.MapAdminMaintenanceEndpoints();
+app.MapAdminVersionEndpoints(
+    transportSecurity.AllowInsecure,
+    usesSqlite,
+    databaseStartupState);
 if (monitoringToken is not null)
 {
     app.MapMonitoringEndpoints(monitoringToken);
@@ -866,6 +981,11 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
 // 含み得るので応答へ出さない。
 app.MapGet("/ready", async (CancellationToken cancellationToken) =>
 {
+    if (!databaseStartupState.IsReady)
+    {
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+
     var failure = await DatabaseMigrator.WaitForDatabaseAsync(
         provider,
         connectionString,
@@ -879,7 +999,25 @@ app.MapGet("/ready", async (CancellationToken cancellationToken) =>
     .WithTags("生存確認")
     .DisableRateLimiting();
 
-app.Run();
+await app.StartAsync();
+try
+{
+    await DatabaseStartupMigration.RunAsync(
+        builder.Configuration,
+        provider,
+        connectionString,
+        databaseStartupState,
+        app.Logger,
+        app.Lifetime.ApplicationStopping);
+    await app.WaitForShutdownAsync();
+}
+catch (OperationCanceledException) when (app.Lifetime.ApplicationStopping.IsCancellationRequested)
+{
+}
+finally
+{
+    await app.StopAsync();
+}
 
 /// <summary>結合テストから参照するための入口。</summary>
 public partial class Program;

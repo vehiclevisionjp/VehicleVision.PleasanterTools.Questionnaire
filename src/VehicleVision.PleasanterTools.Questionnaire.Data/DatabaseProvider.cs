@@ -1,5 +1,7 @@
+using System.Data;
 using System.Data.Common;
 using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 using MySqlConnector;
 using Npgsql;
 
@@ -7,14 +9,50 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 
 /// <summary>対応する RDBMS。</summary>
 /// <remarks>
-/// **Pleasanter が対応する 3 つに揃える**（<c>_documents/アーキテクチャ方針.md</c> 13 章）。
+/// **原則は Pleasanter が対応する 3 つに揃える**（<c>_documents/アーキテクチャ方針.md</c> 13 章）。
 /// 導入先の Pleasanter が使う RDBMS に合わせられないと、DB サーバを別に立てることになる。
+/// SQLite は簡易セットアップとデバッグだけに使う例外で、本番運用には使わない。
 /// </remarks>
 public enum DatabaseProvider
 {
     SqlServer,
     PostgreSql,
     MySql,
+    Sqlite,
+}
+
+/// <summary>DB 接続文字列の既定値を決める。</summary>
+public static class DatabaseConnectionString
+{
+    /// <summary>SQLite の既定ファイル名。</summary>
+    public const string DefaultSqliteFileName = "questionnaire.db";
+
+    /// <summary>設定値を解決する。SQLite だけは App_Data 配下のファイルを既定に持つ。</summary>
+    public static string Resolve(
+        DatabaseProvider provider,
+        string? configured,
+        string contentRootPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contentRootPath);
+
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
+
+        if (provider is not DatabaseProvider.Sqlite)
+        {
+            throw new InvalidOperationException("QUESTIONNAIRE_DB_CONNECTIONSTRING が設定されていない");
+        }
+
+        var appDataPath = Path.Combine(contentRootPath, "App_Data");
+        Directory.CreateDirectory(appDataPath);
+        return new SqliteConnectionStringBuilder
+        {
+            DataSource = Path.Combine(appDataPath, DefaultSqliteFileName),
+            Mode = SqliteOpenMode.ReadWriteCreate,
+        }.ConnectionString;
+    }
 }
 
 /// <summary>接続を作る。</summary>
@@ -41,6 +79,7 @@ public interface IDbConnectionFactory
 /// </remarks>
 public sealed class DbConnectionFactory : IDbConnectionFactory
 {
+    private const int SqliteBusyTimeoutSeconds = 30;
     private readonly string _connectionString;
 
     public DbConnectionFactory(DatabaseProvider provider, string connectionString)
@@ -48,9 +87,12 @@ public sealed class DbConnectionFactory : IDbConnectionFactory
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
         Provider = provider;
-        _connectionString = provider is DatabaseProvider.SqlServer
-            ? Encrypted(connectionString)
-            : connectionString;
+        _connectionString = provider switch
+        {
+            DatabaseProvider.SqlServer => Encrypted(connectionString),
+            DatabaseProvider.Sqlite => ConfigureSqlite(connectionString),
+            _ => connectionString,
+        };
     }
 
     public DatabaseProvider Provider { get; }
@@ -60,8 +102,49 @@ public sealed class DbConnectionFactory : IDbConnectionFactory
         DatabaseProvider.SqlServer => new SqlConnection(_connectionString),
         DatabaseProvider.PostgreSql => new NpgsqlConnection(_connectionString),
         DatabaseProvider.MySql => new MySqlConnection(_connectionString),
+        DatabaseProvider.Sqlite => CreateSqliteConnection(),
         _ => throw new NotSupportedException($"対応していない RDBMS: {Provider}"),
     };
+
+    /// <summary>SQLite の待機時間を接続文字列へ強制する。</summary>
+    private static string ConfigureSqlite(string connectionString)
+    {
+        SqliteTypeHandlers.Register();
+        var builder = new SqliteConnectionStringBuilder(connectionString)
+        {
+            DefaultTimeout = SqliteBusyTimeoutSeconds,
+        };
+        return builder.ConnectionString;
+    }
+
+    /// <summary>SQLite の同時書き込み設定を、開くたびに確実に適用する。</summary>
+    private SqliteConnection CreateSqliteConnection()
+    {
+        var connection = new SqliteConnection(_connectionString);
+        connection.StateChange += (_, args) =>
+        {
+            if (args.CurrentState is not ConnectionState.Open)
+            {
+                return;
+            }
+
+            using var command = connection.CreateCommand();
+            command.CommandText = $"PRAGMA busy_timeout = {SqliteBusyTimeoutSeconds * 1000};";
+            command.ExecuteNonQuery();
+
+            command.CommandText = "PRAGMA journal_mode = WAL;";
+            var journalMode = command.ExecuteScalar()?.ToString();
+            if (!string.Equals(journalMode, "wal", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"SQLite WAL mode could not be enabled. Current journal mode: {journalMode ?? "(unknown)"}.");
+            }
+
+            command.CommandText = "PRAGMA foreign_keys = ON;";
+            command.ExecuteNonQuery();
+        };
+        return connection;
+    }
 
     /// <summary>SQL Server 向けに暗号化を立てる。</summary>
     /// <remarks>

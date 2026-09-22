@@ -15,6 +15,7 @@
     changeOwnPassword,
     completeOwnTotp,
     disableOwnTotp,
+    saveResponseNotification,
   } from '../lib/api';
   import AdminSessionList from './AdminSessionList.svelte';
   import { twoFactorPolicyLabel } from '../lib/adminUsers';
@@ -53,10 +54,18 @@
   let recoveryCodes = $state<string[]>([]);
   let totpError = $state('');
   let totpBusy = $state(false);
+  let responseNotificationEnabled = $state(false);
+  let responseNotificationMessage = $state('');
+  let responseNotificationError = $state('');
+  let responseNotificationBusy = $state(false);
 
   /** 2 要素の方針。**必須なら解除させない。** */
   const twoFactor = $derived(session.twoFactor ?? 'Optional');
   const hasTotp = $derived(session.hasTotp ?? false);
+
+  $effect(() => {
+    responseNotificationEnabled = session.responseNotificationEnabled ?? false;
+  });
 
   async function submitPassword(event: SubmitEvent) {
     event.preventDefault();
@@ -147,6 +156,23 @@
     totpPassword = '';
     onchanged();
   }
+
+  async function saveNotificationSetting() {
+    responseNotificationMessage = '';
+    responseNotificationError = '';
+    responseNotificationBusy = true;
+    const result = await saveResponseNotification(responseNotificationEnabled);
+    responseNotificationBusy = false;
+
+    if (!result.ok) {
+      responseNotificationEnabled = !responseNotificationEnabled;
+      responseNotificationError = result.message;
+      return;
+    }
+
+    responseNotificationMessage = t('account.responseNotificationSaved');
+    onchanged();
+  }
 </script>
 
 <section>
@@ -156,6 +182,27 @@
   </header>
 
   <p class="who">{session.loginId}</p>
+
+  <div class="card">
+    <h2>{t('account.responseNotificationTitle')}</h2>
+    <label class="check">
+      <input
+        type="checkbox"
+        bind:checked={responseNotificationEnabled}
+        disabled={responseNotificationBusy}
+        onchange={saveNotificationSetting}
+      />
+      <span>{t('account.responseNotificationEnabled')}</span>
+    </label>
+    <p class="hint">{t('account.responseNotificationHint')}</p>
+    {#if !session.mailEnabled}
+      <p class="hint warning">{t('account.responseNotificationMailDisabled')}</p>
+    {:else if !session.autoReplyTestRecipientAvailable}
+      <p class="hint warning">{t('account.responseNotificationAddressUnavailable')}</p>
+    {/if}
+    {#if responseNotificationError}<p class="error" role="alert">{responseNotificationError}</p>{/if}
+    {#if responseNotificationMessage}<p class="done" role="status">{responseNotificationMessage}</p>{/if}
+  </div>
 
   <!-- ---- パスワード ------------------------------------------------------- -->
   <div class="card">
@@ -298,7 +345,7 @@
   .card {
     max-width: 28rem;
     padding: 1.25rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 1.25rem;
@@ -306,7 +353,7 @@
 
   .session-card {
     padding: 1.25rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 1.25rem;
@@ -327,6 +374,21 @@
     border-radius: 4px;
     font: inherit;
     box-sizing: border-box;
+  }
+
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .check input {
+    width: auto;
+    margin: 0;
+  }
+
+  .warning {
+    color: var(--warning-text, var(--muted));
   }
 
   .row {
@@ -355,7 +417,7 @@
   .secret code {
     display: inline-block;
     padding: 0.4rem 0.6rem;
-    background: #f2f4f7;
+    background: var(--disabled-surface);
     border-radius: 4px;
     /* **写し間違いを減らす。** 桁が揃う書体で出す */
     font-family: var(--font-mono, monospace);
@@ -381,7 +443,7 @@
     border: 0;
     border-radius: 4px;
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-text);
     font: inherit;
     cursor: pointer;
   }
@@ -411,7 +473,7 @@
   }
 
   .done {
-    color: #027a48;
+    color: var(--success);
     font-size: 0.9rem;
   }
 </style>

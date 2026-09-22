@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import SurveyPreview from './SurveyPreview.svelte';
+  import SurveyFlowchart from './SurveyFlowchart.svelte';
+  import QuestionImportPanel from './QuestionImportPanel.svelte';
   import {
     loadColumnAvailability,
     loadAssetOptions,
@@ -19,6 +22,7 @@
     type MappingProblem,
     type Page,
     type Question,
+    type QuestionImportResult,
     type SurveyDefinition,
   } from '../lib/types';
   import {
@@ -45,6 +49,7 @@
   import { adminAssetUrl } from '../lib/api';
   import { addQuestionAssignment } from '../lib/mappingSelection';
   import { assetMarkup as markupForAsset } from '../lib/asset';
+  import { requiredPortCount } from '../lib/columnBudget';
 
   interface Props {
     surveyId: string;
@@ -85,11 +90,13 @@
 
   /** プレビューを開いているか。**保存前の下書きをそのまま見る。** */
   let previewing = $state(false);
+  /** 分岐の全体図を開いているか。**保存前の下書きを読み取り専用で見る。** */
+  let flowcharting = $state(false);
 
   $effect(() => {
     // **開いている間は下敷きを巻き取らせない。**
     // 重ねて出しているのに背後が動くと、どちらを操作しているのか分からなくなる
-    if (!previewing) {
+    if (!previewing && !flowcharting) {
       return;
     }
 
@@ -100,6 +107,7 @@
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         previewing = false;
+        flowcharting = false;
       }
     };
 
@@ -126,6 +134,7 @@
   let saving = $state(false);
   let error = $state('');
   let notice = $state('');
+  let importWarnings = $state<string[]>([]);
   let conflict = $state(false);
   let warnings = $state<MappingProblem[]>([]);
   let selectedQuestionId = $state<string | null>(null);
@@ -159,6 +168,9 @@
   );
   const breadcrumbTitle = $derived(
     definition ? displayText(definition.title, language()) || null : null,
+  );
+  const estimatedRequiredColumns = $derived(
+    definition ? requiredPortCount(definition) : 0,
   );
 
   $effect(() => {
@@ -234,6 +246,7 @@
     assetHistoryMapping = result.value.assetHistoryMapping ?? { assignments: [] };
     savedAssetHistoryMapping = assetHistoryMapping;
     selectedQuestionId = null;
+    importWarnings = [];
     revision = result.value.revision;
     await refreshColumnAvailability(id);
   }
@@ -310,6 +323,43 @@
     };
 
     updatePage(pageIndex, { questions: [...page.questions, question] });
+  }
+
+  function addImportedQuestions(pageIndex: number, result: QuestionImportResult) {
+    const page = definition?.pages[pageIndex];
+    if (!page || !definition) return;
+
+    const nextDefinition = {
+      ...definition,
+      pages: definition.pages.map((entry, index) =>
+        index === pageIndex
+          ? { ...entry, questions: [...entry.questions, ...result.questions] }
+          : entry,
+      ),
+    };
+    definition = nextDefinition;
+    selectedQuestionId = result.questions.at(-1)?.questionId ?? null;
+    notice = t('questionImport.done', {
+      count: result.questions.length,
+      columns: requiredPortCount(nextDefinition),
+    });
+    importWarnings = [
+      ...(result.removedChoiceTransitions > 0 || result.removedVisibilityConditions > 0
+        ? [
+            t('questionImport.removedBranching', {
+              transitions: result.removedChoiceTransitions,
+              conditions: result.removedVisibilityConditions,
+            }),
+          ]
+        : []),
+      ...(result.removedAssetReferences > 0
+        ? [
+            t('questionImport.removedAssets', {
+              count: result.removedAssetReferences,
+            }),
+          ]
+        : []),
+    ];
   }
 
   function updateQuestion(pageIndex: number, questionIndex: number, next: Question) {
@@ -523,6 +573,15 @@
       ? displayText(question.title, editing) || questionId
       : t('mapping.missingQuestion', { questionId });
   }
+
+  /** 全体図から該当ページの編集位置へ戻る。 */
+  async function editPageFromFlowchart(pageId: string) {
+    flowcharting = false;
+    await tick();
+    const page = document.getElementById(`page-${pageId}`);
+    page?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    page?.focus();
+  }
 </script>
 
 <header class="bar">
@@ -537,6 +596,14 @@
       disabled={loading || definition === undefined}
     >
       {t('preview.open')}
+    </button>
+    <button
+      type="button"
+      class="secondary"
+      onclick={() => (flowcharting = true)}
+      disabled={loading || definition === undefined}
+    >
+      {t('flowchart.open')}
     </button>
     <button type="button" class="secondary" onclick={save} disabled={saving || loading}>
       {saving ? t('editor.working') : t('editor.saveDraft')}
@@ -559,6 +626,17 @@
 
 {#if error && !conflict}<p class="error" role="alert">{error}</p>{/if}
 {#if notice}<p class="notice">{notice}</p>{/if}
+
+{#if importWarnings.length > 0}
+  <section class="import-warnings" role="status">
+    <strong>{t('questionImport.changedTitle')}</strong>
+    <ul>
+      {#each importWarnings as warning (warning)}
+        <li>{warning}</li>
+      {/each}
+    </ul>
+  </section>
+{/if}
 
 {#if warnings.length > 0}
   <ul class="problems">
@@ -832,7 +910,7 @@
     {@const targets = jumpTargets(pageIndex)}
     {@const stale = staleTargetId(page.next, targets.map((target) => target.pageId))}
     {@const hasVisibility = page.questions.some((question) => question.visibleWhen)}
-    <section class="page">
+    <section class="page" id={`page-${page.pageId}`} tabindex="-1">
       <div class="page-head">
         <!-- **ページの区切りがそのまま改ページになる** -->
         <input
@@ -875,9 +953,17 @@
         />
       {/each}
 
-      <button type="button" class="secondary small" onclick={() => addQuestion(pageIndex)}>
-        {t('editor.addQuestion')}
-      </button>
+      <div class="question-actions">
+        <button type="button" class="secondary small" onclick={() => addQuestion(pageIndex)}>
+          {t('editor.addQuestion')}
+        </button>
+        <QuestionImportPanel
+          {surveyId}
+          existingQuestionIds={allQuestions.map((entry) => entry.questionId)}
+          {editing}
+          onimport={(result) => addImportedQuestions(pageIndex, result)}
+        />
+      </div>
 
       <!-- **選択肢の行き先が優先される。** そちらが無いときにここへ落ちる -->
       <div class="page-next">
@@ -935,6 +1021,9 @@
     </div>
 
     <div class="mapping-column">
+      <p class="column-estimate" role="status">
+        {t('questionImport.columnEstimate', { count: estimatedRequiredColumns })}
+      </p>
       <MappingEditor
         {mapping}
         questions={allQuestions}
@@ -1009,6 +1098,20 @@
   </div>
 {/if}
 
+{#if flowcharting && definition}
+  <div class="overlay" role="dialog" aria-modal="true" aria-label={t('flowchart.title')}>
+    <div class="sheet">
+      <SurveyFlowchart
+        {definition}
+        {flowProblems}
+        language={editing}
+        onclose={() => (flowcharting = false)}
+        onpage={editPageFromFlowchart}
+      />
+    </div>
+  </div>
+{/if}
+
 <style lang="scss">
   .overlay {
     position: fixed;
@@ -1060,7 +1163,7 @@
     flex-wrap: wrap;
     padding: 0.75rem 1.25rem;
     margin-bottom: 1rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 0.85rem;
@@ -1077,8 +1180,8 @@
       padding: 0.25rem 0.4rem;
       border: 1px solid var(--border);
       border-radius: 4px;
-      background: #fff;
-      color: #101828;
+      background: var(--surface);
+      color: var(--text);
     }
 
     .hint {
@@ -1090,7 +1193,7 @@
   .survey,
   .page {
     padding: 1.25rem;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     margin-bottom: 1rem;
@@ -1138,7 +1241,8 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font: inherit;
-    color: #101828;
+    background: var(--surface);
+    color: var(--text);
     box-sizing: border-box;
   }
 
@@ -1178,7 +1282,7 @@
   .conflict {
     padding: 1rem;
     margin-bottom: 1rem;
-    background: #fef3f2;
+    background: var(--error-surface);
     border: 1px solid var(--error);
     border-radius: 6px;
 
@@ -1195,7 +1299,7 @@
   .flow-problems {
     margin: 0 0 1rem;
     padding: 0.75rem 1rem;
-    background: #fef3f2;
+    background: var(--error-surface);
     border: 1px solid var(--error);
     border-radius: 6px;
     font-size: 0.85rem;
@@ -1210,9 +1314,40 @@
     }
 
     &.from-server {
-      background: #fffaeb;
-      border-color: #fec84b;
+      background: var(--warning-surface);
+      border-color: var(--warning-border);
     }
+  }
+
+  .import-warnings {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+
+    ul {
+      margin: 0.4rem 0 0;
+      padding-left: 1.25rem;
+    }
+  }
+
+  .question-actions {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .column-estimate {
+    margin: 0 0 0.75rem;
+    padding: 0.65rem 0.8rem;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
   }
 
   .page-next {
@@ -1231,8 +1366,8 @@
       padding: 0.3rem 0.4rem;
       border: 1px solid var(--border);
       border-radius: 4px;
-      background: #fff;
-      color: #101828;
+      background: var(--surface);
+      color: var(--text);
     }
 
     .hint {
@@ -1257,8 +1392,8 @@
   .problems {
     margin: 0 0 1rem;
     padding: 0.75rem 1rem 0.75rem 2rem;
-    background: #fffaeb;
-    border: 1px solid #fec84b;
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
     border-radius: 6px;
     font-size: 0.85rem;
 
@@ -1269,7 +1404,7 @@
   }
 
   .notice {
-    color: #067647;
+    color: var(--success);
   }
 
   .error {
@@ -1286,7 +1421,7 @@
     flex: none;
     padding: 0;
     line-height: 1;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
     cursor: pointer;

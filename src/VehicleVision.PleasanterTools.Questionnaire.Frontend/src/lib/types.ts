@@ -311,6 +311,7 @@ export type RejectionReason =
   | 'notStarted'
   | 'closed'
   | 'suspended'
+  | 'embeddingNotAllowed'
   | 'notFound'
   | 'rejected'
   | 'tooManyRequests';
