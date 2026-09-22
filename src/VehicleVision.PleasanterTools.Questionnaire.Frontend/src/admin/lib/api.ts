@@ -329,6 +329,18 @@ export const saveAppSettings = (settings: AppSettings) =>
     },
   });
 
+export const testAppSettings = (settings: AppSettings) =>
+  call<{ connected: boolean }>('/api/admin/settings/test', {
+    method: 'POST',
+    json: {
+      values: Object.fromEntries(
+        settings.fields
+          .filter((field) => !field.isSecret || (field.value?.trim() ?? '') !== '')
+          .map((field) => [field.key, field.value]),
+      ),
+    },
+  });
+
 // ---- アンケート -------------------------------------------------------------
 
 /**

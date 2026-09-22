@@ -637,6 +637,7 @@ export type AdminPermission =
 
 export interface AppSettings {
   fields: AppSettingField[];
+  publishedSurveyCount: number;
 }
 
 export interface AppSettingField {

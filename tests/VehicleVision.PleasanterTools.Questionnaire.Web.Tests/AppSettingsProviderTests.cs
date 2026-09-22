@@ -23,6 +23,8 @@ public class AppSettingsProviderTests
 
         public int SaveCount { get; private set; }
 
+        public AppSettingRecord? SavedRecord { get; private set; }
+
         public Task<IReadOnlyList<AppSettingRecord>> ListAsync(
             CancellationToken cancellationToken = default)
         {
@@ -38,12 +40,13 @@ public class AppSettingsProviderTests
             CancellationToken cancellationToken = default)
         {
             SaveCount++;
-            values[settingKey] = new AppSettingRecord(
+            SavedRecord = new AppSettingRecord(
                 settingKey,
                 value,
                 isSecret,
                 DateTime.UtcNow,
                 updatedByAdminUserId);
+            values[settingKey] = SavedRecord;
             return Task.CompletedTask;
         }
     }
@@ -86,6 +89,37 @@ public class AppSettingsProviderTests
             new FakeStore()).GetAsync();
 
         Assert.Equal(string.Empty, snapshot[AppSettingsProvider.AdminNoticeKey]);
+    }
+
+    [Fact]
+    public async Task Pleasanterタイムゾーンはアプリの既定値へフォールバックする()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [ParameterFiles.TimeZoneDefaultKey] = "UTC",
+            })
+            .Build();
+
+        var snapshot = await Create(configuration, new FakeStore()).GetAsync();
+
+        Assert.Equal("UTC", snapshot[AppSettingsProvider.PleasanterTimeZoneKey]);
+    }
+
+    [Fact]
+    public async Task 外部設定のPleasanterAPIバージョン誤記は既定値へ落とす()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.PleasanterApiVersionKey] = "invalid",
+            })
+            .Build();
+
+        var snapshot = await Create(configuration, new FakeStore()).GetAsync();
+
+        Assert.Equal("1.1", snapshot[AppSettingsProvider.PleasanterApiVersionKey]);
+        Assert.Contains(AppSettingsProvider.PleasanterApiVersionKey, snapshot.FixedKeys);
     }
 
     [Fact]
@@ -260,6 +294,79 @@ public class AppSettingsProviderTests
 
         Assert.Equal("portal.example.com", snapshot[EmbedParentOptions.AllowedParentsKey]);
         Assert.Contains(EmbedParentOptions.AllowedParentsKey, snapshot.FixedKeys);
+    }
+
+    [Fact]
+    public async Task Pleasanter接続設定4件を管理できる()
+    {
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+
+        var snapshot = await provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.PleasanterBaseUrlKey] = "https://pleasanter.example.test/",
+                [AppSettingsProvider.PleasanterApiVersionKey] = "1.10",
+                [AppSettingsProvider.PleasanterTimeZoneKey] = "Asia/Tokyo",
+                [AppSettingsProvider.PleasanterApiKeyKey] = "secret-api-key",
+            },
+            Guid.NewGuid());
+
+        Assert.Equal(
+            "https://pleasanter.example.test",
+            snapshot[AppSettingsProvider.PleasanterBaseUrlKey]);
+        Assert.Equal("1.10", snapshot[AppSettingsProvider.PleasanterApiVersionKey]);
+        Assert.Equal("Asia/Tokyo", snapshot[AppSettingsProvider.PleasanterTimeZoneKey]);
+        Assert.Equal("secret-api-key", snapshot[AppSettingsProvider.PleasanterApiKeyKey]);
+        Assert.True(snapshot.Definitions.Single(
+            definition => definition.Key == AppSettingsProvider.PleasanterApiKeyKey).IsSecret);
+    }
+
+    [Fact]
+    public async Task PleasanterAPIキーは保護して保存し空欄では既存値を消さない()
+    {
+        var store = new FakeStore();
+        var provider = Create(new ConfigurationBuilder().Build(), store);
+
+        await provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.PleasanterApiKeyKey] = "secret-api-key",
+            },
+            Guid.NewGuid());
+
+        Assert.NotNull(store.SavedRecord);
+        Assert.True(store.SavedRecord.IsSecret);
+        Assert.DoesNotContain("secret-api-key", store.SavedRecord.Value, StringComparison.Ordinal);
+        Assert.Equal("secret-api-key", Protector.Unprotect(store.SavedRecord.Value));
+
+        var saveCount = store.SaveCount;
+        var snapshot = await provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.PleasanterApiKeyKey] = " ",
+            },
+            Guid.NewGuid());
+
+        Assert.Equal(saveCount, store.SaveCount);
+        Assert.Equal("secret-api-key", snapshot[AppSettingsProvider.PleasanterApiKeyKey]);
+    }
+
+    [Theory]
+    [InlineData("ftp://pleasanter.example.test")]
+    [InlineData("relative")]
+    [InlineData("https://pleasanter.example.test/?key=value")]
+    [InlineData("https://user:password@pleasanter.example.test")]
+    public async Task Pleasanterの不正なURLを拒否する(string value)
+    {
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+
+        await Assert.ThrowsAsync<AppSettingValidationException>(() =>
+            provider.SaveAsync(
+                new Dictionary<string, string?>
+                {
+                    [AppSettingsProvider.PleasanterBaseUrlKey] = value,
+                },
+                Guid.NewGuid()));
     }
 
     [Fact]

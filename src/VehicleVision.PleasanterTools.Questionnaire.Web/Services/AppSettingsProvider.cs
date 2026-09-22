@@ -115,6 +115,10 @@ public sealed class AppSettingsProvider(
 {
     /// <summary>管理画面の設定区画が機能することを示す、管理者向けのお知らせ。</summary>
     public const string AdminNoticeKey = "QUESTIONNAIRE_ADMIN_NOTICE";
+    public const string PleasanterBaseUrlKey = "QUESTIONNAIRE_PLEASANTER_BASEURL";
+    public const string PleasanterApiVersionKey = "QUESTIONNAIRE_PLEASANTER_APIVERSION";
+    public const string PleasanterTimeZoneKey = "QUESTIONNAIRE_PLEASANTER_TIMEZONE";
+    public const string PleasanterApiKeyKey = "QUESTIONNAIRE_PLEASANTER_APIKEY";
 
     /// <summary>
     /// Redis は任意なので、短い TTL で全インスタンスが DB の更新へ必ず追いつく構成にする。
@@ -153,6 +157,46 @@ public sealed class AppSettingsProvider(
             "Enter comma-separated hosts. www.example.net allows only that host; *.example.net allows only its subdomains.",
             MaximumLength: 2000,
             StringNormalizer: EmbedHostSettings.Normalize),
+        new(
+            PleasanterBaseUrlKey,
+            AppSettingValueType.String,
+            string.Empty,
+            "Pleasanter の URL",
+            "Pleasanter URL",
+            "Pleasanter のベース URL を指定します。変更すると、既存アンケートの回答も新しい接続先へ送信されます。",
+            "Enter the Pleasanter base URL. Existing surveys will also send responses to the new destination.",
+            MaximumLength: 2000,
+            StringNormalizer: NormalizePleasanterBaseUrl),
+        new(
+            PleasanterApiVersionKey,
+            AppSettingValueType.String,
+            "1.1",
+            "Pleasanter API バージョン",
+            "Pleasanter API version",
+            "Pleasanter API へ渡すバージョンです。",
+            "The version sent to the Pleasanter API.",
+            MaximumLength: 20,
+            StringNormalizer: NormalizePleasanterApiVersion),
+        new(
+            PleasanterTimeZoneKey,
+            AppSettingValueType.String,
+            "Asia/Tokyo",
+            "Pleasanter API キー利用者のタイムゾーン",
+            "Pleasanter API key user time zone",
+            "誤ると回答日時が静かにずれます。保存後、日時表示など全機能へ反映するにはアプリの再起動が必要です。",
+            "An incorrect value silently shifts response times. Restart the application after saving to apply it to all date and time displays.",
+            MaximumLength: 255,
+            StringNormalizer: NormalizePleasanterTimeZone),
+        new(
+            PleasanterApiKeyKey,
+            AppSettingValueType.String,
+            string.Empty,
+            "Pleasanter API キー",
+            "Pleasanter API key",
+            "値は画面へ返しません。空欄のまま保存すると現在の値を保持し、画面からは削除できません。",
+            "The value is never returned to the browser. Saving an empty field keeps the current value; it cannot be deleted from this screen.",
+            IsSecret: true,
+            MaximumLength: 2000),
     ];
 
     private static readonly FrozenDictionary<string, AppSettingDefinition> Definitions =
@@ -204,11 +248,16 @@ public sealed class AppSettingsProvider(
                     throw new AppSettingValidationException($"管理対象ではない設定です: {key}");
                 }
 
+                if (definition.IsSecret && string.IsNullOrWhiteSpace(requestedValue))
+                {
+                    continue;
+                }
+
                 if (configuration[key] is { } external)
                 {
                     if (string.Equals(
                         definition.Normalize(requestedValue),
-                        definition.Normalize(external),
+                        NormalizeExternal(definition, external),
                         StringComparison.Ordinal))
                     {
                         continue;
@@ -255,14 +304,17 @@ public sealed class AppSettingsProvider(
         {
             if (configuration[definition.Key] is { } external)
             {
-                values[definition.Key] = definition.Normalize(external);
+                values[definition.Key] = NormalizeExternal(definition, external);
                 fixedKeys.Add(definition.Key);
                 continue;
             }
 
             if (!records.TryGetValue(definition.Key, out var record))
             {
-                values[definition.Key] = definition.Normalize(definition.DefaultValue);
+                var defaultValue = definition.Key == PleasanterTimeZoneKey
+                    ? configuration[ParameterFiles.TimeZoneDefaultKey] ?? definition.DefaultValue
+                    : definition.DefaultValue;
+                values[definition.Key] = definition.Normalize(defaultValue);
                 continue;
             }
 
@@ -286,4 +338,75 @@ public sealed class AppSettingsProvider(
     }
 
     private sealed record CacheEntry(AppSettingsSnapshot Snapshot, DateTimeOffset ExpiresAt);
+
+    private static string NormalizePleasanterBaseUrl(string value)
+    {
+        if (value.Length == 0)
+        {
+            return value;
+        }
+
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+            || string.IsNullOrWhiteSpace(uri.Host)
+            || !string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            throw new AppSettingValidationException(
+                "Pleasanter の URL は http または https の絶対 URL で指定してください。");
+        }
+
+        return value.TrimEnd('/');
+    }
+
+    private static string NormalizeExternal(AppSettingDefinition definition, string value)
+    {
+        try
+        {
+            return definition.Normalize(value);
+        }
+        catch (AppSettingValidationException)
+            when (definition.Key == PleasanterApiVersionKey)
+        {
+            return definition.Normalize(definition.DefaultValue);
+        }
+    }
+
+    private static string NormalizePleasanterApiVersion(string value)
+    {
+        if (!decimal.TryParse(
+            value,
+            NumberStyles.Number,
+            CultureInfo.InvariantCulture,
+            out var version)
+            || version <= 0)
+        {
+            throw new AppSettingValidationException(
+                "Pleasanter API バージョンは 0 より大きい数値で指定してください。");
+        }
+
+        return version.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static string NormalizePleasanterTimeZone(string value)
+    {
+        if (value.Length == 0)
+        {
+            throw new AppSettingValidationException(
+                "Pleasanter API キー利用者のタイムゾーンを指定してください。");
+        }
+
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(value);
+            return value;
+        }
+        catch (Exception exception)
+            when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            throw new AppSettingValidationException(
+                "Pleasanter API キー利用者のタイムゾーンが見つかりません。");
+        }
+    }
 }

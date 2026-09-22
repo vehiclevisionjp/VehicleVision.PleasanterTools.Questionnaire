@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAppSettings, saveAppSettings } from '../lib/api';
+  import { getAppSettings, saveAppSettings, testAppSettings } from '../lib/api';
   import type { AppSettingField, AppSettings } from '../lib/types';
   import { language, t } from '../lib/i18n/state.svelte';
 
@@ -13,6 +13,10 @@
   let busy = $state(false);
   let error = $state('');
   let done = $state('');
+  let connectionDone = $state('');
+  let initialPleasanterBaseUrl = $state('');
+
+  const pleasanterBaseUrlKey = 'QUESTIONNAIRE_PLEASANTER_BASEURL';
 
   $effect(() => {
     void load();
@@ -26,6 +30,8 @@
       return;
     }
     settings = result.value;
+    initialPleasanterBaseUrl =
+      settings.fields.find((field) => field.key === pleasanterBaseUrlKey)?.value ?? '';
   }
 
   function label(field: AppSettingField): string {
@@ -42,6 +48,32 @@
 
   function setValue(field: AppSettingField, value: string) {
     field.value = value;
+    connectionDone = '';
+  }
+
+  function pleasanterDestinationChanged(): boolean {
+    if (!settings || settings.publishedSurveyCount === 0) return false;
+    const current =
+      settings.fields.find((field) => field.key === pleasanterBaseUrlKey)?.value ?? '';
+    return current.trim().replace(/\/+$/, '') !== initialPleasanterBaseUrl.trim().replace(/\/+$/, '');
+  }
+
+  async function testConnection() {
+    if (!settings) return;
+
+    error = '';
+    done = '';
+    connectionDone = '';
+    busy = true;
+    const result = await testAppSettings(settings);
+    busy = false;
+
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    connectionDone = t('appSettings.connectionSucceeded');
   }
 
   async function save(event: SubmitEvent) {
@@ -60,6 +92,8 @@
     }
 
     settings = result.value;
+    initialPleasanterBaseUrl =
+      settings.fields.find((field) => field.key === pleasanterBaseUrlKey)?.value ?? '';
     done = t('appSettings.saved');
   }
 </script>
@@ -130,8 +164,20 @@
         </label>
       {/each}
 
+      {#if pleasanterDestinationChanged()}
+        <p class="warning" role="alert">
+          {t('appSettings.publishedDestinationWarning').replace(
+            '{count}',
+            String(settings.publishedSurveyCount),
+          )}
+        </p>
+      {/if}
       {#if error}<p class="error" role="alert">{error}</p>{/if}
       {#if done}<p class="done" role="status">{done}</p>{/if}
+      {#if connectionDone}<p class="done" role="status">{connectionDone}</p>{/if}
+      <button type="button" disabled={busy} onclick={testConnection}>
+        {busy ? t('appSettings.testingConnection') : t('appSettings.testConnection')}
+      </button>
       <button type="submit" disabled={busy || settings.fields.every((field) => field.isFixed)}>
         {busy ? t('appSettings.saving') : t('appSettings.save')}
       </button>
@@ -209,6 +255,10 @@
   }
   .error {
     color: var(--error);
+  }
+  .warning {
+    color: var(--warning-text);
+    font-weight: 600;
   }
   .done {
     color: var(--success);

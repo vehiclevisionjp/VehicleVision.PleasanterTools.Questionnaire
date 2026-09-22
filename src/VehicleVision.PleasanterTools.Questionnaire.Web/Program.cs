@@ -135,38 +135,12 @@ if (MigrationCommand.IsRequested(args))
     return;
 }
 
-// **設定ファイルのキーは正式な名前へ写してある**（ParameterFiles）。
-// ここは 1 つの名前だけを見る
-var timeZoneDefault =
-    builder.Configuration[ParameterFiles.TimeZoneDefaultKey] ?? "Asia/Tokyo";
-
-var pleasanterOptions = new PleasanterOptions
-{
-    BaseUrl = builder.Configuration["QUESTIONNAIRE_PLEASANTER_BASEURL"]
-        ?? throw new InvalidOperationException("QUESTIONNAIRE_PLEASANTER_BASEURL が設定されていない"),
-    ApiKey = builder.Configuration["QUESTIONNAIRE_PLEASANTER_APIKEY"]
-        ?? throw new InvalidOperationException("QUESTIONNAIRE_PLEASANTER_APIKEY が設定されていない"),
-
-    // **書き間違いは既定へ落とす。** ここで止めると、
-    // 版やタイムアウトの打ち間違いでアプリが上がらなくなる
-    ApiVersion = decimal.TryParse(
-        builder.Configuration["QUESTIONNAIRE_PLEASANTER_APIVERSION"],
-        System.Globalization.NumberStyles.Number,
-        System.Globalization.CultureInfo.InvariantCulture,
-        out var apiVersion) && apiVersion > 0
-        ? apiVersion
-        : PleasanterOptions.DefaultApiVersion,
-    Timeout = int.TryParse(
-        builder.Configuration["QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS"], out var timeoutSeconds)
-        && timeoutSeconds > 0
+var pleasanterTimeout = int.TryParse(
+    builder.Configuration["QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS"],
+    out var timeoutSeconds)
+    && timeoutSeconds > 0
         ? TimeSpan.FromSeconds(timeoutSeconds)
-        : PleasanterOptions.DefaultTimeout,
-
-    // **API キー側の指定が無ければ、アプリの既定タイムゾーンを使う**
-    // （Pleasanter.json の ApiKeyUserTimeZoneId の但し書きと同じ）
-    ApiKeyUserTimeZoneId =
-        builder.Configuration["QUESTIONNAIRE_PLEASANTER_TIMEZONE"] ?? timeZoneDefault,
-};
+        : PleasanterOptions.DefaultTimeout;
 
 // ---- サービス --------------------------------------------------------------
 builder.Services.AddOpenApi();
@@ -214,8 +188,12 @@ builder.Services.AddSingleton(serviceProvider => new AltchaGuard(
     serviceProvider.GetRequiredService<IAltchaChallengeStore>()));
 builder.Services.AddSingleton(AdminCaptchaOptions.FromConfiguration(builder.Configuration));
 
-builder.Services.AddSingleton(pleasanterOptions);
-builder.Services.AddSingleton(new PleasanterDateTime(pleasanterOptions.ApiKeyUserTimeZoneId));
+builder.Services.AddSingleton<IPleasanterOptionsProvider, PleasanterOptionsProvider>();
+builder.Services.AddSingleton(serviceProvider =>
+    serviceProvider.GetRequiredService<IPleasanterOptionsProvider>()
+        .GetAsync().GetAwaiter().GetResult());
+builder.Services.AddSingleton(serviceProvider => new PleasanterDateTime(
+    serviceProvider.GetRequiredService<PleasanterOptions>().ApiKeyUserTimeZoneId));
 builder.Services.AddSingleton<PleasanterRecordBuilder>();
 // **変換スクリプトは上限付きで走らせる**（Issue #83、_documents/アーキテクチャ方針.md 8 章）。
 // **上限が無いと、書き間違えた `while (true)` 1 つで送信ワーカーが永久に固まる。**
@@ -225,8 +203,11 @@ builder.Services.AddSingleton<IScriptConverter>(serviceProvider =>
     new JintScriptConverter(serviceProvider.GetRequiredService<ScriptConverterOptions>()));
 builder.Services.AddSingleton(serviceProvider =>
     new MappingEvaluator(serviceProvider.GetRequiredService<IScriptConverter>()));
-builder.Services.AddHttpClient<PleasanterApiClient>(client =>
-    client.Timeout = pleasanterOptions.Timeout);
+builder.Services.AddHttpClient("pleasanter", client =>
+    client.Timeout = pleasanterTimeout);
+builder.Services.AddTransient(serviceProvider => new PleasanterApiClient(
+    serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter"),
+    serviceProvider.GetRequiredService<IPleasanterOptionsProvider>()));
 
 // **溜まりすぎたら受付を止める**（Issue #72、_documents/非機能設計.md 2 章）。
 // **WAF が無い導入先を想定した最後の壁。** 分散した相手にはレート制限が効かない。
