@@ -398,6 +398,32 @@ public class AppSettingsProviderTests
         Assert.DoesNotContain(secret, json, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Pleasanter接続の未設定状態を管理画面へ返す()
+    {
+        var snapshot = await Create(new ConfigurationBuilder().Build(), new FakeStore()).GetAsync();
+
+        var response = AdminSettingsEndpoints.Body(snapshot);
+
+        Assert.False(response.IsPleasanterConfigured);
+    }
+
+    [Fact]
+    public async Task Pleasanter接続が設定済みなら未設定として扱わない()
+    {
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+        var snapshot = await provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.PleasanterBaseUrlKey] = "https://pleasanter.example.test",
+                [AppSettingsProvider.PleasanterApiKeyKey] = "secret-api-key",
+            },
+            Guid.NewGuid());
+
+        Assert.Empty(PleasanterConfigurationReport.MissingKeys(snapshot));
+        Assert.True(AdminSettingsEndpoints.Body(snapshot).IsPleasanterConfigured);
+    }
+
     private static AppSettingsProvider Create(
         IConfiguration configuration,
         IAppSettingStore store,

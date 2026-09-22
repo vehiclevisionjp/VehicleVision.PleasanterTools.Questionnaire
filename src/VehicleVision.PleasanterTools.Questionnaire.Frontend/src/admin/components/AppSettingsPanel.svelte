@@ -172,6 +172,9 @@
           )}
         </p>
       {/if}
+      {#if !settings.isPleasanterConfigured}
+        <p class="warning" role="alert">{t('appSettings.pleasanterNotConfigured')}</p>
+      {/if}
       {#if error}<p class="error" role="alert">{error}</p>{/if}
       {#if done}<p class="done" role="status">{done}</p>{/if}
       {#if connectionDone}<p class="done" role="status">{connectionDone}</p>{/if}

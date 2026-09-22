@@ -925,6 +925,10 @@ try
         databaseStartupState,
         app.Logger,
         app.Lifetime.ApplicationStopping);
+    await PleasanterConfigurationReport.ReportAsync(
+        app.Services.GetRequiredService<IAppSettingsProvider>(),
+        app.Logger,
+        app.Lifetime.ApplicationStopping);
     await app.WaitForShutdownAsync();
 }
 catch (OperationCanceledException) when (app.Lifetime.ApplicationStopping.IsCancellationRequested)

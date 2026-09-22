@@ -141,7 +141,8 @@ public static class AdminSettingsEndpoints
             definition.Maximum,
             definition.MaximumLength,
             definition.ShowPreview)).ToArray(),
-        publishedSurveyCount);
+        publishedSurveyCount,
+        PleasanterConfigurationReport.MissingKeys(snapshot).Count == 0);
 
     private static AppSettingsSnapshot Candidate(
         AppSettingsSnapshot current,
@@ -191,7 +192,8 @@ public static class AdminSettingsEndpoints
 
     public sealed record AppSettingsResponse(
         IReadOnlyList<AppSettingFieldResponse> Fields,
-        int PublishedSurveyCount);
+        int PublishedSurveyCount,
+        bool IsPleasanterConfigured);
 
     public sealed record ConnectionTestResponse(bool Connected);
 
