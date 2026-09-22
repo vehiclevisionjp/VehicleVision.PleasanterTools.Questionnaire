@@ -237,14 +237,16 @@ public static class FormEndpoints
         // **送信チケットを出す。** 画面を開いた時刻を署名に閉じ込めて返すだけで、
         // サーバ側には何も覚えない（回答者を突き合わせる手掛かりを残さない）。
         //
-        // **DB を見ない。** 見ると応答の速さで公開 ID の実在が分かってしまうため、
+        // **アンケート・回答の DB を見ない。** 見ると応答の速さで公開 ID の実在が分かってしまうため、
         // 存在しないアンケートでも同じようにチケットを返す。**使っても受付で断られる。**
-        forms.MapPost("/{publicId}/ticket", (
+        forms.MapPost("/{publicId}/ticket", async (
             string publicId,
             TicketRequest request,
             SubmissionGuard guard,
             AltchaGuard altcha,
-            CaptchaOptions captcha) =>
+            CaptchaOptions captcha,
+            BotMitigationOptionsProvider botOptionsProvider,
+            CancellationToken cancellationToken) =>
         {
             // **端末が持っていない・書式が壊れていれば、こちらで作る。**
             // 回答トークンは推測不能でなければならない値なので、
@@ -262,11 +264,14 @@ public static class FormEndpoints
             // **外部の CAPTCHA を選んでいるなら、自前の課題は出さない**（Issue #164）。
             // 課すのは 1 つだけ。両方出すと、回答者に二重の手間をかける
             var usesExternalCaptcha = captcha.IsExternalReady;
+            var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
 
             return Results.Ok(new TicketResponse(
                 responseToken,
                 guard.Issue(publicId, responseToken),
-                !usesExternalCaptcha && altcha.Options.Enabled ? altcha.Issue() : null,
+                !usesExternalCaptcha && botOptions.Altcha.Enabled
+                    ? altcha.Issue(botOptions.Altcha)
+                    : null,
                 captcha.Provider.ToString(),
 
                 // **秘密鍵は返さない。** 画面へ渡すのはサイトキーだけ
@@ -397,6 +402,7 @@ public static class FormEndpoints
             MaintenanceMode maintenance,
             SubmissionGuard guard,
             AltchaGuard altcha,
+            BotMitigationOptionsProvider botOptionsProvider,
             CaptchaOptions captchaOptions,
             CaptchaVerifier captchaVerifier,
             ILogger<SubmissionGuard> logger,
@@ -448,14 +454,20 @@ public static class FormEndpoints
                 return Results.BadRequest();
             }
 
-            // **DB を見る前に bot を弾く**（_documents/非機能設計.md 1 章）。
+            // **アンケート・回答の DB を見る前に bot を弾く**（_documents/非機能設計.md 1章）。
             // 書いてから弾いても、DB の消費はもう起きている。
             // **アンケートの実在を確かめる前に弾くので、ここで断った応答は
             // 公開 ID が実在するかを漏らさない。**
             //
             // **本文を読んだ後でしか判定できない。** チケットと罠は本文に載っている。
             // 添付を伴う要求では、その分だけ読み込みが先に走る（上限は上で掛けてある）
-            var botRejection = guard.Check(request.Ticket, request.Trap, publicId, responseToken);
+            var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
+            var botRejection = guard.Check(
+                request.Ticket,
+                request.Trap,
+                publicId,
+                responseToken,
+                botOptions.SubmissionGuard);
             if (botRejection is { } reason)
             {
                 // **理由は外へ返さない。** 返すと、bot がどこを直せばよいか分かる。
@@ -498,8 +510,8 @@ public static class FormEndpoints
                 }
             }
             else if (requiresChallenge
-                && altcha.Options.Enabled
-                && await altcha.CheckAsync(request.Altcha, cancellationToken) is { } altchaReason)
+                && botOptions.Altcha.Enabled
+                && await altcha.CheckAsync(request.Altcha, botOptions.Altcha, cancellationToken) is { } altchaReason)
             {
                 // **理由は外へ返さない**（上と同じ）
                 logger.LogWarning("回答の送信を proof-of-work で断った。理由: {Reason}", altchaReason);
