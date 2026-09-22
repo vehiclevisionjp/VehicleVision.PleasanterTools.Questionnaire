@@ -22,20 +22,20 @@ public sealed class ScriptConverterOptions
     /// ⚠️ **「1 回」は列 1 つぶん。** スクリプト変換を持つ列の数だけ実行されるので、
     /// 緩めるときは 1 件の回答あたりの合計で見積もること。
     /// </remarks>
-    public TimeSpan TimeLimit { get; init; } = TimeSpan.FromMilliseconds(200);
+    public TimeSpan TimeLimit { get; set; } = TimeSpan.FromMilliseconds(200);
 
     /// <summary>スクリプト 1 回あたりに使えるメモリの上限（バイト）。</summary>
     /// <remarks>
     /// **時間の上限だけでは、確保し続けるコードを止めきれない。**
     /// 打ち切るまでの間に大きな配列を作られると、他の処理を巻き添えにする。
     /// </remarks>
-    public long MemoryLimitBytes { get; init; } = 4 * 1024 * 1024;
+    public long MemoryLimitBytes { get; set; } = 4 * 1024 * 1024;
 
     /// <summary>再帰の深さの上限。</summary>
     /// <remarks>
     /// **スタックオーバーフローはプロセスごと落ちる。** 例外にして受け止められる形にしておく。
     /// </remarks>
-    public int RecursionLimit { get; init; } = 64;
+    public int RecursionLimit { get; set; } = 64;
 
     /// <summary>実行時間の上限（ミリ秒）の設定名。</summary>
     public const string TimeLimitKey = "QUESTIONNAIRE_SCRIPT_TIMEOUT_MS";
