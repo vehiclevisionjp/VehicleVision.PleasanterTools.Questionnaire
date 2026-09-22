@@ -44,6 +44,7 @@ public static class AdminSettingsEndpoints
                 var definitions = before.Definitions.ToDictionary(
                     definition => definition.Key,
                     StringComparer.Ordinal);
+                ValidateAltchaRange(request.Values, before, definitions);
                 var changedKeys = request.Values
                     .Where(value => definitions.TryGetValue(value.Key, out var definition)
                         && !before.FixedKeys.Contains(value.Key)
@@ -58,6 +59,15 @@ public static class AdminSettingsEndpoints
                 {
                     AuditNotes.SetTarget(context, "AppSetting", string.Join(",", changedKeys));
                     AuditNotes.Add(context, "changedKeys", string.Join(",", changedKeys));
+                    AuditNotes.Add(
+                        context,
+                        "changedValues",
+                        string.Join(
+                            ";",
+                            changedKeys
+                                .Where(key => !definitions[key].IsSecret)
+                                .Select(key =>
+                                $"{key}:{before[key]}->{definitions[key].Normalize(request.Values[key])}")));
                 }
 
                 var adminUserId = Guid.Parse(
@@ -120,6 +130,39 @@ public static class AdminSettingsEndpoints
         });
 
         return builder;
+    }
+
+    private static void ValidateAltchaRange(
+        IReadOnlyDictionary<string, string?> requestedValues,
+        AppSettingsSnapshot before,
+        IReadOnlyDictionary<string, AppSettingDefinition> definitions)
+    {
+        static int ValueOf(
+            string key,
+            IReadOnlyDictionary<string, string?> requested,
+            AppSettingsSnapshot current,
+            IReadOnlyDictionary<string, AppSettingDefinition> currentDefinitions) =>
+            int.Parse(
+                requested.TryGetValue(key, out var requestedValue)
+                    ? currentDefinitions[key].Normalize(requestedValue)
+                    : current[key],
+                System.Globalization.CultureInfo.InvariantCulture);
+
+        var minimum = ValueOf(
+            BotMitigationOptionsProvider.AltchaMinimumNumberKey,
+            requestedValues,
+            before,
+            definitions);
+        var maximum = ValueOf(
+            BotMitigationOptionsProvider.AltchaMaximumNumberKey,
+            requestedValues,
+            before,
+            definitions);
+        if (minimum > maximum)
+        {
+            throw new AppSettingValidationException(
+                "proof-of-work の探索下限は探索上限以下で指定してください。");
+        }
     }
 
     /// <summary>設定を管理画面へ返す形へ変換する。秘密値の本文は絶対に含めない。</summary>

@@ -1,4 +1,4 @@
-using System.Collections.Frozen;
+﻿using System.Collections.Frozen;
 using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
@@ -26,7 +26,8 @@ public sealed record AppSettingDefinition(
     int? Maximum = null,
     int? MaximumLength = null,
     bool ShowPreview = false,
-    Func<string, string>? StringNormalizer = null)
+    Func<string, string>? StringNormalizer = null,
+    string? BooleanFalseAlias = null)
 {
     /// <summary>入力を検証し、DB へ保存する表現へそろえる。</summary>
     public string Normalize(string? requestedValue)
@@ -54,6 +55,12 @@ public sealed record AppSettingDefinition(
 
     private string NormalizeBoolean(string value)
     {
+        if (BooleanFalseAlias is not null
+            && string.Equals(value, BooleanFalseAlias, StringComparison.OrdinalIgnoreCase))
+        {
+            return "false";
+        }
+
         if (!bool.TryParse(value, out var parsed))
         {
             throw new AppSettingValidationException($"{LabelJa}は真偽値で指定してください。");
@@ -197,6 +204,71 @@ public sealed class AppSettingsProvider(
             "The value is never returned to the browser. Saving an empty field keeps the current value; it cannot be deleted from this screen.",
             IsSecret: true,
             MaximumLength: 2000),
+        new(
+            BotMitigationOptionsProvider.MitigationEnabledKey,
+            AppSettingValueType.Boolean,
+            "true",
+            "回答送信の bot 対策",
+            "Bot protection for form submissions",
+            "送信チケット、最短時間、ハニーポットを有効にします。無効化すると回答送信の bot 対策がなくなるため、検証環境以外では変更しないでください。",
+            "Enables submission tickets, minimum elapsed time, and a honeypot. Do not disable outside test environments because form submissions will no longer have bot protection.",
+            BooleanFalseAlias: "off"),
+        new(
+            BotMitigationOptionsProvider.SubmitMinimumSecondsKey,
+            AppSettingValueType.Integer,
+            "3",
+            "回答送信までの最短時間（秒）",
+            "Minimum time before submitting (seconds)",
+            "チケット発行からこの時間より早い回答を拒否します。長くすると、素早く回答した利用者も拒否されます。",
+            "Rejects responses submitted sooner than this after ticket issuance. Increasing it can also reject legitimate fast respondents.",
+            Minimum: 1,
+            Maximum: 60),
+        new(
+            BotMitigationOptionsProvider.SubmitTicketHoursKey,
+            AppSettingValueType.Integer,
+            "24",
+            "送信チケットの有効期間（時間）",
+            "Submission ticket lifetime (hours)",
+            "期限を過ぎた回答は拒否します。短くすると、長い設問を回答中の利用者が送り直す必要があります。",
+            "Rejects responses after the ticket expires. Reducing it can require respondents completing long forms to start over.",
+            Minimum: 1,
+            Maximum: 168),
+        new(
+            BotMitigationOptionsProvider.AltchaEnabledKey,
+            AppSettingValueType.Boolean,
+            "true",
+            "回答者向け proof-of-work",
+            "Proof of work for respondents",
+            "回答者の端末で計算する自前の proof-of-work を有効にします。第三者へ回答者情報を送らないため、完全匿名の前提を保てます。",
+            "Enables self-hosted proof of work computed on the respondent's device. It preserves anonymity because no respondent data is sent to a third party."),
+        new(
+            BotMitigationOptionsProvider.AltchaMinimumNumberKey,
+            AppSettingValueType.Integer,
+            "50000",
+            "proof-of-work の探索下限",
+            "Proof-of-work minimum search number",
+            "回答者の端末で探す数の下限です。大きくすると bot の負担も増えますが、古い端末での待ち時間も伸びます。上限以下にしてください。",
+            "Minimum number searched on the respondent's device. A larger value increases bot cost but also wait time on older devices. Keep it no greater than the maximum.",
+            Minimum: 10_000,
+            Maximum: 250_000),
+        new(
+            BotMitigationOptionsProvider.AltchaMaximumNumberKey,
+            AppSettingValueType.Integer,
+            "150000",
+            "proof-of-work の探索上限",
+            "Proof-of-work maximum search number",
+            "回答者の端末で探す数の上限です。大きくすると bot の負担も増えますが、古い端末での待ち時間も伸びます。下限以上にしてください。",
+            "Maximum number searched on the respondent's device. A larger value increases bot cost but also wait time on older devices. Keep it no less than the minimum.",
+            Minimum: 50_000,
+            Maximum: 500_000),
+        new(
+            BotMitigationOptionsProvider.LoginProofOfWorkKey,
+            AppSettingValueType.Boolean,
+            "false",
+            "管理者ログインの proof-of-work",
+            "Proof of work for administrator sign-in",
+            "パスワードログインと招待受取に proof-of-work を課します。管理者がログインする前に追加の計算が必要になります。",
+            "Requires proof of work for password sign-in and invitation acceptance. Administrators must complete additional computation before signing in."),
     ];
 
     private static readonly FrozenDictionary<string, AppSettingDefinition> Definitions =
