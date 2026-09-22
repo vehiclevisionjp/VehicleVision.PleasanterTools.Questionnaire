@@ -34,9 +34,16 @@ public static class AdminSettingsEndpoints
             try
             {
                 var before = await provider.GetAsync(cancellationToken).ConfigureAwait(false);
+                var definitions = before.Definitions.ToDictionary(
+                    definition => definition.Key,
+                    StringComparer.Ordinal);
                 var changedKeys = request.Values
-                    .Where(value => before.Values.TryGetValue(value.Key, out var current)
-                        && !string.Equals(current, value.Value?.Trim(), StringComparison.Ordinal))
+                    .Where(value => definitions.TryGetValue(value.Key, out var definition)
+                        && !before.FixedKeys.Contains(value.Key)
+                        && !string.Equals(
+                            before[value.Key],
+                            definition.Normalize(value.Value),
+                            StringComparison.Ordinal))
                     .Select(value => value.Key)
                     .ToArray();
                 if (changedKeys.Length > 0)
@@ -62,14 +69,15 @@ public static class AdminSettingsEndpoints
         return builder;
     }
 
-    private static object Body(AppSettingsSnapshot snapshot) => new
-    {
-        fields = snapshot.Definitions.Select(definition => new
-        {
-            key = definition.Key,
-            type = definition.Type.ToString().ToLowerInvariant(),
-            value = snapshot[definition.Key],
-            isFixed = snapshot.FixedKeys.Contains(definition.Key),
+    /// <summary>設定を管理画面へ返す形へ変換する。秘密値の本文は絶対に含めない。</summary>
+    public static AppSettingsResponse Body(AppSettingsSnapshot snapshot) => new(
+        snapshot.Definitions.Select(definition => new AppSettingFieldResponse(
+            definition.Key,
+            definition.Type.ToString().ToLowerInvariant(),
+            definition.IsSecret ? null : snapshot[definition.Key],
+            definition.IsSecret && snapshot[definition.Key].Length > 0,
+            definition.IsSecret,
+            snapshot.FixedKeys.Contains(definition.Key),
             definition.LabelJa,
             definition.LabelEn,
             definition.DescriptionJa,
@@ -77,9 +85,25 @@ public static class AdminSettingsEndpoints
             definition.Minimum,
             definition.Maximum,
             definition.MaximumLength,
-            definition.ShowPreview,
-        }),
-    };
+            definition.ShowPreview)).ToArray());
 
     public sealed record AppSettingsRequest(IReadOnlyDictionary<string, string?>? Values);
+
+    public sealed record AppSettingsResponse(IReadOnlyList<AppSettingFieldResponse> Fields);
+
+    public sealed record AppSettingFieldResponse(
+        string Key,
+        string Type,
+        string? Value,
+        bool HasValue,
+        bool IsSecret,
+        bool IsFixed,
+        string LabelJa,
+        string LabelEn,
+        string DescriptionJa,
+        string DescriptionEn,
+        int? Minimum,
+        int? Maximum,
+        int? MaximumLength,
+        bool ShowPreview);
 }

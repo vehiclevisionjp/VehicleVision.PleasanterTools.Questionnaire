@@ -642,7 +642,9 @@ export interface AppSettings {
 export interface AppSettingField {
   key: string;
   type: 'string' | 'boolean' | 'integer';
-  value: string;
+  value: string | null;
+  hasValue: boolean;
+  isSecret: boolean;
   isFixed: boolean;
   labelJa: string;
   labelEn: string;

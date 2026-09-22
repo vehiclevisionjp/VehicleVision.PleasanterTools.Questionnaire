@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Time.Testing;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
+using System.Collections.Frozen;
+using System.Text.Json;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
@@ -18,6 +21,8 @@ public class AppSettingsProviderTests
 
         public int ListCount { get; private set; }
 
+        public int SaveCount { get; private set; }
+
         public Task<IReadOnlyList<AppSettingRecord>> ListAsync(
             CancellationToken cancellationToken = default)
         {
@@ -32,6 +37,7 @@ public class AppSettingsProviderTests
             Guid updatedByAdminUserId,
             CancellationToken cancellationToken = default)
         {
+            SaveCount++;
             values[settingKey] = new AppSettingRecord(
                 settingKey,
                 value,
@@ -178,6 +184,20 @@ public class AppSettingsProviderTests
     }
 
     [Fact]
+    public async Task 保存要求から省略した設定は既存値を保持する()
+    {
+        var store = new FakeStore(Record("既存値"));
+        var provider = Create(new ConfigurationBuilder().Build(), store);
+
+        var snapshot = await provider.SaveAsync(
+            new Dictionary<string, string?>(),
+            Guid.NewGuid());
+
+        Assert.Equal("既存値", snapshot[AppSettingsProvider.AdminNoticeKey]);
+        Assert.Equal(0, store.SaveCount);
+    }
+
+    [Fact]
     public void 定義が文字列真偽整数を検証できる()
     {
         var text = Definition(AppSettingValueType.String, maximumLength: 3);
@@ -191,6 +211,35 @@ public class AppSettingsProviderTests
         Assert.Equal("5", integer.Normalize("05"));
         Assert.Throws<AppSettingValidationException>(() => integer.Normalize("0"));
         Assert.Throws<AppSettingValidationException>(() => integer.Normalize("11"));
+    }
+
+    [Fact]
+    public void 秘密の設定値は管理画面の応答へ含めない()
+    {
+        const string secret = "smtp-password-must-not-leak";
+        var definition = new AppSettingDefinition(
+            "QUESTIONNAIRE_TEST_SECRET",
+            AppSettingValueType.String,
+            string.Empty,
+            "試験用の秘密",
+            "Test secret",
+            string.Empty,
+            string.Empty,
+            IsSecret: true);
+        var snapshot = new AppSettingsSnapshot(
+            [definition],
+            new Dictionary<string, string> { [definition.Key] = secret }
+                .ToFrozenDictionary(StringComparer.Ordinal),
+            FrozenSet<string>.Empty);
+
+        var response = AdminSettingsEndpoints.Body(snapshot);
+        var field = Assert.Single(response.Fields);
+        var json = JsonSerializer.Serialize(response, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        Assert.Null(field.Value);
+        Assert.True(field.HasValue);
+        Assert.True(field.IsSecret);
+        Assert.DoesNotContain(secret, json, StringComparison.Ordinal);
     }
 
     private static AppSettingsProvider Create(

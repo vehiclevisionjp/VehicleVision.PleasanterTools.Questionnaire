@@ -320,7 +320,12 @@ export const saveAppSettings = (settings: AppSettings) =>
   call<AppSettings>('/api/admin/settings', {
     method: 'PUT',
     json: {
-      values: Object.fromEntries(settings.fields.map((field) => [field.key, field.value])),
+      // 秘密欄は空なら送らず、既存値を保つ。入力した値だけを置き換える。
+      values: Object.fromEntries(
+        settings.fields
+          .filter((field) => !field.isSecret || (field.value?.trim() ?? '') !== '')
+          .map((field) => [field.key, field.value]),
+      ),
     },
   });
 

@@ -40,6 +40,10 @@
     field.value = checked ? 'true' : 'false';
   }
 
+  function setValue(field: AppSettingField, value: string) {
+    field.value = value;
+  }
+
   async function save(event: SubmitEvent) {
     event.preventDefault();
     if (!settings) return;
@@ -89,23 +93,38 @@
             {#if field.isFixed}<span class="fixed">{t('appSettings.fixed')}</span>{/if}
           </span>
           {#if field.type === 'string'}
-            <textarea
-              rows="4"
-              maxlength={field.maximumLength ?? undefined}
-              bind:value={field.value}
-              disabled={field.isFixed}
-            ></textarea>
+            {#if field.isSecret}
+              <input
+                type="password"
+                value={field.value ?? ''}
+                autocomplete="new-password"
+                disabled={field.isFixed}
+                oninput={(event) => setValue(field, event.currentTarget.value)}
+              />
+              <span class="hint">
+                {field.hasValue ? t('appSettings.secretConfigured') : t('appSettings.secretNotConfigured')}
+              </span>
+            {:else}
+              <textarea
+                rows="4"
+                maxlength={field.maximumLength ?? undefined}
+                value={field.value ?? ''}
+                disabled={field.isFixed}
+                oninput={(event) => setValue(field, event.currentTarget.value)}
+              ></textarea>
+            {/if}
           {:else if field.type === 'integer'}
             <input
               type="number"
               min={field.minimum ?? undefined}
               max={field.maximum ?? undefined}
-              bind:value={field.value}
+              value={field.value ?? ''}
               disabled={field.isFixed}
+              oninput={(event) => setValue(field, event.currentTarget.value)}
             />
           {/if}
           <span class="hint">{description(field)}</span>
-          {#if field.showPreview && field.value.trim() !== ''}
+          {#if field.showPreview && (field.value?.trim() ?? '') !== ''}
             <aside class="preview">{field.value}</aside>
           {/if}
         </label>
@@ -161,6 +180,7 @@
     grid-column: 2;
   }
   input[type='number'],
+  input[type='password'],
   textarea {
     box-sizing: border-box;
     width: 100%;
