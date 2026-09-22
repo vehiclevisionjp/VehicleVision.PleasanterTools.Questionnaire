@@ -27,19 +27,35 @@ public sealed record AttachmentRejection(
 /// **必ず送信待ちへ保存する前に呼ぶこと。** 保存してからでは未検査のバイナリが DB に載る
 /// （<c>_documents/添付ファイル検査-運用手順書.md</c>）。
 /// </remarks>
-public sealed class AttachmentInspector(AttachmentPolicy policy, IVirusScanner? scanner = null)
+public sealed class AttachmentInspector
 {
+    private readonly Func<AttachmentPolicy> policyProvider;
+    private readonly IVirusScanner? scanner;
+
+    public AttachmentInspector(AttachmentPolicy policy, IVirusScanner? scanner = null)
+        : this(() => policy, scanner)
+    {
+    }
+
+    public AttachmentInspector(
+        Func<AttachmentPolicy> policyProvider,
+        IVirusScanner? scanner = null)
+    {
+        this.policyProvider = policyProvider;
+        this.scanner = scanner;
+    }
+
     /// <summary>先頭バイトの照合に必要な長さ。</summary>
     private const int SignatureProbeLength = 16;
 
     /// <summary>共通の受け入れ条件。**設問ごとに絞り込むときの元になる。**</summary>
-    public AttachmentPolicy Policy => policy;
+    public AttachmentPolicy Policy => policyProvider();
 
     /// <summary>設問 1 つ分の添付を検査する。</summary>
     public Task<ImmutableArray<AttachmentRejection>> InspectAsync(
         IReadOnlyList<IncomingAttachment> attachments,
         CancellationToken cancellationToken = default) =>
-        InspectAsync(attachments, policy, questionId: null, cancellationToken);
+        InspectAsync(attachments, Policy, questionId: null, cancellationToken);
 
     /// <summary>1 回の送信ぶんをまとめて検査する。</summary>
     /// <remarks>
@@ -57,6 +73,7 @@ public sealed class AttachmentInspector(AttachmentPolicy policy, IVirusScanner? 
     {
         ArgumentNullException.ThrowIfNull(attachments);
 
+        var policy = Policy;
         var total = attachments.Sum(attachment => (long)attachment.File.Content.Length);
         if (total > policy.MaxTotalBytes)
         {
