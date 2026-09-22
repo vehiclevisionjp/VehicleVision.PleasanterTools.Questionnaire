@@ -18,20 +18,20 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// </remarks>
 public sealed record BacklogGuardOptions
 {
-    /// <summary>アンケート 1 本あたりの上限。**0 以下で無効。**</summary>
+    /// <summary>アンケート 1 本あたりの上限。</summary>
     /// <remarks>
     /// **狙われている 1 本を切り離し、他を生かすための段。**
     /// 既定は 1 万件。**添付があると 1 件が桁違いに重い**ので、
     /// 添付を受け付けるアンケートが多い導入先では下げること。
     /// </remarks>
-    public int PerSurveyLimit { get; init; } = 10_000;
+    public int PerSurveyLimit { get; set; } = 10_000;
 
-    /// <summary>全アンケート合計の上限。**0 以下で無効。**</summary>
+    /// <summary>全アンケート合計の上限。</summary>
     /// <remarks>
     /// **Pleasanter が止まると全アンケートが等しく溜まる**ので、
     /// 1 本ずつの上限だけでは DB が溢れるのを止められない。既定は 5 万件。
     /// </remarks>
-    public int TotalLimit { get; init; } = 50_000;
+    public int TotalLimit { get; set; } = 50_000;
 
     /// <summary>受付を再開する水準（上限に対する割合）。</summary>
     /// <remarks>
@@ -68,7 +68,7 @@ public sealed record BacklogGuardOptions
     /// <summary>設定から読む。</summary>
     /// <remarks>
     /// **読めない値を黙って既定へ落とさない。** 設定したつもりが効いていない状態を作る。
-    /// **0 以下は「その段を使わない」**という指定として通す。
+    /// **0 以下は受け付けない。** 防御を意図せず外す指定を作らない。
     /// </remarks>
     public static BacklogGuardOptions FromConfiguration(IConfiguration configuration)
     {
@@ -92,10 +92,10 @@ public sealed record BacklogGuardOptions
             return fallback;
         }
 
-        return int.TryParse(raw, CultureInfo.InvariantCulture, out var value)
+        return int.TryParse(raw, CultureInfo.InvariantCulture, out var value) && value > 0
             ? value
             : throw new InvalidOperationException(
-                $"{key} は整数で指定する（今の値: {raw}）。0 以下にするとその段を使わない");
+                $"{key} は 1 以上の整数で指定する（今の値: {raw}）");
     }
 }
 

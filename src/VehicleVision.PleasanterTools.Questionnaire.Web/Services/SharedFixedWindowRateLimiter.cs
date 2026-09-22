@@ -165,10 +165,11 @@ public static class RateLimitPartitions
         ISharedRateLimitStore? sharedStore,
         ILogger logger)
     {
+        var limiterKey = $"{partition}|limit:{permitLimit}";
         if (sharedStore is null)
         {
             return RateLimitPartition.GetFixedWindowLimiter(
-                partition,
+                limiterKey,
                 _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = permitLimit,
@@ -177,7 +178,7 @@ public static class RateLimitPartitions
         }
 
         return new RateLimitPartition<string>(
-            partition,
+            limiterKey,
             _ => new SharedFixedWindowRateLimiter(
                 sharedStore,
                 scope + ":" + partition,
