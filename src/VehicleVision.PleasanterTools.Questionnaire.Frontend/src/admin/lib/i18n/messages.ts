@@ -62,6 +62,7 @@ export const ja = {
   'breadcrumb.notifications': 'お知らせ',
   'breadcrumb.users': '管理者の管理',
   'breadcrumb.account': '自分のアカウント',
+  'breadcrumb.appSettings': 'アプリケーション設定',
   'breadcrumb.samlSettings': 'SAML 設定',
   'breadcrumb.help': '使い方',
 
@@ -274,6 +275,21 @@ export const ja = {
   'saml.testFailed': 'メタデータを取得できませんでした。URL と IdP の状態をご確認ください。',
   'saml.testSucceeded': 'SAML メタデータを取得できました。',
   'saml.testSucceededWithEntityId': 'SAML メタデータを取得できました（Entity ID: {entityId}）。',
+
+  // ---- アプリケーション設定 ----------------------------------------------
+  'appSettings.open': '設定',
+  'appSettings.title': 'アプリケーション設定',
+  'appSettings.back': '← アンケートの一覧へ',
+  'appSettings.lead':
+    '外部設定に値がある項目は固定されます。それ以外は保存後、再起動せずに反映されます。',
+  'appSettings.fixed': '外部設定で固定されています',
+  'appSettings.adminNotice': '管理者向けのお知らせ',
+  'appSettings.adminNoticeHint':
+    '設定の保存と反映を確認するための項目です。入力した内容は下にプレビューされます。',
+  'appSettings.preview': 'お知らせのプレビュー',
+  'appSettings.save': '保存する',
+  'appSettings.saving': '処理しています…',
+  'appSettings.saved': 'アプリケーション設定を保存しました。',
 
   // ---- 2 要素の登録 -------------------------------------------------------
   'enroll.title': '2 要素認証を登録する',
@@ -1114,6 +1130,7 @@ export const en: Record<MessageKey, string> = {
   'breadcrumb.notifications': 'Notifications',
   'breadcrumb.users': 'Manage administrators',
   'breadcrumb.account': 'My account',
+  'breadcrumb.appSettings': 'Application settings',
   'breadcrumb.samlSettings': 'SAML settings',
   'breadcrumb.help': 'Help',
 
@@ -1324,6 +1341,21 @@ export const en: Record<MessageKey, string> = {
   'saml.testFailed': 'Could not retrieve metadata. Check the URL and IdP status.',
   'saml.testSucceeded': 'SAML metadata was retrieved.',
   'saml.testSucceededWithEntityId': 'SAML metadata was retrieved (Entity ID: {entityId}).',
+
+  // ---- Application settings ----------------------------------------------
+  'appSettings.open': 'Settings',
+  'appSettings.title': 'Application settings',
+  'appSettings.back': '\u2190 Back to surveys',
+  'appSettings.lead':
+    'Values supplied by external configuration are fixed. Other values take effect after saving without restarting the application.',
+  'appSettings.fixed': 'Fixed by external configuration',
+  'appSettings.adminNotice': 'Administrator notice',
+  'appSettings.adminNoticeHint':
+    'This field demonstrates saving and applying settings. The text is previewed below.',
+  'appSettings.preview': 'Notice preview',
+  'appSettings.save': 'Save',
+  'appSettings.saving': 'Working…',
+  'appSettings.saved': 'Application settings saved.',
 
   'enroll.title': 'Register two-factor authentication',
   'enroll.lead': 'Administration reaches every survey definition and every response.',

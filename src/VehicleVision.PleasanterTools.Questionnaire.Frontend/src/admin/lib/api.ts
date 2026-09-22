@@ -21,6 +21,7 @@ import type {
   SurveyPage,
   SurveyTemplateSummary,
   SamlSettings,
+  AppSettings,
 } from './types';
 
 /**
@@ -308,6 +309,17 @@ export const testSamlMetadata = (metadataUrl: string) =>
   call<{ reachable: boolean; entityId?: string | null }>('/api/admin/saml/settings/test', {
     method: 'POST',
     json: { metadataUrl },
+  });
+
+// ---- アプリケーション設定（Issue #372）-------------------------------------
+
+export const getAppSettings = () =>
+  call<AppSettings>('/api/admin/settings');
+
+export const saveAppSettings = (settings: AppSettings) =>
+  call<AppSettings>('/api/admin/settings', {
+    method: 'PUT',
+    json: { adminNotice: settings.adminNotice },
   });
 
 // ---- アンケート -------------------------------------------------------------

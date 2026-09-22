@@ -632,7 +632,15 @@ export type AdminPermission =
   | 'users.write'
   | 'users.resetTwoFactor'
   | 'settings.saml'
+  | 'settings.manage'
   | 'maintenance.manage';
+
+export interface AppSettings {
+  adminNotice: string;
+  fixedFields: {
+    adminNotice: boolean;
+  };
+}
 
 export interface SamlSettings {
   enabled: boolean;
