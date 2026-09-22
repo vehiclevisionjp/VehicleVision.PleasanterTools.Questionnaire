@@ -577,6 +577,11 @@ public sealed class AppSettingsProvider(
             }
         }
 
+        if (configuration[PleasanterTimeZoneKey] is null)
+        {
+            values[PleasanterTimeZoneKey] = values[ParameterFiles.TimeZoneDefaultKey];
+        }
+
         return new AppSettingsSnapshot(
             DefinitionList,
             values.ToFrozenDictionary(StringComparer.Ordinal),
@@ -710,6 +715,12 @@ public sealed class AppSettingsProvider(
                     ?? throw new InvalidOperationException($"設定を復号できません: {definition.Key}")
                 : record.Value;
             values[definition.Key] = definition.Normalize(stored);
+        }
+
+        if (configuration[PleasanterTimeZoneKey] is null
+            && !records.ContainsKey(PleasanterTimeZoneKey))
+        {
+            values[PleasanterTimeZoneKey] = values[ParameterFiles.TimeZoneDefaultKey];
         }
 
         return new AppSettingsSnapshot(
