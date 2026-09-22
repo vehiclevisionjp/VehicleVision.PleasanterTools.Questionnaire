@@ -48,36 +48,23 @@ public class DatabaseMigrationTests
         return providers;
     }
 
-    private static TheoryData<DatabaseProvider, string> Provider(DatabaseProvider provider) =>
-        provider switch
+    private static TheoryData<DatabaseProvider, string> Provider(DatabaseProvider provider)
+    {
+        if (provider is DatabaseProvider.Sqlite)
         {
-            DatabaseProvider.SqlServer => new()
-            {
-                {
-                    DatabaseProvider.SqlServer,
-                    $"Server=localhost,11433;Database=Questionnaire;UID=sa;******;TrustServerCertificate=True"
-                },
-            },
-            DatabaseProvider.PostgreSql => new()
-            {
-                {
-                    DatabaseProvider.PostgreSql,
-                    $"Host=localhost;Port=15432;Database=questionnaire;Username=postgres;******"
-                },
-            },
-            DatabaseProvider.MySql => new()
-            {
-                {
-                    DatabaseProvider.MySql,
-                    $"Server=localhost;Port=13306;Database=questionnaire;Uid=root;******"
-                },
-            },
-            DatabaseProvider.Sqlite => new()
+            return new()
             {
                 { DatabaseProvider.Sqlite, SqliteConnectionString },
-            },
-            _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null),
+            };
+        }
+
+        var selectedProvider = ServerProviders().Single(values => values[0] is DatabaseProvider value
+            && value == provider);
+        return new()
+        {
+            { (DatabaseProvider)selectedProvider[0], (string)selectedProvider[1] },
         };
+    }
 
     private static TheoryData<DatabaseProvider, string> ServerProviders() => new()
     {
