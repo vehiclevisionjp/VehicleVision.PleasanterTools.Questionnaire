@@ -1,7 +1,8 @@
-using VehicleVision.PleasanterTools.Questionnaire.Data;
+﻿using VehicleVision.PleasanterTools.Questionnaire.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Time.Testing;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
@@ -78,8 +79,10 @@ public class AppSettingStoreTests
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-09-22T00:00:00Z"));
         var configuration = new ConfigurationBuilder().Build();
         var protector = new SecretProtector(Convert.ToBase64String(new byte[32]));
-        var first = new AppSettingsProvider(configuration, store, protector, time);
-        var second = new AppSettingsProvider(configuration, store, protector, time);
+        var first = new AppSettingsProvider(
+            configuration, store, protector, time, NullLogger<AppSettingsProvider>.Instance);
+        var second = new AppSettingsProvider(
+            configuration, store, protector, time, NullLogger<AppSettingsProvider>.Instance);
         var initial = $"初期値-{Guid.NewGuid():N}";
         var changed = $"更新値-{Guid.NewGuid():N}";
 
