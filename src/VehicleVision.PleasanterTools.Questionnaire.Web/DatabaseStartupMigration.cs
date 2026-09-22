@@ -28,13 +28,21 @@ public static class DatabaseStartupMigration
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(logger);
 
-        var autoMigrate = IsTrue(configuration[AutoMigrateSetting]);
+        var autoMigrateSetting = configuration[AutoMigrateSetting];
+        var autoMigrate = ReadAutoMigrate(autoMigrateSetting);
         var skipCheck = IsTrue(configuration[SkipCheckSetting]);
 
         try
         {
             if (autoMigrate)
             {
+                if (string.IsNullOrWhiteSpace(autoMigrateSetting))
+                {
+                    logger.LogInformation(
+                        "Automatic database migration is enabled by default. Set {Setting}=false to disable it.",
+                        AutoMigrateSetting);
+                }
+
                 var timeout = ReadLockTimeout(configuration[LockTimeoutSetting]);
                 var result = await DatabaseMigrator.MigrateUpWithLockAsync(
                     provider,
@@ -100,6 +108,28 @@ public static class DatabaseStartupMigration
         }
 
         return TimeSpan.FromSeconds(seconds);
+    }
+
+    /// <summary>起動時の自動マイグレーション設定を読む。</summary>
+    public static bool ReadAutoMigrate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(value, "false", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        throw new InvalidOperationException(
+            $"{AutoMigrateSetting} must be either true or false.");
     }
 
     private static bool IsTrue(string? value) =>
