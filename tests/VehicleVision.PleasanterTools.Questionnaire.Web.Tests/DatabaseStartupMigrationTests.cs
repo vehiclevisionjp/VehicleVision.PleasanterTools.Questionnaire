@@ -36,11 +36,34 @@ public class DatabaseStartupMigrationTests
     }
 
     [Fact]
+    public void 自動マイグレーションは未設定で有効にする()
+    {
+        Assert.True(DatabaseStartupMigration.ReadAutoMigrate(null));
+    }
+
+    [Fact]
+    public void 自動マイグレーションはfalseで無効にする()
+    {
+        Assert.False(DatabaseStartupMigration.ReadAutoMigrate("false"));
+    }
+
+    [Theory]
+    [InlineData("enabled")]
+    [InlineData("1")]
+    [InlineData(" true")]
+    public void 不正な自動マイグレーション設定では起動を止める(string value)
+    {
+        Assert.Throws<InvalidOperationException>(
+            () => DatabaseStartupMigration.ReadAutoMigrate(value));
+    }
+
+    [Fact]
     public async Task 検査を明示的に外したときだけDBなしで受付可能になる()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
+                [DatabaseStartupMigration.AutoMigrateSetting] = "false",
                 [DatabaseStartupMigration.SkipCheckSetting] = "true",
             })
             .Build();
