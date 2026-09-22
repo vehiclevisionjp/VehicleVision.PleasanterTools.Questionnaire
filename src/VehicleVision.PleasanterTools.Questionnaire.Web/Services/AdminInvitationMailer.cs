@@ -27,9 +27,18 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 public sealed class AdminInvitationMailer(
     IMailOutbox outbox,
     IMailPayloadProtector protector,
-    MailOptions options,
+    IMailSettingsProvider mailSettings,
     ILogger<AdminInvitationMailer> logger)
 {
+    public AdminInvitationMailer(
+        IMailOutbox outbox,
+        IMailPayloadProtector protector,
+        MailOptions options,
+        ILogger<AdminInvitationMailer> logger)
+        : this(outbox, protector, new FixedMailSettingsProvider(options), logger)
+    {
+    }
+
     /// <summary>招待のメールを積む。**積んだら <c>true</c>。**</summary>
     /// <param name="loginId">招いた相手のログイン ID。**メールアドレスのときだけ送る。**</param>
     /// <param name="token">招待のトークン。**この 1 回しか受け取れない値。**</param>
@@ -43,6 +52,7 @@ public sealed class AdminInvitationMailer(
         string? language,
         CancellationToken cancellationToken = default)
     {
+        var options = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
         if (!options.IsReady)
         {
             return false;

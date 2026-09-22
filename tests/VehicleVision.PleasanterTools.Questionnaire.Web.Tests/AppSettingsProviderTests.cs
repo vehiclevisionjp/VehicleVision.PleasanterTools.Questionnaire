@@ -607,6 +607,104 @@ public class AppSettingsProviderTests
     }
 
     [Fact]
+    public async Task メール設定を定義しSMTPパスワードを秘密として返す()
+    {
+        var snapshot = await Create(
+            new ConfigurationBuilder().Build(),
+            new FakeStore()).GetAsync();
+
+        var response = AdminSettingsEndpoints.Body(snapshot);
+        var password = Assert.Single(
+            response.Fields,
+            field => field.Key == AppSettingsProvider.MailSmtpPasswordKey);
+
+        Assert.Equal("Smtp", snapshot[AppSettingsProvider.MailTransportKey]);
+        Assert.Equal("587", snapshot[AppSettingsProvider.MailSmtpPortKey]);
+        Assert.True(password.IsSecret);
+        Assert.Null(password.Value);
+        Assert.False(password.HasValue);
+    }
+
+    [Fact]
+    public async Task 有効なSMTP設定を保存してもパスワードを応答へ含めない()
+    {
+        const string password = "smtp-password-must-not-leak";
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+
+        var snapshot = await provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.MailEnabledKey] = "true",
+                [AppSettingsProvider.MailTransportKey] = "smtp",
+                [AppSettingsProvider.MailSmtpHostKey] = "smtp.example.test",
+                [AppSettingsProvider.MailSmtpPasswordKey] = password,
+                [AppSettingsProvider.MailFromAddressKey] = "noreply@example.test",
+                [AppSettingsProvider.MailBaseUrlKey] = "https://survey.example.test/",
+            },
+            Guid.NewGuid());
+
+        var response = AdminSettingsEndpoints.Body(snapshot);
+        var field = Assert.Single(
+            response.Fields,
+            candidate => candidate.Key == AppSettingsProvider.MailSmtpPasswordKey);
+        var json = JsonSerializer.Serialize(response, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        Assert.Equal("Smtp", snapshot[AppSettingsProvider.MailTransportKey]);
+        Assert.Equal("https://survey.example.test", snapshot[AppSettingsProvider.MailBaseUrlKey]);
+        Assert.Equal(password, snapshot[AppSettingsProvider.MailSmtpPasswordKey]);
+        var options = await new MailSettingsProvider(provider).GetAsync();
+        Assert.True(options.IsReady);
+        Assert.Equal("smtp.example.test", options.Host);
+        Assert.Equal(password, options.Password);
+        Assert.True(field.HasValue);
+        Assert.Null(field.Value);
+        Assert.DoesNotContain(password, json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 公開URLが無い有効設定はほかの値も保存せず拒否する()
+    {
+        var store = new FakeStore();
+        var provider = Create(new ConfigurationBuilder().Build(), store);
+
+        var exception = await Assert.ThrowsAsync<AppSettingValidationException>(() =>
+            provider.SaveAsync(
+                new Dictionary<string, string?>
+                {
+                    [AppSettingsProvider.AdminNoticeKey] = "保存されてはいけない",
+                    [AppSettingsProvider.MailEnabledKey] = "true",
+                    [AppSettingsProvider.MailSmtpHostKey] = "smtp.example.test",
+                    [AppSettingsProvider.MailFromAddressKey] = "noreply@example.test",
+                },
+                Guid.NewGuid()));
+
+        Assert.Contains("公開 URL", exception.Message);
+        Assert.Equal(0, store.SaveCount);
+    }
+
+    [Fact]
+    public async Task 保存前確認は入力値を反映するがDBへ保存しない()
+    {
+        var store = new FakeStore();
+        var provider = Create(new ConfigurationBuilder().Build(), store);
+
+        var preview = await provider.PreviewAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.MailEnabledKey] = "true",
+                [AppSettingsProvider.MailSmtpHostKey] = "smtp.example.test",
+                [AppSettingsProvider.MailFromAddressKey] = "noreply@example.test",
+                [AppSettingsProvider.MailBaseUrlKey] = "https://survey.example.test",
+            });
+
+        Assert.Equal("true", preview[AppSettingsProvider.MailEnabledKey]);
+        Assert.Equal(0, store.SaveCount);
+        Assert.Equal(
+            "false",
+            (await provider.GetAsync())[AppSettingsProvider.MailEnabledKey]);
+    }
+
+    [Fact]
     public async Task Pleasanter接続の未設定状態を管理画面へ返す()
     {
         var snapshot = await Create(new ConfigurationBuilder().Build(), new FakeStore()).GetAsync();
