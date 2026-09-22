@@ -17,6 +17,7 @@
   let initialPleasanterBaseUrl = $state('');
 
   const pleasanterBaseUrlKey = 'QUESTIONNAIRE_PLEASANTER_BASEURL';
+  let initialValues = $state<Record<string, string | null>>({});
 
   $effect(() => {
     void load();
@@ -32,6 +33,9 @@
     settings = result.value;
     initialPleasanterBaseUrl =
       settings.fields.find((field) => field.key === pleasanterBaseUrlKey)?.value ?? '';
+    initialValues = Object.fromEntries(
+      result.value.fields.map((field) => [field.key, field.value]),
+    );
   }
 
   function label(field: AppSettingField): string {
@@ -83,7 +87,13 @@
     error = '';
     done = '';
     busy = true;
-    const result = await saveAppSettings(settings);
+    const changed: AppSettings = {
+      ...settings,
+      fields: settings.fields.filter(
+        (field) => !field.isFixed && field.value !== initialValues[field.key],
+      ),
+    };
+    const result = await saveAppSettings(changed);
     busy = false;
 
     if (!result.ok) {
@@ -94,6 +104,9 @@
     settings = result.value;
     initialPleasanterBaseUrl =
       settings.fields.find((field) => field.key === pleasanterBaseUrlKey)?.value ?? '';
+    initialValues = Object.fromEntries(
+      result.value.fields.map((field) => [field.key, field.value]),
+    );
     done = t('appSettings.saved');
   }
 </script>
@@ -158,6 +171,10 @@
             />
           {/if}
           <span class="hint">{description(field)}</span>
+          <span class="hint">
+            {t('appSettings.defaultValue')}: {field.defaultValue}
+            {#if field.isDefault} ({t('appSettings.usingDefault')}){/if}
+          </span>
           {#if field.showPreview && (field.value?.trim() ?? '') !== ''}
             <aside class="preview">{field.value}</aside>
           {/if}

@@ -18,15 +18,6 @@ public sealed class PleasanterOptionsProvider(
         AppSettingsSnapshot snapshot,
         IConfiguration configuration)
     {
-        var timeout = int.TryParse(
-            configuration["QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS"],
-            NumberStyles.Integer,
-            CultureInfo.InvariantCulture,
-            out var seconds)
-            && seconds > 0
-                ? TimeSpan.FromSeconds(seconds)
-                : PleasanterOptions.DefaultTimeout;
-
         return new PleasanterOptions
         {
             BaseUrl = snapshot[AppSettingsProvider.PleasanterBaseUrlKey],
@@ -35,7 +26,10 @@ public sealed class PleasanterOptionsProvider(
                 snapshot[AppSettingsProvider.PleasanterApiVersionKey],
                 NumberStyles.Number,
                 CultureInfo.InvariantCulture),
-            Timeout = timeout,
+            Timeout = TimeSpan.FromSeconds(int.Parse(
+                snapshot["QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS"],
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture)),
             ApiKeyUserTimeZoneId = snapshot[AppSettingsProvider.PleasanterTimeZoneKey],
         };
     }

@@ -29,7 +29,7 @@ public sealed class PleasanterOptions
     public decimal ApiVersion { get; init; } = DefaultApiVersion;
 
     /// <summary>1 回の呼び出しの上限。</summary>
-    public TimeSpan Timeout { get; init; } = DefaultTimeout;
+    public TimeSpan Timeout { get; set; } = DefaultTimeout;
 
     /// <summary>API キーに紐づく Pleasanter 利用者のタイムゾーン ID。</summary>
     /// <remarks>
@@ -37,7 +37,7 @@ public sealed class PleasanterOptions
     /// （<c>_documents/実機検証結果.md</c> 4 章。実測で確定）。
     /// **運用開始後に変更してはならない。** 変えると保存済みレコードの解釈が変わる。
     /// </remarks>
-    public required string ApiKeyUserTimeZoneId { get; init; }
+    public required string ApiKeyUserTimeZoneId { get; set; }
 }
 
 /// <summary>固定した Pleasanter 接続設定を返す。</summary>

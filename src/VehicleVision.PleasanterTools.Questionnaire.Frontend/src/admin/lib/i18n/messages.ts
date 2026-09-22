@@ -283,6 +283,8 @@ export const ja = {
   'appSettings.lead':
     '外部設定に値がある項目は固定されます。それ以外は保存後、再起動せずに反映されます。',
   'appSettings.fixed': '外部設定で固定されています',
+  'appSettings.defaultValue': '既定値',
+  'appSettings.usingDefault': '現在は既定値',
   'appSettings.secretConfigured': '設定済みです。変更するときだけ新しい値を入力してください。',
   'appSettings.secretNotConfigured': '未設定です。設定するときだけ値を入力してください。',
   'appSettings.save': '保存する',
@@ -1354,6 +1356,8 @@ export const en: Record<MessageKey, string> = {
   'appSettings.lead':
     'Values supplied by external configuration are fixed. Other values take effect after saving without restarting the application.',
   'appSettings.fixed': 'Fixed by external configuration',
+  'appSettings.defaultValue': 'Default',
+  'appSettings.usingDefault': 'currently using the default',
   'appSettings.secretConfigured': 'Configured. Enter a new value only when changing it.',
   'appSettings.secretNotConfigured': 'Not configured. Enter a value only when setting it.',
   'appSettings.save': 'Save',

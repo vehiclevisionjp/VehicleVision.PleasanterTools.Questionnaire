@@ -183,8 +183,10 @@ public sealed class PleasanterApiClient(
         HttpResponseMessage response;
         try
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(options.Timeout);
             response = await httpClient
-                .SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken)
+                .SendAsync(request, HttpCompletionOption.ResponseContentRead, timeout.Token)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

@@ -41,7 +41,7 @@ public sealed class PleasanterDateTime
     /// <summary>Pleasanter がやり取りする日時の書式。</summary>
     private const string Format = "yyyy-MM-ddTHH:mm:ss";
 
-    private readonly TimeZoneInfo _apiKeyUserTimeZone;
+    private TimeZoneInfo _apiKeyUserTimeZone;
 
     public PleasanterDateTime(string apiKeyUserTimeZoneId)
     {
@@ -51,10 +51,16 @@ public sealed class PleasanterDateTime
         _apiKeyUserTimeZone = TimeZoneInfo.FindSystemTimeZoneById(apiKeyUserTimeZoneId);
     }
 
+    /// <summary>以後の変換で使うタイムゾーンを切り替える。</summary>
+    public void SetTimeZone(string timeZoneId) =>
+        Volatile.Write(
+            ref _apiKeyUserTimeZone,
+            TimeZoneInfo.FindSystemTimeZoneById(timeZoneId));
+
     /// <summary>Pleasanter へ渡す文字列にする。</summary>
     public string ToPleasanter(DateTimeOffset value) =>
         TimeZoneInfo
-            .ConvertTime(value, _apiKeyUserTimeZone)
+            .ConvertTime(value, Volatile.Read(ref _apiKeyUserTimeZone))
             .ToString(Format, CultureInfo.InvariantCulture);
 
     /// <summary>Pleasanter から返ってきた文字列を読む。</summary>
@@ -98,7 +104,7 @@ public sealed class PleasanterDateTime
             return null;
         }
 
-        var offset = _apiKeyUserTimeZone.GetUtcOffset(local);
+        var offset = Volatile.Read(ref _apiKeyUserTimeZone).GetUtcOffset(local);
         return new DateTimeOffset(local, offset);
     }
 

@@ -1,6 +1,9 @@
 ﻿using System.Collections.Frozen;
 using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Scripting;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
+using VehicleVision.PleasanterTools.Questionnaire.Worker;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -30,14 +33,27 @@ public sealed record AppSettingDefinition(
     string? BooleanFalseAlias = null)
 {
     /// <summary>入力を検証し、DB へ保存する表現へそろえる。</summary>
-    public string Normalize(string? requestedValue)
+    public string Normalize(string? requestedValue) =>
+        Normalize(requestedValue, enforceRange: true);
+
+    /// <summary>外部設定の値をそろえる。**上限・下限は課さない**（Issue #383）。</summary>
+    /// <remarks>
+    /// **上限・下限は「管理者が画面から守りを弱められないようにする」ためのもの。**
+    /// 環境変数や設定ファイルを書くのは運用者で、もともと何でも設定できる立場にある。
+    /// ⚠️ **ここで課すと、検証環境のように意図して低くしている構成が起動しなくなる**
+    /// （`compose.yaml` は proof-of-work を軽くするため既定より低い値を渡している）。
+    /// </remarks>
+    public string NormalizeExternal(string? value) =>
+        Normalize(value, enforceRange: false);
+
+    private string Normalize(string? requestedValue, bool enforceRange)
     {
         var value = requestedValue?.Trim() ?? string.Empty;
         return Type switch
         {
             AppSettingValueType.String => NormalizeString(value),
             AppSettingValueType.Boolean => NormalizeBoolean(value),
-            AppSettingValueType.Integer => NormalizeInteger(value),
+            AppSettingValueType.Integer => NormalizeInteger(value, enforceRange),
             _ => throw new InvalidOperationException($"未対応の設定型です: {Type}"),
         };
     }
@@ -69,11 +85,16 @@ public sealed record AppSettingDefinition(
         return parsed ? "true" : "false";
     }
 
-    private string NormalizeInteger(string value)
+    private string NormalizeInteger(string value, bool enforceRange)
     {
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
         {
             throw new AppSettingValidationException($"{LabelJa}は整数で指定してください。");
+        }
+
+        if (!enforceRange)
+        {
+            return parsed.ToString(CultureInfo.InvariantCulture);
         }
 
         if (Minimum is { } minimum && parsed < minimum)
@@ -118,7 +139,8 @@ public sealed class AppSettingsProvider(
     IConfiguration configuration,
     IAppSettingStore store,
     SecretProtector secretProtector,
-    TimeProvider timeProvider) : IAppSettingsProvider
+    TimeProvider timeProvider,
+    ILogger<AppSettingsProvider> logger) : IAppSettingsProvider
 {
     /// <summary>管理画面の設定区画が機能することを示す、管理者向けのお知らせ。</summary>
     public const string AdminNoticeKey = "QUESTIONNAIRE_ADMIN_NOTICE";
@@ -269,6 +291,286 @@ public sealed class AppSettingsProvider(
             "Proof of work for administrator sign-in",
             "パスワードログインと招待受取に proof-of-work を課します。管理者がログインする前に追加の計算が必要になります。",
             "Requires proof of work for password sign-in and invitation acceptance. Administrators must complete additional computation before signing in."),
+        new(
+            AuditLogRetentionOptions.RetentionDaysKey,
+            AppSettingValueType.Integer,
+            "365",
+            "監査ログの保持日数",
+            "Audit log retention days",
+            "管理操作の記録を保持する日数です。",
+            "Number of days to retain administrative audit logs.",
+            Minimum: 1,
+            Maximum: 36500),
+        new(
+            AuditLogRetentionOptions.DeadLetterRetentionDaysKey,
+            AppSettingValueType.Integer,
+            "0",
+            "デッドレターの保持日数",
+            "Dead-letter retention days",
+            "既定値 0 は無期限です。値を設定すると回答本体が期限後に削除されるため、1 日以上を指定します。",
+            "The default 0 retains items indefinitely. Setting a value permanently deletes response data after at least one day.",
+            Minimum: 1,
+            Maximum: 36500),
+        new(
+            AuditLogRetentionOptions.NotificationRetentionDaysKey,
+            AppSettingValueType.Integer,
+            "90",
+            "既読通知の保持日数",
+            "Read notification retention days",
+            "既読になった管理者向け通知を保持する日数です。未読通知は削除しません。",
+            "Number of days to retain read administrator notifications. Unread notifications are not deleted.",
+            Minimum: 1,
+            Maximum: 36500),
+        new(
+            AuditLogRetentionOptions.AttachmentRejectionRetentionDaysKey,
+            AppSettingValueType.Integer,
+            "90",
+            "添付拒否記録の保持日数",
+            "Attachment rejection retention days",
+            "添付ファイルを拒否した運用記録を保持する日数です。",
+            "Number of days to retain attachment rejection records.",
+            Minimum: 1,
+            Maximum: 36500),
+        new(
+            "QUESTIONNAIRE_REQUESTS_PER_MIN",
+            AppSettingValueType.Integer,
+            "60",
+            "API 要求数上限（1 分）",
+            "API request limit per minute",
+            "送信元 IP ごとの通常 API 要求数上限です。",
+            "Maximum regular API requests per source IP per minute.",
+            Minimum: 1,
+            Maximum: 1000000),
+        new(
+            "QUESTIONNAIRE_FORM_REQUESTS_PER_MIN",
+            AppSettingValueType.Integer,
+            "600",
+            "フォーム要求数上限（1 分）",
+            "Form request limit per minute",
+            "アンケートごとのフォーム要求数上限です。",
+            "Maximum form requests per survey per minute.",
+            Minimum: 1,
+            Maximum: 1000000),
+        new(
+            "QUESTIONNAIRE_SUBMITS_PER_MIN",
+            AppSettingValueType.Integer,
+            "20",
+            "回答送信数上限（1 分）",
+            "Submission limit per minute",
+            "送信元 IP ごとの回答送信数上限です。",
+            "Maximum submissions per source IP per minute.",
+            Minimum: 1,
+            Maximum: 1000000),
+        new(
+            "QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN",
+            AppSettingValueType.Integer,
+            "600",
+            "配布資産要求数上限（1 分）",
+            "Asset request limit per minute",
+            "送信元 IP ごとの配布資産要求数上限です。",
+            "Maximum asset requests per source IP per minute.",
+            Minimum: 1,
+            Maximum: 1000000),
+        new(
+            "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN",
+            AppSettingValueType.Integer,
+            "10",
+            "ログイン試行数上限（5 分）",
+            "Login attempt limit per 5 minutes",
+            "送信元 IP ごとの管理者ログイン試行数上限です。",
+            "Maximum administrator login attempts per source IP per five minutes.",
+            Minimum: 1,
+            Maximum: 100000),
+        new(
+            MailSenderOptions.MaxSendsPerMinuteKey,
+            AppSettingValueType.Integer,
+            "60",
+            "メール送信数上限（1 分）",
+            "Mail send limit per minute",
+            "メール送信ワーカーが 1 分あたりに送る件数の上限です。",
+            "Maximum messages sent by the mail worker per minute.",
+            Minimum: 1,
+            Maximum: 1000000),
+        new(
+            ResponseSenderOptions.MaxSendsPerMinuteKey,
+            AppSettingValueType.Integer,
+            "600",
+            "回答転送数上限（1 分）",
+            "Response delivery limit per minute",
+            "回答送信ワーカーが Pleasanter へ 1 分あたりに送る件数の上限です。",
+            "Maximum responses delivered to Pleasanter per minute.",
+            Minimum: 1,
+            Maximum: 1000000),
+        new(
+            BacklogGuardOptions.PerSurveyLimitKey,
+            AppSettingValueType.Integer,
+            "10000",
+            "アンケート単位の送信待ち上限",
+            "Per-survey backlog limit",
+            "1 アンケートで送信待ちにできる回答数の上限です。",
+            "Maximum queued responses for one survey.",
+            Minimum: 1,
+            Maximum: 10000000),
+        new(
+            BacklogGuardOptions.TotalLimitKey,
+            AppSettingValueType.Integer,
+            "50000",
+            "全体の送信待ち上限",
+            "Total backlog limit",
+            "全アンケートで送信待ちにできる回答数の上限です。",
+            "Maximum queued responses across all surveys.",
+            Minimum: 1,
+            Maximum: 100000000),
+        new(
+            "QUESTIONNAIRE_ATTACHMENT_MAXFILESIZEBYTES",
+            AppSettingValueType.Integer,
+            "5242880",
+            "回答添付 1 件の上限（バイト）",
+            "Maximum response attachment size (bytes)",
+            "回答添付ファイル 1 件のサイズ上限です。",
+            "Maximum size of one response attachment.",
+            Minimum: 1,
+            Maximum: int.MaxValue),
+        new(
+            "QUESTIONNAIRE_ATTACHMENT_MAXFILECOUNT",
+            AppSettingValueType.Integer,
+            "5",
+            "回答添付の個数上限",
+            "Maximum response attachment count",
+            "1 設問に添付できるファイル数の上限です。",
+            "Maximum number of files attached to one question.",
+            Minimum: 1,
+            Maximum: 1000),
+        new(
+            "QUESTIONNAIRE_ATTACHMENT_MAXTOTALBYTES",
+            AppSettingValueType.Integer,
+            "20971520",
+            "回答添付の合計上限（バイト）",
+            "Maximum total response attachment size (bytes)",
+            "1 回の回答送信に含められる添付ファイルの合計サイズ上限です。",
+            "Maximum total attachment size in one response.",
+            Minimum: 1,
+            Maximum: int.MaxValue),
+        new(
+            "QUESTIONNAIRE_ATTACHMENT_ALLOWEDEXTENSIONS",
+            AppSettingValueType.String,
+            string.Join(", ", AttachmentOptions.DefaultAllowedExtensions),
+            "回答添付の許可拡張子",
+            "Allowed response attachment extensions",
+            "許可する拡張子をカンマ区切りで指定します。空にはできません。",
+            "Enter allowed extensions separated by commas. The value cannot be empty.",
+            MaximumLength: 1000,
+            StringNormalizer: AttachmentOptions.NormalizeAllowedExtensions),
+        new(
+            "QUESTIONNAIRE_ASSET_MAXFILESIZEBYTES",
+            AppSettingValueType.Integer,
+            "10485760",
+            "配布資産 1 件の上限（バイト）",
+            "Maximum asset size (bytes)",
+            "説明文や完了画面で配布する資産 1 件のサイズ上限です。",
+            "Maximum size of one asset distributed in descriptions or completion pages.",
+            Minimum: 1,
+            Maximum: int.MaxValue),
+        new(
+            "QUESTIONNAIRE_ASSET_MAXFILECOUNT",
+            AppSettingValueType.Integer,
+            "20",
+            "配布資産の個数上限",
+            "Maximum asset count",
+            "1 アンケートに登録できる配布資産数の上限です。",
+            "Maximum number of assets registered for one survey.",
+            Minimum: 1,
+            Maximum: 1000),
+        new(
+            "QUESTIONNAIRE_ASSET_ALLOWEDEXTENSIONS",
+            AppSettingValueType.String,
+            string.Join(", ", AssetOptions.DefaultAllowedExtensions),
+            "配布資産の許可拡張子",
+            "Allowed asset extensions",
+            "許可する拡張子をカンマ区切りで指定します。空にはできません。",
+            "Enter allowed extensions separated by commas. The value cannot be empty.",
+            MaximumLength: 1000,
+            StringNormalizer: AssetOptions.NormalizeAllowedExtensions),
+        new(
+            ScriptConverterOptions.TimeLimitKey,
+            AppSettingValueType.Integer,
+            "200",
+            "スクリプト実行時間上限（ミリ秒）",
+            "Script execution time limit (milliseconds)",
+            "変換スクリプト 1 回あたりの実行時間上限です。",
+            "Maximum execution time for one conversion script.",
+            Minimum: 1,
+            Maximum: 60000),
+        new(
+            ScriptConverterOptions.MemoryLimitKey,
+            AppSettingValueType.Integer,
+            "4194304",
+            "スクリプトメモリ上限（バイト）",
+            "Script memory limit (bytes)",
+            "変換スクリプト 1 回あたりのメモリ上限です。",
+            "Maximum memory for one conversion script.",
+            Minimum: 1,
+            Maximum: int.MaxValue),
+        new(
+            ScriptConverterOptions.RecursionLimitKey,
+            AppSettingValueType.Integer,
+            "64",
+            "スクリプト再帰上限",
+            "Script recursion limit",
+            "変換スクリプトの再帰の深さの上限です。",
+            "Maximum recursion depth for conversion scripts.",
+            Minimum: 1,
+            Maximum: 1024),
+        new(
+            ParameterFiles.TimeZoneDefaultKey,
+            AppSettingValueType.String,
+            "Asia/Tokyo",
+            "既定タイムゾーン",
+            "Default time zone",
+            "Pleasanter の API キーに個別指定がない場合に使うタイムゾーン ID です。",
+            "Time zone ID used when the Pleasanter API key has no specific setting.",
+            MaximumLength: 100,
+            StringNormalizer: NormalizeTimeZone),
+        new(
+            ResponseNotificationMailerOptions.DigestIntervalMinutesKey,
+            AppSettingValueType.Integer,
+            "1440",
+            "回答通知の集約間隔（分）",
+            "Response notification digest interval (minutes)",
+            "回答通知メールをアンケート単位でまとめる間隔です。",
+            "Interval for grouping response notification emails by survey.",
+            Minimum: 60,
+            Maximum: 525600),
+        new(
+            "QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS",
+            AppSettingValueType.Integer,
+            "30",
+            "Pleasanter API のタイムアウト（秒）",
+            "Pleasanter API timeout (seconds)",
+            "Pleasanter API への 1 回の要求を待つ上限です。",
+            "Maximum time to wait for one Pleasanter API request.",
+            Minimum: 1,
+            Maximum: 3600),
+        new(
+            "QUESTIONNAIRE_VIRUSSCAN_TIMEOUTSECONDS",
+            AppSettingValueType.Integer,
+            "30",
+            "ClamAV 検査のタイムアウト（秒）",
+            "ClamAV scan timeout (seconds)",
+            "ClamAV による 1 ファイルの検査を待つ上限です。",
+            "Maximum time to wait for one ClamAV file scan.",
+            Minimum: 1,
+            Maximum: 3600),
+        new(
+            "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_RESULTTIMEOUTSECONDS",
+            AppSettingValueType.Integer,
+            "300",
+            "Defender 検査結果のタイムアウト（秒）",
+            "Defender scan result timeout (seconds)",
+            "Defender for Storage の検査結果を待つ上限です。",
+            "Maximum time to wait for a Defender for Storage scan result.",
+            Minimum: 1,
+            Maximum: 86400),
     ];
 
     private static readonly FrozenDictionary<string, AppSettingDefinition> Definitions =
@@ -276,6 +578,35 @@ public sealed class AppSettingsProvider(
 
     private readonly SemaphoreSlim gate = new(1, 1);
     private CacheEntry? cache;
+
+    /// <summary>DB を読めるようになる前に使う、外部設定と既定値だけのスナップショット。</summary>
+    public static AppSettingsSnapshot InitialSnapshot(IConfiguration configuration)
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        var fixedKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var definition in DefinitionList)
+        {
+            if (configuration[definition.Key] is { } external)
+            {
+                values[definition.Key] = definition.Normalize(external);
+                fixedKeys.Add(definition.Key);
+            }
+            else
+            {
+                values[definition.Key] = definition.DefaultValue;
+            }
+        }
+
+        if (configuration[PleasanterTimeZoneKey] is null)
+        {
+            values[PleasanterTimeZoneKey] = values[ParameterFiles.TimeZoneDefaultKey];
+        }
+
+        return new AppSettingsSnapshot(
+            DefinitionList,
+            values.ToFrozenDictionary(StringComparer.Ordinal),
+            fixedKeys.ToFrozenSet(StringComparer.Ordinal));
+    }
 
     public async Task<AppSettingsSnapshot> GetAsync(
         CancellationToken cancellationToken = default)
@@ -386,7 +717,10 @@ public sealed class AppSettingsProvider(
                 var defaultValue = definition.Key == PleasanterTimeZoneKey
                     ? configuration[ParameterFiles.TimeZoneDefaultKey] ?? definition.DefaultValue
                     : definition.DefaultValue;
-                values[definition.Key] = definition.Normalize(defaultValue);
+                values[definition.Key] =
+                    definition.Key == AuditLogRetentionOptions.DeadLetterRetentionDaysKey
+                        ? defaultValue
+                        : definition.Normalize(defaultValue);
                 continue;
             }
 
@@ -401,6 +735,12 @@ public sealed class AppSettingsProvider(
                     ?? throw new InvalidOperationException($"設定を復号できません: {definition.Key}")
                 : record.Value;
             values[definition.Key] = definition.Normalize(stored);
+        }
+
+        if (configuration[PleasanterTimeZoneKey] is null
+            && !records.ContainsKey(PleasanterTimeZoneKey))
+        {
+            values[PleasanterTimeZoneKey] = values[ParameterFiles.TimeZoneDefaultKey];
         }
 
         return new AppSettingsSnapshot(
@@ -432,15 +772,25 @@ public sealed class AppSettingsProvider(
         return value.TrimEnd('/');
     }
 
-    private static string NormalizeExternal(AppSettingDefinition definition, string value)
+    /// <summary>外部設定の値をそろえる。**書式が壊れていても起動を止めない**（Issue #383）。</summary>
+    /// <remarks>
+    /// ⚠️ **起動を止めると、設定を直す手立てごと失う。**
+    /// 打ち間違いは既定値へ落とし、**落としたことを起動時の記録へ出す。**
+    /// 黙って既定へ戻るのが一番まずい。
+    /// </remarks>
+    private string NormalizeExternal(AppSettingDefinition definition, string value)
     {
         try
         {
-            return definition.Normalize(value);
+            return definition.NormalizeExternal(value);
         }
-        catch (AppSettingValidationException)
-            when (definition.Key == PleasanterApiVersionKey)
+        catch (AppSettingValidationException exception)
         {
+            // **コンソールへ出す文字列は英語**（Azure の Kudu で日本語が化けるため）
+            logger.LogWarning(
+                "The value of {Setting} is invalid and the default value is used instead. {Reason}",
+                definition.Key,
+                exception.Message);
             return definition.Normalize(definition.DefaultValue);
         }
     }
@@ -479,6 +829,27 @@ public sealed class AppSettingsProvider(
         {
             throw new AppSettingValidationException(
                 "Pleasanter API キー利用者のタイムゾーンが見つかりません。");
+        }
+    }
+
+    private static string NormalizeTimeZone(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new AppSettingValidationException("既定タイムゾーンは空にできません。");
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(value).Id;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            throw new AppSettingValidationException($"タイムゾーン ID を解釈できません: {value}");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            throw new AppSettingValidationException($"タイムゾーン ID が不正です: {value}");
         }
     }
 }
