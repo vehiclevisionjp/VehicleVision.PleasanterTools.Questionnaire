@@ -26,9 +26,11 @@ public class DatabaseMigrationTests
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
-    public static TheoryData<DatabaseProvider, string> Providers()
+    public static TheoryData<DatabaseProvider, string> Providers() =>
+        Providers(Environment.GetEnvironmentVariable(ProviderSetting));
+
+    private static TheoryData<DatabaseProvider, string> Providers(string? selectedProvider)
     {
-        var selectedProvider = Environment.GetEnvironmentVariable(ProviderSetting);
         if (!string.IsNullOrWhiteSpace(selectedProvider))
         {
             if (!Enum.TryParse<DatabaseProvider>(
@@ -46,6 +48,30 @@ public class DatabaseMigrationTests
         var providers = ServerProviders();
         providers.Add(DatabaseProvider.Sqlite, SqliteConnectionString);
         return providers;
+    }
+
+    [Theory]
+    [InlineData("SqlServer", DatabaseProvider.SqlServer)]
+    [InlineData("PostgreSql", DatabaseProvider.PostgreSql)]
+    [InlineData("MySql", DatabaseProvider.MySql)]
+    [InlineData("Sqlite", DatabaseProvider.Sqlite)]
+    public void 指定したRDBMSだけの接続設定を返す(
+        string providerSetting,
+        DatabaseProvider expectedProvider)
+    {
+        var providers = Providers(providerSetting);
+        var selected = Assert.Single(providers);
+
+        Assert.Equal(expectedProvider, selected[0]);
+        if (expectedProvider is DatabaseProvider.Sqlite)
+        {
+            Assert.Equal(SqliteConnectionString, selected[1]);
+            return;
+        }
+
+        Assert.Equal(
+            Assert.Single(ServerProviders(), values => Equals(values[0], expectedProvider))[1],
+            selected[1]);
     }
 
     private static TheoryData<DatabaseProvider, string> Provider(DatabaseProvider provider)
