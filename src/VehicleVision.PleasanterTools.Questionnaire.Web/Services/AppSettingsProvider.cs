@@ -272,6 +272,7 @@ public sealed class AppSettingsProvider(
             "Proof of work for administrator sign-in",
             "パスワードログインと招待受取に proof-of-work を課します。管理者がログインする前に追加の計算が必要になります。",
             "Requires proof of work for password sign-in and invitation acceptance. Administrators must complete additional computation before signing in."),
+        new(
             AuditLogRetentionOptions.RetentionDaysKey,
             AppSettingValueType.Integer,
             "365",

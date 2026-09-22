@@ -87,7 +87,8 @@
     error = '';
     done = '';
     busy = true;
-    const changed = {
+    const changed: AppSettings = {
+      ...settings,
       fields: settings.fields.filter(
         (field) => !field.isFixed && field.value !== initialValues[field.key],
       ),
