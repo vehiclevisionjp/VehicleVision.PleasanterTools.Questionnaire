@@ -30,14 +30,27 @@ public sealed record AppSettingDefinition(
     string? BooleanFalseAlias = null)
 {
     /// <summary>入力を検証し、DB へ保存する表現へそろえる。</summary>
-    public string Normalize(string? requestedValue)
+    public string Normalize(string? requestedValue) =>
+        Normalize(requestedValue, enforceRange: true);
+
+    /// <summary>外部設定の値をそろえる。**上限・下限は課さない**（Issue #383）。</summary>
+    /// <remarks>
+    /// **上限・下限は「管理者が画面から守りを弱められないようにする」ためのもの。**
+    /// 環境変数や設定ファイルを書くのは運用者で、もともと何でも設定できる立場にある。
+    /// ⚠️ **ここで課すと、検証環境のように意図して低くしている構成が起動しなくなる**
+    /// （`compose.yaml` は proof-of-work を軽くするため既定より低い値を渡している）。
+    /// </remarks>
+    public string NormalizeExternal(string? value) =>
+        Normalize(value, enforceRange: false);
+
+    private string Normalize(string? requestedValue, bool enforceRange)
     {
         var value = requestedValue?.Trim() ?? string.Empty;
         return Type switch
         {
             AppSettingValueType.String => NormalizeString(value),
             AppSettingValueType.Boolean => NormalizeBoolean(value),
-            AppSettingValueType.Integer => NormalizeInteger(value),
+            AppSettingValueType.Integer => NormalizeInteger(value, enforceRange),
             _ => throw new InvalidOperationException($"未対応の設定型です: {Type}"),
         };
     }
@@ -69,11 +82,16 @@ public sealed record AppSettingDefinition(
         return parsed ? "true" : "false";
     }
 
-    private string NormalizeInteger(string value)
+    private string NormalizeInteger(string value, bool enforceRange)
     {
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
         {
             throw new AppSettingValidationException($"{LabelJa}は整数で指定してください。");
+        }
+
+        if (!enforceRange)
+        {
+            return parsed.ToString(CultureInfo.InvariantCulture);
         }
 
         if (Minimum is { } minimum && parsed < minimum)
@@ -118,7 +136,8 @@ public sealed class AppSettingsProvider(
     IConfiguration configuration,
     IAppSettingStore store,
     SecretProtector secretProtector,
-    TimeProvider timeProvider) : IAppSettingsProvider
+    TimeProvider timeProvider,
+    ILogger<AppSettingsProvider> logger) : IAppSettingsProvider
 {
     /// <summary>管理画面の設定区画が機能することを示す、管理者向けのお知らせ。</summary>
     public const string AdminNoticeKey = "QUESTIONNAIRE_ADMIN_NOTICE";
@@ -432,15 +451,25 @@ public sealed class AppSettingsProvider(
         return value.TrimEnd('/');
     }
 
-    private static string NormalizeExternal(AppSettingDefinition definition, string value)
+    /// <summary>外部設定の値をそろえる。**書式が壊れていても起動を止めない**（Issue #383）。</summary>
+    /// <remarks>
+    /// ⚠️ **起動を止めると、設定を直す手立てごと失う。**
+    /// 打ち間違いは既定値へ落とし、**落としたことを起動時の記録へ出す。**
+    /// 黙って既定へ戻るのが一番まずい。
+    /// </remarks>
+    private string NormalizeExternal(AppSettingDefinition definition, string value)
     {
         try
         {
-            return definition.Normalize(value);
+            return definition.NormalizeExternal(value);
         }
-        catch (AppSettingValidationException)
-            when (definition.Key == PleasanterApiVersionKey)
+        catch (AppSettingValidationException exception)
         {
+            // **コンソールへ出す文字列は英語**（Azure の Kudu で日本語が化けるため）
+            logger.LogWarning(
+                "The value of {Setting} is invalid and the default value is used instead. {Reason}",
+                definition.Key,
+                exception.Message);
             return definition.Normalize(definition.DefaultValue);
         }
     }
