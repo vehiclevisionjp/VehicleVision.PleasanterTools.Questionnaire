@@ -288,6 +288,13 @@ export const ja = {
   'appSettings.save': '保存する',
   'appSettings.saving': '処理しています…',
   'appSettings.saved': 'アプリケーション設定を保存しました。',
+  'appSettings.testConnection': '保存前に Pleasanter 接続を試す',
+  'appSettings.testingConnection': '接続を確認しています…',
+  'appSettings.connectionSucceeded': 'Pleasanter へ接続できました。',
+  'appSettings.publishedDestinationWarning':
+    '公開中のアンケートが {count} 件あります。URL を変更すると、これらの回答の送信先も変わります。',
+  'appSettings.pleasanterNotConfigured':
+    'Pleasanter 接続が未設定です。回答は受け付けますが、Pleasanter への送信待ちが積み上がります。保存前に接続を試してください。',
 
   // ---- 2 要素の登録 -------------------------------------------------------
   'enroll.title': '2 要素認証を登録する',
@@ -1352,6 +1359,13 @@ export const en: Record<MessageKey, string> = {
   'appSettings.save': 'Save',
   'appSettings.saving': 'Working…',
   'appSettings.saved': 'Application settings saved.',
+  'appSettings.testConnection': 'Test Pleasanter connection before saving',
+  'appSettings.testingConnection': 'Testing connection…',
+  'appSettings.connectionSucceeded': 'Connected to Pleasanter.',
+  'appSettings.publishedDestinationWarning':
+    'There are {count} published surveys. Changing the URL also changes where their responses are sent.',
+  'appSettings.pleasanterNotConfigured':
+    'Pleasanter is not configured. Responses are accepted but remain queued for delivery. Test the connection before saving.',
 
   'enroll.title': 'Register two-factor authentication',
   'enroll.lead': 'Administration reaches every survey definition and every response.',

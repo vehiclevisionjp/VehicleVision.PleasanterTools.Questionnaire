@@ -1,5 +1,11 @@
 namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
+/// <summary>Pleasanter の接続設定を呼び出し時に解決する。</summary>
+public interface IPleasanterOptionsProvider
+{
+    Task<PleasanterOptions> GetAsync(CancellationToken cancellationToken = default);
+}
+
 /// <summary>接続先 Pleasanter の設定。</summary>
 /// <remarks>
 /// 実値は <c>App_Data/Parameters/Pleasanter.json</c> か環境変数から読む。
@@ -32,4 +38,12 @@ public sealed class PleasanterOptions
     /// **運用開始後に変更してはならない。** 変えると保存済みレコードの解釈が変わる。
     /// </remarks>
     public required string ApiKeyUserTimeZoneId { get; init; }
+}
+
+/// <summary>固定した Pleasanter 接続設定を返す。</summary>
+public sealed class StaticPleasanterOptionsProvider(PleasanterOptions options)
+    : IPleasanterOptionsProvider
+{
+    public Task<PleasanterOptions> GetAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(options);
 }

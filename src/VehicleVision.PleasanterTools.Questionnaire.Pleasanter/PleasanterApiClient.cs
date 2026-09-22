@@ -55,12 +55,31 @@ public sealed record PleasanterResponse(
 /// **このクラスは再試行しない。** 失敗の扱いは送信ワーカーが決める。
 /// </para>
 /// </remarks>
-public sealed class PleasanterApiClient(HttpClient httpClient, PleasanterOptions options)
+public sealed class PleasanterApiClient(
+    HttpClient httpClient,
+    IPleasanterOptionsProvider optionsProvider)
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
     };
+
+    public PleasanterApiClient(HttpClient httpClient, PleasanterOptions options)
+        : this(httpClient, new StaticPleasanterOptionsProvider(options))
+    {
+    }
+
+    /// <summary>接続先へ到達し、API キーが拒否されないことを確かめる。</summary>
+    public async Task<bool> CheckConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await PostAsync(
+            "api/users/Get",
+            new Dictionary<string, object?>(),
+            cancellationToken).ConfigureAwait(false);
+        return response.ErrorKind is not (
+                PleasanterErrorKind.Unauthorized or PleasanterErrorKind.Unknown)
+            && response.StatusCode is not (int)HttpStatusCode.NotFound;
+    }
 
     /// <summary>レコードを作る。</summary>
     public Task<PleasanterResponse> CreateAsync(
@@ -147,6 +166,7 @@ public sealed class PleasanterApiClient(HttpClient httpClient, PleasanterOptions
         IReadOnlyDictionary<string, object?> body,
         CancellationToken cancellationToken)
     {
+        var options = await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
         var payload = new Dictionary<string, object?>(body, StringComparer.Ordinal)
         {
             ["ApiKey"] = options.ApiKey,
