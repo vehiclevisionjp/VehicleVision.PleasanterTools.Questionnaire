@@ -188,6 +188,7 @@ builder.Services.AddSingleton(maintenanceOptions);
 builder.Services.AddSingleton<MaintenanceMode>();
 builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
 builder.Services.AddSingleton<IAppSettingStore, AppSettingStore>();
+builder.Services.AddSingleton<BotMitigationOptionsProvider>();
 
 // **添付を弾いた記録は監査ログと別の表**（Issue #39）。
 // あちらは IpAddress を持つ。**弾いた記録は回答者側の出来事**なので、

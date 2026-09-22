@@ -263,6 +263,55 @@ public class AppSettingsProviderTests
     }
 
     [Fact]
+    public async Task bot対策の外部設定は従来のoffも含めて正規化する()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotMitigationOptionsProvider.MitigationEnabledKey] = "off",
+            })
+            .Build();
+
+        var snapshot = await Create(configuration, new FakeStore()).GetAsync();
+
+        Assert.Equal("false", snapshot[BotMitigationOptionsProvider.MitigationEnabledKey]);
+        Assert.Contains(BotMitigationOptionsProvider.MitigationEnabledKey, snapshot.FixedKeys);
+    }
+
+    [Fact]
+    public async Task bot対策の数値設定は安全な範囲外を拒否する()
+    {
+        var provider = Create(new ConfigurationBuilder().Build(), new FakeStore());
+
+        await Assert.ThrowsAsync<AppSettingValidationException>(() => provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [BotMitigationOptionsProvider.SubmitMinimumSecondsKey] = "0",
+            },
+            Guid.NewGuid()));
+        await Assert.ThrowsAsync<AppSettingValidationException>(() => provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [BotMitigationOptionsProvider.AltchaMaximumNumberKey] = "500001",
+            },
+            Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task bot対策の管理対象は安全な既定値を持つ()
+    {
+        var snapshot = await Create(new ConfigurationBuilder().Build(), new FakeStore()).GetAsync();
+
+        Assert.Equal("true", snapshot[BotMitigationOptionsProvider.MitigationEnabledKey]);
+        Assert.Equal("3", snapshot[BotMitigationOptionsProvider.SubmitMinimumSecondsKey]);
+        Assert.Equal("24", snapshot[BotMitigationOptionsProvider.SubmitTicketHoursKey]);
+        Assert.Equal("true", snapshot[BotMitigationOptionsProvider.AltchaEnabledKey]);
+        Assert.Equal("50000", snapshot[BotMitigationOptionsProvider.AltchaMinimumNumberKey]);
+        Assert.Equal("150000", snapshot[BotMitigationOptionsProvider.AltchaMaximumNumberKey]);
+        Assert.Equal("false", snapshot[BotMitigationOptionsProvider.LoginProofOfWorkKey]);
+    }
+
+    [Fact]
     public void 秘密の設定値は管理画面の応答へ含めない()
     {
         const string secret = "smtp-password-must-not-leak";

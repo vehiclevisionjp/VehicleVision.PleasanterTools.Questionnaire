@@ -96,7 +96,8 @@ public sealed class AltchaGuard
     private static readonly byte[] KeyLabel =
         System.Text.Encoding.UTF8.GetBytes("questionnaire:altcha:v1");
 
-    private readonly AltchaService service;
+    private readonly string base64Key;
+    private readonly AltchaChallengeLog store;
 
     public AltchaGuard(string base64Key, AltchaOptions options, AltchaChallengeLog store)
     {
@@ -104,12 +105,17 @@ public sealed class AltchaGuard
         ArgumentNullException.ThrowIfNull(store);
 
         Options = options;
+        this.base64Key = base64Key;
+        this.store = store;
+    }
 
+    private AltchaService CreateService(AltchaOptions options)
+    {
         // **設定の鍵をそのまま使わず、用途ごとに派生させる。**
         // ALTCHA は 64 バイトの鍵を要求する
         var key = System.Security.Cryptography.HKDF.DeriveKey(
             System.Security.Cryptography.HashAlgorithmName.SHA256,
-            SecretProtector.DecodeKey(base64Key),
+            SecretProtector.DecodeKey(this.base64Key),
             64,
             info: KeyLabel);
 
@@ -122,7 +128,7 @@ public sealed class AltchaGuard
 
         // **難しさだけ差し替える。** 既定の組み立てを丸ごと置き換えると、
         // 版が上がって項目が増えたときに黙って既定へ戻る
-        service = Altcha.CreateService(configuration with
+        return Altcha.CreateService(configuration with
         {
             Complexity = configuration.Complexity with
             {
@@ -139,7 +145,14 @@ public sealed class AltchaGuard
     /// **DB を見ない。** 見てしまうと、応答の速さで公開 ID の実在が分かる
     /// （<c>_documents/非機能設計.md</c> 1 章「識別子の秘匿」）。
     /// </remarks>
-    public AltchaChallenge Issue() => service.Generate();
+    public AltchaChallenge Issue() => Issue(Options);
+
+    /// <summary>指定した実行時設定で課題を作る。</summary>
+    public AltchaChallenge Issue(AltchaOptions runtimeOptions)
+    {
+        ArgumentNullException.ThrowIfNull(runtimeOptions);
+        return CreateService(runtimeOptions).Generate();
+    }
 
     /// <summary>解答を確かめる。受け付けてよければ <c>null</c>。</summary>
     /// <remarks>
@@ -149,13 +162,22 @@ public sealed class AltchaGuard
     public async Task<AltchaRejection?> CheckAsync(
         string? solution,
         CancellationToken cancellationToken = default)
+        => await CheckAsync(solution, Options, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>指定した実行時設定で解答を確かめる。</summary>
+    public async Task<AltchaRejection?> CheckAsync(
+        string? solution,
+        AltchaOptions runtimeOptions,
+        CancellationToken cancellationToken = default)
     {
-        if (!Options.Enabled)
+        ArgumentNullException.ThrowIfNull(runtimeOptions);
+
+        if (!runtimeOptions.Enabled)
         {
             return null;
         }
 
-        return await CheckRequiredAsync(solution, cancellationToken).ConfigureAwait(false);
+        return await CheckRequiredAsync(solution, runtimeOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>回答画面の有効設定にかかわらず、解答を確かめる。</summary>
@@ -165,7 +187,16 @@ public sealed class AltchaGuard
     public async Task<AltchaRejection?> CheckRequiredAsync(
         string? solution,
         CancellationToken cancellationToken = default)
+        => await CheckRequiredAsync(solution, Options, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>指定した実行時設定で、解答を必須として確かめる。</summary>
+    public async Task<AltchaRejection?> CheckRequiredAsync(
+        string? solution,
+        AltchaOptions runtimeOptions,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(runtimeOptions);
+
         if (string.IsNullOrWhiteSpace(solution))
         {
             return AltchaRejection.Missing;
@@ -175,7 +206,9 @@ public sealed class AltchaGuard
         // それ自体が攻撃になる
         try
         {
-            var result = await service.Validate(solution, cancellationToken).ConfigureAwait(false);
+            var result = await CreateService(runtimeOptions)
+                .Validate(solution, cancellationToken)
+                .ConfigureAwait(false);
             return result.IsValid ? null : AltchaRejection.Invalid;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
