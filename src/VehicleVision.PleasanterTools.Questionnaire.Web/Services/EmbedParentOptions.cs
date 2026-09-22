@@ -37,20 +37,9 @@ public sealed class EmbedParentOptions
         CspSources = EmbedPolicy.ToCspSources(allowedParents);
     }
 
-    public static EmbedParentOptions FromConfiguration(IConfiguration configuration)
+    public static EmbedParentOptions FromSnapshot(AppSettingsSnapshot snapshot)
     {
-        ArgumentNullException.ThrowIfNull(configuration);
-
-        var raw = configuration[AllowedParentsKey];
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return new EmbedParentOptions();
-        }
-
-        var parents = raw
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToImmutableArray();
-
-        return new EmbedParentOptions(parents);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        return new EmbedParentOptions(EmbedHostSettings.Parse(snapshot[AllowedParentsKey]));
     }
 }

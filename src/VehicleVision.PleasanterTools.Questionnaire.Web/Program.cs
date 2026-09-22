@@ -1,6 +1,5 @@
 using System.Threading.RateLimiting;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
@@ -258,15 +257,6 @@ var assetOptions = AssetOptions.FromConfiguration(
     builder.Configuration, attachmentOptions.VirusScan.Enabled);
 builder.Services.AddSingleton(assetOptions);
 
-// **埋め込みを許す配信元**（Issue #104 / #107）。**既定は空＝一切埋め込めない**
-var embedOptions = EmbedOptions.FromConfiguration(builder.Configuration);
-builder.Services.AddSingleton(embedOptions);
-
-// **回答画面を埋め込める親サイト**（Issue #334）。
-// 配信元を許す `EmbedOptions` とは逆方向なので混ぜない
-var embedParentOptions = EmbedParentOptions.FromConfiguration(builder.Configuration);
-builder.Services.AddSingleton(embedParentOptions);
-
 // **添付と配布資産は multipart で届く。上限を既定値に任せない**
 // （_documents/非機能設計.md 1 章）。
 // 大きい方に合わせ、個別の入口ではそれぞれの上限まで絞る
@@ -327,6 +317,11 @@ builder.Services.AddSingleton(analyticsOptions);
 // ⚠️ **秘密鍵は設定ファイルへ書かせない。** 環境変数か Key Vault から読む
 var captchaOptions = CaptchaOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(captchaOptions);
+// 埋め込み先だけを設定スナップショットから要求ごとに解決し、
+// アクセス解析と CAPTCHA の許可先は起動時の固定値として保つ。
+builder.Services.AddSingleton(new ContentSecurityPolicyBuilder(
+    analyticsOptions.CspSources,
+    captchaOptions.CspSources));
 
 // **検証の待ち時間に上限を持たせる。** 外部が遅いだけで送信が固まらないように。
 // ⚠️ **到達できないときは通さない**（CaptchaVerifier の但し書き）
@@ -726,53 +721,10 @@ if (maintenanceOptions.EnvironmentEnabled)
         + "This mode cannot be disabled from the administration screen.");
 }
 
-// **CSP は起動時に 1 度だけ組み立てる**（Issue #104 / #107）。
-//
 // **アンケートごとには出し分けない。** 出し分けるには、回答画面の HTML を返す時点で
 // DB を引くことになり、**ヘッダの違いから公開 ID の実在が分かってしまう**
 // （`_documents/非機能設計.md` 1 章「識別子の秘匿」）。
 //
-// **代わりに、許す配信元を運用側だけが決められる場所（設定）へ置く。**
-// 既定は空なので、設定しなければ従来と同じ CSP になる。
-// **`frame-src https:` のようには絶対に広げない**
-var embedSources = embedOptions.CspSources;
-var embedParentSources = embedParentOptions.CspSources;
-
-// **アクセス解析を有効にしたときだけ広げる**（Issue #162）。
-// 既定では 1 つも足さないので、今までと同じ CSP になる。
-//
-// ⚠️ **`https:` のようには広げない。** 許すのは選んだサービスの配信元だけ。
-// **inline script は許さない。** タグは同梱した JS から DOM へ差し込む
-var analyticsSources = analyticsOptions.CspSources;
-
-// **CAPTCHA も、外部を選んだときだけ広げる**（Issue #164）。
-// どのサービスも iframe で課題を出すので、script-src と frame-src の両方に要る
-var captchaSources = captchaOptions.CspSources;
-var externalScriptSources = analyticsSources.AddRange(captchaSources);
-const string scalarCspNonceKey = "ScalarCspNonce";
-var contentSecurityPolicy = string.Join("; ",
-[
-    "default-src 'self'",
-    // **画像の埋め込み先も設定で許した配信元だけ**（2 要素の QR は data: URI で描く）。
-    // 解析は計測を画像で送ることがあるので、有効なときはその送信先も許す
-    "img-src 'self' data:" + Join(embedSources) + Join(analyticsSources) + Join(captchaSources),
-    // **設定が空なら 'none'。** 指定そのものを省くと default-src へ落ちる
-    // **CAPTCHA は iframe で出る。** 埋め込みの許可と同じ枠へ足す
-    "frame-src "
-        + (embedSources.IsEmpty && captchaSources.IsEmpty
-            ? "'none'"
-            : string.Join(' ', embedSources.AddRange(captchaSources))),
-    "frame-ancestors "
-        + (embedParentSources.IsEmpty ? "'none'" : string.Join(' ', embedParentSources)),
-    "base-uri 'self'",
-    "object-src 'none'",
-    "script-src 'self'" + Join(externalScriptSources),
-    "connect-src 'self'" + Join(externalScriptSources),
-]);
-
-static string Join(System.Collections.Immutable.ImmutableArray<string> sources) =>
-    sources.IsEmpty ? string.Empty : " " + string.Join(' ', sources);
-
 // **リバースプロキシ配下でも本当の送信元 IP を見る。** レート制限が効かなくなるため。
 // 転送ヘッダを無条件には信じず、運用者が指定した Ingress の CIDR だけを追加する。
 var forwardedHeadersOptions = new ForwardedHeadersOptions
@@ -881,29 +833,9 @@ if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
         branch => branch.UseHttpsRedirection());
 }
 
-// **セキュリティヘッダを一式付ける**（_documents/非機能設計.md 1 章）
-app.Use(async (context, next) =>
-{
-    var headers = context.Response.Headers;
-    var csp = contentSecurityPolicy;
-    if (context.Request.Path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase))
-    {
-        // Scalar は画面を組み立てる inline script を返す。要求ごとの nonce だけを許して CSP を緩めない。
-        var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        context.Items[scalarCspNonceKey] = nonce;
-        csp = csp.Replace(
-            "script-src 'self'",
-            $"script-src 'self' 'nonce-{nonce}'",
-            StringComparison.Ordinal);
-    }
-
-    headers["X-Content-Type-Options"] = "nosniff";
-    headers["Referrer-Policy"] = "no-referrer";
-    headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()";
-    // **2 要素の QR は data: URI で描く。** 外部から画像を取りに行かせない
-    headers["Content-Security-Policy"] = csp;
-    await next();
-});
+// **セキュリティヘッダを一式付ける**（_documents/非機能設計.md 1 章）。
+// 埋め込み先だけは 30 秒 TTL の設定スナップショットから要求ごとに差し替える。
+app.UseMiddleware<SecurityHeadersMiddleware>();
 
 app.UseRateLimiter();
 
@@ -950,7 +882,7 @@ if (openApiExposure.Enabled)
     {
         // CDN の既定フォントと利用状況テレメトリーを止め、画面から第三者へ要求を出さない。
         options.DisableDefaultFonts().DisableTelemetry().DisableAgent().WithNonce(
-            context.Items[scalarCspNonceKey] as string
+            context.Items[SecurityHeadersMiddleware.ScalarCspNonceKey] as string
             ?? throw new InvalidOperationException("Scalar の CSP nonce を設定できなかった"));
     });
 }

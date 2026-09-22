@@ -149,20 +149,36 @@ public static class EmbedPolicy
     }
 
     /// <summary>CSP のヘッダへそのまま書ける形か。</summary>
-    private static bool IsWritableInCsp(string host)
+    private static bool IsWritableInCsp(string source)
     {
-        if (host.Length == 0)
+        if (source.Length == 0)
         {
             return false;
         }
 
-        var body = host.StartsWith(SubdomainPrefix, StringComparison.Ordinal)
-            ? host[SubdomainPrefix.Length..]
-            : host;
+        var body = source.StartsWith(SubdomainPrefix, StringComparison.Ordinal)
+            ? source[SubdomainPrefix.Length..]
+            : source;
 
-        // **英数字と `.` `-` `:` だけ。** ポート（`:8443`）は許す。
-        // それ以外の記号は、ヘッダの区切りや別の指定へ化ける
-        return body.Length > 0
-            && body.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or ':');
+        var colon = body.LastIndexOf(':');
+        var host = colon < 0 ? body : body[..colon];
+        if (colon >= 0
+            && (body.AsSpan(0, colon).Contains(':')
+                || !int.TryParse(body.AsSpan((colon + 1)..), out var port)
+                || port is < 1 or > 65535))
+        {
+            return false;
+        }
+
+        if (host.Length is 0 or > 253)
+        {
+            return false;
+        }
+
+        return host.Split('.').All(label =>
+            label.Length is > 0 and <= 63
+            && char.IsAsciiLetterOrDigit(label[0])
+            && char.IsAsciiLetterOrDigit(label[^1])
+            && label.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'));
     }
 }

@@ -31,7 +31,7 @@ public sealed class EmbedOptions
     public bool Enabled => !AllowedHosts.IsDefaultOrEmpty;
 
     /// <summary>CSP のホスト源に直したもの。</summary>
-    /// <remarks>**ヘッダを組み立てるたびに作り直さない。** 設定は動かない。</remarks>
+    /// <remarks>同じ設定スナップショットからの判定と CSP がずれないよう、生成時に確定する。</remarks>
     public ImmutableArray<string> CspSources { get; }
 
     public EmbedOptions() => CspSources = [];
@@ -42,23 +42,42 @@ public sealed class EmbedOptions
         CspSources = EmbedPolicy.ToCspSources(allowedHosts);
     }
 
-    public static EmbedOptions FromConfiguration(IConfiguration configuration)
+    public static EmbedOptions FromSnapshot(AppSettingsSnapshot snapshot)
     {
-        ArgumentNullException.ThrowIfNull(configuration);
-
-        var raw = configuration[AllowedHostsKey];
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return new EmbedOptions();
-        }
-
-        var hosts = raw
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToImmutableArray();
-
-        return new EmbedOptions(hosts);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        return new EmbedOptions(EmbedHostSettings.Parse(snapshot[AllowedHostsKey]));
     }
 
     /// <summary>この URL を埋め込んでよいか。</summary>
     public bool IsAllowed(string? url) => EmbedPolicy.IsAllowed(url, AllowedHosts);
+}
+
+/// <summary>埋め込み先のホスト設定を検証し、同じ規則で読み取る。</summary>
+internal static class EmbedHostSettings
+{
+    public static string Normalize(string value)
+    {
+        if (value.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var hosts = value.Split(',', StringSplitOptions.TrimEntries);
+        if (hosts.Any(host => host.Length == 0
+            || EmbedPolicy.ToCspSources([host]).Length != 1))
+        {
+            throw new AppSettingValidationException(
+                "埋め込み先は www.example.net または *.example.net の形式で、読点区切りで指定してください。");
+        }
+
+        return string.Join(", ", hosts.Distinct(StringComparer.OrdinalIgnoreCase));
+    }
+
+    public static ImmutableArray<string> Parse(string value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(
+                ',',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToImmutableArray();
 }

@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+using System.Collections.Frozen;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
@@ -6,18 +6,20 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 /// <summary>埋め込みを許す配信元の設定（Issue #104 / #107）。</summary>
 public class EmbedOptionsTests
 {
-    private static IConfiguration Configuration(string? allowedHosts) =>
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(allowedHosts is null
-                ? []
-                : [new KeyValuePair<string, string?>(EmbedOptions.AllowedHostsKey, allowedHosts)])
-            .Build();
+    private static AppSettingsSnapshot Snapshot(string? allowedHosts) =>
+        new(
+            [],
+            new Dictionary<string, string>
+            {
+                [EmbedOptions.AllowedHostsKey] = allowedHosts ?? string.Empty,
+            }.ToFrozenDictionary(StringComparer.Ordinal),
+            FrozenSet<string>.Empty);
 
     [Fact]
     public void 既定では埋め込みを使えない()
     {
         // **設定しなければ、設定を入れる前と同じ振る舞いになる**
-        var options = EmbedOptions.FromConfiguration(Configuration(null));
+        var options = EmbedOptions.FromSnapshot(Snapshot(null));
 
         Assert.False(options.Enabled);
         Assert.Empty(options.AllowedHosts);
@@ -28,7 +30,7 @@ public class EmbedOptionsTests
     [Fact]
     public void 空文字も何も許さないものとして読む()
     {
-        var options = EmbedOptions.FromConfiguration(Configuration("  "));
+        var options = EmbedOptions.FromSnapshot(Snapshot("  "));
 
         Assert.False(options.Enabled);
     }
@@ -36,8 +38,8 @@ public class EmbedOptionsTests
     [Fact]
     public void 読点区切りで複数書ける()
     {
-        var options = EmbedOptions.FromConfiguration(
-            Configuration("www.example.com, *.example.net"));
+        var options = EmbedOptions.FromSnapshot(
+            Snapshot("www.example.com, *.example.net"));
 
         Assert.True(options.Enabled);
         Assert.Equal(["www.example.com", "*.example.net"], options.AllowedHosts.ToArray());
@@ -50,9 +52,8 @@ public class EmbedOptionsTests
     [Fact]
     public void CSPのホスト源へ直したものを持つ()
     {
-        // **ヘッダを組み立てるたびに作り直さない。** 設定は動かない
-        var options = EmbedOptions.FromConfiguration(
-            Configuration("www.example.com,*.example.net"));
+        var options = EmbedOptions.FromSnapshot(
+            Snapshot("www.example.com,*.example.net"));
 
         Assert.Equal(
             ["https://www.example.com", "https://*.example.net"],
