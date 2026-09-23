@@ -290,6 +290,10 @@ export const ja = {
   'appSettings.save': '保存する',
   'appSettings.saving': '処理しています…',
   'appSettings.saved': 'アプリケーション設定を保存しました。',
+  'appSettings.testMail': '保存前の設定で試験送信する',
+  'appSettings.testMailSent': 'ログイン中の管理者へ試験メールを送信しました。',
+  'appSettings.mailBaseUrlRequired':
+    'メールを有効にするには公開 URL が必要です。招待メールのリンクに使うため、空のまま保存できません。',
   'appSettings.testConnection': '保存前に Pleasanter 接続を試す',
   'appSettings.testingConnection': '接続を確認しています…',
   'appSettings.connectionSucceeded': 'Pleasanter へ接続できました。',
@@ -1363,6 +1367,10 @@ export const en: Record<MessageKey, string> = {
   'appSettings.save': 'Save',
   'appSettings.saving': 'Working…',
   'appSettings.saved': 'Application settings saved.',
+  'appSettings.testMail': 'Send a test message without saving',
+  'appSettings.testMailSent': 'A test message was sent to the signed-in administrator.',
+  'appSettings.mailBaseUrlRequired':
+    'A public base URL is required when email is enabled because invitation messages use it for links.',
   'appSettings.testConnection': 'Test Pleasanter connection before saving',
   'appSettings.testingConnection': 'Testing connection…',
   'appSettings.connectionSucceeded': 'Connected to Pleasanter.',

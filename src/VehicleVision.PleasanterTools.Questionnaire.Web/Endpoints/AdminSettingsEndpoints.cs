@@ -1,6 +1,8 @@
-using System.Security.Claims;
 using System.Collections.Frozen;
+using System.Net.Mail;
+using System.Security.Claims;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -66,7 +68,8 @@ public static class AdminSettingsEndpoints
                         string.Join(
                             ";",
                             changedKeys
-                                .Where(key => !definitions[key].IsSecret)
+                                .Where(key => !definitions[key].IsSecret
+                                    && !key.StartsWith(MailOptions.Prefix, StringComparison.Ordinal))
                                 .Select(key =>
                                 $"{key}:{before[key]}->{definitions[key].Normalize(request.Values[key])}")));
                 }
@@ -130,6 +133,45 @@ public static class AdminSettingsEndpoints
                 return Results.BadRequest(new { message = exception.Message });
             }
         });
+
+        group.MapPost("/test-send", async (
+            AppSettingsRequest request,
+            ClaimsPrincipal principal,
+            HttpContext context,
+            MailSettingsTestMailer mailer,
+            CancellationToken cancellationToken) =>
+        {
+            if (request.Values is null)
+            {
+                return Results.BadRequest(new { message = "設定値を指定してください。" });
+            }
+
+            var recipient = principal.Identity?.Name;
+            if (!MailAddress.TryCreate(recipient, out _))
+            {
+                return Results.BadRequest(new
+                {
+                    message = "ログイン ID がメールアドレスではないため、試験送信できません。",
+                });
+            }
+
+            try
+            {
+                AuditNotes.SetTarget(context, "AppSetting", "mail-test");
+                await mailer.SendAsync(request.Values, recipient, cancellationToken)
+                    .ConfigureAwait(false);
+                return Results.Ok(new { sent = true });
+            }
+            catch (AppSettingValidationException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+            catch (MailDeliveryException exception)
+            {
+                return Results.BadRequest(new { message = exception.Message });
+            }
+        })
+            .RequireRateLimiting(AdminAutoReplyEndpoints.TestSendRateLimitPolicy);
 
         return builder;
     }

@@ -48,11 +48,12 @@ public static class AdminAuthEndpoints
             ISamlOptionsProvider samlProvider,
             AdminAuthOptions options,
             BotMitigationOptionsProvider botOptionsProvider,
-            MailOptions mail,
+            IMailSettingsProvider mailSettings,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
             var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+            var mail = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
             var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
 
             // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。

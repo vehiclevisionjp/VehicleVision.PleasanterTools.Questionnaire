@@ -25,7 +25,8 @@ public sealed class ResponseNotificationMailer(
     IMailPayloadProtector protector,
     ILogger<ResponseNotificationMailer> logger,
     ResponseNotificationMailerOptions options,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    IMailSettingsProvider? mailSettings = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -33,6 +34,12 @@ public sealed class ResponseNotificationMailer(
     /// <returns>処理を確定したアンケート数。</returns>
     public async Task<int> QueueDueAsync(CancellationToken cancellationToken = default)
     {
+        if (mailSettings is not null
+            && !(await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false)).IsReady)
+        {
+            return 0;
+        }
+
         var now = _time.GetUtcNow().UtcDateTime;
         var due = await notifications
             .ListDueResponseDigestsAsync(now.Subtract(options.DigestInterval), cancellationToken)
