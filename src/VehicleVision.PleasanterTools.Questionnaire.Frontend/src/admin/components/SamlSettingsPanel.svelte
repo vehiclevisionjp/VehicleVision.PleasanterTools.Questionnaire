@@ -261,8 +261,23 @@
   .check {
     display: flex;
     align-items: center;
+    gap: 0.5rem;
   }
-  input,
+
+  /*
+    ⚠️ **チェックボックスを width: 100% の対象から外す**（Issue #416）。
+    入れていたため**チェックボックスが横いっぱいに伸び、ラベルが右端へ押し出されていた。**
+    枠と余白の指定も、四角い箱には合わない
+  */
+  .check input[type='checkbox'] {
+    flex: none;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  input:not([type='checkbox']),
   select,
   textarea {
     box-sizing: border-box;
