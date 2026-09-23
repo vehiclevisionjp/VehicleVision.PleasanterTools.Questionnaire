@@ -3,6 +3,13 @@
   //
   // **資格情報の実値をここへ書かないこと。** 入っているのは検証環境用の固定値だけ
   // （App_Data/Parameters/README.md）。
+  //
+  // ⚠️ **args へ ${workspaceFolder} を書かないこと**（Issue #411）。
+  // Windows では `D:\repos\...` に展開される。既定シェルが Git Bash だと
+  // VS Code が 1 本のコマンド行へ組み立て、**bash がバックスラッシュを食べて**
+  // `D:reposVehicleVision...` になり、MSB1009（プロジェクトが見つからない）で落ちる。
+  // **タスクの作業ディレクトリは既定でワークスペース直下なので、相対パスで書けば足りる。**
+  // options.cwd はシェルを通らないため ${workspaceFolder} のままでよい。
   "version": "2.0.0",
   "tasks": [
     {
@@ -10,7 +17,7 @@
       "detail": "ソリューション全体をビルドする",
       "type": "shell",
       "command": "dotnet",
-      "args": ["build", "${workspaceFolder}/VehicleVision.PleasanterTools.Questionnaire.slnx"],
+      "args": ["build", "VehicleVision.PleasanterTools.Questionnaire.slnx"],
       "group": { "kind": "build", "isDefault": true },
       "problemMatcher": "$msCompile",
       "presentation": { "reveal": "silent", "clear": true }
@@ -23,7 +30,7 @@
         "build",
         "-c",
         "Release",
-        "${workspaceFolder}/VehicleVision.PleasanterTools.Questionnaire.slnx"
+        "VehicleVision.PleasanterTools.Questionnaire.slnx"
       ],
       "problemMatcher": "$msCompile"
     },
@@ -35,7 +42,7 @@
       "command": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder}/VehicleVision.PleasanterTools.Questionnaire.slnx",
+        "VehicleVision.PleasanterTools.Questionnaire.slnx",
         "--filter",
         "FullyQualifiedName!~Integration.Tests"
       ],
@@ -49,7 +56,7 @@
       "command": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder}/tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests"
+        "tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests"
       ],
       "options": { "env": { "QUESTIONNAIRE_INTEGRATION": "1" } },
       "problemMatcher": "$msCompile"
@@ -61,7 +68,7 @@
       "command": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder}/tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests",
+        "tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests",
         "--filter",
         "FullyQualifiedName~AttachmentScanEndToEndTests"
       ],
@@ -77,7 +84,7 @@
       "command": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder}/VehicleVision.PleasanterTools.Questionnaire.slnx",
+        "VehicleVision.PleasanterTools.Questionnaire.slnx",
         "--filter",
         "FullyQualifiedName~${fileBasenameNoExtension}"
       ],
@@ -187,7 +194,7 @@
       "type": "shell",
       "command": "dotnet",
       "args": [
-        "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
+        "src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
         "--migrate"
       ],
       "options": {
@@ -243,7 +250,7 @@
       "detail": "配信・セキュリティヘッダ・管理画面の入口を見る",
       "type": "shell",
       "command": "bash",
-      "args": ["${workspaceFolder}/scripts/smoke.sh"],
+      "args": ["scripts/smoke.sh"],
       "problemMatcher": []
     },
     {
@@ -251,7 +258,7 @@
       "detail": "**Pleasanter 本体（AGPL）への参照が混ざっていないか**を見る",
       "type": "shell",
       "command": "bash",
-      "args": ["${workspaceFolder}/scripts/license-check.sh"],
+      "args": ["scripts/license-check.sh"],
       "problemMatcher": []
     },
     {
@@ -262,7 +269,7 @@
       "args": [
         "run",
         "--project",
-        "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web",
+        "src/VehicleVision.PleasanterTools.Questionnaire.Web",
         "--",
         "--generate-secret-key"
       ],
