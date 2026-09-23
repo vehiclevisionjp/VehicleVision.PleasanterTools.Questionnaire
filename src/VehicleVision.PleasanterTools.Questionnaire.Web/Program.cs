@@ -1,6 +1,5 @@
-using System.Threading.RateLimiting;
+﻿using System.Threading.RateLimiting;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
@@ -136,39 +135,6 @@ if (MigrationCommand.IsRequested(args))
     return;
 }
 
-// **設定ファイルのキーは正式な名前へ写してある**（ParameterFiles）。
-// ここは 1 つの名前だけを見る
-var timeZoneDefault =
-    builder.Configuration[ParameterFiles.TimeZoneDefaultKey] ?? "Asia/Tokyo";
-
-var pleasanterOptions = new PleasanterOptions
-{
-    BaseUrl = builder.Configuration["QUESTIONNAIRE_PLEASANTER_BASEURL"]
-        ?? throw new InvalidOperationException("QUESTIONNAIRE_PLEASANTER_BASEURL が設定されていない"),
-    ApiKey = builder.Configuration["QUESTIONNAIRE_PLEASANTER_APIKEY"]
-        ?? throw new InvalidOperationException("QUESTIONNAIRE_PLEASANTER_APIKEY が設定されていない"),
-
-    // **書き間違いは既定へ落とす。** ここで止めると、
-    // 版やタイムアウトの打ち間違いでアプリが上がらなくなる
-    ApiVersion = decimal.TryParse(
-        builder.Configuration["QUESTIONNAIRE_PLEASANTER_APIVERSION"],
-        System.Globalization.NumberStyles.Number,
-        System.Globalization.CultureInfo.InvariantCulture,
-        out var apiVersion) && apiVersion > 0
-        ? apiVersion
-        : PleasanterOptions.DefaultApiVersion,
-    Timeout = int.TryParse(
-        builder.Configuration["QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS"], out var timeoutSeconds)
-        && timeoutSeconds > 0
-        ? TimeSpan.FromSeconds(timeoutSeconds)
-        : PleasanterOptions.DefaultTimeout,
-
-    // **API キー側の指定が無ければ、アプリの既定タイムゾーンを使う**
-    // （Pleasanter.json の ApiKeyUserTimeZoneId の但し書きと同じ）
-    ApiKeyUserTimeZoneId =
-        builder.Configuration["QUESTIONNAIRE_PLEASANTER_TIMEZONE"] ?? timeZoneDefault,
-};
-
 // ---- サービス --------------------------------------------------------------
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IDbConnectionFactory>(
@@ -188,6 +154,8 @@ builder.Services.AddSingleton<IMaintenanceModeStore, MaintenanceModeStore>();
 builder.Services.AddSingleton(maintenanceOptions);
 builder.Services.AddSingleton<MaintenanceMode>();
 builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
+builder.Services.AddSingleton<IAppSettingStore, AppSettingStore>();
+builder.Services.AddSingleton<BotMitigationOptionsProvider>();
 
 // **添付を弾いた記録は監査ログと別の表**（Issue #39）。
 // あちらは IpAddress を持つ。**弾いた記録は回答者側の出来事**なので、
@@ -214,24 +182,33 @@ builder.Services.AddSingleton(serviceProvider => new AltchaGuard(
     serviceProvider.GetRequiredService<IAltchaChallengeStore>()));
 builder.Services.AddSingleton(AdminCaptchaOptions.FromConfiguration(builder.Configuration));
 
-builder.Services.AddSingleton(pleasanterOptions);
-builder.Services.AddSingleton(new PleasanterDateTime(pleasanterOptions.ApiKeyUserTimeZoneId));
+builder.Services.AddSingleton<IPleasanterOptionsProvider, PleasanterOptionsProvider>();
+builder.Services.AddSingleton(serviceProvider =>
+    serviceProvider.GetRequiredService<IPleasanterOptionsProvider>()
+        .GetAsync().GetAwaiter().GetResult());
+builder.Services.AddSingleton(serviceProvider => new PleasanterDateTime(
+    serviceProvider.GetRequiredService<PleasanterOptions>().ApiKeyUserTimeZoneId));
 builder.Services.AddSingleton<PleasanterRecordBuilder>();
 // **変換スクリプトは上限付きで走らせる**（Issue #83、_documents/アーキテクチャ方針.md 8 章）。
 // **上限が無いと、書き間違えた `while (true)` 1 つで送信ワーカーが永久に固まる。**
 // 打ち切ったものはマッピングの不備になり、回答はデッドレターへ回る
-builder.Services.AddSingleton(ScriptConverterOptions.FromConfiguration(builder.Configuration));
+var scriptConverterOptions = ScriptConverterOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(scriptConverterOptions);
 builder.Services.AddSingleton<IScriptConverter>(serviceProvider =>
     new JintScriptConverter(serviceProvider.GetRequiredService<ScriptConverterOptions>()));
 builder.Services.AddSingleton(serviceProvider =>
     new MappingEvaluator(serviceProvider.GetRequiredService<IScriptConverter>()));
-builder.Services.AddHttpClient<PleasanterApiClient>(client =>
-    client.Timeout = pleasanterOptions.Timeout);
+builder.Services.AddHttpClient("pleasanter", client =>
+    client.Timeout = Timeout.InfiniteTimeSpan);
+builder.Services.AddTransient(serviceProvider => new PleasanterApiClient(
+    serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter"),
+    serviceProvider.GetRequiredService<IPleasanterOptionsProvider>()));
 
 // **溜まりすぎたら受付を止める**（Issue #72、_documents/非機能設計.md 2 章）。
 // **WAF が無い導入先を想定した最後の壁。** 分散した相手にはレート制限が効かない。
 // 攻撃が無くても、Pleasanter が長く落ちれば同じように溜まる
-builder.Services.AddSingleton(BacklogGuardOptions.FromConfiguration(builder.Configuration));
+var backlogGuardOptions = BacklogGuardOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(backlogGuardOptions);
 builder.Services.AddSingleton<ResponseBacklogGuard>();
 
 builder.Services.AddSingleton<ResponseIntake>();
@@ -257,22 +234,11 @@ var assetOptions = AssetOptions.FromConfiguration(
     builder.Configuration, attachmentOptions.VirusScan.Enabled);
 builder.Services.AddSingleton(assetOptions);
 
-// **埋め込みを許す配信元**（Issue #104 / #107）。**既定は空＝一切埋め込めない**
-var embedOptions = EmbedOptions.FromConfiguration(builder.Configuration);
-builder.Services.AddSingleton(embedOptions);
-
-// **回答画面を埋め込める親サイト**（Issue #334）。
-// 配信元を許す `EmbedOptions` とは逆方向なので混ぜない
-var embedParentOptions = EmbedParentOptions.FromConfiguration(builder.Configuration);
-builder.Services.AddSingleton(embedParentOptions);
-
 // **添付と配布資産は multipart で届く。上限を既定値に任せない**
 // （_documents/非機能設計.md 1 章）。
 // 大きい方に合わせ、個別の入口ではそれぞれの上限まで絞る
 builder.Services.Configure<FormOptions>(options =>
-    options.MultipartBodyLengthLimit = Math.Max(
-        attachmentOptions.MaxRequestBodyBytes,
-        assetOptions.MaxRequestBodyBytes));
+    options.MultipartBodyLengthLimit = int.MaxValue);
 
 // **ウイルススキャンは設定で有効にしたときだけ組み込む**（既定は無効）。
 // **ClamAV 本体は GPL-2.0 なので別プロセスとして呼ぶだけ**（LICENSING.md）
@@ -310,7 +276,7 @@ if (attachmentOptions.VirusScan.Enabled)
 // **スキャナが登録されていなければ 3 層目は無効。**
 // 「有効なのにスキャナが無い」場合は検査側が添付を拒否する（素通しにしない）
 builder.Services.AddSingleton(serviceProvider => new AttachmentInspector(
-    attachmentOptions.ToPolicy(), serviceProvider.GetService<IVirusScanner>()));
+    attachmentOptions.ToPolicy, serviceProvider.GetService<IVirusScanner>()));
 builder.Services.AddSingleton(serviceProvider => new AssetInspector(
     assetOptions, serviceProvider.GetService<IVirusScanner>()));
 
@@ -326,6 +292,11 @@ builder.Services.AddSingleton(analyticsOptions);
 // ⚠️ **秘密鍵は設定ファイルへ書かせない。** 環境変数か Key Vault から読む
 var captchaOptions = CaptchaOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(captchaOptions);
+// 埋め込み先だけを設定スナップショットから要求ごとに解決し、
+// アクセス解析と CAPTCHA の許可先は起動時の固定値として保つ。
+builder.Services.AddSingleton(new ContentSecurityPolicyBuilder(
+    analyticsOptions.CspSources,
+    captchaOptions.CspSources));
 
 // **検証の待ち時間に上限を持たせる。** 外部が遅いだけで送信が固まらないように。
 // ⚠️ **到達できないときは通さない**（CaptchaVerifier の但し書き）
@@ -385,6 +356,12 @@ builder.Services.AddSingleton(new AdminPasswordPolicy(passwordPolicyOptions));
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton(new SecretProtector(secretKey));
+builder.Services.AddSingleton<AppSettingsProvider>();
+builder.Services.AddSingleton<IAppSettingsProvider>(services =>
+    services.GetRequiredService<AppSettingsProvider>());
+builder.Services.AddSingleton<AppSettingsMonitor>();
+builder.Services.AddHostedService(
+    serviceProvider => serviceProvider.GetRequiredService<AppSettingsMonitor>());
 // **2 要素認証をどこまで求めるか**（Issue #154）。**既定は任意。**
 //
 // **知らない値は落とす。** 黙って既定へ落ちると、必須にしたつもりで任意のまま動く。
@@ -448,37 +425,6 @@ builder.Services.AddSingleton(serviceProvider => new SubmissionGuard(
 
 // **既定は厳しく。** 緩めるのは検証環境だけにすること。
 // 端から端まで通す試験は 1 つの IP から大量に叩くので、既定のままだと自分で枠を使い切る
-var loginPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"], out var configuredLogin)
-    ? configuredLogin
-    : 10;
-
-var submitPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_SUBMITS_PER_MIN"], out var configuredSubmits)
-    ? configuredSubmits
-    : 20;
-var requestPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_REQUESTS_PER_MIN"], out var configuredRequests)
-    ? configuredRequests
-    : 60;
-
-// **1 画面で何本も出るもの（ビルド成果物・本文画像）の枠。**
-// ⚠️ **ここを固定値にすると、検証環境の緩和が効かない。**
-// 端から端まで通す試験と写しの一式は 1 つの IP から大量に叩くため、
-// 固定の 600 では自分で使い切る（Issue #322）
-var assetPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN"], out var configuredAssets)
-    ? configuredAssets
-    : 600;
-
-// **アンケート 1 本あたりの枠。** 他の枠と同じく検証環境でだけ緩められるようにする。
-// ⚠️ **`publicId` を持たない要求は 1 つの枠にまとめて数えられる**ので、
-// これは実質「回答画面以外すべての合計」の上限にもなる（Issue #311）
-var formPermitLimit = int.TryParse(
-    builder.Configuration["QUESTIONNAIRE_FORM_REQUESTS_PER_MIN"], out var configuredForm)
-    ? configuredForm
-    : 600;
-
 builder.Services
     .AddAuthentication(AdminAuthSchemes.Session)
     .AddCookie(AdminAuthSchemes.Session, options =>
@@ -531,17 +477,16 @@ builder.Services.AddAuthorization(options =>
 
 // **送信ワーカーは .Web に同居させる**（_documents/アプリケーション設計.md 8 章）。
 // Azure App Service では別プロセス常駐の手段が限られるため。**Always On を有効にすること**
-builder.Services.AddSingleton(ResponseSenderOptions.FromConfiguration(builder.Configuration));
+var responseSenderOptions = ResponseSenderOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(responseSenderOptions);
 builder.Services.AddSingleton<ResponseSender>();
 builder.Services.AddHostedService<ResponseSenderHostedService>();
 builder.Services.AddSingleton<AssetHistorySender>();
 builder.Services.AddHostedService<AssetHistorySenderHostedService>();
 
-// **メールの送信ワーカー**（Issue #189）。**既定は無効で、設定したときだけ常駐する。**
+// **メールの送信ワーカー**（Issue #189）。メール設定の変更へ再起動なしで追従できるよう常駐する。
 // 回答の送信ワーカーとは別に動く。**メールが詰まっても回答は送られ、
 // 回答が詰まってもメールは出る。** どちらかの不調がもう一方を止めない
-var mailOptions = MailOptions.FromConfiguration(builder.Configuration);
-builder.Services.AddSingleton(mailOptions);
 builder.Services.AddSingleton<IMailOutbox, MailOutbox>();
 // ⚠️ **宛先も本文も暗号化して置く。** 完全匿名の前提で、個人を指す値が
 // DB に載る唯一の場所（Issue #189）
@@ -554,37 +499,21 @@ builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
 builder.Services.AddSingleton<IResponseEditTokenStore, ResponseEditTokenStore>();
 builder.Services.AddSingleton<AutoReplyDispatcher>();
 builder.Services.AddSingleton<AutoReplyTestMailer>();
+builder.Services.AddSingleton<IMailSettingsProvider, MailSettingsProvider>();
+builder.Services.AddSingleton<MailSettingsTestMailer>();
 // **招待を本人へ直接送る**（Issue #189）。手渡しの途中で漏れる経路を減らす。
 // **送れない構成でも招待は出せる**（画面の URL は今までどおり返る）
 builder.Services.AddSingleton<AdminInvitationMailer>();
 
-if (mailOptions.IsReady)
-{
-    // **送信経路は設定で選ぶ**（Issue #198）。
-    // ⚠️ **SES と ACS はマネージド ID で通るので、保管する秘密が 0 になる。**
-    // SMTP は必ずパスワードを 1 つ持つことになる
-    switch (mailOptions.Transport)
-    {
-        case MailTransportKind.AmazonSes:
-            builder.Services.AddSingleton<IMailTransport, SesMailTransport>();
-            break;
-
-        case MailTransportKind.AzureCommunicationServices:
-            builder.Services.AddSingleton<IMailTransport, AcsMailTransport>();
-            break;
-
-        default:
-            builder.Services.AddSingleton<IMailTransport, SmtpMailTransport>();
-            break;
-    }
-
-    builder.Services.AddSingleton(MailSenderOptions.FromConfiguration(builder.Configuration));
-    builder.Services.AddSingleton<MailSender>();
-    builder.Services.AddHostedService<MailSenderHostedService>();
-    builder.Services.AddSingleton(ResponseNotificationMailerOptions.FromConfiguration(builder.Configuration));
-    builder.Services.AddSingleton<ResponseNotificationMailer>();
-    builder.Services.AddHostedService<ResponseNotificationMailerHostedService>();
-}
+// **送信直前に設定を読み直す。** Web で保存した値は同じ設定プロバイダーを通じて
+// 同居ワーカーへ最大 30 秒で届き、再起動なしで送信方式も切り替わる。
+builder.Services.AddSingleton<IMailTransport, DynamicMailTransport>();
+builder.Services.AddSingleton(MailSenderOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<MailSender>();
+builder.Services.AddHostedService<MailSenderHostedService>();
+builder.Services.AddSingleton(ResponseNotificationMailerOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<ResponseNotificationMailer>();
+builder.Services.AddHostedService<ResponseNotificationMailerHostedService>();
 
 // **設定したときだけ監視の口を生やす。** 既定で外部から DB の状態を読める口を作らない。
 var monitoringTokenValue = builder.Configuration[MonitoringToken.Setting];
@@ -599,7 +528,7 @@ if (monitoringToken is not null)
         serviceProvider.GetRequiredService<IResponseOutbox>(),
         serviceProvider.GetRequiredService<IMonitoringStore>(),
         serviceProvider.GetRequiredService<IMailOutbox>(),
-        mailOptions,
+        serviceProvider.GetRequiredService<IMailSettingsProvider>(),
         serviceProvider.GetRequiredService<TimeProvider>()));
 }
 
@@ -612,7 +541,9 @@ builder.Services.AddHostedService(serviceProvider => new ParameterFilesReport(
 
 // **管理操作の記録は放っておくと増え続ける**（_documents/データモデル設計.md）。
 // 期限を過ぎた分を消す係を常駐させる。**既定は 365 日残す**
-builder.Services.AddSingleton(AuditLogRetentionOptions.FromConfiguration(builder.Configuration));
+var auditLogRetentionOptions =
+    AuditLogRetentionOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(auditLogRetentionOptions);
 builder.Services.AddHostedService<AuditLogRetentionService>();
 
 // ---- レート制限 ------------------------------------------------------------
@@ -625,6 +556,7 @@ builder.Services
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     var sharedRateLimits = serviceProvider.GetService<ISharedRateLimitStore>();
+    var settings = serviceProvider.GetRequiredService<AppSettingsMonitor>();
     var rateLimitLogger = loggerFactory.CreateLogger("SharedRateLimit");
 
     // **複数の軸で掛ける。** 1 つの軸だけでは抜けられる
@@ -640,7 +572,9 @@ builder.Services
             return RateLimitPartitions.FixedWindow(
                 $"{address}|{kind}",
                 "request",
-                isAsset ? assetPermitLimit : requestPermitLimit,
+                settings.GetInt32(isAsset
+                    ? "QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN"
+                    : "QUESTIONNAIRE_REQUESTS_PER_MIN"),
                 TimeSpan.FromMinutes(1),
                 sharedRateLimits,
                 rateLimitLogger);
@@ -650,7 +584,7 @@ builder.Services
             // 経路の値は UseRouting が利用者のミドルウェアより前に入るため、ここで取れる
             RateLimitPartitions.Survey(
                 context.Request.RouteValues["publicId"]?.ToString(),
-                formPermitLimit,
+                settings.GetInt32("QUESTIONNAIRE_FORM_REQUESTS_PER_MIN"),
                 TimeSpan.FromMinutes(1),
                 sharedRateLimits,
                 rateLimitLogger)));
@@ -662,7 +596,7 @@ builder.Services
         RateLimitPartitions.FixedWindow(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             "submit",
-            submitPermitLimit,
+            settings.GetInt32("QUESTIONNAIRE_SUBMITS_PER_MIN"),
             TimeSpan.FromMinutes(1),
             sharedRateLimits,
             rateLimitLogger));
@@ -676,7 +610,7 @@ builder.Services
         RateLimitPartitions.FixedWindow(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             "login",
-            loginPermitLimit,
+            settings.GetInt32("QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"),
             TimeSpan.FromMinutes(5),
             sharedRateLimits,
             rateLimitLogger));
@@ -694,6 +628,75 @@ builder.Services
 });
 
 var app = builder.Build();
+
+var runtimeSettings = app.Services.GetRequiredService<AppSettingsMonitor>();
+runtimeSettings.Register(snapshot =>
+{
+    static int Integer(AppSettingsSnapshot current, string key) =>
+        int.Parse(current[key], System.Globalization.CultureInfo.InvariantCulture);
+
+    auditLogRetentionOptions.RetentionDays =
+        Integer(snapshot, AuditLogRetentionOptions.RetentionDaysKey);
+    auditLogRetentionOptions.DeadLetterRetentionDays =
+        Integer(snapshot, AuditLogRetentionOptions.DeadLetterRetentionDaysKey);
+    auditLogRetentionOptions.NotificationRetentionDays =
+        Integer(snapshot, AuditLogRetentionOptions.NotificationRetentionDaysKey);
+    auditLogRetentionOptions.AttachmentRejectionRetentionDays =
+        Integer(snapshot, AuditLogRetentionOptions.AttachmentRejectionRetentionDaysKey);
+
+    responseSenderOptions.MaxSendsPerMinute =
+        Integer(snapshot, ResponseSenderOptions.MaxSendsPerMinuteKey);
+    backlogGuardOptions.PerSurveyLimit =
+        Integer(snapshot, BacklogGuardOptions.PerSurveyLimitKey);
+    backlogGuardOptions.TotalLimit =
+        Integer(snapshot, BacklogGuardOptions.TotalLimitKey);
+
+    attachmentOptions.MaxFileSizeBytes =
+        Integer(snapshot, "QUESTIONNAIRE_ATTACHMENT_MAXFILESIZEBYTES");
+    attachmentOptions.MaxFileCount =
+        Integer(snapshot, "QUESTIONNAIRE_ATTACHMENT_MAXFILECOUNT");
+    attachmentOptions.MaxTotalBytes =
+        Integer(snapshot, "QUESTIONNAIRE_ATTACHMENT_MAXTOTALBYTES");
+    attachmentOptions.AllowedExtensions =
+        [.. snapshot["QUESTIONNAIRE_ATTACHMENT_ALLOWEDEXTENSIONS"]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+    assetOptions.MaxFileSizeBytes =
+        Integer(snapshot, "QUESTIONNAIRE_ASSET_MAXFILESIZEBYTES");
+    assetOptions.MaxFileCount =
+        Integer(snapshot, "QUESTIONNAIRE_ASSET_MAXFILECOUNT");
+    assetOptions.AllowedExtensions =
+        [.. snapshot["QUESTIONNAIRE_ASSET_ALLOWEDEXTENSIONS"]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+
+    scriptConverterOptions.TimeLimit = TimeSpan.FromMilliseconds(
+        Integer(snapshot, ScriptConverterOptions.TimeLimitKey));
+    scriptConverterOptions.MemoryLimitBytes =
+        Integer(snapshot, ScriptConverterOptions.MemoryLimitKey);
+    scriptConverterOptions.RecursionLimit =
+        Integer(snapshot, ScriptConverterOptions.RecursionLimitKey);
+
+    attachmentOptions.VirusScan.ClamAvTimeout = TimeSpan.FromSeconds(
+        Integer(snapshot, "QUESTIONNAIRE_VIRUSSCAN_TIMEOUTSECONDS"));
+    attachmentOptions.VirusScan.DefenderResultTimeout = TimeSpan.FromSeconds(
+        Integer(snapshot, "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_RESULTTIMEOUTSECONDS"));
+
+    app.Services.GetRequiredService<PleasanterDateTime>()
+        .SetTimeZone(snapshot[AppSettingsProvider.PleasanterTimeZoneKey]);
+
+    var mailSender = app.Services.GetService<MailSenderOptions>();
+    if (mailSender is not null)
+    {
+        mailSender.MaxSendsPerMinute =
+            Integer(snapshot, MailSenderOptions.MaxSendsPerMinuteKey);
+    }
+
+    var notificationOptions = app.Services.GetService<ResponseNotificationMailerOptions>();
+    if (notificationOptions is not null)
+    {
+        notificationOptions.DigestInterval = TimeSpan.FromMinutes(
+            Integer(snapshot, ResponseNotificationMailerOptions.DigestIntervalMinutesKey));
+    }
+});
 
 if (transportSecurity.AllowInsecure)
 {
@@ -724,53 +727,10 @@ if (maintenanceOptions.EnvironmentEnabled)
         + "This mode cannot be disabled from the administration screen.");
 }
 
-// **CSP は起動時に 1 度だけ組み立てる**（Issue #104 / #107）。
-//
 // **アンケートごとには出し分けない。** 出し分けるには、回答画面の HTML を返す時点で
 // DB を引くことになり、**ヘッダの違いから公開 ID の実在が分かってしまう**
 // （`_documents/非機能設計.md` 1 章「識別子の秘匿」）。
 //
-// **代わりに、許す配信元を運用側だけが決められる場所（設定）へ置く。**
-// 既定は空なので、設定しなければ従来と同じ CSP になる。
-// **`frame-src https:` のようには絶対に広げない**
-var embedSources = embedOptions.CspSources;
-var embedParentSources = embedParentOptions.CspSources;
-
-// **アクセス解析を有効にしたときだけ広げる**（Issue #162）。
-// 既定では 1 つも足さないので、今までと同じ CSP になる。
-//
-// ⚠️ **`https:` のようには広げない。** 許すのは選んだサービスの配信元だけ。
-// **inline script は許さない。** タグは同梱した JS から DOM へ差し込む
-var analyticsSources = analyticsOptions.CspSources;
-
-// **CAPTCHA も、外部を選んだときだけ広げる**（Issue #164）。
-// どのサービスも iframe で課題を出すので、script-src と frame-src の両方に要る
-var captchaSources = captchaOptions.CspSources;
-var externalScriptSources = analyticsSources.AddRange(captchaSources);
-const string scalarCspNonceKey = "ScalarCspNonce";
-var contentSecurityPolicy = string.Join("; ",
-[
-    "default-src 'self'",
-    // **画像の埋め込み先も設定で許した配信元だけ**（2 要素の QR は data: URI で描く）。
-    // 解析は計測を画像で送ることがあるので、有効なときはその送信先も許す
-    "img-src 'self' data:" + Join(embedSources) + Join(analyticsSources) + Join(captchaSources),
-    // **設定が空なら 'none'。** 指定そのものを省くと default-src へ落ちる
-    // **CAPTCHA は iframe で出る。** 埋め込みの許可と同じ枠へ足す
-    "frame-src "
-        + (embedSources.IsEmpty && captchaSources.IsEmpty
-            ? "'none'"
-            : string.Join(' ', embedSources.AddRange(captchaSources))),
-    "frame-ancestors "
-        + (embedParentSources.IsEmpty ? "'none'" : string.Join(' ', embedParentSources)),
-    "base-uri 'self'",
-    "object-src 'none'",
-    "script-src 'self'" + Join(externalScriptSources),
-    "connect-src 'self'" + Join(externalScriptSources),
-]);
-
-static string Join(System.Collections.Immutable.ImmutableArray<string> sources) =>
-    sources.IsEmpty ? string.Empty : " " + string.Join(' ', sources);
-
 // **リバースプロキシ配下でも本当の送信元 IP を見る。** レート制限が効かなくなるため。
 // 転送ヘッダを無条件には信じず、運用者が指定した Ingress の CIDR だけを追加する。
 var forwardedHeadersOptions = new ForwardedHeadersOptions
@@ -879,29 +839,9 @@ if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
         branch => branch.UseHttpsRedirection());
 }
 
-// **セキュリティヘッダを一式付ける**（_documents/非機能設計.md 1 章）
-app.Use(async (context, next) =>
-{
-    var headers = context.Response.Headers;
-    var csp = contentSecurityPolicy;
-    if (context.Request.Path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase))
-    {
-        // Scalar は画面を組み立てる inline script を返す。要求ごとの nonce だけを許して CSP を緩めない。
-        var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        context.Items[scalarCspNonceKey] = nonce;
-        csp = csp.Replace(
-            "script-src 'self'",
-            $"script-src 'self' 'nonce-{nonce}'",
-            StringComparison.Ordinal);
-    }
-
-    headers["X-Content-Type-Options"] = "nosniff";
-    headers["Referrer-Policy"] = "no-referrer";
-    headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()";
-    // **2 要素の QR は data: URI で描く。** 外部から画像を取りに行かせない
-    headers["Content-Security-Policy"] = csp;
-    await next();
-});
+// **セキュリティヘッダを一式付ける**（_documents/非機能設計.md 1 章）。
+// 埋め込み先だけは 30 秒 TTL の設定スナップショットから要求ごとに差し替える。
+app.UseMiddleware<SecurityHeadersMiddleware>();
 
 app.UseRateLimiter();
 
@@ -931,6 +871,7 @@ app.MapAdminAuditLogEndpoints();
 app.MapAdminOutboxEndpoints();
 app.MapAdminNotificationEndpoints();
 app.MapAdminMaintenanceEndpoints();
+app.MapAdminSettingsEndpoints();
 app.MapAdminVersionEndpoints(
     transportSecurity.AllowInsecure,
     usesSqlite,
@@ -947,7 +888,7 @@ if (openApiExposure.Enabled)
     {
         // CDN の既定フォントと利用状況テレメトリーを止め、画面から第三者へ要求を出さない。
         options.DisableDefaultFonts().DisableTelemetry().DisableAgent().WithNonce(
-            context.Items[scalarCspNonceKey] as string
+            context.Items[SecurityHeadersMiddleware.ScalarCspNonceKey] as string
             ?? throw new InvalidOperationException("Scalar の CSP nonce を設定できなかった"));
     });
 }
@@ -1007,6 +948,10 @@ try
         provider,
         connectionString,
         databaseStartupState,
+        app.Logger,
+        app.Lifetime.ApplicationStopping);
+    await PleasanterConfigurationReport.ReportAsync(
+        app.Services.GetRequiredService<IAppSettingsProvider>(),
         app.Logger,
         app.Lifetime.ApplicationStopping);
     await app.WaitForShutdownAsync();

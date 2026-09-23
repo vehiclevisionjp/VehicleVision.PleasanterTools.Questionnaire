@@ -21,6 +21,7 @@ import type {
   SurveyPage,
   SurveyTemplateSummary,
   SamlSettings,
+  AppSettings,
 } from './types';
 
 /**
@@ -308,6 +309,40 @@ export const testSamlMetadata = (metadataUrl: string) =>
   call<{ reachable: boolean; entityId?: string | null }>('/api/admin/saml/settings/test', {
     method: 'POST',
     json: { metadataUrl },
+  });
+
+// ---- アプリケーション設定（Issue #372）-------------------------------------
+
+export const getAppSettings = () =>
+  call<AppSettings>('/api/admin/settings');
+
+const appSettingValues = (settings: AppSettings) =>
+  Object.fromEntries(
+    settings.fields
+      .filter((field) => !field.isSecret || (field.value?.trim() ?? '') !== '')
+      .map((field) => [field.key, field.value]),
+  );
+
+export const saveAppSettings = (settings: AppSettings) =>
+  call<AppSettings>('/api/admin/settings', {
+    method: 'PUT',
+    json: {
+      // 秘密欄は空なら送らず、既存値を保つ。入力した値だけを置き換える。
+      values: appSettingValues(settings),
+    },
+  });
+
+/** 保存せず、入力中のメール設定でログイン中の管理者へ 1 通送る。 */
+export const testAppSettingsMail = (settings: AppSettings) =>
+  call<{ sent: boolean }>('/api/admin/settings/test-send', {
+    method: 'POST',
+    json: { values: appSettingValues(settings) },
+  });
+
+export const testAppSettings = (settings: AppSettings) =>
+  call<{ connected: boolean }>('/api/admin/settings/test', {
+    method: 'POST',
+    json: { values: appSettingValues(settings) },
   });
 
 // ---- アンケート -------------------------------------------------------------

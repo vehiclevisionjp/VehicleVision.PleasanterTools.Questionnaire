@@ -34,7 +34,7 @@ public sealed class ResponseSenderOptions
     /// <summary>期限切れの確保を解放する間隔。</summary>
     public TimeSpan ReleaseExpiredLocksInterval { get; init; } = TimeSpan.FromMinutes(1);
 
-    /// <summary>1 分あたりに送る件数の上限。**0 以下で無制限。**（Issue #72）</summary>
+    /// <summary>1 分あたりに送る件数の上限。</summary>
     /// <remarks>
     /// <para>
     /// **復旧直後に溜まった分を一斉に送ると、Pleasanter をもう一度落とす**
@@ -50,7 +50,7 @@ public sealed class ResponseSenderOptions
     /// Pleasanter 側の余力に合わせて割り算して設定すること。
     /// </para>
     /// </remarks>
-    public int MaxSendsPerMinute { get; init; } = 600;
+    public int MaxSendsPerMinute { get; set; } = 600;
 
     /// <summary>送信と送信の間に最低限あける時間。</summary>
     /// <remarks>
@@ -78,10 +78,10 @@ public sealed class ResponseSenderOptions
             return new ResponseSenderOptions();
         }
 
-        return int.TryParse(raw, CultureInfo.InvariantCulture, out var value)
+        return int.TryParse(raw, CultureInfo.InvariantCulture, out var value) && value > 0
             ? new ResponseSenderOptions { MaxSendsPerMinute = value }
             : throw new InvalidOperationException(
-                $"{MaxSendsPerMinuteKey} は整数で指定する（今の値: {raw}）。0 以下で無制限");
+                $"{MaxSendsPerMinuteKey} は 1 以上の整数で指定する（今の値: {raw}）");
     }
 
     /// <summary>指数バックオフで次に送る時刻を決める。</summary>

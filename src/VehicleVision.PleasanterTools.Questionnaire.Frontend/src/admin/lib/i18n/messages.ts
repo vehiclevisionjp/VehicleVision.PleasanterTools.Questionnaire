@@ -62,6 +62,7 @@ export const ja = {
   'breadcrumb.notifications': 'お知らせ',
   'breadcrumb.users': '管理者の管理',
   'breadcrumb.account': '自分のアカウント',
+  'breadcrumb.appSettings': 'アプリケーション設定',
   'breadcrumb.samlSettings': 'SAML 設定',
   'breadcrumb.help': '使い方',
 
@@ -274,6 +275,32 @@ export const ja = {
   'saml.testFailed': 'メタデータを取得できませんでした。URL と IdP の状態をご確認ください。',
   'saml.testSucceeded': 'SAML メタデータを取得できました。',
   'saml.testSucceededWithEntityId': 'SAML メタデータを取得できました（Entity ID: {entityId}）。',
+
+  // ---- アプリケーション設定 ----------------------------------------------
+  'appSettings.open': '設定',
+  'appSettings.title': 'アプリケーション設定',
+  'appSettings.back': '← アンケートの一覧へ',
+  'appSettings.lead':
+    '外部設定に値がある項目は固定されます。それ以外は保存後、再起動せずに反映されます。',
+  'appSettings.fixed': '外部設定で固定されています',
+  'appSettings.defaultValue': '既定値',
+  'appSettings.usingDefault': '現在は既定値',
+  'appSettings.secretConfigured': '設定済みです。変更するときだけ新しい値を入力してください。',
+  'appSettings.secretNotConfigured': '未設定です。設定するときだけ値を入力してください。',
+  'appSettings.save': '保存する',
+  'appSettings.saving': '処理しています…',
+  'appSettings.saved': 'アプリケーション設定を保存しました。',
+  'appSettings.testMail': '保存前の設定で試験送信する',
+  'appSettings.testMailSent': 'ログイン中の管理者へ試験メールを送信しました。',
+  'appSettings.mailBaseUrlRequired':
+    'メールを有効にするには公開 URL が必要です。招待メールのリンクに使うため、空のまま保存できません。',
+  'appSettings.testConnection': '保存前に Pleasanter 接続を試す',
+  'appSettings.testingConnection': '接続を確認しています…',
+  'appSettings.connectionSucceeded': 'Pleasanter へ接続できました。',
+  'appSettings.publishedDestinationWarning':
+    '公開中のアンケートが {count} 件あります。URL を変更すると、これらの回答の送信先も変わります。',
+  'appSettings.pleasanterNotConfigured':
+    'Pleasanter 接続が未設定です。回答は受け付けますが、Pleasanter への送信待ちが積み上がります。保存前に接続を試してください。',
 
   // ---- 2 要素の登録 -------------------------------------------------------
   'enroll.title': '2 要素認証を登録する',
@@ -1114,6 +1141,7 @@ export const en: Record<MessageKey, string> = {
   'breadcrumb.notifications': 'Notifications',
   'breadcrumb.users': 'Manage administrators',
   'breadcrumb.account': 'My account',
+  'breadcrumb.appSettings': 'Application settings',
   'breadcrumb.samlSettings': 'SAML settings',
   'breadcrumb.help': 'Help',
 
@@ -1324,6 +1352,32 @@ export const en: Record<MessageKey, string> = {
   'saml.testFailed': 'Could not retrieve metadata. Check the URL and IdP status.',
   'saml.testSucceeded': 'SAML metadata was retrieved.',
   'saml.testSucceededWithEntityId': 'SAML metadata was retrieved (Entity ID: {entityId}).',
+
+  // ---- Application settings ----------------------------------------------
+  'appSettings.open': 'Settings',
+  'appSettings.title': 'Application settings',
+  'appSettings.back': '\u2190 Back to surveys',
+  'appSettings.lead':
+    'Values supplied by external configuration are fixed. Other values take effect after saving without restarting the application.',
+  'appSettings.fixed': 'Fixed by external configuration',
+  'appSettings.defaultValue': 'Default',
+  'appSettings.usingDefault': 'currently using the default',
+  'appSettings.secretConfigured': 'Configured. Enter a new value only when changing it.',
+  'appSettings.secretNotConfigured': 'Not configured. Enter a value only when setting it.',
+  'appSettings.save': 'Save',
+  'appSettings.saving': 'Working…',
+  'appSettings.saved': 'Application settings saved.',
+  'appSettings.testMail': 'Send a test message without saving',
+  'appSettings.testMailSent': 'A test message was sent to the signed-in administrator.',
+  'appSettings.mailBaseUrlRequired':
+    'A public base URL is required when email is enabled because invitation messages use it for links.',
+  'appSettings.testConnection': 'Test Pleasanter connection before saving',
+  'appSettings.testingConnection': 'Testing connection…',
+  'appSettings.connectionSucceeded': 'Connected to Pleasanter.',
+  'appSettings.publishedDestinationWarning':
+    'There are {count} published surveys. Changing the URL also changes where their responses are sent.',
+  'appSettings.pleasanterNotConfigured':
+    'Pleasanter is not configured. Responses are accepted but remain queued for delivery. Test the connection before saving.',
 
   'enroll.title': 'Register two-factor authentication',
   'enroll.lead': 'Administration reaches every survey definition and every response.',

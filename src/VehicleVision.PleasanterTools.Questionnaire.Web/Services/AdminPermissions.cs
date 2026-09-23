@@ -71,6 +71,10 @@ public static class AdminPermissions
     /// <remarks>認証の入口を変えるため、特権管理者だけに持たせる。</remarks>
     public const string SamlSettings = "settings.saml";
 
+    /// <summary>アプリケーション設定の閲覧・変更。</summary>
+    /// <remarks>システム全体の挙動を変えるため、特権管理者だけに持たせる。</remarks>
+    public const string SettingsManage = "settings.manage";
+
     /// <summary>システム全体のメンテナンス状態の変更。</summary>
     /// <remarks>回答受付と外部送信を一括で止めるため、特権管理者だけに持たせる。</remarks>
     public const string MaintenanceManage = "maintenance.manage";
@@ -92,6 +96,7 @@ public static class AdminPermissions
         UsersWrite,
         UsersResetTwoFactor,
         SamlSettings,
+        SettingsManage,
         MaintenanceManage,
     ];
 

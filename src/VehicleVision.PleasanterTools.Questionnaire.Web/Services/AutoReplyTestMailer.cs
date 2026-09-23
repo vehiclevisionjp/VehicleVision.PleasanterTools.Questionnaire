@@ -21,11 +21,28 @@ public enum AutoReplyTestMailOutcome
 public sealed class AutoReplyTestMailer(
     IMailOutbox outbox,
     IMailPayloadProtector protector,
-    MailOptions options,
+    IMailSettingsProvider mailSettings,
     PleasanterOptions pleasanter,
     TimeProvider timeProvider,
     ILogger<AutoReplyTestMailer> logger)
 {
+    public AutoReplyTestMailer(
+        IMailOutbox outbox,
+        IMailPayloadProtector protector,
+        MailOptions options,
+        PleasanterOptions pleasanter,
+        TimeProvider timeProvider,
+        ILogger<AutoReplyTestMailer> logger)
+        : this(
+            outbox,
+            protector,
+            new FixedMailSettingsProvider(options),
+            pleasanter,
+            timeProvider,
+            logger)
+    {
+    }
+
     public async Task<AutoReplyTestMailOutcome> TryEnqueueAsync(
         SurveyDefinition definition,
         string? language,
@@ -39,6 +56,7 @@ public sealed class AutoReplyTestMailer(
             return AutoReplyTestMailOutcome.LoginIdNotEmail;
         }
 
+        var options = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
         if (!options.IsReady)
         {
             return AutoReplyTestMailOutcome.MailDisabled;

@@ -47,12 +47,14 @@ public static class AdminAuthEndpoints
             IAdminUserStore store,
             ISamlOptionsProvider samlProvider,
             AdminAuthOptions options,
-            AdminCaptchaOptions captcha,
-            MailOptions mail,
+            BotMitigationOptionsProvider botOptionsProvider,
+            IMailSettingsProvider mailSettings,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
             var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+            var mail = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
+            var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
 
             // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
@@ -105,7 +107,7 @@ public static class AdminAuthEndpoints
                     hasTotp,
                     samlEnabled,
                     samlLabel,
-                    captchaEnabled = captcha.Enabled,
+                    captchaEnabled = botOptions.AdminCaptcha.Enabled,
 
                     // **IdP へログアウトを頼めるか**（Issue #191）。
                     // 画面はこれを見て、ログアウトの行き先を決める
@@ -150,15 +152,21 @@ public static class AdminAuthEndpoints
                 needsEnrollment,
                 samlEnabled,
                 samlLabel,
-                captchaEnabled = captcha.Enabled,
+                captchaEnabled = botOptions.AdminCaptcha.Enabled,
             });
         });
 
         // **課題を出すだけでは利用者を調べない。** ログイン ID の実在を応答時間へ出さない。
-        group.MapGet("/captcha/challenge", (
-            AdminCaptchaOptions options,
-            AltchaGuard altcha) =>
-            options.Enabled ? Results.Ok(altcha.Issue()) : Results.NotFound());
+        group.MapGet("/captcha/challenge", async (
+            BotMitigationOptionsProvider botOptionsProvider,
+            AltchaGuard altcha,
+            CancellationToken cancellationToken) =>
+        {
+            var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
+            return botOptions.AdminCaptcha.Enabled
+                ? Results.Ok(altcha.Issue(botOptions.Altcha))
+                : Results.NotFound();
+        });
 
         // ---- 最初の管理者 ----------------------------------------------------
         group.MapPost("/setup", async (
@@ -224,7 +232,7 @@ public static class AdminAuthEndpoints
             AdminCredentialRequest request,
             HttpContext context,
             AdminAuthenticator authenticator,
-            AdminCaptchaOptions captcha,
+            BotMitigationOptionsProvider botOptionsProvider,
             AltchaGuard altcha,
             CancellationToken cancellationToken) =>
         {
@@ -234,8 +242,9 @@ public static class AdminAuthEndpoints
 
             // **この handler より先にレート制限 middleware が動く。**
             // 無制限に署名検証だけをさせて、サーバの CPU を使わせない。
-            if (captcha.Enabled
-                && await altcha.CheckRequiredAsync(request.Altcha, cancellationToken)
+            var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
+            if (botOptions.AdminCaptcha.Enabled
+                && await altcha.CheckRequiredAsync(request.Altcha, botOptions.Altcha, cancellationToken)
                     .ConfigureAwait(false) is not null)
             {
                 return Results.Json(

@@ -1,5 +1,6 @@
 <script lang="ts">
   import AdminUserList from './components/AdminUserList.svelte';
+  import AppSettingsPanel from './components/AppSettingsPanel.svelte';
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
   import HelpPanel from './components/HelpPanel.svelte';
@@ -85,6 +86,9 @@
   /** SAML 設定を開いているか。**特権管理者だけに見せる。** */
   let openSamlSettings = $state(readSamlSettings());
 
+  /** アプリケーション設定を開いているか。**特権管理者だけに見せる。** */
+  let openAppSettings = $state(readAppSettings());
+
   /** 使い方を開いているか。**これも URL に出す。** */
   let openHelp = $state(readHelp());
 
@@ -116,6 +120,7 @@
       openUsers = readUsers();
       openAccount = readAccount();
       openSamlSettings = readSamlSettings();
+      openAppSettings = readAppSettings();
       openHelp = readHelp();
     };
     window.addEventListener('popstate', onPop);
@@ -151,6 +156,10 @@
     return /^\/admin\/saml-settings\/?$/.test(location.pathname);
   }
 
+  function readAppSettings(): boolean {
+    return /^\/admin\/settings\/?$/.test(location.pathname);
+  }
+
   function readHelp(): boolean {
     return /^\/admin\/help\/?$/.test(location.pathname);
   }
@@ -164,6 +173,7 @@
     openUsers = flags.users ?? false;
     openAccount = flags.account ?? false;
     openSamlSettings = flags.samlSettings ?? false;
+    openAppSettings = flags.appSettings ?? false;
     openHelp = flags.help ?? false;
     history.pushState(null, '', path);
   }
@@ -192,6 +202,12 @@
   function openSamlSettingsPanel() {
     if (navigate('/admin/saml-settings', { samlSettings: true })) {
       openSamlSettings = true;
+    }
+  }
+
+  function openAppSettingsPanel() {
+    if (navigate('/admin/settings', { appSettings: true })) {
+      openAppSettings = true;
     }
   }
 
@@ -236,6 +252,7 @@
     if (openNotifications && canSeeNotifications) return 'notifications';
     if (openUsers && canSeeUsers) return 'users';
     if (openAccount) return 'account';
+    if (openAppSettings && canManageSettings) return 'app-settings';
     if (openSamlSettings && canManageSaml) return 'saml-settings';
     if (openHelp) return 'help';
     return 'surveys';
@@ -252,6 +269,7 @@
     if (page === 'outbox') return t('breadcrumb.outbox');
     if (page === 'notifications') return t('breadcrumb.notifications');
     if (page === 'users') return t('breadcrumb.users');
+    if (page === 'app-settings') return t('breadcrumb.appSettings');
     if (page === 'saml-settings') return t('breadcrumb.samlSettings');
     if (page === 'help') return t('breadcrumb.help');
     return t('breadcrumb.account');
@@ -326,6 +344,7 @@
     openUsers = false;
     openAccount = false;
     openSamlSettings = false;
+    openAppSettings = false;
     openHelp = false;
     unreadCount = 0;
     history.replaceState(null, '', '/admin');
@@ -383,6 +402,9 @@
 
   /** 認証の入口を変えられるのは Administrator だけ。 */
   const canManageSaml = $derived(can('settings.saml'));
+
+  /** システム全体の設定を変えられるのは Administrator だけ。 */
+  const canManageSettings = $derived(can('settings.manage'));
 
   const needsEnrollment = $derived(
     session !== undefined &&
@@ -473,6 +495,12 @@
         <button type="button" class="link" onclick={openSamlSettingsPanel}>{t('saml.open')}</button>
       {/if}
 
+      {#if canManageSettings}
+        <button type="button" class="link" onclick={openAppSettingsPanel}>
+          {t('appSettings.open')}
+        </button>
+      {/if}
+
       <button type="button" class="link" onclick={openHelpPanel}>{t('help.open')}</button>
 
       <!-- **自分の設定は誰でも開ける。** 役割を問わない -->
@@ -537,6 +565,8 @@
           canReset={can('users.resetTwoFactor')}
           onback={back}
         />
+      {:else if openAppSettings && canManageSettings}
+        <AppSettingsPanel onback={back} />
       {:else if openSamlSettings && canManageSaml}
         <SamlSettingsPanel onback={back} />
       {:else if openHelp}

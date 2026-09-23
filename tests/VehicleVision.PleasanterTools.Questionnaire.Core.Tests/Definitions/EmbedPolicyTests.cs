@@ -105,6 +105,17 @@ public class EmbedPolicyTests
         Assert.Equal(["https://www.example.com"], sources);
     }
 
+    [Theory]
+    [InlineData(":")]
+    [InlineData("https:")]
+    [InlineData(".example.com")]
+    [InlineData("example..com")]
+    [InlineData("-example.com")]
+    [InlineData("example.com:")]
+    [InlineData("example.com:65536")]
+    public void CSPのホスト源として不正な形は落とす(string host)
+        => Assert.Empty(ToSources([host]));
+
     [Fact]
     public void CSPのホスト源はポートを許す()
         => Assert.Equal(["https://localhost:9443"],

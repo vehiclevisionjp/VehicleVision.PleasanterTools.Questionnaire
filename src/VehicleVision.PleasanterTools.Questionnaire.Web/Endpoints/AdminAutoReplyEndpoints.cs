@@ -40,12 +40,14 @@ public static class AdminAutoReplyEndpoints
             .RequireAuthorization(policy => policy.AddAuthenticationSchemes(AdminAuthSchemes.Session)
                 .RequireAuthenticatedUser());
 
-        group.MapPost("/preview", (
+        group.MapPost("/preview", async (
             AutoReplyPreviewRequest request,
-            MailOptions options,
+            IMailSettingsProvider mailSettings,
             PleasanterOptions pleasanter,
-            TimeProvider timeProvider) =>
+            TimeProvider timeProvider,
+            CancellationToken cancellationToken) =>
         {
+            var options = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
             var response = Preview(
                 request.Definition,
                 request.Language,

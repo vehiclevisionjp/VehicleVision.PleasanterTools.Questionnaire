@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Mail;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 
@@ -79,7 +80,7 @@ public sealed class MonitoringService(
     IResponseOutbox responseOutbox,
     IMonitoringStore monitoringStore,
     IMailOutbox mailOutbox,
-    MailOptions mailOptions,
+    IMailSettingsProvider mailSettings,
     TimeProvider timeProvider)
 {
     /// <summary>匿名な稼働状況を読む。</summary>
@@ -100,6 +101,7 @@ public sealed class MonitoringService(
         var responseStatusTask = responseOutbox.GetStatusAsync(cancellationToken);
         var publishedSurveyCountTask =
             monitoringStore.CountPublishedSurveysAsync(cancellationToken);
+        var mailOptions = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
         var mailStatusTask = mailOptions.Enabled
             ? mailOutbox.GetStatusAsync(cancellationToken)
             : null;

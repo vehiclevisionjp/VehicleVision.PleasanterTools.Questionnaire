@@ -17,7 +17,7 @@ public sealed class ResponseNotificationMailerOptions
     public static readonly TimeSpan MinimumDigestInterval = TimeSpan.FromHours(1);
 
     /// <summary>アンケートごとにメールをまとめる間隔。</summary>
-    public TimeSpan DigestInterval { get; init; } = DefaultDigestInterval;
+    public TimeSpan DigestInterval { get; set; } = DefaultDigestInterval;
 
     /// <summary>設定から読む。</summary>
     /// <remarks>

@@ -9,9 +9,18 @@
 # ここで起動するのは「相手方の実機」であって、本製品の一部ではない
 # （_reference/README.md と同じ立て付け）。
 #
-# **PR ごとには回さない。** Pleasanter の起動（CodeDefiner のスキーマ作成を含む）に
-# 数分かかり、PR の待ち時間が延びる。根幹ブランチへ入った後と、日次で回す。
-# 手元で先に確かめたいときは workflow_dispatch から流す。
+# **コードを触る PR では回す**（Issue #399）。
+# ⚠️ **メールが実際に届くかを確かめているのはここだけ。**
+# #397（自動返信が 1 通も送れない）は、PR の CI が緑のままマージされ、
+# **develop へ入ってから初めて分かった**。#393 の起動確認はアプリが起動するところまでしか見ない。
+#
+# **以前は「PR ごとには回さない」としていた**（Pleasanter の起動に数分かかるため）。
+# ⚠️ **その根拠は実測で崩れた。** 丸ごとで 7〜8 分、Pleasanter を使わないクラスだけに
+# 絞ってもテスト本体で 6 分かかる（重いのは起動ではなく、1 件ごとに管理者を作り直す試験本体）。
+# **絞ると「PR で回すクラスの一覧」を手で保守することになり、
+# 新しく足した試験が PR で回らなくなる**ので、丸ごと回す。
+#
+# **ドキュメントだけの PR では回さない**（下の paths）。
 #
 # **Pleasanter の版は固定する**（tools/pleasanter-testenv/docker-compose.yml が
 # implem/pleasanter:1.5.7.0 を指す）。最新に追随させると、壊れた原因が
@@ -23,6 +32,19 @@ on:
     branches:
       - develop
       - master
+  pull_request:
+    branches:
+      - develop
+    # **振る舞いが変わり得るものだけ。** ドキュメントや Issue テンプレートでは回さない
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "tools/**"
+      - "compose.yaml"
+      - "Dockerfile"
+      - "Directory.Build.props"
+      - "global.json"
+      - ".github/workflows/e2e.yml"
   schedule:
     # 毎日 03:00 JST（UTC では前日 18:00）。日本の業務時間から外す
     - cron: "0 18 * * *"
@@ -170,42 +192,66 @@ jobs:
               echo "::error title=$title::$message"
               exit 1
           }
-          initial_log=/tmp/pleasanter-initial.log
-          initial_log=/tmp/pleasanter-initial.log
-          api_ready=true
-          if ! wait_for_pleasanter_api; then
-              api_ready=false
-          fi
-          docker compose logs --no-color --since "$PLEASANTER_STARTED_AT" pleasanter > "$initial_log"
+          # **資源が尽きていないかを残す**（Issue #356）。
+          # ⚠️ **warmup が落ちる原因はまだ分かっていない。** ランナーの資源不足が候補の 1 つで、
+          # **落ちた瞬間の様子を残さないと、次も同じ推測から始めることになる。**
+          record_resources() {
+              echo "----- resources ($1) -----"
+              free -h || true
+              df -h / || true
+              docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' || true
+              echo "--------------------------"
+          }
 
-          if grep -q 'Application Warmup Failed' "$initial_log"; then
-              retry_started_at=$(date --iso-8601=ns)
-              echo "Application warmup failed. Restarting Pleasanter once."
+          # **入れ直しは 1 回では足りないことがある**（Issue #356）。
+          # ⚠️ **起動の順番や待ち時間には触らない。** 原因が分かっていないので、
+          # 先回りして触るとかえって不安定になる（#348 / #351 で確認済み）。
+          # **ここでやるのは「駄目なら入れ直す」を厚くすることだけ。**
+          attempts=3
+          started_from="$PLEASANTER_STARTED_AT"
+          log=/tmp/pleasanter-attempt.log
+          for attempt in $(seq 1 "$attempts"); do
+              api_ready=true
+              if ! wait_for_pleasanter_api; then
+                  api_ready=false
+              fi
+              docker compose logs --no-color --since "$started_from" pleasanter > "$log"
+
+              warmup_failed=false
+              if grep -q 'Application Warmup Failed' "$log"; then
+                  warmup_failed=true
+              fi
+
+              if [ "$warmup_failed" = false ] && [ "$api_ready" = true ]; then
+                  if [ "$attempt" -gt 1 ]; then
+                      # **通ったときも、何回目で通ったかを残す。**
+                      # ⚠️ **緑だと記録が残らないと、どれくらい頻発しているか誰も分からない**
+                      echo "::warning title=Pleasanter warmup needed a restart::Succeeded on attempt ${attempt} of ${attempts}."
+                  fi
+                  echo "OK   Pleasanter warmup completed (attempt ${attempt})"
+                  break
+              fi
+
+              record_resources "attempt ${attempt}"
+
+              if [ "$attempt" -eq "$attempts" ]; then
+                  if [ "$warmup_failed" = true ]; then
+                      fail_with_pleasanter_logs \
+                          "Pleasanter warmup failed" \
+                          "Application Warmup Failed was logged on all ${attempts} attempts." \
+                          "$log"
+                  fi
+                  fail_with_pleasanter_logs \
+                      "Pleasanter API readiness failed" \
+                      "The API did not return a JSON object on all ${attempts} attempts." \
+                      "$log"
+              fi
+
+              echo "Pleasanter is not ready (attempt ${attempt}). Restarting it."
+              started_from=$(date --iso-8601=ns)
               docker compose restart pleasanter
               docker compose up -d --wait pleasanter
-
-              if ! wait_for_pleasanter_api; then
-                  docker compose logs --no-color --since "$retry_started_at" pleasanter > /tmp/pleasanter-retry.log
-                  fail_with_pleasanter_logs \
-                      "Pleasanter API readiness failed after restart" \
-                      "The API did not return a JSON object after the single restart." \
-                      /tmp/pleasanter-retry.log
-              fi
-              docker compose logs --no-color --since "$retry_started_at" pleasanter > /tmp/pleasanter-retry.log
-              if grep -q 'Application Warmup Failed' /tmp/pleasanter-retry.log; then
-                  fail_with_pleasanter_logs \
-                      "Pleasanter warmup failed after restart" \
-                      "Application Warmup Failed was logged again after the single restart." \
-                      /tmp/pleasanter-retry.log
-              fi
-          elif [ "$api_ready" = false ]; then
-              fail_with_pleasanter_logs \
-                  "Pleasanter API readiness failed" \
-                  "The API did not return a JSON object." \
-                  "$initial_log"
-          else
-              echo "OK   Pleasanter warmup completed"
-          fi
+          done
 
           # **Admin*EndToEndTests の当て先**（QUESTIONNAIRE_BASE_URL の既定）
           wait_for "Questionnaire app" http://localhost:8081/healthz
@@ -371,3 +417,66 @@ jobs:
               title,
               body,
             });
+
+  # **直ったら閉じる**（Issue #401）。
+  # ⚠️ **notify-failure は失敗したときしか動かないので、直っても Issue が残り続ける。**
+  # 原因を直した PR は「原因の Issue」を Closes するため、**CI が立てた Issue だけが取り残される**
+  # （2026-09-23 に #394 がそうなった）。どれが現役の失敗か分からなくなる。
+  close-failure-issue:
+    name: 直ったことを Issue へ知らせる
+    needs:
+      - e2e
+      - screenshots
+    # ⚠️ **push と schedule のときだけ。** notify-failure と同じ条件にそろえる。
+    # **PR が通っても develop が直ったとは限らない。**
+    # **両方の job が成功したときだけ**閉じる（片方でも落ちていれば閉じない）
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'schedule')
+      && needs.e2e.result == 'success'
+      && needs.screenshots.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+
+    steps:
+      - name: 開いている失敗の Issue を閉じる
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`
+              + `/actions/runs/${context.runId}`;
+            // ⚠️ **印で探す。** 表題で探すと、人が同じ名前で立てた Issue まで閉じてしまう
+            const marker = '<!-- e2e-workflow-failure -->';
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const targets = issues.filter((issue) =>
+              issue.pull_request === undefined && (issue.body ?? '').includes(marker));
+
+            for (const issue of targets) {
+              // **どの実行で直ったかを残す。** 後から経緯を追えるようにする
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: [
+                  '## 直ったので閉じます',
+                  '',
+                  '端から端まで通す試験と写しの一式が、どちらも成功しました。',
+                  '',
+                  runUrl,
+                ].join('\n'),
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+            }
