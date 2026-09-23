@@ -27,9 +27,6 @@ public class EndToEndTests
     private const string ApiKey =
         "6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6";
 
-    private const string ConnectionString =
-        "Host=localhost;Port=15432;Database=questionnaire;Username=postgres;Password=Questionnaire#Test1";
-
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
@@ -124,8 +121,8 @@ public class EndToEndTests
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var siteId = await CreatePleasanterSiteAsync(http, $"E2E {Guid.NewGuid():N}");
 
-        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
-        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
         var snapshots = new SurveySnapshotStore(factory);
@@ -286,8 +283,8 @@ public class EndToEndTests
         var siteId = await CreatePleasanterSiteAsync(
             http, $"E2E grid {Guid.NewGuid():N}", "ClassB");
 
-        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
-        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
         var snapshots = new SurveySnapshotStore(factory);
@@ -401,8 +398,8 @@ public class EndToEndTests
         var siteId = await CreatePleasanterSiteAsync(
             http, $"E2E date {Guid.NewGuid():N}", "DateA");
 
-        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
-        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
         var snapshots = new SurveySnapshotStore(factory);
@@ -493,8 +490,8 @@ public class EndToEndTests
         }
 
         // **行の一部だけ答えて送れると、どこまで答えたのか誰にも分からなくなる**
-        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
-        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
         var surveyId = Guid.NewGuid();
@@ -538,8 +535,8 @@ public class EndToEndTests
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var siteId = await CreatePleasanterSiteAsync(http, $"E2E {Guid.NewGuid():N}");
 
-        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
-        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        var factory = E2EDatabase.InProcessFactory();
         var surveys = new SurveyRepository(factory);
 
         var surveyId = Guid.NewGuid();
@@ -567,8 +564,8 @@ public class EndToEndTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
-        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        var factory = E2EDatabase.InProcessFactory();
         var surveys = new SurveyRepository(factory);
 
         var surveyId = Guid.NewGuid();
@@ -595,8 +592,8 @@ public class EndToEndTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(DatabaseProvider.PostgreSql, ConnectionString);
-        var factory = new DbConnectionFactory(DatabaseProvider.PostgreSql, ConnectionString);
+        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        var factory = E2EDatabase.InProcessFactory();
         var surveys = new SurveyRepository(factory);
 
         // 未公開のアンケート

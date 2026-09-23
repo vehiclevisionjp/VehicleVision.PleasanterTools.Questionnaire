@@ -27,9 +27,6 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 /// </remarks>
 public class AttachmentScanEndToEndTests
 {
-    private const string ConnectionString =
-        "Server=localhost,11433;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True";
-
     /// <summary>
     /// EICAR の検査用文字列。**無害**で、どのウイルス対策製品も検出するよう申し合わせがある。
     /// </summary>
@@ -115,7 +112,7 @@ public class AttachmentScanEndToEndTests
             return;
         }
 
-        var factory = new DbConnectionFactory(DatabaseProvider.SqlServer, ConnectionString);
+        var factory = E2EDatabase.AppFactory();
         var surveys = new SurveyRepository(factory);
 
         var surveyId = Guid.NewGuid();
@@ -163,13 +160,15 @@ public class AttachmentScanEndToEndTests
             Assert.Equal(
                 0,
                 await connection.ExecuteScalarAsync<int>(
-                    "SELECT COUNT(*) FROM [Responses] WHERE [ResponseToken] = @Token",
+                    E2EDatabase.Sql(
+                        "SELECT COUNT(*) FROM [Responses] WHERE [ResponseToken] = @Token"),
                     new { Token = infectedToken }));
 
             Assert.Equal(
                 1,
                 await connection.ExecuteScalarAsync<int>(
-                    "SELECT COUNT(*) FROM [Responses] WHERE [ResponseToken] = @Token",
+                    E2EDatabase.Sql(
+                        "SELECT COUNT(*) FROM [Responses] WHERE [ResponseToken] = @Token"),
                     new { Token = cleanToken }));
         }
         finally
@@ -180,15 +179,19 @@ public class AttachmentScanEndToEndTests
             foreach (var token in new[] { cleanToken, infectedToken })
             {
                 await connection.ExecuteAsync(
-                    "DELETE FROM [Responses] WHERE [ResponseToken] = @Token", new { Token = token });
+                    E2EDatabase.Sql("DELETE FROM [Responses] WHERE [ResponseToken] = @Token"),
+                    new { Token = token });
                 await connection.ExecuteAsync(
-                    "DELETE FROM [ResponseTokens] WHERE [ResponseToken] = @Token", new { Token = token });
+                    E2EDatabase.Sql("DELETE FROM [ResponseTokens] WHERE [ResponseToken] = @Token"),
+                    new { Token = token });
             }
 
             await connection.ExecuteAsync(
-                "DELETE FROM [SurveyVersions] WHERE [SurveyId] = @SurveyId", new { SurveyId = surveyId });
+                E2EDatabase.Sql("DELETE FROM [SurveyVersions] WHERE [SurveyId] = @SurveyId"),
+                new { SurveyId = surveyId });
             await connection.ExecuteAsync(
-                "DELETE FROM [Surveys] WHERE [SurveyId] = @SurveyId", new { SurveyId = surveyId });
+                E2EDatabase.Sql("DELETE FROM [Surveys] WHERE [SurveyId] = @SurveyId"),
+                new { SurveyId = surveyId });
         }
     }
 }

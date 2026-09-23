@@ -30,9 +30,6 @@ public class AutoReplyEndToEndTests
 {
     private const string Password = "long-enough-password";
 
-    private const string ConnectionString =
-        "Server=localhost,11433;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True";
-
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
@@ -62,12 +59,11 @@ public class AutoReplyEndToEndTests
     /// <summary>ログイン済みのクライアントを作る。</summary>
     private static async Task<HttpClient> SignInAsync()
     {
-        await using (var connection = new DbConnectionFactory(
-            DatabaseProvider.SqlServer, ConnectionString).Create())
+        await using (var connection = E2EDatabase.AppFactory().Create())
         {
             await connection.OpenAsync();
-            await connection.ExecuteAsync("DELETE FROM [AdminRecoveryCodes]");
-            await connection.ExecuteAsync("DELETE FROM [AdminUsers]");
+            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"));
+            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"));
         }
 
         var http = CreateClient();
