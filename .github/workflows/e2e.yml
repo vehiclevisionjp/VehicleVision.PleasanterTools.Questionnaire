@@ -9,9 +9,18 @@
 # ここで起動するのは「相手方の実機」であって、本製品の一部ではない
 # （_reference/README.md と同じ立て付け）。
 #
-# **PR ごとには回さない。** Pleasanter の起動（CodeDefiner のスキーマ作成を含む）に
-# 数分かかり、PR の待ち時間が延びる。根幹ブランチへ入った後と、日次で回す。
-# 手元で先に確かめたいときは workflow_dispatch から流す。
+# **コードを触る PR では回す**（Issue #399）。
+# ⚠️ **メールが実際に届くかを確かめているのはここだけ。**
+# #397（自動返信が 1 通も送れない）は、PR の CI が緑のままマージされ、
+# **develop へ入ってから初めて分かった**。#393 の起動確認はアプリが起動するところまでしか見ない。
+#
+# **以前は「PR ごとには回さない」としていた**（Pleasanter の起動に数分かかるため）。
+# ⚠️ **その根拠は実測で崩れた。** 丸ごとで 7〜8 分、Pleasanter を使わないクラスだけに
+# 絞ってもテスト本体で 6 分かかる（重いのは起動ではなく、1 件ごとに管理者を作り直す試験本体）。
+# **絞ると「PR で回すクラスの一覧」を手で保守することになり、
+# 新しく足した試験が PR で回らなくなる**ので、丸ごと回す。
+#
+# **ドキュメントだけの PR では回さない**（下の paths）。
 #
 # **Pleasanter の版は固定する**（tools/pleasanter-testenv/docker-compose.yml が
 # implem/pleasanter:1.5.7.0 を指す）。最新に追随させると、壊れた原因が
@@ -23,6 +32,19 @@ on:
     branches:
       - develop
       - master
+  pull_request:
+    branches:
+      - develop
+    # **振る舞いが変わり得るものだけ。** ドキュメントや Issue テンプレートでは回さない
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "tools/**"
+      - "compose.yaml"
+      - "Dockerfile"
+      - "Directory.Build.props"
+      - "global.json"
+      - ".github/workflows/e2e.yml"
   schedule:
     # 毎日 03:00 JST（UTC では前日 18:00）。日本の業務時間から外す
     - cron: "0 18 * * *"
