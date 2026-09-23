@@ -4,6 +4,7 @@ import {
   cancelConfirmation,
   confirmAction,
   currentConfirmation,
+  handleConfirmationKeydown,
 } from './confirmation.svelte';
 
 const options = {
@@ -45,10 +46,33 @@ describe('確認ダイアログ', () => {
 
   it('Esc と同じ取消処理で false を返す', async () => {
     const result = confirmAction(options);
+    const preventDefault = vi.fn();
 
-    cancelConfirmation();
+    handleConfirmationKeydown(
+      { key: 'Escape', shiftKey: false, preventDefault },
+      null,
+      null,
+      null,
+    );
 
     await expect(result).resolves.toBe(false);
+    expect(preventDefault).toHaveBeenCalledOnce();
+  });
+
+  it('Tab の移動をダイアログ内のボタンに閉じ込める', () => {
+    const cancel = { focus: vi.fn() };
+    const confirm = { focus: vi.fn() };
+    const preventDefault = vi.fn();
+
+    handleConfirmationKeydown(
+      { key: 'Tab', shiftKey: false, preventDefault },
+      cancel,
+      confirm,
+      confirm,
+    );
+
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(cancel.focus).toHaveBeenCalledOnce();
   });
 
   it('閉じると開く前に焦点があった要素へ戻す', async () => {

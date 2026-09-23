@@ -4,6 +4,7 @@
     acceptConfirmation,
     cancelConfirmation,
     currentConfirmation,
+    handleConfirmationKeydown,
   } from '../lib/confirmation.svelte';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -27,27 +28,12 @@
   }
 
   function handleKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      cancelConfirmation();
-      return;
-    }
-
-    if (event.key !== 'Tab') {
-      return;
-    }
-
-    if (!cancelButton || !confirmButton) {
-      return;
-    }
-
-    if (event.shiftKey && document.activeElement === cancelButton) {
-      event.preventDefault();
-      confirmButton.focus();
-    } else if (!event.shiftKey && document.activeElement === confirmButton) {
-      event.preventDefault();
-      cancelButton.focus();
-    }
+    handleConfirmationKeydown(
+      event,
+      cancelButton ?? null,
+      confirmButton ?? null,
+      document.activeElement,
+    );
   }
 </script>
 
