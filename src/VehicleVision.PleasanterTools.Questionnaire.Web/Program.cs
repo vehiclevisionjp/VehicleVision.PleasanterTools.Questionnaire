@@ -186,8 +186,16 @@ builder.Services.AddSingleton<IPleasanterOptionsProvider, PleasanterOptionsProvi
 builder.Services.AddSingleton(serviceProvider =>
     serviceProvider.GetRequiredService<IPleasanterOptionsProvider>()
         .GetAsync().GetAwaiter().GetResult());
-builder.Services.AddSingleton(serviceProvider => new PleasanterDateTime(
-    serviceProvider.GetRequiredService<PleasanterOptions>().ApiKeyUserTimeZoneId));
+// ⚠️ **ここで DB を読まない**（Issue #404）。
+// `app.StartAsync()` は**マイグレーションより前**に走る（起動中も `/healthz` を応答させる設計）。
+// その時点で `AppSettingsMonitor` がリスナーを 1 度呼び、ここが解決されるため、
+// `PleasanterOptions` を経由すると**まだ存在しない `AppSettings` を読んで落ちる。**
+// **空の DB へ初めて起動する経路が丸ごと死ぬ**（#382 で自動適用を既定にしたので、これが既定の道）。
+//
+// **初期値は設定だけから採れば足りる。** 直後にリスナーが `SetTimeZone` で上書きする。
+builder.Services.AddSingleton(new PleasanterDateTime(
+    AppSettingsProvider.InitialSnapshot(builder.Configuration)[
+        AppSettingsProvider.PleasanterTimeZoneKey]));
 builder.Services.AddSingleton<PleasanterRecordBuilder>();
 // **変換スクリプトは上限付きで走らせる**（Issue #83、_documents/アーキテクチャ方針.md 8 章）。
 // **上限が無いと、書き間違えた `while (true)` 1 つで送信ワーカーが永久に固まる。**
