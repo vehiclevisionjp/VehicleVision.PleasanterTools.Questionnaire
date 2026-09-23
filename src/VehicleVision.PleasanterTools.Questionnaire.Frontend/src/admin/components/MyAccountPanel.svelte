@@ -342,8 +342,14 @@
     margin: 0 0 1.25rem;
   }
 
-  .card {
-    max-width: 28rem;
+  /*
+    ⚠️ **カードの幅をそろえる**（Issue #416）。
+    `.card` だけ 28rem で、端末の一覧は幅の指定が無かったため、
+    **同じ画面でカードの右端が 2 種類**になり、崩れて見えていた。
+    **枠は同じ幅にして、狭くしたいのは中の入力欄だけにする。**
+  */
+  .card,
+  .session-card {
     padding: 1.25rem;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -351,12 +357,9 @@
     margin-bottom: 1.25rem;
   }
 
-  .session-card {
-    padding: 1.25rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 1.25rem;
+  /* 入力欄まで横いっぱいに伸ばすと、かえって読みにくい */
+  .card form {
+    max-width: 28rem;
   }
 
   label {
