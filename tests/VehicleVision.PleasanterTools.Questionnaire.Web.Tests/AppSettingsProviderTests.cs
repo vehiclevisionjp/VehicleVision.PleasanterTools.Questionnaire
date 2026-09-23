@@ -695,6 +695,34 @@ public class AppSettingsProviderTests
         Assert.DoesNotContain(password, json, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// ⚠️ **未設定を空文字のまま渡すと自動返信が 1 通も送れなくなる**（Issue #397）。
+    /// 空の返信先が <c>null</c> ではなくなり、宛先の検証で弾かれてデッドレターへ回った。
+    /// </summary>
+    [Fact]
+    public async Task 空のままの任意項目はメール設定では未設定として扱う()
+    {
+        var store = new FakeStore();
+        var provider = Create(new ConfigurationBuilder().Build(), store);
+
+        await provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.MailEnabledKey] = "true",
+                [AppSettingsProvider.MailSmtpHostKey] = "smtp.example.test",
+                [AppSettingsProvider.MailFromAddressKey] = "noreply@example.test",
+                [AppSettingsProvider.MailBaseUrlKey] = "https://survey.example.test",
+            },
+            Guid.NewGuid());
+
+        var options = await new MailSettingsProvider(provider).GetAsync();
+
+        Assert.True(options.IsReady);
+        Assert.Null(options.ReplyToAddress);
+        Assert.Null(options.FromName);
+        Assert.Null(options.UserName);
+    }
+
     [Fact]
     public async Task 公開URLが無い有効設定はほかの値も保存せず拒否する()
     {

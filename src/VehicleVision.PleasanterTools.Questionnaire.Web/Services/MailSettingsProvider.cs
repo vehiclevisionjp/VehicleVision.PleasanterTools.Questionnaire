@@ -24,10 +24,25 @@ public sealed class MailSettingsProvider(AppSettingsProvider appSettings) : IMai
         CancellationToken cancellationToken = default) =>
         FromSnapshot(await appSettings.PreviewAsync(values, cancellationToken).ConfigureAwait(false));
 
+    /// <summary>
+    /// スナップショットをメール設定へ直す。**空の値は積まない**（Issue #397）。
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ **スナップショットは「未設定」を空文字で持つ**（定義の既定値が <c>string.Empty</c>）。
+    /// そのまま積むと、**以前は <c>null</c> だった任意の項目が空文字になる。**
+    /// <c>ReplyToAddress</c> が空文字になった結果、
+    /// <c>MailMessageFactory.ValidateHeaders</c> の <c>is not null</c> を通過し、
+    /// **自動返信が 1 通も送れなくなった**（再試行もされずデッドレターへ回る）。
+    /// **同じ形の項目はほかにもある**（<c>FROM_NAME</c> / <c>BASEURL</c> /
+    /// <c>SMTP_USER</c> / <c>SMTP_PASSWORD</c>）ので、1 つずつ直さずここでまとめて落とす。
+    /// </remarks>
     private static MailOptions FromSnapshot(AppSettingsSnapshot snapshot)
     {
+        var values = snapshot.Values
+            .Where(pair => !string.IsNullOrEmpty(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.Ordinal);
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(snapshot.Values!)
+            .AddInMemoryCollection(values)
             .Build();
         return MailOptions.FromConfiguration(configuration);
     }
