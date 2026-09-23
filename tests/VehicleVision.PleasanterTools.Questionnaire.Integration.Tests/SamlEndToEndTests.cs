@@ -43,15 +43,6 @@ public partial class SamlEndToEndTests
 
     private const string IdpPassword = "idp-test-password";
 
-    /// <summary>本アプリの DB。</summary>
-    /// <remarks>
-    /// **接続先を環境変数で差し替えられる。** 同じ機械で別の検証環境が 11433 を
-    /// 使っていることがあり、**その 1 台だけのために試験を落とさない。**
-    /// </remarks>
-    private static string ConnectionString =>
-        Environment.GetEnvironmentVariable("QUESTIONNAIRE_E2E_CONNECTIONSTRING")
-        ?? "Server=localhost,11433;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True";
-
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_SAML_INTEGRATION") == "1";
 
@@ -99,12 +90,11 @@ public partial class SamlEndToEndTests
     /// </remarks>
     private static async Task<string> ResetAdminAsync(string? loginId)
     {
-        await using (var connection = new DbConnectionFactory(
-            DatabaseProvider.SqlServer, ConnectionString).Create())
+        await using (var connection = E2EDatabase.AppFactory().Create())
         {
             await connection.OpenAsync();
-            await connection.ExecuteAsync("DELETE FROM [AdminRecoveryCodes]");
-            await connection.ExecuteAsync("DELETE FROM [AdminUsers]");
+            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"));
+            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"));
         }
 
         if (loginId is null)

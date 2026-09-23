@@ -22,9 +22,6 @@ public class AdminSurveyEndToEndTests
 {
     private const string Password = "long-enough-password";
 
-    private const string ConnectionString =
-        "Server=localhost,11433;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True";
-
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
@@ -46,12 +43,11 @@ public class AdminSurveyEndToEndTests
     /// <summary>ログイン済みのクライアントを作る。</summary>
     private static async Task<HttpClient> SignInAsync()
     {
-        await using (var connection = new DbConnectionFactory(
-            DatabaseProvider.SqlServer, ConnectionString).Create())
+        await using (var connection = E2EDatabase.AppFactory().Create())
         {
             await connection.OpenAsync();
-            await connection.ExecuteAsync("DELETE FROM [AdminRecoveryCodes]");
-            await connection.ExecuteAsync("DELETE FROM [AdminUsers]");
+            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"));
+            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"));
         }
 
         var http = CreateClient();
@@ -266,15 +262,15 @@ public class AdminSurveyEndToEndTests
             Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         }
 
-        await using var connection = new DbConnectionFactory(
-            DatabaseProvider.SqlServer, ConnectionString).Create();
+        await using var connection = E2EDatabase.AppFactory().Create();
         await connection.OpenAsync();
         // ⚠️ **1 行に絞らない。** 断られた 2 回ぶんも記録に残る
         // （経路の値から TargetId が入るため、成功したものと同じ条件で当たる）。
         // **見たいのは消えたときの 1 行**なので、値を載せている行を選ぶ
         var details = (await connection.QueryAsync<string>(
-            "SELECT [DetailJson] FROM [AuditLogs] "
-            + "WHERE [Action] = @Action AND [TargetId] = @TargetId",
+            E2EDatabase.Sql(
+                "SELECT [DetailJson] FROM [AuditLogs] "
+                + "WHERE [Action] = @Action AND [TargetId] = @TargetId"),
             new
             {
                 Action = "POST /api/admin/surveys/{surveyId}/delete",
@@ -855,8 +851,7 @@ public class AdminSurveyEndToEndTests
 
         // **受け付けた回答の代わりに、対応表へ直に 1 行入れる。**
         // 回答の送信は最短時間の判定を挟むので、ここで確かめたいこととは関係ない待ちが増える
-        var tokens = new ResponseTokenStore(
-            new DbConnectionFactory(DatabaseProvider.SqlServer, ConnectionString));
+        var tokens = new ResponseTokenStore(E2EDatabase.AppFactory());
         await tokens.EnsureAsync($"tok-{Guid.NewGuid():N}", Guid.Parse(surveyId));
 
         using (var suspend = await http.PostAsJsonAsync(
