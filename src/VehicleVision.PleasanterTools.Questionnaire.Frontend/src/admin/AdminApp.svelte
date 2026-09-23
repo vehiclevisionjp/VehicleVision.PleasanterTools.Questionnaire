@@ -549,14 +549,17 @@
     {/if}
 
     <!--
-      **表を出す画面だけ広く使う。** 列が多くて識別子も入るので、
-      他の画面と同じ幅だと横に流さないと読めない
+      **表を出す画面と、2 カラムの編集画面を広く使う。**
+      表は列が多くて識別子も入るので、他の画面と同じ幅だと横に流さないと読めない。
+      ⚠️ **アンケートの編集は左右 2 カラムなのに 56rem の中へ押し込んでいた**（Issue #416）。
+      画面が広いほど 1 列あたりが痩せ、FHD でかえって窮屈になっていた
     -->
     <main
       class:wide={(openAuditLog && canSeeAuditLog) ||
         (openOutbox && canSeeOutbox) ||
         (openNotifications && canSeeNotifications) ||
-        (openUsers && canSeeUsers)}
+        (openUsers && canSeeUsers) ||
+        openSurveyId !== null}
     >
       {#if openUsers && canSeeUsers}
         <AdminUserList
