@@ -193,8 +193,11 @@
       "detail": "DB サーバ不要。src/....Web/App_Data/questionnaire.db へ当てる",
       "type": "shell",
       "command": "dotnet",
+      // ⚠️ **下の cwd からの相対で書くこと**（Issue #413）。
+      // このタスクだけ cwd を Web プロジェクトへ移しているので、
+      // ワークスペース直下からの相対にすると解決できない
       "args": [
-        "src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
+        "bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
         "--migrate"
       ],
       "options": {

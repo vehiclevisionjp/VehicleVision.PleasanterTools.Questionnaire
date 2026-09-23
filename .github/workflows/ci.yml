@@ -145,3 +145,9 @@ jobs:
         # **デュアルライセンス（AGPL ＋ 商用）の前提を機械で守る。**
         # 取り込むと商用ライセンスでの提供ができなくなる（LICENSING.md）
         run: bash ./scripts/license-check.sh
+
+      - name: VS Code のタスク定義を検査する
+        # ⚠️ **手元でしか壊れないものは CI を素通りする**（Issue #411 / #413）。
+        # タスクが壊れると F5 が通らず、開発が止まる。
+        # **2 日続けて壊し、2 回とも利用者が踏んで初めて分かった**ので機械で見る
+        run: bash ./scripts/vscode-task-check.sh
