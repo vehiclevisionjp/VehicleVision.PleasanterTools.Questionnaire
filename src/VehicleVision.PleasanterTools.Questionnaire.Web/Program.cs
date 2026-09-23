@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.StaticFiles;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
@@ -858,7 +859,20 @@ app.UseAuthorization();
 
 // 回答画面（TypeScript + Vite + Svelte のビルド成果物）
 app.UseDefaultFiles();
-app.UseStaticFiles();
+
+// **キャッシュの指示を必ず付ける**（Issue #425）。
+//
+// ⚠️ **付けないと、ブラウザが独自の判断で使い回す**（`Last-Modified` からの推測）。
+// 実際に**作り直した画面が出ず、9/17 のものを 1 週間見続けた**（#421 と同じ根）。
+//
+// **入口の HTML と、中身を指す資産で扱いを分ける。**
+//   - `admin.html` / `index.html` は**名前が変わらない**ので、毎回確かめさせる
+//   - `/assets/` は**内容ハッシュ付きの名前**なので、長く持たせて構わない
+//     （中身が変われば名前が変わり、取り直される）
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = StaticCachePolicy.Apply,
+});
 
 app.MapFormEndpoints();
 app.MapAnalyticsEndpoints();
@@ -901,9 +915,17 @@ if (openApiExposure.Enabled)
     });
 }
 
-// **管理画面は別の入口。** 回答者へ管理画面のコードを配らない
-app.MapGet("/admin", () => Results.File("admin.html", "text/html"));
-app.MapFallbackToFile("/admin/{**path}", "admin.html");
+// **管理画面は別の入口。** 回答者へ管理画面のコードを配らない。
+// ⚠️ **ここは UseStaticFiles の設定を通らない**ので、キャッシュの指示を自分で付ける（Issue #425）
+app.MapGet("/admin", (HttpContext context) =>
+{
+    context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
+    return Results.File("admin.html", "text/html");
+});
+app.MapFallbackToFile("/admin/{**path}", "admin.html", new StaticFileOptions
+{
+    OnPrepareResponse = StaticCachePolicy.Apply,
+});
 
 // **Defender for Storage を使うときだけ受け口を生やす。**
 // 使わない構成で認証の外の口を開けたままにしない
@@ -918,7 +940,10 @@ if (attachmentOptions.VirusScan is
 
 // **`/f/{publicId}` は画面側で解釈する。** サーバは同じ入口を返すだけ。
 // 存在しない公開 ID でも同じ応答にして、総当たりで実在が分からないようにする
-app.MapFallbackToFile("/f/{**path}", "index.html");
+app.MapFallbackToFile("/f/{**path}", "index.html", new StaticFileOptions
+{
+    OnPrepareResponse = StaticCachePolicy.Apply,
+});
 
 // 生存確認。**アンケートの情報を出さない**
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
