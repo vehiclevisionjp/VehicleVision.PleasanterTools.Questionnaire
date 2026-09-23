@@ -42,6 +42,7 @@
     type ReadabilityPreferenceName,
     type ReadabilityPreferences,
   } from '../lib/readability';
+  import { confirmAction } from './lib/confirmation.svelte';
 
   let session = $state<AdminSession>();
   let applicationVersion = $state<ApplicationVersion>();
@@ -49,7 +50,7 @@
   let loading = $state(true);
   let failed = $state(false);
   let surveyBreadcrumbTitle = $state<string | null>(null);
-  let navigationGuard = $state<(() => boolean) | null>(null);
+  let navigationGuard = $state<(() => Promise<boolean>) | null>(null);
   let readability = $state<ReadabilityPreferences>(
     resolveReadabilityPreferences(readReadabilityPreferences(), systemReadabilityPreferences()),
   );
@@ -179,8 +180,19 @@
     history.pushState(null, '', path);
   }
 
-  function navigate(path: string, flags: Partial<Record<string, boolean>> = {}) {
-    if (navigationGuard && !navigationGuard()) {
+  async function navigate(
+    path: string,
+    flags: Partial<Record<string, boolean>> = {},
+  ): Promise<boolean> {
+    if (
+      navigationGuard &&
+      (await navigationGuard()) &&
+      !(await confirmAction({
+        title: t('confirmation.unsavedTitle'),
+        message: t('editor.confirmDiscardChanges'),
+        confirmLabel: t('confirmation.continue'),
+      }))
+    ) {
       return false;
     }
 
@@ -188,62 +200,62 @@
     return true;
   }
 
-  function openUserList() {
-    if (navigate('/admin/users', { users: true })) {
+  async function openUserList() {
+    if (await navigate('/admin/users', { users: true })) {
       openUsers = true;
     }
   }
 
-  function openMyAccount() {
-    if (navigate('/admin/me', { account: true })) {
+  async function openMyAccount() {
+    if (await navigate('/admin/me', { account: true })) {
       openAccount = true;
     }
   }
 
-  function openSamlSettingsPanel() {
-    if (navigate('/admin/saml-settings', { samlSettings: true })) {
+  async function openSamlSettingsPanel() {
+    if (await navigate('/admin/saml-settings', { samlSettings: true })) {
       openSamlSettings = true;
     }
   }
 
-  function openAppSettingsPanel() {
-    if (navigate('/admin/settings', { appSettings: true })) {
+  async function openAppSettingsPanel() {
+    if (await navigate('/admin/settings', { appSettings: true })) {
       openAppSettings = true;
     }
   }
 
-  function openHelpPanel() {
-    if (navigate('/admin/help', { help: true })) {
+  async function openHelpPanel() {
+    if (await navigate('/admin/help', { help: true })) {
       openHelp = true;
     }
   }
 
-  function open(surveyId: string) {
-    if (navigate(`/admin/surveys/${surveyId}`)) {
+  async function open(surveyId: string) {
+    if (await navigate(`/admin/surveys/${surveyId}`)) {
       openSurveyId = surveyId;
     }
   }
 
-  function openAudit() {
-    if (navigate('/admin/audit-logs')) {
+  async function openAudit() {
+    if (await navigate('/admin/audit-logs')) {
       openAuditLog = true;
     }
   }
 
-  function openDelivery() {
-    if (navigate('/admin/outbox')) {
+  async function openDelivery() {
+    if (await navigate('/admin/outbox')) {
       openOutbox = true;
     }
   }
 
-  function openNotificationList() {
-    if (navigate('/admin/notifications')) {
+  async function openNotificationList() {
+    if (await navigate('/admin/notifications')) {
       openNotifications = true;
     }
   }
 
-  function back() {
-    navigate('/admin');
+  async function back() {
+    await navigate('/admin');
   }
 
   const breadcrumbPage = $derived.by<AdminPage>(() => {
@@ -515,7 +527,11 @@
         {#each buildBreadcrumbs(breadcrumbPage) as breadcrumb, index (breadcrumb.page)}
           <li>
             {#if breadcrumb.path}
-              <button type="button" class="breadcrumb-link" onclick={() => navigate(breadcrumb.path!)}>
+              <button
+                type="button"
+                class="breadcrumb-link"
+                onclick={() => void navigate(breadcrumb.path!)}
+              >
                 {breadcrumbLabel(breadcrumb.page)}
               </button>
             {:else}

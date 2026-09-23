@@ -407,6 +407,8 @@ export const ja = {
   'editor.conflictDetail': 'この画面での変更は保存されていません。再読み込みすると失われます。',
   'editor.reload': '再読み込み',
   'editor.confirmDiscardChanges': '保存していない変更があります。移動すると変更は失われます。よろしいですか？',
+  'confirmation.unsavedTitle': '保存していない変更',
+  'confirmation.continue': '移動する',
   'editor.title': '題名',
   'editor.description': '説明（任意）',
   'editor.confirmationMessage': '送信後に表示するメッセージ（任意）',
@@ -1482,6 +1484,8 @@ export const en: Record<MessageKey, string> = {
   'editor.reload': 'Reload',
   'editor.confirmDiscardChanges':
     'There are unsaved changes. Moving away discards them. Do you want to continue?',
+  'confirmation.unsavedTitle': 'Unsaved changes',
+  'confirmation.continue': 'Continue',
   'editor.title': 'Title',
   'editor.description': 'Description (optional)',
   'editor.confirmationMessage': 'Message shown after submitting (optional)',
