@@ -7,7 +7,7 @@
     onback: () => void;
   }
 
-  let { onback }: Props = $props();
+  let { onback: _onback }: Props = $props();
 
   /** 1 ページの件数。**サーバ側の上限（200）より小さくしてある。** */
   const pageSize = 50;
@@ -107,7 +107,6 @@
 
 <section>
   <header class="head">
-    <button type="button" class="secondary" onclick={onback}>{t('audit.back')}</button>
     <h1>{t('audit.title')}</h1>
   </header>
 

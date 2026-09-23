@@ -453,6 +453,12 @@
     onback();
   }
 
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && !previewing && !flowcharting) {
+      back();
+    }
+  }
+
   async function doPublish() {
     saving = true;
     error = '';
@@ -582,8 +588,9 @@
   }
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
+
 <header class="bar">
-  <button type="button" class="link" onclick={back}>{t('editor.back')}</button>
 
   <div class="right">
     <span class="revision">{t('editor.revision', { revision })}</span>
@@ -1143,15 +1150,6 @@
   .revision {
     color: var(--muted);
     font-size: 0.82rem;
-  }
-
-  .link {
-    background: none;
-    border: none;
-    padding: 0;
-    color: var(--accent);
-    font: inherit;
-    cursor: pointer;
   }
 
   .editing-language {

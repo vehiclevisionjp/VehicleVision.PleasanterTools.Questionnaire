@@ -9,12 +9,21 @@ describe('buildBreadcrumbs', () => {
     ]);
   });
 
-  it('一覧と並列の管理画面は現在地だけを出す', () => {
-    expect(buildBreadcrumbs('notifications')).toEqual([{ page: 'notifications', path: null }]);
-  });
-
-  it('使い方は一覧と並列の管理画面として扱う', () => {
-    expect(buildBreadcrumbs('help')).toEqual([{ page: 'help', path: null }]);
+  it.each([
+    'survey-editor',
+    'audit-logs',
+    'outbox',
+    'notifications',
+    'users',
+    'app-settings',
+    'saml-settings',
+    'help',
+    'account',
+  ] as const)('%s では一覧へのパンくずを先頭に置く', (page) => {
+    expect(buildBreadcrumbs(page)).toEqual([
+      { page: 'surveys', path: '/admin' },
+      { page, path: null },
+    ]);
   });
 });
 
