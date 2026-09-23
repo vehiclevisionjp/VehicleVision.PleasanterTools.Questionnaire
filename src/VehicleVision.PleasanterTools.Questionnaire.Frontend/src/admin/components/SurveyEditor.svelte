@@ -61,7 +61,7 @@
     testRecipientAvailable: boolean;
     onback: () => void;
     onbreadcrumbchange: (title: string | null) => void;
-    onnavigationguardchange: (guard: (() => boolean) | null) => void;
+    onnavigationguardchange: (guard: (() => Promise<boolean>) | null) => void;
   }
 
   let {
@@ -189,7 +189,7 @@
   });
 
   $effect(() => {
-    onnavigationguardchange(confirmDiscardChanges);
+    onnavigationguardchange(hasUnsavedChangesGuard);
     return () => onnavigationguardchange(null);
   });
 
@@ -445,14 +445,12 @@
     notice = t('editor.saved');
   }
 
-  function confirmDiscardChanges(): boolean {
-    return !hasUnsavedChanges || confirm(t('editor.confirmDiscardChanges'));
+  async function hasUnsavedChangesGuard(): Promise<boolean> {
+    return hasUnsavedChanges;
   }
 
   function back() {
-    if (confirmDiscardChanges()) {
-      onback();
-    }
+    onback();
   }
 
   async function doPublish() {

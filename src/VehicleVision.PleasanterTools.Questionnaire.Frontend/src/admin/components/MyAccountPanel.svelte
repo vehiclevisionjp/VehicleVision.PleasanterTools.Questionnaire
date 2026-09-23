@@ -19,6 +19,7 @@
   } from '../lib/api';
   import AdminSessionList from './AdminSessionList.svelte';
   import { twoFactorPolicyLabel } from '../lib/adminUsers';
+  import { confirmAction } from '../lib/confirmation.svelte';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -140,7 +141,14 @@
   async function disable() {
     totpError = '';
 
-    if (!confirm(t('account.confirmDisableTwoFactor'))) {
+    if (
+      !(await confirmAction({
+        title: t('account.disableTwoFactor'),
+        message: t('account.confirmDisableTwoFactor'),
+        confirmLabel: t('account.disableTwoFactor'),
+        danger: true,
+      }))
+    ) {
       return;
     }
 

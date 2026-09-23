@@ -5,6 +5,7 @@
     revokeOtherOwnSessions,
   } from '../lib/api';
   import type { AdminSessionRow } from '../lib/types';
+  import { confirmAction } from '../lib/confirmation.svelte';
   import { t } from '../lib/i18n/state.svelte';
 
   interface Props {
@@ -37,7 +38,17 @@
   }
 
   async function revoke(session: AdminSessionRow) {
-    if (!confirm(t('sessions.confirmRevoke'))) return;
+    if (
+      !(await confirmAction({
+        title: t('sessions.revoke'),
+        message: t('sessions.confirmRevoke'),
+        confirmLabel: t('sessions.revoke'),
+        danger: true,
+      }))
+    ) {
+      return;
+    }
+
     busy = true;
     const result = await revokeAdminSession(session.adminSessionId, adminUserId);
     busy = false;
@@ -49,7 +60,17 @@
   }
 
   async function revokeOthers() {
-    if (!confirm(t('sessions.confirmRevokeOthers'))) return;
+    if (
+      !(await confirmAction({
+        title: t('sessions.revokeOthers'),
+        message: t('sessions.confirmRevokeOthers'),
+        confirmLabel: t('sessions.revokeOthers'),
+        danger: true,
+      }))
+    ) {
+      return;
+    }
+
     busy = true;
     const result = await revokeOtherOwnSessions();
     busy = false;
