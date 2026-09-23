@@ -417,3 +417,66 @@ jobs:
               title,
               body,
             });
+
+  # **直ったら閉じる**（Issue #401）。
+  # ⚠️ **notify-failure は失敗したときしか動かないので、直っても Issue が残り続ける。**
+  # 原因を直した PR は「原因の Issue」を Closes するため、**CI が立てた Issue だけが取り残される**
+  # （2026-09-23 に #394 がそうなった）。どれが現役の失敗か分からなくなる。
+  close-failure-issue:
+    name: 直ったことを Issue へ知らせる
+    needs:
+      - e2e
+      - screenshots
+    # ⚠️ **push と schedule のときだけ。** notify-failure と同じ条件にそろえる。
+    # **PR が通っても develop が直ったとは限らない。**
+    # **両方の job が成功したときだけ**閉じる（片方でも落ちていれば閉じない）
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'schedule')
+      && needs.e2e.result == 'success'
+      && needs.screenshots.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+
+    steps:
+      - name: 開いている失敗の Issue を閉じる
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`
+              + `/actions/runs/${context.runId}`;
+            // ⚠️ **印で探す。** 表題で探すと、人が同じ名前で立てた Issue まで閉じてしまう
+            const marker = '<!-- e2e-workflow-failure -->';
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const targets = issues.filter((issue) =>
+              issue.pull_request === undefined && (issue.body ?? '').includes(marker));
+
+            for (const issue of targets) {
+              // **どの実行で直ったかを残す。** 後から経緯を追えるようにする
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: [
+                  '## 直ったので閉じます',
+                  '',
+                  '端から端まで通す試験と写しの一式が、どちらも成功しました。',
+                  '',
+                  runUrl,
+                ].join('\n'),
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+            }
