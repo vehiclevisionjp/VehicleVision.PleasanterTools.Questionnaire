@@ -1,5 +1,6 @@
 <script lang="ts">
   import AdminUserList from './components/AdminUserList.svelte';
+  import ConfirmationDialog from './components/ConfirmationDialog.svelte';
   import AppSettingsPanel from './components/AppSettingsPanel.svelte';
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
@@ -642,6 +643,7 @@
     <SignInPanel {session} onadvance={refresh} />
   {/if}
 </div>
+<ConfirmationDialog />
 
 <style lang="scss">
   :global(:root) {
