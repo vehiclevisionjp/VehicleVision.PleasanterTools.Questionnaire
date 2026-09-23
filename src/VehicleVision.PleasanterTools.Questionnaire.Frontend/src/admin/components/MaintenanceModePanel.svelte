@@ -97,7 +97,16 @@
   .maintenance {
     display: grid;
     gap: 0.75rem;
-    max-width: 77rem;
+
+    /*
+      ⚠️ **ページの幅は呼び出し側が決める**（Issue #433）。
+      ここで独自の幅（77rem）を持っていたため、本体（56rem / 100rem）と
+      **左右の端がずれていた。** 変数が無い場所で使われても崩れないよう既定値を置く
+    */
+    max-width: var(--page-max-width, 77rem);
+
+    /* ⚠️ **枠と余白を幅の内側へ入れる。** 入れないと帯だけ外へ膨らみ、本体と端がずれる */
+    box-sizing: border-box;
     margin: 1rem auto 0;
     padding: 0.9rem 1rem;
     border: 2px solid var(--border);
