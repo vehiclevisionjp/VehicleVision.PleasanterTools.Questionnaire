@@ -13,12 +13,31 @@
   "version": "2.0.0",
   "tasks": [
     {
+      // **デバッグ起動はこれを通す**（Issue #421）。
+      // ⚠️ **wwwroot は git で追跡していない。** .NET のビルドだけでは画面が新しくならず、
+      // `git pull` しても古い画面が出続ける（実際に 1 週間気付かなかった）。
+      "label": "ビルド（アプリと画面）",
+      "detail": "画面を組み立ててから .NET をビルドする",
+      "dependsOn": ["画面をビルドする", "ビルド"],
+      "dependsOrder": "sequence",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      // **依存は無いときだけ入れる**（毎回 npm ci を回すとデバッグの開始が遅くなる）
+      "label": "画面をビルドする",
+      "detail": "管理画面・回答画面を .Web/wwwroot へ出す",
+      "type": "shell",
+      "command": "bash",
+      "args": ["scripts/frontend-build.sh"],
+      "problemMatcher": []
+    },
+    {
       "label": "ビルド",
-      "detail": "ソリューション全体をビルドする",
+      "detail": "ソリューション全体をビルドする（画面は含まない）",
       "type": "shell",
       "command": "dotnet",
       "args": ["build", "VehicleVision.PleasanterTools.Questionnaire.slnx"],
-      "group": { "kind": "build", "isDefault": true },
       "problemMatcher": "$msCompile",
       "presentation": { "reveal": "silent", "clear": true }
     },
@@ -210,7 +229,8 @@
           "QUESTIONNAIRE_SECRET_KEY": "4S8dqZ1yq7Xh0mF2vQnQZ6dQ0kGf1o8pM3nR5tU7wYs="
         }
       },
-      "dependsOn": "ビルド",
+      // SQLite の F5 はこのタスクを通るので、ここでも画面を組み立てる（Issue #421）
+      "dependsOn": "ビルド（アプリと画面）",
       "problemMatcher": []
     },
     {

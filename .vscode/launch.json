@@ -11,7 +11,7 @@
       "name": "アプリ（SQL Server の検証環境へ繋ぐ）",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "ビルド",
+      "preLaunchTask": "ビルド（アプリと画面）",
       "program": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
       "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web",
       "serverReadyAction": {
@@ -45,7 +45,7 @@
       "name": "アプリ（PostgreSQL の検証環境へ繋ぐ）",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "ビルド",
+      "preLaunchTask": "ビルド（アプリと画面）",
       "program": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
       "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web",
       "env": {
@@ -70,7 +70,7 @@
       "name": "アプリ（MySQL の検証環境へ繋ぐ）",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "ビルド",
+      "preLaunchTask": "ビルド（アプリと画面）",
       "program": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web/bin/Debug/net10.0/VehicleVision.PleasanterTools.Questionnaire.Web.dll",
       "cwd": "${workspaceFolder}/src/VehicleVision.PleasanterTools.Questionnaire.Web",
       "env": {
