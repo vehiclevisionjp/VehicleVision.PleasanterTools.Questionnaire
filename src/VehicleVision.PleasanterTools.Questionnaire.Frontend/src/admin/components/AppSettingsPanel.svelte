@@ -12,7 +12,7 @@
     onback: () => void;
   }
 
-  let { onback }: Props = $props();
+  let { onback: _onback }: Props = $props();
   let settings = $state<AppSettings>();
   let loading = $state(true);
   let busy = $state(false);
@@ -171,7 +171,6 @@
 
 <section>
   <header class="head">
-    <button type="button" class="link" onclick={onback}>{t('appSettings.back')}</button>
     <h1>{t('appSettings.title')}</h1>
   </header>
 
@@ -297,12 +296,6 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-  }
-  .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--accent);
   }
   .lead,
   .hint {

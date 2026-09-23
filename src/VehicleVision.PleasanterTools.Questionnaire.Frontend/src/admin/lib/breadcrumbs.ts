@@ -18,12 +18,12 @@ export interface Breadcrumb {
 /**
  * 管理画面で現在地までに通った画面を組み立てる。
  *
- * 一覧以外の管理機能は一覧と並列なので、一覧を経由したようには見せない。
+ * 一覧以外の管理機能も、一覧へ戻る入口を共通にするため一覧を先頭に置く。
  */
 export function buildBreadcrumbs(page: AdminPage): Breadcrumb[] {
   const current: Breadcrumb = { page, path: null };
 
-  if (page === 'survey-editor') {
+  if (page !== 'surveys') {
     return [{ page: 'surveys', path: '/admin' }, current];
   }
 

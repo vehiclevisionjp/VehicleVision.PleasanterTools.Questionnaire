@@ -38,7 +38,7 @@
     onback: () => void;
   }
 
-  let { ownAdminUserId, canWrite, canReset, onback }: Props = $props();
+  let { ownAdminUserId, canWrite, canReset }: Props = $props();
 
   let users = $state<AdminUserRow[]>([]);
   let loading = $state(true);
@@ -128,7 +128,6 @@
 
 <section>
   <header class="head">
-    <button type="button" class="link" onclick={onback}>{t('users.back')}</button>
     <h1>{t('users.title')}</h1>
   </header>
 

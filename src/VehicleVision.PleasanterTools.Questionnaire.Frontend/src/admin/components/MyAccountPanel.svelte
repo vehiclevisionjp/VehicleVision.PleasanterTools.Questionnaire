@@ -30,7 +30,7 @@
     onback: () => void;
   }
 
-  let { session, onchanged, onback }: Props = $props();
+  let { session, onchanged }: Props = $props();
 
   /**
    * パスワードの最低の長さ。
@@ -185,7 +185,6 @@
 
 <section>
   <header class="head">
-    <button type="button" class="link" onclick={onback}>{t('account.back')}</button>
     <h1>{t('account.title')}</h1>
   </header>
 
