@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
@@ -41,6 +41,48 @@ public class AdminSessionGuardTests
             SignedOutSchemes.Add(scheme);
             return Task.CompletedTask;
         }
+    }
+
+    /// <summary>要求の打ち切りを真似るだけのセッションストア（Issue #426）。</summary>
+    /// <remarks>**どの口も中断で返す。** 見たいのは「例外が外へ出ないこと」だけ。</remarks>
+    private sealed class CancellingAdminSessionStore : IAdminSessionStore
+    {
+        private static readonly CancellationToken Canceled = new(canceled: true);
+
+        // **作成は通す。** ログインを済ませないと、読み取りまで辿り着かない
+        public Task CreateAsync(AdminSessionEntry entry, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<AdminSessionEntry?> FindAsync(
+            Guid adminSessionId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<AdminSessionEntry?>(Canceled);
+
+        public Task<IReadOnlyList<AdminSessionEntry>> ListAsync(
+            Guid adminUserId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<IReadOnlyList<AdminSessionEntry>>(Canceled);
+
+        public Task<bool> DeleteAsync(Guid adminSessionId, CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<bool>(Canceled);
+
+        public Task<IReadOnlyList<Guid>> DeleteAllExceptAsync(
+            Guid adminUserId,
+            Guid? keepAdminSessionId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<IReadOnlyList<Guid>>(Canceled);
+
+        public Task<int> DeleteExpiredAsync(
+            DateTime now,
+            CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<int>(Canceled);
+
+        public Task TouchAsync(
+            Guid adminSessionId,
+            DateTime lastSeenAt,
+            DateTime expiresAt,
+            CancellationToken cancellationToken = default) =>
+            Task.FromCanceled(Canceled);
     }
 
     private sealed class FakeAdminSessionStore : IAdminSessionStore
@@ -185,6 +227,65 @@ public class AdminSessionGuardTests
 
         await AdminSessionGuard.ValidateAsync(context);
         return (context, auth);
+    }
+
+    /// <summary>
+    /// ⚠️ **要求が打ち切られただけで例外を外へ出さない**（Issue #426）。
+    /// 最外周まで飛ぶとデバッガが毎回止まり、本物の異常と見分けがつかなくなる。
+    /// </summary>
+    [Fact]
+    public async Task 要求が打ち切られても例外を外へ出さずCookieも捨てない()
+    {
+        var auth = new FakeAuthenticationService();
+        var services = new ServiceCollection()
+            .AddSingleton<IAdminUserStore>(new FakeAdminUserStore(TimeProvider.System))
+            .AddSingleton<IAdminSessionStore, CancellingAdminSessionStore>()
+            .AddSingleton<IAuthenticationService>(auth)
+            .AddSingleton(TimeProvider.System)
+            .AddDataProtection()
+            .Services
+            .AddLogging()
+            .AddSingleton<AdminSessionManager>()
+            .BuildServiceProvider();
+
+        // **先にログインさせる。** セッション ID が無いと、ストアに触れる前に拒否される
+        var signInContext = new DefaultHttpContext { RequestServices = services };
+        await services.GetRequiredService<AdminSessionManager>().SignInAsync(
+            signInContext,
+            AdminAuthSchemes.Session,
+            AdminSessionKind.Session,
+            Principal(AdminUserId),
+            AdminAuthSchemes.SessionLifetime);
+        var cookiePrincipal = auth.SignedInPrincipal!;
+        auth.SignedOutSchemes.Clear();
+
+        // **打ち切られた要求を作る。** これが立っているときだけ素通りさせる決まり
+        using var aborted = new CancellationTokenSource();
+        await aborted.CancelAsync();
+        var httpContext = new DefaultHttpContext
+        {
+            RequestServices = services,
+            RequestAborted = aborted.Token,
+        };
+
+        var scheme = new AuthenticationScheme(
+            AdminAuthSchemes.Session,
+            AdminAuthSchemes.Session,
+            typeof(CookieAuthenticationHandler));
+        var context = new CookieValidatePrincipalContext(
+            httpContext,
+            scheme,
+            new CookieAuthenticationOptions(),
+            new AuthenticationTicket(
+                cookiePrincipal,
+                new AuthenticationProperties(),
+                AdminAuthSchemes.Session));
+
+        // 例外が外へ出れば、ここで落ちる
+        await AdminSessionGuard.ValidateAsync(context);
+
+        // ⚠️ **cookie を捨てないこと。** 中断を「セッション無効」に倒さない
+        Assert.Empty(auth.SignedOutSchemes);
     }
 
     [Fact]
