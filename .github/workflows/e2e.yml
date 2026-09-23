@@ -62,13 +62,17 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
   # **検証環境用の固定値。** 本番の資格情報ではない。
-  # tests 側の接続文字列に直書きされている値と同じにする必要がある
+  # app と tests の接続文字列で共用する
   TESTENV_SA_PASSWORD: Questionnaire#Test1
 
 jobs:
-  e2e:
-    name: 端から端まで通す試験
+  e2e-database:
+    name: 端から端まで通す試験（${{ matrix.profile }}）
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: ${{ fromJSON(github.event_name == 'schedule' && '["postgres","mysql"]' || '["sqlserver"]') }}
     # Pleasanter の起動と試験本体で、既定の 6 時間は要らないが 30 分では足りない恐れがある
     timeout-minutes: 45
 
@@ -84,16 +88,42 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: 試験対象の RDBMS を設定する
+        run: |
+          set -euo pipefail
+          case "${{ matrix.profile }}" in
+              sqlserver)
+                  provider=SqlServer
+                  connection_string='Server=db;Database=Questionnaire;UID=sa;Password=Questionnaire#Test1;TrustServerCertificate=True'
+                  ;;
+              postgres)
+                  provider=PostgreSql
+                  connection_string='Host=db-postgres;Database=questionnaire;Username=postgres;Password=Questionnaire#Test1'
+                  ;;
+              mysql)
+                  provider=MySql
+                  connection_string='Server=db-mysql;Database=questionnaire;Uid=root;Password=Questionnaire#Test1'
+                  ;;
+              *)
+                  echo "::error title=Unknown RDBMS profile::${{ matrix.profile }}"
+                  exit 1
+                  ;;
+          esac
+
+          echo "E2E_PROFILE=${{ matrix.profile }}" >> "$GITHUB_ENV"
+          echo "DEV_DB_PROVIDER=$provider" >> "$GITHUB_ENV"
+          echo "DEV_DB_CONNECTIONSTRING=$connection_string" >> "$GITHUB_ENV"
+          echo "QUESTIONNAIRE_E2E_PROVIDER=$provider" >> "$GITHUB_ENV"
+          echo "::notice title=E2E database provider::$provider"
+
       - name: Pleasanter と本アプリを起動する
         # **サービスコンテナを使わない。** CodeDefiner は「走り切って終了する」係で、
         # 常駐を前提とするサービスコンテナには載せられない。compose の
         # depends_on: service_completed_successfully がその順序を持っている。
         #
-        # **プロファイルを 2 つとも指定する。** 試験の中身が 2 系統に分かれている。
-        #   - Admin*EndToEndTests は**起動している本アプリ**（8081）へ HTTP で当て、
-        #     同時に SQL Server の Questionnaire を直に覗く → `sqlserver`
-        #   - EndToEndTests は**アプリの処理を試験プロセスの中で直に動かし**、
-        #     PostgreSQL（15432）へ自分でスキーマを当てる → `postgres`
+        # app と HTTP 系試験は Questionnaire、in-process 系試験は
+        # Questionnaire_E2E（PostgreSQL / MySQL は questionnaire_e2e）を使う。
+        # **同じエンジンでも DB を分け、互いの行を消さない。**
         #
         # **本アプリのイメージはここで組む。** 数分かかるが、
         # 「起動しているアプリへ当てる」試験はこれが無いと成り立たない。
@@ -101,7 +131,33 @@ jobs:
           set -euo pipefail
           # **mail プロファイルも起こす**（Issue #189）。自動返信の通しを確かめるため
           # **saml プロファイルも起こす**（Issue #190）。SAML の往復を確かめるため
-          DEV_MAIL_ENABLED=true DEV_SAML_ENABLED=true docker compose --profile sqlserver --profile postgres --profile mail --profile saml up -d --wait
+          DEV_MAIL_ENABLED=true DEV_SAML_ENABLED=true \
+            docker compose --profile "$E2E_PROFILE" --profile mail --profile saml up -d --wait
+
+      - name: in-process 試験専用の DB を作る
+        run: |
+          set -euo pipefail
+          case "$E2E_PROFILE" in
+              sqlserver)
+                  docker compose exec -T db /opt/mssql-tools18/bin/sqlcmd \
+                    -S localhost -U sa -P "$TESTENV_SA_PASSWORD" -C -b \
+                    -Q "IF DB_ID('Questionnaire_E2E') IS NULL CREATE DATABASE [Questionnaire_E2E];"
+                  ;;
+              postgres)
+                  if ! docker compose exec -T db-postgres \
+                    psql -U postgres -d postgres -tAc \
+                    "SELECT 1 FROM pg_database WHERE datname = 'questionnaire_e2e'" \
+                    | grep -q 1; then
+                      docker compose exec -T db-postgres \
+                        psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+                        -c "CREATE DATABASE questionnaire_e2e;"
+                  fi
+                  ;;
+              mysql)
+                  docker compose exec -T db-mysql sh -c \
+                    'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS questionnaire_e2e;"'
+                  ;;
+          esac
 
       - name: CodeDefiner が成功したか確かめる
         # **CodeDefiner は失敗しても終了コード 0 を返す**
@@ -279,6 +335,7 @@ jobs:
       - name: 失敗したときは容器のログを残す
         if: failure()
         run: |
+          echo "::error title=E2E failed ($QUESTIONNAIRE_E2E_PROVIDER)::See this job's logs."
           echo "===== Pleasanter ====="
           docker compose logs --no-color pleasanter | tail -n 100
           echo "===== 本アプリ ====="
@@ -290,13 +347,31 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: 端から端まで通す試験の結果
+          name: 端から端まで通す試験の結果-${{ matrix.profile }}
           path: TestResults/*.trx
           if-no-files-found: ignore
 
       - name: 後片付け
         if: always()
         run: docker compose --profile '*' down -v --remove-orphans
+
+  e2e:
+    name: 端から端まで通す試験
+    needs: e2e-database
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: RDBMS ごとの結果をまとめる
+        env:
+          E2E_DATABASE_RESULT: ${{ needs.e2e-database.result }}
+        run: |
+          if [ "$E2E_DATABASE_RESULT" != "success" ]; then
+              echo "::error title=E2E database job failed::Result: $E2E_DATABASE_RESULT"
+              exit 1
+          fi
+          echo "All E2E database jobs succeeded."
 
   screenshots:
     name: 写しの一式
@@ -351,23 +426,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      actions: read
       issues: write
 
     steps:
       - name: 失敗した job と実行 URL を Issue に記録する
         uses: actions/github-script@v9
-        env:
-          E2E_RESULT: ${{ needs.e2e.result }}
-          SCREENSHOTS_RESULT: ${{ needs.screenshots.result }}
         with:
           script: |
-            const jobs = [
-              ['端から端まで通す試験', process.env.E2E_RESULT],
-              ['写しの一式', process.env.SCREENSHOTS_RESULT],
-            ];
-            const failedJobs = jobs
-              .filter(([, result]) => result === 'failure')
-              .map(([name]) => `- ${name}`)
+            const response = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRun,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
+                per_page: 100,
+              },
+            );
+            const failedJobs = response
+              .filter((job) => job.conclusion === 'failure')
+              .map((job) => `- ${job.name}`)
               .join('\n');
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`
               + `/actions/runs/${context.runId}`;
