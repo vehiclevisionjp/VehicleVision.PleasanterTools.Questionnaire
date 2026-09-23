@@ -47,8 +47,10 @@ for task in document.get('tasks', []):
             continue
         if argument.startswith('-') or '/' not in argument:
             continue
-        # ビルド成果物は未ビルドだと存在しないので見ない
-        if '/bin/' in argument or '/obj/' in argument:
+        # ビルド成果物は未ビルドだと存在しないので見ない。
+        # ⚠️ '/bin/' の部分一致で書くと bin/ で始まるパスを拾えない（実際に踏んだ）。
+        # **区切りごとに見る**
+        if {'bin', 'obj'} & set(argument.split('/')):
             continue
         target = os.path.join(cwd, argument)
         if not os.path.exists(target):
