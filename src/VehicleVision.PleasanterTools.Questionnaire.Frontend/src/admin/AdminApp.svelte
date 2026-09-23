@@ -436,7 +436,19 @@
   }
 </script>
 
-<div class="shell">
+<!--
+  **ページの幅はここ 1 か所で決める**（Issue #433）。
+  ⚠️ **パンくず・帯・本体がそれぞれ別の幅を持っていた**（80rem / 77rem / 56rem）ため、
+  同じ画面で左右の端が階段状にずれていた。
+-->
+<div
+  class="shell"
+  class:wide={(openAuditLog && canSeeAuditLog) ||
+    (openOutbox && canSeeOutbox) ||
+    (openNotifications && canSeeNotifications) ||
+    (openUsers && canSeeUsers) ||
+    openSurveyId !== null}
+>
   {#if loading}
     <p class="status">{t('app.loading')}</p>
   {:else if failed}
@@ -571,13 +583,7 @@
       ⚠️ **アンケートの編集は左右 2 カラムなのに 56rem の中へ押し込んでいた**（Issue #416）。
       画面が広いほど 1 列あたりが痩せ、FHD でかえって窮屈になっていた
     -->
-    <main
-      class:wide={(openAuditLog && canSeeAuditLog) ||
-        (openOutbox && canSeeOutbox) ||
-        (openNotifications && canSeeNotifications) ||
-        (openUsers && canSeeUsers) ||
-        openSurveyId !== null}
-    >
+    <main>
       {#if openUsers && canSeeUsers}
         <AdminUserList
           ownAdminUserId={session.adminUserId ?? ''}
@@ -771,7 +777,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    max-width: 80rem;
+    max-width: var(--page-max-width);
     padding: 0;
     margin: 0 auto;
     list-style: none;
@@ -788,7 +794,10 @@
     display: flex;
     align-items: flex-start;
     gap: 0.5rem;
-    max-width: 77rem;
+    max-width: var(--page-max-width);
+
+    /* ⚠️ **枠と余白を幅の内側へ入れる。** 入れないと帯だけ外へ膨らみ、本体と端がずれる */
+    box-sizing: border-box;
     margin: 1rem auto 0;
     padding: 0.75rem 1rem;
     border: 1px solid var(--warning-border);
@@ -869,10 +878,12 @@
     text-align: center;
   }
 
-  main {
-    max-width: 56rem;
-    margin: 0 auto;
-    padding: 2rem 1.5rem 4rem;
+  /*
+    **ページの幅は --page-max-width 1 本で決まる**（Issue #433）。
+    パンくず・帯・本体が同じ値を見るので、**どの画面でも左右の端が揃う。**
+  */
+  .shell {
+    --page-max-width: 56rem;
   }
 
   /*
@@ -880,8 +891,14 @@
     ⚠️ **80rem では足りない。** 一覧は 7 桁あり、行ごとに釦が最大 7 つ並ぶので、
     **題名か回答用 URL のどちらかが 1 文字ずつ折り返す**（実測。2026-09-16）
   */
-  main.wide {
-    max-width: 100rem;
+  .shell.wide {
+    --page-max-width: 100rem;
+  }
+
+  main {
+    max-width: var(--page-max-width);
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
   }
 
   .status {
