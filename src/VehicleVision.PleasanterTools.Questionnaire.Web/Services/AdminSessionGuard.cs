@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using StackExchange.Redis;
@@ -45,6 +45,20 @@ public static class AdminSessionGuard
             restored = await manager
                 .FindAsync(context.Principal, kind, context.HttpContext.RequestAborted)
                 .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+            when (context.HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            // **要求が打ち切られただけ**（再読み込み・画面遷移・タブを閉じる。Issue #426）。
+            //
+            // ⚠️ **RejectAsync を呼ばないこと。** 中断を「セッション無効」に倒すと、
+            // **打ち切られた要求で cookie を捨てる**副作用が出る。
+            // **応答はどこへも返らない**ので、何もせず戻るのが正しい。
+            //
+            // ⚠️ **ここで拾わないと最外周まで飛ぶ。** デバッガが毎回止まり、
+            // **本物の異常と見分けがつかなくなる**（実際にそうなっていた）。
+            // **中断でないもの（タイムアウトなど）は when で除いて投げ直す。**
+            return;
         }
         catch (RedisException exception)
         {
