@@ -144,6 +144,19 @@ public class AutoReplyComposerTests
     }
 
     [Fact]
+    public void 知らない言語はアンケートの落とし先言語へ落とす()
+    {
+        var definition = Definition(Enabled) with { FallbackLanguage = "en" };
+
+        var mail = AutoReplyComposer.Compose(
+            definition, Payload(Answer("mail", "a@example.test")), "de");
+
+        Assert.NotNull(mail);
+        Assert.Equal("Thank you for your response", mail.Subject);
+        Assert.Equal("We received your response.", mail.Body);
+    }
+
+    [Fact]
     public void 宛先の前後の空白を落とす()
     {
         var mail = Compose(Enabled, Payload(Answer("mail", "  a@example.test  ")));
