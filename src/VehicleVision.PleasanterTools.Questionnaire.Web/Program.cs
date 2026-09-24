@@ -981,7 +981,8 @@ IResult AdminPage(HttpContext context, AdminPasswordSignInPolicy passwordSignIn)
 {
     context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
 
-    if (context.Request.Query.TryGetValue("rescue", out var rescue))
+    if (string.Equals(context.Request.Path.Value, adminPath.Path, StringComparison.Ordinal)
+        && context.Request.Query.TryGetValue("rescue", out var rescue))
     {
         // **照合後は秘密を URL から落とす。** 履歴や次の要求の Referer に残し続けない。
         var granted = passwordSignIn.TryGrantRescue(
