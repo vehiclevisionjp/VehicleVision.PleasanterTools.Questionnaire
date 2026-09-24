@@ -149,6 +149,14 @@ public class AdminSurveyEndToEndTests
         return (await ReadAsync(created))!["surveyId"]!.GetValue<string>();
     }
 
+    /// <summary>保存に使う、その時点の下書きの版を読む。</summary>
+    private static async Task<int> CurrentRevisionAsync(HttpClient http, string surveyId)
+    {
+        using var draft = await http.GetAsync($"/api/admin/surveys/{surveyId}");
+        draft.EnsureSuccessStatusCode();
+        return (await ReadAsync(draft))!["revision"]!.GetValue<int>();
+    }
+
     [Fact]
     public async Task 認証していなければ何も見えない()
     {
@@ -178,21 +186,28 @@ public class AdminSurveyEndToEndTests
         using var http = await SignInAsync();
         var surveyId = await CreateSurveyAsync(http);
 
-        // 作った直後は下書きで、まだ版が無い
+        int initialRevision;
+        // 作った直後から、見出しも設問も無いページを 1 つ持つ
         using (var draft = await http.GetAsync($"/api/admin/surveys/{surveyId}"))
         {
             draft.EnsureSuccessStatusCode();
             var body = await ReadAsync(draft);
-            Assert.Equal(0, body!["revision"]!.GetValue<int>());
+            initialRevision = body!["revision"]!.GetValue<int>();
+            var page = Assert.Single(body["definition"]!["pages"]!.AsArray());
+            Assert.Null(page!["title"]);
+            Assert.Empty(page["questions"]!.AsArray());
             // **次に公開される版**
             Assert.Equal(1, body["definition"]!["version"]!.GetValue<int>());
         }
 
         using (var save = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true)))
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(surveyId, initialRevision, withMapping: true)))
         {
             save.EnsureSuccessStatusCode();
-            Assert.Equal(1, (await ReadAsync(save))!["revision"]!.GetValue<int>());
+            Assert.Equal(
+                initialRevision + 1,
+                (await ReadAsync(save))!["revision"]!.GetValue<int>());
         }
 
         using (var reloaded = await http.GetAsync($"/api/admin/surveys/{surveyId}"))
@@ -341,7 +356,10 @@ public class AdminSurveyEndToEndTests
 
         using var save = await http.PutAsJsonAsync(
             $"/api/admin/surveys/{surveyId}",
-            EmbedDraftBody(surveyId, 0, "https://www.example.com/logo.png"));
+            EmbedDraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                "https://www.example.com/logo.png"));
 
         save.EnsureSuccessStatusCode();
     }
@@ -361,7 +379,10 @@ public class AdminSurveyEndToEndTests
 
         using var save = await http.PutAsJsonAsync(
             $"/api/admin/surveys/{surveyId}",
-            EmbedDraftBody(surveyId, 0, "https://evil.test/logo.png"));
+            EmbedDraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                "https://evil.test/logo.png"));
 
         Assert.Equal(HttpStatusCode.BadRequest, save.StatusCode);
         var body = await ReadAsync(save);
@@ -381,7 +402,10 @@ public class AdminSurveyEndToEndTests
 
         using var save = await http.PutAsJsonAsync(
             $"/api/admin/surveys/{surveyId}",
-            EmbedDraftBody(surveyId, 0, "http://www.example.com/logo.png"));
+            EmbedDraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                "http://www.example.com/logo.png"));
 
         Assert.Equal(HttpStatusCode.BadRequest, save.StatusCode);
     }
@@ -439,7 +463,11 @@ public class AdminSurveyEndToEndTests
         var surveyId = await CreateSurveyAsync(http);
 
         using (var save = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: false)))
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: false)))
         {
             save.EnsureSuccessStatusCode();
         }
@@ -484,7 +512,7 @@ public class AdminSurveyEndToEndTests
             $"/api/admin/surveys/{surveyId}",
             DraftBody(
                 surveyId,
-                0,
+                await CurrentRevisionAsync(http, surveyId),
                 withMapping: true,
                 assetHistorySiteId: 1,
                 withAssetHistoryMapping: true)))
@@ -512,19 +540,22 @@ public class AdminSurveyEndToEndTests
 
         using var http = await SignInAsync();
         var surveyId = await CreateSurveyAsync(http);
+        var revision = await CurrentRevisionAsync(http, surveyId);
 
         using (var first = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true)))
+            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, revision, withMapping: true)))
         {
             first.EnsureSuccessStatusCode();
         }
 
         // **先に開いていた画面から、同じ版で保存した状況**
         using var stale = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true));
+            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, revision, withMapping: true));
 
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
-        Assert.Equal(1, (await ReadAsync(stale))!["actualRevision"]!.GetValue<int>());
+        Assert.Equal(
+            revision + 1,
+            (await ReadAsync(stale))!["actualRevision"]!.GetValue<int>());
     }
 
     [Fact]
@@ -539,7 +570,11 @@ public class AdminSurveyEndToEndTests
         var surveyId = await CreateSurveyAsync(http);
 
         using (var save = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true)))
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: true)))
         {
             save.EnsureSuccessStatusCode();
         }
@@ -595,7 +630,11 @@ public class AdminSurveyEndToEndTests
         var surveyId = await CreateSurveyAsync(http);
 
         using (var save = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true)))
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: true)))
         {
             save.EnsureSuccessStatusCode();
         }
@@ -632,7 +671,11 @@ public class AdminSurveyEndToEndTests
         var publicId = createdBody["publicId"]!.GetValue<string>();
 
         using (var save = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true)))
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: true)))
         {
             save.EnsureSuccessStatusCode();
         }
@@ -706,7 +749,11 @@ public class AdminSurveyEndToEndTests
         var surveyId = await CreateSurveyAsync(http);
 
         using (var save = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true)))
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: true)))
         {
             save.EnsureSuccessStatusCode();
         }
@@ -929,7 +976,11 @@ public class AdminSurveyEndToEndTests
         var surveyId = await CreateSurveyAsync(http);
 
         using (var save = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", AttachmentDraftBody(surveyId, 0, "Files")))
+            $"/api/admin/surveys/{surveyId}",
+            AttachmentDraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                "Files")))
         {
             save.EnsureSuccessStatusCode();
         }
@@ -953,7 +1004,11 @@ public class AdminSurveyEndToEndTests
 
         // 名前だけを添付列へ入れても、ファイルとしては取り出せない
         using (var save = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", AttachmentDraftBody(surveyId, 0, "FileNames")))
+            $"/api/admin/surveys/{surveyId}",
+            AttachmentDraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                "FileNames")))
         {
             // **直している途中でも保存はできる**
             save.EnsureSuccessStatusCode();
@@ -1087,7 +1142,7 @@ public class AdminSurveyEndToEndTests
         var targetId = await CreateSurveyAsync(http);
         var sourceDraft = new
         {
-            revision = 0,
+            revision = await CurrentRevisionAsync(http, sourceId),
             definition = new
             {
                 surveyId = sourceId,
@@ -1216,7 +1271,11 @@ public class AdminSurveyEndToEndTests
         var surveyId = await CreateSurveyAsync(http);
 
         using (var save = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, 0, withMapping: true)))
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: true)))
         {
             save.EnsureSuccessStatusCode();
         }
@@ -1244,7 +1303,7 @@ public class AdminSurveyEndToEndTests
         {
             draft.EnsureSuccessStatusCode();
             var body = await ReadAsync(draft);
-            Assert.Equal(0, body!["revision"]!.GetValue<int>());
+            Assert.NotNull(body);
             Assert.Equal("満足度調査のコピー", body["definition"]!["title"]!["ja"]!.GetValue<string>());
             // **マッピングも写る**
             Assert.Single(body["mapping"]!["assignments"]!.AsArray());
