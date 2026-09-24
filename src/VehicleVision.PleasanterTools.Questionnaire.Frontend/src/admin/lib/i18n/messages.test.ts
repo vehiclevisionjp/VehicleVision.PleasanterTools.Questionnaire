@@ -1,3 +1,4 @@
+import type { Language } from '../../../lib/i18n/language';
 import { describe, expect, it } from 'vitest';
 import {
   de,
@@ -40,12 +41,34 @@ describe('一覧へ戻るリンクの文言', () => {
 });
 
 describe('translator', () => {
-  // **未翻訳の言語は英語で操作できる状態にする。** 日本語へ直接落とさない
-  it('未翻訳の言語は英語の文言へ落ちる', () => {
-    const key = Object.keys(ja)[0] as MessageKey;
+  /**
+   * **未翻訳の言語は英語で操作できる状態にする。** 日本語へ直接落とさない。
+   *
+   * ⚠️ **確かめる言語を決め打ちにしない。** 訳が進むと、その言語では
+   * 落とし先を通らなくなり、**試験が何も確かめなくなるか落ちる。**
+   * 訳の無い鍵を探して確かめ、全部訳し終わっていたら
+   * 代わりに各言語が自分の文言を返すことを確かめる。
+   */
+  it('訳の無い鍵は英語の文言へ落ちる', () => {
+    const entries = Object.entries(catalogs) as [Language, Partial<Record<MessageKey, string>>][];
+    const missing = entries
+      .filter(([language]) => language !== 'ja' && language !== 'en')
+      .flatMap(([language, catalog]) =>
+        (Object.keys(ja) as MessageKey[])
+          .filter((key) => !(key in catalog))
+          .map((key) => [language, key] as const))
+      .at(0);
 
-    expect(translator('zh')(key)).toBe(en[key]);
-    expect(translator('vi')(key)).toBe(en[key]);
+    if (missing) {
+      const [language, key] = missing;
+      expect(translator(language)(key)).toBe(en[key]);
+      return;
+    }
+
+    const key = Object.keys(ja)[0] as MessageKey;
+    for (const [language, catalog] of entries) {
+      expect(translator(language)(key), language).toBe(catalog[key]);
+    }
   });
 });
 
