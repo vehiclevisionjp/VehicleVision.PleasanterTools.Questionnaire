@@ -11,7 +11,8 @@
    * Pleasanter のログインで入る設定（Issue #464）。
    *
    * **SAML 設定（`SamlSettingsPanel`）と同じ作り。** 外部設定で決まっている項目はロックする。
-   * 秘密の値は無い（API キーは使わない）。
+   * 秘密の値は無い（403 のときに使う API キーは、Pleasanter 接続設定のものをサーバだけが読む）。
+   * 拡張 SQL の名前は、方式が拡張 SQL のときだけ入力できる。
    */
   interface Props {
     onback: () => void;
@@ -46,6 +47,8 @@
   function fixed(field: PleasanterSsoSettingField): boolean {
     return settings?.fixedFields[field] ?? false;
   }
+
+  let usesExtendedSql = $derived(settings?.method === 'ExtendedSql');
 
   async function save(event: SubmitEvent) {
     event.preventDefault();
@@ -151,19 +154,33 @@
 
       <div class="row">
         <label>
-          {t('pleasanterSso.sqlName')}
-          {#if fixed('sqlName')}<span class="fixed">{t('pleasanterSso.fixed')}</span>{/if}
-          <input type="text" bind:value={settings.sqlName} disabled={fixed('sqlName')} />
-          <span class="hint">{t('pleasanterSso.sqlNameHint')}</span>
+          {t('pleasanterSso.method')}
+          {#if fixed('method')}<span class="fixed">{t('pleasanterSso.fixed')}</span>{/if}
+          <select bind:value={settings.method} disabled={fixed('method')}>
+            <option value="StandardApi">{t('pleasanterSso.methodStandardApi')}</option>
+            <option value="ExtendedSql">{t('pleasanterSso.methodExtendedSql')}</option>
+          </select>
+          <span class="hint">{t('pleasanterSso.methodHint')}</span>
         </label>
 
         <label>
-          {t('pleasanterSso.cookieNames')}
-          {#if fixed('cookieNames')}<span class="fixed">{t('pleasanterSso.fixed')}</span>{/if}
-          <input type="text" bind:value={settings.cookieNames} disabled={fixed('cookieNames')} />
-          <span class="hint">{t('pleasanterSso.cookieNamesHint')}</span>
+          {t('pleasanterSso.sqlName')}
+          {#if fixed('sqlName')}<span class="fixed">{t('pleasanterSso.fixed')}</span>{/if}
+          <input
+            type="text"
+            bind:value={settings.sqlName}
+            disabled={fixed('sqlName') || !usesExtendedSql}
+          />
+          <span class="hint">{t('pleasanterSso.sqlNameHint')}</span>
         </label>
       </div>
+
+      <label>
+        {t('pleasanterSso.cookieNames')}
+        {#if fixed('cookieNames')}<span class="fixed">{t('pleasanterSso.fixed')}</span>{/if}
+        <input type="text" bind:value={settings.cookieNames} disabled={fixed('cookieNames')} />
+        <span class="hint">{t('pleasanterSso.cookieNamesHint')}</span>
+      </label>
 
       <div class="row">
         <label>

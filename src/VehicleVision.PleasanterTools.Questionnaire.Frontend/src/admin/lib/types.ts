@@ -684,6 +684,8 @@ export interface PleasanterSsoSettings {
   internalBaseUrl: string;
   loginUrl: string;
   logoutUrl: string;
+  /** 本人の確かめ方。`StandardApi`（既定）か `ExtendedSql`。 */
+  method: string;
   sqlName: string;
   cookieNames: string;
   unknownUser: string;
@@ -699,6 +701,7 @@ export type PleasanterSsoSettingField =
   | 'internalBaseUrl'
   | 'loginUrl'
   | 'logoutUrl'
+  | 'method'
   | 'sqlName'
   | 'cookieNames'
   | 'unknownUser'
