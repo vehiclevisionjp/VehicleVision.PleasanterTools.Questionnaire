@@ -19,6 +19,9 @@ export const SUPPORTED_LANGUAGES: readonly Language[] = ['ja', 'en', 'zh', 'de',
  */
 export const DEFAULT_LANGUAGE: Language = 'ja';
 
+/** 画面自身の文言が未翻訳のときに使う言語。 */
+export const UI_FALLBACK_LANGUAGE: Language = 'en';
+
 /** 画面に出す言語の名前。**その言語自身で書く**（読めない名前で選ばせない）。 */
 export const LANGUAGE_NAMES: Record<Language, string> = {
   ja: '日本語',

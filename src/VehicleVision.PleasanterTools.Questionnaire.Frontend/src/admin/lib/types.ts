@@ -359,6 +359,8 @@ export interface AssetDeliverySettings {
 export interface SurveyDefinition {
   surveyId: string;
   version: number;
+  /** 訳が無いときに回答者へ表示する言語。 */
+  fallbackLanguage: Language;
   title: LocalizedText;
   description?: LocalizedText;
   confirmationMessage?: LocalizedText;
@@ -756,6 +758,9 @@ export interface AdminSession {
   /** SAML でのログインが使えるか（Issue #166）。**既定は無効** */
   samlEnabled?: boolean;
 
+  /** 合言葉ログインの入口を出すか（Issue #423）。 */
+  passwordSignInEnabled?: boolean;
+
   /** パスワードログインと招待受取に proof-of-work が必要か（Issue #252）。 */
   captchaEnabled?: boolean;
 
@@ -835,8 +840,12 @@ export function withText(
 }
 
 /** 回答画面で実際に出る文字列。**未入力なら既定の言語へ落ちる。** */
-export function displayText(value: LocalizedText | undefined, language: Language): string {
-  return value?.[language] ?? value?.[DEFAULT_LANGUAGE] ?? '';
+export function displayText(
+  value: LocalizedText | undefined,
+  language: Language,
+  fallbackLanguage: Language = DEFAULT_LANGUAGE,
+): string {
+  return value?.[language] ?? value?.[fallbackLanguage] ?? '';
 }
 
 /**

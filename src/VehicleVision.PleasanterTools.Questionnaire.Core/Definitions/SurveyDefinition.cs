@@ -17,6 +17,9 @@ public sealed record SurveyDefinition
 
     public required LocalizedText Title { get; init; }
 
+    /// <summary>要求した言語の文言が無いときに表示する言語。</summary>
+    public string FallbackLanguage { get; init; } = LocalizedText.DefaultLanguage;
+
     public LocalizedText? Description { get; init; }
 
     public ImmutableArray<Page> Pages { get; init; } = [];

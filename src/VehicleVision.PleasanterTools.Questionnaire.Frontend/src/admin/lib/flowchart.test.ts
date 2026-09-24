@@ -35,6 +35,7 @@ function definition(...pages: Page[]): SurveyDefinition {
   return {
     surveyId: 's1',
     version: 1,
+    fallbackLanguage: 'ja',
     title: { ja: '見本' },
     displayMode: 'Paged',
     showProgress: true,

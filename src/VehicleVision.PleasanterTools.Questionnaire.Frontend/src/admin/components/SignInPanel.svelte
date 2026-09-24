@@ -8,6 +8,7 @@
     verifyTotp,
   } from '../lib/api';
   import { solveAltcha } from '../../lib/altcha';
+  import { adminUrl } from '../lib/adminPath';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -66,10 +67,13 @@
    * 場所を書き換える。
    */
   function startSaml() {
-    window.location.assign('/api/admin/saml/login?returnUrl=/admin');
+    window.location.assign(
+      `/api/admin/saml/login?returnUrl=${encodeURIComponent(adminUrl())}`,
+    );
   }
 
   const isSetup = $derived(session.setupRequired);
+  const passwordSignInEnabled = $derived(session.passwordSignInEnabled !== false);
 
   async function submitPassword(event: SubmitEvent) {
     event.preventDefault();
@@ -159,41 +163,45 @@
       </p>
     {/if}
 
-    <form onsubmit={submitPassword}>
-      <label>
-        {t('signIn.loginId')}
-        <input type="text" autocomplete="username" bind:value={loginId} required />
-      </label>
-
-      <label>
-        {t('signIn.password')}
-        <input
-          type="password"
-          autocomplete={isSetup ? 'new-password' : 'current-password'}
-          bind:value={password}
-          required
-        />
-      </label>
-
-      {#if isSetup}
+    {#if passwordSignInEnabled}
+      <form onsubmit={submitPassword}>
         <label>
-          {t('signIn.passwordConfirmation')}
-          <input type="password" autocomplete="new-password" bind:value={confirmation} required />
+          {t('signIn.loginId')}
+          <input type="text" autocomplete="username" bind:value={loginId} required />
         </label>
-        <p class="hint">{t('signIn.passwordHint', { minimum: MINIMUM_PASSWORD_LENGTH })}</p>
-      {/if}
 
-      {#if error}<p class="error" role="alert">{error}</p>{/if}
+        <label>
+          {t('signIn.password')}
+          <input
+            type="password"
+            autocomplete={isSetup ? 'new-password' : 'current-password'}
+            bind:value={password}
+            required
+          />
+        </label>
 
-      <button type="submit" disabled={busy}>
-        {busy ? t('signIn.checking') : isSetup ? t('signIn.register') : t('signIn.next')}
-      </button>
-    </form>
+        {#if isSetup}
+          <label>
+            {t('signIn.passwordConfirmation')}
+            <input type="password" autocomplete="new-password" bind:value={confirmation} required />
+          </label>
+          <p class="hint">{t('signIn.passwordHint', { minimum: MINIMUM_PASSWORD_LENGTH })}</p>
+        {/if}
+
+        {#if error}<p class="error" role="alert">{error}</p>{/if}
+
+        <button type="submit" disabled={busy}>
+          {busy ? t('signIn.checking') : isSetup ? t('signIn.register') : t('signIn.next')}
+        </button>
+      </form>
+    {/if}
 
     {#if session.samlEnabled && !isSetup}
       <!-- **最初の管理者を作る画面には出さない。** IdP から来た人を
            最初の管理者にすると、誰でも全権を取れる -->
-      <div class="or"><span>{t('signIn.samlOr')}</span></div>
+      {#if passwordSignInEnabled}
+        <div class="or"><span>{t('signIn.samlOr')}</span></div>
+      {/if}
 
       {#if samlError}<p class="error" role="alert">{samlError}</p>{/if}
 

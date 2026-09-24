@@ -30,6 +30,7 @@ function definition(autoReply: AutoReplySettings | null, ...questions: Question[
   return {
     surveyId: 's1',
     version: 1,
+    fallbackLanguage: 'ja',
     title: { ja: '検証用' },
     displayMode: 'Paged',
     showProgress: true,

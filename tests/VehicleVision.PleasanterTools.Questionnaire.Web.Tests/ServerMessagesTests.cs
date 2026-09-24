@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
@@ -12,6 +14,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 /// </remarks>
 public class ServerMessagesTests
 {
+    private static IReadOnlyDictionary<string, LocalizedText> Catalog() =>
+        (IReadOnlyDictionary<string, LocalizedText>)typeof(ServerMessages)
+            .GetField("Catalog", BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetValue(null)!;
+
     private static IReadOnlyList<string> DeclaredKeys() =>
         typeof(ServerMessageKeys)
             .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
@@ -40,6 +47,54 @@ public class ServerMessagesTests
             extra.Length == 0,
             "カタログにあって ServerMessageKeys に無い鍵がある。"
             + $"**呼べない文言は消し忘れ**: {string.Join("、", extra)}");
+    }
+
+    [Fact]
+    public void 各言語のカタログに日本語カタログに無い鍵は無い()
+    {
+        var catalog = Catalog();
+        var japaneseKeys = catalog
+            .Where(pair => pair.Value.TryGet("ja", out _))
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        foreach (var language in SupportedLanguages.All)
+        {
+            var extra = catalog
+                .Where(pair => pair.Value.TryGet(language, out _))
+                .Select(pair => pair.Key)
+                .Except(japaneseKeys)
+                .ToArray();
+
+            Assert.True(
+                extra.Length == 0,
+                $"{language} に日本語カタログに無い鍵がある: {string.Join("、", extra)}");
+        }
+    }
+
+    [Fact]
+    public void 各言語にある文言の差し込み番号が日本語と一致する()
+    {
+        static string[] Placeholders(string value) =>
+            Regex.Matches(value, @"\{(\d+)(?:[^}]*)?\}")
+                .Select(match => match.Groups[1].Value)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+        foreach (var (key, text) in Catalog())
+        {
+            Assert.True(text.TryGet("ja", out var japanese), $"ja.{key} が無い");
+            var expected = Placeholders(japanese);
+
+            foreach (var language in text.Languages)
+            {
+                Assert.True(text.TryGet(language, out var translated));
+                Assert.True(
+                    expected.SequenceEqual(Placeholders(translated), StringComparer.Ordinal),
+                    $"{language}.{key} の差し込みが日本語と一致しない");
+            }
+        }
     }
 
     [Fact]
@@ -91,12 +146,37 @@ public class ServerMessagesTests
             $"日本語のまま英語のカタログに入っている: {string.Join("、", untranslated)}");
     }
 
+    /// <summary>対応していない言語は英語へ落ちる。</summary>
+    /// <remarks>
+    /// ⚠️ **対応言語を決め打ちにしない。** 以前は <c>zh</c> を「未翻訳の例」に使っていたが、
+    /// **訳が入った時点でこの試験は落ちる。** 確かめたいのは
+    /// 「カタログに無い言語は英語になる」ことなので、対応外の言語で確かめる。
+    /// </remarks>
     [Fact]
-    public void 対応していない言語は既定の言語へ落ちる()
+    public void 対応外の言語は英語へ落ちる()
     {
         Assert.Equal(
-            ServerMessages.Get(ServerMessageKeys.InvalidCredentials, SupportedLanguages.Default),
+            ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "en"),
             ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "fr"));
+    }
+
+    /// <summary>どの対応言語を指定しても空にならない。</summary>
+    /// <remarks>
+    /// **訳が無い言語は英語、それも無ければ日本語へ落ちる**ので、空になる道は無い。
+    /// ⚠️ **空を返すと画面に何も出ない。** 落とし先が効いているかをここで押さえる。
+    /// </remarks>
+    [Fact]
+    public void どの対応言語でも空にならない()
+    {
+        foreach (var language in SupportedLanguages.All)
+        {
+            foreach (var key in ServerMessages.Keys)
+            {
+                Assert.False(
+                    string.IsNullOrEmpty(ServerMessages.Get(key, language)),
+                    $"{language} / {key}");
+            }
+        }
     }
 
     [Fact]

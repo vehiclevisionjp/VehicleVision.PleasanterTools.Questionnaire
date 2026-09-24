@@ -21,6 +21,10 @@ describe('noteBlocks', () => {
     expect(noteBlocks({ ja }, 'en')).toBe(ja);
   });
 
+  it('無い言語はアンケートの落とし先言語へ落とす', () => {
+    expect(noteBlocks({ ja, en }, 'de', 'en')).toBe(en);
+  });
+
   it('何も無ければ空', () => {
     expect(noteBlocks(null, 'ja')).toEqual([]);
     expect(noteBlocks(undefined, 'ja')).toEqual([]);

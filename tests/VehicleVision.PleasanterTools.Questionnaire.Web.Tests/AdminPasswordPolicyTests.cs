@@ -60,11 +60,13 @@ public class AdminPasswordPolicyTests
     }
 
     [Fact]
-    public void 対応していない言語は既定の文言へ落ちる()
+    public void 対応していない言語は英語の文言へ落ちる()
     {
         var policy = Create();
 
-        Assert.Equal(policy.Message(SupportedLanguages.Default), policy.Message("fr"));
+        // **画面自身の文言は `en` へ落とす**（Issue #431）。
+        // 日本語を読めない利用者に、いきなり日本語を出さない
+        Assert.Equal(policy.Message("en"), policy.Message("fr"));
     }
 
     // ---- ログイン ID との一致 -----------------------------------------------

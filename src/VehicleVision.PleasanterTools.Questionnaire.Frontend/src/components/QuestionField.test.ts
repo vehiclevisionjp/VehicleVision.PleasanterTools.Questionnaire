@@ -52,6 +52,23 @@ describe('確認・同意の回答欄', () => {
 });
 
 describe('設問の説明文', () => {
+  it('回答者の言語に訳が無ければアンケートの落とし先言語を描画する', () => {
+    const question = confirmQuestion();
+    question.title = { ja: '日本語', en: 'English' };
+
+    const { body } = render(QuestionField, {
+      props: {
+        question,
+        language: 'de',
+        fallbackLanguage: 'en',
+        answer: { values: [], otherText: '' },
+      },
+    });
+
+    expect(body).toContain('English');
+    expect(body).not.toContain('日本語');
+  });
+
   it('プレーンでは記法を解釈せず改行を保つ', () => {
     const question: Question = {
       ...confirmQuestion(),

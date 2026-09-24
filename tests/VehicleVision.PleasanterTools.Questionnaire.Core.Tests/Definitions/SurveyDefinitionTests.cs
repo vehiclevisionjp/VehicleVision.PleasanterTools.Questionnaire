@@ -5,6 +5,12 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Definitions;
 
 public class SurveyDefinitionTests
 {
+    [Fact]
+    public void 落とし先の言語は既定で日本語()
+    {
+        Assert.Equal(LocalizedText.DefaultLanguage, CreateDefinition().FallbackLanguage);
+    }
+
     private static SurveyDefinition CreateDefinition() => new()
     {
         SurveyId = "s1",
