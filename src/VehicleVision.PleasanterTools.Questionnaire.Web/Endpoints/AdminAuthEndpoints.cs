@@ -46,6 +46,7 @@ public static class AdminAuthEndpoints
             HttpContext context,
             IAdminUserStore store,
             ISamlOptionsProvider samlProvider,
+            AdminPasswordSignInPolicy passwordSignIn,
             AdminAuthOptions options,
             BotMitigationOptionsProvider botOptionsProvider,
             IMailSettingsProvider mailSettings,
@@ -60,6 +61,8 @@ public static class AdminAuthEndpoints
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
             var samlEnabled = saml.Enabled;
             var samlLabel = saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null;
+            var passwordSignInEnabled =
+                setupRequired || passwordSignIn.IsAllowed(context, samlEnabled);
 
             var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             if (session.Succeeded)
@@ -107,6 +110,7 @@ public static class AdminAuthEndpoints
                     hasTotp,
                     samlEnabled,
                     samlLabel,
+                    passwordSignInEnabled,
                     captchaEnabled = botOptions.AdminCaptcha.Enabled,
 
                     // **IdP へログアウトを頼めるか**（Issue #191）。
@@ -152,6 +156,7 @@ public static class AdminAuthEndpoints
                 needsEnrollment,
                 samlEnabled,
                 samlLabel,
+                passwordSignInEnabled,
                 captchaEnabled = botOptions.AdminCaptcha.Enabled,
             });
         });
@@ -296,7 +301,10 @@ public static class AdminAuthEndpoints
                         new { message = InvalidMessage(context) },
                         statusCode: StatusCodes.Status401Unauthorized);
             }
-        }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+        })
+            // **画面から隠すだけでは足りない。** API を直接叩かれても認証しない。
+            .AddEndpointFilter<AdminPasswordSignInFilter>()
+            .RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
         // ---- 2 要素の登録 ----------------------------------------------------
         group.MapPost("/enroll/begin", async (
@@ -593,6 +601,9 @@ public static class AdminAuthSchemes
 
     /// <summary>ログインの試行に掛けるレート制限の名前。</summary>
     public const string LoginRateLimitPolicy = "admin-login";
+
+    /// <summary>救済トークンの照合に掛ける専用レート制限の名前。</summary>
+    public const string RescueRateLimitPolicy = "admin-rescue";
 
     /// <summary>ログイン済みなら通す認可の名前。</summary>
     public const string SessionPolicy = "Admin.Session.Any";

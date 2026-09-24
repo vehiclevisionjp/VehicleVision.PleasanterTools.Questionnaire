@@ -42,6 +42,12 @@ builder.Configuration.AddParameterFiles();
 var adminPath = AdminPathOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(adminPath);
 
+// **合言葉を塞ぐ指定と救済トークンも外部設定だけで決める。**
+// 画面から変えられると、その場で自分自身を締め出せるため。
+var adminPasswordSignInOptions =
+    AdminPasswordSignInOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(adminPasswordSignInOptions);
+
 // **CIDR の書き間違いは起動時に止める。** 無制限へ黙って落ちると、絞ったつもりの口が開く。
 var endpointNetworkRestrictions =
     EndpointNetworkRestrictions.FromConfiguration(builder.Configuration);
@@ -394,6 +400,7 @@ if (builder.Configuration[AdminAuthOptions.TwoFactorSetting] is { Length: > 0 } 
 builder.Services.AddSingleton(new AdminAuthOptions { TwoFactor = twoFactorPolicy });
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
+builder.Services.AddSingleton<AdminPasswordSignInPolicy>();
 
 // **外部設定だけで有効にしている従来構成は、起動時の検証も保つ。**
 // 書き間違いを 500 応答になるまで見つけられない構成へ後退させない。
@@ -628,6 +635,19 @@ builder.Services
             TimeSpan.FromMinutes(5),
             sharedRateLimits,
             rateLimitLogger));
+
+    // **救済トークンは合言葉と同じ上限値の専用枠にする。**
+    // 通常の管理画面表示で枠を消費せず、救済への攻撃で通常ログインまで妨害されないため。
+    options.AddPolicy(AdminAuthSchemes.RescueRateLimitPolicy, context =>
+        context.Request.Query.ContainsKey("rescue")
+            ? RateLimitPartitions.FixedWindow(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                "admin-rescue",
+                settings.GetInt32("QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"),
+                TimeSpan.FromMinutes(5),
+                sharedRateLimits,
+                rateLimitLogger)
+            : RateLimitPartition.GetNoLimiter("admin-page"));
 
     // **試し送信は 1 分に 3 通まで。** 任意の宛先へは送れないが、
     // 管理者本人のメールボックスや送信基盤を連打で埋めさせない。
@@ -957,9 +977,23 @@ var adminHtml = new Lazy<string?>(() =>
 });
 
 // ⚠️ **ここは UseStaticFiles の設定を通らない**ので、キャッシュの指示を自分で付ける（Issue #425）
-IResult AdminPage(HttpContext context)
+IResult AdminPage(HttpContext context, AdminPasswordSignInPolicy passwordSignIn)
 {
     context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
+
+    if (string.Equals(context.Request.Path.Value, adminPath.Path, StringComparison.Ordinal)
+        && context.Request.Query.TryGetValue("rescue", out var rescue))
+    {
+        // **照合後は秘密を URL から落とす。** 履歴や次の要求の Referer に残し続けない。
+        var granted = passwordSignIn.TryGrantRescue(
+            context,
+            rescue.Count == 1 ? rescue[0] : null);
+        // **問い合わせ文字列は監査ログへ渡さない。** 成否だけを明示して残す。
+        AuditNotes.RecordRead(context);
+        AuditNotes.SetTarget(context, "AdminRescue", targetId: null);
+        AuditNotes.Add(context, "result", granted ? "succeeded" : "failed");
+        return Results.Redirect(adminPath.Path);
+    }
 
     // **画面が置かれていないときは、今までどおり見つからないものとして返す。**
     return adminHtml.Value is { } html
@@ -967,7 +1001,9 @@ IResult AdminPage(HttpContext context)
         : Results.NotFound();
 }
 
-app.MapGet(adminPath.Path, AdminPage);
+app.MapGet(adminPath.Path, AdminPage)
+    .RequireRateLimiting(AdminAuthSchemes.RescueRateLimitPolicy)
+    .AddEndpointFilter<AuditLogFilter>();
 app.MapFallback($"{adminPath.Path}/{{**path}}", AdminPage);
 
 // **Defender for Storage を使うときだけ受け口を生やす。**
