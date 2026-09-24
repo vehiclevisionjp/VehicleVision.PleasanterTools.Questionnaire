@@ -334,6 +334,10 @@ jobs:
           # **SAML の往復も確かめる**（Issue #190）。saml プロファイルの Keycloak が相手。
           # **これも設定しないと素通りする**
           QUESTIONNAIRE_SAML_INTEGRATION: "1"
+          # **Pleasanter のログインの往復も確かめる**（Issue #470）。
+          # 相手は検証環境の Pleasanter（2 要素はメール、試験用の利用者にだけ）。
+          # **これも設定しないと素通りする**
+          QUESTIONNAIRE_PLEASANTERSSO_INTEGRATION: "1"
           # 実行環境の時間帯は既定 UTC。検証環境（compose.yaml）に合わせる
           TZ: Asia/Tokyo
         # integration.yml が除外している分だけを回す（裏返しの条件）
