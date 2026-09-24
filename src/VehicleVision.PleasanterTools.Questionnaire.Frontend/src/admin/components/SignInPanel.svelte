@@ -2,6 +2,7 @@
   import { appUrl } from '../../lib/basePath';
   import { untrack } from 'svelte';
   import {
+    checkPleasanterSso,
     getAdminCaptchaChallenge,
     login,
     setupFirstAdministrator,
@@ -10,6 +11,16 @@
   } from '../lib/api';
   import { solveAltcha } from '../../lib/altcha';
   import { adminUrl } from '../lib/adminPath';
+  import {
+    classifyCheck,
+    isSafeBrowserUrl,
+    POLL_INTERVAL_MS,
+    readSuppressed,
+    shouldAutoCheck,
+    shouldKeepPolling,
+    writeSuppressed,
+    type PleasanterSsoFailure,
+  } from '../lib/pleasanterSso';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -72,6 +83,156 @@
       appUrl(`/api/admin/saml/login?returnUrl=${encodeURIComponent(adminUrl())}`),
     );
   }
+
+  // ---- Pleasanter のログイン（Issue #464） -----------------------------------
+
+  /** Pleasanter でのログインを待っているか。 */
+  let pleasanterWaiting = $state(false);
+  let pleasanterError = $state('');
+  /** 別窓を開けなかった（ポップアップを止められた）。**リンクから開いてもらう。** */
+  let pleasanterPopupBlocked = $state(false);
+  let pleasanterWindow: Window | null = null;
+  let pleasanterTimer: ReturnType<typeof setTimeout> | undefined;
+  let pleasanterStartedAt = 0;
+
+  const pleasanterLoginUrl = $derived(
+    isSafeBrowserUrl(session.pleasanterSsoLoginUrl) ? session.pleasanterSsoLoginUrl : null,
+  );
+  const pleasanterAvailable = $derived(
+    session.pleasanterSsoEnabled === true && !session.setupRequired && pleasanterLoginUrl !== null,
+  );
+
+  function pleasanterFailureMessage(reason: PleasanterSsoFailure): string {
+    switch (reason) {
+      case 'unknown-user':
+        return t('signIn.pleasanterError.unknownUser');
+      case 'disabled':
+        return t('signIn.pleasanterError.disabled');
+      case 'setup-required':
+        return t('signIn.pleasanterError.setupRequired');
+      case 'upstream-error':
+        return t('signIn.pleasanterError.upstream');
+      case 'rate-limited':
+        return t('signIn.pleasanterError.rateLimited');
+      case 'unavailable':
+        return t('signIn.pleasanterError.unavailable');
+      default:
+        return t('signIn.pleasanterError.failed');
+    }
+  }
+
+  function stopPleasanterWaiting() {
+    pleasanterWaiting = false;
+    pleasanterPopupBlocked = false;
+    if (pleasanterTimer !== undefined) {
+      clearTimeout(pleasanterTimer);
+      pleasanterTimer = undefined;
+    }
+  }
+
+  /**
+   * 確かめた結果で次へ進む。
+   *
+   * @returns 待ち続けるなら真。
+   */
+  function applyPleasanterOutcome(outcome: ReturnType<typeof classifyCheck>, silent: boolean): boolean {
+    if (outcome.kind === 'signedIn') {
+      stopPleasanterWaiting();
+      // **開いた別窓は閉じる。** Pleasanter の画面が残ったままにしない
+      try {
+        pleasanterWindow?.close();
+      } catch {
+        // 閉じられなくても進める
+      }
+      pleasanterWindow = null;
+      writeSuppressed(localStorage, false);
+      if (outcome.next === 'totp') {
+        step = 'totp';
+      }
+      onadvance();
+      return false;
+    }
+
+    if (outcome.kind === 'waiting') {
+      return true;
+    }
+
+    stopPleasanterWaiting();
+    // **黙って確かめたときは失敗を出さない。** 合言葉で入りたい人の邪魔をしない
+    if (!silent) {
+      pleasanterError = pleasanterFailureMessage(outcome.reason);
+    }
+    return false;
+  }
+
+  async function pollPleasanter() {
+    pleasanterTimer = undefined;
+    if (!pleasanterWaiting) return;
+
+    if (!shouldKeepPolling(pleasanterStartedAt, Date.now())) {
+      stopPleasanterWaiting();
+      pleasanterError = t('signIn.pleasanterError.timeout');
+      return;
+    }
+
+    const outcome = classifyCheck(await checkPleasanterSso());
+    if (pleasanterWaiting && applyPleasanterOutcome(outcome, false)) {
+      pleasanterTimer = setTimeout(() => void pollPleasanter(), POLL_INTERVAL_MS);
+    }
+  }
+
+  /**
+   * 「Pleasanter でログイン」を押した。
+   *
+   * **先に確かめる。** 既に Pleasanter にログインしていれば、そのまま入る。
+   * していなければ Pleasanter のログイン画面を別窓で開き、ログインが済むまで確かめ続ける。
+   * ⚠️ **別窓は押した流れの中で開く**（後から開くとポップアップとして止められる）。
+   * 止められたときは、リンクを出して利用者に開いてもらう。
+   */
+  async function startPleasanter() {
+    if (!pleasanterLoginUrl) return;
+
+    error = '';
+    pleasanterError = '';
+    stopPleasanterWaiting();
+
+    // **自分で押したので、ログアウト直後の印は外す**
+    writeSuppressed(localStorage, false);
+
+    busy = true;
+    const first = classifyCheck(await checkPleasanterSso());
+    busy = false;
+    if (!applyPleasanterOutcome(first, false)) {
+      return;
+    }
+
+    pleasanterWindow = window.open(pleasanterLoginUrl, '_blank');
+    pleasanterPopupBlocked = pleasanterWindow === null;
+    pleasanterWaiting = true;
+    pleasanterStartedAt = Date.now();
+    pleasanterTimer = setTimeout(() => void pollPleasanter(), POLL_INTERVAL_MS);
+  }
+
+  // **ログイン画面を開いたとき、黙って一度だけ確かめる。**
+  // Pleasanter に既にログインしていれば、釦を押さずに入れる。
+  // ⚠️ **自分でログアウトした直後は確かめない**（入り直してしまい、ログアウトできないように見える）
+  $effect(() => {
+    const auto = untrack(() =>
+      shouldAutoCheck({
+        enabled: pleasanterAvailable,
+        setupRequired: session.setupRequired,
+        pending: session.pending === true,
+        suppressed: readSuppressed(localStorage),
+      }),
+    );
+    if (auto) {
+      void checkPleasanterSso().then((result) => {
+        applyPleasanterOutcome(classifyCheck(result), true);
+      });
+    }
+
+    return () => stopPleasanterWaiting();
+  });
 
   const isSetup = $derived(session.setupRequired);
   const passwordSignInEnabled = $derived(session.passwordSignInEnabled !== false);
@@ -210,6 +371,32 @@
         {session.samlLabel ?? t('signIn.samlButton')}
       </button>
     {/if}
+
+    {#if pleasanterAvailable && !isSetup}
+      <!-- **最初の管理者を作る画面には出さない**（SAML と同じ理由。Issue #464） -->
+      {#if passwordSignInEnabled || session.samlEnabled}
+        <div class="or"><span>{t('signIn.samlOr')}</span></div>
+      {/if}
+
+      {#if pleasanterError}<p class="error" role="alert">{pleasanterError}</p>{/if}
+
+      {#if pleasanterWaiting}
+        <p class="hint waiting" role="status">{t('signIn.pleasanterWaiting')}</p>
+        {#if pleasanterPopupBlocked}
+          <p class="hint">{t('signIn.pleasanterPopupBlocked')}</p>
+        {/if}
+        <a class="saml" href={pleasanterLoginUrl} target="_blank" rel="noopener">
+          {t('signIn.pleasanterOpenLogin')}
+        </a>
+        <button type="button" class="link" onclick={stopPleasanterWaiting}>
+          {t('signIn.pleasanterCancel')}
+        </button>
+      {:else}
+        <button type="button" class="saml" disabled={busy} onclick={startPleasanter}>
+          {session.pleasanterSsoLabel ?? t('signIn.pleasanterButton')}
+        </button>
+      {/if}
+    {/if}
   {:else}
     <h1>{step === 'totp' ? t('signIn.totpTitle') : t('signIn.recoveryTitle')}</h1>
     <p class="lead">
@@ -324,6 +511,16 @@
     border-radius: 4px;
     font: inherit;
     cursor: pointer;
+  }
+
+  a.saml {
+    box-sizing: border-box;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .waiting {
+    margin: 0 0 0.75rem;
   }
 
   .saml:hover {

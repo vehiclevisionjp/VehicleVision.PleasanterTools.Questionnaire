@@ -53,6 +53,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'breadcrumb.account': '我的账户',
   'breadcrumb.appSettings': '应用程序设置',
   'breadcrumb.samlSettings': 'SAML 设置',
+  'breadcrumb.pleasanterSsoSettings': 'Pleasanter 登录设置',
   'breadcrumb.help': '帮助',
 
   // ---- 使い方 -------------------------------------------------------------
@@ -222,6 +223,19 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'signIn.samlError.unknownUser':
     '此账户尚未在管理界面中注册。请联系管理员添加账户。',
   'signIn.samlError.disabled': '此账户已被停用。请联系管理员。',
+  'signIn.pleasanterButton': '使用 Pleasanter 登录',
+  'signIn.pleasanterWaiting': '请在打开的窗口中登录 Pleasanter。登录完成后将自动继续。',
+  'signIn.pleasanterPopupBlocked': '无法在新窗口中打开登录页面。请使用下面的链接打开。',
+  'signIn.pleasanterOpenLogin': '打开 Pleasanter 登录页面',
+  'signIn.pleasanterCancel': '停止等待',
+  'signIn.pleasanterError.unknownUser': '此 Pleasanter 账户未注册为本应用的管理员。请联系管理员。',
+  'signIn.pleasanterError.disabled': '此账户已被停用。请联系管理员。',
+  'signIn.pleasanterError.setupRequired': '在注册第一位管理员之前，无法使用 Pleasanter 登录。',
+  'signIn.pleasanterError.upstream': '无法连接 Pleasanter。请稍后重试。',
+  'signIn.pleasanterError.rateLimited': '请求过多。请稍候再试。',
+  'signIn.pleasanterError.unavailable': 'Pleasanter 登录当前不可用。',
+  'signIn.pleasanterError.timeout': '在确认 Pleasanter 登录之前已超时。请重试。',
+  'signIn.pleasanterError.failed': '无法完成 Pleasanter 登录。请重试。',
   'saml.open': 'SAML 设置',
   'saml.title': 'SAML 设置',
   'saml.lead':

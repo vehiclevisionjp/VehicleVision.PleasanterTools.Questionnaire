@@ -23,7 +23,10 @@ import type {
   SurveyTemplateSummary,
   SamlSettings,
   AppSettings,
+  PleasanterSsoSettings,
+  PleasanterSsoTestResult,
 } from './types';
+import type { PleasanterSsoCheckResponse } from './pleasanterSso';
 
 /**
  * 呼び出しの結果。
@@ -297,6 +300,32 @@ export const saveResponseNotification = (enabled: boolean) =>
   });
 
 // ---- SAML 設定（Issue #254）-------------------------------------------------
+
+// ---- Pleasanter のログイン（Issue #464） -------------------------------------
+
+/**
+ * Pleasanter にログインしているかをサーバに確かめさせ、していれば本アプリへ入る。
+ *
+ * **本文は空の JSON。** 他所のサイトの form から呼ばせないために JSON で送る。
+ */
+export const checkPleasanterSso = () =>
+  call<PleasanterSsoCheckResponse>('/api/admin/pleasanter-sso/check', { method: 'POST', json: {} });
+
+export const getPleasanterSsoSettings = () =>
+  call<PleasanterSsoSettings>('/api/admin/pleasanter-sso/settings');
+
+export const savePleasanterSsoSettings = (settings: PleasanterSsoSettings) =>
+  call<PleasanterSsoSettings>('/api/admin/pleasanter-sso/settings', {
+    method: 'PUT',
+    json: settings,
+  });
+
+/** 保存前の値で、いまのブラウザの Pleasanter の cookie を使って問い合わせる。 */
+export const testPleasanterSsoSettings = (settings: PleasanterSsoSettings) =>
+  call<PleasanterSsoTestResult>('/api/admin/pleasanter-sso/settings/test', {
+    method: 'POST',
+    json: settings,
+  });
 
 export const getSamlSettings = () =>
   call<SamlSettings>('/api/admin/saml/settings');

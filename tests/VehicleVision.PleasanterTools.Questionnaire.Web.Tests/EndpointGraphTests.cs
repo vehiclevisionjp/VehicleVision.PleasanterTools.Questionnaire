@@ -48,6 +48,7 @@ public class EndpointGraphTests
         app.MapAdminNotificationEndpoints();
         app.MapAdminOutboxEndpoints();
         app.MapAdminSamlEndpoints(new AdminPathOptions(AdminPathOptions.DefaultPath));
+        app.MapAdminPleasanterSsoEndpoints();
         app.MapAdminSurveyEndpoints();
         app.MapAdminTemplateEndpoints();
         app.MapAdminUserEndpoints();
@@ -92,6 +93,31 @@ public class EndpointGraphTests
         Assert.Equal(
             AdminAutoReplyEndpoints.TestSendRateLimitPolicy,
             autoReplyTest.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName);
+
+        // **Pleasanter のログインの確認は未認証で呼ばれ、専用の枠で数える**（Issue #464）。
+        // ログインの試行の枠を使うと、ログインを待つ間の問い合わせで合言葉のログインまで止まる
+        var pleasanterCheck = Assert.Single(
+            endpoints.OfType<RouteEndpoint>(),
+            endpoint => endpoint.RoutePattern.RawText == "/api/admin/pleasanter-sso/check");
+        Assert.Empty(pleasanterCheck.Metadata.GetOrderedMetadata<IAuthorizeData>());
+        Assert.Equal(
+            AdminPleasanterSsoEndpoints.CheckRateLimitPolicy,
+            pleasanterCheck.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName);
+
+        // **設定の入口は特権管理者の権限を要求する**
+        foreach (var route in new[]
+                 {
+                     "/api/admin/pleasanter-sso/settings",
+                     "/api/admin/pleasanter-sso/settings/test",
+                 })
+        {
+            Assert.All(
+                endpoints.OfType<RouteEndpoint>().Where(endpoint => endpoint.RoutePattern.RawText == route),
+                endpoint => Assert.Contains(
+                    endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>(),
+                    data => data.Policy == Services.AdminPermissions.PolicyOf(
+                        Services.AdminPermissions.PleasanterSsoSettings)));
+        }
 
         // **CAPTCHA の検証より前にレート制限を通す。**
         // handler の中で検証するため、入口にこの metadata が無い変更を通さない。

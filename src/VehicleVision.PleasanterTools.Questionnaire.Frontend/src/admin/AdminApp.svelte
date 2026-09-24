@@ -13,6 +13,7 @@
   import OutboxStatusPanel from './components/OutboxStatusPanel.svelte';
   import SignInPanel from './components/SignInPanel.svelte';
   import SamlSettingsPanel from './components/SamlSettingsPanel.svelte';
+  import PleasanterSsoSettingsPanel from './components/PleasanterSsoSettingsPanel.svelte';
   import SurveyEditor from './components/SurveyEditor.svelte';
   import SurveyList from './components/SurveyList.svelte';
   import ReadabilityControls from '../components/ReadabilityControls.svelte';
@@ -45,6 +46,7 @@
   } from '../lib/readability';
   import { confirmAction } from './lib/confirmation.svelte';
   import { adminRoute, adminUrl } from './lib/adminPath';
+  import { isSafeBrowserUrl, writeSuppressed } from './lib/pleasanterSso';
 
   let session = $state<AdminSession>();
   let applicationVersion = $state<ApplicationVersion>();
@@ -90,6 +92,9 @@
   /** SAML 設定を開いているか。**特権管理者だけに見せる。** */
   let openSamlSettings = $state(readSamlSettings());
 
+  /** Pleasanter のログイン設定を開いているか（Issue #464）。**特権管理者だけに見せる。** */
+  let openPleasanterSsoSettings = $state(readPleasanterSsoSettings());
+
   /** アプリケーション設定を開いているか。**特権管理者だけに見せる。** */
   let openAppSettings = $state(readAppSettings());
 
@@ -124,6 +129,7 @@
       openUsers = readUsers();
       openAccount = readAccount();
       openSamlSettings = readSamlSettings();
+      openPleasanterSsoSettings = readPleasanterSsoSettings();
       openAppSettings = readAppSettings();
       openHelp = readHelp();
     };
@@ -160,6 +166,10 @@
     return adminRoute(location.pathname) === '/saml-settings';
   }
 
+  function readPleasanterSsoSettings(): boolean {
+    return adminRoute(location.pathname) === '/pleasanter-sso-settings';
+  }
+
   function readAppSettings(): boolean {
     return adminRoute(location.pathname) === '/settings';
   }
@@ -177,6 +187,7 @@
     openUsers = flags.users ?? false;
     openAccount = flags.account ?? false;
     openSamlSettings = flags.samlSettings ?? false;
+    openPleasanterSsoSettings = flags.pleasanterSsoSettings ?? false;
     openAppSettings = flags.appSettings ?? false;
     openHelp = flags.help ?? false;
     history.pushState(null, '', path);
@@ -217,6 +228,12 @@
   async function openSamlSettingsPanel() {
     if (await navigate(adminUrl('/saml-settings'), { samlSettings: true })) {
       openSamlSettings = true;
+    }
+  }
+
+  async function openPleasanterSsoSettingsPanel() {
+    if (await navigate(adminUrl('/pleasanter-sso-settings'), { pleasanterSsoSettings: true })) {
+      openPleasanterSsoSettings = true;
     }
   }
 
@@ -269,6 +286,7 @@
     if (openAccount) return 'account';
     if (openAppSettings && canManageSettings) return 'app-settings';
     if (openSamlSettings && canManageSaml) return 'saml-settings';
+    if (openPleasanterSsoSettings && canManagePleasanterSso) return 'pleasanter-sso-settings';
     if (openHelp) return 'help';
     return 'surveys';
   });
@@ -286,6 +304,7 @@
     if (page === 'users') return t('breadcrumb.users');
     if (page === 'app-settings') return t('breadcrumb.appSettings');
     if (page === 'saml-settings') return t('breadcrumb.samlSettings');
+    if (page === 'pleasanter-sso-settings') return t('breadcrumb.pleasanterSsoSettings');
     if (page === 'help') return t('breadcrumb.help');
     return t('breadcrumb.account');
   }
@@ -346,12 +365,26 @@
    * **行き先はサーバが決める**（`samlSingleLogout`）。画面は行くだけ。
    */
   async function signOut() {
+    // **Pleasanter のログインが使える構成では、ログアウトした印を置く**（Issue #464）。
+    // Pleasanter のログインは残っているので、印が無いとログイン画面が自動で入り直してしまう
+    if (session?.pleasanterSsoEnabled) {
+      writeSuppressed(localStorage, true);
+    }
+
     if (session?.samlSingleLogout) {
       window.location.href = appUrl('/api/admin/saml/logout');
       return;
     }
 
+    const pleasanterLogoutUrl = session?.pleasanterSsoLogoutUrl;
     await logout();
+
+    // **Pleasanter のログインで入った人は、設定があれば Pleasanter からもログアウトさせる**
+    if (isSafeBrowserUrl(pleasanterLogoutUrl)) {
+      window.location.href = pleasanterLogoutUrl;
+      return;
+    }
+
     openSurveyId = null;
     openAuditLog = false;
     openOutbox = false;
@@ -359,6 +392,7 @@
     openUsers = false;
     openAccount = false;
     openSamlSettings = false;
+    openPleasanterSsoSettings = false;
     openAppSettings = false;
     openHelp = false;
     unreadCount = 0;
@@ -417,6 +451,9 @@
 
   /** 認証の入口を変えられるのは Administrator だけ。 */
   const canManageSaml = $derived(can('settings.saml'));
+
+  /** Pleasanter のログインの設定を変えられるのは Administrator だけ（Issue #464）。 */
+  const canManagePleasanterSso = $derived(can('settings.pleasanterSso'));
 
   /** システム全体の設定を変えられるのは Administrator だけ。 */
   const canManageSettings = $derived(can('settings.manage'));
@@ -515,6 +552,12 @@
         <button type="button" class="link" onclick={openSamlSettingsPanel}>{t('saml.open')}</button>
       {/if}
 
+      {#if canManagePleasanterSso}
+        <button type="button" class="link" onclick={openPleasanterSsoSettingsPanel}>
+          {t('pleasanterSso.open')}
+        </button>
+      {/if}
+
       {#if canManageSettings}
         <button type="button" class="link" onclick={openAppSettingsPanel}>
           {t('appSettings.open')}
@@ -590,6 +633,8 @@
         <AppSettingsPanel onback={back} />
       {:else if openSamlSettings && canManageSaml}
         <SamlSettingsPanel onback={back} />
+      {:else if openPleasanterSsoSettings && canManagePleasanterSso}
+        <PleasanterSsoSettingsPanel onback={back} />
       {:else if openHelp}
         <HelpPanel onback={back} />
       {:else if openAccount}
