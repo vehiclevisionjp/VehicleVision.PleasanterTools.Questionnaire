@@ -28,14 +28,21 @@ public sealed class AdminInvitationMailer(
     IMailOutbox outbox,
     IMailPayloadProtector protector,
     IMailSettingsProvider mailSettings,
+    AdminPathOptions adminPath,
     ILogger<AdminInvitationMailer> logger)
 {
     public AdminInvitationMailer(
         IMailOutbox outbox,
         IMailPayloadProtector protector,
         MailOptions options,
-        ILogger<AdminInvitationMailer> logger)
-        : this(outbox, protector, new FixedMailSettingsProvider(options), logger)
+        ILogger<AdminInvitationMailer> logger,
+        AdminPathOptions? adminPath = null)
+        : this(
+            outbox,
+            protector,
+            new FixedMailSettingsProvider(options),
+            adminPath ?? new AdminPathOptions(AdminPathOptions.DefaultPath),
+            logger)
     {
     }
 
@@ -58,7 +65,8 @@ public sealed class AdminInvitationMailer(
             return false;
         }
 
-        if (options.Link($"/admin/invitations/accept?token={Uri.EscapeDataString(token)}")
+        if (options.Link(
+                $"{adminPath.Path}/invitations/accept?token={Uri.EscapeDataString(token)}")
             is not { } url)
         {
             // ⚠️ **要求の Host から組み立てない**（host header injection）。
