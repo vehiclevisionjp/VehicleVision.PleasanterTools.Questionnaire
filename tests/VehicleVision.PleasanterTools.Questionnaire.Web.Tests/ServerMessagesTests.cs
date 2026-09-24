@@ -146,15 +146,37 @@ public class ServerMessagesTests
             $"日本語のまま英語のカタログに入っている: {string.Join("、", untranslated)}");
     }
 
+    /// <summary>対応していない言語は英語へ落ちる。</summary>
+    /// <remarks>
+    /// ⚠️ **対応言語を決め打ちにしない。** 以前は <c>zh</c> を「未翻訳の例」に使っていたが、
+    /// **訳が入った時点でこの試験は落ちる。** 確かめたいのは
+    /// 「カタログに無い言語は英語になる」ことなので、対応外の言語で確かめる。
+    /// </remarks>
     [Fact]
-    public void 未翻訳または対応外の言語は英語へ落ちる()
+    public void 対応外の言語は英語へ落ちる()
     {
         Assert.Equal(
             ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "en"),
-            ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "zh"));
-        Assert.Equal(
-            ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "en"),
             ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "fr"));
+    }
+
+    /// <summary>どの対応言語を指定しても空にならない。</summary>
+    /// <remarks>
+    /// **訳が無い言語は英語、それも無ければ日本語へ落ちる**ので、空になる道は無い。
+    /// ⚠️ **空を返すと画面に何も出ない。** 落とし先が効いているかをここで押さえる。
+    /// </remarks>
+    [Fact]
+    public void どの対応言語でも空にならない()
+    {
+        foreach (var language in SupportedLanguages.All)
+        {
+            foreach (var key in ServerMessages.Keys)
+            {
+                Assert.False(
+                    string.IsNullOrEmpty(ServerMessages.Get(key, language)),
+                    $"{language} / {key}");
+            }
+        }
     }
 
     [Fact]
