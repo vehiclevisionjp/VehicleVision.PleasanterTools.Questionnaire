@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { appUrl } from '../../lib/basePath';
   import { untrack } from 'svelte';
   import {
     checkPleasanterSso,
@@ -79,7 +80,7 @@
    */
   function startSaml() {
     window.location.assign(
-      `/api/admin/saml/login?returnUrl=${encodeURIComponent(adminUrl())}`,
+      appUrl(`/api/admin/saml/login?returnUrl=${encodeURIComponent(adminUrl())}`),
     );
   }
 

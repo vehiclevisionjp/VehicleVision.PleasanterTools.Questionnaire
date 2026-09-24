@@ -1,5 +1,6 @@
 import { acceptLanguageHeader, t } from './i18n/state.svelte';
 import type { NoteBlock } from '../../lib/types';
+import { appUrl } from '../../lib/basePath';
 import type { AltchaChallenge } from '../../lib/altcha';
 import type {
   AdminNotificationPage,
@@ -45,7 +46,8 @@ async function call<T>(
 
   let response: Response;
   try {
-    response = await fetch(path, {
+    // **呼び先はサブパスから始める**（Issue #465）。呼び出し側は `/api/...` のまま書いてよい
+    response = await fetch(appUrl(path), {
       ...rest,
       // **cookie を必ず送る。** 認証は cookie で持っている
       credentials: 'same-origin',
@@ -595,7 +597,7 @@ export const uploadContentAsset = (surveyId: string, file: File) => {
  * 上げたばかりの画像はまだ出ない。
  */
 export const adminAssetUrl = (surveyId: string, assetId: string): string =>
-  `/api/admin/surveys/${encodeURIComponent(surveyId)}/assets/${encodeURIComponent(assetId)}`;
+  appUrl(`/api/admin/surveys/${encodeURIComponent(surveyId)}/assets/${encodeURIComponent(assetId)}`);
 
 export const loadProblems = (surveyId: string) =>
   call<MappingProblem[]>(`/api/admin/surveys/${surveyId}/problems`);

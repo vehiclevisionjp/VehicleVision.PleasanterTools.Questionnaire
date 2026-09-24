@@ -137,7 +137,7 @@ public static class AdminSamlEndpoints
                 context,
                 protectionProvider,
                 request.IdAsString,
-                LocalReturnUrl(returnUrl, adminPath.Path));
+                LocalReturnUrl(returnUrl, AdminEntry(context, adminPath.Path)));
 
             return Results.Redirect(binding.RedirectLocation.OriginalString);
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
@@ -157,14 +157,14 @@ public static class AdminSamlEndpoints
                 return Results.NotFound();
             }
 
-            var relay = ReadRelay(context, protectionProvider, adminPath.Path);
+            var relay = ReadRelay(context, protectionProvider, AdminEntry(context, adminPath.Path));
             ClearRelay(context);
 
             if (relay is null)
             {
                 // **こちらが出した要求と結び付かない応答は受け取らない**
                 logger.LogWarning("SAML の応答に、対応する要求が見つかりませんでした。");
-                return Failed(adminPath.Path, SamlFailure.Invalid);
+                return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
             }
 
             var configuration = options.ToSaml2Configuration();
@@ -181,7 +181,7 @@ public static class AdminSamlEndpoints
                 {
                     logger.LogWarning(
                         "IdP が認証を断りました: {Status}", response.Status);
-                    return Failed(adminPath.Path, SamlFailure.Invalid);
+                    return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
                 }
 
                 // **署名・発行者・宛先・有効期間を確かめるのはここ**
@@ -196,21 +196,21 @@ public static class AdminSamlEndpoints
             {
                 // **理由は外へ返さない。** 何が通らなかったかは手掛かりになる
                 logger.LogWarning(exception, "SAML の応答を受け取れませんでした。");
-                return Failed(adminPath.Path, SamlFailure.Invalid);
+                return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
             }
 
             // **出した要求への応答であることを確かめる**
             if (!string.Equals(response.InResponseToAsString, relay.RequestId, StringComparison.Ordinal))
             {
                 logger.LogWarning("SAML の応答が、こちらの出した要求のものではありませんでした。");
-                return Failed(adminPath.Path, SamlFailure.Invalid);
+                return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
             }
 
             var loginId = ReadLoginId(response.ClaimsIdentity, options);
             if (string.IsNullOrWhiteSpace(loginId))
             {
                 logger.LogWarning("SAML の応答にログイン ID として使える値がありませんでした。");
-                return Failed(adminPath.Path, SamlFailure.Invalid);
+                return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
             }
 
             // **誰が来たかを記録に残す**（AuditNotes は本文へ触らない）
@@ -244,10 +244,10 @@ public static class AdminSamlEndpoints
                     return Results.Redirect(relay.ReturnUrl);
 
                 case SamlSignInOutcome.Disabled:
-                    return Failed(adminPath.Path, SamlFailure.Disabled);
+                    return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Disabled);
 
                 default:
-                    return Failed(adminPath.Path, SamlFailure.UnknownUser);
+                    return Failed(AdminEntry(context, adminPath.Path), SamlFailure.UnknownUser);
             }
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
@@ -293,7 +293,7 @@ public static class AdminSamlEndpoints
             if (!options.SingleLogoutEnabled || keys is null)
             {
                 // **SAML で入った人でなければ、頼む相手が居ない**
-                return Results.Redirect(adminPath);
+                return Results.Redirect(AdminEntry(context, adminPath));
             }
 
             var configuration = options.ToSaml2Configuration();
@@ -308,7 +308,7 @@ public static class AdminSamlEndpoints
             binding.Bind(request);
 
             // **出した要求の id を預ける。** 戻ってきた応答と突き合わせる
-            SaveRelay(context, protectionProvider, request.IdAsString, adminPath);
+            SaveRelay(context, protectionProvider, request.IdAsString, AdminEntry(context, adminPath));
 
             logger.LogInformation("IdP へ単一ログアウトを頼みました。");
 
@@ -340,7 +340,7 @@ public static class AdminSamlEndpoints
 
             if (IsLogoutResponse(context))
             {
-                var relay = ReadRelay(context, protectionProvider, adminPath);
+                var relay = ReadRelay(context, protectionProvider, AdminEntry(context, adminPath));
                 ClearRelay(context);
 
                 try
@@ -363,7 +363,7 @@ public static class AdminSamlEndpoints
                 }
 
                 // **どちらにせよ、こちらは落ちている**
-                return Results.Redirect(adminPath);
+                return Results.Redirect(AdminEntry(context, adminPath));
             }
 
             try
@@ -391,7 +391,7 @@ public static class AdminSamlEndpoints
             {
                 // **理由は外へ返さない**（ログインの受け口と同じ）
                 logger.LogWarning(exception, "単一ログアウトの要求を受け取れませんでした。");
-                return Results.Redirect(adminPath);
+                return Results.Redirect(AdminEntry(context, adminPath));
             }
         };
 
@@ -651,6 +651,19 @@ public static class AdminSamlEndpoints
         return new SamlSessionKeys(nameId, sessionIndex);
     }
 
+    /// <summary>管理画面の入口を、配置先のサブパス込みで返す（Issue #465）。</summary>
+    /// <remarks>
+    /// ⚠️ **リダイレクト先はサブパスを自動では含まない。** 素の管理画面パスへ返すと、
+    /// サブパス配下に置いたときに同じホストの別アプリ（Pleasanter）へ飛んでしまう。
+    /// 画面から届く <c>returnUrl</c> もサブパス込みなので、照合もこの値で行う。
+    /// </remarks>
+    private static string AdminEntry(HttpContext context, string adminPath) =>
+        context.Request.PathBase.Add(adminPath).ToUriComponent();
+
+    /// <summary>サブパス込みの SAML の経路。**cookie の Path に使う。**</summary>
+    private static string SamlCookiePath(HttpContext context) =>
+        context.Request.PathBase.Add("/api/admin/saml").ToUriComponent();
+
     /// <summary>失敗の印を付けて管理画面へ戻す。</summary>
     private static IResult Failed(string adminPath, string failure) =>
         Results.Redirect($"{adminPath}?samlError={failure}");
@@ -672,9 +685,11 @@ public static class AdminSamlEndpoints
     /// <remarks>
     /// **設定へ書かせない。** 逆プロキシの前後で食い違ったときに気付けなくなる。
     /// 転送ヘッダの扱いは <c>UseForwardedHeaders</c> に任せる。
+    /// **サブパス（PathBase）も含める**（Issue #465）。
     /// </remarks>
     private static Uri AssertionConsumerServiceUrl(HttpContext context) =>
-        new(new Uri($"{context.Request.Scheme}://{context.Request.Host.ToUriComponent()}/"),
+        new(new Uri($"{context.Request.Scheme}://{context.Request.Host.ToUriComponent()}"
+            + $"{context.Request.PathBase.ToUriComponent()}/"),
             "api/admin/saml/acs");
 
     /// <summary>ログイン ID として使う値を取り出す。</summary>
@@ -741,7 +756,8 @@ public static class AdminSamlEndpoints
             SameSite = SameSiteMode.None,
             Secure = true,
             IsEssential = true,
-            Path = "/api/admin/saml",
+            // **サブパスの中に閉じる。** 同じホストの Pleasanter へ送らない（Issue #465）
+            Path = SamlCookiePath(context),
             MaxAge = RelayLifetime,
         });
     }
@@ -781,6 +797,7 @@ public static class AdminSamlEndpoints
             HttpOnly = true,
             SameSite = SameSiteMode.None,
             Secure = true,
-            Path = "/api/admin/saml",
+            // **サブパスの中に閉じる。** 同じホストの Pleasanter へ送らない（Issue #465）
+            Path = SamlCookiePath(context),
         });
 }

@@ -88,7 +88,12 @@ find_or_create_pr() {
         printf '%s' "$number"
         return 0
     fi
-    gh pr create --base "$base" --head "$head" --title "$title" --body "$body" >&2
+    # **作成の失敗を握り潰さない。** 呼び出し元は `$(...)` の中なので
+    # `set -e` が効かず、黙って次へ進んでしまう
+    if ! gh pr create --base "$base" --head "$head" --title "$title" --body "$body" >&2; then
+        echo "NG: PR を作れなかった（base: $base / head: $head）" >&2
+        return 1
+    fi
     number="$(gh pr list --base "$base" --head "$head" --state open --json number --jq '.[0].number // ""')"
     if [[ -z "$number" ]]; then
         echo "NG: PR を作れたのに番号を引けない（base: $base / head: $head）" >&2
@@ -215,8 +220,12 @@ fi
 # ---- 3〜4. develop → master の PR を出してマージ ------------------------------
 git fetch --no-tags origin develop:refs/remotes/origin/develop master:refs/remotes/origin/master
 
-if [[ "$(git rev-parse refs/remotes/origin/develop)" == "$(git rev-parse refs/remotes/origin/master)" ]]; then
-    echo "== develop と master が同じコミット。PR は要らない"
+# **SHA の一致ではなく「master に入っていない commit が無いか」で判定する。**
+# master へは merge コミットで取り込むため、中身が同じでも SHA は一致しない。
+# 取り込みの PR が別経路で先にマージされた後の再実行で、PR を作りに行って
+# 「No commits between master and develop」で断られる（Issue #460）
+if git merge-base --is-ancestor refs/remotes/origin/develop refs/remotes/origin/master; then
+    echo "== develop は既に master へ入っている。取り込みの PR は省く"
     release_pr=""
 else
     release_pr="$(find_or_create_pr master develop \

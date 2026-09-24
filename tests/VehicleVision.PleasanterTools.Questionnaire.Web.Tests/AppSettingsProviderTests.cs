@@ -696,6 +696,37 @@ public class AppSettingsProviderTests
     }
 
     /// <summary>
+    /// **サブパスに置いたとき、メール本文のリンクもサブパス込みにする**（Issue #465）。
+    /// 招待・自動返信・再編集リンク・配布資産のリンクは、すべてこの起点から作られる。
+    /// </summary>
+    [Theory]
+    [InlineData("https://survey.example.test")]
+    [InlineData("https://survey.example.test/questionnaire/")]
+    public async Task サブパスに置いたときメールの起点へサブパスを足す(string baseUrl)
+    {
+        var store = new FakeStore();
+        var provider = Create(new ConfigurationBuilder().Build(), store);
+
+        await provider.SaveAsync(
+            new Dictionary<string, string?>
+            {
+                [AppSettingsProvider.MailEnabledKey] = "true",
+                [AppSettingsProvider.MailSmtpHostKey] = "smtp.example.test",
+                [AppSettingsProvider.MailFromAddressKey] = "noreply@example.test",
+                [AppSettingsProvider.MailBaseUrlKey] = baseUrl,
+            },
+            Guid.NewGuid());
+
+        var options = await new MailSettingsProvider(provider, PathBaseOptions.Parse("/questionnaire"))
+            .GetAsync();
+
+        Assert.Equal("https://survey.example.test/questionnaire", options.BaseUrl);
+        Assert.Equal(
+            "https://survey.example.test/questionnaire/admin/invitations/accept",
+            options.Link("/admin/invitations/accept"));
+    }
+
+    /// <summary>
     /// ⚠️ **未設定を空文字のまま渡すと自動返信が 1 通も送れなくなる**（Issue #397）。
     /// 空の返信先が <c>null</c> ではなくなり、宛先の検証で弾かれてデッドレターへ回った。
     /// </summary>

@@ -73,7 +73,8 @@ public sealed class AdminPasswordSignInPolicy(
             HttpOnly = true,
             Secure = context.Request.IsHttps,
             SameSite = SameSiteMode.Strict,
-            Path = "/api/admin",
+            // **サブパスの中に閉じる**（Issue #465）。同じホストの Pleasanter へ送らない
+            Path = context.Request.PathBase.Add("/api/admin").ToUriComponent(),
             MaxAge = RescueLifetime,
         });
         return true;

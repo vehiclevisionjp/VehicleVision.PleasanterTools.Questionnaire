@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { appUrl } from '../lib/basePath';
   import AdminUserList from './components/AdminUserList.svelte';
   import ConfirmationDialog from './components/ConfirmationDialog.svelte';
   import AppSettingsPanel from './components/AppSettingsPanel.svelte';
@@ -371,7 +372,7 @@
     }
 
     if (session?.samlSingleLogout) {
-      window.location.href = '/api/admin/saml/logout';
+      window.location.href = appUrl('/api/admin/saml/logout');
       return;
     }
 

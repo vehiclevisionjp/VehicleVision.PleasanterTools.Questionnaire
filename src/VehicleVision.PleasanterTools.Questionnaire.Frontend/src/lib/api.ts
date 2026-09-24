@@ -1,5 +1,6 @@
 import type { FormResponse, PayloadAnswer, RejectionReason, Ticket } from './types';
 import { framedHeaders } from './framed';
+import { appUrl } from './basePath';
 
 /** 回答トークンの保存先。**URL には載せない。** */
 const TOKEN_STORAGE_PREFIX = 'questionnaire.token.';
@@ -48,11 +49,12 @@ function removeStorage(key: string): void {
  *
  * **`path` を `/f/{publicId}` に絞る。** こうすると API の要求には付かず、
  * 回答画面の JavaScript から読むためだけの Cookie になる。
+ * **サブパスに置いたときは、その下に絞る**（Issue #465）。
  * **入るのは真偽値だけで、回答者を識別する値は入れない。**
  */
 function cookieAttributes(publicId: string): string {
   const secure = location.protocol === 'https:' ? '; secure' : '';
-  return `; path=/f/${encodeURIComponent(publicId)}; max-age=${SUBMITTED_MAX_AGE}; samesite=lax${secure}`;
+  return `; path=${appUrl(`/f/${encodeURIComponent(publicId)}`)}; max-age=${SUBMITTED_MAX_AGE}; samesite=lax${secure}`;
 }
 
 function readCookie(name: string): string | null {
@@ -104,7 +106,7 @@ export async function redeemEditLink(publicId: string): Promise<boolean> {
 
   if (!editToken) return false;
 
-  const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}/edit-link`, {
+  const response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}/edit-link`), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ editToken }),
@@ -134,7 +136,7 @@ export async function redeemAssetTicket(publicId: string): Promise<FormResponse 
 
   if (!assetTicket) return null;
 
-  const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}/asset-ticket`, {
+  const response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}/asset-ticket`), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ assetTicket }),
@@ -154,7 +156,7 @@ export async function activateAssetTicket(
 }
 
 export async function requestTicket(publicId: string): Promise<Ticket | null> {
-  const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}/ticket`, {
+  const response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}/ticket`), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ responseToken: readResponseToken(publicId) }),
@@ -211,7 +213,7 @@ export interface LoadResult {
 
 /** 公開中のアンケートを取りに行く。 */
 export async function loadForm(publicId: string): Promise<LoadResult> {
-  const response = await fetch(`/api/forms/${encodeURIComponent(publicId)}`, {
+  const response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}`), {
     headers: { accept: 'application/json', ...framedHeaders() },
   });
 
@@ -290,7 +292,7 @@ export async function submitAnswers(
   context: SubmitContext,
   attachments: Attachment[] = [],
 ): Promise<SubmitResult> {
-  const url = `/api/forms/${encodeURIComponent(publicId)}/responses/${encodeURIComponent(responseToken)}`;
+  const url = appUrl(`/api/forms/${encodeURIComponent(publicId)}/responses/${encodeURIComponent(responseToken)}`);
 
   let request: RequestInit;
   if (attachments.length === 0) {
@@ -371,7 +373,7 @@ export async function loadPendingAnswers(
   responseToken: string,
 ): Promise<PayloadAnswer[] | null> {
   const response = await fetch(
-    `/api/forms/${encodeURIComponent(publicId)}/responses/${encodeURIComponent(responseToken)}`,
+    appUrl(`/api/forms/${encodeURIComponent(publicId)}/responses/${encodeURIComponent(responseToken)}`),
     { headers: { accept: 'application/json' } },
   );
 
