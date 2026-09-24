@@ -1,4 +1,7 @@
-import { connect, createServer, type Server } from 'node:net';
+import { connect, createServer, type Server, type Socket } from 'node:net';
+
+/** 素通しごとの開いている接続。**止めるときに残さず切る。** */
+const openSockets = new WeakMap<Server, Set<Socket>>();
 
 /**
  * 容器の中の `127.0.0.1:{listenPort}` を、compose の網の中の別の容器へ素通しする。
@@ -16,8 +19,11 @@ export async function startForward(
   targetHost: string,
   targetPort: number,
 ): Promise<Server> {
+  const sockets = new Set<Socket>();
   const server = createServer((client) => {
     const upstream = connect(targetPort, targetHost);
+    sockets.add(client);
+    sockets.add(upstream);
     client.pipe(upstream);
     upstream.pipe(client);
 
@@ -25,6 +31,8 @@ export async function startForward(
     const close = () => {
       client.destroy();
       upstream.destroy();
+      sockets.delete(client);
+      sockets.delete(upstream);
     };
     client.on('error', close);
     upstream.on('error', close);
@@ -40,12 +48,22 @@ export async function startForward(
     });
   });
 
+  openSockets.set(server, sockets);
   return server;
 }
 
-/** 素通しを止める。 */
+/**
+ * 素通しを止める。
+ *
+ * ⚠️ **開いている接続を先に切る。** `server.close()` は接続がすべて閉じるまで待つが、
+ * Chromium は使い終わった接続も保ったままにするので、切らないと待ち続ける（CI で実際に踏んだ）。
+ */
 export async function stopForward(server: Server): Promise<void> {
-  await new Promise<void>((resolve) => {
+  const closed = new Promise<void>((resolve) => {
     server.close(() => resolve());
   });
+  for (const socket of openSockets.get(server) ?? []) {
+    socket.destroy();
+  }
+  await closed;
 }

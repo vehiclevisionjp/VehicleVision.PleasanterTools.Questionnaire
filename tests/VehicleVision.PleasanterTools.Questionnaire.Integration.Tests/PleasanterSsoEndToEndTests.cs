@@ -247,9 +247,8 @@ public class PleasanterSsoEndToEndTests
         Assert.True(settings["fixedFields"]!["unknownUser"]!.GetValue<bool>());
         Assert.Equal("Reject", settings["unknownUser"]!.GetValue<string>());
 
-        // **外部設定に無い項目は画面から変えられる**（方式は既定の標準の API）
-        Assert.False(settings["fixedFields"]!["method"]!.GetValue<bool>());
-        Assert.Equal("StandardApi", settings["method"]!.GetValue<string>());
+        // **外部設定に無い項目は画面から変えられる**
+        Assert.False(settings["fixedFields"]!["timeoutSeconds"]!.GetValue<bool>());
 
         using var saved = await http.PutAsJsonAsync("/api/admin/pleasanter-sso/settings", new
         {
@@ -257,8 +256,6 @@ public class PleasanterSsoEndToEndTests
             internalBaseUrl = "http://example.invalid/",
             loginUrl = "/users/login",
             logoutUrl = string.Empty,
-            method = "StandardApi",
-            sqlName = settings["sqlName"]!.GetValue<string>(),
             cookieNames = settings["cookieNames"]!.GetValue<string>(),
             unknownUser = settings["unknownUser"]!.GetValue<string>(),
             registerRole = settings["registerRole"]!.GetValue<string>(),

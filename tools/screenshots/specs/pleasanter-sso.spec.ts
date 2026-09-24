@@ -8,7 +8,7 @@ import { totp } from '../lib/totp';
 /**
  * Pleasanter のログインで管理画面へ入る機能（Issue #464）を、ブラウザで確かめる（Issue #470）。
  *
- * - 設定画面で本人の確かめ方を選び、画面から有効にする
+ * - 設定画面から有効にする
  * - 外部設定で決まった項目のロック表示
  * - ログイン画面の「Pleasanter でログイン」→ 別窓で Pleasanter にログイン → 管理画面へ入る往復
  *
@@ -87,6 +87,8 @@ test.beforeAll(async ({ browser, baseURL, playwright }) => {
 });
 
 test.afterAll(async ({ browser, baseURL }) => {
+  test.setTimeout(60_000);
+
   // **無効へ戻す。** 後に走る spec のログイン画面を変えない
   if (storageState !== '') {
     const context = await browser.newContext({ baseURL, storageState });
@@ -100,7 +102,7 @@ test.afterAll(async ({ browser, baseURL }) => {
   await Promise.all(forwards.map((server) => stopForward(server)));
 });
 
-test('設定画面で本人の確かめ方を選び、Pleasanter のログインを有効にする', async ({ browser, baseURL }) => {
+test('設定画面から Pleasanter のログインを有効にする', async ({ browser, baseURL }) => {
   const context = await browser.newContext({ baseURL, storageState });
   try {
     const page = await context.newPage();
@@ -109,19 +111,6 @@ test('設定画面で本人の確かめ方を選び、Pleasanter のログイン
 
     // **外部設定が無いので、どの項目もロックされていない**
     await expect(page.getByText('設定で固定されています')).toHaveCount(0);
-
-    // ---- 本人の確かめ方。拡張 SQL の名前は拡張 SQL を選んだときだけ入れられる
-    const method = page.getByLabel('本人の確かめ方');
-    const sqlName = page.getByLabel('拡張 SQL の名前');
-    await expect(method).toHaveValue('StandardApi');
-    await expect(sqlName).toBeDisabled();
-
-    await method.selectOption('ExtendedSql');
-    await expect(sqlName).toBeEnabled();
-
-    // **既定の標準の API へ戻す。** 検証環境の Pleasanter には拡張 SQL の定義を置いていない
-    await method.selectOption('StandardApi');
-    await expect(sqlName).toBeDisabled();
 
     // ---- 有効にする
     await page.getByLabel('Pleasanter のログインを有効にする').check();
@@ -139,7 +128,6 @@ test('設定画面で本人の確かめ方を選び、Pleasanter のログイン
     // **保存した値が読み直しても残っている**
     const saved = (await (await context.request.get(settingsPath)).json()) as Record<string, unknown>;
     expect(saved['enabled']).toBe(true);
-    expect(saved['method']).toBe('StandardApi');
     expect(saved['unknownUser']).toBe('Register');
   } finally {
     await context.close();
@@ -171,10 +159,12 @@ test('外部設定で決まった項目はロックして出す', async ({ brows
     await page.goto('/admin/pleasanter-sso-settings');
     await expect(page.getByRole('heading', { name: 'Pleasanter ログイン設定' })).toBeVisible();
 
-    // **12 項目すべてに印が付き、どの欄も触れない**
-    await expect(page.getByText('設定で固定されています')).toHaveCount(12);
+    // **すべての項目に印が付き、どの欄も触れない**（項目の数は決め打ちにしない）
     const form = page.locator('form');
-    for (const control of await form.locator('input, select').all()) {
+    const controls = await form.locator('input, select').all();
+    expect(controls.length).toBeGreaterThan(0);
+    await expect(page.getByText('設定で固定されています')).toHaveCount(controls.length);
+    for (const control of controls) {
       await expect(control).toBeDisabled();
     }
   } finally {
