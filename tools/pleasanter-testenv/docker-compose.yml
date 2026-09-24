@@ -72,6 +72,11 @@ services:
     volumes:
       # 本体イメージの Parameters は /app/App_Data/Parameters 配下（CodeDefiner とは階層が異なる）
       - ./Parameters/Rds.json:/app/App_Data/Parameters/Rds.json:ro
+      # **2 要素（メールのワンタイムパスワード）を試験用の利用者にだけ掛ける**（Issue #470）。
+      # Mode を DefaultDisable にし、Users.EnableSecondaryAuthentication を立てた利用者だけに効かせる。
+      # **ファイル全体を差し替える**（Pleasanter は一部だけを読まない）。中身の由来は README。
+      # CodeDefiner はスキーマを作るだけで 2 要素を見ないので、こちらにだけ置く
+      - ./Parameters/Security.json:/app/App_Data/Parameters/Security.json:ro
     healthcheck:
       # 本体イメージ（dotnet runtime ベース）には curl / wget が無いため bash の /dev/tcp で待受を確認する
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080"]

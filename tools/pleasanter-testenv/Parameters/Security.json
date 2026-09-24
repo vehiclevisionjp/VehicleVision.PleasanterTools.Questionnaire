@@ -1,0 +1,163 @@
+{
+    "//": "Pleasanter 1.5.8.1 の公式イメージ（implem/pleasanter:1.5.8.1）の App_Data/Parameters/Security.json を写し、SecondaryAuthentication.Mode だけを None から DefaultDisable に変えたもの（Issue #470）。NotificationType は既定で Mail。Pleasanter はファイル全体を読むため、一部だけを置くことはできない。DefaultDisable では Users.EnableSecondaryAuthentication を有効にした利用者（seed/03_sso_users.sql の sso-e2e-mail）にだけ 2 要素が掛かり、ほかの利用者と API キーの試験には影響しない。版を上げるときは新しいイメージから取り直すこと（tools/pleasanter-testenv/README.md）。",
+    "AllowIpAddresses": null,
+    "IpRestrictionExcludeMembers": null,
+    "MimeTypeCheckOnApi": false,
+    "PrivilegedUsers": null,
+    "RevealUserDisabled": false,
+    "LockoutCount": 0,
+    "PasswordExpirationPeriod": 0,
+    "JoeAccountCheck": true,
+    "TokenCheck": false,
+    "SecureCookies": false,
+    "DisableMvcResponseHeader": false,
+    "DisableDeletingSiteAuthentication": false,
+    "AccessControlAllowOrigin": null,
+    "EnforcePasswordHistories": 0,
+    "DisableCheckPasswordPolicyIfApi": false,
+    "PasswordPolicies": [
+        {
+            "Enabled": true,
+            "Regex": ".{6,}",
+            "Languages": [
+                {
+                    "Body": "Please enter at least 6 characters for the password."
+                },
+                {
+                    "Language": "ja",
+                    "Body": "パスワードは6文字以上を入力してください。"
+                }
+            ]
+        },
+        {
+            "Enabled": false,
+            "Regex": "[a-z]+",
+            "Languages": [
+                {
+                    "Body": "Please enter at least one lower case alphabetic character in the password."
+                },
+                {
+                    "Language": "ja",
+                    "Body": "パスワードにはアルファベット小文字を1文字以上を入力してください。"
+                }
+            ]
+        },
+        {
+            "Enabled": false,
+            "Regex": "[A-Z]+",
+            "Languages": [
+                {
+                    "Body": "Please enter at least one alphabetic capital letter in the password."
+                },
+                {
+                    "Language": "ja",
+                    "Body": "パスワードにはアルファベット大文字を1文字以上を入力してください。"
+                }
+            ]
+        },
+        {
+            "Enabled": false,
+            "Regex": "[0-9]+",
+            "Languages": [
+                {
+                    "Body": "Please enter one or more digits in the password."
+                },
+                {
+                    "Language": "ja",
+                    "Body": "パスワードには数字を1文字以上を入力してください。"
+                }
+            ]
+        },
+        {
+            "Enabled": false,
+            "Regex": "[^a-zA-Z0-9]+",
+            "Languages": [
+                {
+                    "Body": "Please enter one or more symbols in the password."
+                },
+                {
+                    "Language": "ja",
+                    "Body": "パスワードには記号を1文字以上を入力してください。"
+                }
+            ]
+        }
+    ],
+    "PasswordGenerator": true,
+    "SecondaryAuthentication": {
+        "Mode": "DefaultDisable",
+        "NotificationType": "Mail",
+        "CountTolerances": 1,
+        "NotificationMailBcc": false,
+        "AuthenticationCodeCharacterType": "Number",
+        "AuthenticationCodeLength": 8,
+        "AuthenticationCodeExpirationPeriod": 300
+    },
+    "AspNetCoreDataProtection": {
+        "BlobContainerUri": null,
+        "KeyIdentifier": null,
+        "KeyFileName": "Keys.xml",
+        "XmlAesKey": null,
+        "KeyValueStoreConnectionString": null,
+        "KeyValueStoreKeyName": null
+    },
+    "HttpStrictTransportSecurity": {
+        "Enabled": false,
+        "Preload": false,
+        "IncludeSubDomains": false,
+        "MaxAge": "30.00:00:00",
+        "ExcludeHosts": null
+    },
+    "SecureCacheControl": {
+        "NoCache": false,
+        "NoStore": false,
+        "Private": false,
+        "MustRevalidate": false,
+        "PragmaNoCache": false
+    },
+    "HealthCheck": {
+        "Enabled": true,
+        "EnableDatabaseCheck": false,
+        "HealthQuery": null,
+        "RequireHosts": null,
+        "EnableDetailedResponse": false
+    },
+    "ContentSecurityPolicy": {
+        "Enabled": false,
+        "ReportOnlyEnabled": true,
+        "Values": [
+            {
+                "default-src": "'self'",
+                "script-src": "'self' 'strict-dynamic'",
+                "script-src-attr": "'self' 'unsafe-inline'",
+                "script-src-elem": "",
+                "style-src": "'self'",
+                "style-src-attr": "'self' 'unsafe-inline'",
+                "style-src-elem": "'self' 'unsafe-inline'",
+                "img-src": "'self' data:",
+                "font-src": "'self' data:",
+                "object-src": "'none'",
+                "connect-src": "'self'",
+                "frame-src": "'none'",
+                "manifest-src": "",
+                "media-src": "",
+                "worker-src": "",
+                "base-uri": "'self'",
+                "form-action": "'self'",
+                "frame-ancestors": "",
+                "report-uri": "/CspReport/Report",
+                "report-to": "",
+                "sandbox": "",
+                "upgrade-insecure-requests": false
+            }
+        ]
+    },
+    "ShowLoginPageOnAuthError": true,
+    "CaptchaConfig": {
+        "Type": "None"
+    },
+    "ForwardedHeaders": {
+        "KnownNetworks": [],
+        "KnownProxies": []
+    },
+    "ExcludeCookiePrefixes": []
+}
