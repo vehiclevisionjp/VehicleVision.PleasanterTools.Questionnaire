@@ -37,6 +37,11 @@ var builder = WebApplication.CreateBuilder(args);
 // （App_Data/Parameters/README.md。Issue #158）
 builder.Configuration.AddParameterFiles();
 
+// **管理画面の入口は起動時に 1 度だけ決める。**
+// 画面から変えると、その場で入口を失って管理者自身を締め出すため外部設定だけにする。
+var adminPath = AdminPathOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(adminPath);
+
 // **CIDR の書き間違いは起動時に止める。** 無制限へ黙って落ちると、絞ったつもりの口が開く。
 var endpointNetworkRestrictions =
     EndpointNetworkRestrictions.FromConfiguration(builder.Configuration);
@@ -757,7 +762,7 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 // 先に置くと、リバースプロキシ配下では全要求がプロキシ自身の IP に見える。
 app.UseEndpointNetworkRestrictions(endpointNetworkRestrictions);
 
-// **回答者側だけを止める。** `/admin` と `/api/admin` は解除のため常に通す。
+// **回答者側だけを止める。** 管理画面と `/api/admin` は解除のため常に通す。
 // `/healthz` と `/ready` も対象外。メンテナンスはプロセスや DB の異常ではなく、
 // readiness を落とすと Kubernetes が Pod を再起動し続けて管理操作まで不安定になる。
 app.Use(async (context, next) =>
@@ -883,7 +888,7 @@ app.MapAdminSessionEndpoints();
 // 認証の外の口を開けたままにしないため）が、**管理画面から設定を変えられるように
 // した**ので、起動時に決めると変更のたびに再起動が要る。
 // **無効な間は各入口が 404 を返すことで、外から見た姿は変わらない**
-app.MapAdminSamlEndpoints();
+app.MapAdminSamlEndpoints(adminPath);
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();
@@ -916,16 +921,54 @@ if (openApiExposure.Enabled)
 }
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない。
+// 画面が組み立てる経路の基準を meta 要素へ埋めるため、素のファイルではなく差し替えた本文を返す。
+//
+// ⚠️ **起動時に読まない。** `wwwroot` はフロントエンドを組み立てて初めて出来るもので、
+// **無い状態でも起動はできなければならない**（`dotnet run` だけした手元、Issue #406 と同じ筋）。
+// 起動時に読むと `WebRootPath` が `null` のまま落ち、**DB も設定も正しいのにアプリが上がらない。**
+// 1 度読んだら覚えておき、2 度目からはディスクを触らない
+var adminHtml = new Lazy<string?>(() =>
+{
+    var webRoot = app.Environment.WebRootPath;
+    if (string.IsNullOrEmpty(webRoot))
+    {
+        return null;
+    }
+
+    var file = Path.Combine(webRoot, "admin.html");
+    if (!File.Exists(file))
+    {
+        return null;
+    }
+
+    const string placeholder = "__QUESTIONNAIRE_ADMIN_PATH__";
+    var template = File.ReadAllText(file);
+
+    // **埋め込み先が無いのは組み立ての不備。** 既定のパスなら動いてしまうので黙らせない
+    if (!template.Contains(placeholder, StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("admin.html に管理画面パスの埋め込み先がありません。");
+    }
+
+    return template.Replace(
+        placeholder,
+        System.Text.Encodings.Web.HtmlEncoder.Default.Encode(adminPath.Path),
+        StringComparison.Ordinal);
+});
+
 // ⚠️ **ここは UseStaticFiles の設定を通らない**ので、キャッシュの指示を自分で付ける（Issue #425）
-app.MapGet("/admin", (HttpContext context) =>
+IResult AdminPage(HttpContext context)
 {
     context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
-    return Results.File("admin.html", "text/html");
-});
-app.MapFallbackToFile("/admin/{**path}", "admin.html", new StaticFileOptions
-{
-    OnPrepareResponse = StaticCachePolicy.Apply,
-});
+
+    // **画面が置かれていないときは、今までどおり見つからないものとして返す。**
+    return adminHtml.Value is { } html
+        ? Results.Content(html, "text/html; charset=utf-8")
+        : Results.NotFound();
+}
+
+app.MapGet(adminPath.Path, AdminPage);
+app.MapFallback($"{adminPath.Path}/{{**path}}", AdminPage);
 
 // **Defender for Storage を使うときだけ受け口を生やす。**
 // 使わない構成で認証の外の口を開けたままにしない

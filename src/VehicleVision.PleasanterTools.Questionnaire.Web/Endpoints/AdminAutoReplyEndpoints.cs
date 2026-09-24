@@ -112,8 +112,10 @@ public static class AdminAutoReplyEndpoints
         ArgumentNullException.ThrowIfNull(pleasanter);
 
         var settings = definition.AutoReply;
-        var subjectTemplate = settings?.Subject?.Get(language) ?? string.Empty;
-        var bodyTemplate = settings?.Body?.Get(language) ?? string.Empty;
+        var subjectTemplate =
+            settings?.Subject?.Get(language, definition.FallbackLanguage) ?? string.Empty;
+        var bodyTemplate =
+            settings?.Body?.Get(language, definition.FallbackLanguage) ?? string.Empty;
         var unknown = AutoReplyKeywords.UnknownIn(subjectTemplate, bodyTemplate);
         var displayNow = TimeZoneInfo.ConvertTime(now, DisplayTimeZone(pleasanter));
         var baseUrl = options.BaseUrl is { Length: > 0 }

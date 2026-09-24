@@ -33,6 +33,10 @@ describe('text', () => {
     expect(text({ ja: '日本語' }, 'en')).toBe('日本語');
   });
 
+  it('無い言語はアンケートの落とし先言語へ落とす', () => {
+    expect(text({ ja: '日本語', en: 'English' }, 'de', 'en')).toBe('English');
+  });
+
   it('どちらも無ければ空文字', () => {
     expect(text({ fr: 'français' }, 'en')).toBe('');
     expect(text(undefined, 'ja')).toBe('');

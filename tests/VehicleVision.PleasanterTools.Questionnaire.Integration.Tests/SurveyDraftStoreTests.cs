@@ -311,7 +311,7 @@ public class SurveyDraftStoreTests
         var (drafts, surveys) = Create(provider, connectionString);
         var surveyId = await CreateSurveyAsync(surveys);
 
-        var definition = Definition(surveyId, "q1", "q2");
+        var definition = Definition(surveyId, "q1", "q2") with { FallbackLanguage = "en" };
         var mapping = new MappingDefinition
         {
             Assignments =
@@ -331,6 +331,7 @@ public class SurveyDraftStoreTests
         var loaded = await drafts.LoadAsync(surveyId);
         Assert.NotNull(loaded);
         Assert.Equal(1, loaded.Revision);
+        Assert.Equal("en", loaded.Definition.FallbackLanguage);
 
         Assert.Equal("満足度調査", loaded.Definition.Title.Get("ja"));
         Assert.Equal("ありがとうございました", loaded.Definition.ConfirmationMessage!.Get("ja"));
