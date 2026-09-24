@@ -23,3 +23,5 @@ services:
       # **再検証の間隔を最短（1 分）にする。** Pleasanter でログアウトした後に締め出されることを、
       # 試験で待てる長さで確かめるため。製品の既定は 5 分
       QUESTIONNAIRE_PLEASANTERSSO_REVALIDATEMINUTES: ${DEV_PLEASANTERSSO_REVALIDATEMINUTES:-1}
+      # **未登録の利用者は断る（製品の既定）。** 外部設定で固定し、DB に残った画面の設定に左右されないようにする
+      QUESTIONNAIRE_PLEASANTERSSO_UNKNOWNUSER: Reject

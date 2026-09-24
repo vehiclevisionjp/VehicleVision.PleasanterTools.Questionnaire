@@ -51,10 +51,14 @@ public class PleasanterSsoEndToEndTests
 
     private const string MailPassword = "SsoE2e#Mail1";
 
-    /// <summary>Pleasanter の管理者。**本アプリには作らない**（居ない人として使う）。</summary>
-    private const string PleasanterAdministrator = "Administrator";
+    /// <summary>Pleasanter には居るが、**本アプリには作らない**利用者。</summary>
+    /// <remarks>
+    /// ⚠️ **Administrator を使わない。** 作りたての Administrator は初回のログインで
+    /// パスワードの変更を求められ、ログインが最後まで通らない（CI で実際に踏んだ）。
+    /// </remarks>
+    private const string StrangerUser = "sso-e2e-stranger";
 
-    private const string PleasanterAdministratorPassword = "pleasanter";
+    private const string StrangerPassword = "SsoE2e#Stranger1";
 
     /// <summary>compose.pleasanter-sso.yaml の再検証の間隔（1 分）。</summary>
     private static readonly TimeSpan RevalidateInterval = TimeSpan.FromMinutes(1);
@@ -206,12 +210,12 @@ public class PleasanterSsoEndToEndTests
         }
 
         // ⚠️ **Pleasanter で認証が通っても、本アプリの管理者でなければ入れない**
-        // （compose.pleasanter-sso.yaml は未登録の利用者の扱いを既定の Reject のままにしている）
+        // （compose.pleasanter-sso.yaml は未登録の利用者の扱いを既定の Reject で固定している）
         _ = await ResetAdminAsync(PlainUser);
         using var browser = new SharedHostBrowser();
 
         AssertPleasanterSignedIn(
-            await browser.LoginToPleasanterAsync(PleasanterAdministrator, PleasanterAdministratorPassword));
+            await browser.LoginToPleasanterAsync(StrangerUser, StrangerPassword));
 
         using var response = await browser.App.PostAsJsonAsync("/api/admin/pleasanter-sso/check", new { });
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -240,6 +244,8 @@ public class PleasanterSsoEndToEndTests
         Assert.True(settings["fixedFields"]!["internalBaseUrl"]!.GetValue<bool>());
         Assert.True(settings["fixedFields"]!["loginUrl"]!.GetValue<bool>());
         Assert.True(settings["fixedFields"]!["revalidateMinutes"]!.GetValue<bool>());
+        Assert.True(settings["fixedFields"]!["unknownUser"]!.GetValue<bool>());
+        Assert.Equal("Reject", settings["unknownUser"]!.GetValue<string>());
 
         // **外部設定に無い項目は画面から変えられる**（方式は既定の標準の API）
         Assert.False(settings["fixedFields"]!["method"]!.GetValue<bool>());

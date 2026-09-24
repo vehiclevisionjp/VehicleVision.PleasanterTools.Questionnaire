@@ -46,6 +46,7 @@ docker compose down -v               # 後片付け（DB ごと破棄）
 |---|---|---|---|
 | `sso-e2e-plain` | `SsoE2e#Plain1` | なし | 一般の利用者で入れる・ログアウトで締め出される |
 | `sso-e2e-mail` | `SsoE2e#Mail1` | メールのワンタイムパスワード | パスワードだけでは入れず、コードの後に入れる |
+| `sso-e2e-stranger` | `SsoE2e#Stranger1` | なし | 本アプリに居ない人は断られる（`Administrator` は作りたてだと初回にパスワードの変更を求められるため使わない） |
 
 - **パスワードは SHA-512 の 16 進で DB へ直接入れている。** Pleasanter 1.5.8.1 は
   `Users_Password` を塩なしの SHA-512（`Sha512Cng()`）にして `Users.Password` と比べる

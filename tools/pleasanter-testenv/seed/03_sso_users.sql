@@ -4,6 +4,10 @@
 -- | --- | --- | --- |
 -- | sso-e2e-plain | SsoE2e#Plain1 | なし |
 -- | sso-e2e-mail  | SsoE2e#Mail1  | メールのワンタイムパスワード |
+-- | sso-e2e-stranger | SsoE2e#Stranger1 | なし（本アプリには作らない人として使う） |
+--
+-- **本アプリに居ない人の試験に Administrator を使わない。** 作りたての Administrator は
+-- 初回のログインでパスワードの変更を求められる（CI で実際に踏んだ）。
 --
 -- **何度流してもよい。** 居なければ作り、居ればパスワードと状態を初期値へ戻す。
 --
@@ -36,7 +40,8 @@ DECLARE @Users TABLE (
 
 INSERT INTO @Users VALUES
     (N'sso-e2e-plain', N'SSO E2E Plain', 'SsoE2e#Plain1', 0),
-    (N'sso-e2e-mail', N'SSO E2E Mail', 'SsoE2e#Mail1', 1);
+    (N'sso-e2e-mail', N'SSO E2E Mail', 'SsoE2e#Mail1', 1),
+    (N'sso-e2e-stranger', N'SSO E2E Stranger', 'SsoE2e#Stranger1', 0);
 
 DECLARE @TenantId int = (SELECT [TenantId] FROM [Users] WHERE [LoginId] = N'Administrator');
 
