@@ -28,12 +28,25 @@ public sealed class LocalizedText
     /// <summary>指定した言語の文字列を返す。無ければ既定の言語、それも無ければ空文字。</summary>
     public string Get(string? language)
     {
-        if (!string.IsNullOrEmpty(language) && _byLanguage.TryGetValue(language, out var text))
+        if (TryGet(language, out var text))
         {
             return text;
         }
 
         return _byLanguage.TryGetValue(DefaultLanguage, out var fallback) ? fallback : string.Empty;
+    }
+
+    /// <summary>指定した言語の文字列があれば返す。フォールバックはしない。</summary>
+    public bool TryGet(string? language, out string text)
+    {
+        if (!string.IsNullOrEmpty(language) && _byLanguage.TryGetValue(language, out var found))
+        {
+            text = found;
+            return true;
+        }
+
+        text = string.Empty;
+        return false;
     }
 
     /// <summary>保持している言語コード。</summary>
