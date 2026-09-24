@@ -86,9 +86,9 @@ public class AutoReplyEndToEndTests
     /// <remarks>
     /// ⚠️ **自動返信は「メールアドレス形式の記述式」しか宛先にできない**（Issue #189）。
     /// </remarks>
-    private static object DraftBody(string surveyId, bool withAnswers) => new
+    private static object DraftBody(string surveyId, int revision, bool withAnswers) => new
     {
-        revision = 0,
+        revision,
         definition = new
         {
             surveyId,
@@ -153,7 +153,8 @@ public class AutoReplyEndToEndTests
         }
 
         using (var saved = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, withAnswers)))
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(surveyId, await CurrentRevisionAsync(http, surveyId), withAnswers)))
         {
             saved.EnsureSuccessStatusCode();
         }
@@ -173,6 +174,14 @@ public class AutoReplyEndToEndTests
         }
 
         return publicId;
+    }
+
+    /// <summary>保存に使う、その時点の下書きの版を読む。</summary>
+    private static async Task<int> CurrentRevisionAsync(HttpClient http, string surveyId)
+    {
+        using var draft = await http.GetAsync($"/api/admin/surveys/{surveyId}");
+        draft.EnsureSuccessStatusCode();
+        return (await ReadAsync(draft))!["revision"]!.GetValue<int>();
     }
 
     /// <summary>回答を 1 件送る。</summary>

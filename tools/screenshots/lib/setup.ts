@@ -1,4 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
+import { currentRevision } from './survey';
 
 /**
  * 写しを撮るための下ごしらえ。
@@ -97,7 +98,7 @@ export async function prepareSurvey(
   };
 
   const saved = await request.put(`/api/admin/surveys/${surveyId}`, {
-    data: { revision: 0, definition, mapping },
+    data: { revision: await currentRevision(request, surveyId), definition, mapping },
   });
   if (!saved.ok()) {
     throw new Error(`下書きを保存できなかった: ${saved.status()} ${await saved.text()}`);
