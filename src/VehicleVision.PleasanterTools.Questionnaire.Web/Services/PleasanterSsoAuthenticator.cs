@@ -34,7 +34,6 @@ public sealed record PleasanterSsoSignInResult(
 /// <para>
 /// **突き合わせはログイン ID で行う**（SAML と同じ。DB へ列を足していない）。
 /// Pleasanter の <c>LoginId</c> を本アプリのログイン ID として扱う。
-/// 拡張 SQL で別の列を <c>LoginId</c> という名前で返せば、メールアドレスなどでも突き合わせられる。
 /// </para>
 /// <para>
 /// ⚠️ **本アプリ側で 2 要素を登録している人は、Pleasanter から来ても 2 要素を通す。**

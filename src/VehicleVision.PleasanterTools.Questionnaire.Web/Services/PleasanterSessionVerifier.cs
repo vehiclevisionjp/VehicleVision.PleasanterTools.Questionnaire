@@ -58,22 +58,17 @@ public interface IPleasanterSessionVerifier
 /// <summary>Pleasanter の API へ cookie を転送して本人を聞く。</summary>
 /// <remarks>
 /// <para>
-/// **方式は 2 つ**（<see cref="PleasanterSsoOptions.Method"/>）。どちらも cookie の認証で本人を決めさせる
+/// **cookie を転送して <c>POST /api/users/get</c> を利用者 ID <c>Own</c> で絞って 1 回呼ぶ。**
+/// 本人は cookie の認証で Pleasanter に決めさせる
 /// （<c>_reference/Implem.Pleasanter/Implem.Pleasanter/Libraries/Requests/Context.cs</c>）。
-/// </para>
-/// <list type="bullet">
-/// <item>
-/// <see cref="PleasanterSsoMethod.StandardApi"/>（既定）: <c>POST /api/users/get</c> を
-/// 利用者 ID <c>Own</c> で絞る。Pleasanter は <c>Own</c> をログイン中の利用者 ID に置き換える
+/// Pleasanter は <c>Own</c> をログイン中の利用者 ID に置き換える
 /// （<c>Libraries/Settings/View.cs</c> の <c>ConvertedOwn</c>）。読むだけで書き込みは無い。
+/// </para>
+/// <para>
 /// 利用者の API 利用が禁止されていて 403 が返ったときだけ、本アプリの API キーを使う代わりの経路へ回る
-/// （<see cref="VerifyWithApiKeyAsync"/>）。
-/// </item>
-/// <item>
-/// <see cref="PleasanterSsoMethod.ExtendedSql"/>: 登録済みの拡張 SQL（<c>POST /api/extended/sql</c>）が、
-/// Pleasanter の自動で束縛する利用者 ID で本人の行だけを返す。
-/// </item>
-/// </list>
+/// （<see cref="VerifyWithApiKeyAsync"/>）。**本アプリは回答を Pleasanter へ書くために API キーを必ず持つ。**
+/// 複数テナントでもテナントと本アプリの配置は 1 対 1 なので、キーの持ち主と利用者のテナントは一致する。
+/// </para>
 /// <para>
 /// ⚠️ **成功と判断するのは、JSON の業務ステータスが 200 で、本人がちょうど 1 行、
 /// TenantId・UserId・LoginId がきっちり読めたときだけ。** 応答を正しく読めたことを確かめるため。
@@ -145,9 +140,7 @@ public sealed class PleasanterSessionVerifier(
         PleasanterSessionResult result;
         try
         {
-            result = options.Method == PleasanterSsoMethod.ExtendedSql
-                ? await VerifyByExtendedSqlAsync(options, cookieHeader, timeout.Token).ConfigureAwait(false)
-                : await VerifyByStandardApiAsync(options, cookieHeader, timeout.Token).ConfigureAwait(false);
+            result = await VerifyOwnUserAsync(options, cookieHeader, timeout.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -162,7 +155,7 @@ public sealed class PleasanterSessionVerifier(
             return PleasanterSessionResult.Error("unreachable");
         }
 
-        LogOutcome(result, options.Method, forwardedCount, stopwatch.ElapsedMilliseconds);
+        LogOutcome(result, forwardedCount, stopwatch.ElapsedMilliseconds);
         return result;
     }
 
@@ -215,33 +208,10 @@ public sealed class PleasanterSessionVerifier(
         return (builder.ToString(), count);
     }
 
-    // ---- 方式ごとの流れ ----------------------------------------------------
+    // ---- 問い合わせの流れ --------------------------------------------------
 
-    /// <summary>拡張 SQL で本人を聞く。</summary>
-    private async Task<PleasanterSessionResult> VerifyByExtendedSqlAsync(
-        PleasanterSsoOptions options,
-        string cookieHeader,
-        CancellationToken cancellationToken)
-    {
-        var (failure, document) = await PostAsync(
-            options.ExtendedSqlUrl,
-            JsonSerializer.Serialize(new { ApiVersion, Name = options.SqlName }),
-            cookieHeader,
-            reasonPrefix: string.Empty,
-            cancellationToken).ConfigureAwait(false);
-        if (document is null)
-        {
-            return failure!;
-        }
-
-        using (document)
-        {
-            return ParseExtendedSql(document.RootElement);
-        }
-    }
-
-    /// <summary>標準の API（<c>/api/users/get</c> を <c>Own</c> で絞る）で本人を聞く。</summary>
-    private async Task<PleasanterSessionResult> VerifyByStandardApiAsync(
+    /// <summary><c>/api/users/get</c> を <c>Own</c> で絞って本人を聞く。403 なら代わりの経路へ回る。</summary>
+    private async Task<PleasanterSessionResult> VerifyOwnUserAsync(
         PleasanterSsoOptions options,
         string cookieHeader,
         CancellationToken cancellationToken)
@@ -274,12 +244,10 @@ public sealed class PleasanterSessionVerifier(
             logger.LogWarning(
                 "Pleasanter が利用者の API 利用を許していないため（{Reason}）、本人を読めませんでした。"
                 + "User.json の DisableApi や利用者ごとの API 禁止を確認してください。API を禁止したまま使うには、"
-                + "本アプリの Pleasanter 接続設定（{BaseUrlKey} と {ApiKeyKey}）を設定するか、"
-                + "{MethodKey} を ExtendedSql にしてください。",
+                + "本アプリの Pleasanter 接続設定（{BaseUrlKey} と {ApiKeyKey}）を設定してください。",
                 failure.Reason,
                 AppSettingsProvider.PleasanterBaseUrlKey,
-                AppSettingsProvider.PleasanterApiKeyKey,
-                PleasanterSsoOptions.MethodKey);
+                AppSettingsProvider.PleasanterApiKeyKey);
             return failure;
         }
 
@@ -376,7 +344,7 @@ public sealed class PleasanterSessionVerifier(
         return (baseUrl, pleasanter.ApiKey.Trim());
     }
 
-    // ---- 問い合わせと応答の読み取り（方式で共通） ----------------------------
+    // ---- 問い合わせと応答の読み取り ------------------------------------------
 
     /// <summary>JSON を POST し、業務ステータス 200 の JSON だけを返す。**それ以外は理由を付けて返す。**</summary>
     /// <param name="cookieHeader">
@@ -507,41 +475,6 @@ public sealed class PleasanterSessionVerifier(
         }
     }
 
-    /// <summary>拡張 SQL API の応答（業務ステータス 200）を読む。</summary>
-    /// <remarks>
-    /// 期待する形（2026-09-24 に Pleasanter 1.5.8.1 で実測）:
-    /// <c>{"StatusCode":200,"Response":{"Data":{"Table":[{"TenantId":1,"UserId":1,"LoginId":"...","Name":"..."}]}}}</c>。
-    /// **表が 1 つ・行がちょうど 1 つでなければ成功にしない。** 0 行や複数行は定義の誤りとして扱う。
-    /// </remarks>
-    private static PleasanterSessionResult ParseExtendedSql(JsonElement root)
-    {
-        if (!TryGetObject(root, "Response", out var response)
-            || !TryGetObject(response, "Data", out var data))
-        {
-            return PleasanterSessionResult.Error("no-data");
-        }
-
-        // **表の名前に依らず、表が 1 つであることを求める。**
-        // Pleasanter は DataSet の表を名前ごとに返す（既定は "Table"）
-        JsonElement? table = null;
-        foreach (var property in data.EnumerateObject())
-        {
-            if (table is not null)
-            {
-                return PleasanterSessionResult.Error("multiple-tables");
-            }
-
-            table = property.Value;
-        }
-
-        if (table is not { ValueKind: JsonValueKind.Array } rows)
-        {
-            return PleasanterSessionResult.Error("no-table");
-        }
-
-        return ParseSingleRow(rows, expectedUserId: null, reasonPrefix: string.Empty);
-    }
-
     /// <summary><c>/api/users/get</c> の応答（業務ステータス 200）を読む。</summary>
     /// <remarks>
     /// 期待する形（2026-09-25 に Pleasanter 1.5.8.1 で実測）:
@@ -569,12 +502,6 @@ public sealed class PleasanterSessionVerifier(
             return PleasanterSessionResult.Error(reasonPrefix + (total == 0 ? "no-row" : "multiple-rows"));
         }
 
-        return ParseSingleRow(rows, expectedUserId, reasonPrefix);
-    }
-
-    /// <summary>ちょうど 1 行の本人を読む。</summary>
-    private static PleasanterSessionResult ParseSingleRow(JsonElement rows, int? expectedUserId, string reasonPrefix)
-    {
         var count = rows.GetArrayLength();
         if (count != 1)
         {
@@ -621,14 +548,13 @@ public sealed class PleasanterSessionVerifier(
 
     // ---- ログ -------------------------------------------------------------
 
-    private void LogOutcome(PleasanterSessionResult result, PleasanterSsoMethod method, int cookieCount, long elapsedMs)
+    private void LogOutcome(PleasanterSessionResult result, int cookieCount, long elapsedMs)
     {
         switch (result.Status)
         {
             case PleasanterSessionStatus.Authenticated:
                 logger.LogInformation(
-                    "Pleasanter が本人を返しました（方式 {Method}、TenantId {TenantId}、UserId {UserId}、{ElapsedMs} ms）。",
-                    method,
+                    "Pleasanter が本人を返しました（TenantId {TenantId}、UserId {UserId}、{ElapsedMs} ms）。",
                     result.Identity!.TenantId,
                     result.Identity.UserId,
                     elapsedMs);
@@ -642,35 +568,26 @@ public sealed class PleasanterSessionVerifier(
                 break;
             default:
                 logger.LogWarning(
-                    "Pleasanter の本人確認が成り立ちませんでした（方式 {Method}、{Reason}）。{Hint}",
-                    method,
+                    "Pleasanter の本人確認が成り立ちませんでした（{Reason}）。{Hint}",
                     result.Reason,
-                    Hint(method, result.Reason));
+                    Hint(result.Reason));
                 break;
         }
     }
 
     /// <summary>失敗の理由ごとに、運用者が見るべき所を返す。</summary>
-    private static string Hint(PleasanterSsoMethod method, string reason)
-    {
-        var extendedSql = method == PleasanterSsoMethod.ExtendedSql;
-        return reason switch
+    private static string Hint(string reason) =>
+        reason switch
         {
-            "redirect" when extendedSql =>
-                "内部 URL と拡張 SQL の名前が正しいか確認してください（名前が見つからないときも転送が返ります）。",
             "redirect" or "session-redirect" => "内部 URL が Pleasanter を指しているか確認してください。",
-            "http-403" or "status-403" when !extendedSql =>
-                "利用者の API 利用が禁止されています。本アプリの Pleasanter 接続設定の API キーを設定するか、ExtendedSql 方式を選んでください。",
-            _ when extendedSql && reason.StartsWith("http-", StringComparison.Ordinal) =>
-                "拡張 SQL の名前・Api 指定・IP 制限・TokenCheck を確認してください。",
+            "http-403" or "status-403" =>
+                "利用者の API 利用が禁止されています。本アプリの Pleasanter 接続設定の API キーを設定してください。",
             "user-http-401" or "user-status-401" or "user-http-403" or "user-status-403" =>
                 "本アプリの Pleasanter 接続設定の API キーが正しいか、キーの持ち主の API 利用が許されているかを確認してください。",
             "user-no-row" =>
                 "API キーの持ち主と同じテナントの利用者しか引けません。本アプリの Pleasanter 接続設定の URL が内部 URL と同じ Pleasanter を指しているかも確認してください。",
             "user-mismatch" or "user-multiple-rows" =>
                 "本アプリの Pleasanter 接続設定の URL が内部 URL と同じ Pleasanter を指しているか確認してください。",
-            _ when extendedSql => "拡張 SQL の定義を確認してください。",
             _ => string.Empty,
         };
-    }
 }

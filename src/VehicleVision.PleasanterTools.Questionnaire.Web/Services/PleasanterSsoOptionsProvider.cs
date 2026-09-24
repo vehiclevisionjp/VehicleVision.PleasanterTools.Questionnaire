@@ -52,8 +52,6 @@ public sealed class PleasanterSsoOptionsProvider(
         (PleasanterSsoOptions.InternalBaseUrlKey, values => values.InternalBaseUrl),
         (PleasanterSsoOptions.LoginUrlKey, values => values.LoginUrl),
         (PleasanterSsoOptions.LogoutUrlKey, values => values.LogoutUrl),
-        (PleasanterSsoOptions.MethodKey, values => values.Method),
-        (PleasanterSsoOptions.SqlNameKey, values => values.SqlName),
         (PleasanterSsoOptions.CookieNamesKey, values => values.CookieNames),
         (PleasanterSsoOptions.UnknownUserKey, values => values.UnknownUser),
         (PleasanterSsoOptions.RegisterRoleKey, values => values.RegisterRole),
@@ -135,8 +133,6 @@ public sealed class PleasanterSsoOptionsProvider(
                 PleasanterSsoOptions.InternalBaseUrlKey, requested.InternalBaseUrl, current.InternalBaseUrl),
             LoginUrl = Mutable(PleasanterSsoOptions.LoginUrlKey, requested.LoginUrl, current.LoginUrl),
             LogoutUrl = Mutable(PleasanterSsoOptions.LogoutUrlKey, requested.LogoutUrl, current.LogoutUrl),
-            Method = Mutable(PleasanterSsoOptions.MethodKey, requested.Method, current.Method),
-            SqlName = Mutable(PleasanterSsoOptions.SqlNameKey, requested.SqlName, current.SqlName),
             CookieNames = Mutable(
                 PleasanterSsoOptions.CookieNamesKey, requested.CookieNames, current.CookieNames),
             UnknownUser = Mutable(
@@ -172,9 +168,6 @@ public sealed class PleasanterSsoOptionsProvider(
             InternalBaseUrl = ValueOf(PleasanterSsoOptions.InternalBaseUrlKey) ?? string.Empty,
             LoginUrl = ValueOf(PleasanterSsoOptions.LoginUrlKey) ?? string.Empty,
             LogoutUrl = ValueOf(PleasanterSsoOptions.LogoutUrlKey) ?? string.Empty,
-            Method = OrDefault(
-                ValueOf(PleasanterSsoOptions.MethodKey), nameof(PleasanterSsoMethod.StandardApi)),
-            SqlName = OrDefault(ValueOf(PleasanterSsoOptions.SqlNameKey), PleasanterSsoOptions.DefaultSqlName),
             CookieNames = OrDefault(
                 ValueOf(PleasanterSsoOptions.CookieNamesKey), PleasanterSsoOptions.DefaultCookieNames),
             UnknownUser = OrDefault(

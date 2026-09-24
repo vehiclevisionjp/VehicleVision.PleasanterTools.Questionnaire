@@ -25,8 +25,6 @@ public class PleasanterSsoOptionsTests
         var options = Read([]);
 
         Assert.False(options.Enabled);
-        Assert.Equal(PleasanterSsoMethod.StandardApi, options.Method);
-        Assert.Equal(PleasanterSsoOptions.DefaultSqlName, options.SqlName);
         Assert.Equal([".AspNetCore.Cookies", "Pleasanter_SessionGuid"], options.CookieNamePrefixes.ToArray());
         Assert.Equal(PleasanterSsoUnknownUserPolicy.Reject, options.UnknownUser);
         Assert.Equal(AdminRole.Editor, options.RegisterRole);
@@ -41,7 +39,6 @@ public class PleasanterSsoOptionsTests
 
         Assert.True(options.Enabled);
         Assert.Equal(new Uri("http://pleasanter:8080/"), options.InternalBaseUrl);
-        Assert.Equal(new Uri("http://pleasanter:8080/api/extended/sql"), options.ExtendedSqlUrl);
     }
 
     [Theory]
@@ -66,8 +63,6 @@ public class PleasanterSsoOptionsTests
     [InlineData(PleasanterSsoOptions.LoginUrlKey, "/\\evil.example.com")]
     [InlineData(PleasanterSsoOptions.LogoutUrlKey, "javascript:alert(1)")]
     [InlineData(PleasanterSsoOptions.EnabledKey, "yes")]
-    [InlineData(PleasanterSsoOptions.MethodKey, "Sessions")]
-    [InlineData(PleasanterSsoOptions.MethodKey, "1")]
     [InlineData(PleasanterSsoOptions.UnknownUserKey, "Allow")]
     [InlineData(PleasanterSsoOptions.UnknownUserKey, "1")]
     [InlineData(PleasanterSsoOptions.RegisterRoleKey, "Root")]
@@ -136,19 +131,6 @@ public class PleasanterSsoOptionsTests
         Assert.False(options.ShouldForwardCookie(string.Empty));
     }
 
-    [Theory]
-    [InlineData("StandardApi", PleasanterSsoMethod.StandardApi)]
-    [InlineData("extendedsql", PleasanterSsoMethod.ExtendedSql)]
-    [InlineData(" ExtendedSql ", PleasanterSsoMethod.ExtendedSql)]
-    [InlineData("", PleasanterSsoMethod.StandardApi)]
-    public void 方式を読み空なら標準のAPI(string value, PleasanterSsoMethod expected)
-    {
-        var values = Enabled();
-        values[PleasanterSsoOptions.MethodKey] = value;
-
-        Assert.Equal(expected, Read(values).Method);
-    }
-
     [Fact]
     public void 数値と列挙を読む()
     {
@@ -157,7 +139,6 @@ public class PleasanterSsoOptionsTests
         values[PleasanterSsoOptions.RegisterRoleKey] = "SurveyAdministrator";
         values[PleasanterSsoOptions.RevalidateMinutesKey] = "15";
         values[PleasanterSsoOptions.TimeoutSecondsKey] = "3";
-        values[PleasanterSsoOptions.SqlNameKey] = "WhoAmI";
         values[PleasanterSsoOptions.CookieNamesKey] = ".AspNetCore.Cookies, MyCookie";
 
         var options = Read(values);
@@ -166,7 +147,6 @@ public class PleasanterSsoOptionsTests
         Assert.Equal(AdminRole.SurveyAdministrator, options.RegisterRole);
         Assert.Equal(TimeSpan.FromMinutes(15), options.RevalidateInterval);
         Assert.Equal(TimeSpan.FromSeconds(3), options.Timeout);
-        Assert.Equal("WhoAmI", options.SqlName);
         Assert.Equal([".AspNetCore.Cookies", "MyCookie"], options.CookieNamePrefixes.ToArray());
     }
 }
@@ -224,72 +204,6 @@ public class PleasanterSsoOptionsProviderTests
         Assert.Equal("DB の表示", snapshot.Options.ButtonLabel);
         Assert.Contains(PleasanterSsoOptions.InternalBaseUrlKey, snapshot.FixedKeys);
         Assert.DoesNotContain(PleasanterSsoOptions.ButtonLabelKey, snapshot.FixedKeys);
-    }
-
-    [Fact]
-    public async Task 方式は外部設定で固定でき画面から変えられない()
-    {
-        var store = new FakeStore(new PleasanterSsoSettingValues
-        {
-            Enabled = "true",
-            InternalBaseUrl = "http://pleasanter/",
-            LoginUrl = "/users/login",
-            Method = "StandardApi",
-        });
-        var provider = Create(new() { [PleasanterSsoOptions.MethodKey] = "ExtendedSql" }, store);
-
-        var snapshot = await provider.GetAsync();
-        Assert.Equal(PleasanterSsoMethod.ExtendedSql, snapshot.Options.Method);
-        Assert.Contains(PleasanterSsoOptions.MethodKey, snapshot.FixedKeys);
-
-        var saved = await provider.SaveAsync(new PleasanterSsoSettingValues
-        {
-            Enabled = "true",
-            InternalBaseUrl = "http://pleasanter/",
-            LoginUrl = "/users/login",
-            Method = "StandardApi",
-        });
-
-        Assert.Equal(PleasanterSsoMethod.ExtendedSql, saved.Options.Method);
-        Assert.Equal("StandardApi", store.Values.Method);
-    }
-
-    [Fact]
-    public async Task 方式はDBへ保存でき未設定なら標準のAPIを返す()
-    {
-        var store = new FakeStore(new PleasanterSsoSettingValues());
-        var provider = Create([], store);
-
-        Assert.Equal(nameof(PleasanterSsoMethod.StandardApi), (await provider.GetAsync()).Values.Method);
-
-        var saved = await provider.SaveAsync(new PleasanterSsoSettingValues
-        {
-            Enabled = "true",
-            InternalBaseUrl = "http://pleasanter/",
-            LoginUrl = "/users/login",
-            Method = "ExtendedSql",
-        });
-
-        Assert.Equal(PleasanterSsoMethod.ExtendedSql, saved.Options.Method);
-        Assert.Equal("ExtendedSql", store.Values.Method);
-    }
-
-    [Fact]
-    public async Task 知らない方式は保存しない()
-    {
-        var store = new FakeStore(new PleasanterSsoSettingValues());
-        var provider = Create([], store);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.SaveAsync(
-            new PleasanterSsoSettingValues
-            {
-                Enabled = "true",
-                InternalBaseUrl = "http://pleasanter/",
-                LoginUrl = "/users/login",
-                Method = "Magic",
-            }));
-
-        Assert.Null(store.Values.Method);
     }
 
     [Fact]

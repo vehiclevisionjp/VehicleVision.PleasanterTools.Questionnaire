@@ -15,26 +15,6 @@ public enum PleasanterSsoUnknownUserPolicy
     Register = 1,
 }
 
-/// <summary>Pleasanter に本人を聞く方式。</summary>
-public enum PleasanterSsoMethod
-{
-    /// <summary>
-    /// 標準の API（<c>POST /api/users/get</c> を利用者 ID <c>Own</c> で絞る）で聞く。**既定。**
-    /// Pleasanter 側に何も置かなくてよく、書き込みも無い。
-    /// </summary>
-    /// <remarks>
-    /// 利用者の API 利用が禁止されていて 403 が返ったときは、本アプリの API キーがあれば
-    /// <c>/api/sessions/set</c> で利用者 ID を得て、API キーで <c>/api/users/{id}/get</c> を引く。
-    /// </remarks>
-    StandardApi = 0,
-
-    /// <summary>
-    /// 登録済みの拡張 SQL（<c>POST /api/extended/sql</c>）で聞く。
-    /// Pleasanter 側に SQL の定義ファイルを置いて再起動する必要がある。
-    /// </summary>
-    ExtendedSql = 1,
-}
-
 /// <summary>Pleasanter のログインで管理画面へ入れるようにする設定（Issue #464）。</summary>
 /// <remarks>
 /// <para>
@@ -42,7 +22,10 @@ public enum PleasanterSsoMethod
 /// </para>
 /// <para>
 /// **仕組み。** ブラウザが持つ Pleasanter の cookie を**本アプリのサーバが** Pleasanter へ転送し、
-/// ログイン中の本人を返させる。方式は <see cref="Method"/> で選ぶ（既定は標準の API）。
+/// ログイン中の本人を返させる。聞き方は標準の API（<c>POST /api/users/get</c> を利用者 ID
+/// <c>Own</c> で絞る）だけ。Pleasanter 側に何も置かなくてよく、書き込みも無い。
+/// 利用者の API 利用が禁止されていて 403 が返ったときは、本アプリの API キーで引き直す
+/// （<see cref="PleasanterSessionVerifier"/>）。
 /// **API キーはブラウザへ渡さない**（規約 8）。cookie を転送する問い合わせには API キーを載せない。
 /// </para>
 /// <para>
@@ -56,17 +39,12 @@ public sealed class PleasanterSsoOptions
     public const string InternalBaseUrlKey = "QUESTIONNAIRE_PLEASANTERSSO_INTERNALBASEURL";
     public const string LoginUrlKey = "QUESTIONNAIRE_PLEASANTERSSO_LOGINURL";
     public const string LogoutUrlKey = "QUESTIONNAIRE_PLEASANTERSSO_LOGOUTURL";
-    public const string MethodKey = "QUESTIONNAIRE_PLEASANTERSSO_METHOD";
-    public const string SqlNameKey = "QUESTIONNAIRE_PLEASANTERSSO_SQLNAME";
     public const string CookieNamesKey = "QUESTIONNAIRE_PLEASANTERSSO_COOKIENAMES";
     public const string UnknownUserKey = "QUESTIONNAIRE_PLEASANTERSSO_UNKNOWNUSER";
     public const string RegisterRoleKey = "QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE";
     public const string RevalidateMinutesKey = "QUESTIONNAIRE_PLEASANTERSSO_REVALIDATEMINUTES";
     public const string TimeoutSecondsKey = "QUESTIONNAIRE_PLEASANTERSSO_TIMEOUTSECONDS";
     public const string ButtonLabelKey = "QUESTIONNAIRE_PLEASANTERSSO_BUTTONLABEL";
-
-    /// <summary>拡張 SQL の名前の既定値。手順書の定義例と同じ。</summary>
-    public const string DefaultSqlName = "QuestionnaireWhoAmI";
 
     /// <summary>転送する cookie の名前（前方一致）の既定値。</summary>
     /// <remarks>
@@ -110,12 +88,6 @@ public sealed class PleasanterSsoOptions
     /// </summary>
     public string LogoutUrl { get; init; } = string.Empty;
 
-    /// <summary>本人を聞く方式。**既定は標準の API。**</summary>
-    public PleasanterSsoMethod Method { get; init; } = PleasanterSsoMethod.StandardApi;
-
-    /// <summary>本人を返す拡張 SQL の名前。**<see cref="PleasanterSsoMethod.ExtendedSql"/> のときだけ使う。**</summary>
-    public string SqlName { get; init; } = DefaultSqlName;
-
     /// <summary>転送する cookie の名前（前方一致）。</summary>
     public ImmutableArray<string> CookieNamePrefixes { get; init; } = ParseCookieNames(DefaultCookieNames);
 
@@ -138,11 +110,6 @@ public sealed class PleasanterSsoOptions
     /// <summary>ログイン画面の釦に出す文字。**空なら既定の文言。**</summary>
     public string ButtonLabel { get; init; } = string.Empty;
 
-    /// <summary>拡張 SQL API の URL。</summary>
-    public Uri ExtendedSqlUrl => new(
-        InternalBaseUrl ?? throw new InvalidOperationException("Pleasanter のシングルサインオンは無効です。"),
-        "api/extended/sql");
-
     /// <summary>鍵ごとの生値から設定を読む。**足りないものがあれば例外にする。**</summary>
     /// <remarks>
     /// **黙って無効へ落とさない。** 「有効にしたつもりが効いていない」を保存の時点で気付かせる。
@@ -157,11 +124,8 @@ public sealed class PleasanterSsoOptions
         var internalBaseUrl = Trim(valueOf(InternalBaseUrlKey));
         var loginUrl = Trim(valueOf(LoginUrlKey));
         var logoutUrl = Trim(valueOf(LogoutUrlKey));
-        var sqlName = Trim(valueOf(SqlNameKey));
         var cookieNames = Trim(valueOf(CookieNamesKey));
 
-        var method = ParseEnum<PleasanterSsoMethod>(valueOf(MethodKey), MethodKey)
-            ?? PleasanterSsoMethod.StandardApi;
         var unknownUser = ParseEnum<PleasanterSsoUnknownUserPolicy>(valueOf(UnknownUserKey), UnknownUserKey)
             ?? PleasanterSsoUnknownUserPolicy.Reject;
         var registerRole = ParseEnum<AdminRole>(valueOf(RegisterRoleKey), RegisterRoleKey)
@@ -199,11 +163,6 @@ public sealed class PleasanterSsoOptions
             ValidateBrowserUrl(logoutUrl, LogoutUrlKey);
         }
 
-        if (sqlName.Length > 0)
-        {
-            ValidateSqlName(sqlName);
-        }
-
         if (enabled)
         {
             if (internalUri is null)
@@ -225,8 +184,6 @@ public sealed class PleasanterSsoOptions
             InternalBaseUrl = internalUri,
             LoginUrl = loginUrl,
             LogoutUrl = logoutUrl,
-            Method = method,
-            SqlName = sqlName.Length == 0 ? DefaultSqlName : sqlName,
             CookieNamePrefixes = prefixes,
             UnknownUser = unknownUser,
             RegisterRole = registerRole,
@@ -331,15 +288,6 @@ public sealed class PleasanterSsoOptions
         {
             throw new InvalidOperationException(
                 $"{key} は / で始まる同じホストのパスか、http(s) の絶対 URL で書いてください: {value}");
-        }
-    }
-
-    /// <summary>拡張 SQL の名前を確かめる。**JSON の本文に入れるだけだが、変な値は最初から断る。**</summary>
-    private static void ValidateSqlName(string value)
-    {
-        if (value.Length > 256 || value.Any(char.IsControl))
-        {
-            throw new InvalidOperationException($"{SqlNameKey} に使えない値が入っています。");
         }
     }
 

@@ -18,10 +18,6 @@ public sealed record PleasanterSsoSettingValues
 
     public string? LogoutUrl { get; init; }
 
-    public string? Method { get; init; }
-
-    public string? SqlName { get; init; }
-
     public string? CookieNames { get; init; }
 
     public string? UnknownUser { get; init; }
@@ -58,7 +54,7 @@ public sealed class PleasanterSsoSettingStore(IDbConnectionFactory connectionFac
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
         return await connection.QuerySingleAsync<PleasanterSsoSettingValues>(Sql(
-            "SELECT [Enabled], [InternalBaseUrl], [LoginUrl], [LogoutUrl], [Method], [SqlName], "
+            "SELECT [Enabled], [InternalBaseUrl], [LoginUrl], [LogoutUrl], "
             + "       [CookieNames], [UnknownUser], [RegisterRole], [RevalidateMinutes], "
             + "       [TimeoutSeconds], [ButtonLabel] "
             + "FROM [PleasanterSsoSettings] WHERE [PleasanterSsoSettingId] = 1",
@@ -76,7 +72,7 @@ public sealed class PleasanterSsoSettingStore(IDbConnectionFactory connectionFac
         await connection.ExecuteAsync(Sql(
             "UPDATE [PleasanterSsoSettings] SET "
             + "[Enabled] = @Enabled, [InternalBaseUrl] = @InternalBaseUrl, "
-            + "[LoginUrl] = @LoginUrl, [LogoutUrl] = @LogoutUrl, [Method] = @Method, [SqlName] = @SqlName, "
+            + "[LoginUrl] = @LoginUrl, [LogoutUrl] = @LogoutUrl, "
             + "[CookieNames] = @CookieNames, [UnknownUser] = @UnknownUser, "
             + "[RegisterRole] = @RegisterRole, [RevalidateMinutes] = @RevalidateMinutes, "
             + "[TimeoutSeconds] = @TimeoutSeconds, [ButtonLabel] = @ButtonLabel "

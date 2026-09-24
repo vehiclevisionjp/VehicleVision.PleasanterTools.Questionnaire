@@ -66,7 +66,7 @@ public static class AdminAuthEndpoints
             var samlLabel = saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null;
 
             // **Pleasanter のログインも同じ扱い**（Issue #464）。
-            // 返すのはブラウザで開くログイン画面の URL だけ。**内部 URL・拡張 SQL の名前は返さない**
+            // 返すのはブラウザで開くログイン画面の URL だけ。**内部 URL は返さない**
             var pleasanterSsoEnabled = pleasanterSso.Enabled;
             var pleasanterSsoLabel = pleasanterSso.ButtonLabel.Length > 0 ? pleasanterSso.ButtonLabel : null;
             var pleasanterSsoLoginUrl = pleasanterSsoEnabled ? pleasanterSso.LoginUrl : null;
