@@ -1072,6 +1072,9 @@ export const ja = {
   'settings.proofOfWorkHint':
     '回答者のブラウザに短い計算をさせ、機械的な大量送信のコストを上げます。一般公開するアンケートでは有効のままにしてください。社内向けなど、URL を知る人が限られる場合は無効にしても構いません。',
   'settings.proofOfWorkKeepsOthers': '無効にしても、送信チケット・最短送信時間・ハニーポットは有効なままです。',
+  'editor.fallbackLanguage': '訳がないときに表示する言語',
+  'editor.fallbackLanguageHint':
+    '回答者の言語に設問・選択肢・見出しの訳がない場合、この言語の文言を表示します。「編集する言語」とは別の設定です。',
 } as const;
 
 /** 文言の鍵。**日本語のカタログが一覧そのもの。** */
@@ -2198,6 +2201,9 @@ export const en: Record<MessageKey, string> = {
   'settings.proofOfWorkKeepsOthers':
     'Turning it off keeps the submission ticket, the minimum time before submitting, and the '
     + 'honeypot field in effect.',
+  'editor.fallbackLanguage': 'Language shown when a translation is missing',
+  'editor.fallbackLanguageHint':
+    'When a question, choice, or heading has no translation in the respondent language, text in this language is shown. This is separate from the language being edited.',
 };
 
 const CATALOGS: Partial<Record<Language, Record<MessageKey, string>>> = { ja, en };
