@@ -431,7 +431,6 @@ export const ja = {
   'editor.shuffleBlockedByVisibility': '表示条件が設定された設問があるため、指定できません。表示条件で参照できるのは前にある設問だけのため、順序を入れ替えると条件が成立しなくなります。',
   'editor.editingLanguage': '編集する言語',
   'editor.editingLanguageHint': '入力したテキストはこの言語に保存されます。他の言語のテキストはそのまま残ります。',
-  'editor.fallbackNotice': 'この言語のテキストが未入力の項目は、回答画面では日本語で表示されます。',
   'questionImport.open': 'ほかのアンケートから取り込む',
   'questionImport.title': '設問を取り込む',
   'questionImport.close': '閉じる',
@@ -1507,8 +1506,6 @@ export const en: Record<MessageKey, string> = {
   'editor.editingLanguage': 'Language being edited',
   'editor.editingLanguageHint':
     'What you type goes into this language. Text in other languages is kept as it is.',
-  'editor.fallbackNotice':
-    'Fields with no text in this language fall back to Japanese on the response screen.',
   'questionImport.open': 'Import from another survey',
   'questionImport.title': 'Import questions',
   'questionImport.close': 'Close',
