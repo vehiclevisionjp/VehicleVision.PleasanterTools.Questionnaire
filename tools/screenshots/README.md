@@ -137,6 +137,8 @@ docker compose --profile sqlserver --profile screenshots run --rm     screenshot
 | `admin-09-audit-log` | 操作の記録 |
 | `admin-10-outbox` | 送信状況 |
 | `admin-11-preview` | プレビュー |
+| `admin-19-pleasanter-sso-settings` | Pleasanter ログイン設定（`specs/pleasanter-sso.spec.ts`） |
+| `admin-20-pleasanter-login` | ログイン（「Pleasanter でログイン」の釦） |
 
 ## 秘密の値は伏せる
 
@@ -157,6 +159,22 @@ docker compose --profile sqlserver --profile screenshots run --rm     screenshot
 - **ログインは試験をまたいで持ち越す。** 試験ごとに入れ物は作り直されるので、
   cookie を書き出して次へ渡している
 - **送信は最短時間を待つ。** 速すぎる送信は bot 対策で断られる
+
+## Pleasanter のログインの往復（Issue #470）
+
+`specs/pleasanter-sso.spec.ts` が、設定画面から Pleasanter のログインを有効にし、
+ログイン画面の「Pleasanter でログイン」→ 別窓で Pleasanter にログイン → 管理画面へ入る往復を確かめる。
+
+- **Pleasanter の利用者を先に入れておくこと**（`tools/pleasanter-testenv/seed/03_sso_users.sql`。
+  e2e.yml の写しの一式の job が流している）
+- **Pleasanter と本アプリをブラウザから同じホスト名で開く。** cookie はホスト名ごとにしか届かないため、
+  容器の中に `localhost:8080`（→ `pleasanter:8080`）と `localhost:8081`（→ `questionnaire-app:8080`）の
+  素通しを立てる（`lib/tcp-forward.ts`。TCP を流すだけ）
+- **設定は画面から有効にし、終わったら無効へ戻す。** 写しの一式の本アプリは外部設定を持たないので、
+  ロック表示はサーバの応答の `fixedFields` だけを書き換えて確かめる。サーバが外部設定を優先することは
+  結合テストの `PleasanterSsoEndToEndTests` が見ている
+- 手元（容器の外）で走らせるときは、`localhost:8080` と `localhost:8081` に Pleasanter と本アプリが
+  既に居る前提で `SSO_SKIP_FORWARD=1 SSO_PLEASANTER_HOST=localhost` を付ける
 
 ## 安全なコンテキスト（https）でも試す
 
