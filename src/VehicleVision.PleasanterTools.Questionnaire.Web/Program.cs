@@ -762,7 +762,7 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 // 先に置くと、リバースプロキシ配下では全要求がプロキシ自身の IP に見える。
 app.UseEndpointNetworkRestrictions(endpointNetworkRestrictions);
 
-// **回答者側だけを止める。** `/admin` と `/api/admin` は解除のため常に通す。
+// **回答者側だけを止める。** 管理画面と `/api/admin` は解除のため常に通す。
 // `/healthz` と `/ready` も対象外。メンテナンスはプロセスや DB の異常ではなく、
 // readiness を落とすと Kubernetes が Pod を再起動し続けて管理操作まで不安定になる。
 app.Use(async (context, next) =>
@@ -888,7 +888,7 @@ app.MapAdminSessionEndpoints();
 // 認証の外の口を開けたままにしないため）が、**管理画面から設定を変えられるように
 // した**ので、起動時に決めると変更のたびに再起動が要る。
 // **無効な間は各入口が 404 を返すことで、外から見た姿は変わらない**
-app.MapAdminSamlEndpoints();
+app.MapAdminSamlEndpoints(adminPath);
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();
@@ -921,16 +921,29 @@ if (openApiExposure.Enabled)
 }
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない。
+// 起動時に 1 度だけ読み、画面が組み立てる経路の基準を meta 要素へ埋める。
+var adminHtmlTemplate = File.ReadAllText(
+    Path.Combine(app.Environment.WebRootPath, "admin.html"));
+const string adminPathPlaceholder = "__QUESTIONNAIRE_ADMIN_PATH__";
+if (!adminHtmlTemplate.Contains(adminPathPlaceholder, StringComparison.Ordinal))
+{
+    throw new InvalidOperationException("admin.html に管理画面パスの埋め込み先がありません。");
+}
+
+var adminHtml = adminHtmlTemplate.Replace(
+    adminPathPlaceholder,
+    System.Text.Encodings.Web.HtmlEncoder.Default.Encode(adminPath.Path),
+    StringComparison.Ordinal);
+
 // ⚠️ **ここは UseStaticFiles の設定を通らない**ので、キャッシュの指示を自分で付ける（Issue #425）
-app.MapGet("/admin", (HttpContext context) =>
+IResult AdminPage(HttpContext context)
 {
     context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
-    return Results.File("admin.html", "text/html");
-});
-app.MapFallbackToFile("/admin/{**path}", "admin.html", new StaticFileOptions
-{
-    OnPrepareResponse = StaticCachePolicy.Apply,
-});
+    return Results.Content(adminHtml, "text/html; charset=utf-8");
+}
+
+app.MapGet(adminPath.Path, AdminPage);
+app.MapFallback($"{adminPath.Path}/{{**path}}", AdminPage);
 
 // **Defender for Storage を使うときだけ受け口を生やす。**
 // 使わない構成で認証の外の口を開けたままにしない

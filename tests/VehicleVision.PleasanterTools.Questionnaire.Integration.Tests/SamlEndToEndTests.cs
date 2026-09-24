@@ -233,7 +233,10 @@ public partial class SamlEndToEndTests
         var (location, cookies) = await RoundTripAsync(KnownUser, IdpPassword);
 
         // **返ってきたら管理画面へ送る**（returnUrl で頼んだ先）
-        Assert.Contains("/admin", location, StringComparison.Ordinal);
+        var adminPath =
+            Environment.GetEnvironmentVariable(AdminPathOptions.Setting)
+            ?? AdminPathOptions.DefaultPath;
+        Assert.Contains(adminPath, location, StringComparison.Ordinal);
 
         var session = await SessionAsync(cookies);
 
