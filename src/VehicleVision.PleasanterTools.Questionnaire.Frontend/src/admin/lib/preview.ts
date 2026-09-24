@@ -19,10 +19,11 @@ export function listDesignPreviewPages(
   pages: readonly Page[],
   language: Language,
   pageLabel: (number: number) => string,
+  fallbackLanguage: Language = 'ja',
 ): DesignPreviewPage[] {
   return pages.map((page, pageIndex) => ({
     pageIndex,
     pageId: page.pageId,
-    title: text(page.title, language) || pageLabel(pageIndex + 1),
+    title: text(page.title, language, fallbackLanguage) || pageLabel(pageIndex + 1),
   }));
 }

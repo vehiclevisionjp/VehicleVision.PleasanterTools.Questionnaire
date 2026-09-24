@@ -6,9 +6,9 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 /// <summary>本アプリが画面に出せる言語。</summary>
 /// <remarks>
 /// <para>
-/// **落とし先は必ず <see cref="LocalizedText.DefaultLanguage"/>。**
-/// 未翻訳の設問が 1 つあっただけで画面が空になっては困る
-/// （<c>_documents/データモデル設計.md</c> 2.3）。
+/// <see cref="LocalizedText.DefaultLanguage"/> はデータの既定。
+/// アンケートの中身は <see cref="SurveyDefinition.FallbackLanguage"/> で
+/// アンケートごとの落とし先を選べる。
 /// </para>
 /// <para>
 /// **ここに無い言語は「指定されなかった」ものとして扱う。** 例外にしない。

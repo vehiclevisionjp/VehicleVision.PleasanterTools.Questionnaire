@@ -192,8 +192,11 @@
     currentStep ? applyShuffle(currentStep.page, currentStep.questions, previewSeed) : [],
   );
   const designPages = $derived(
-    listDesignPreviewPages(definition.pages, language, (number) =>
-      t('preview.page', { number }),
+    listDesignPreviewPages(
+      definition.pages,
+      language,
+      (number) => t('preview.page', { number }),
+      definition.fallbackLanguage,
     ),
   );
   const designPage = $derived(
@@ -203,7 +206,11 @@
     designPage ? applyShuffle(designPage, designPage.questions, previewSeed) : [],
   );
   const confirmation = $derived(
-    noteBlocks(parsedNotes[CONFIRMATION_NOTE_ID] ?? null, language),
+    noteBlocks(
+      parsedNotes[CONFIRMATION_NOTE_ID] ?? null,
+      language,
+      definition.fallbackLanguage,
+    ),
   );
 
   const progress = $derived(
@@ -254,7 +261,13 @@
 
   function goNext() {
     if (currentStep) {
-      errors = validatePage(currentStep.questions, answers, formText, language);
+      errors = validatePage(
+        currentStep.questions,
+        answers,
+        formText,
+        language,
+        definition.fallbackLanguage,
+      );
       if (Object.keys(errors).length > 0) {
         return;
       }
@@ -355,9 +368,11 @@
       {#if headerImageUrl}
         <img class="header-image" src={headerImageUrl} alt="" />
       {/if}
-      <h2>{text(definition.title, language)}</h2>
+      <h2>{text(definition.title, language, definition.fallbackLanguage)}</h2>
       {#if definition.description}
-        <p class="lead">{text(definition.description, language)}</p>
+        <p class="lead">
+          {text(definition.description, language, definition.fallbackLanguage)}
+        </p>
       {/if}
     {/if}
 
@@ -386,7 +401,11 @@
           <div class="status"><NoteContent blocks={confirmation} {assetUrl} /></div>
         {:else}
           <p class="status">
-            {text(definition.confirmationMessage, language) || t('preview.completedThanks')}
+            {text(
+              definition.confirmationMessage,
+              language,
+              definition.fallbackLanguage,
+            ) || t('preview.completedThanks')}
           </p>
         {/if}
         {#if definition.allowEditingAfterSubmit}
@@ -396,16 +415,19 @@
       </section>
     {:else if previewMode === 'design' && designPage}
       {#if designPage.title}
-        <h3>{text(designPage.title, language)}</h3>
+        <h3>{text(designPage.title, language, definition.fallbackLanguage)}</h3>
       {/if}
       {#if designPage.description}
-        <p class="lead">{text(designPage.description, language)}</p>
+        <p class="lead">
+          {text(designPage.description, language, definition.fallbackLanguage)}
+        </p>
       {/if}
 
       {#each designQuestions as question (question.questionId)}
         <QuestionField
           question={withNoteBlocks(question) as never}
           {language}
+          fallbackLanguage={definition.fallbackLanguage}
           {assetUrl}
           bind:answer={
             () => ensure(question.questionId), (value) => (answers[question.questionId] = value)
@@ -418,16 +440,19 @@
       <p class="empty">{t('preview.empty')}</p>
     {:else}
       {#if currentStep?.page.title}
-        <h3>{text(currentStep.page.title, language)}</h3>
+        <h3>{text(currentStep.page.title, language, definition.fallbackLanguage)}</h3>
       {/if}
       {#if currentStep?.page.description}
-        <p class="lead">{text(currentStep.page.description, language)}</p>
+        <p class="lead">
+          {text(currentStep.page.description, language, definition.fallbackLanguage)}
+        </p>
       {/if}
 
       {#each currentQuestions as question (question.questionId)}
         <QuestionField
           question={withNoteBlocks(question) as never}
           {language}
+          fallbackLanguage={definition.fallbackLanguage}
           {assetUrl}
           bind:answer={
             () => ensure(question.questionId), (value) => (answers[question.questionId] = value)
