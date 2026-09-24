@@ -72,13 +72,15 @@ public class AdminSurveyEndToEndTests
         int revision,
         bool withMapping,
         long assetHistorySiteId = 0,
-        bool withAssetHistoryMapping = false) => new
+        bool withAssetHistoryMapping = false,
+        string fallbackLanguage = "ja") => new
     {
         revision,
         definition = new
         {
             surveyId,
             version = 1,
+            fallbackLanguage,
             title = new { ja = "満足度調査" },
             pages = new[]
             {
@@ -140,6 +142,25 @@ public class AdminSurveyEndToEndTests
                 : [],
         },
     };
+
+    [Fact]
+    public async Task 対応外の落とし先言語は保存できない()
+    {
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using var response = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: false,
+                fallbackLanguage: "fr"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await ReadAsync(response);
+        Assert.Equal("fallbackLanguage", body!["fields"]![0]!.GetValue<string>());
+    }
 
     private static async Task<string> CreateSurveyAsync(HttpClient http)
     {

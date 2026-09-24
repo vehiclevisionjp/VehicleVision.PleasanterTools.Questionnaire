@@ -5,6 +5,18 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Definitions;
 public class LocalizedTextTests
 {
     [Fact]
+    public void 指定した落とし先の言語を返す()
+    {
+        var text = new LocalizedText(new Dictionary<string, string>
+        {
+            ["ja"] = "日本語",
+            ["en"] = "English",
+        });
+
+        Assert.Equal("English", text.Get("de", "en"));
+    }
+
+    [Fact]
     public void 指定した言語の文字列を返す()
     {
         var text = new LocalizedText(new Dictionary<string, string>
