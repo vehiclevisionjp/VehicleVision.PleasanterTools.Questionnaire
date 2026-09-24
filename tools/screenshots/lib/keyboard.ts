@@ -1,4 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
+import { currentRevision } from './survey';
 
 /**
  * キーボード操作を確かめるため、回答部品を一通り載せたアンケートを作って公開する。
@@ -83,7 +84,11 @@ export async function prepareKeyboardSurvey(
   };
 
   const saved = await request.put(`/api/admin/surveys/${surveyId}`, {
-    data: { revision: 0, definition, mapping: { assignments: [] } },
+    data: {
+      revision: await currentRevision(request, surveyId),
+      definition,
+      mapping: { assignments: [] },
+    },
   });
   if (!saved.ok()) {
     throw new Error(`下書きを保存できなかった: ${saved.status()} ${await saved.text()}`);

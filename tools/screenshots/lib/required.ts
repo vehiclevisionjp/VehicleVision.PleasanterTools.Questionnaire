@@ -1,4 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
+import { currentRevision } from './survey';
 
 /**
  * **必須の断り方とページの行き来**を確かめる見本を作って公開する（Issue #120）。
@@ -94,7 +95,11 @@ export async function prepareRequiredSurvey(
   };
 
   const saved = await request.put(`/api/admin/surveys/${surveyId}`, {
-    data: { revision: 0, definition, mapping: { assignments: [] } },
+    data: {
+      revision: await currentRevision(request, surveyId),
+      definition,
+      mapping: { assignments: [] },
+    },
   });
   if (!saved.ok()) {
     throw new Error(`下書きを保存できなかった: ${saved.status()} ${await saved.text()}`);

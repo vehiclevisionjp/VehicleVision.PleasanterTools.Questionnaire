@@ -1,4 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
+import { currentRevision } from './survey';
 
 /**
  * 分岐を確かめるための見本アンケートを作って公開する。
@@ -123,7 +124,7 @@ export async function prepareBranchingSurvey(
   };
 
   const saved = await request.put(`/api/admin/surveys/${surveyId}`, {
-    data: { revision: 0, definition, mapping },
+    data: { revision: await currentRevision(request, surveyId), definition, mapping },
   });
   if (!saved.ok()) {
     throw new Error(`下書きを保存できなかった: ${saved.status()} ${await saved.text()}`);
@@ -251,7 +252,7 @@ export async function prepareFlowchartDraft(
 
   const saved = await request.put(`/api/admin/surveys/${surveyId}`, {
     data: {
-      revision: 0,
+      revision: await currentRevision(request, surveyId),
       definition: {
         surveyId,
         version: 1,

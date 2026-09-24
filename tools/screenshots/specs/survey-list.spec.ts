@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
 import { ensureAdminStorageState } from '../lib/admin';
+import { currentRevision } from '../lib/survey';
 
 /**
  * アンケート一覧のページ送りと絞り込みを実機で確かめる（Issue #79）。
@@ -125,7 +126,11 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
       };
 
       const saved = await context.request.put(`/api/admin/surveys/${surveyId}`, {
-        data: { revision: 0, definition, mapping: { assignments: [] } },
+        data: {
+          revision: await currentRevision(context.request, surveyId),
+          definition,
+          mapping: { assignments: [] },
+        },
       });
       expect(saved.ok(), await saved.text()).toBe(true);
 
