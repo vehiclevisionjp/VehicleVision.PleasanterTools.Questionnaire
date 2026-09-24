@@ -95,7 +95,9 @@
 
   $effect(() => {
     // **題名も言語に合わせる。** タブに出るのはこれ
-    const title = definition ? text(definition.title, language) : '';
+    const title = definition
+      ? text(definition.title, language, definition.fallbackLanguage)
+      : '';
     if (title !== '') {
       document.title = title;
     }
@@ -498,7 +500,13 @@
    */
   function checkCurrentStep(): boolean {
     if (!currentStep) return true;
-    errors = validatePage(currentStep.questions, answers, t, language);
+    errors = validatePage(
+      currentStep.questions,
+      answers,
+      t,
+      language,
+      definition?.fallbackLanguage,
+    );
     return Object.keys(errors).length === 0;
   }
 
@@ -768,12 +776,17 @@
     {#if recordsAssetHistory}
       <p class="status" role="note">{t('assetHistory.notice')}</p>
     {/if}
-    {@const confirmation = noteBlocks(definition.confirmationBlocks, language)}
+    {@const confirmation = noteBlocks(
+      definition.confirmationBlocks,
+      language,
+      definition.fallbackLanguage,
+    )}
     {#if confirmation.length > 0}
       <div class="status"><NoteContent blocks={confirmation} assetUrl={contentAssetUrl} /></div>
     {:else}
       <p class="status">
-        {text(definition.confirmationMessage, language) || t('completed.thanks')}
+        {text(definition.confirmationMessage, language, definition.fallbackLanguage) ||
+          t('completed.thanks')}
       </p>
     {/if}
     {#if definition.allowEditingAfterSubmit && !assetTicketVisit}
@@ -791,9 +804,9 @@
       {#if headerImage}
         <img class="header-image" src={headerImage} alt="" />
       {/if}
-      <h1>{text(definition.title, language)}</h1>
+      <h1>{text(definition.title, language, definition.fallbackLanguage)}</h1>
       {#if definition.description}
-        <p class="lead">{text(definition.description, language)}</p>
+        <p class="lead">{text(definition.description, language, definition.fallbackLanguage)}</p>
       {/if}
 
       {#if definition.showProgress && steps.length > 1}
@@ -832,9 +845,11 @@
       <p class="draft-notice" role="status">{draftNotice}</p>
     {/if}
 
-    {#if currentPage.title}<h2>{text(currentPage.title, language)}</h2>{/if}
+    {#if currentPage.title}
+      <h2>{text(currentPage.title, language, definition.fallbackLanguage)}</h2>
+    {/if}
     {#if currentPage.description}
-      <p class="lead">{text(currentPage.description, language)}</p>
+      <p class="lead">{text(currentPage.description, language, definition.fallbackLanguage)}</p>
     {/if}
 
     <!--
@@ -854,6 +869,7 @@
         <QuestionField
           {question}
           {language}
+          fallbackLanguage={definition.fallbackLanguage}
           assetUrl={contentAssetUrl}
           bind:answer={answers[question.questionId]}
           error={errors[question.questionId]}

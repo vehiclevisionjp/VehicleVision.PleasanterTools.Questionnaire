@@ -98,6 +98,24 @@ public class AuditLogFilterTests
     }
 
     [Fact]
+    public async Task 明示した救済の読み取りは秘密を除いて残す()
+    {
+        var context = Request("GET", "/back-office");
+        context.Request.QueryString = new QueryString("?rescue=do-not-record-this-secret");
+        AuditNotes.RecordRead(context);
+        AuditNotes.SetTarget(context, "AdminRescue", targetId: null);
+        AuditNotes.Add(context, "result", "failed");
+
+        var store = await RunAsync(context, Results.Redirect("/back-office"));
+
+        var entry = Assert.Single(store.Written);
+        Assert.Equal("GET /back-office", entry.Action);
+        Assert.Equal("AdminRescue", entry.TargetType);
+        Assert.Contains("\"result\":\"failed\"", entry.DetailJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("do-not-record-this-secret", entry.DetailJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task 変える操作は残す()
     {
         var actor = Guid.NewGuid();

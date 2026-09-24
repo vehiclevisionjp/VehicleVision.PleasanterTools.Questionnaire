@@ -9,6 +9,7 @@ public class SurveyJsonTests
     {
         SurveyId = "s1",
         Version = 7,
+        FallbackLanguage = "en",
         Title = new LocalizedText(new Dictionary<string, string>
         {
             ["ja"] = "顧客満足度アンケート",
@@ -88,6 +89,7 @@ public class SurveyJsonTests
 
         Assert.NotNull(restored);
         Assert.Equal(7, restored.Version);
+        Assert.Equal("en", restored.FallbackLanguage);
         Assert.Equal(DisplayMode.OneQuestionPerPage, restored.DisplayMode);
         Assert.False(restored.ShowProgress);
         Assert.Equal(AssetTicketExpiration.AcceptTo, restored.AssetDelivery!.Expiration);
@@ -110,6 +112,18 @@ public class SurveyJsonTests
         Assert.True(question.Settings.TrimWhitespace);
         Assert.Equal(TextFormat.Email, question.Settings.Format);
         Assert.True(restored.FindQuestion("note1")!.IsDisplayOnly);
+    }
+
+    [Fact]
+    public void 落とし先を持たない過去の定義は日本語を既定にする()
+    {
+        const string json =
+            """{"surveyId":"s1","version":1,"title":{"ja":"アンケート"},"pages":[]}""";
+
+        var restored = SurveyJson.Deserialize<SurveyDefinition>(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal(LocalizedText.DefaultLanguage, restored.FallbackLanguage);
     }
 
     [Fact]

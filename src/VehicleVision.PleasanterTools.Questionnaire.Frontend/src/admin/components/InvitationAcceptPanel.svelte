@@ -3,6 +3,7 @@
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
   import { solveAltcha } from '../../lib/altcha';
+  import { adminUrl } from '../lib/adminPath';
 
   const MINIMUM_PASSWORD_LENGTH = 12;
 
@@ -61,7 +62,7 @@
 
     password = '';
     confirmation = '';
-    history.replaceState(null, '', '/admin');
+    history.replaceState(null, '', adminUrl());
     onadvance();
   }
 </script>

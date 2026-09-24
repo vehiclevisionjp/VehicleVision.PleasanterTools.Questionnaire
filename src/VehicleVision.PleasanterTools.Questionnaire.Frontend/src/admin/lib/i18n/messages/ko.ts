@@ -365,7 +365,9 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'editor.shuffleBlockedByVisibility': '표시 조건이 설정된 질문이 있으므로 지정할 수 없습니다. 표시 조건에서 참조할 수 있는 것은 앞에 있는 설문만이므로, 순서를 바꾸면 조건이 성립하지 않게 됩니다.',
   'editor.editingLanguage': '편집할 언어',
   'editor.editingLanguageHint': '입력한 텍스트는 이 언어로 저장됩니다. 다른 언어의 텍스트는 그대로 유지됩니다.',
-  'editor.fallbackNotice': '이 언어의 텍스트가 입력되지 않은 항목은 답변 화면에 일본어로 표시됩니다.',
+  'editor.fallbackLanguage': '번역이 없을 때 표시할 언어',
+  'editor.fallbackLanguageHint':
+    '응답자의 언어에 질문·선택지·제목의 번역이 없는 경우, 이 언어의 문구를 표시합니다. 「편집할 언어」와는 다른 설정입니다.',
   'questionImport.open': '다른 설문조사에서 캡처',
   'questionImport.title': '질문을 캡처',
   'questionImport.close': '닫다',

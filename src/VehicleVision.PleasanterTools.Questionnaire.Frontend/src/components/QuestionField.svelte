@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { AnswerState, Question } from '../lib/types';
+  import type { AnswerState, LocalizedText, Question } from '../lib/types';
   import {
     allowsMultiplePerRow,
     confirmAnswer,
     hasSelectionRange,
     isConfirmed,
     rowValues,
-    text,
+    text as localizedText,
   } from '../lib/types';
-  import type { Language } from '../lib/i18n/language';
+  import { DEFAULT_LANGUAGE, type Language } from '../lib/i18n/language';
   import { translator } from '../lib/i18n/messages';
   import { hasAnswerNormalization, normalizeAnswer } from '../lib/answerNormalization';
   import { noteBlocks } from '../lib/note';
@@ -19,6 +19,8 @@
     question: Question;
     /** 画面に出す言語。**設問の文言も画面の文言もこれで決まる。** */
     language: Language;
+    /** 訳が無いときに表示する言語。 */
+    fallbackLanguage?: Language;
     /** **まだ初期化されていないことがある。** 辞書からそのまま渡ってくるため */
     answer: AnswerState | undefined;
     error?: string;
@@ -26,9 +28,20 @@
     assetUrl?: (assetId: string) => string;
   }
 
-  let { question, language, answer = $bindable(), error, assetUrl }: Props = $props();
+  let {
+    question,
+    language,
+    fallbackLanguage = DEFAULT_LANGUAGE,
+    answer = $bindable(),
+    error,
+    assetUrl,
+  }: Props = $props();
 
   const t = $derived(translator(language));
+
+  function text(value: LocalizedText | undefined, _language: Language): string {
+    return localizedText(value, language, fallbackLanguage);
+  }
 
   /** 読み取り用。未初期化なら空の回答として扱う。 */
   const current = $derived<AnswerState>(answer ?? { values: [], otherText: '' });
@@ -183,7 +196,7 @@
 
   const descriptionBlocks = $derived(
     question.settings.descriptionFormat === 'Markup'
-      ? noteBlocks(question.descriptionBlocks, language)
+      ? noteBlocks(question.descriptionBlocks, language, fallbackLanguage)
       : [],
   );
 
@@ -194,7 +207,7 @@
 
 <!-- 説明文ブロックは回答を持たない -->
 {#if question.type === 'Note'}
-  {@const blocks = noteBlocks(question.noteBlocks, language)}
+  {@const blocks = noteBlocks(question.noteBlocks, language, fallbackLanguage)}
   <section class="note">
     <h3>{text(question.title, language)}</h3>
     <!-- **書式の付いた本文があればそちらを出す**（Issue #108）。
@@ -206,7 +219,7 @@
     {/if}
   </section>
 {:else if question.type === 'Embed'}
-  <EmbedBlock {question} {language} />
+  <EmbedBlock {question} {language} {fallbackLanguage} />
 {:else}
   <fieldset class="field" class:has-error={error !== undefined}>
     {#if question.type !== 'Confirm'}

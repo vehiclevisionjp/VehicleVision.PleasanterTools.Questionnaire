@@ -47,7 +47,7 @@ public class EndpointGraphTests
         app.MapAdminAutoReplyEndpoints();
         app.MapAdminNotificationEndpoints();
         app.MapAdminOutboxEndpoints();
-        app.MapAdminSamlEndpoints();
+        app.MapAdminSamlEndpoints(new AdminPathOptions(AdminPathOptions.DefaultPath));
         app.MapAdminSurveyEndpoints();
         app.MapAdminTemplateEndpoints();
         app.MapAdminUserEndpoints();
