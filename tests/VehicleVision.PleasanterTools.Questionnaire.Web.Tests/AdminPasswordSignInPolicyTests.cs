@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -11,7 +13,7 @@ public class AdminPasswordSignInPolicyTests
     {
         var policy = Policy(enabled: true);
 
-        Assert.True(policy.IsAllowed(samlEnabled: true));
+        Assert.True(policy.IsAllowed(new DefaultHttpContext(), samlEnabled: true));
     }
 
     [Fact]
@@ -19,7 +21,7 @@ public class AdminPasswordSignInPolicyTests
     {
         var policy = Policy(enabled: false);
 
-        Assert.False(policy.IsAllowed(samlEnabled: true));
+        Assert.False(policy.IsAllowed(new DefaultHttpContext(), samlEnabled: true));
     }
 
     [Fact]
@@ -27,11 +29,45 @@ public class AdminPasswordSignInPolicyTests
     {
         var policy = Policy(enabled: false);
 
-        Assert.True(policy.IsAllowed(samlEnabled: false));
+        Assert.True(policy.IsAllowed(new DefaultHttpContext(), samlEnabled: false));
     }
 
-    private static AdminPasswordSignInPolicy Policy(bool enabled) =>
+    [Fact]
+    public void 正しい救済トークンだけが合言葉の入口を開く()
+    {
+        var policy = Policy(enabled: false, rescueToken: new string('x', 32));
+        var rescue = new DefaultHttpContext();
+
+        Assert.True(policy.TryGrantRescue(rescue, new string('x', 32)));
+
+        var setCookie = Assert.Single(rescue.Response.Headers.SetCookie);
+        var request = new DefaultHttpContext();
+        request.Request.Headers.Cookie = setCookie[..setCookie.IndexOf(';')];
+        Assert.True(policy.IsAllowed(request, samlEnabled: true));
+    }
+
+    [Fact]
+    public void 違う救済トークンでは合言葉の入口を開かない()
+    {
+        var policy = Policy(enabled: false, rescueToken: new string('x', 32));
+
+        Assert.False(policy.TryGrantRescue(new DefaultHttpContext(), new string('y', 32)));
+    }
+
+    [Fact]
+    public void 救済トークンが未設定なら逃げ道は存在しない()
+    {
+        var policy = Policy(enabled: false);
+
+        Assert.False(policy.TryGrantRescue(new DefaultHttpContext(), new string('x', 32)));
+    }
+
+    private static AdminPasswordSignInPolicy Policy(
+        bool enabled,
+        string? rescueToken = null) =>
         new(
-            new AdminPasswordSignInOptions(enabled, RescueToken: null),
+            new AdminPasswordSignInOptions(enabled, rescueToken),
+            new EphemeralDataProtectionProvider(),
+            TimeProvider.System,
             NullLogger<AdminPasswordSignInPolicy>.Instance);
 }

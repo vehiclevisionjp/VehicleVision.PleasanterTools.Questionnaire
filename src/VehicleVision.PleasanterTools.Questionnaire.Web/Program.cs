@@ -964,9 +964,18 @@ var adminHtml = new Lazy<string?>(() =>
 });
 
 // ⚠️ **ここは UseStaticFiles の設定を通らない**ので、キャッシュの指示を自分で付ける（Issue #425）
-IResult AdminPage(HttpContext context)
+IResult AdminPage(HttpContext context, AdminPasswordSignInPolicy passwordSignIn)
 {
     context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
+
+    if (context.Request.Query.TryGetValue("rescue", out var rescue))
+    {
+        // **照合後は秘密を URL から落とす。** 履歴や次の要求の Referer に残し続けない。
+        passwordSignIn.TryGrantRescue(
+            context,
+            rescue.Count == 1 ? rescue[0] : null);
+        return Results.Redirect(adminPath.Path);
+    }
 
     // **画面が置かれていないときは、今までどおり見つからないものとして返す。**
     return adminHtml.Value is { } html

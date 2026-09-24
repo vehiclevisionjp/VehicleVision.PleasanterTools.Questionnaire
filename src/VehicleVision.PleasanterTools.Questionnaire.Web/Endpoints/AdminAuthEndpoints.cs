@@ -62,7 +62,7 @@ public static class AdminAuthEndpoints
             var samlEnabled = saml.Enabled;
             var samlLabel = saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null;
             var passwordSignInEnabled =
-                setupRequired || passwordSignIn.IsAllowed(samlEnabled);
+                setupRequired || passwordSignIn.IsAllowed(context, samlEnabled);
 
             var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             if (session.Succeeded)
@@ -248,7 +248,7 @@ public static class AdminAuthEndpoints
             AuditNotes.Add(context, "loginId", request.LoginId);
 
             var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
-            if (!passwordSignIn.IsAllowed(saml.Enabled))
+            if (!passwordSignIn.IsAllowed(context, saml.Enabled))
             {
                 // **画面から隠すだけでは足りない。** API を直接叩かれても認証しない。
                 return Results.NotFound();
