@@ -634,6 +634,7 @@ export type AdminPermission =
   | 'users.write'
   | 'users.resetTwoFactor'
   | 'settings.saml'
+  | 'settings.pleasanterSso'
   | 'settings.manage'
   | 'maintenance.manage';
 
@@ -675,6 +676,47 @@ export interface SamlSettings {
   buttonLabel: string;
   singleLogoutUrl: string;
   fixedFields: Record<SamlSettingField, boolean>;
+}
+
+/** Pleasanter のログインで入る設定（Issue #464）。**秘密の値は無い。** */
+export interface PleasanterSsoSettings {
+  enabled: boolean;
+  internalBaseUrl: string;
+  loginUrl: string;
+  logoutUrl: string;
+  sqlName: string;
+  cookieNames: string;
+  unknownUser: string;
+  registerRole: string;
+  revalidateMinutes: string;
+  timeoutSeconds: string;
+  buttonLabel: string;
+  fixedFields: Record<PleasanterSsoSettingField, boolean>;
+}
+
+export type PleasanterSsoSettingField =
+  | 'enabled'
+  | 'internalBaseUrl'
+  | 'loginUrl'
+  | 'logoutUrl'
+  | 'sqlName'
+  | 'cookieNames'
+  | 'unknownUser'
+  | 'registerRole'
+  | 'revalidateMinutes'
+  | 'timeoutSeconds'
+  | 'buttonLabel';
+
+/** 設定画面の「接続の試験」の結果（Issue #464）。 */
+export interface PleasanterSsoTestResult {
+  status: 'Authenticated' | 'Unauthenticated' | 'UpstreamError';
+  reason?: string;
+  tenantId?: number;
+  userId?: number;
+  loginId?: string;
+  name?: string | null;
+  /** 返ったログイン ID の管理者が本アプリに居るか。 */
+  registered?: boolean;
 }
 
 export type SamlSettingField =
@@ -766,6 +808,29 @@ export interface AdminSession {
 
   /** SAML の釦に出す文字。`null` なら決まった文言を使う */
   samlLabel?: string | null;
+
+  /** Pleasanter のログインで入れるか（Issue #464）。**既定は無効** */
+  pleasanterSsoEnabled?: boolean;
+
+  /** Pleasanter の釦に出す文字。`null` なら決まった文言を使う */
+  pleasanterSsoLabel?: string | null;
+
+  /**
+   * ブラウザで開く Pleasanter のログイン画面（Issue #464）。
+   *
+   * **同じホストの相対パスのことがある**（`/users/login`）。内部 URL は返らない。
+   */
+  pleasanterSsoLoginUrl?: string | null;
+
+  /** この人が Pleasanter のログインで入ったか（Issue #464）。**認証済みのときだけ載る。** */
+  viaPleasanterSso?: boolean;
+
+  /**
+   * ログアウトの後に開く Pleasanter のログアウト画面（Issue #464）。
+   *
+   * **Pleasanter のログインで入った人で、設定されているときだけ載る。**
+   */
+  pleasanterSsoLogoutUrl?: string | null;
 
   /**
    * IdP へログアウトを頼めるか（Issue #191）。
