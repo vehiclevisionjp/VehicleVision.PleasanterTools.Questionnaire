@@ -441,14 +441,7 @@
   ⚠️ **パンくず・帯・本体がそれぞれ別の幅を持っていた**（80rem / 77rem / 56rem）ため、
   同じ画面で左右の端が階段状にずれていた。
 -->
-<div
-  class="shell"
-  class:wide={(openAuditLog && canSeeAuditLog) ||
-    (openOutbox && canSeeOutbox) ||
-    (openNotifications && canSeeNotifications) ||
-    (openUsers && canSeeUsers) ||
-    openSurveyId !== null}
->
+<div class="shell">
   {#if loading}
     <p class="status">{t('app.loading')}</p>
   {:else if failed}
@@ -882,16 +875,13 @@
     **ページの幅は --page-max-width 1 本で決まる**（Issue #433）。
     パンくず・帯・本体が同じ値を見るので、**どの画面でも左右の端が揃う。**
   */
-  .shell {
-    --page-max-width: 56rem;
-  }
-
   /*
-    **桁の多い画面はここを使う**（アンケート一覧・2 カラムの編集）。
-    ⚠️ **80rem では足りない。** 一覧は 7 桁あり、行ごとに釦が最大 7 つ並ぶので、
-    **題名か回答用 URL のどちらかが 1 文字ずつ折り返す**（実測。2026-09-16）
+    **どの画面も同じ幅にする**（Issue #436）。
+    ⚠️ **画面ごとに端の位置が変わると、行き来したときに落ち着かない。**
+    一覧は 7 桁あり行ごとに釦が最大 7 つ並ぶ、編集は左右 2 カラムと、
+    **広い側に合わせないと成り立たない画面がある**ので、そちらへ揃える。
   */
-  .shell.wide {
+  .shell {
     --page-max-width: 100rem;
   }
 
