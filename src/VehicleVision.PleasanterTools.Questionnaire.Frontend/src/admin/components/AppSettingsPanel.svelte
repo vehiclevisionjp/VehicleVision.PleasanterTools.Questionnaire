@@ -288,9 +288,17 @@
 </section>
 
 <style lang="scss">
+  /*
+    ⚠️ **ページの幅は呼び出し側が決める**（Issue #436）。
+    ここで 52rem を持っていたため、**ほかの画面と端がずれていた。**
+    1 行の入力欄が長くなりすぎる分は、下の form 側で絞る。
+  */
   section {
-    max-width: 52rem;
     margin: 0 auto;
+  }
+
+  form {
+    max-width: 52rem;
   }
   .head {
     display: flex;
