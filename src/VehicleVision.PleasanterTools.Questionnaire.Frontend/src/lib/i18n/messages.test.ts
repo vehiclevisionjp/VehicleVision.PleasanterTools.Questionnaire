@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { en, ja, serverValidationKey, translator, type MessageKey } from './messages';
+import {
+  de,
+  en,
+  es,
+  ja,
+  ko,
+  serverValidationKey,
+  translator,
+  vi,
+  zh,
+  type MessageKey,
+} from './messages';
+
+const catalogs = { ja, en, zh, de, ko, es, vi };
+
+function placeholders(value: string): string[] {
+  return [...value.matchAll(/\{(\w+)\}/g)]
+    .map((match) => match[1]!)
+    .filter((name, index, names) => names.indexOf(name) === index)
+    .sort();
+}
 
 describe('serverValidationKey', () => {
   it('文言のある符号はその鍵を返す', () => {
@@ -23,11 +43,27 @@ describe('文言の集合', () => {
   });
 
   it('空の文言を置かない', () => {
-    for (const [key, value] of Object.entries(ja)) {
-      expect(value, `ja.${key}`).not.toBe('');
+    for (const [language, catalog] of Object.entries(catalogs)) {
+      for (const [key, value] of Object.entries(catalog)) {
+        expect(value, `${language}.${key}`).not.toBe('');
+      }
     }
-    for (const [key, value] of Object.entries(en)) {
-      expect(value, `en.${key}`).not.toBe('');
+  });
+
+  it('各言語のカタログに日本語カタログに無い鍵がない', () => {
+    for (const [language, catalog] of Object.entries(catalogs)) {
+      const extra = Object.keys(catalog).filter((key) => !(key in ja));
+      expect(extra, language).toEqual([]);
+    }
+  });
+
+  it('各言語にある文言の差し込み名が日本語と一致する', () => {
+    for (const [language, catalog] of Object.entries(catalogs)) {
+      for (const [key, value] of Object.entries(catalog)) {
+        expect(placeholders(value), `${language}.${key}`).toEqual(
+          placeholders(ja[key as MessageKey]),
+        );
+      }
     }
   });
 });

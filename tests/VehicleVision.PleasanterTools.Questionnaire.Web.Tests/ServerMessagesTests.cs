@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
@@ -12,6 +14,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 /// </remarks>
 public class ServerMessagesTests
 {
+    private static IReadOnlyDictionary<string, LocalizedText> Catalog() =>
+        (IReadOnlyDictionary<string, LocalizedText>)typeof(ServerMessages)
+            .GetField("Catalog", BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetValue(null)!;
+
     private static IReadOnlyList<string> DeclaredKeys() =>
         typeof(ServerMessageKeys)
             .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
@@ -40,6 +47,54 @@ public class ServerMessagesTests
             extra.Length == 0,
             "カタログにあって ServerMessageKeys に無い鍵がある。"
             + $"**呼べない文言は消し忘れ**: {string.Join("、", extra)}");
+    }
+
+    [Fact]
+    public void 各言語のカタログに日本語カタログに無い鍵は無い()
+    {
+        var catalog = Catalog();
+        var japaneseKeys = catalog
+            .Where(pair => pair.Value.TryGet("ja", out _))
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        foreach (var language in SupportedLanguages.All)
+        {
+            var extra = catalog
+                .Where(pair => pair.Value.TryGet(language, out _))
+                .Select(pair => pair.Key)
+                .Except(japaneseKeys)
+                .ToArray();
+
+            Assert.True(
+                extra.Length == 0,
+                $"{language} に日本語カタログに無い鍵がある: {string.Join("、", extra)}");
+        }
+    }
+
+    [Fact]
+    public void 各言語にある文言の差し込み番号が日本語と一致する()
+    {
+        static string[] Placeholders(string value) =>
+            Regex.Matches(value, @"\{(\d+)(?:[^}]*)?\}")
+                .Select(match => match.Groups[1].Value)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+        foreach (var (key, text) in Catalog())
+        {
+            Assert.True(text.TryGet("ja", out var japanese), $"ja.{key} が無い");
+            var expected = Placeholders(japanese);
+
+            foreach (var language in text.Languages)
+            {
+                Assert.True(text.TryGet(language, out var translated));
+                Assert.True(
+                    expected.SequenceEqual(Placeholders(translated), StringComparer.Ordinal),
+                    $"{language}.{key} の差し込みが日本語と一致しない");
+            }
+        }
     }
 
     [Fact]
