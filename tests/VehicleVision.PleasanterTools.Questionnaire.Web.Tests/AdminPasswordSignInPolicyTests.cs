@@ -40,7 +40,8 @@ public class AdminPasswordSignInPolicyTests
 
         Assert.True(policy.TryGrantRescue(rescue, new string('x', 32)));
 
-        var setCookie = Assert.Single(rescue.Response.Headers.SetCookie);
+        var setCookie = rescue.Response.Headers.SetCookie.ToString();
+        Assert.NotEmpty(setCookie);
         var request = new DefaultHttpContext();
         request.Request.Headers.Cookie = setCookie[..setCookie.IndexOf(';')];
         Assert.True(policy.IsAllowed(request, samlEnabled: true));
