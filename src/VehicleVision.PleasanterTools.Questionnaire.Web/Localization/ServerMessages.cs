@@ -72,13 +72,87 @@ public static class ServerMessages
         void AddAll(string key, IReadOnlyDictionary<string, string> byLanguage) =>
             catalog.Add(key, new LocalizedText(byLanguage));
 
+        var german = new Dictionary<string, string>
+        {
+            [ServerMessageKeys.InvalidCredentials] = "Die Anmelde-ID oder der eingegebene Wert ist nicht korrekt.",
+            [ServerMessageKeys.LoginIdAndPasswordRequired] = "Geben Sie Ihre Anmelde-ID und Ihr Passwort ein.",
+            [ServerMessageKeys.AdministratorAlreadyExists] = "Ein Administrator wurde bereits registriert.",
+            [ServerMessageKeys.LoginTemporarilyLocked] = "Zu viele Versuche. Die Anmeldung ist für eine Weile nicht verfügbar; versuchen Sie es später erneut.",
+            [ServerMessageKeys.EnrollmentRestartRequired] = "Starten Sie die Registrierung erneut.",
+            [ServerMessageKeys.TotpCodeMismatch] = "Dieser Code stimmt nicht überein. Prüfen Sie die Nummer in Ihrer Authenticator-App.",
+            [ServerMessageKeys.TwoFactorDisabled] = "Die Zwei-Faktor-Authentifizierung ist deaktiviert. Bitten Sie Ihren Administrator, die Einstellung zu ändern.",
+            [ServerMessageKeys.TwoFactorRequired] = "Die Zwei-Faktor-Authentifizierung ist erforderlich und kann daher nicht entfernt werden.",
+            [ServerMessageKeys.TwoFactorNotEnrolled] = "Die Zwei-Faktor-Authentifizierung ist nicht eingerichtet.",
+            [ServerMessageKeys.PasswordTooShort] = "Verwenden Sie ein Passwort mit mindestens {0} Zeichen.",
+            [ServerMessageKeys.PasswordSameAsLoginId] = "Das Passwort darf nicht mit der Anmelde-ID übereinstimmen.",
+            [ServerMessageKeys.PasswordPolicyMismatch] = "Das Passwort erfüllt die erforderlichen Bedingungen nicht.",
+            [ServerMessageKeys.RoleNotSupported] = "Die Rolle muss Administrator, SurveyAdministrator, UserAdministrator, Editor oder Auditor sein.",
+            [ServerMessageKeys.AdminUserNotFound] = "Dieser Administrator wurde nicht gefunden.",
+            [ServerMessageKeys.DuplicateLoginId] = "Diese Anmelde-ID wird bereits verwendet.",
+            [ServerMessageKeys.InvalidInput] = "Überprüfen Sie Ihre Eingabe.",
+            [ServerMessageKeys.SelfNotAllowed] = "Sie können dies nicht für Ihr eigenes Konto tun. Bitten Sie einen anderen Administrator.",
+            [ServerMessageKeys.LastAdministrator] = "Kein anderer Administrator kann sich anmelden. Fügen Sie zuerst einen weiteren Administrator hinzu und bestätigen Sie dessen Anmeldung.",
+            [ServerMessageKeys.OperationTemporarilyLocked] = "Zu viele Versuche. Diese Aktion ist für eine Weile nicht verfügbar; versuchen Sie es später erneut.",
+            [ServerMessageKeys.InvitationInvalid] = "Diese Einladung kann nicht verwendet werden. Bitten Sie um eine neue Einladung.",
+            [ServerMessageKeys.CurrentPasswordRejected] = "Ihr aktuelles Passwort ist nicht korrekt.",
+            [ServerMessageKeys.UnsupportedLanguage] = "Diese Sprache wird nicht unterstützt.",
+            [ServerMessageKeys.AdminSessionNotFound] = "Diese Sitzung wurde nicht gefunden.",
+            [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "Die aktuelle Sitzung kann hier nicht beendet werden. Melden Sie sich stattdessen ab.",
+            [ServerMessageKeys.ResponseNotificationMailSubject] = "Neue Umfrageantworten",
+            [ServerMessageKeys.ResponseNotificationMailBody] = "Die Umfrage „{0}“ hat {1} neue Antwort(en) erhalten.\nZeitraum (UTC): {2} bis {3}\n\nZeigen Sie den Antwortinhalt in Pleasanter an.",
+            [ServerMessageKeys.RemovedSurvey] = "Gelöschte Umfrage",
+            [ServerMessageKeys.SurveyTitleRequired] = "Geben Sie einen Titel ein.",
+            [ServerMessageKeys.PleasanterSiteIdRequired] = "Geben Sie die Pleasanter-Site-ID an.",
+            [ServerMessageKeys.DefinitionAndMappingRequired] = "Sowohl die Definition als auch die Zuordnung sind erforderlich.",
+            [ServerMessageKeys.SurveyUpdatedByOther] = "Jemand anderes hat diese Umfrage aktualisiert. Laden Sie sie neu.",
+            [ServerMessageKeys.QuestionImportSourceInvalid] = "Die Quellumfrage kann nicht geöffnet werden. Prüfen Sie, ob sie gelöscht, archiviert oder geändert wurde.",
+            [ServerMessageKeys.QuestionImportSelectionRequired] = "Wählen Sie mindestens eine zu importierende Frage aus.",
+            [ServerMessageKeys.PublishBlockedByMapping] = "Veröffentlichung nicht möglich. Beheben Sie zuerst die Probleme in der Zuordnung.",
+            [ServerMessageKeys.PublishBlockedByFlow] = "Veröffentlichung nicht möglich. Beheben Sie zuerst die Probleme in der Verzweigung.",
+            [ServerMessageKeys.PublishBlockedBySettings] = "Veröffentlichung nicht möglich. Einige Fragen haben Einstellungen, die keine Antwort erfüllen kann.",
+            [ServerMessageKeys.AutoReplyTestSubjectPrefix] = "[Test] ",
+            [ServerMessageKeys.AutoReplyTestLoginIdNotEmail] = "Ihre Anmelde-ID ist keine E-Mail-Adresse, daher kann keine Testnachricht gesendet werden.",
+            [ServerMessageKeys.AutoReplyTestMailDisabled] = "Der E-Mail-Versand ist auf dem Server nicht aktiviert, daher kann keine Testnachricht gesendet werden.",
+            [ServerMessageKeys.AutoReplyTestQueueFailed] = "Die Testnachricht konnte nicht in die Warteschlange gestellt werden.",
+            [ServerMessageKeys.InvitationMailSubject] = "Sie wurden zur Umfrageverwaltung eingeladen",
+            [ServerMessageKeys.InvitationMailBody] = "Sie wurden zum Verwaltungsbildschirm für Umfragen eingeladen.\n\nÖffnen Sie die folgende URL und wählen Sie Ihr Passwort.\n{0}\n\nLäuft ab: {1} (UTC)\n\nWenn Sie dies nicht erwartet haben, löschen Sie diese Nachricht, ohne die URL zu öffnen.",
+            [ServerMessageKeys.PublishBlockedByAutoReply] = "Veröffentlichung nicht möglich. Die Einstellungen für automatische Antworten können keine E-Mail senden.",
+            [ServerMessageKeys.NoAnswerableQuestion] = "Es gibt keine Frage, die beantwortet werden kann.",
+            [ServerMessageKeys.NotPublishedYet] = "Diese Umfrage wurde noch nicht veröffentlicht.",
+            [ServerMessageKeys.VersionAlreadyPublished] = "Diese Version wurde bereits veröffentlicht. Laden Sie die Seite neu und versuchen Sie es erneut.",
+            [ServerMessageKeys.InvalidSurveyStatus] = "Diese Aktion ist im aktuellen Zustand nicht verfügbar. Laden Sie die Seite neu.",
+            [ServerMessageKeys.SurveyArchived] = "Diese Umfrage ist archiviert. Stellen Sie sie wieder her, bevor Sie Änderungen vornehmen.",
+            [ServerMessageKeys.InvalidArchiveState] = "Der Archivstatus wurde bereits geändert. Laden Sie die Seite neu.",
+            [ServerMessageKeys.SurveyDeleteRequiresArchive] = "Nur archivierte Umfragen können dauerhaft gelöscht werden. Archivieren Sie diese Umfrage zuerst.",
+            [ServerMessageKeys.SurveyDeleteTitleMismatch] = "Der eingegebene Titel stimmt nicht mit dem Titel der Umfrage überein.",
+            [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "Diese Umfrage kann nicht dauerhaft gelöscht werden, solange Antworten oder E-Mails ausstehen oder gesendet werden.",
+            [ServerMessageKeys.SiteIdLockedAfterPublish] = "Die Pleasanter-Site-ID kann nach der Produktionsveröffentlichung nicht geändert werden.",
+            [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "Die Pleasanter-Site-ID kann nicht geändert werden, solange Antworten auf den Versand warten.",
+            [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "Geben Sie eine andere Pleasanter-Site-ID an als diejenige, in die die ursprüngliche Umfrage schreibt.",
+            [ServerMessageKeys.SurveyIsTemplate] = "Dies ist eine Vorlage. Vorlagen können nicht veröffentlicht werden. Erstellen Sie zuerst eine Umfrage daraus.",
+            [ServerMessageKeys.TemplateSourceRequired] = "Geben Sie die Umfrage an, aus der eine Vorlage erstellt werden soll.",
+            [ServerMessageKeys.ThemeColorInvalid] = "Geben Sie Farben im Format #rrggbb an.",
+            [ServerMessageKeys.EmbedHostNotAllowed] = "Die eingebettete URL befindet sich nicht in den zulässigen Quellen. Bitten Sie einen Administrator, sie hinzuzufügen.",
+            [ServerMessageKeys.HeaderImageRejected] = "Dieses Bild kann nicht verwendet werden. Wählen Sie ein PNG-, JPEG-, GIF- oder WebP-Bild mit höchstens 2 MB.",
+            [ServerMessageKeys.ContentAssetRejected] = "Dieses Asset kann nicht verwendet werden. Prüfen Sie die zulässigen Dateitypen und die Größenbeschränkung.",
+            [ServerMessageKeys.ContentAssetLimitReached] = "Diese Umfrage hat das Asset-Limit erreicht.",
+            [ServerMessageKeys.AssetScannerUnavailable] = "Das Asset kann nicht gespeichert werden, da die Virenprüfung nicht verfügbar ist. Wenden Sie sich an einen Administrator.",
+            [ServerMessageKeys.ResponseLimitMustBePositive] = "Die Antwortgrenze muss mindestens 1 betragen. Lassen Sie das Feld für keine Begrenzung leer.",
+            [ServerMessageKeys.ResponseLimitReached] = "Die Antwortgrenze wurde erreicht ({0} von {1}). Erhöhen Sie die Grenze vor der Fortsetzung.",
+            [ServerMessageKeys.ResponseTokenRequired] = "Geben Sie an, welche Antwort zurückgesetzt werden soll.",
+            [ServerMessageKeys.DeadLetterNotFound] = "Diese Antwort wurde nicht gefunden. Sie wurde möglicherweise bereits zurückgestellt oder bereits gesendet.",
+        };
+
         // **2 言語ぶんの書き方は残す。** 既存の 46 件を書き換えない
         void Add(string key, string ja, string en) =>
-            AddAll(key, new Dictionary<string, string>
-            {
-                [SupportedLanguages.Default] = ja,
-                ["en"] = en,
-            });
+            AddAll(
+                key,
+                new Dictionary<string, string>
+                {
+                    [SupportedLanguages.Default] = ja,
+                    ["en"] = en,
+                    ["de"] = german[key],
+                });
 
         // ---- 認証 -----------------------------------------------------------
         Add(
