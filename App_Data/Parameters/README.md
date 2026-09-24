@@ -115,6 +115,8 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | `QUESTIONNAIRE_REQUESTS_PER_MIN` | 送信元 IP ごとの要求上限（1 分あたり・既定 60） |
 | `QUESTIONNAIRE_SUBMITS_PER_MIN` | 送信元 IP ごとの回答送信の上限（1 分あたり・既定 20） |
 | `QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN` | 送信元 IP ごとのログイン試行上限（5 分あたり・既定 10）。**検証環境向けの変更口であり、本番で緩めない** |
+| `QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN` | SAML 有効時に合言葉ログインを許可するか（既定 `true`）。`false` は画面と API の両方を塞ぐ。SAML 無効時は締め出し防止のため警告付きで許可する |
+| `QUESTIONNAIRE_ADMIN_RESCUE_TOKEN` | 合言葉を塞いだときの救済トークン（未設定なら逃げ道なし、32 文字以上）。**秘密管理基盤から外部設定として与える** |
 | `QUESTIONNAIRE_ALTCHA_ENABLED` | `false` で proof-of-work を切る。**アプリ全体。検証環境のためだけ** |
 | `QUESTIONNAIRE_ALTCHA_MIN_NUMBER` | 探させる数の下限（既定 50000）。**大きいほど回答者の待ち時間も伸びる** |
 | `QUESTIONNAIRE_ALTCHA_MAX_NUMBER` | 探させる数の上限（既定 150000） |
