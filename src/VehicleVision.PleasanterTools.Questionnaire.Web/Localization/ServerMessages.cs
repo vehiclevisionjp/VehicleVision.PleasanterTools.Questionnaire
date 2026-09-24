@@ -214,6 +214,83 @@ public static class ServerMessages
             [ServerMessageKeys.DeadLetterNotFound] = "未找到该回答。它可能已恢复为等待发送状态，或已发送完成。",
         };
 
+        var spanish = new Dictionary<string, string>
+        {
+            [ServerMessageKeys.InvalidCredentials] = "El ID de inicio de sesión o el valor introducido no es correcto.",
+            [ServerMessageKeys.LoginIdAndPasswordRequired] = "Introduzca su ID de inicio de sesión y contraseña.",
+            [ServerMessageKeys.AdministratorAlreadyExists] = "Ya se ha registrado un administrador.",
+            [ServerMessageKeys.LoginTemporarilyLocked] = "Demasiados intentos. El inicio de sesión no está disponible durante un tiempo; inténtelo de nuevo más tarde.",
+            [ServerMessageKeys.EnrollmentRestartRequired] = "Vuelva a iniciar el registro.",
+            [ServerMessageKeys.TotpCodeMismatch] = "El código no coincide. Compruebe el número mostrado en su aplicación de autenticación.",
+            [ServerMessageKeys.TwoFactorDisabled] = "La autenticación de dos factores está desactivada. Pida a su administrador que cambie la configuración para registrarla.",
+            [ServerMessageKeys.TwoFactorRequired] = "La autenticación de dos factores es obligatoria, por lo que no se puede eliminar.",
+            [ServerMessageKeys.TwoFactorNotEnrolled] = "La autenticación de dos factores no está configurada.",
+            [ServerMessageKeys.PasswordTooShort] = "Use una contraseña de al menos {0} caracteres.",
+            [ServerMessageKeys.PasswordSameAsLoginId] = "La contraseña no puede ser igual al ID de inicio de sesión.",
+            [ServerMessageKeys.PasswordPolicyMismatch] = "La contraseña no cumple las condiciones requeridas.",
+            [ServerMessageKeys.RoleNotSupported] = "El rol debe ser Administrator, SurveyAdministrator, UserAdministrator, Editor o Auditor.",
+            [ServerMessageKeys.AdminUserNotFound] = "No se encontró ese administrador.",
+            [ServerMessageKeys.DuplicateLoginId] = "Ese ID de inicio de sesión ya está en uso.",
+            [ServerMessageKeys.InvalidInput] = "Compruebe lo que ha introducido.",
+            [ServerMessageKeys.SelfNotAllowed] = "No puede hacer esto en su propia cuenta. Pida ayuda a otro administrador.",
+            [ServerMessageKeys.LastAdministrator] = "No hay ningún otro administrador que pueda iniciar sesión. Primero agregue otro administrador y confirme que puede iniciar sesión.",
+            [ServerMessageKeys.OperationTemporarilyLocked] = "Demasiados intentos. Esta acción no está disponible durante un tiempo; inténtelo de nuevo más tarde.",
+            [ServerMessageKeys.InvitationInvalid] = "No se puede usar esta invitación. Solicite una nueva invitación.",
+            [ServerMessageKeys.CurrentPasswordRejected] = "Su contraseña actual no es correcta.",
+            [ServerMessageKeys.UnsupportedLanguage] = "Ese idioma no es compatible.",
+            [ServerMessageKeys.AdminSessionNotFound] = "No se encontró esa sesión.",
+            [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "La sesión actual no se puede cerrar desde aquí. Cierre sesión en su lugar.",
+            [ServerMessageKeys.ResponseNotificationMailSubject] = "Nuevas respuestas de encuesta",
+            [ServerMessageKeys.ResponseNotificationMailBody] = "La encuesta \"{0}\" recibió {1} respuesta(s) nueva(s).\n"
+                + "Período (UTC): de {2} a {3}\n\n"
+                + "Consulte el contenido de las respuestas en Pleasanter.",
+            [ServerMessageKeys.RemovedSurvey] = "Encuesta eliminada",
+            [ServerMessageKeys.SurveyTitleRequired] = "Introduzca un título.",
+            [ServerMessageKeys.PleasanterSiteIdRequired] = "Especifique el ID del sitio de Pleasanter.",
+            [ServerMessageKeys.DefinitionAndMappingRequired] = "Se requieren tanto la definición como la asignación.",
+            [ServerMessageKeys.SurveyUpdatedByOther] = "Otra persona actualizó esta encuesta. Vuelva a cargarla.",
+            [ServerMessageKeys.QuestionImportSourceInvalid] = "No se puede abrir la encuesta de origen. Compruebe si se eliminó, archivó o modificó.",
+            [ServerMessageKeys.QuestionImportSelectionRequired] = "Seleccione al menos una pregunta para importar.",
+            [ServerMessageKeys.PublishBlockedByMapping] = "No se puede publicar. Primero corrija los problemas de la asignación.",
+            [ServerMessageKeys.PublishBlockedByFlow] = "No se puede publicar. Primero corrija los problemas de la ramificación.",
+            [ServerMessageKeys.PublishBlockedBySettings] = "No se puede publicar. Algunas preguntas tienen configuraciones que ninguna respuesta puede satisfacer.",
+            [ServerMessageKeys.AutoReplyTestSubjectPrefix] = "[Prueba] ",
+            [ServerMessageKeys.AutoReplyTestLoginIdNotEmail] = "No se puede enviar un mensaje de prueba porque su ID de inicio de sesión no es una dirección de correo electrónico.",
+            [ServerMessageKeys.AutoReplyTestMailDisabled] = "No se puede enviar un mensaje de prueba porque el envío de correo no está habilitado en el servidor.",
+            [ServerMessageKeys.AutoReplyTestQueueFailed] = "No se pudo poner en cola el mensaje de prueba.",
+            [ServerMessageKeys.InvitationMailSubject] = "Ha sido invitado a la administración de cuestionarios",
+            [ServerMessageKeys.InvitationMailBody] = "Ha sido invitado a la pantalla de administración de cuestionarios.\n\n"
+                + "Abra la siguiente URL y elija su contraseña.\n"
+                + "{0}\n\n"
+                + "Caduca: {1} (UTC)\n\n"
+                + "Si no esperaba este mensaje, descártelo sin abrir la URL.",
+            [ServerMessageKeys.PublishBlockedByAutoReply] = "No se puede publicar. La configuración de respuesta automática no puede enviar un correo electrónico.",
+            [ServerMessageKeys.NoAnswerableQuestion] = "No hay ninguna pregunta que se pueda responder.",
+            [ServerMessageKeys.NotPublishedYet] = "Esta encuesta aún no se ha publicado.",
+            [ServerMessageKeys.VersionAlreadyPublished] = "Esta versión ya se ha publicado. Vuelva a cargar la página e inténtelo de nuevo.",
+            [ServerMessageKeys.InvalidSurveyStatus] = "Esta acción no está disponible en el estado actual. Vuelva a cargar la página.",
+            [ServerMessageKeys.SurveyArchived] = "Esta encuesta está archivada. Restáurela antes de realizar cambios.",
+            [ServerMessageKeys.InvalidArchiveState] = "El estado del archivo ya ha cambiado. Vuelva a cargar la página.",
+            [ServerMessageKeys.SurveyDeleteRequiresArchive] = "Solo se pueden eliminar permanentemente las encuestas archivadas. Archive primero esta encuesta.",
+            [ServerMessageKeys.SurveyDeleteTitleMismatch] = "El título introducido no coincide con el título de la encuesta.",
+            [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "Esta encuesta no se puede eliminar permanentemente mientras haya respuestas o correos pendientes o en proceso de envío.",
+            [ServerMessageKeys.SiteIdLockedAfterPublish] = "El ID del sitio de Pleasanter no se puede cambiar después de la publicación en producción.",
+            [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "El ID del sitio de Pleasanter no se puede cambiar mientras haya respuestas pendientes de envío.",
+            [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "Especifique un ID de sitio de Pleasanter distinto del sitio donde escribe la encuesta original.",
+            [ServerMessageKeys.SurveyIsTemplate] = "Esta es una plantilla. Las plantillas no se pueden publicar. Primero cree una encuesta a partir de ella.",
+            [ServerMessageKeys.TemplateSourceRequired] = "Especifique la encuesta a partir de la cual crear una plantilla.",
+            [ServerMessageKeys.ThemeColorInvalid] = "Especifique los colores con el formato #rrggbb.",
+            [ServerMessageKeys.EmbedHostNotAllowed] = "La URL incrustada no está en los orígenes permitidos. Pida a un administrador que agregue el origen.",
+            [ServerMessageKeys.HeaderImageRejected] = "No se puede usar esa imagen. Elija una imagen PNG, JPEG, GIF o WebP de hasta 2 MB.",
+            [ServerMessageKeys.ContentAssetRejected] = "No se puede usar ese recurso. Compruebe los tipos de archivo permitidos y el límite de tamaño.",
+            [ServerMessageKeys.ContentAssetLimitReached] = "Esta encuesta ha alcanzado su límite de recursos.",
+            [ServerMessageKeys.AssetScannerUnavailable] = "No se puede guardar el recurso porque el análisis de virus no está disponible. Póngase en contacto con un administrador.",
+            [ServerMessageKeys.ResponseLimitMustBePositive] = "El límite de respuestas debe ser al menos 1. Déjelo vacío si no desea establecer un límite.",
+            [ServerMessageKeys.ResponseLimitReached] = "Se ha alcanzado el límite de respuestas ({0} de {1}). Aumente el límite antes de reanudar.",
+            [ServerMessageKeys.ResponseTokenRequired] = "Especifique qué respuesta desea devolver.",
+            [ServerMessageKeys.DeadLetterNotFound] = "No se encontró esa respuesta. Es posible que ya se haya devuelto o que se haya enviado.",
+        };
+
         // **言語ごとの辞書で受ける。** 3 言語目を足すときに、
         // この関数だけを直せば済むようにしておく（Issue #195）
         void AddAll(string key, IReadOnlyDictionary<string, string> byLanguage) =>
@@ -298,6 +375,7 @@ public static class ServerMessages
             StringComparer.Ordinal)
         {
             ["de"] = german,
+            ["es"] = spanish,
             ["ko"] = Korean,
             ["zh"] = zh,
         };
