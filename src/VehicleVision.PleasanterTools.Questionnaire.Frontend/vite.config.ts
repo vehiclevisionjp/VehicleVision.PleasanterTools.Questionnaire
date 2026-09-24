@@ -6,6 +6,19 @@ import { defineConfig } from 'vitest/config';
 // ビルド成果物は .Web の wwwroot へ出す。**単一のアプリとして配信するため**
 export default defineConfig({
   plugins: [svelte()],
+  // **配置先のサブパスを組み立て時に焼き込まない**（Issue #465）。
+  //   - JS と CSS からの参照は**自分の位置からの相対**にする（`./`）。
+  //     サブパスがどこでも、資産同士は同じ `assets/` の中で見つかる
+  //   - HTML からの参照だけは、開いている URL（`/f/{publicId}` など）によって
+  //     相対の基準が変わるので**埋め込み先の印**にしておき、サーバが配信時に
+  //     `QUESTIONNAIRE_PATH_BASE` へ差し替える（`HtmlShell.cs`）
+  // **組み立て直さずに、同じ成果物を `/` にもサブパスにも置ける。**
+  base: './',
+  experimental: {
+    renderBuiltUrl(filename, { hostType }) {
+      return hostType === 'html' ? `__QUESTIONNAIRE_BASE_PATH__/${filename}` : { relative: true };
+    },
+  },
   build: {
     outDir: '../VehicleVision.PleasanterTools.Questionnaire.Web/wwwroot',
     emptyOutDir: true,

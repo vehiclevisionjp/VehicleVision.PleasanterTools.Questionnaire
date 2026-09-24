@@ -58,6 +58,10 @@ x-app-environment: &app-environment
     QUESTIONNAIRE_ADMIN_TWOFACTOR: ${DEV_ADMIN_TWOFACTOR:-required}
     # **管理画面の入口。** 未指定なら従来の `/admin` のまま
     QUESTIONNAIRE_ADMIN_PATH: ${DEV_ADMIN_PATH:-/admin}
+    # **サブパスに置く**（Issue #465）。未指定（空）なら従来どおり `/` で動く。
+    # 例: DEV_PATH_BASE=/questionnaire で http://localhost:8081/questionnaire/admin になる。
+    # ⚠️ 結合試験・E2E・写しの一式は `/` を前提にしているので、試すときだけ指定すること
+    QUESTIONNAIRE_PATH_BASE: ${DEV_PATH_BASE:-}
     # ---- SAML（Issue #166）--------------------------------------------------
     # **既定は無効。** saml profile の IdP と合わせて使うときだけ有効にする
     #
