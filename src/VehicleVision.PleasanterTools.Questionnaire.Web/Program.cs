@@ -400,6 +400,7 @@ if (builder.Configuration[AdminAuthOptions.TwoFactorSetting] is { Length: > 0 } 
 builder.Services.AddSingleton(new AdminAuthOptions { TwoFactor = twoFactorPolicy });
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
+builder.Services.AddSingleton<AdminPasswordSignInPolicy>();
 
 // **外部設定だけで有効にしている従来構成は、起動時の検証も保つ。**
 // 書き間違いを 500 応答になるまで見つけられない構成へ後退させない。

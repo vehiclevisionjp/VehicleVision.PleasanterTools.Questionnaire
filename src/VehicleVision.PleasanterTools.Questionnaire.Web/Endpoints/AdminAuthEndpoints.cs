@@ -46,6 +46,7 @@ public static class AdminAuthEndpoints
             HttpContext context,
             IAdminUserStore store,
             ISamlOptionsProvider samlProvider,
+            AdminPasswordSignInPolicy passwordSignIn,
             AdminAuthOptions options,
             BotMitigationOptionsProvider botOptionsProvider,
             IMailSettingsProvider mailSettings,
@@ -60,6 +61,8 @@ public static class AdminAuthEndpoints
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
             var samlEnabled = saml.Enabled;
             var samlLabel = saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null;
+            var passwordSignInEnabled =
+                setupRequired || passwordSignIn.IsAllowed(samlEnabled);
 
             var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             if (session.Succeeded)
@@ -107,6 +110,7 @@ public static class AdminAuthEndpoints
                     hasTotp,
                     samlEnabled,
                     samlLabel,
+                    passwordSignInEnabled,
                     captchaEnabled = botOptions.AdminCaptcha.Enabled,
 
                     // **IdP へログアウトを頼めるか**（Issue #191）。
@@ -152,6 +156,7 @@ public static class AdminAuthEndpoints
                 needsEnrollment,
                 samlEnabled,
                 samlLabel,
+                passwordSignInEnabled,
                 captchaEnabled = botOptions.AdminCaptcha.Enabled,
             });
         });
@@ -232,6 +237,8 @@ public static class AdminAuthEndpoints
             AdminCredentialRequest request,
             HttpContext context,
             AdminAuthenticator authenticator,
+            ISamlOptionsProvider samlProvider,
+            AdminPasswordSignInPolicy passwordSignIn,
             BotMitigationOptionsProvider botOptionsProvider,
             AltchaGuard altcha,
             CancellationToken cancellationToken) =>
@@ -239,6 +246,13 @@ public static class AdminAuthEndpoints
             // **誰が狙われているかは、記録に残っていないと分からない。**
             // パスワードは預けない（AuditNotes の但し書き）
             AuditNotes.Add(context, "loginId", request.LoginId);
+
+            var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+            if (!passwordSignIn.IsAllowed(saml.Enabled))
+            {
+                // **画面から隠すだけでは足りない。** API を直接叩かれても認証しない。
+                return Results.NotFound();
+            }
 
             // **この handler より先にレート制限 middleware が動く。**
             // 無制限に署名検証だけをさせて、サーバの CPU を使わせない。
