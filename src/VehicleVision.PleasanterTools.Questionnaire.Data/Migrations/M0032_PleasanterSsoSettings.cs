@@ -18,6 +18,7 @@ public sealed class M0032_PleasanterSsoSettings : Migration
             .WithColumn("InternalBaseUrl").AsString(2048).Nullable()
             .WithColumn("LoginUrl").AsString(2048).Nullable()
             .WithColumn("LogoutUrl").AsString(2048).Nullable()
+            .WithColumn("Method").AsString(32).Nullable()
             .WithColumn("SqlName").AsString(256).Nullable()
             .WithColumn("CookieNames").AsString(1024).Nullable()
             .WithColumn("UnknownUser").AsString(32).Nullable()

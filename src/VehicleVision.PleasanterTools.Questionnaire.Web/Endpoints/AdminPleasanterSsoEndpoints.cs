@@ -7,7 +7,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// <remarks>
 /// <para>
 /// **流れ。** ログイン画面が <c>POST /api/admin/pleasanter-sso/check</c> を呼ぶ。
-/// サーバはブラウザから届いた Pleasanter の cookie を Pleasanter の拡張 SQL API へ転送し、
+/// サーバはブラウザから届いた Pleasanter の cookie を Pleasanter の API へ転送し
+/// （既定は標準の <c>/api/users/get</c>、選べば拡張 SQL）、
 /// 本人が返れば本アプリの管理者へ結び付けて本アプリの cookie を発行する。
 /// Pleasanter にログインしていなければ、画面は Pleasanter のログイン画面を別窓で開き、
 /// ログインが済むまでこの入口を繰り返し呼ぶ。
@@ -188,7 +189,7 @@ public static class AdminPleasanterSsoEndpoints
         // ---- 接続の試験 ------------------------------------------------------
         // **保存前の値で、いまのブラウザの Pleasanter の cookie を使って問い合わせる。**
         // 同じブラウザで Pleasanter にログインしていれば、その人が返る。
-        // 有効にする前に「内部 URL・拡張 SQL・cookie の転送」が揃っているかを確かめられる
+        // 有効にする前に「内部 URL・方式（拡張 SQL なら定義）・cookie の転送」が揃っているかを確かめられる
         group.MapPost("/settings/test", async (
             PleasanterSsoSettingsRequest request,
             HttpContext context,
@@ -261,6 +262,7 @@ public static class AdminPleasanterSsoEndpoints
         Add("internalBaseUrl", PleasanterSsoOptions.InternalBaseUrlKey, old.InternalBaseUrl, next.InternalBaseUrl);
         Add("loginUrl", PleasanterSsoOptions.LoginUrlKey, old.LoginUrl, next.LoginUrl);
         Add("logoutUrl", PleasanterSsoOptions.LogoutUrlKey, old.LogoutUrl, next.LogoutUrl);
+        Add("method", PleasanterSsoOptions.MethodKey, old.Method, next.Method);
         Add("sqlName", PleasanterSsoOptions.SqlNameKey, old.SqlName, next.SqlName);
         Add("cookieNames", PleasanterSsoOptions.CookieNamesKey, old.CookieNames, next.CookieNames);
         Add("unknownUser", PleasanterSsoOptions.UnknownUserKey, old.UnknownUser, next.UnknownUser);
@@ -287,6 +289,7 @@ public static class AdminPleasanterSsoEndpoints
             internalBaseUrl = values.InternalBaseUrl,
             loginUrl = values.LoginUrl,
             logoutUrl = values.LogoutUrl,
+            method = values.Method,
             sqlName = values.SqlName,
             cookieNames = values.CookieNames,
             unknownUser = values.UnknownUser,
@@ -300,6 +303,7 @@ public static class AdminPleasanterSsoEndpoints
                 internalBaseUrl = Fixed(PleasanterSsoOptions.InternalBaseUrlKey),
                 loginUrl = Fixed(PleasanterSsoOptions.LoginUrlKey),
                 logoutUrl = Fixed(PleasanterSsoOptions.LogoutUrlKey),
+                method = Fixed(PleasanterSsoOptions.MethodKey),
                 sqlName = Fixed(PleasanterSsoOptions.SqlNameKey),
                 cookieNames = Fixed(PleasanterSsoOptions.CookieNamesKey),
                 unknownUser = Fixed(PleasanterSsoOptions.UnknownUserKey),
@@ -326,7 +330,8 @@ public static class AdminPleasanterSsoEndpoints
         string? RegisterRole,
         string? RevalidateMinutes,
         string? TimeoutSeconds,
-        string? ButtonLabel)
+        string? ButtonLabel,
+        string? Method = null)
     {
         public PleasanterSsoSettingValues ToValues() => new()
         {
@@ -334,6 +339,7 @@ public static class AdminPleasanterSsoEndpoints
             InternalBaseUrl = InternalBaseUrl,
             LoginUrl = LoginUrl,
             LogoutUrl = LogoutUrl,
+            Method = Method,
             SqlName = SqlName,
             CookieNames = CookieNames,
             UnknownUser = UnknownUser,

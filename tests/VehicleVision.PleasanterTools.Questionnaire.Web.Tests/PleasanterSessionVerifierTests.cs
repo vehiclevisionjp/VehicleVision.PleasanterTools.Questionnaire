@@ -6,7 +6,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
-/// <summary>Pleasanter へ cookie を転送して本人を聞く（Issue #464）。</summary>
+/// <summary>Pleasanter へ cookie を転送して本人を聞く（Issue #464）。拡張 SQL の方式と、方式で共通の扱い。</summary>
 /// <remarks>
 /// **成功と判断してよいのは、業務ステータス 200 で本人 1 行がきっちり読めたときだけ。**
 /// それ以外（転送・HTML・時間切れ・壊れた JSON・5xx）を成功と取り違えないことを確かめる。
@@ -26,6 +26,7 @@ public class PleasanterSessionVerifierTests
         Enabled = true,
         InternalBaseUrl = new Uri("http://pleasanter.internal:8080/"),
         LoginUrl = "/users/login",
+        Method = PleasanterSsoMethod.ExtendedSql,
         Timeout = timeout ?? TimeSpan.FromSeconds(5),
     };
 
@@ -33,6 +34,7 @@ public class PleasanterSessionVerifierTests
         FakeHttpMessageHandler handler) =>
         (new PleasanterSessionVerifier(
             new SingleHttpClientFactory(handler),
+            PleasanterSsoTestConnections.WithoutApiKey,
             NullLogger<PleasanterSessionVerifier>.Instance), handler);
 
     [Fact]
@@ -281,6 +283,7 @@ public class PleasanterSessionVerifierTests
             PleasanterSsoOptions.EnabledKey => "true",
             PleasanterSsoOptions.InternalBaseUrlKey => "http://pleasanter.internal/pleasanter",
             PleasanterSsoOptions.LoginUrlKey => "/pleasanter/users/login",
+            PleasanterSsoOptions.MethodKey => "ExtendedSql",
             _ => null,
         });
 

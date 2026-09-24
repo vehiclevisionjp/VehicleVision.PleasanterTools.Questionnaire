@@ -1,7 +1,9 @@
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
@@ -80,4 +82,48 @@ internal sealed class FakeHttpMessageHandler(
 internal sealed class SingleHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory
 {
     public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+}
+
+/// <summary>本アプリの Pleasanter 接続設定（API キー）の組み合わせ。</summary>
+internal static class PleasanterSsoTestConnections
+{
+    public const string ApiKey = "0123456789abcdef-secret-api-key";
+
+    /// <summary>API キーが設定されていない（導入直後）。</summary>
+    public static StaticPleasanterOptionsProvider WithoutApiKey { get; } = new(new PleasanterOptions
+    {
+        BaseUrl = string.Empty,
+        ApiKey = string.Empty,
+        ApiKeyUserTimeZoneId = "Asia/Tokyo",
+    });
+
+    /// <summary>API キーが設定されている。**宛先は内部 URL と別の書き方にして、送り先を見分けられるようにする。**</summary>
+    public static StaticPleasanterOptionsProvider WithApiKey { get; } = new(new PleasanterOptions
+    {
+        BaseUrl = "http://pleasanter.api:8080/root",
+        ApiKey = ApiKey,
+        ApiKeyUserTimeZoneId = "Asia/Tokyo",
+    });
+}
+
+/// <summary>書かれたログを文字列で覚えるロガー。**秘密がログへ出ないことを確かめる。**</summary>
+internal sealed class ListLogger<T> : ILogger<T>
+{
+    public List<string> Messages { get; } = [];
+
+    public IDisposable? BeginScope<TState>(TState state)
+        where TState : notnull => null;
+
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(
+        LogLevel logLevel,
+        EventId eventId,
+        TState state,
+        Exception? exception,
+        Func<TState, Exception?, string> formatter)
+    {
+        ArgumentNullException.ThrowIfNull(formatter);
+        Messages.Add($"{logLevel}: {formatter(state, exception)} {exception}");
+    }
 }

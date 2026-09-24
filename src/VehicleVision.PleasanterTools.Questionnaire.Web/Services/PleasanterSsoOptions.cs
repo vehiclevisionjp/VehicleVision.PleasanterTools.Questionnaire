@@ -15,17 +15,35 @@ public enum PleasanterSsoUnknownUserPolicy
     Register = 1,
 }
 
+/// <summary>Pleasanter に本人を聞く方式。</summary>
+public enum PleasanterSsoMethod
+{
+    /// <summary>
+    /// 標準の API（<c>POST /api/users/get</c> を利用者 ID <c>Own</c> で絞る）で聞く。**既定。**
+    /// Pleasanter 側に何も置かなくてよく、書き込みも無い。
+    /// </summary>
+    /// <remarks>
+    /// 利用者の API 利用が禁止されていて 403 が返ったときは、本アプリの API キーがあれば
+    /// <c>/api/sessions/set</c> で利用者 ID を得て、API キーで <c>/api/users/{id}/get</c> を引く。
+    /// </remarks>
+    StandardApi = 0,
+
+    /// <summary>
+    /// 登録済みの拡張 SQL（<c>POST /api/extended/sql</c>）で聞く。
+    /// Pleasanter 側に SQL の定義ファイルを置いて再起動する必要がある。
+    /// </summary>
+    ExtendedSql = 1,
+}
+
 /// <summary>Pleasanter のログインで管理画面へ入れるようにする設定（Issue #464）。</summary>
 /// <remarks>
 /// <para>
 /// **既定は無効。** 何も設定しなければ、今までどおりの入り方だけになる。
 /// </para>
 /// <para>
-/// **仕組み。** ブラウザが持つ Pleasanter の cookie を**本アプリのサーバが**
-/// Pleasanter の拡張 SQL API（<c>POST /api/extended/sql</c>）へ転送し、
-/// Pleasanter が自動で束縛する利用者 ID（SQL Server は <c>@_U</c>、
-/// PostgreSQL / MySQL は <c>@ipU</c>）で本人を返させる。
-/// **API キーは送らない**（規約 8。ブラウザにも渡らない）。
+/// **仕組み。** ブラウザが持つ Pleasanter の cookie を**本アプリのサーバが** Pleasanter へ転送し、
+/// ログイン中の本人を返させる。方式は <see cref="Method"/> で選ぶ（既定は標準の API）。
+/// **API キーはブラウザへ渡さない**（規約 8）。cookie を転送する問い合わせには API キーを載せない。
 /// </para>
 /// <para>
 /// ⚠️ **本アプリと Pleasanter を同じホスト名で動かすことが前提。**
@@ -38,6 +56,7 @@ public sealed class PleasanterSsoOptions
     public const string InternalBaseUrlKey = "QUESTIONNAIRE_PLEASANTERSSO_INTERNALBASEURL";
     public const string LoginUrlKey = "QUESTIONNAIRE_PLEASANTERSSO_LOGINURL";
     public const string LogoutUrlKey = "QUESTIONNAIRE_PLEASANTERSSO_LOGOUTURL";
+    public const string MethodKey = "QUESTIONNAIRE_PLEASANTERSSO_METHOD";
     public const string SqlNameKey = "QUESTIONNAIRE_PLEASANTERSSO_SQLNAME";
     public const string CookieNamesKey = "QUESTIONNAIRE_PLEASANTERSSO_COOKIENAMES";
     public const string UnknownUserKey = "QUESTIONNAIRE_PLEASANTERSSO_UNKNOWNUSER";
@@ -91,7 +110,10 @@ public sealed class PleasanterSsoOptions
     /// </summary>
     public string LogoutUrl { get; init; } = string.Empty;
 
-    /// <summary>本人を返す拡張 SQL の名前。</summary>
+    /// <summary>本人を聞く方式。**既定は標準の API。**</summary>
+    public PleasanterSsoMethod Method { get; init; } = PleasanterSsoMethod.StandardApi;
+
+    /// <summary>本人を返す拡張 SQL の名前。**<see cref="PleasanterSsoMethod.ExtendedSql"/> のときだけ使う。**</summary>
     public string SqlName { get; init; } = DefaultSqlName;
 
     /// <summary>転送する cookie の名前（前方一致）。</summary>
@@ -138,6 +160,8 @@ public sealed class PleasanterSsoOptions
         var sqlName = Trim(valueOf(SqlNameKey));
         var cookieNames = Trim(valueOf(CookieNamesKey));
 
+        var method = ParseEnum<PleasanterSsoMethod>(valueOf(MethodKey), MethodKey)
+            ?? PleasanterSsoMethod.StandardApi;
         var unknownUser = ParseEnum<PleasanterSsoUnknownUserPolicy>(valueOf(UnknownUserKey), UnknownUserKey)
             ?? PleasanterSsoUnknownUserPolicy.Reject;
         var registerRole = ParseEnum<AdminRole>(valueOf(RegisterRoleKey), RegisterRoleKey)
@@ -201,6 +225,7 @@ public sealed class PleasanterSsoOptions
             InternalBaseUrl = internalUri,
             LoginUrl = loginUrl,
             LogoutUrl = logoutUrl,
+            Method = method,
             SqlName = sqlName.Length == 0 ? DefaultSqlName : sqlName,
             CookieNamePrefixes = prefixes,
             UnknownUser = unknownUser,

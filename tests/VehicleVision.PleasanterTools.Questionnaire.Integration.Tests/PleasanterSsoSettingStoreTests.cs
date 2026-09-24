@@ -56,6 +56,7 @@ public class PleasanterSsoSettingStoreTests
             InternalBaseUrl = longUrl,
             LoginUrl = "https://pleasanter.example.jp/users/login",
             LogoutUrl = "https://pleasanter.example.jp/users/logout",
+            Method = "ExtendedSql",
             SqlName = "QuestionnaireWhoAmI",
             CookieNames = ".AspNetCore.Cookies,Pleasanter_SessionGuid",
             UnknownUser = "Register",
