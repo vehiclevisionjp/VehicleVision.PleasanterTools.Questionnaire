@@ -285,12 +285,6 @@ export const ja = {
   'pleasanterSso.loginUrlHint': 'ブラウザで開く URL です。同じホストのパス（例: /users/login）か、http(s) の絶対 URL を入力してください。',
   'pleasanterSso.logoutUrl': 'Pleasanter のログアウト画面',
   'pleasanterSso.logoutUrlHint': '空欄の場合は、本アプリからだけログアウトします（例: /users/logout）。',
-  'pleasanterSso.method': '本人の確かめ方',
-  'pleasanterSso.methodStandardApi': '標準の API（既定）',
-  'pleasanterSso.methodExtendedSql': '拡張 SQL',
-  'pleasanterSso.methodHint': '標準の API は Pleasanter 側の準備が要りません。利用者の API 利用を禁止している場合は、本アプリの Pleasanter 接続設定の API キーを使って確かめます。拡張 SQL は Pleasanter 側に定義を置いて再起動する必要があります。',
-  'pleasanterSso.sqlName': '拡張 SQL の名前',
-  'pleasanterSso.sqlNameHint': 'Pleasanter の App_Data/Parameters/ExtendedSqls に置いた定義の Name です。拡張 SQL を選んだときだけ使います。',
   'pleasanterSso.cookieNames': '転送する cookie の名前（前方一致）',
   'pleasanterSso.cookieNamesHint': 'カンマ区切りで入力します。本アプリの cookie（q. で始まるもの）は転送しません。',
   'pleasanterSso.unknownUser': '未登録の利用者',
@@ -308,7 +302,7 @@ export const ja = {
   'pleasanterSso.testAuthenticated': 'Pleasanter から本人が返りました（ログイン ID: {loginId}、利用者 ID: {userId}、テナント ID: {tenantId}）。',
   'pleasanterSso.testNotRegistered': 'このログイン ID の管理者は本アプリに居ません。未登録の利用者を拒否する設定では入れません。',
   'pleasanterSso.testUnauthenticated': 'Pleasanter はログインしていないと答えました。同じブラウザで Pleasanter にログインしているか、ホスト名がそろっているかを確認してください。',
-  'pleasanterSso.testUpstreamError': 'Pleasanter に問い合わせできませんでした（{reason}）。内部 URL、IP 制限、TokenCheck を確認してください。標準の API で 403 の場合は利用者の API 利用が禁止されています（API キーの設定が必要です）。拡張 SQL の場合は名前と定義も確認してください。',
+  'pleasanterSso.testUpstreamError': 'Pleasanter に問い合わせできませんでした（{reason}）。内部 URL、IP 制限、TokenCheck を確認してください。403 の場合は利用者の API 利用が禁止されています（本アプリの Pleasanter 接続設定の API キーが必要です）。',
 
   // ---- アプリケーション設定 ----------------------------------------------
   'appSettings.open': '設定',

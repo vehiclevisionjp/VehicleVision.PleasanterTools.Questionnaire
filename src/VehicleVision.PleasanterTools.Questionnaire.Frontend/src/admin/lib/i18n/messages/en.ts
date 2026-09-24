@@ -285,12 +285,6 @@ export const en: Record<MessageKey, string> = {
   'pleasanterSso.loginUrlHint': 'Opened in the browser. Enter a path on the same host (e.g. /users/login) or an absolute http(s) URL.',
   'pleasanterSso.logoutUrl': 'Pleasanter sign-out page',
   'pleasanterSso.logoutUrlHint': 'If empty, users are signed out of this application only (e.g. /users/logout).',
-  'pleasanterSso.method': 'Identification method',
-  'pleasanterSso.methodStandardApi': 'Standard API (default)',
-  'pleasanterSso.methodExtendedSql': 'Extended SQL',
-  'pleasanterSso.methodHint': 'The standard API needs no preparation on Pleasanter. If API use is disabled for users, the API key in this application\'s Pleasanter connection settings is used. The extended SQL requires placing a definition on Pleasanter and restarting it.',
-  'pleasanterSso.sqlName': 'Extended SQL name',
-  'pleasanterSso.sqlNameHint': 'The Name of the definition placed in App_Data/Parameters/ExtendedSqls on Pleasanter. Used only with the extended SQL method.',
   'pleasanterSso.cookieNames': 'Cookie names to forward (prefix match)',
   'pleasanterSso.cookieNamesHint': 'Comma-separated. This application\'s own cookies (starting with q.) are never forwarded.',
   'pleasanterSso.unknownUser': 'Unregistered users',
@@ -308,7 +302,7 @@ export const en: Record<MessageKey, string> = {
   'pleasanterSso.testAuthenticated': 'Pleasanter returned the user (login ID: {loginId}, user ID: {userId}, tenant ID: {tenantId}).',
   'pleasanterSso.testNotRegistered': 'No administrator with this login ID exists in this application. With the reject setting for unregistered users, this user cannot sign in.',
   'pleasanterSso.testUnauthenticated': 'Pleasanter answered that you are not signed in. Check that you are signed in to Pleasanter in this browser and that the host names match.',
-  'pleasanterSso.testUpstreamError': 'Could not query Pleasanter ({reason}). Check the internal URL, IP restrictions and TokenCheck. A 403 with the standard API means API use is disabled for the user (an API key must be configured). With the extended SQL, also check its name and definition.',
+  'pleasanterSso.testUpstreamError': 'Could not query Pleasanter ({reason}). Check the internal URL, IP restrictions and TokenCheck. A 403 means API use is disabled for the user (the API key in the Pleasanter connection settings of this application is required).',
 
   // ---- Application settings ----------------------------------------------
   'appSettings.open': 'Settings',
