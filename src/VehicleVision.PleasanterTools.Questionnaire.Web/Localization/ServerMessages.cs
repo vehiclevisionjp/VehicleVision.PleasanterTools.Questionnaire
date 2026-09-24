@@ -137,6 +137,83 @@ public static class ServerMessages
     private static FrozenDictionary<string, LocalizedText> Build()
     {
         var catalog = new Dictionary<string, LocalizedText>(StringComparer.Ordinal);
+        var zh = new Dictionary<string, string>
+        {
+            [ServerMessageKeys.InvalidCredentials] = "登录 ID 或输入内容不正确。",
+            [ServerMessageKeys.LoginIdAndPasswordRequired] = "请输入登录 ID 和密码。",
+            [ServerMessageKeys.AdministratorAlreadyExists] = "管理员已注册。",
+            [ServerMessageKeys.LoginTemporarilyLocked] = "尝试次数过多，暂时无法登录。请稍后再试。",
+            [ServerMessageKeys.EnrollmentRestartRequired] = "请重新开始注册。",
+            [ServerMessageKeys.TotpCodeMismatch] = "代码不匹配。请确认身份验证器应用显示的号码。",
+            [ServerMessageKeys.TwoFactorDisabled] = "双重身份验证已被禁用。若要注册，请请求管理员更改设置。",
+            [ServerMessageKeys.TwoFactorRequired] = "双重身份验证为必需设置，因此无法解除。",
+            [ServerMessageKeys.TwoFactorNotEnrolled] = "尚未注册双重身份验证。",
+            [ServerMessageKeys.PasswordTooShort] = "密码至少需要 {0} 个字符。",
+            [ServerMessageKeys.PasswordSameAsLoginId] = "密码不能与登录 ID 相同。",
+            [ServerMessageKeys.PasswordPolicyMismatch] = "密码不符合规定的条件。",
+            [ServerMessageKeys.RoleNotSupported] = "角色必须指定为 Administrator、SurveyAdministrator、UserAdministrator、Editor 或 Auditor 之一。",
+            [ServerMessageKeys.AdminUserNotFound] = "未找到该管理员。",
+            [ServerMessageKeys.DuplicateLoginId] = "该登录 ID 已被使用。",
+            [ServerMessageKeys.InvalidInput] = "请检查输入内容。",
+            [ServerMessageKeys.SelfNotAllowed] = "无法对自己的帐户执行此操作。请请求其他管理员协助。",
+            [ServerMessageKeys.LastAdministrator] = "没有其他能够登录的管理员。请先添加其他管理员，并确认该管理员能够登录。",
+            [ServerMessageKeys.OperationTemporarilyLocked] = "尝试次数过多，暂时无法执行此操作。请稍后再试。",
+            [ServerMessageKeys.InvitationInvalid] = "该邀请无法使用。请重新发送邀请。",
+            [ServerMessageKeys.CurrentPasswordRejected] = "当前密码不正确。",
+            [ServerMessageKeys.UnsupportedLanguage] = "不支持该语言。",
+            [ServerMessageKeys.AdminSessionNotFound] = "未找到该会话。",
+            [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "无法在此结束当前使用的会话。请改为注销。",
+            [ServerMessageKeys.ResponseNotificationMailSubject] = "问卷有新的回答",
+            [ServerMessageKeys.ResponseNotificationMailBody] = "问卷“{0}”收到了 {1} 条新回答。\n"
+                + "统计期间（UTC）：{2} ～ {3}\n\n"
+                + "请在 Pleasanter 中查看回答内容。",
+            [ServerMessageKeys.RemovedSurvey] = "已删除的问卷",
+            [ServerMessageKeys.SurveyTitleRequired] = "请输入标题。",
+            [ServerMessageKeys.PleasanterSiteIdRequired] = "请指定 Pleasanter 的站点 ID。",
+            [ServerMessageKeys.DefinitionAndMappingRequired] = "定义和映射均为必填项。",
+            [ServerMessageKeys.SurveyUpdatedByOther] = "其他人已更新此问卷。请重新加载。",
+            [ServerMessageKeys.QuestionImportSourceInvalid] = "无法打开导入来源问卷。请确认它是否已被删除、存档或更改。",
+            [ServerMessageKeys.QuestionImportSelectionRequired] = "请至少选择一个要导入的问题。",
+            [ServerMessageKeys.PublishBlockedByMapping] = "无法发布。请先修正映射中的问题。",
+            [ServerMessageKeys.PublishBlockedByFlow] = "无法发布。请先修正分支中的问题。",
+            [ServerMessageKeys.PublishBlockedBySettings] = "无法发布。某些问题的设置无法满足任何回答。",
+            [ServerMessageKeys.AutoReplyTestSubjectPrefix] = "【测试发送】",
+            [ServerMessageKeys.AutoReplyTestLoginIdNotEmail] = "登录 ID 不是电子邮件地址，因此无法发送测试邮件。",
+            [ServerMessageKeys.AutoReplyTestMailDisabled] = "服务器端未启用邮件发送，因此无法发送测试邮件。",
+            [ServerMessageKeys.AutoReplyTestQueueFailed] = "无法将测试邮件加入发送队列。",
+            [ServerMessageKeys.InvitationMailSubject] = "问卷管理页面邀请",
+            [ServerMessageKeys.InvitationMailBody] = "您已收到问卷管理页面的邀请。\n\n"
+                + "请打开以下 URL 并设置密码。\n"
+                + "{0}\n\n"
+                + "到期时间：{1} (UTC)\n\n"
+                + "如果您未曾预期收到此邮件，请勿打开 URL 并删除此邮件。",
+            [ServerMessageKeys.PublishBlockedByAutoReply] = "无法发布。自动回复邮件的设置无法发送电子邮件。",
+            [ServerMessageKeys.NoAnswerableQuestion] = "没有可回答的问题。",
+            [ServerMessageKeys.NotPublishedYet] = "尚未发布。",
+            [ServerMessageKeys.VersionAlreadyPublished] = "此版本已发布。请重新加载后再试。",
+            [ServerMessageKeys.InvalidSurveyStatus] = "当前状态下无法执行此操作。请重新加载。",
+            [ServerMessageKeys.SurveyArchived] = "此问卷已存档。请先恢复后再进行更改。",
+            [ServerMessageKeys.InvalidArchiveState] = "存档状态已发生变化。请重新加载。",
+            [ServerMessageKeys.SurveyDeleteRequiresArchive] = "只有已存档的问卷可以永久删除。请先存档此问卷。",
+            [ServerMessageKeys.SurveyDeleteTitleMismatch] = "输入的标题与问卷标题不一致。",
+            [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "仍有等待发送或正在发送的回答或邮件，因此无法永久删除。",
+            [ServerMessageKeys.SiteIdLockedAfterPublish] = "正式发布后的问卷无法更改 Pleasanter 站点 ID。",
+            [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "仍有等待发送的回答，因此无法更改 Pleasanter 站点 ID。",
+            [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "请为副本指定与原问卷不同的 Pleasanter 站点 ID。",
+            [ServerMessageKeys.SurveyIsTemplate] = "这是模板。模板无法发布。请先从模板创建问卷。",
+            [ServerMessageKeys.TemplateSourceRequired] = "请指定要作为模板来源的问卷。",
+            [ServerMessageKeys.ThemeColorInvalid] = "颜色请指定为 #rrggbb 格式。",
+            [ServerMessageKeys.EmbedHostNotAllowed] = "嵌入目标不在允许的来源中。请请求管理员添加来源。",
+            [ServerMessageKeys.HeaderImageRejected] = "无法使用此图像。请选择大小不超过 2 MB 的 PNG、JPEG、GIF 或 WebP 图像。",
+            [ServerMessageKeys.ContentAssetRejected] = "无法使用此资源。请确认允许的文件类型和大小限制。",
+            [ServerMessageKeys.ContentAssetLimitReached] = "此问卷已达到可保存资源的上限。",
+            [ServerMessageKeys.AssetScannerUnavailable] = "由于无法使用病毒扫描，无法保存资源。请联系管理员。",
+            [ServerMessageKeys.ResponseLimitMustBePositive] = "回答数上限必须至少为 1。若不设上限，请留空。",
+            [ServerMessageKeys.ResponseLimitReached] = "回答数已达到上限（{0} / {1} 条）。请先提高上限后再继续。",
+            [ServerMessageKeys.ResponseTokenRequired] = "请指定要恢复的回答。",
+            [ServerMessageKeys.DeadLetterNotFound] = "未找到该回答。它可能已恢复为等待发送状态，或已发送完成。",
+        };
+
         var spanish = new Dictionary<string, string>
         {
             [ServerMessageKeys.InvalidCredentials] = "El ID de inicio de sesión o el valor introducido no es correcto.",
@@ -300,6 +377,7 @@ public static class ServerMessages
             ["de"] = german,
             ["es"] = spanish,
             ["ko"] = Korean,
+            ["zh"] = zh,
         };
 
         void Add(string key, string ja, string en, string? vi = null)
