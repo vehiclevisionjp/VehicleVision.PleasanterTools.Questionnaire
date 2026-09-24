@@ -9,7 +9,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 /// <remarks>
 /// <para>
 /// **入れ物は <see cref="LocalizedText"/> を使い回す。**
-/// 未翻訳のときに <c>ja</c> へ落ちる決まりを、設問と画面の文言で 2 通り持たない
+/// ただし、画面自身の文言は未翻訳のときに <c>en</c>、<c>ja</c> の順で落とす
 /// （<c>_documents/多言語対応方針.md</c> 1 章）。
 /// </para>
 /// <para>
@@ -21,6 +21,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 /// </remarks>
 public static class ServerMessages
 {
+    private const string UiFallbackLanguage = "en";
+
     private static readonly FrozenDictionary<string, LocalizedText> Catalog = Build();
 
     /// <summary>カタログに載っている鍵。**テストから照合するために公開している。**</summary>
@@ -32,8 +34,26 @@ public static class ServerMessages
     /// 鍵とカタログの食い違いは単体テストで先に落ちるので、
     /// ここで例外を投げても直る場所が増えるだけ。
     /// </remarks>
-    public static string Get(string key, string? language) =>
-        Catalog.TryGetValue(key, out var text) ? text.Get(language) : key;
+    public static string Get(string key, string? language)
+    {
+        if (!Catalog.TryGetValue(key, out var text))
+        {
+            return key;
+        }
+
+        var requested = SupportedLanguages.Normalize(language);
+        if (text.TryGet(requested, out var translated) && !string.IsNullOrEmpty(translated))
+        {
+            return translated;
+        }
+
+        if (text.TryGet(UiFallbackLanguage, out var english) && !string.IsNullOrEmpty(english))
+        {
+            return english;
+        }
+
+        return text.Get(LocalizedText.DefaultLanguage);
+    }
 
     /// <summary>差し込みのある文言を返す。</summary>
     /// <remarks>

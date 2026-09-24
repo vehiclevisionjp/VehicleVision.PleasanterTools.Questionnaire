@@ -92,10 +92,13 @@ public class ServerMessagesTests
     }
 
     [Fact]
-    public void 対応していない言語は既定の言語へ落ちる()
+    public void 未翻訳または対応外の言語は英語へ落ちる()
     {
         Assert.Equal(
-            ServerMessages.Get(ServerMessageKeys.InvalidCredentials, SupportedLanguages.Default),
+            ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "en"),
+            ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "zh"));
+        Assert.Equal(
+            ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "en"),
             ServerMessages.Get(ServerMessageKeys.InvalidCredentials, "fr"));
     }
 

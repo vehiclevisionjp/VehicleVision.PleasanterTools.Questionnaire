@@ -1,4 +1,4 @@
-import { interpolate, type Language } from '../language';
+import { interpolate, type Language, UI_FALLBACK_LANGUAGE } from '../language';
 import { de } from './de';
 import { en } from './en';
 import { es } from './es';
@@ -53,8 +53,12 @@ export type Translate = (
  * **翻訳が無ければ既定の言語へ落ちる**（`_documents/多言語対応方針.md` 1 章）。
  */
 export function translator(language: Language): Translate {
-  const catalog = CATALOGS[language] ?? ja;
+  const catalog = CATALOGS[language];
 
   return (key, parameters) =>
-    interpolate(catalog[key] || ja[key], parameters, language);
+    interpolate(
+      catalog[key] || CATALOGS[UI_FALLBACK_LANGUAGE][key] || ja[key],
+      parameters,
+      language,
+    );
 }

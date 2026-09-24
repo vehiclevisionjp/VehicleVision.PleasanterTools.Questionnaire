@@ -40,11 +40,11 @@ describe('translator', () => {
     expect(translator('en')(key)).toBe(en[key]);
   });
 
-  it('未翻訳の言語は日本語の文言へ落ちる', () => {
+  it('未翻訳の言語は英語の文言へ落ちる', () => {
     const key = Object.keys(ja)[0] as MessageKey;
 
-    expect(translator('zh')(key)).toBe(ja[key]);
-    expect(translator('vi')(key)).toBe(ja[key]);
+    expect(translator('zh')(key)).toBe(en[key]);
+    expect(translator('vi')(key)).toBe(en[key]);
   });
 
   it('差し込みのある文言を組み立てる', () => {
