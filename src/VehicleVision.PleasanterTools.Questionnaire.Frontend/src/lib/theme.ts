@@ -7,6 +7,7 @@
  * **管理画面もここを使う。** 検査と書体の並びを 2 か所に持つと、
  * 片方だけ緩んでも気付けない。
  */
+import { appUrl } from './basePath';
 
 /** 書体。**値はサーバの列挙そのもの。** */
 export type ThemeFont = 'System' | 'Sans' | 'Serif' | 'Rounded' | 'Monospace';
@@ -303,5 +304,5 @@ export const CONTRAST_AA = 4.5;
 export function headerImageUrl(publicId: string, theme: SurveyTheme | null | undefined): string | null {
   const id = theme?.headerImageId;
   if (!id) return null;
-  return `/api/forms/${encodeURIComponent(publicId)}/header-image?v=${encodeURIComponent(id)}`;
+  return appUrl(`/api/forms/${encodeURIComponent(publicId)}/header-image?v=${encodeURIComponent(id)}`);
 }

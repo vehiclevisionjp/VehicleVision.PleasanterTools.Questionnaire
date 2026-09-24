@@ -9,6 +9,7 @@
  * ⚠️ **サーバから受け取るのは ID と配信元だけ。** 任意のスクリプトは受け取らない
  * （受け取れる作りにすると、そこが XSS の入口になる）。
  */
+import { appUrl } from './basePath';
 
 /** サーバが返す設定。 */
 export interface AnalyticsSettings {
@@ -42,7 +43,7 @@ declare global {
  */
 export async function fetchAnalyticsSettings(): Promise<AnalyticsSettings> {
   try {
-    const response = await fetch('/api/analytics', { headers: { Accept: 'application/json' } });
+    const response = await fetch(appUrl('/api/analytics'), { headers: { Accept: 'application/json' } });
     if (!response.ok) {
       return DISABLED_ANALYTICS;
     }
