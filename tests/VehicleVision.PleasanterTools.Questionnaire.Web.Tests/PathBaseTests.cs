@@ -256,6 +256,20 @@ public class PathBaseTests
     }
 
     [Fact]
+    public async Task 綴りの違う要求でもcookieのPathは設定した綴りになる()
+    {
+        await using var app = await StartAsync("/questionnaire");
+        using var http = Client(app);
+
+        using var response = await http.PostAsync("/QUESTIONNAIRE/api/signin", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cookie = Assert.Single(response.Headers.GetValues("Set-Cookie"));
+        // **ブラウザは cookie の Path を大文字小文字で区別する。** 要求の綴りを写してはいけない
+        Assert.Contains("path=/questionnaire;", cookie + ";", StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task サブパス無しなら管理者のcookieは従来どおり根に置く()
     {
         await using var app = await StartAsync(null);
