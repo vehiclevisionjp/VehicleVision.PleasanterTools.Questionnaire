@@ -19,6 +19,7 @@ public static class AuditNotes
 
     private const string TargetKey = "questionnaire:audit_target";
     private const string TargetsKey = "questionnaire:audit_targets";
+    private const string RecordReadKey = "questionnaire:audit_record_read";
 
     /// <summary>補足を 1 つ預ける。</summary>
     /// <remarks>**制御文字は落として長さも切る**（<see cref="LogSafe"/>）。</remarks>
@@ -39,6 +40,16 @@ public static class AuditNotes
     /// <summary>預かった補足。</summary>
     internal static IReadOnlyDictionary<string, string>? Of(HttpContext context) =>
         context.Items[ItemKey] as Dictionary<string, string>;
+
+    /// <summary>通常は記録しない読み取り要求を、明示的に監査対象へ含める。</summary>
+    public static void RecordRead(HttpContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        context.Items[RecordReadKey] = true;
+    }
+
+    internal static bool ShouldRecordRead(HttpContext context) =>
+        context.Items[RecordReadKey] is true;
 
     /// <summary>この操作が何に対して行われたかを明示する。</summary>
     /// <remarks>

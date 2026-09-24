@@ -608,6 +608,9 @@ public static class AdminAuthSchemes
     /// <summary>ログインの試行に掛けるレート制限の名前。</summary>
     public const string LoginRateLimitPolicy = "admin-login";
 
+    /// <summary>救済トークンの照合に掛ける専用レート制限の名前。</summary>
+    public const string RescueRateLimitPolicy = "admin-rescue";
+
     /// <summary>ログイン済みなら通す認可の名前。</summary>
     public const string SessionPolicy = "Admin.Session.Any";
 

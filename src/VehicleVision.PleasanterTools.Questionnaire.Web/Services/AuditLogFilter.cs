@@ -65,7 +65,8 @@ public sealed partial class AuditLogFilter(
         var http = context.HttpContext;
 
         // **読み取りは残さない**
-        if (HttpMethods.IsGet(http.Request.Method) || HttpMethods.IsHead(http.Request.Method))
+        if ((HttpMethods.IsGet(http.Request.Method) || HttpMethods.IsHead(http.Request.Method))
+            && !AuditNotes.ShouldRecordRead(http))
         {
             return await next(context).ConfigureAwait(false);
         }

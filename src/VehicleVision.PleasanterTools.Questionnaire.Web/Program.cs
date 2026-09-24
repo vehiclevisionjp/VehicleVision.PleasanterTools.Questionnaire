@@ -636,6 +636,19 @@ builder.Services
             sharedRateLimits,
             rateLimitLogger));
 
+    // **救済トークンは合言葉と同じ上限値の専用枠にする。**
+    // 通常の管理画面表示で枠を消費せず、救済への攻撃で通常ログインまで妨害されないため。
+    options.AddPolicy(AdminAuthSchemes.RescueRateLimitPolicy, context =>
+        context.Request.Query.ContainsKey("rescue")
+            ? RateLimitPartitions.FixedWindow(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                "admin-rescue",
+                settings.GetInt32("QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"),
+                TimeSpan.FromMinutes(5),
+                sharedRateLimits,
+                rateLimitLogger)
+            : RateLimitPartition.GetNoLimiter("admin-page"));
+
     // **試し送信は 1 分に 3 通まで。** 任意の宛先へは送れないが、
     // 管理者本人のメールボックスや送信基盤を連打で埋めさせない。
     options.AddPolicy(AdminAutoReplyEndpoints.TestSendRateLimitPolicy, context =>
@@ -971,9 +984,13 @@ IResult AdminPage(HttpContext context, AdminPasswordSignInPolicy passwordSignIn)
     if (context.Request.Query.TryGetValue("rescue", out var rescue))
     {
         // **照合後は秘密を URL から落とす。** 履歴や次の要求の Referer に残し続けない。
-        passwordSignIn.TryGrantRescue(
+        var granted = passwordSignIn.TryGrantRescue(
             context,
             rescue.Count == 1 ? rescue[0] : null);
+        // **問い合わせ文字列は監査ログへ渡さない。** 成否だけを明示して残す。
+        AuditNotes.RecordRead(context);
+        AuditNotes.SetTarget(context, "AdminRescue", targetId: null);
+        AuditNotes.Add(context, "result", granted ? "succeeded" : "failed");
         return Results.Redirect(adminPath.Path);
     }
 
@@ -983,7 +1000,9 @@ IResult AdminPage(HttpContext context, AdminPasswordSignInPolicy passwordSignIn)
         : Results.NotFound();
 }
 
-app.MapGet(adminPath.Path, AdminPage);
+app.MapGet(adminPath.Path, AdminPage)
+    .RequireRateLimiting(AdminAuthSchemes.RescueRateLimitPolicy)
+    .AddEndpointFilter<AuditLogFilter>();
 app.MapFallback($"{adminPath.Path}/{{**path}}", AdminPage);
 
 // **Defender for Storage を使うときだけ受け口を生やす。**
