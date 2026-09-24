@@ -23,9 +23,10 @@ export const MAX_HEADING_LEVEL = 4;
 export function noteBlocks(
   byLanguage: Record<string, NoteBlock[]> | null | undefined,
   language: Language,
+  fallbackLanguage: Language = DEFAULT_LANGUAGE,
 ): NoteBlock[] {
   if (!byLanguage) return [];
-  return byLanguage[language] ?? byLanguage[DEFAULT_LANGUAGE] ?? [];
+  return byLanguage[language] ?? byLanguage[fallbackLanguage] ?? [];
 }
 
 /**

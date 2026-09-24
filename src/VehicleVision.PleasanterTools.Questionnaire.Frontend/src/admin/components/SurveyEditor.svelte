@@ -36,7 +36,6 @@
   } from '../lib/flow';
   import { autoReplyKey, validateAutoReply } from '../lib/autoReply';
   import {
-    DEFAULT_LANGUAGE,
     LANGUAGE_NAMES,
     SUPPORTED_LANGUAGES,
     type Language,
@@ -707,10 +706,22 @@
       </select>
     </label>
     <p class="hint">{t('editor.editingLanguageHint')}</p>
-    {#if editing !== DEFAULT_LANGUAGE}
-      <!-- **未翻訳の落とし先は ja。** 空のまま公開しても画面は空にならない -->
-      <p class="hint">{t('editor.fallbackNotice')}</p>
-    {/if}
+    <label>
+      {t('editor.fallbackLanguage')}
+      <select
+        value={definition.fallbackLanguage}
+        onchange={(event) =>
+          (definition = {
+            ...definition!,
+            fallbackLanguage: event.currentTarget.value as Language,
+          })}
+      >
+        {#each SUPPORTED_LANGUAGES as option (option)}
+          <option value={option}>{LANGUAGE_NAMES[option]}</option>
+        {/each}
+      </select>
+    </label>
+    <p class="hint">{t('editor.fallbackLanguageHint')}</p>
   </section>
 
   <section class="survey">

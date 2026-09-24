@@ -112,6 +112,34 @@ public class SurveySnapshotStoreTests
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public async Task 公開済みの版は後の版の落とし先変更で変わらない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        DatabaseMigrator.MigrateUp(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, connectionString);
+        var repository = new SurveyRepository(factory);
+        var snapshots = new SurveySnapshotStore(factory);
+        var surveyId = Guid.NewGuid();
+
+        await repository.SaveAsync(new SurveyRecord(
+            surveyId, $"pub-{Guid.NewGuid():N}", "検証用", 1, null, 0, null));
+        await repository.PublishAsync(
+            surveyId, 1, Definition(1) with { FallbackLanguage = "en" }, Mapping(), null);
+        await repository.PublishAsync(
+            surveyId, 2, Definition(2) with { FallbackLanguage = "ja" }, Mapping(), null);
+
+        Assert.Equal("en", (await snapshots.FindAsync(surveyId, 1))!.Definition.FallbackLanguage);
+        Assert.Equal("ja", (await snapshots.FindAsync(surveyId, 2))!.Definition.FallbackLanguage);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public async Task 公開用IDからアンケートを引ける(
         DatabaseProvider provider,
         string connectionString)

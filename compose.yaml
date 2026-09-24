@@ -56,6 +56,8 @@ x-app-environment: &app-environment
     # 取説（_documents/アンケート作成-運用手順書.md）はこの状態の図で説明している。
     # 任意・無効の振る舞いを手元で見たいときは DEV_ADMIN_TWOFACTOR で切り替える
     QUESTIONNAIRE_ADMIN_TWOFACTOR: ${DEV_ADMIN_TWOFACTOR:-required}
+    # **管理画面の入口。** 未指定なら従来の `/admin` のまま
+    QUESTIONNAIRE_ADMIN_PATH: ${DEV_ADMIN_PATH:-/admin}
     # ---- SAML（Issue #166）--------------------------------------------------
     # **既定は無効。** saml profile の IdP と合わせて使うときだけ有効にする
     #

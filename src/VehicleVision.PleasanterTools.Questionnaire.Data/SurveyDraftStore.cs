@@ -230,6 +230,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string? TitleJson,
         string? DescriptionJson,
         string? ConfirmationMessageJson,
+        string FallbackLanguage,
         int DisplayMode,
         bool ShowProgress,
         bool AllowEditingAfterSubmit,
@@ -452,7 +453,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
     {
         var survey = await connection.QueryFirstOrDefaultAsync<SurveyRow>(Sql(
             "SELECT [SurveyId], [TitleJson], [DescriptionJson], "
-            + "       [ConfirmationMessageJson], [DisplayMode], [ShowProgress], "
+            + "       [ConfirmationMessageJson], [FallbackLanguage], [DisplayMode], [ShowProgress], "
             + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], [AssetDeliveryJson], "
             + "       [PublishedVersion], "
             + "       [DraftRevision], [AssetHistorySiteId], [AssetHistoryMappingJson] "
@@ -557,6 +558,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             // **次に公開される版を入れておく。** 公開して初めて確定する
             Version = (survey.PublishedVersion ?? 0) + 1,
             Title = ReadText(survey.TitleJson) ?? LocalizedText.Japanese(string.Empty),
+            FallbackLanguage = survey.FallbackLanguage,
             Description = ReadText(survey.DescriptionJson),
             ConfirmationMessage = ReadText(survey.ConfirmationMessageJson),
             DisplayMode = (DisplayMode)survey.DisplayMode,
@@ -628,6 +630,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "  [DraftRevision] = [DraftRevision] + 1, "
             + "  [TitleJson] = @TitleJson, [DescriptionJson] = @DescriptionJson, "
             + "  [ConfirmationMessageJson] = @ConfirmationMessageJson, "
+            + "  [FallbackLanguage] = @FallbackLanguage, "
             + "  [DisplayMode] = @DisplayMode, [ShowProgress] = @ShowProgress, "
             + "  [AllowEditingAfterSubmit] = @AllowEditingAfterSubmit, "
             + "  [AssetHistorySiteId] = @AssetHistorySiteId, "
@@ -643,6 +646,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 TitleJson = WriteText(definition.Title),
                 DescriptionJson = WriteText(definition.Description),
                 ConfirmationMessageJson = WriteText(definition.ConfirmationMessage),
+                definition.FallbackLanguage,
                 DisplayMode = (int)definition.DisplayMode,
                 definition.ShowProgress,
                 definition.AllowEditingAfterSubmit,
@@ -870,14 +874,14 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "   [ResponseJsonColumn], [Status], [PublishedVersion], "
             + "   [DraftRevision], [DisplayMode], [ShowProgress], "
             + "   [AllowEditingAfterSubmit], [TitleJson], [DescriptionJson], "
-            + "   [ConfirmationMessageJson], [IsTemplate], [ThemeJson], [AutoReplyJson], "
+            + "   [ConfirmationMessageJson], [FallbackLanguage], [IsTemplate], [ThemeJson], [AutoReplyJson], "
             + "   [AssetDeliveryJson], "
             + "   [CreatedAt], [UpdatedAt]) "
             + "VALUES (@SurveyId, @PublicId, @Title, @PleasanterSiteId, "
             + "        @ResponseJsonColumn, @Status, NULL, "
             + "        0, @DisplayMode, @ShowProgress, "
             + "        @AllowEditingAfterSubmit, @TitleJson, @DescriptionJson, "
-            + "        @ConfirmationMessageJson, @IsTemplate, @ThemeJson, @AutoReplyJson, "
+            + "        @ConfirmationMessageJson, @FallbackLanguage, @IsTemplate, @ThemeJson, @AutoReplyJson, "
             + "        @AssetDeliveryJson, "
             + "        @Now, @Now)",
             new
@@ -894,6 +898,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 TitleJson = WriteText(definition.Title),
                 DescriptionJson = WriteText(definition.Description),
                 ConfirmationMessageJson = WriteText(definition.ConfirmationMessage),
+                definition.FallbackLanguage,
                 ThemeJson = WriteTheme(definition.Theme),
                 // **自動返信も複製に付いてくる**（文面はテンプレートの一部）
                 AutoReplyJson = WriteAutoReply(definition.AutoReply),

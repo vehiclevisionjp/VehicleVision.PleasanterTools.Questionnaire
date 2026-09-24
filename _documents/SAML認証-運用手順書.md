@@ -42,6 +42,7 @@
 | 未登録の利用者 | **拒絶**（既定）か **その場で登録**（JIT）を選べる |
 | 単一ログアウト | **対応**（Issue #191）。`QUESTIONNAIRE_SAML_SINGLELOGOUTURL` を設定したときだけ使う。SP 起点・IdP 起点の両方を受ける |
 | 設定の反映 | DB の設定は**再起動なし**で次の要求から反映する |
+| 管理画面の入口 | `QUESTIONNAIRE_ADMIN_PATH` で変更できる。変更の反映にはアプリの再起動が必要 |
 | 設定できる人 | `Administrator` だけ。アンケートの権限とは別 |
 
 ### やり取りの流れ
@@ -216,6 +217,10 @@ GET https://{本アプリのホスト}/api/admin/saml/metadata
 |---|---|
 | ACS URL（受け口） | `https://{本アプリのホスト}/api/admin/saml/acs` |
 | Entity ID | `QUESTIONNAIRE_SAML_ENTITYID` に入れた値 |
+
+`QUESTIONNAIRE_ADMIN_PATH` を変更しても、ACS URL は変わらない。変更されるのは SAML ログイン後の
+管理画面への戻り先である。リバースプロキシの経路変更などで外部から見える ACS URL も変える場合は、
+**IdP 側へ登録した ACS URL も必ず変更する。** IdP 側が古い URL のままでは応答を受け取れない。
 
 ## 5. Google Workspace の設定例
 
