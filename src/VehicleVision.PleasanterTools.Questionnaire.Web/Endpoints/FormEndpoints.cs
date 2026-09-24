@@ -369,7 +369,8 @@ public static class FormEndpoints
                     context.Request.IsHttps,
                     publicId,
                     new DateTimeOffset(DateTime.SpecifyKind(
-                        grant.ExpiresAtUtc, DateTimeKind.Utc))));
+                        grant.ExpiresAtUtc, DateTimeKind.Utc)),
+                    context.Request.PathBase));
 
             return Results.Ok(new FormResponse(
                 publicId,
@@ -554,7 +555,8 @@ public static class FormEndpoints
                         AssetCookieOptions(
                             result.AllowEmbedding,
                             context.Request.IsHttps,
-                            publicId));
+                            publicId,
+                            pathBase: context.Request.PathBase));
                 }
 
                 // **受付完了。** Pleasanter へはこの後ワーカーが送る
@@ -718,12 +720,14 @@ public static class FormEndpoints
     /// <remarks>
     /// **埋め込みを許可したアンケートかつ HTTPS のときだけ cross-site へ送る。**
     /// それ以外は従来の Lax を保ち、平文 HTTP 運用でも Cookie を保存できるようにする。
+    /// **Path はサブパス込み**（Issue #465）。サブパスの外へは送らない。
     /// </remarks>
     public static CookieOptions AssetCookieOptions(
         bool allowEmbedding,
         bool isHttps,
         string publicId,
-        DateTimeOffset? expires = null)
+        DateTimeOffset? expires = null,
+        PathString pathBase = default)
     {
         var crossSite = allowEmbedding && isHttps;
         return new CookieOptions
@@ -731,7 +735,7 @@ public static class FormEndpoints
             HttpOnly = true,
             Secure = isHttps,
             SameSite = crossSite ? SameSiteMode.None : SameSiteMode.Lax,
-            Path = $"/api/forms/{Uri.EscapeDataString(publicId)}/assets",
+            Path = $"{pathBase.ToUriComponent()}/api/forms/{Uri.EscapeDataString(publicId)}/assets",
             Expires = expires,
         };
     }
