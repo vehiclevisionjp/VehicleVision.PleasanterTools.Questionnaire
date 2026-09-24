@@ -264,12 +264,14 @@ curl -s -b jar.txt -H "Content-Type: application/json" \
 **Pleasanter は 2 要素を終えるまで認証 cookie を出さない**（2.1 の表）。パスワードだけ通した段階では
 `Pleasanter_SessionGuid` しか無く、`users/get`・`sessions/set` とも 401 になる。
 どちらも同じ「認証されているか」の判定（`context.Authenticated`）を通るため。**本アプリは何もしなくても、
-Pleasanter の 2 要素を終えた人しか通さない**（2.2 の表。`users/get` で TOTP を確認済み。
-メールのワンタイムパスワードは 2026-09-24 に当時の問い合わせで確認しており、`users/get` でも同じ判定を
-通ることからの推論）。
+Pleasanter の 2 要素を終えた人しか通さない**（2.2 の表。`users/get` で TOTP を手で確認済み。
+メールのワンタイムパスワードは、`users/get` で端から端までの自動試験 `PleasanterSsoEndToEndTests` が
+毎回確かめている。10 章）。
 
 ⚠️ **この性質に頼っている。** Pleasanter の版を上げたときは、2.2 の手順で 2 要素の途中が 401 に
-なることを確かめ直すこと。
+なることを確かめ直すこと。メールのワンタイムパスワードは端から端までの試験（`e2e.yml`）が
+検証環境の Pleasanter の版で確かめる（版を上げるときは `tools/pleasanter-testenv/Parameters/Security.json` を
+新しいイメージから取り直すこと。`tools/pleasanter-testenv/README.md`）。
 
 ### 6.2 本アプリ側の 2 要素（SAML と同じ）
 
@@ -453,11 +455,15 @@ App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現
 | 設定の読み取り・優先順位・保存 | 単体テスト（`PleasanterSsoOptionsTests`） |
 | 未登録の扱い・本アプリの 2 要素 | 単体テスト（`PleasanterSsoAuthenticatorTests`） |
 | 再検証（間隔・別人・ログアウト・接続不可・機能の無効化）と `AdminSessionGuard` への組み込み | 単体テスト（`PleasanterSsoSessionRevalidatorTests`、`AdminSessionGuardTests`） |
-| SQL Server の Pleasanter 実機との往復・再検証・本アプリの 2 要素 | 2026-09-24 に手元で確認（2.2。当時の本人確認は拡張 SQL）。**`users/get` で本アプリを起動した状態の往復は未確認** |
+| SQL Server の Pleasanter 実機との往復・再検証・本アプリの 2 要素 | 2026-09-24 に手元で確認（2.2。当時の本人確認は拡張 SQL）。`users/get` での往復は下の自動試験で確かめている |
 | `users/get` と代わりの経路（一般利用者・管理者・未ログイン・`DisableApi` で API キーあり／なし／違うキー） | 2026-09-25 に実機で確認（2.2） |
-| Pleasanter の TOTP・メールのワンタイムパスワード | TOTP は 2026-09-25 に `users/get` で実機確認（2.2）。**メールのワンタイムパスワードは `users/get` では未確認**（2026-09-24 に当時の問い合わせで確認。同じ判定を通ることからの推論） |
+| `users/get` での往復: 一般の利用者で入れる・本アプリに居ない人は `unknown-user`・外部設定の項目は画面から変えられない | **自動試験**（`PleasanterSsoEndToEndTests`。`e2e.yml` の SQL Server の job で毎回。検証環境の Pleasanter 1.5.8.1、本アプリは `compose.pleasanter-sso.yaml` で外部設定から有効） |
+| Pleasanter でログアウトした後、再検証で締め出される | **自動試験**（同上。間隔は最短の 1 分。本アプリの cookie を持ったままでも入れず、管理 API は 401） |
+| Pleasanter の TOTP・メールのワンタイムパスワード | TOTP は 2026-09-25 に `users/get` で実機確認（2.2）。**メールのワンタイムパスワードは自動試験**（同上。パスワードだけ・違うコードでは入れず、正しいコードの後に入れる。コードは Pleasanter の DB から読み、メールの配送そのものは見ていない） |
 | 利用者ごとの API 禁止（`DisableApi` 以外の禁止） | **未検証**（`UserSettings.AllowApi` の同じ判定に入る） |
 | 複数テナント | **未検証**（検証環境のテナントは 1 つ） |
 | PostgreSQL・MySQL の Pleasanter | DBMS に依らない（SQL を書かない）が実機では**未検証** |
-| ブラウザでの画面操作（別窓・自動確認・ログアウトの印） | **未検証** |
+| ブラウザでの往復（「Pleasanter でログイン」→ 別窓で Pleasanter にログイン → 別窓が閉じて本アプリの 2 要素の登録 → 管理画面） | **自動試験**（写しの一式 `tools/screenshots/specs/pleasanter-sso.spec.ts`。未登録の利用者はその場で登録する設定） |
+| 設定画面（画面から有効にして保存・固定項目のロック表示） | **自動試験**（同上。ロック表示は応答の `fixedFields` を書き換えて確かめる。サーバ側の固定は `PleasanterSsoEndToEndTests`） |
+| ブラウザでの自動確認（ログイン画面を開いただけで入る）・ログアウトの印 | **未検証** |
 | サブパス配置（8 章） | **未検証。** 本アプリ単体のサブパス配信は #465 で確認済み。IIS・Apache・Nginx・Azure の実機での SSO は未確認 |
