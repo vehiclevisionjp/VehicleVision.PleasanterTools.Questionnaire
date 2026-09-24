@@ -237,8 +237,6 @@ public static class AdminAuthEndpoints
             AdminCredentialRequest request,
             HttpContext context,
             AdminAuthenticator authenticator,
-            ISamlOptionsProvider samlProvider,
-            AdminPasswordSignInPolicy passwordSignIn,
             BotMitigationOptionsProvider botOptionsProvider,
             AltchaGuard altcha,
             CancellationToken cancellationToken) =>
@@ -246,13 +244,6 @@ public static class AdminAuthEndpoints
             // **誰が狙われているかは、記録に残っていないと分からない。**
             // パスワードは預けない（AuditNotes の但し書き）
             AuditNotes.Add(context, "loginId", request.LoginId);
-
-            var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
-            if (!passwordSignIn.IsAllowed(context, saml.Enabled))
-            {
-                // **画面から隠すだけでは足りない。** API を直接叩かれても認証しない。
-                return Results.NotFound();
-            }
 
             // **この handler より先にレート制限 middleware が動く。**
             // 無制限に署名検証だけをさせて、サーバの CPU を使わせない。
@@ -310,7 +301,10 @@ public static class AdminAuthEndpoints
                         new { message = InvalidMessage(context) },
                         statusCode: StatusCodes.Status401Unauthorized);
             }
-        }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+        })
+            // **画面から隠すだけでは足りない。** API を直接叩かれても認証しない。
+            .AddEndpointFilter<AdminPasswordSignInFilter>()
+            .RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
         // ---- 2 要素の登録 ----------------------------------------------------
         group.MapPost("/enroll/begin", async (
