@@ -1,4 +1,4 @@
-import type { Language } from './i18n/language';
+import { DEFAULT_LANGUAGE, type Language } from './i18n/language';
 import type { Translate } from './i18n/messages';
 import type { AnswerState, Question } from './types';
 import {
@@ -26,6 +26,7 @@ export function validateQuestion(
   answer: AnswerState | undefined,
   t: Translate,
   language: Language,
+  fallbackLanguage: Language = DEFAULT_LANGUAGE,
 ): string | null {
   if (isDisplayOnly(question)) return null;
 
@@ -80,7 +81,7 @@ export function validateQuestion(
   if (selectionError) return selectionError;
 
   for (const value of values) {
-    const error = validateValue(question, value, t, language);
+    const error = validateValue(question, value, t, language, fallbackLanguage);
     if (error) return error;
   }
 
@@ -149,6 +150,7 @@ function validateValue(
   value: string,
   t: Translate,
   language: Language,
+  fallbackLanguage: Language,
 ): string | null {
   const settings = question.settings;
 
@@ -167,7 +169,7 @@ function validateValue(
       // **正規表現は最後に見る**（Issue #102）。
       // 文字数や形式の方が直し方を伝えやすいので、そちらを先に出す
       if (settings.pattern !== undefined && !matchesPattern(settings.pattern, value)) {
-        return patternMessage(question, t, language);
+        return patternMessage(question, t, language, fallbackLanguage);
       }
       return null;
     }
@@ -231,8 +233,13 @@ function matchesPattern(pattern: string, value: string): boolean {
 }
 
 /** 合わないときの文言。**正規表現そのものは見せない。** */
-function patternMessage(question: Question, t: Translate, language: Language): string {
-  const custom = text(question.settings.patternMessage, language);
+function patternMessage(
+  question: Question,
+  t: Translate,
+  language: Language,
+  fallbackLanguage: Language = DEFAULT_LANGUAGE,
+): string {
+  const custom = text(question.settings.patternMessage, language, fallbackLanguage);
   return custom === '' ? t('validation.pattern') : custom;
 }
 
@@ -242,10 +249,17 @@ export function validatePage(
   answers: Record<string, AnswerState>,
   t: Translate,
   language: Language,
+  fallbackLanguage: Language = DEFAULT_LANGUAGE,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const question of questions) {
-    const error = validateQuestion(question, answers[question.questionId], t, language);
+    const error = validateQuestion(
+      question,
+      answers[question.questionId],
+      t,
+      language,
+      fallbackLanguage,
+    );
     if (error) errors[question.questionId] = error;
   }
   return errors;

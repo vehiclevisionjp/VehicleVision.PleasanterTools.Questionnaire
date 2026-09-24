@@ -26,14 +26,19 @@ public sealed class LocalizedText
         new(new Dictionary<string, string> { [DefaultLanguage] = text });
 
     /// <summary>指定した言語の文字列を返す。無ければ既定の言語、それも無ければ空文字。</summary>
-    public string Get(string? language)
+    public string Get(string? language) => Get(language, DefaultLanguage);
+
+    /// <summary>指定した言語の文字列を返す。無ければ指定した落とし先、それも無ければ空文字。</summary>
+    public string Get(string? language, string fallbackLanguage)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fallbackLanguage);
+
         if (TryGet(language, out var text))
         {
             return text;
         }
 
-        return _byLanguage.TryGetValue(DefaultLanguage, out var fallback) ? fallback : string.Empty;
+        return _byLanguage.TryGetValue(fallbackLanguage, out var fallback) ? fallback : string.Empty;
     }
 
     /// <summary>指定した言語の文字列があれば返す。フォールバックはしない。</summary>

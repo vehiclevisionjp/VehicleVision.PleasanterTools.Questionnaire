@@ -224,6 +224,8 @@ export interface Page {
 export interface SurveyDefinition {
   surveyId: string;
   version: number;
+  /** 要求した言語の文言が無いときに表示する言語。 */
+  fallbackLanguage: Language;
   title: LocalizedText;
   description?: LocalizedText;
   pages: Page[];
@@ -340,9 +342,13 @@ export interface AnswerState {
  * **言語は必ず渡す。** 既定値を持たせると、
  * 言語を渡し忘れた場所が日本語のまま静かに残る。
  */
-export function text(value: LocalizedText | undefined, language: Language): string {
+export function text(
+  value: LocalizedText | undefined,
+  language: Language,
+  fallbackLanguage: Language = DEFAULT_LANGUAGE,
+): string {
   if (!value) return '';
-  return value[language] ?? value[DEFAULT_LANGUAGE] ?? '';
+  return value[language] ?? value[fallbackLanguage] ?? '';
 }
 
 /**

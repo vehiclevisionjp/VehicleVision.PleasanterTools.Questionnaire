@@ -421,8 +421,9 @@ export const en: Record<MessageKey, string> = {
   'editor.editingLanguage': 'Language being edited',
   'editor.editingLanguageHint':
     'What you type goes into this language. Text in other languages is kept as it is.',
-  'editor.fallbackNotice':
-    'Fields with no text in this language fall back to Japanese on the response screen.',
+  'editor.fallbackLanguage': 'Language shown when a translation is missing',
+  'editor.fallbackLanguageHint':
+    'When a question, choice, or heading has no translation in the respondent language, text in this language is shown. This is separate from the language being edited.',
   'questionImport.open': 'Import from another survey',
   'questionImport.title': 'Import questions',
   'questionImport.close': 'Close',
