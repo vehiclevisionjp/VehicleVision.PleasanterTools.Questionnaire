@@ -46,6 +46,7 @@ public static class AdminAuthEndpoints
             HttpContext context,
             IAdminUserStore store,
             ISamlOptionsProvider samlProvider,
+            IPleasanterSsoOptionsProvider pleasanterSsoProvider,
             AdminPasswordSignInPolicy passwordSignIn,
             AdminAuthOptions options,
             BotMitigationOptionsProvider botOptionsProvider,
@@ -54,6 +55,8 @@ public static class AdminAuthEndpoints
         {
             var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
             var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+            var pleasanterSso = (await pleasanterSsoProvider.GetAsync(cancellationToken).ConfigureAwait(false))
+                .Options;
             var mail = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
             var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
 
@@ -61,8 +64,16 @@ public static class AdminAuthEndpoints
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
             var samlEnabled = saml.Enabled;
             var samlLabel = saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null;
+
+            // **Pleasanter のログインも同じ扱い**（Issue #464）。
+            // 返すのはブラウザで開くログイン画面の URL だけ。**内部 URL・拡張 SQL の名前は返さない**
+            var pleasanterSsoEnabled = pleasanterSso.Enabled;
+            var pleasanterSsoLabel = pleasanterSso.ButtonLabel.Length > 0 ? pleasanterSso.ButtonLabel : null;
+            var pleasanterSsoLoginUrl = pleasanterSsoEnabled ? pleasanterSso.LoginUrl : null;
+
+            // **合言葉を塞げるのは、ほかの入口（SAML か Pleasanter）が有効な間だけ**
             var passwordSignInEnabled =
-                setupRequired || passwordSignIn.IsAllowed(context, samlEnabled);
+                setupRequired || passwordSignIn.IsAllowed(context, samlEnabled || pleasanterSsoEnabled);
 
             var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             if (session.Succeeded)
@@ -90,6 +101,14 @@ public static class AdminAuthEndpoints
                 var samlSingleLogout = saml.SingleLogoutEnabled
                     && session.Principal?.FindFirstValue(AdminAuthSchemes.SamlNameIdClaim) is { Length: > 0 };
 
+                // **Pleasanter のログインで入った人だけに、Pleasanter のログアウト画面を返す**（Issue #464）
+                var viaPleasanterSso = session.Principal?.FindFirst(PleasanterSsoClaims.UserId) is not null;
+                var pleasanterSsoLogoutUrl = pleasanterSsoEnabled
+                    && viaPleasanterSso
+                    && pleasanterSso.LogoutUrl.Length > 0
+                        ? pleasanterSso.LogoutUrl
+                        : null;
+
                 return Results.Ok(new
                 {
                     authenticated = true,
@@ -110,12 +129,20 @@ public static class AdminAuthEndpoints
                     hasTotp,
                     samlEnabled,
                     samlLabel,
+                    pleasanterSsoEnabled,
+                    pleasanterSsoLabel,
+                    pleasanterSsoLoginUrl,
                     passwordSignInEnabled,
                     captchaEnabled = botOptions.AdminCaptcha.Enabled,
 
                     // **IdP へログアウトを頼めるか**（Issue #191）。
                     // 画面はこれを見て、ログアウトの行き先を決める
                     samlSingleLogout,
+
+                    // **Pleasanter のログインで入ったか**（Issue #464）。
+                    // 画面はログアウトの直後に自動で入り直さないよう、これを見て印を付ける
+                    viaPleasanterSso,
+                    pleasanterSsoLogoutUrl,
 
                     // **メールを送れる状態かを画面へ返す**（Issue #189）。
                     // 自動返信を設定しただけで「送っているつもり」にさせない。
@@ -156,6 +183,9 @@ public static class AdminAuthEndpoints
                 needsEnrollment,
                 samlEnabled,
                 samlLabel,
+                pleasanterSsoEnabled,
+                pleasanterSsoLabel,
+                pleasanterSsoLoginUrl,
                 passwordSignInEnabled,
                 captchaEnabled = botOptions.AdminCaptcha.Enabled,
             });
@@ -331,7 +361,12 @@ public static class AdminAuthEndpoints
             var enrollment = authenticator.BeginTotpEnrollment(loginId);
 
             // **共有鍵は途中状態の側に持たせる。** 画面から送り返させると差し替えられる
-            await SignInPendingAsync(context, ReadPending(pending.Principal), enrollment.SecretBase32)
+            // **Pleasanter のログインで来た印も引き継ぐ**（Issue #464）。落とすと再検証から外れる
+            await SignInPendingAsync(
+                    context,
+                    ReadPending(pending.Principal),
+                    enrollment.SecretBase32,
+                    PleasanterSsoClaims.Carry(pending.Principal))
                 .ConfigureAwait(false);
 
             return Results.Ok(new { secret = enrollment.SecretBase32, uri = enrollment.OtpAuthUri });
@@ -385,7 +420,11 @@ public static class AdminAuthEndpoints
                     statusCode: StatusCodes.Status401Unauthorized);
             }
 
-            await SignInSessionAsync(context, user).ConfigureAwait(false);
+            await SignInSessionAsync(
+                    context,
+                    user,
+                    extraClaims: PleasanterSsoClaims.Carry(pending.Principal))
+                .ConfigureAwait(false);
 
             // **復旧コードを返せるのはここだけ。** 保存しているのはハッシュのみ
             return Results.Ok(new { recoveryCodes = codes });
@@ -449,7 +488,12 @@ public static class AdminAuthEndpoints
         switch (outcome)
         {
             case SecondFactorOutcome.Succeeded:
-                await SignInSessionAsync(context, user).ConfigureAwait(false);
+                // **Pleasanter のログインで来た印を引き継ぐ**（Issue #464）
+                await SignInSessionAsync(
+                        context,
+                        user,
+                        extraClaims: PleasanterSsoClaims.Carry(pending.Principal))
+                    .ConfigureAwait(false);
                 return Results.Ok(new { authenticated = true });
 
             case SecondFactorOutcome.LockedOut:
@@ -488,7 +532,14 @@ public static class AdminAuthEndpoints
     };
 
     /// <summary>パスワードまで通った状態にする。**ここでは何も操作させない。**</summary>
-    internal static async Task SignInPendingAsync(HttpContext context, AdminUser user, string? secret)
+    /// <param name="extraClaims">
+    /// ログイン後へ引き継ぐ claim（Pleasanter のログインで来た印など。Issue #464）。
+    /// </param>
+    internal static async Task SignInPendingAsync(
+        HttpContext context,
+        AdminUser user,
+        string? secret,
+        IEnumerable<Claim>? extraClaims = null)
     {
         var claims = new List<Claim>
         {
@@ -500,6 +551,11 @@ public static class AdminAuthEndpoints
         if (secret is not null)
         {
             claims.Add(new Claim(EnrollmentSecretClaim, secret));
+        }
+
+        if (extraClaims is not null)
+        {
+            claims.AddRange(extraClaims);
         }
 
         var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Pending);
@@ -520,8 +576,15 @@ public static class AdminAuthEndpoints
     /// SAML で入ったときの <c>NameID</c> と <c>SessionIndex</c>（Issue #191）。
     /// **単一ログアウトの要求に載せるのに要る。** それ以外の入り方では <c>null</c>。
     /// </param>
+    /// <param name="extraClaims">
+    /// セッションへ足す claim。**Pleasanter のログインで入ったときの本人と確かめた時刻**
+    /// （<see cref="PleasanterSsoClaims"/>。Issue #464）。再検証に使う。
+    /// </param>
     internal static async Task SignInSessionAsync(
-        HttpContext context, AdminUser user, SamlSessionKeys? samlSession = null)
+        HttpContext context,
+        AdminUser user,
+        SamlSessionKeys? samlSession = null,
+        IEnumerable<Claim>? extraClaims = null)
     {
         // **途中状態は必ず消す。** ストアにも共有鍵を残さない
         await context.RequestServices.GetRequiredService<AdminSessionManager>()
@@ -544,6 +607,11 @@ public static class AdminAuthEndpoints
             {
                 claims.Add(new Claim(AdminAuthSchemes.SamlSessionIndexClaim, samlSession.SessionIndex));
             }
+        }
+
+        if (extraClaims is not null)
+        {
+            claims.AddRange(extraClaims);
         }
 
         var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Session);
@@ -657,7 +725,12 @@ public static class AdminAuthSchemes
         // **画面へ飛ばさない。** これは API なので、状態だけを返す
         options.Events.OnRedirectToLogin = context =>
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            // **Pleasanter に確かめ直せずに落としたときは 503**（Issue #464）。
+            // 「ログアウトされた」と「Pleasanter に届かない」を画面で分けられるようにする
+            context.Response.StatusCode =
+                context.HttpContext.Items[PleasanterSsoSessionRevalidator.UpstreamErrorItemKey] is true
+                    ? StatusCodes.Status503ServiceUnavailable
+                    : StatusCodes.Status401Unauthorized;
             return Task.CompletedTask;
         };
         options.Events.OnRedirectToAccessDenied = context =>

@@ -166,6 +166,7 @@ builder.Services.AddSingleton<IMaintenanceModeStore, MaintenanceModeStore>();
 builder.Services.AddSingleton(maintenanceOptions);
 builder.Services.AddSingleton<MaintenanceMode>();
 builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
+builder.Services.AddSingleton<IPleasanterSsoSettingStore, PleasanterSsoSettingStore>();
 builder.Services.AddSingleton<IAppSettingStore, AppSettingStore>();
 builder.Services.AddSingleton<BotMitigationOptionsProvider>();
 
@@ -419,6 +420,33 @@ builder.Services
         UseProxy = false,
         ConnectCallback = SamlMetadataConnection.ConnectAsync,
     });
+
+// **Pleasanter のログインで管理画面へ入る**（Issue #464）。SAML と同じく、
+// 外部設定 → DB → 既定値の順で要求ごとに読み、管理画面から再起動なしで変えられる。
+// **外部設定の書き間違いは起動時に落とす**（有効・無効は DB 側と組み合わさるので、形だけ確かめる）
+_ = PleasanterSsoOptions.FromValues(key =>
+    key == PleasanterSsoOptions.EnabledKey ? null : builder.Configuration[key]);
+if (builder.Configuration[PleasanterSsoOptions.EnabledKey] is { Length: > 0 } pleasanterSsoEnabled
+    && !bool.TryParse(pleasanterSsoEnabled.Trim(), out _))
+{
+    throw new InvalidOperationException($"{PleasanterSsoOptions.EnabledKey} must be true or false.");
+}
+builder.Services.AddSingleton<IPleasanterSsoOptionsProvider, PleasanterSsoOptionsProvider>();
+builder.Services.AddSingleton<IPleasanterSessionVerifier, PleasanterSessionVerifier>();
+builder.Services.AddSingleton<PleasanterSsoAuthenticator>();
+builder.Services.AddSingleton<PleasanterSsoSessionRevalidator>();
+builder.Services
+    // **時間切れは要求ごとに設定の値で掛ける**（PleasanterSessionVerifier）。ここでは無限にしておく
+    .AddHttpClient(PleasanterSessionVerifier.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        // ⚠️ **cookie を覚えさせない。** 覚えると、ある管理者の cookie が別の管理者の問い合わせへ混ざる。
+        // cookie は要求ごとに Cookie ヘッダで付ける
+        UseCookies = false,
+
+        // ⚠️ **転送を追わない。** ログイン画面への転送などを成功と取り違えない
+        AllowAutoRedirect = false,
+    });
 builder.Services.AddSingleton<AdminUserService>();
 
 // ---- bot 対策 --------------------------------------------------------------
@@ -632,6 +660,18 @@ builder.Services
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             "login",
             settings.GetInt32("QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"),
+            TimeSpan.FromMinutes(5),
+            sharedRateLimits,
+            rateLimitLogger));
+
+    // **Pleasanter のログインの確認は別枠にする**（Issue #464）。
+    // 画面は Pleasanter でのログインを待つ間この入口を繰り返し呼ぶため、
+    // ログインの試行の枠に混ぜると数十秒で使い切り、合言葉のログインまで止まる
+    options.AddPolicy(AdminPleasanterSsoEndpoints.CheckRateLimitPolicy, context =>
+        RateLimitPartitions.FixedWindow(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            "pleasanter-sso",
+            AdminPleasanterSsoEndpoints.CheckRequestsPer5Minutes,
             TimeSpan.FromMinutes(5),
             sharedRateLimits,
             rateLimitLogger));
@@ -909,6 +949,8 @@ app.MapAdminSessionEndpoints();
 // した**ので、起動時に決めると変更のたびに再起動が要る。
 // **無効な間は各入口が 404 を返すことで、外から見た姿は変わらない**
 app.MapAdminSamlEndpoints(adminPath);
+// **Pleasanter のログインも同じ**（Issue #464）。無効な間は確認の入口が 404 を返す
+app.MapAdminPleasanterSsoEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();

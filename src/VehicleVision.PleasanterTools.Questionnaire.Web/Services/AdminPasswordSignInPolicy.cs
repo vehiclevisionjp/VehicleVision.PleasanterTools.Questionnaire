@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
-/// <summary>SAML の現在値を含め、合言葉ログインを許すかを決める。</summary>
+/// <summary>SAML・Pleasanter のログインの現在値を含め、合言葉ログインを許すかを決める。</summary>
 public sealed class AdminPasswordSignInPolicy(
     AdminPasswordSignInOptions options,
     IDataProtectionProvider protectionProvider,
@@ -18,7 +18,8 @@ public sealed class AdminPasswordSignInPolicy(
         protectionProvider.CreateProtector("Questionnaire.AdminRescueGrant.v1");
     private int warnedWhileSamlDisabled;
 
-    public bool IsAllowed(HttpContext context, bool samlEnabled)
+    /// <param name="ssoEnabled">SAML か Pleasanter のログイン（Issue #464）のどちらかが有効か。</param>
+    public bool IsAllowed(HttpContext context, bool ssoEnabled)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -27,15 +28,15 @@ public sealed class AdminPasswordSignInPolicy(
             return true;
         }
 
-        if (!samlEnabled)
+        if (!ssoEnabled)
         {
-            // **SAML は画面から再起動なしで無効にできる。**
+            // **SAML も Pleasanter のログインも画面から再起動なしで無効にできる。**
             // 起動時だけ検証しても後から締め出せるため、この組み合わせでは停止指定を無視する。
             // 警告は SAML が再び有効になるまで 1 回に抑え、ログを要求数で埋めない。
             if (Interlocked.Exchange(ref warnedWhileSamlDisabled, 1) == 0)
             {
                 logger.LogWarning(
-                    "{Setting}=false は SAML が無効な間は適用せず、合言葉ログインを許可する",
+                    "{Setting}=false は SAML と Pleasanter のログインがどちらも無効な間は適用せず、合言葉ログインを許可する",
                     AdminPasswordSignInOptions.EnabledSetting);
             }
 

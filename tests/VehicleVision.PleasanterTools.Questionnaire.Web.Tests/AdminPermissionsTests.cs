@@ -54,6 +54,17 @@ public class AdminPermissionsTests
     }
 
     [Fact]
+    public void Pleasanterのログイン設定は特権管理者だけが持つ()
+    {
+        foreach (var role in Enum.GetValues<AdminRole>())
+        {
+            Assert.Equal(
+                role == AdminRole.Administrator,
+                AdminPermissions.Of(role).Contains(AdminPermissions.PleasanterSsoSettings));
+        }
+    }
+
+    [Fact]
     public void アプリケーション設定は特権管理者だけが持つ()
     {
         foreach (var role in Enum.GetValues<AdminRole>())
