@@ -42,6 +42,12 @@ builder.Configuration.AddParameterFiles();
 var adminPath = AdminPathOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(adminPath);
 
+// **合言葉を塞ぐ指定と救済トークンも外部設定だけで決める。**
+// 画面から変えられると、その場で自分自身を締め出せるため。
+var adminPasswordSignInOptions =
+    AdminPasswordSignInOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(adminPasswordSignInOptions);
+
 // **CIDR の書き間違いは起動時に止める。** 無制限へ黙って落ちると、絞ったつもりの口が開く。
 var endpointNetworkRestrictions =
     EndpointNetworkRestrictions.FromConfiguration(builder.Configuration);
