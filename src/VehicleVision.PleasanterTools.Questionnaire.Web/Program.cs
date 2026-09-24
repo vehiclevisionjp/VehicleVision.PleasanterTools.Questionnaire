@@ -37,6 +37,11 @@ var builder = WebApplication.CreateBuilder(args);
 // （App_Data/Parameters/README.md。Issue #158）
 builder.Configuration.AddParameterFiles();
 
+// **管理画面の入口は起動時に 1 度だけ決める。**
+// 画面から変えると、その場で入口を失って管理者自身を締め出すため外部設定だけにする。
+var adminPath = AdminPathOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(adminPath);
+
 // **CIDR の書き間違いは起動時に止める。** 無制限へ黙って落ちると、絞ったつもりの口が開く。
 var endpointNetworkRestrictions =
     EndpointNetworkRestrictions.FromConfiguration(builder.Configuration);
