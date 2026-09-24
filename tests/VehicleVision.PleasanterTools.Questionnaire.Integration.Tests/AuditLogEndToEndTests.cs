@@ -22,10 +22,6 @@ public class AuditLogEndToEndTests
 {
     private const string Password = "long-enough-password";
 
-    /// <summary>アプリが繋いでいる DB。**確かめるために直接読む。**</summary>
-    private const string ConnectionString =
-        "Server=localhost,11433;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True";
-
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
@@ -289,29 +285,32 @@ public class AuditLogEndToEndTests
 
         await using var connection = Connect();
         await connection.OpenAsync().ConfigureAwait(false);
-        var adminUserId = await connection
-            .QuerySingleAsync<Guid>("SELECT TOP 1 [AdminUserId] FROM [AdminUsers]").ConfigureAwait(false);
+        var adminUserId = await connection.QuerySingleAsync<Guid>(
+            E2EDatabase.Sql("SELECT [AdminUserId] FROM [AdminUsers]")).ConfigureAwait(false);
 
         return (http, adminUserId);
     }
 
     private static System.Data.Common.DbConnection Connect() =>
-        new DbConnectionFactory(DatabaseProvider.SqlServer, ConnectionString).Create();
+        E2EDatabase.AppFactory().Create();
 
     private static async Task ClearAsync()
     {
         await using var connection = Connect();
         await connection.OpenAsync().ConfigureAwait(false);
-        await connection.ExecuteAsync("DELETE FROM [AuditLogs]").ConfigureAwait(false);
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AuditLogs]")).ConfigureAwait(false);
     }
 
     private static async Task ClearAdministratorsAsync()
     {
         await using var connection = Connect();
         await connection.OpenAsync().ConfigureAwait(false);
-        await connection.ExecuteAsync("DELETE FROM [AdminInvitations]").ConfigureAwait(false);
-        await connection.ExecuteAsync("DELETE FROM [AdminRecoveryCodes]").ConfigureAwait(false);
-        await connection.ExecuteAsync("DELETE FROM [AdminUsers]").ConfigureAwait(false);
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminInvitations]"))
+            .ConfigureAwait(false);
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"))
+            .ConfigureAwait(false);
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"))
+            .ConfigureAwait(false);
     }
 
     private static async Task<IReadOnlyList<LogRow>> ReadLogsAsync()
@@ -319,9 +318,9 @@ public class AuditLogEndToEndTests
         await using var connection = Connect();
         await connection.OpenAsync().ConfigureAwait(false);
 
-        var rows = await connection.QueryAsync<LogRow>(
+        var rows = await connection.QueryAsync<LogRow>(E2EDatabase.Sql(
             "SELECT [Action], [StatusCode], [AdminUserId], [DetailJson] "
-            + "FROM [AuditLogs] ORDER BY [OccurredAt] DESC").ConfigureAwait(false);
+            + "FROM [AuditLogs] ORDER BY [OccurredAt] DESC")).ConfigureAwait(false);
 
         return rows.ToList();
     }

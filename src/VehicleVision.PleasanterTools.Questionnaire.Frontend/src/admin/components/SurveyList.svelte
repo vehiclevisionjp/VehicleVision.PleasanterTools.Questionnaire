@@ -26,6 +26,7 @@
   } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
   import { canConfirmSurveyDeletion, deletionResponseCount } from '../lib/surveyDeletion';
+  import { confirmAction } from '../lib/confirmation.svelte';
   import { iframeTag } from '../lib/iframeTag';
   import SurveyQrCode from './SurveyQrCode.svelte';
   import TemplatePanel from './TemplatePanel.svelte';
@@ -428,7 +429,15 @@
 
   async function changeArchive(survey: SurveySummary) {
     const archived = survey.archivedAt != null;
-    if (!archived && !confirm(t('archive.confirm', { title: survey.title }))) {
+    if (
+      !archived &&
+      !(await confirmAction({
+        title: t('archive.open'),
+        message: t('archive.confirm', { title: survey.title }),
+        confirmLabel: t('archive.open'),
+        danger: true,
+      }))
+    ) {
       return;
     }
 

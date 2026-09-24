@@ -10,7 +10,7 @@
     onunread?: (count: number) => void;
   }
 
-  let { onback, onunread }: Props = $props();
+  let { onunread }: Props = $props();
 
   /** 1 ページの件数。**サーバ側の上限（200）より小さくしてある。** */
   const pageSize = 50;
@@ -105,7 +105,6 @@
 
 <section>
   <header class="head">
-    <button type="button" class="secondary" onclick={onback}>{t('notifications.back')}</button>
     <h1>{t('notifications.title')}</h1>
 
     {#if unreadCount > 0}

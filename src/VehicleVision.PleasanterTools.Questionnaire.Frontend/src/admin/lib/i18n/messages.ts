@@ -69,7 +69,6 @@ export const ja = {
   // ---- 使い方 -------------------------------------------------------------
   'help.open': '使い方',
   'help.title': '使い方',
-  'help.back': '← アンケート一覧へ戻る',
   'help.lead': 'アンケートを作成してから、Pleasanter に回答が届くまでの基本的な手順です。',
   'help.workflowTitle': 'アンケートを公開するまで',
   'help.create':
@@ -135,7 +134,6 @@ export const ja = {
   'users.title': '管理者の管理',
   'users.lead':
     '管理画面に入れる人の一覧です。追加すると招待の URL が 1 度だけ表示されるので、本人へ渡してください。',
-  'users.back': '← アンケートの一覧へ',
   'users.loading': '読み込んでいます…',
   'users.empty': '管理者がいません。',
   'users.failed': '操作できませんでした。',
@@ -175,7 +173,6 @@ export const ja = {
   // ---- 自分のアカウント（Issue #156）-------------------------------------------
   'account.open': '自分の設定',
   'account.title': '自分のアカウント',
-  'account.back': '← アンケートの一覧へ',
   'account.passwordTitle': 'パスワードの変更',
   'account.currentPassword': '現在のパスワード',
   'account.newPassword': '新しいパスワード',
@@ -238,7 +235,6 @@ export const ja = {
   'signIn.samlError.disabled': 'このアカウントは利用を停止されています。管理者にお問い合わせください。',
   'saml.open': 'SAML 設定',
   'saml.title': 'SAML 設定',
-  'saml.back': '← アンケートの一覧へ',
   'saml.lead':
     '外部設定に値がある項目は、その値が優先されます。設定を保存すると、編集できる項目は再起動なしで反映されます。',
   'saml.fixed': '設定で固定されています',
@@ -279,7 +275,6 @@ export const ja = {
   // ---- アプリケーション設定 ----------------------------------------------
   'appSettings.open': '設定',
   'appSettings.title': 'アプリケーション設定',
-  'appSettings.back': '← アンケートの一覧へ',
   'appSettings.lead':
     '外部設定に値がある項目は固定されます。それ以外は保存後、再起動せずに反映されます。',
   'appSettings.fixed': '外部設定で固定されています',
@@ -393,7 +388,6 @@ export const ja = {
   'siteId.syncConfirm': 'この内容で同期する',
 
   // ---- 設問エディタ -------------------------------------------------------
-  'editor.back': '← 一覧へ',
   'editor.revision': '下書き rev.{revision}',
   'editor.working': '処理しています…',
   'editor.saveDraft': '下書きを保存',
@@ -407,6 +401,8 @@ export const ja = {
   'editor.conflictDetail': 'この画面での変更は保存されていません。再読み込みすると失われます。',
   'editor.reload': '再読み込み',
   'editor.confirmDiscardChanges': '保存していない変更があります。移動すると変更は失われます。よろしいですか？',
+  'confirmation.unsavedTitle': '保存していない変更',
+  'confirmation.continue': '移動する',
   'editor.title': '題名',
   'editor.description': '説明（任意）',
   'editor.confirmationMessage': '送信後に表示するメッセージ（任意）',
@@ -662,7 +658,6 @@ export const ja = {
   // ---- 監査ログ -----------------------------------------------------------
   'audit.title': '操作の記録',
   'audit.open': '操作の記録',
-  'audit.back': 'アンケート一覧へ戻る',
   'audit.lead': '管理画面で行われた操作の記録です。',
   'audit.leadStrong': 'この一覧を開いたことは記録されません。',
   'audit.empty': '記録がありません。',
@@ -691,7 +686,6 @@ export const ja = {
   // ---- 管理者への知らせ（Issue #80）---------------------------------------
   'notifications.title': 'お知らせ',
   'notifications.open': 'お知らせ',
-  'notifications.back': 'アンケート一覧へ戻る',
   'notifications.lead': '回答が Pleasanter へ届かなかったときや、受付を自動で止めたときの記録です。',
   'notifications.leadStrong': 'ログを見ていなくても気付けるように残しています。',
   'notifications.retention': '既読にしたものは一定期間を過ぎると自動で消えます。未読は消えません。',
@@ -810,7 +804,6 @@ export const ja = {
   // ---- 送信状況 -----------------------------------------------------------
   'outbox.open': '送信状況',
   'outbox.title': '送信状況',
-  'outbox.back': 'アンケート一覧へ戻る',
   'outbox.lead': 'Pleasanter へまだ届いていない回答の状況です。',
   'outbox.leadStrong': '回答の中身は表示しません。',
   'outbox.loading': '読み込んでいます…',
@@ -1148,7 +1141,6 @@ export const en: Record<MessageKey, string> = {
   // ---- Help ---------------------------------------------------------------
   'help.open': 'Help',
   'help.title': 'Help',
-  'help.back': '← Back to surveys',
   'help.lead':
     'The basic steps from creating a survey to getting its responses into Pleasanter.',
   'help.workflowTitle': 'Publishing a survey',
@@ -1212,7 +1204,6 @@ export const en: Record<MessageKey, string> = {
   'users.title': 'Manage administrators',
   'users.lead':
     'People who can sign in to administration. Adding someone shows an invitation URL once \u2014 pass it to them.',
-  'users.back': '\u2190 Back to surveys',
   'users.loading': 'Loading\u2026',
   'users.empty': 'No administrators.',
   'users.failed': 'The operation failed.',
@@ -1252,7 +1243,6 @@ export const en: Record<MessageKey, string> = {
   'users.role.Editor': 'Editor',
   'account.open': 'My account',
   'account.title': 'My account',
-  'account.back': '\u2190 Back to surveys',
   'account.passwordTitle': 'Change password',
   'account.currentPassword': 'Current password',
   'account.newPassword': 'New password',
@@ -1315,7 +1305,6 @@ export const en: Record<MessageKey, string> = {
   'signIn.samlError.disabled': 'This account is disabled. Contact an administrator.',
   'saml.open': 'SAML settings',
   'saml.title': 'SAML settings',
-  'saml.back': '\u2190 Back to surveys',
   'saml.lead':
     'Values supplied by external configuration take precedence. Saving applies editable fields without restarting the application.',
   'saml.fixed': 'Fixed by configuration',
@@ -1356,7 +1345,6 @@ export const en: Record<MessageKey, string> = {
   // ---- Application settings ----------------------------------------------
   'appSettings.open': 'Settings',
   'appSettings.title': 'Application settings',
-  'appSettings.back': '\u2190 Back to surveys',
   'appSettings.lead':
     'Values supplied by external configuration are fixed. Other values take effect after saving without restarting the application.',
   'appSettings.fixed': 'Fixed by external configuration',
@@ -1467,7 +1455,6 @@ export const en: Record<MessageKey, string> = {
   'siteId.syncHistory': 'History column order: {columns}',
   'siteId.syncConfirm': 'Synchronize these changes',
 
-  'editor.back': '← Back to the list',
   'editor.revision': 'Draft rev.{revision}',
   'editor.working': 'Working…',
   'editor.saveDraft': 'Save draft',
@@ -1482,6 +1469,8 @@ export const en: Record<MessageKey, string> = {
   'editor.reload': 'Reload',
   'editor.confirmDiscardChanges':
     'There are unsaved changes. Moving away discards them. Do you want to continue?',
+  'confirmation.unsavedTitle': 'Unsaved changes',
+  'confirmation.continue': 'Continue',
   'editor.title': 'Title',
   'editor.description': 'Description (optional)',
   'editor.confirmationMessage': 'Message shown after submitting (optional)',
@@ -1761,7 +1750,6 @@ export const en: Record<MessageKey, string> = {
   // ---- Audit log ----------------------------------------------------------
   'audit.title': 'Activity log',
   'audit.open': 'Activity log',
-  'audit.back': 'Back to surveys',
   'audit.lead': 'What was done in the administration screens.',
   'audit.leadStrong': 'Opening this list is not recorded.',
   'audit.empty': 'Nothing recorded.',
@@ -1790,7 +1778,6 @@ export const en: Record<MessageKey, string> = {
   // ---- Administrator notifications (Issue #80) ----------------------------
   'notifications.title': 'Notifications',
   'notifications.open': 'Notifications',
-  'notifications.back': 'Back to surveys',
   'notifications.lead':
     'Recorded when responses could not reach Pleasanter, or when intake was stopped automatically.',
   'notifications.leadStrong': 'Kept so you can notice without watching the logs.',
@@ -1920,7 +1907,6 @@ export const en: Record<MessageKey, string> = {
   // ---- 送信状況 -----------------------------------------------------------
   'outbox.open': 'Delivery',
   'outbox.title': 'Delivery status',
-  'outbox.back': 'Back to surveys',
   'outbox.lead': 'Responses that have not reached Pleasanter yet.',
   'outbox.leadStrong': 'The content of the responses is never shown.',
   'outbox.loading': 'Loading…',

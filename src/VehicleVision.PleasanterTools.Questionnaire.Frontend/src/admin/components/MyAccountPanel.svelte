@@ -19,6 +19,7 @@
   } from '../lib/api';
   import AdminSessionList from './AdminSessionList.svelte';
   import { twoFactorPolicyLabel } from '../lib/adminUsers';
+  import { confirmAction } from '../lib/confirmation.svelte';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -29,7 +30,7 @@
     onback: () => void;
   }
 
-  let { session, onchanged, onback }: Props = $props();
+  let { session, onchanged }: Props = $props();
 
   /**
    * パスワードの最低の長さ。
@@ -140,7 +141,14 @@
   async function disable() {
     totpError = '';
 
-    if (!confirm(t('account.confirmDisableTwoFactor'))) {
+    if (
+      !(await confirmAction({
+        title: t('account.disableTwoFactor'),
+        message: t('account.confirmDisableTwoFactor'),
+        confirmLabel: t('account.disableTwoFactor'),
+        danger: true,
+      }))
+    ) {
       return;
     }
 
@@ -177,7 +185,6 @@
 
 <section>
   <header class="head">
-    <button type="button" class="link" onclick={onback}>{t('account.back')}</button>
     <h1>{t('account.title')}</h1>
   </header>
 
@@ -342,8 +349,14 @@
     margin: 0 0 1.25rem;
   }
 
-  .card {
-    max-width: 28rem;
+  /*
+    ⚠️ **カードの幅をそろえる**（Issue #416）。
+    `.card` だけ 28rem で、端末の一覧は幅の指定が無かったため、
+    **同じ画面でカードの右端が 2 種類**になり、崩れて見えていた。
+    **枠は同じ幅にして、狭くしたいのは中の入力欄だけにする。**
+  */
+  .card,
+  .session-card {
     padding: 1.25rem;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -351,12 +364,9 @@
     margin-bottom: 1.25rem;
   }
 
-  .session-card {
-    padding: 1.25rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 1.25rem;
+  /* 入力欄まで横いっぱいに伸ばすと、かえって読みにくい */
+  .card form {
+    max-width: 28rem;
   }
 
   label {

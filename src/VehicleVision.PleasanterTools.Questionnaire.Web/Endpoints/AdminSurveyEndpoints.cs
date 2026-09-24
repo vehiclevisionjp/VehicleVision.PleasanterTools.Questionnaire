@@ -32,6 +32,14 @@ public static class AdminSurveyEndpoints
     /// <summary>1 度に返す上限。**画面から大きな値を指定されても超えない。**</summary>
     private const int MaxListLimit = 200;
 
+    /// <summary>作成したときに置く、空のページの ID（Issue #429）。</summary>
+    /// <remarks>
+    /// **画面が足すページと同じ書き方にそろえる**（<c>page-</c> で始まる）。
+    /// ⚠️ **固定の値にしない。** 同じ ID が複数のアンケートに出ると、
+    /// 分岐の行き先を写したときに取り違える
+    /// </remarks>
+    private static string InitialPageId => $"page-{Guid.NewGuid():N}"[..13];
+
     private const int DefaultListLimit = 50;
 
     public static IEndpointRouteBuilder MapAdminSurveyEndpoints(this IEndpointRouteBuilder builder)
@@ -124,6 +132,7 @@ public static class AdminSurveyEndpoints
             CreateSurveyRequest request,
             HttpContext context,
             ISurveyRepository surveys,
+            ISurveyDraftStore drafts,
             PleasanterApiClient pleasanter,
             CancellationToken cancellationToken) =>
         {
@@ -175,6 +184,23 @@ public static class AdminSurveyEndpoints
                 PublishedVersion: null);
 
             await surveys.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+
+            // **空のページを 1 つ持たせて始める**（Issue #429）。
+            // **1 ページも無いアンケートに意味は無い**ので、作った直後に必ず要る一手を省く。
+            // ⚠️ **見出しは入れない。** 「1 ページ目」のような文言を置くと、消す手間になる。
+            // 設問は 0 件なので、**この状態では公開できない**（公開前の検査で弾かれる）。
+            await drafts.SaveAsync(
+                surveyId,
+                new SurveyDefinition
+                {
+                    SurveyId = surveyId.ToString(),
+                    Version = 1,
+                    Title = LocalizedText.Japanese(request.Title.Trim()),
+                    Pages = [new Page { PageId = InitialPageId }],
+                },
+                new MappingDefinition(),
+                expectedRevision: 0,
+                cancellationToken).ConfigureAwait(false);
 
             return Results.Created($"/api/admin/surveys/{surveyId}", new { surveyId, record.PublicId });
         })

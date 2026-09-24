@@ -194,14 +194,20 @@ jobs:
         # アプリ全体が起動しない。単体テストも結合テストも経路を組み立てないので、
         # **ここを通さないとマージ後の E2E で初めて分かる。**
         #
-        # **結合テストの後に置く。** スキーマが当たっていないと起動時に止まるので、
-        # マイグレーションを当てる検証（DatabaseMigrationTests）より後で回す。
+        # ⚠️ **空の DB へ当てる**（Issue #404）。
+        # **いちばん普通の入り方は「設定だけ与えて初めて起動する」**で、
+        # #382 で自動マイグレーションを既定 ON にしてからは、それが既定の道になった。
+        # **スキーマが当たった DB へ当てていたので、初回起動を一度も試していなかった**
+        # （app.StartAsync() がマイグレーションより前に走るため、
+        # そこで DB を読む経路が 1 つでもあると初回起動だけが死ぬ。実際に #404 で死んだ）。
         #
-        # Pleasanter は要らない（URL とキーは形だけ渡す）。DB は上で起こしたものを使う。
+        # 結合テストが使う questionnaire とは別に、**このステップ専用の空の DB を作る。**
+        #
+        # Pleasanter は要らない（URL とキーは形だけ渡す）。
         env:
           QUESTIONNAIRE_DB_PROVIDER: PostgreSql
           QUESTIONNAIRE_DB_CONNECTIONSTRING: >-
-            Host=localhost;Port=15432;Database=questionnaire;Username=postgres;Password=Questionnaire#Test1
+            Host=localhost;Port=15432;Database=questionnaire_firstboot;Username=postgres;Password=Questionnaire#Test1
           # **検証用の DB なので暗号化を求めない。** 本番では外さないこと
           QUESTIONNAIRE_DB_ALLOW_INSECURE: "true"
           QUESTIONNAIRE_PLEASANTER_BASEURL: http://127.0.0.1:9
@@ -210,6 +216,13 @@ jobs:
           ASPNETCORE_ENVIRONMENT: Production
         run: |
           set -euo pipefail
+
+          # ⚠️ **毎回まっさらから作る**（Issue #404）。
+          # 残っていると「初めて起動する」を試したことにならない
+          docker exec ${{ job.services.postgres.id }} \
+              psql -U postgres -c 'DROP DATABASE IF EXISTS questionnaire_firstboot;'
+          docker exec ${{ job.services.postgres.id }} \
+              psql -U postgres -c 'CREATE DATABASE questionnaire_firstboot;'
 
           # **共有鍵は使い捨て。** ここで作った鍵は誰にも渡らない
           QUESTIONNAIRE_SECRET_KEY="$(openssl rand -base64 32)"

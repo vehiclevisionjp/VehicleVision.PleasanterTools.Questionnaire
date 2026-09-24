@@ -1,4 +1,5 @@
 import type { APIRequestContext, APIResponse } from '@playwright/test';
+import { currentRevision } from './survey';
 
 /** アンケートの入れ物を作る。**中身はまだ入れない。** */
 export async function createSurvey(
@@ -22,7 +23,7 @@ export async function createSurvey(
  * **成否を呼び出し側に判断させる。** 断られること自体を確かめたい試験があるので、
  * ここで投げてしまうと「断られた」を見られなくなる。
  */
-export function saveTheme(
+export async function saveTheme(
   request: APIRequestContext,
   surveyId: string,
   title: string,
@@ -55,7 +56,11 @@ export function saveTheme(
   };
 
   return request.put(`/api/admin/surveys/${surveyId}`, {
-    data: { revision: 0, definition, mapping: { assignments: [] } },
+    data: {
+      revision: await currentRevision(request, surveyId),
+      definition,
+      mapping: { assignments: [] },
+    },
   });
 }
 

@@ -24,6 +24,7 @@
     roleLabel,
   } from '../lib/adminUsers';
   import AdminSessionList from './AdminSessionList.svelte';
+  import { confirmAction } from '../lib/confirmation.svelte';
   import type { AdminUserRow, IssuedInvitation } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -37,7 +38,7 @@
     onback: () => void;
   }
 
-  let { ownAdminUserId, canWrite, canReset, onback }: Props = $props();
+  let { ownAdminUserId, canWrite, canReset }: Props = $props();
 
   let users = $state<AdminUserRow[]>([]);
   let loading = $state(true);
@@ -127,7 +128,6 @@
 
 <section>
   <header class="head">
-    <button type="button" class="link" onclick={onback}>{t('users.back')}</button>
     <h1>{t('users.title')}</h1>
   </header>
 
@@ -268,8 +268,15 @@
                     type="button"
                     class="link danger"
                     disabled={busy !== ''}
-                    onclick={() => {
-                      if (!confirm(t('users.confirmDisable', { loginId: user.loginId }))) {
+                    onclick={async () => {
+                      if (
+                        !(await confirmAction({
+                          title: t('users.disable'),
+                          message: t('users.confirmDisable', { loginId: user.loginId }),
+                          confirmLabel: t('users.disable'),
+                          danger: true,
+                        }))
+                      ) {
                         return;
                       }
                       void run(`disable:${user.adminUserId}`, () =>
@@ -301,8 +308,15 @@
                     type="button"
                     class="link danger"
                     disabled={busy !== ''}
-                    onclick={() => {
-                      if (!confirm(t('users.confirmResetTwoFactor', { loginId: user.loginId }))) {
+                    onclick={async () => {
+                      if (
+                        !(await confirmAction({
+                          title: t('users.resetTwoFactor'),
+                          message: t('users.confirmResetTwoFactor', { loginId: user.loginId }),
+                          confirmLabel: t('users.resetTwoFactor'),
+                          danger: true,
+                        }))
+                      ) {
                         return;
                       }
                       void run(`totp:${user.adminUserId}`, () =>

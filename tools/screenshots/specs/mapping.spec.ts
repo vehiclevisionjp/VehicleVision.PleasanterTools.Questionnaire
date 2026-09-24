@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { ensureAdminStorageState } from '../lib/admin';
+import { currentRevision } from '../lib/survey';
 
 /**
  * マッピングの編集画面が「ソース → 変換 → ターゲット」の表になっていることを
@@ -100,7 +101,11 @@ test.describe('マッピングの編集画面', () => {
       };
 
       const saved = await context.request.put(`/api/admin/surveys/${surveyId}`, {
-        data: { revision: 0, definition, mapping },
+        data: {
+          revision: await currentRevision(context.request, surveyId),
+          definition,
+          mapping,
+        },
       });
       expect(saved.ok(), await saved.text()).toBe(true);
     } finally {

@@ -12,7 +12,7 @@
     onback: () => void;
   }
 
-  let { onback }: Props = $props();
+  let { onback: _onback }: Props = $props();
   let settings = $state<AppSettings>();
   let loading = $state(true);
   let busy = $state(false);
@@ -171,7 +171,6 @@
 
 <section>
   <header class="head">
-    <button type="button" class="link" onclick={onback}>{t('appSettings.back')}</button>
     <h1>{t('appSettings.title')}</h1>
   </header>
 
@@ -289,20 +288,22 @@
 </section>
 
 <style lang="scss">
+  /*
+    ⚠️ **ページの幅は呼び出し側が決める**（Issue #436）。
+    ここで 52rem を持っていたため、**ほかの画面と端がずれていた。**
+    1 行の入力欄が長くなりすぎる分は、下の form 側で絞る。
+  */
   section {
-    max-width: 52rem;
     margin: 0 auto;
+  }
+
+  form {
+    max-width: 52rem;
   }
   .head {
     display: flex;
     align-items: center;
     gap: 1rem;
-  }
-  .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--accent);
   }
   .lead,
   .hint {

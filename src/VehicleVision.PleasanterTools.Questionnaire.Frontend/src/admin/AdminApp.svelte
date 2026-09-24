@@ -1,5 +1,6 @@
 <script lang="ts">
   import AdminUserList from './components/AdminUserList.svelte';
+  import ConfirmationDialog from './components/ConfirmationDialog.svelte';
   import AppSettingsPanel from './components/AppSettingsPanel.svelte';
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
@@ -41,6 +42,7 @@
     type ReadabilityPreferenceName,
     type ReadabilityPreferences,
   } from '../lib/readability';
+  import { confirmAction } from './lib/confirmation.svelte';
 
   let session = $state<AdminSession>();
   let applicationVersion = $state<ApplicationVersion>();
@@ -48,7 +50,7 @@
   let loading = $state(true);
   let failed = $state(false);
   let surveyBreadcrumbTitle = $state<string | null>(null);
-  let navigationGuard = $state<(() => boolean) | null>(null);
+  let navigationGuard = $state<(() => Promise<boolean>) | null>(null);
   let readability = $state<ReadabilityPreferences>(
     resolveReadabilityPreferences(readReadabilityPreferences(), systemReadabilityPreferences()),
   );
@@ -178,8 +180,19 @@
     history.pushState(null, '', path);
   }
 
-  function navigate(path: string, flags: Partial<Record<string, boolean>> = {}) {
-    if (navigationGuard && !navigationGuard()) {
+  async function navigate(
+    path: string,
+    flags: Partial<Record<string, boolean>> = {},
+  ): Promise<boolean> {
+    if (
+      navigationGuard &&
+      (await navigationGuard()) &&
+      !(await confirmAction({
+        title: t('confirmation.unsavedTitle'),
+        message: t('editor.confirmDiscardChanges'),
+        confirmLabel: t('confirmation.continue'),
+      }))
+    ) {
       return false;
     }
 
@@ -187,62 +200,62 @@
     return true;
   }
 
-  function openUserList() {
-    if (navigate('/admin/users', { users: true })) {
+  async function openUserList() {
+    if (await navigate('/admin/users', { users: true })) {
       openUsers = true;
     }
   }
 
-  function openMyAccount() {
-    if (navigate('/admin/me', { account: true })) {
+  async function openMyAccount() {
+    if (await navigate('/admin/me', { account: true })) {
       openAccount = true;
     }
   }
 
-  function openSamlSettingsPanel() {
-    if (navigate('/admin/saml-settings', { samlSettings: true })) {
+  async function openSamlSettingsPanel() {
+    if (await navigate('/admin/saml-settings', { samlSettings: true })) {
       openSamlSettings = true;
     }
   }
 
-  function openAppSettingsPanel() {
-    if (navigate('/admin/settings', { appSettings: true })) {
+  async function openAppSettingsPanel() {
+    if (await navigate('/admin/settings', { appSettings: true })) {
       openAppSettings = true;
     }
   }
 
-  function openHelpPanel() {
-    if (navigate('/admin/help', { help: true })) {
+  async function openHelpPanel() {
+    if (await navigate('/admin/help', { help: true })) {
       openHelp = true;
     }
   }
 
-  function open(surveyId: string) {
-    if (navigate(`/admin/surveys/${surveyId}`)) {
+  async function open(surveyId: string) {
+    if (await navigate(`/admin/surveys/${surveyId}`)) {
       openSurveyId = surveyId;
     }
   }
 
-  function openAudit() {
-    if (navigate('/admin/audit-logs')) {
+  async function openAudit() {
+    if (await navigate('/admin/audit-logs')) {
       openAuditLog = true;
     }
   }
 
-  function openDelivery() {
-    if (navigate('/admin/outbox')) {
+  async function openDelivery() {
+    if (await navigate('/admin/outbox')) {
       openOutbox = true;
     }
   }
 
-  function openNotificationList() {
-    if (navigate('/admin/notifications')) {
+  async function openNotificationList() {
+    if (await navigate('/admin/notifications')) {
       openNotifications = true;
     }
   }
 
-  function back() {
-    navigate('/admin');
+  async function back() {
+    await navigate('/admin');
   }
 
   const breadcrumbPage = $derived.by<AdminPage>(() => {
@@ -423,6 +436,11 @@
   }
 </script>
 
+<!--
+  **ページの幅はここ 1 か所で決める**（Issue #433）。
+  ⚠️ **パンくず・帯・本体がそれぞれ別の幅を持っていた**（80rem / 77rem / 56rem）ため、
+  同じ画面で左右の端が階段状にずれていた。
+-->
 <div class="shell">
   {#if loading}
     <p class="status">{t('app.loading')}</p>
@@ -514,7 +532,11 @@
         {#each buildBreadcrumbs(breadcrumbPage) as breadcrumb, index (breadcrumb.page)}
           <li>
             {#if breadcrumb.path}
-              <button type="button" class="breadcrumb-link" onclick={() => navigate(breadcrumb.path!)}>
+              <button
+                type="button"
+                class="breadcrumb-link"
+                onclick={() => void navigate(breadcrumb.path!)}
+              >
                 {breadcrumbLabel(breadcrumb.page)}
               </button>
             {:else}
@@ -549,15 +571,12 @@
     {/if}
 
     <!--
-      **表を出す画面だけ広く使う。** 列が多くて識別子も入るので、
-      他の画面と同じ幅だと横に流さないと読めない
+      **表を出す画面と、2 カラムの編集画面を広く使う。**
+      表は列が多くて識別子も入るので、他の画面と同じ幅だと横に流さないと読めない。
+      ⚠️ **アンケートの編集は左右 2 カラムなのに 56rem の中へ押し込んでいた**（Issue #416）。
+      画面が広いほど 1 列あたりが痩せ、FHD でかえって窮屈になっていた
     -->
-    <main
-      class:wide={(openAuditLog && canSeeAuditLog) ||
-        (openOutbox && canSeeOutbox) ||
-        (openNotifications && canSeeNotifications) ||
-        (openUsers && canSeeUsers)}
-    >
+    <main>
       {#if openUsers && canSeeUsers}
         <AdminUserList
           ownAdminUserId={session.adminUserId ?? ''}
@@ -639,6 +658,7 @@
     <SignInPanel {session} onadvance={refresh} />
   {/if}
 </div>
+<ConfirmationDialog />
 
 <style lang="scss">
   :global(:root) {
@@ -750,7 +770,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    max-width: 80rem;
+    max-width: var(--page-max-width);
     padding: 0;
     margin: 0 auto;
     list-style: none;
@@ -767,7 +787,10 @@
     display: flex;
     align-items: flex-start;
     gap: 0.5rem;
-    max-width: 77rem;
+    max-width: var(--page-max-width);
+
+    /* ⚠️ **枠と余白を幅の内側へ入れる。** 入れないと帯だけ外へ膨らみ、本体と端がずれる */
+    box-sizing: border-box;
     margin: 1rem auto 0;
     padding: 0.75rem 1rem;
     border: 1px solid var(--warning-border);
@@ -848,19 +871,24 @@
     text-align: center;
   }
 
-  main {
-    max-width: 56rem;
-    margin: 0 auto;
-    padding: 2rem 1.5rem 4rem;
+  /*
+    **ページの幅は --page-max-width 1 本で決まる**（Issue #433）。
+    パンくず・帯・本体が同じ値を見るので、**どの画面でも左右の端が揃う。**
+  */
+  /*
+    **どの画面も同じ幅にする**（Issue #436）。
+    ⚠️ **画面ごとに端の位置が変わると、行き来したときに落ち着かない。**
+    一覧は 7 桁あり行ごとに釦が最大 7 つ並ぶ、編集は左右 2 カラムと、
+    **広い側に合わせないと成り立たない画面がある**ので、そちらへ揃える。
+  */
+  .shell {
+    --page-max-width: 100rem;
   }
 
-  /*
-    **桁の多い画面はここを使う**（アンケート一覧・2 カラムの編集）。
-    ⚠️ **80rem では足りない。** 一覧は 7 桁あり、行ごとに釦が最大 7 つ並ぶので、
-    **題名か回答用 URL のどちらかが 1 文字ずつ折り返す**（実測。2026-09-16）
-  */
-  main.wide {
-    max-width: 100rem;
+  main {
+    max-width: var(--page-max-width);
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
   }
 
   .status {

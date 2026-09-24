@@ -61,7 +61,7 @@
     testRecipientAvailable: boolean;
     onback: () => void;
     onbreadcrumbchange: (title: string | null) => void;
-    onnavigationguardchange: (guard: (() => boolean) | null) => void;
+    onnavigationguardchange: (guard: (() => Promise<boolean>) | null) => void;
   }
 
   let {
@@ -189,7 +189,7 @@
   });
 
   $effect(() => {
-    onnavigationguardchange(confirmDiscardChanges);
+    onnavigationguardchange(hasUnsavedChangesGuard);
     return () => onnavigationguardchange(null);
   });
 
@@ -445,13 +445,17 @@
     notice = t('editor.saved');
   }
 
-  function confirmDiscardChanges(): boolean {
-    return !hasUnsavedChanges || confirm(t('editor.confirmDiscardChanges'));
+  async function hasUnsavedChangesGuard(): Promise<boolean> {
+    return hasUnsavedChanges;
   }
 
   function back() {
-    if (confirmDiscardChanges()) {
-      onback();
+    onback();
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && !previewing && !flowcharting) {
+      back();
     }
   }
 
@@ -584,8 +588,9 @@
   }
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
+
 <header class="bar">
-  <button type="button" class="link" onclick={back}>{t('editor.back')}</button>
 
   <div class="right">
     <span class="revision">{t('editor.revision', { revision })}</span>
@@ -1147,15 +1152,6 @@
     font-size: 0.82rem;
   }
 
-  .link {
-    background: none;
-    border: none;
-    padding: 0;
-    color: var(--accent);
-    font: inherit;
-    cursor: pointer;
-  }
-
   .editing-language {
     display: flex;
     align-items: baseline;
@@ -1233,7 +1229,8 @@
     font-weight: 600;
   }
 
-  input[type='text'] {
+  input[type='text'],
+  textarea {
     display: block;
     width: 100%;
     margin-top: 0.2rem;
@@ -1244,6 +1241,34 @@
     background: var(--surface);
     color: var(--text);
     box-sizing: border-box;
+  }
+
+  /*
+    ⚠️ **textarea が抜けていた**（Issue #416）。指定が無いと既定のインライン表示になり、
+    **ラベルの右へ小さな枠が出る**。題名や説明と並べたときに、ここだけ形が違って見えていた。
+    縦だけ伸ばせるようにする（横へ伸ばすと 2 カラムの組みが崩れる）
+  */
+  textarea {
+    resize: vertical;
+  }
+
+  input[type='file'] {
+    display: block;
+    margin-top: 0.3rem;
+    font: inherit;
+    color: var(--text);
+  }
+
+  /*
+    ⚠️ **`.hint` が入れ子の中にしか無かった**（Issue #416）。
+    アンケート直下の `<p class="hint">` に当たらず、**ただの本文として大きく出ていた。**
+    ここで土台を決め、入れ子側は色の上書きだけにする
+  */
+  .hint {
+    margin: 0.25rem 0 0.75rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--muted);
   }
 
   .toggles {

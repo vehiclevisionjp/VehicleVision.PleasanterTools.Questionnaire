@@ -28,10 +28,6 @@ public class AdminAuthEndToEndTests
 {
     private const string Password = "long-enough-password";
 
-    /// <summary>アプリが繋いでいる DB。**片付けのために直接触る。**</summary>
-    private const string ConnectionString =
-        "Server=localhost,11433;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True";
-
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
@@ -41,11 +37,10 @@ public class AdminAuthEndToEndTests
     /// <summary>管理者を消す。**「まだ 1 人も居ない」から始めたいため。**</summary>
     private static async Task ClearAdministratorsAsync()
     {
-        await using var connection = new DbConnectionFactory(
-            DatabaseProvider.SqlServer, ConnectionString).Create();
+        await using var connection = E2EDatabase.AppFactory().Create();
         await connection.OpenAsync();
-        await connection.ExecuteAsync("DELETE FROM [AdminRecoveryCodes]");
-        await connection.ExecuteAsync("DELETE FROM [AdminUsers]");
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"));
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"));
     }
 
     /// <summary>cookie を保つ HTTP クライアント。**ブラウザと同じように往復させる。**</summary>

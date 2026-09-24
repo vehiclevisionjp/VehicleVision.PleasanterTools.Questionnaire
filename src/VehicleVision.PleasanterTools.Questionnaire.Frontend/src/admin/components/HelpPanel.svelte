@@ -5,12 +5,11 @@
     onback: () => void;
   }
 
-  let { onback }: Props = $props();
+  let { onback: _onback }: Props = $props();
 </script>
 
 <section aria-labelledby="help-title">
   <header class="head">
-    <button type="button" class="secondary" onclick={onback}>{t('help.back')}</button>
     <h1 id="help-title">{t('help.title')}</h1>
   </header>
 

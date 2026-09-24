@@ -46,6 +46,11 @@ App_Data/Parameters/*.local.json
 **/App_Data/*.db
 **/App_Data/*.db-wal
 **/App_Data/*.db-shm
+## 起動時マイグレーションの排他に使う SQLite（DatabaseMigrationLock が実行時に作る）。
+## ⚠️ 上の *.db では拾えない。実際に 1 度コミットしてしまった（#406）
+**/App_Data/*.migration-lock.sqlite
+**/App_Data/*.migration-lock.sqlite-wal
+**/App_Data/*.migration-lock.sqlite-shm
 
 ## 検証環境の出力
 tools/pleasanter-testenv/results/

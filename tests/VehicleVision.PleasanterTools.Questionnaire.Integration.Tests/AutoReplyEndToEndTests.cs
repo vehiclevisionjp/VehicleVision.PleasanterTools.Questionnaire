@@ -30,9 +30,6 @@ public class AutoReplyEndToEndTests
 {
     private const string Password = "long-enough-password";
 
-    private const string ConnectionString =
-        "Server=localhost,11433;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True";
-
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
@@ -62,12 +59,11 @@ public class AutoReplyEndToEndTests
     /// <summary>ログイン済みのクライアントを作る。</summary>
     private static async Task<HttpClient> SignInAsync()
     {
-        await using (var connection = new DbConnectionFactory(
-            DatabaseProvider.SqlServer, ConnectionString).Create())
+        await using (var connection = E2EDatabase.AppFactory().Create())
         {
             await connection.OpenAsync();
-            await connection.ExecuteAsync("DELETE FROM [AdminRecoveryCodes]");
-            await connection.ExecuteAsync("DELETE FROM [AdminUsers]");
+            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"));
+            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"));
         }
 
         var http = CreateClient();
@@ -90,9 +86,9 @@ public class AutoReplyEndToEndTests
     /// <remarks>
     /// ⚠️ **自動返信は「メールアドレス形式の記述式」しか宛先にできない**（Issue #189）。
     /// </remarks>
-    private static object DraftBody(string surveyId, bool withAnswers) => new
+    private static object DraftBody(string surveyId, int revision, bool withAnswers) => new
     {
-        revision = 0,
+        revision,
         definition = new
         {
             surveyId,
@@ -157,7 +153,8 @@ public class AutoReplyEndToEndTests
         }
 
         using (var saved = await http.PutAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}", DraftBody(surveyId, withAnswers)))
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(surveyId, await CurrentRevisionAsync(http, surveyId), withAnswers)))
         {
             saved.EnsureSuccessStatusCode();
         }
@@ -177,6 +174,14 @@ public class AutoReplyEndToEndTests
         }
 
         return publicId;
+    }
+
+    /// <summary>保存に使う、その時点の下書きの版を読む。</summary>
+    private static async Task<int> CurrentRevisionAsync(HttpClient http, string surveyId)
+    {
+        using var draft = await http.GetAsync($"/api/admin/surveys/{surveyId}");
+        draft.EnsureSuccessStatusCode();
+        return (await ReadAsync(draft))!["revision"]!.GetValue<int>();
     }
 
     /// <summary>回答を 1 件送る。</summary>

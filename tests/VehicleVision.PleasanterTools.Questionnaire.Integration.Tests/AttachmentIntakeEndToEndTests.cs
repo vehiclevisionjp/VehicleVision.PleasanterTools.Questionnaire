@@ -28,10 +28,6 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 /// </remarks>
 public class AttachmentIntakeEndToEndTests
 {
-    /// <summary>アプリが繋いでいる DB。**用意と片付けのために直接触る。**</summary>
-    private const string ConnectionString =
-        "Server=localhost,11433;Database=Questionnaire;UID=sa;PWD=Questionnaire#Test1;TrustServerCertificate=True";
-
     /// <summary>PNG の先頭バイト。**拡張子と中身の一致を見る検査を通すため。**</summary>
     private static readonly byte[] PngHeader =
         [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01];
@@ -130,7 +126,7 @@ public class AttachmentIntakeEndToEndTests
             return;
         }
 
-        var factory = new DbConnectionFactory(DatabaseProvider.SqlServer, ConnectionString);
+        var factory = E2EDatabase.AppFactory();
         var surveys = new SurveyRepository(factory);
 
         var surveyId = Guid.NewGuid();
@@ -158,7 +154,8 @@ public class AttachmentIntakeEndToEndTests
             await using var connection = factory.Create();
             await connection.OpenAsync();
             var payload = await connection.QuerySingleAsync<string>(
-                "SELECT [PayloadJson] FROM [Responses] WHERE [ResponseToken] = @Token",
+                E2EDatabase.Sql(
+                    "SELECT [PayloadJson] FROM [Responses] WHERE [ResponseToken] = @Token"),
                 new { Token = token });
 
             Assert.Contains(Convert.ToBase64String(PngHeader), payload, StringComparison.Ordinal);
@@ -180,7 +177,8 @@ public class AttachmentIntakeEndToEndTests
 
             // **未検査のバイナリを DB に載せない**
             var stored = await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM [Responses] WHERE [ResponseToken] = @Token",
+                E2EDatabase.Sql(
+                    "SELECT COUNT(*) FROM [Responses] WHERE [ResponseToken] = @Token"),
                 new { Token = rejectedToken });
             Assert.Equal(0, stored);
         }
@@ -190,13 +188,17 @@ public class AttachmentIntakeEndToEndTests
             await using var connection = factory.Create();
             await connection.OpenAsync();
             await connection.ExecuteAsync(
-                "DELETE FROM [Responses] WHERE [ResponseToken] = @Token", new { Token = token });
+                E2EDatabase.Sql("DELETE FROM [Responses] WHERE [ResponseToken] = @Token"),
+                new { Token = token });
             await connection.ExecuteAsync(
-                "DELETE FROM [ResponseTokens] WHERE [ResponseToken] = @Token", new { Token = token });
+                E2EDatabase.Sql("DELETE FROM [ResponseTokens] WHERE [ResponseToken] = @Token"),
+                new { Token = token });
             await connection.ExecuteAsync(
-                "DELETE FROM [SurveyVersions] WHERE [SurveyId] = @SurveyId", new { SurveyId = surveyId });
+                E2EDatabase.Sql("DELETE FROM [SurveyVersions] WHERE [SurveyId] = @SurveyId"),
+                new { SurveyId = surveyId });
             await connection.ExecuteAsync(
-                "DELETE FROM [Surveys] WHERE [SurveyId] = @SurveyId", new { SurveyId = surveyId });
+                E2EDatabase.Sql("DELETE FROM [Surveys] WHERE [SurveyId] = @SurveyId"),
+                new { SurveyId = surveyId });
         }
     }
 }

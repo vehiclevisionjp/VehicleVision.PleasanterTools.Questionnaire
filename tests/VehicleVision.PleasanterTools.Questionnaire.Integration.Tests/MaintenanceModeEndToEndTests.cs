@@ -10,28 +10,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 public class MaintenanceModeEndToEndTests
 {
     private const string Password = "long-enough-password";
-    private static string SqlServerConnectionString =>
-        $"Server=localhost,11433;Database=Questionnaire;UID=sa;Password={
-            Environment.GetEnvironmentVariable("TESTENV_SA_PASSWORD") ?? "Questionnaire#Test1"
-        };TrustServerCertificate=True";
-
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
 
     private static string BaseUrl =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_BASE_URL") ?? "http://localhost:8081";
-
-    private static DatabaseProvider Provider =>
-        Enum.TryParse<DatabaseProvider>(
-            Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION_PROVIDER"),
-            ignoreCase: true,
-            out var provider)
-            ? provider
-            : DatabaseProvider.SqlServer;
-
-    private static string ConnectionString =>
-        Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION_CONNECTIONSTRING")
-        ?? SqlServerConnectionString;
 
     [Fact]
     public async Task メンテ中は回答を503にして管理者のログインは通す()
@@ -41,11 +24,11 @@ public class MaintenanceModeEndToEndTests
             return;
         }
 
-        var factory = new DbConnectionFactory(Provider, ConnectionString);
+        var factory = E2EDatabase.AppFactory();
         await using var connection = factory.Create();
         await connection.OpenAsync();
-        await connection.ExecuteAsync("DELETE FROM [AdminRecoveryCodes]");
-        await connection.ExecuteAsync("DELETE FROM [AdminUsers]");
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"));
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"));
 
         var store = new MaintenanceModeStore(factory);
         await store.SetAsync(
