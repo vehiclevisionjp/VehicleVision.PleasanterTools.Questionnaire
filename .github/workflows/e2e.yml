@@ -23,7 +23,7 @@
 # **ドキュメントだけの PR では回さない**（下の paths）。
 #
 # **Pleasanter の版は固定する**（tools/pleasanter-testenv/docker-compose.yml が
-# implem/pleasanter:1.5.7.0 を指す）。最新に追随させると、壊れた原因が
+# implem/pleasanter:1.5.8.1 を指す）。最新に追随させると、壊れた原因が
 # 自分の変更か相手の更新かを切り分けられなくなる。
 name: 端から端まで通す試験
 
@@ -79,6 +79,10 @@ jobs:
       # app の compose 展開と、試験側の期待値を同じ変更後の入口へ揃える。
       DEV_ADMIN_PATH: /back-office
       QUESTIONNAIRE_ADMIN_PATH: /back-office
+      # **Pleasanter のログイン（Issue #464）を外部設定で有効にする**（Issue #470）。
+      # この job の docker compose はすべて compose.pleasanter-sso.yaml を重ねて動く。
+      # 本体の compose.yaml へ書かないのは、手元と写しの一式で設定画面をロックしないため
+      COMPOSE_FILE: compose.yaml:compose.pleasanter-sso.yaml
 
     steps:
       - name: ソースを取得する
@@ -191,15 +195,19 @@ jobs:
 
           echo "OK   CodeDefiner は完走した（全文検索のエラーは想定内）"
 
-      - name: 検証用の API キーを設定する
+      - name: 検証用の API キーとシングルサインオンの利用者を設定する
         id: pleasanter-api-key
         # Pleasanter は Users.ApiKey をそのまま比較するので、DB へ直接入れれば通る。
+        # **シングルサインオンの試験の利用者も同じく DB へ入れる**（Issue #470）。
+        # 2 要素（メール）はそのうち 1 人にだけ立てる（seed/03_sso_users.sql）。
         # **キャッシュされた利用者情報を捨てるため、入れた後に再起動する**
         run: |
           set -euo pipefail
-          docker compose cp tools/pleasanter-testenv/seed/01_apikey.sql db:/tmp/01_apikey.sql
-          docker compose exec -T db /opt/mssql-tools18/bin/sqlcmd \
-              -S localhost -U sa -P "$TESTENV_SA_PASSWORD" -C -b -i /tmp/01_apikey.sql
+          for seed in 01_apikey.sql 03_sso_users.sql; do
+              docker compose cp "tools/pleasanter-testenv/seed/$seed" "db:/tmp/$seed"
+              docker compose exec -T db /opt/mssql-tools18/bin/sqlcmd \
+                  -S localhost -U sa -P "$TESTENV_SA_PASSWORD" -C -b -i "/tmp/$seed"
+          done
           started_at=$(date --iso-8601=ns)
           echo "started-at=$started_at" >> "$GITHUB_OUTPUT"
           docker compose restart pleasanter

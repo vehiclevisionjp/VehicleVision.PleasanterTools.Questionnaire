@@ -1,0 +1,25 @@
+# Pleasanter のログインで管理画面へ入る機能（Issue #464）を、外部設定で有効にする上書き（Issue #470）。
+#
+# **compose.yaml に重ねて使う。** 単独では動かない。
+#
+#   docker compose -f compose.yaml -f compose.pleasanter-sso.yaml --profile sqlserver up -d --wait
+#
+# 端から端まで通す試験（.github/workflows/e2e.yml）は、COMPOSE_FILE で常に重ねている。
+#
+# **compose.yaml 本体へ書かない理由。** 外部設定に値があると、その項目は設定画面でロックされる
+# （空文字でもロックされる）。本体へ `${DEV_...:-}` の形で書くと、手元の開発環境と
+# 写しの一式でも設定画面が常にロックされ、画面からの有効化を試せなくなる。
+#
+# **検証環境だけの値。** 本番の設定は _documents/Pleasanter-SSO-運用手順書.md を見ること。
+services:
+  app:
+    environment:
+      QUESTIONNAIRE_PLEASANTERSSO_ENABLED: "true"
+      # **サーバ間の URL。** 本アプリの容器から Pleasanter の容器へ、compose の網の中で届く名前
+      QUESTIONNAIRE_PLEASANTERSSO_INTERNALBASEURL: ${DEV_PLEASANTERSSO_INTERNALBASEURL:-http://pleasanter:8080}
+      # **ブラウザで開く URL。** 本アプリ（localhost:8081）と同じホスト名にしないと cookie が届かない。
+      # cookie はポートを区別しないので、localhost の 8080 と 8081 は同じホストとして扱われる
+      QUESTIONNAIRE_PLEASANTERSSO_LOGINURL: ${DEV_PLEASANTERSSO_LOGINURL:-http://localhost:8080/users/login}
+      # **再検証の間隔を最短（1 分）にする。** Pleasanter でログアウトした後に締め出されることを、
+      # 試験で待てる長さで確かめるため。製品の既定は 5 分
+      QUESTIONNAIRE_PLEASANTERSSO_REVALIDATEMINUTES: ${DEV_PLEASANTERSSO_REVALIDATEMINUTES:-1}
