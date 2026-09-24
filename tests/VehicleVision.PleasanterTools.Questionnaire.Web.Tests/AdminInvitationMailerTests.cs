@@ -125,6 +125,25 @@ public class AdminInvitationMailerTests
     }
 
     [Fact]
+    public async Task 変更した管理画面パスを本文のURLに使う()
+    {
+        var outbox = new FakeMailOutbox();
+        var mailer = new AdminInvitationMailer(
+            outbox,
+            new PassThroughProtector(),
+            Ready,
+            NullLogger<AdminInvitationMailer>.Instance,
+            new AdminPathOptions("/back-office"));
+
+        await mailer.TryEnqueueAsync("hito@example.jp", "tok-1", ExpiresAt, "ja");
+
+        Assert.Contains(
+            "https://survey.example.jp/back-office/invitations/accept?token=tok-1",
+            Single(outbox).Body,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task 起点が未設定なら送らない()
     {
         // ⚠️ **要求の Host から組み立てない**（host header injection）。

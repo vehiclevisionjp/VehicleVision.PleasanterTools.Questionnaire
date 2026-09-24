@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Question } from '../lib/types';
-  import { text } from '../lib/types';
+  import type { LocalizedText, Question } from '../lib/types';
+  import { text as localizedText } from '../lib/types';
   import type { Language } from '../lib/i18n/language';
   import { translator } from '../lib/i18n/messages';
   import { embedAspectRatio, embedSource } from '../lib/embed';
@@ -8,11 +8,16 @@
   interface Props {
     question: Question;
     language: Language;
+    fallbackLanguage: Language;
   }
 
-  let { question, language }: Props = $props();
+  let { question, language, fallbackLanguage }: Props = $props();
 
   const t = $derived(translator(language));
+
+  function text(value: LocalizedText | undefined, _language: Language): string {
+    return localizedText(value, language, fallbackLanguage);
+  }
 
   /**
    * **出す前にもう一度確かめる。**

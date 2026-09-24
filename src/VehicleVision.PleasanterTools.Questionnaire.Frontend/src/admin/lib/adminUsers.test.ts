@@ -152,4 +152,10 @@ describe('招待', () => {
       'https://example.jp/admin/invitations/accept?token=a%20b%2Bc%2Fd',
     );
   });
+
+  it('変更した管理画面パスからURLを組み立てる', () => {
+    expect(invitationUrl('token', 'https://example.jp', '/back-office')).toBe(
+      'https://example.jp/back-office/invitations/accept?token=token',
+    );
+  });
 });

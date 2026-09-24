@@ -418,7 +418,9 @@ export const ja = {
   'editor.shuffleBlockedByVisibility': '表示条件が設定された設問があるため、指定できません。表示条件で参照できるのは前にある設問だけのため、順序を入れ替えると条件が成立しなくなります。',
   'editor.editingLanguage': '編集する言語',
   'editor.editingLanguageHint': '入力したテキストはこの言語に保存されます。他の言語のテキストはそのまま残ります。',
-  'editor.fallbackNotice': 'この言語のテキストが未入力の項目は、回答画面では日本語で表示されます。',
+  'editor.fallbackLanguage': '訳がないときに表示する言語',
+  'editor.fallbackLanguageHint':
+    '回答者の言語に設問・選択肢・見出しの訳がない場合、この言語の文言を表示します。「編集する言語」とは別の設定です。',
   'questionImport.open': 'ほかのアンケートから取り込む',
   'questionImport.title': '設問を取り込む',
   'questionImport.close': '閉じる',

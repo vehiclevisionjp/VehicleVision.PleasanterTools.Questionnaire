@@ -6,6 +6,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Flow;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Validation;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
@@ -586,6 +587,16 @@ public static class AdminSurveyEndpoints
                 {
                     message = ServerMessages.Get(
                         ServerMessageKeys.DefinitionAndMappingRequired, RequestLanguage.Of(context)),
+                });
+            }
+
+            if (!SupportedLanguages.All.Contains(
+                request.Definition.FallbackLanguage, StringComparer.Ordinal))
+            {
+                return Results.BadRequest(new
+                {
+                    message = "落とし先の言語に対応していない言語コードが指定されています。",
+                    fields = new[] { "fallbackLanguage" },
                 });
             }
 

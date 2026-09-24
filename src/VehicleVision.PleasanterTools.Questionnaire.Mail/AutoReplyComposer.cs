@@ -48,7 +48,7 @@ public static class AutoReplyComposer
         }
 
         // **差し込みは件名にも効かせる。** 「{{title}} へのご回答」と書けること
-        var title = definition.Title.Get(language);
+        var title = definition.Title.Get(language, definition.FallbackLanguage);
         var filledAt = submittedAt ?? DateTimeOffset.UtcNow;
         values = (values ?? new AutoReplyPlaceholderValues()) with
         {
@@ -56,7 +56,10 @@ public static class AutoReplyComposer
         };
 
         var subject = MailPlaceholders.Fill(
-            settings.Subject?.Get(language) ?? string.Empty, title, filledAt, values);
+            settings.Subject?.Get(language, definition.FallbackLanguage) ?? string.Empty,
+            title,
+            filledAt,
+            values);
         if (string.IsNullOrWhiteSpace(subject))
         {
             // **公開のときに弾いているはず**（AutoReplyValidator）。
@@ -65,13 +68,16 @@ public static class AutoReplyComposer
         }
 
         var body = MailPlaceholders.Fill(
-            settings.Body?.Get(language) ?? string.Empty, title, filledAt, values);
+            settings.Body?.Get(language, definition.FallbackLanguage) ?? string.Empty,
+            title,
+            filledAt,
+            values);
 
         return new OutgoingMail(
             toAddress.Trim(),
             subject,
             body,
-            settings.FromName?.Get(language),
+            settings.FromName?.Get(language, definition.FallbackLanguage),
             settings.ReplyToAddress?.Trim(),
             settings.BccAddress?.Trim());
     }
@@ -131,7 +137,7 @@ public static class AutoReplyComposer
                 continue;
             }
 
-            lines.Add($"{question.Title.Get(language)}: {text}");
+            lines.Add($"{question.Title.Get(language, definition.FallbackLanguage)}: {text}");
         }
 
         return string.Join(Environment.NewLine, lines);
