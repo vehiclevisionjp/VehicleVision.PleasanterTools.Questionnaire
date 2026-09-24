@@ -9,7 +9,7 @@
   `Services/SamlOptionsProvider.cs`、`Services/SamlAuthenticator.cs`、
   `Endpoints/AdminSamlEndpoints.cs`
 - 保存先: `src/VehicleVision.PleasanterTools.Questionnaire.Data/SamlSettingStore.cs`、
-  `Migrations/M0023_SamlSettings.cs`
+  `Migrations/M0024_SamlSettings.cs`
 - 使っているライブラリ: [ITfoxtec.Identity.Saml2](https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2)
   4.20.1（BSD-3-Clause。2026-09-09 参照）
 
@@ -43,7 +43,7 @@
 | 単一ログアウト | **対応**（Issue #191）。`QUESTIONNAIRE_SAML_SINGLELOGOUTURL` を設定したときだけ使う。SP 起点・IdP 起点の両方を受ける |
 | 設定の反映 | DB の設定は**再起動なし**で次の要求から反映する |
 | 管理画面の入口 | `QUESTIONNAIRE_ADMIN_PATH` で変更できる。変更の反映にはアプリの再起動が必要 |
-| 合言葉ログイン | `QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false` で SAML 有効時だけ停止できる |
+| 合言葉ログイン | `QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false` で SAML（または Pleasanter のログイン）の有効時だけ停止できる |
 | 緊急時の入口 | `{管理画面の入口}?rescue={救済トークン}`。成功・失敗を監査し、5 分あたりのログイン試行上限と同じ回数に制限する |
 | 設定できる人 | `Administrator` だけ。アンケートの権限とは別 |
 
@@ -91,7 +91,8 @@ sequenceDiagram
 - **ログイン ID とパスワードの入口は既定では残す。**
   `QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false` を外部設定へ明示した場合だけ、
   SAML の有効中は画面と認証 API の両方を塞ぐ
-- ⚠️ **SAML が無効なときは、合言葉を塞ぐ指定を警告付きで無視する。**
+  （**Pleasanter のログイン（Issue #464）が有効な間も同じ。**[`Pleasanter-SSO-運用手順書.md`](Pleasanter-SSO-運用手順書.md) 6 章）
+- ⚠️ **SAML が無効なとき（Pleasanter のログインも無効なとき）は、合言葉を塞ぐ指定を警告付きで無視する。**
   SAML は画面から再起動なしで無効にできるため、起動時の検証だけでは後から全員を
   締め出せる。認証手段が 1 つもない状態より復旧可能性を優先する
 - **設定の変更は `AuditLogs` に残す。**
@@ -119,7 +120,7 @@ sequenceDiagram
 ⚠️ **既存環境の互換性を優先する。** これまでの環境変数を残したまま更新すれば、
 DB の値より環境変数が優先され、動作は変わらない。
 
-DB の保存先を作るため、更新後にマイグレーション 23 を適用する。
+DB の保存先を作るため、更新後にマイグレーション 24 を適用する。
 マイグレーションの実行方法は
 [`データモデル設計.md`](データモデル設計.md) の「マイグレーション」を参照する。
 
@@ -174,7 +175,7 @@ QUESTIONNAIRE_ADMIN_RESCUE_TOKEN={32文字以上の推測できない値}
 ```
 
 `QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN` の既定は `true` で、未設定なら従来どおり
-合言葉でもログインできる。`false` は **SAML が有効な間だけ**効く。SAML が無効なら、
+合言葉でもログインできる。`false` は **SAML か Pleasanter のログインが有効な間だけ**効く。両方とも無効なら、
 全員を締め出さないため合言葉ログインを許可し、サーバログへ警告を出す。
 
 #### 救済トークンを決めて保管する
