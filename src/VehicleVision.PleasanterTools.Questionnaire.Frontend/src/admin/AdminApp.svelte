@@ -43,6 +43,7 @@
     type ReadabilityPreferences,
   } from '../lib/readability';
   import { confirmAction } from './lib/confirmation.svelte';
+  import { adminRoute, adminUrl } from './lib/adminPath';
 
   let session = $state<AdminSession>();
   let applicationVersion = $state<ApplicationVersion>();
@@ -130,40 +131,40 @@
   });
 
   function readSurveyId(): string | null {
-    const match = /^\/admin\/surveys\/([0-9a-f-]{36})/i.exec(location.pathname);
+    const match = /^\/surveys\/([0-9a-f-]{36})/i.exec(adminRoute(location.pathname) ?? '');
     return match?.[1] ?? null;
   }
 
   function readAuditLog(): boolean {
-    return /^\/admin\/audit-logs\/?$/.test(location.pathname);
+    return adminRoute(location.pathname) === '/audit-logs';
   }
 
   function readOutbox(): boolean {
-    return /^\/admin\/outbox\/?$/.test(location.pathname);
+    return adminRoute(location.pathname) === '/outbox';
   }
 
   function readNotifications(): boolean {
-    return /^\/admin\/notifications\/?$/.test(location.pathname);
+    return adminRoute(location.pathname) === '/notifications';
   }
 
   function readUsers(): boolean {
-    return /^\/admin\/users\/?$/.test(location.pathname);
+    return adminRoute(location.pathname) === '/users';
   }
 
   function readAccount(): boolean {
-    return /^\/admin\/me\/?$/.test(location.pathname);
+    return adminRoute(location.pathname) === '/me';
   }
 
   function readSamlSettings(): boolean {
-    return /^\/admin\/saml-settings\/?$/.test(location.pathname);
+    return adminRoute(location.pathname) === '/saml-settings';
   }
 
   function readAppSettings(): boolean {
-    return /^\/admin\/settings\/?$/.test(location.pathname);
+    return adminRoute(location.pathname) === '/settings';
   }
 
   function readHelp(): boolean {
-    return /^\/admin\/help\/?$/.test(location.pathname);
+    return adminRoute(location.pathname) === '/help';
   }
 
   /** 画面を 1 つだけ開く。**出し分けの取りこぼしを防ぐ。** */
@@ -201,61 +202,61 @@
   }
 
   async function openUserList() {
-    if (await navigate('/admin/users', { users: true })) {
+    if (await navigate(adminUrl('/users'), { users: true })) {
       openUsers = true;
     }
   }
 
   async function openMyAccount() {
-    if (await navigate('/admin/me', { account: true })) {
+    if (await navigate(adminUrl('/me'), { account: true })) {
       openAccount = true;
     }
   }
 
   async function openSamlSettingsPanel() {
-    if (await navigate('/admin/saml-settings', { samlSettings: true })) {
+    if (await navigate(adminUrl('/saml-settings'), { samlSettings: true })) {
       openSamlSettings = true;
     }
   }
 
   async function openAppSettingsPanel() {
-    if (await navigate('/admin/settings', { appSettings: true })) {
+    if (await navigate(adminUrl('/settings'), { appSettings: true })) {
       openAppSettings = true;
     }
   }
 
   async function openHelpPanel() {
-    if (await navigate('/admin/help', { help: true })) {
+    if (await navigate(adminUrl('/help'), { help: true })) {
       openHelp = true;
     }
   }
 
   async function open(surveyId: string) {
-    if (await navigate(`/admin/surveys/${surveyId}`)) {
+    if (await navigate(adminUrl(`/surveys/${surveyId}`))) {
       openSurveyId = surveyId;
     }
   }
 
   async function openAudit() {
-    if (await navigate('/admin/audit-logs')) {
+    if (await navigate(adminUrl('/audit-logs'))) {
       openAuditLog = true;
     }
   }
 
   async function openDelivery() {
-    if (await navigate('/admin/outbox')) {
+    if (await navigate(adminUrl('/outbox'))) {
       openOutbox = true;
     }
   }
 
   async function openNotificationList() {
-    if (await navigate('/admin/notifications')) {
+    if (await navigate(adminUrl('/notifications'))) {
       openNotifications = true;
     }
   }
 
   async function back() {
-    await navigate('/admin');
+    await navigate(adminUrl());
   }
 
   const breadcrumbPage = $derived.by<AdminPage>(() => {
@@ -360,7 +361,7 @@
     openAppSettings = false;
     openHelp = false;
     unreadCount = 0;
-    history.replaceState(null, '', '/admin');
+    history.replaceState(null, '', adminUrl());
     await refresh();
   }
 
@@ -427,7 +428,7 @@
   );
 
   let acceptingInvitation = $state(
-    /^\/admin\/invitations\/accept\/?$/.test(location.pathname),
+    adminRoute(location.pathname) === '/invitations/accept',
   );
 
   function finishInvitation() {
