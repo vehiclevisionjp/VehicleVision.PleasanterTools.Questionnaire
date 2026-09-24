@@ -275,7 +275,13 @@ GET https://{本アプリのホスト}/api/admin/saml/metadata
 | Entity ID | `QUESTIONNAIRE_SAML_ENTITYID` に入れた値 |
 
 `QUESTIONNAIRE_ADMIN_PATH` を変更しても、ACS URL は変わらない。変更されるのは SAML ログイン後の
-管理画面への戻り先である。リバースプロキシの経路変更などで外部から見える ACS URL も変える場合は、
+管理画面への戻り先である。
+
+⚠️ **`QUESTIONNAIRE_PATH_BASE`（サブパス配置。Issue #465）を設定すると ACS URL も変わる。**
+`/questionnaire` なら `https://{本アプリのホスト}/questionnaire/api/admin/saml/acs` になり、メタデータも
+`/questionnaire/api/admin/saml/metadata` から取る。前段のプロキシが `Host` を書き換える構成では
+ACS URL が正しく組み立たない（[`サブパス配置-運用手順書.md`](サブパス配置-運用手順書.md) 3 章）。
+リバースプロキシの経路変更などで外部から見える ACS URL も変える場合は、
 **IdP 側へ登録した ACS URL も必ず変更する。** IdP 側が古い URL のままでは応答を受け取れない。
 
 ## 5. Google Workspace の設定例
