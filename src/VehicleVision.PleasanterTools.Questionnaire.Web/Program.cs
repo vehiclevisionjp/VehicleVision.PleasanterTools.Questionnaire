@@ -921,25 +921,50 @@ if (openApiExposure.Enabled)
 }
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない。
-// 起動時に 1 度だけ読み、画面が組み立てる経路の基準を meta 要素へ埋める。
-var adminHtmlTemplate = File.ReadAllText(
-    Path.Combine(app.Environment.WebRootPath, "admin.html"));
-const string adminPathPlaceholder = "__QUESTIONNAIRE_ADMIN_PATH__";
-if (!adminHtmlTemplate.Contains(adminPathPlaceholder, StringComparison.Ordinal))
+// 画面が組み立てる経路の基準を meta 要素へ埋めるため、素のファイルではなく差し替えた本文を返す。
+//
+// ⚠️ **起動時に読まない。** `wwwroot` はフロントエンドを組み立てて初めて出来るもので、
+// **無い状態でも起動はできなければならない**（`dotnet run` だけした手元、Issue #406 と同じ筋）。
+// 起動時に読むと `WebRootPath` が `null` のまま落ち、**DB も設定も正しいのにアプリが上がらない。**
+// 1 度読んだら覚えておき、2 度目からはディスクを触らない
+var adminHtml = new Lazy<string?>(() =>
 {
-    throw new InvalidOperationException("admin.html に管理画面パスの埋め込み先がありません。");
-}
+    var webRoot = app.Environment.WebRootPath;
+    if (string.IsNullOrEmpty(webRoot))
+    {
+        return null;
+    }
 
-var adminHtml = adminHtmlTemplate.Replace(
-    adminPathPlaceholder,
-    System.Text.Encodings.Web.HtmlEncoder.Default.Encode(adminPath.Path),
-    StringComparison.Ordinal);
+    var file = Path.Combine(webRoot, "admin.html");
+    if (!File.Exists(file))
+    {
+        return null;
+    }
+
+    const string placeholder = "__QUESTIONNAIRE_ADMIN_PATH__";
+    var template = File.ReadAllText(file);
+
+    // **埋め込み先が無いのは組み立ての不備。** 既定のパスなら動いてしまうので黙らせない
+    if (!template.Contains(placeholder, StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("admin.html に管理画面パスの埋め込み先がありません。");
+    }
+
+    return template.Replace(
+        placeholder,
+        System.Text.Encodings.Web.HtmlEncoder.Default.Encode(adminPath.Path),
+        StringComparison.Ordinal);
+});
 
 // ⚠️ **ここは UseStaticFiles の設定を通らない**ので、キャッシュの指示を自分で付ける（Issue #425）
 IResult AdminPage(HttpContext context)
 {
     context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
-    return Results.Content(adminHtml, "text/html; charset=utf-8");
+
+    // **画面が置かれていないときは、今までどおり見つからないものとして返す。**
+    return adminHtml.Value is { } html
+        ? Results.Content(html, "text/html; charset=utf-8")
+        : Results.NotFound();
 }
 
 app.MapGet(adminPath.Path, AdminPage);
