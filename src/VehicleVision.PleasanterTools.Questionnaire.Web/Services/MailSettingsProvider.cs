@@ -14,7 +14,14 @@ public interface IMailSettingsProvider
 }
 
 /// <summary>アプリケーション設定のスナップショットをメール設定へ変換する。</summary>
-public sealed class MailSettingsProvider(AppSettingsProvider appSettings) : IMailSettingsProvider
+/// <remarks>
+/// **メール本文の起点 URL にはサブパスを足して渡す**（Issue #465）。
+/// 招待・自動返信・再編集リンク・配布資産のリンクは、すべてこの起点から作られる。
+/// 起点に既にサブパスまで書かれていれば足さない（<see cref="PathBaseOptions.ComposePublicUrl"/>）。
+/// </remarks>
+public sealed class MailSettingsProvider(
+    AppSettingsProvider appSettings,
+    PathBaseOptions? pathBase = null) : IMailSettingsProvider
 {
     public async Task<MailOptions> GetAsync(CancellationToken cancellationToken = default) =>
         FromSnapshot(await appSettings.GetAsync(cancellationToken).ConfigureAwait(false));
@@ -36,7 +43,7 @@ public sealed class MailSettingsProvider(AppSettingsProvider appSettings) : IMai
     /// **同じ形の項目はほかにもある**（<c>FROM_NAME</c> / <c>BASEURL</c> /
     /// <c>SMTP_USER</c> / <c>SMTP_PASSWORD</c>）ので、1 つずつ直さずここでまとめて落とす。
     /// </remarks>
-    private static MailOptions FromSnapshot(AppSettingsSnapshot snapshot)
+    private MailOptions FromSnapshot(AppSettingsSnapshot snapshot)
     {
         var values = snapshot.Values
             .Where(pair => !string.IsNullOrEmpty(pair.Value))
@@ -44,7 +51,10 @@ public sealed class MailSettingsProvider(AppSettingsProvider appSettings) : IMai
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(values)
             .Build();
-        return MailOptions.FromConfiguration(configuration);
+        var options = MailOptions.FromConfiguration(configuration);
+        return pathBase is { IsConfigured: true }
+            ? options with { BaseUrl = pathBase.ComposePublicUrl(options.BaseUrl) }
+            : options;
     }
 }
 

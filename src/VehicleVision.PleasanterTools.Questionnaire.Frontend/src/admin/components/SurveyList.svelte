@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { appUrl } from '../../lib/basePath';
   import { onMount } from 'svelte';
   import {
     archiveSurvey,
@@ -508,9 +509,9 @@
     }
   }
 
-  /** 回答用 URL。**公開用 ID しか出さない。** */
+  /** 回答用 URL。**公開用 ID しか出さない。** サブパスに置いたときはサブパス込み（Issue #465）。 */
   function formUrl(publicId: string): string {
-    return `${location.origin}/f/${publicId}`;
+    return `${location.origin}${appUrl(`/f/${publicId}`)}`;
   }
 
   function formatDate(value: string): string {
