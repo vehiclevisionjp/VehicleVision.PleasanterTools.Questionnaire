@@ -7,6 +7,7 @@
  */
 
 import type { AdminUserRow } from './types';
+import { adminUrl } from './adminPath';
 import { t } from './i18n/state.svelte';
 
 /**
@@ -73,8 +74,8 @@ export function hasLoggedIn(user: AdminUserRow): boolean {
 }
 
 /** 招待を受け取る URL。**この形はサーバ側の経路と揃える。** */
-export function invitationUrl(token: string, origin: string): string {
-  return `${origin}/admin/invitations/accept?token=${encodeURIComponent(token)}`;
+export function invitationUrl(token: string, origin: string, basePath?: string): string {
+  return `${origin}${adminUrl('/invitations/accept', basePath)}?token=${encodeURIComponent(token)}`;
 }
 
 /**

@@ -1,3 +1,5 @@
+import { adminUrl } from './adminPath';
+
 export type AdminPage =
   | 'surveys'
   | 'survey-editor'
@@ -24,7 +26,7 @@ export function buildBreadcrumbs(page: AdminPage): Breadcrumb[] {
   const current: Breadcrumb = { page, path: null };
 
   if (page !== 'surveys') {
-    return [{ page: 'surveys', path: '/admin' }, current];
+    return [{ page: 'surveys', path: adminUrl() }, current];
   }
 
   return [current];

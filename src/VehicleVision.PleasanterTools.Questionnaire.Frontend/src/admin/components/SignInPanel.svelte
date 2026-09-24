@@ -8,6 +8,7 @@
     verifyTotp,
   } from '../lib/api';
   import { solveAltcha } from '../../lib/altcha';
+  import { adminUrl } from '../lib/adminPath';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -66,7 +67,9 @@
    * 場所を書き換える。
    */
   function startSaml() {
-    window.location.assign('/api/admin/saml/login?returnUrl=/admin');
+    window.location.assign(
+      `/api/admin/saml/login?returnUrl=${encodeURIComponent(adminUrl())}`,
+    );
   }
 
   const isSetup = $derived(session.setupRequired);

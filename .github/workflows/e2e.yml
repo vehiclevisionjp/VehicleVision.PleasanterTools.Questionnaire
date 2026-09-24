@@ -75,6 +75,10 @@ jobs:
         profile: ${{ fromJSON(github.event_name == 'schedule' && '["postgres","mysql"]' || '["sqlserver"]') }}
     # Pleasanter の起動と試験本体で、既定の 6 時間は要らないが 30 分では足りない恐れがある
     timeout-minutes: 45
+    env:
+      # app の compose 展開と、試験側の期待値を同じ変更後の入口へ揃える。
+      DEV_ADMIN_PATH: /back-office
+      QUESTIONNAIRE_ADMIN_PATH: /back-office
 
     steps:
       - name: ソースを取得する
