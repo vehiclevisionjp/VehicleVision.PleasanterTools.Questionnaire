@@ -43,7 +43,8 @@ export type Translate = (
 /**
  * その言語の文言を引く関数を作る。
  *
- * **翻訳が無ければ既定の言語へ落ちる**（`_documents/多言語対応方針.md` 1 章）。
+ * **翻訳が無ければ `en`、それも無ければ `ja` へ落ちる**
+ * （`_documents/多言語対応方針.md` 1 章）。
  */
 export function translator(language: Language): Translate {
   const catalog = CATALOGS[language];

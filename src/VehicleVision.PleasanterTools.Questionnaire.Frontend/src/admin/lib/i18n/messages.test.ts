@@ -37,32 +37,46 @@ describe('一覧へ戻るリンクの文言', () => {
     expect(ja).not.toHaveProperty(key);
     expect(en).not.toHaveProperty(key);
   });
+});
 
-  describe('translator', () => {
-    it('未翻訳の言語は英語の文言へ落ちる', () => {
-      const key = Object.keys(ja)[0] as MessageKey;
+describe('translator', () => {
+  // **未翻訳の言語は英語で操作できる状態にする。** 日本語へ直接落とさない
+  it('未翻訳の言語は英語の文言へ落ちる', () => {
+    const key = Object.keys(ja)[0] as MessageKey;
 
-      expect(translator('zh')(key)).toBe(en[key]);
-      expect(translator('vi')(key)).toBe(en[key]);
-    });
+    expect(translator('zh')(key)).toBe(en[key]);
+    expect(translator('vi')(key)).toBe(en[key]);
+  });
+});
+
+describe('文言の集合', () => {
+  // **日英で鍵の集合が同じでなければならない。** 足し忘れると画面に鍵がそのまま出る
+  it('日本語と英語で鍵が揃っている', () => {
+    expect(Object.keys(en).sort()).toEqual(Object.keys(ja).sort());
   });
 
-  describe('文言の集合', () => {
-    it('各言語のカタログに日本語カタログに無い鍵がない', () => {
-      for (const [language, catalog] of Object.entries(catalogs)) {
-        const extra = Object.keys(catalog).filter((key) => !(key in ja));
-        expect(extra, language).toEqual([]);
+  it('空の文言を置かない', () => {
+    for (const [language, catalog] of Object.entries(catalogs)) {
+      for (const [key, value] of Object.entries(catalog)) {
+        expect(value, `${language}.${key}`).not.toBe('');
       }
-    });
+    }
+  });
 
-    it('各言語にある文言の差し込み名が日本語と一致する', () => {
-      for (const [language, catalog] of Object.entries(catalogs)) {
-        for (const [key, value] of Object.entries(catalog)) {
-          expect(placeholders(value), `${language}.${key}`).toEqual(
-            placeholders(ja[key as MessageKey]),
-          );
-        }
+  it('各言語のカタログに日本語カタログに無い鍵がない', () => {
+    for (const [language, catalog] of Object.entries(catalogs)) {
+      const extra = Object.keys(catalog).filter((key) => !(key in ja));
+      expect(extra, language).toEqual([]);
+    }
+  });
+
+  it('各言語にある文言の差し込み名が日本語と一致する', () => {
+    for (const [language, catalog] of Object.entries(catalogs)) {
+      for (const [key, value] of Object.entries(catalog)) {
+        expect(placeholders(value), `${language}.${key}`).toEqual(
+          placeholders(ja[key as MessageKey]),
+        );
       }
-    });
+    }
   });
 });
