@@ -62,3 +62,7 @@ tools/screenshots/artifacts/
 
 # 手元の検証環境の控え（scripts/Backup-LocalDev.ps1）。**中身は検証環境の実データ**
 backups/
+
+## Python の実行時キャッシュ
+__pycache__/
+*.py[cod]
