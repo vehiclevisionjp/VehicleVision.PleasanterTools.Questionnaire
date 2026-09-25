@@ -671,6 +671,8 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "notifications.kind.ResponseLimitReached": "Việc nạp đã dừng lại vì đã đạt đến giới hạn phản hồi",
   "notifications.kind.MailDeadLettered": "Một email không thể gửi được và đang bị treo",
   "notifications.kind.ResponseReceived": "Đã nhận được phản hồi mới",
+  "notifications.kind.ClamAvUnavailable": "Không thể sử dụng tính năng quét ClamAV",
+  "notifications.kind.ClamAvRecovered": "Tính năng quét ClamAV đã hoạt động trở lại",
   "notifications.kind.Unknown": "Thông báo không xác định",
   "branching.choiceNext": "Sự lựa chọn này sẽ đi đến đâu",
   "branching.pageNext": "Khi trang này kết thúc",

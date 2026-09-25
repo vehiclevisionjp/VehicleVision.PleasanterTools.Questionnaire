@@ -770,6 +770,8 @@ export const en: Record<MessageKey, string> = {
   'notifications.kind.ResponseLimitReached': 'Intake stopped because the response limit was reached',
   'notifications.kind.MailDeadLettered': 'An email could not be delivered and is on hold',
   'notifications.kind.ResponseReceived': 'New responses were received',
+  "notifications.kind.ClamAvUnavailable": "ClamAV scanning is unavailable",
+  "notifications.kind.ClamAvRecovered": "ClamAV scanning has recovered",
   'notifications.kind.Unknown': 'Unknown notification',
 
   // ---- Branching (jumps) --------------------------------------------------
