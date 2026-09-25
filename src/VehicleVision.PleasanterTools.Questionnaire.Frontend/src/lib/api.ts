@@ -1,6 +1,6 @@
 import type { FormResponse, PayloadAnswer, RejectionReason, Ticket } from './types';
 import { framedHeaders } from './framed';
-import { appUrl } from './basePath';
+import { appUrl, basePath } from './basePath';
 
 /** 回答トークンの保存先。**URL には載せない。** */
 const TOKEN_STORAGE_PREFIX = 'questionnaire.token.';
@@ -45,16 +45,26 @@ function removeStorage(key: string): void {
 }
 
 /**
- * 回答済みの印を置く Cookie の属性。
+ * 回答済みの印の Cookie を置く・消すための `document.cookie` への代入値。
  *
  * **`path` を `/f/{publicId}` に絞る。** こうすると API の要求には付かず、
  * 回答画面の JavaScript から読むためだけの Cookie になる。
  * **サブパスに置いたときは、その下に絞る**（Issue #465）。
  * **入るのは真偽値だけで、回答者を識別する値は入れない。**
+ *
+ * ⚠️ **置くときと消すときで必ずこの関数を通す。** ブラウザは Path が一致しないと
+ * Cookie を消さない。消す側だけサブパスを付け忘れ、回答済みの扱いが残った（Issue #478）。
  */
-function cookieAttributes(publicId: string): string {
-  const secure = location.protocol === 'https:' ? '; secure' : '';
-  return `; path=${appUrl(`/f/${encodeURIComponent(publicId)}`)}; max-age=${SUBMITTED_MAX_AGE}; samesite=lax${secure}`;
+export function submittedCookie(
+  publicId: string,
+  action: 'set' | 'clear',
+  base: string = basePath,
+  protocol: string = location.protocol,
+): string {
+  const path = appUrl(`/f/${encodeURIComponent(publicId)}`, base);
+  const secure = protocol === 'https:' ? '; secure' : '';
+  const [value, maxAge] = action === 'set' ? ['1', SUBMITTED_MAX_AGE] : ['', 0];
+  return `${SUBMITTED_COOKIE_PREFIX}${publicId}=${value}; path=${path}; max-age=${maxAge}; samesite=lax${secure}`;
 }
 
 function readCookie(name: string): string | null {
@@ -187,7 +197,7 @@ export function hasSubmitted(publicId: string): boolean {
 export function markSubmitted(publicId: string): void {
   writeStorage(SUBMITTED_STORAGE_PREFIX + publicId, '1');
   try {
-    document.cookie = `${SUBMITTED_COOKIE_PREFIX}${publicId}=1${cookieAttributes(publicId)}`;
+    document.cookie = submittedCookie(publicId, 'set');
   } catch {
     // Cookie が使えなくても Web Storage 側が残る
   }
@@ -198,9 +208,7 @@ export function forgetSubmission(publicId: string): void {
   removeStorage(TOKEN_STORAGE_PREFIX + publicId);
   removeStorage(SUBMITTED_STORAGE_PREFIX + publicId);
   try {
-    document.cookie = `${SUBMITTED_COOKIE_PREFIX}${publicId}=; path=/f/${encodeURIComponent(
-      publicId,
-    )}; max-age=0`;
+    document.cookie = submittedCookie(publicId, 'clear');
   } catch {
     // 同上
   }
