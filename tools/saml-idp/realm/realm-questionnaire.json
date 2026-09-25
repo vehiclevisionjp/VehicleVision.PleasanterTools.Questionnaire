@@ -47,7 +47,9 @@
       "frontchannelLogout": true,
       "redirectUris": [
         "https://localhost:8443/api/admin/saml/acs",
-        "https://localhost:8443/api/admin/saml/slo"
+        "https://localhost:8443/api/admin/saml/slo",
+        "https://localhost:8443/questionnaire/api/admin/saml/acs",
+        "https://localhost:8443/questionnaire/api/admin/saml/slo"
       ],
       "adminUrl": "https://localhost:8443/api/admin/saml/acs",
       "baseUrl": "https://localhost:8443/admin",
