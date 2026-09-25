@@ -19,6 +19,8 @@ on:
       - "src/**"
       - "tests/**"
       - "tools/**"
+      - "scripts/wait_sqlserver.py"
+      - "scripts/tests/test_wait_sqlserver.py"
       - "compose.yaml"
       - "Dockerfile"
       - "Directory.Build.props"
