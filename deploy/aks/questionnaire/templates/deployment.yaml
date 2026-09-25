@@ -18,6 +18,9 @@ spec:
     metadata:
       labels:
         {{- include "questionnaire.selectorLabels" . | nindent 8 }}
+      annotations:
+        # サブパスなどは起動時に 1 度だけ読むため、ConfigMap が変わったら Pod を入れ替える。
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ include "questionnaire.fullname" . }}
       automountServiceAccountToken: false

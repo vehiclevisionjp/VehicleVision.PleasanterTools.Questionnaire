@@ -21,3 +21,19 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | quote }}
 app.kubernetes.io/name: {{ include "questionnaire.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/* サブパス。空と "/" は根として扱い、空文字を返す。 */}}
+{{- define "questionnaire.pathBase" -}}
+{{- $pathBase := .Values.config.pathBase | default "" }}
+{{- if ne $pathBase "/" }}{{ $pathBase }}{{ end }}
+{{- end }}
+
+{{/* Ingress のパス。未指定なら サブパス、それも無ければ "/"。サブパスの外を指していたら止める。 */}}
+{{- define "questionnaire.ingressPath" -}}
+{{- $pathBase := include "questionnaire.pathBase" . }}
+{{- $path := .Values.ingress.path | default (default "/" $pathBase) }}
+{{- if and $pathBase (not (hasPrefix $pathBase $path)) }}
+{{- fail (printf "ingress.path (%s) must start with config.pathBase (%s). The prefix must not be stripped." $path $pathBase) }}
+{{- end }}
+{{- $path }}
+{{- end }}

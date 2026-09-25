@@ -13,3 +13,19 @@ data:
   QUESTIONNAIRE_FORWARDED_NETWORKS: {{ join "," .Values.config.forwardedNetworks | quote }}
   TZ: {{ .Values.config.timezone | quote }}
   QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH: {{ .Values.dataProtection.mountPath | quote }}
+  {{- with include "questionnaire.pathBase" . }}
+  QUESTIONNAIRE_PATH_BASE: {{ . | quote }}
+  {{- end }}
+  {{- /* 書いた項目だけ渡す。空文字でも渡すと管理画面から変えられなくなるため、空と null は渡さない。 */}}
+  {{- range $key, $value := .Values.config.pleasanterSso }}
+  {{- if and (not (kindIs "invalid" $value)) (ne (toString $value) "") }}
+  {{- /* 数値は YAML から float64 で来るため、指数表記にならないよう整数に戻す。 */}}
+  {{ printf "QUESTIONNAIRE_PLEASANTERSSO_%s" (upper $key) }}: {{ ternary (int64 $value | toString) (toString $value) (kindIs "float64" $value) | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if not (kindIs "invalid" .Values.migration.autoMigrateOnStartup) }}
+  QUESTIONNAIRE_DB_AUTO_MIGRATE: {{ toString .Values.migration.autoMigrateOnStartup | quote }}
+  {{- end }}
+  {{- if not (kindIs "invalid" .Values.migration.startupLockTimeoutSeconds) }}
+  QUESTIONNAIRE_DB_MIGRATION_LOCK_TIMEOUT_SECONDS: {{ int64 .Values.migration.startupLockTimeoutSeconds | toString | quote }}
+  {{- end }}
