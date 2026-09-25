@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Primitives;
+using Microsoft.Extensions.Time.Testing;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -70,13 +71,14 @@ public class PleasanterSessionVerifierTests
 
     private static (PleasanterSessionVerifier Verifier, ListLogger<PleasanterSessionVerifier> Logger) Create(
         FakeHttpMessageHandler handler,
-        IPleasanterOptionsProvider? connection = null)
+        IPleasanterOptionsProvider? connection = null,
+        TimeProvider? timeProvider = null)
     {
         var logger = new ListLogger<PleasanterSessionVerifier>();
         return (new PleasanterSessionVerifier(
             new SingleHttpClientFactory(handler),
             connection ?? PleasanterSsoTestConnections.WithoutApiKey,
-            logger), logger);
+            logger, timeProvider), logger);
     }
 
     private static string? CookieOf(HttpRequestMessage request) =>
@@ -530,30 +532,40 @@ public class PleasanterSessionVerifierTests
         Assert.Null(result.Identity);
     }
 
-    [Fact]
-    public async Task 時間切れは代わりの経路を含めた全体に掛かる()
+    [Theory]
+    [InlineData(90, PleasanterSessionStatus.Authenticated, "")]
+    [InlineData(120, PleasanterSessionStatus.UpstreamError, "timeout")]
+    public async Task 時間切れは代わりの経路を含めた全体に掛かる(
+        int millisecondsPerRequest,
+        PleasanterSessionStatus expectedStatus,
+        string expectedReason)
     {
-        // **1 回ごとの時間ではない。** 3 回それぞれが時間内でも、合計が超えれば時間切れ
-        var handler = new FakeHttpMessageHandler(async (request, cancellationToken) =>
+        // **実時間を待たない。** Task.Delay と CancelAfter の実行順が負荷で前後すると、
+        // 300 ms を超えても成功することがあった（Issue #497）。仮想時計で期限を確定させる。
+        // 3 回の合計が 270 ms なら成功し、各回は期限内でも合計 360 ms なら時間切れになる。
+        var time = new FakeTimeProvider();
+        var handler = new FakeHttpMessageHandler((request, cancellationToken) =>
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(120), cancellationToken);
+            time.Advance(TimeSpan.FromMilliseconds(millisecondsPerRequest));
+            cancellationToken.ThrowIfCancellationRequested();
             var json = request.RequestUri == OwnUserUrl ? ForbiddenJson
                 : request.RequestUri == SessionSetUrl ? SessionSetJson
                 : OwnUserJson;
             var status = request.RequestUri == OwnUserUrl ? HttpStatusCode.Forbidden : HttpStatusCode.OK;
-            return new HttpResponseMessage(status)
+            return Task.FromResult(new HttpResponseMessage(status)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json"),
-            };
+            });
         });
-        var (verifier, _) = Create(handler, PleasanterSsoTestConnections.WithApiKey);
+        var (verifier, _) = Create(handler, PleasanterSsoTestConnections.WithApiKey, time);
 
         var result = await verifier.VerifyAsync(
             new StringValues(BrowserCookies),
             Options(TimeSpan.FromMilliseconds(300)));
 
-        Assert.Equal(PleasanterSessionStatus.UpstreamError, result.Status);
-        Assert.Equal("timeout", result.Reason);
+        Assert.Equal(expectedStatus, result.Status);
+        Assert.Equal(expectedReason, result.Reason);
+        Assert.Equal(3, handler.Requests.Count);
     }
 
     [Fact]
