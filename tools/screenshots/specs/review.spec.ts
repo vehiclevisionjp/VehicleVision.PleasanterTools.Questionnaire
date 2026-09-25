@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { demoAdmin, prepareSurvey } from '../lib/setup';
-import { totp } from '../lib/totp';
+import { readEnrollmentSecret, totp } from '../lib/totp';
 
 /**
  * 目視の代わりに、直した画面だけを撮る。
@@ -24,7 +24,7 @@ test('直した画面を撮る', { tag: '@standalone' }, async ({ page, context 
   await page.getByRole('button', { name: '登録する' }).click();
 
   await page.getByRole('heading', { name: '2 要素認証を登録する' }).waitFor();
-  const secret = (await page.locator('.secret code').innerText()).replace(/\s/g, '');
+  const secret = await readEnrollmentSecret(page);
   await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret));
   await page.getByRole('button', { name: '登録する' }).click();
 

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { expectFewSurveys, expectNoAdminYet } from '../lib/fresh';
 import { demoAdmin, prepareSurvey } from '../lib/setup';
 import { findTofu, japaneseSamples } from '../lib/tofu';
-import { totp, totpInNewWindow } from '../lib/totp';
+import { readEnrollmentSecret, totp, totpInNewWindow } from '../lib/totp';
 
 /**
  * 取説へ載せる画面の写しを撮る。
@@ -99,7 +99,7 @@ test.describe('取説用の写し', { tag: '@standalone' }, () => {
     await expect(page.locator('img.qr')).toBeVisible();
 
     // **伏せる前に読む。** 写しでは見本の文字へ置き換えてしまう
-    const secret = (await page.locator('.secret code').innerText()).replace(/\s/g, '');
+    const secret = await readEnrollmentSecret(page);
     secretBase32 = secret;
 
     await shoot(page, 'admin-02-enroll');

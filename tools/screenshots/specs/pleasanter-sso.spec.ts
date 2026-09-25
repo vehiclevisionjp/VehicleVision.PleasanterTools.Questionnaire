@@ -3,7 +3,7 @@ import type { Server } from 'node:net';
 import { ensureAdminStorageState } from '../lib/admin';
 import { startForward, stopForward } from '../lib/tcp-forward';
 import { findTofu, japaneseSamples } from '../lib/tofu';
-import { totp } from '../lib/totp';
+import { readEnrollmentSecret, totp } from '../lib/totp';
 
 /**
  * Pleasanter のログインで管理画面へ入る機能（Issue #464）を、ブラウザで確かめる（Issue #470）。
@@ -208,7 +208,7 @@ test('ログイン画面の釦から別窓で Pleasanter にログインし、�
     });
     await expect.poll(() => popup.isClosed(), { timeout: 10_000 }).toBe(true);
 
-    const secret = (await page.locator('.secret code').innerText()).replace(/\s/g, '');
+    const secret = await readEnrollmentSecret(page);
     await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret));
     await page.getByRole('button', { name: '登録する' }).click();
 
