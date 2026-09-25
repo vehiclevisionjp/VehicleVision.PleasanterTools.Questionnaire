@@ -28,11 +28,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if ne $pathBase "/" }}{{ $pathBase }}{{ end }}
 {{- end }}
 
-{{/* Ingress のパス。未指定なら サブパス、それも無ければ "/"。サブパスの外を指していたら止める。 */}}
+{{/* Ingress のパス。未指定なら サブパス、それも無ければ "/"。パスの区切りまで一致させ、サブパスの外を指していたら止める。 */}}
 {{- define "questionnaire.ingressPath" -}}
 {{- $pathBase := include "questionnaire.pathBase" . }}
 {{- $path := .Values.ingress.path | default (default "/" $pathBase) }}
-{{- if and $pathBase (not (hasPrefix $pathBase $path)) }}
+{{- if and $pathBase (not (or (eq $pathBase $path) (hasPrefix (printf "%s/" $pathBase) $path))) }}
 {{- fail (printf "ingress.path (%s) must start with config.pathBase (%s). The prefix must not be stripped." $path $pathBase) }}
 {{- end }}
 {{- $path }}
