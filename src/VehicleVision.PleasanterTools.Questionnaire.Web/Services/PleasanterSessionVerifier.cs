@@ -88,7 +88,8 @@ public interface IPleasanterSessionVerifier
 public sealed class PleasanterSessionVerifier(
     IHttpClientFactory clientFactory,
     IPleasanterOptionsProvider pleasanterOptionsProvider,
-    ILogger<PleasanterSessionVerifier> logger) : IPleasanterSessionVerifier
+    ILogger<PleasanterSessionVerifier> logger,
+    TimeProvider? timeProvider = null) : IPleasanterSessionVerifier
 {
     /// <summary>問い合わせに使う HttpClient の名前。</summary>
     public const string HttpClientName = "PleasanterSso";
@@ -133,8 +134,8 @@ public sealed class PleasanterSessionVerifier(
         }
 
         // **時間切れは問い合わせ全体に掛ける。** 代わりの経路で 3 回呼んでも、待つ長さは設定の 1 回分
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(options.Timeout);
+        using var deadline = new CancellationTokenSource(options.Timeout, timeProvider ?? TimeProvider.System);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
         var stopwatch = Stopwatch.StartNew();
 
         PleasanterSessionResult result;
