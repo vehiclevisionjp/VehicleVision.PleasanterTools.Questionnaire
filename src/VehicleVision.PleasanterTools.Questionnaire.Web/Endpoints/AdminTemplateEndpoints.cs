@@ -70,7 +70,7 @@ public static class AdminTemplateEndpoints
 
             return created
                 ? Results.Created(
-                    $"/api/admin/templates/{target.TemplateId}",
+                    $"{context.Request.PathBase}/api/admin/templates/{target.TemplateId}",
                     new { templateId = target.TemplateId })
                 : Results.NotFound();
         })
@@ -112,7 +112,7 @@ public static class AdminTemplateEndpoints
 
             return created
                 ? Results.Created(
-                    $"/api/admin/surveys/{target.SurveyId}",
+                    $"{context.Request.PathBase}/api/admin/surveys/{target.SurveyId}",
                     new { surveyId = target.SurveyId, target.PublicId })
                 : Results.NotFound();
         })

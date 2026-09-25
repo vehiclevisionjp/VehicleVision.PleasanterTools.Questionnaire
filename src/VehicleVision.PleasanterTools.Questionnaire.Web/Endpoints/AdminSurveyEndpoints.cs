@@ -203,7 +203,7 @@ public static class AdminSurveyEndpoints
                 expectedRevision: 0,
                 cancellationToken).ConfigureAwait(false);
 
-            return Results.Created($"/api/admin/surveys/{surveyId}", new { surveyId, record.PublicId });
+            return Results.Created($"{context.Request.PathBase}/api/admin/surveys/{surveyId}", new { surveyId, record.PublicId });
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
@@ -279,7 +279,7 @@ public static class AdminSurveyEndpoints
 
             return duplicated
                 ? Results.Created(
-                    $"/api/admin/surveys/{target.SurveyId}",
+                    $"{context.Request.PathBase}/api/admin/surveys/{target.SurveyId}",
                     new { surveyId = target.SurveyId, target.PublicId })
                 : Results.NotFound();
         }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));

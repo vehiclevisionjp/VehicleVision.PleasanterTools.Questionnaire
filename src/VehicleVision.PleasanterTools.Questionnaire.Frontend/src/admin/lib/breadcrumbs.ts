@@ -9,6 +9,7 @@ export type AdminPage =
   | 'users'
   | 'app-settings'
   | 'saml-settings'
+  | 'pleasanter-sso-settings'
   | 'help'
   | 'account';
 

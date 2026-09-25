@@ -1,8 +1,9 @@
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
-/// <summary>SAML 有効時に、許可されていない合言葉ログイン要求を入口で拒否する。</summary>
+/// <summary>SAML か Pleasanter のログインが有効な間、許可されていない合言葉ログイン要求を入口で拒否する。</summary>
 public sealed class AdminPasswordSignInFilter(
     ISamlOptionsProvider samlProvider,
+    IPleasanterSsoOptionsProvider pleasanterSsoProvider,
     AdminPasswordSignInPolicy passwordSignIn) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(
@@ -16,7 +17,11 @@ public sealed class AdminPasswordSignInFilter(
                 .GetAsync(context.HttpContext.RequestAborted)
                 .ConfigureAwait(false))
             .Options;
-        if (!passwordSignIn.IsAllowed(context.HttpContext, saml.Enabled))
+        var pleasanterSso = (await pleasanterSsoProvider
+                .GetAsync(context.HttpContext.RequestAborted)
+                .ConfigureAwait(false))
+            .Options;
+        if (!passwordSignIn.IsAllowed(context.HttpContext, saml.Enabled || pleasanterSso.Enabled))
         {
             return Results.NotFound();
         }

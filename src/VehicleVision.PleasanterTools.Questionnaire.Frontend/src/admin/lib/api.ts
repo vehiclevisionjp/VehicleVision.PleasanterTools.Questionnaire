@@ -1,5 +1,6 @@
 import { acceptLanguageHeader, t } from './i18n/state.svelte';
 import type { NoteBlock } from '../../lib/types';
+import { appUrl } from '../../lib/basePath';
 import type { AltchaChallenge } from '../../lib/altcha';
 import type {
   AdminNotificationPage,
@@ -22,7 +23,10 @@ import type {
   SurveyTemplateSummary,
   SamlSettings,
   AppSettings,
+  PleasanterSsoSettings,
+  PleasanterSsoTestResult,
 } from './types';
+import type { PleasanterSsoCheckResponse } from './pleasanterSso';
 
 /**
  * 呼び出しの結果。
@@ -42,7 +46,8 @@ async function call<T>(
 
   let response: Response;
   try {
-    response = await fetch(path, {
+    // **呼び先はサブパスから始める**（Issue #465）。呼び出し側は `/api/...` のまま書いてよい
+    response = await fetch(appUrl(path), {
       ...rest,
       // **cookie を必ず送る。** 認証は cookie で持っている
       credentials: 'same-origin',
@@ -295,6 +300,32 @@ export const saveResponseNotification = (enabled: boolean) =>
   });
 
 // ---- SAML 設定（Issue #254）-------------------------------------------------
+
+// ---- Pleasanter のログイン（Issue #464） -------------------------------------
+
+/**
+ * Pleasanter にログインしているかをサーバに確かめさせ、していれば本アプリへ入る。
+ *
+ * **本文は空の JSON。** 他所のサイトの form から呼ばせないために JSON で送る。
+ */
+export const checkPleasanterSso = () =>
+  call<PleasanterSsoCheckResponse>('/api/admin/pleasanter-sso/check', { method: 'POST', json: {} });
+
+export const getPleasanterSsoSettings = () =>
+  call<PleasanterSsoSettings>('/api/admin/pleasanter-sso/settings');
+
+export const savePleasanterSsoSettings = (settings: PleasanterSsoSettings) =>
+  call<PleasanterSsoSettings>('/api/admin/pleasanter-sso/settings', {
+    method: 'PUT',
+    json: settings,
+  });
+
+/** 保存前の値で、いまのブラウザの Pleasanter の cookie を使って問い合わせる。 */
+export const testPleasanterSsoSettings = (settings: PleasanterSsoSettings) =>
+  call<PleasanterSsoTestResult>('/api/admin/pleasanter-sso/settings/test', {
+    method: 'POST',
+    json: settings,
+  });
 
 export const getSamlSettings = () =>
   call<SamlSettings>('/api/admin/saml/settings');
@@ -566,7 +597,7 @@ export const uploadContentAsset = (surveyId: string, file: File) => {
  * 上げたばかりの画像はまだ出ない。
  */
 export const adminAssetUrl = (surveyId: string, assetId: string): string =>
-  `/api/admin/surveys/${encodeURIComponent(surveyId)}/assets/${encodeURIComponent(assetId)}`;
+  appUrl(`/api/admin/surveys/${encodeURIComponent(surveyId)}/assets/${encodeURIComponent(assetId)}`);
 
 export const loadProblems = (surveyId: string) =>
   call<MappingProblem[]>(`/api/admin/surveys/${surveyId}/problems`);

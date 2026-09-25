@@ -42,6 +42,13 @@ builder.Configuration.AddParameterFiles();
 var adminPath = AdminPathOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(adminPath);
 
+// **置き場所のサブパスも起動時に 1 度だけ決める**（Issue #465）。
+// 同じホストの Pleasanter と cookie を分け合うため、本アプリを `/questionnaire` のような
+// サブパスへ置けるようにする。**未設定なら従来どおり `/`。** 書き間違いは起動時に止める
+var pathBase = PathBaseOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(pathBase);
+builder.Services.AddSingleton<HtmlShell>();
+
 // **合言葉を塞ぐ指定と救済トークンも外部設定だけで決める。**
 // 画面から変えられると、その場で自分自身を締め出せるため。
 var adminPasswordSignInOptions =
@@ -166,6 +173,7 @@ builder.Services.AddSingleton<IMaintenanceModeStore, MaintenanceModeStore>();
 builder.Services.AddSingleton(maintenanceOptions);
 builder.Services.AddSingleton<MaintenanceMode>();
 builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
+builder.Services.AddSingleton<IPleasanterSsoSettingStore, PleasanterSsoSettingStore>();
 builder.Services.AddSingleton<IAppSettingStore, AppSettingStore>();
 builder.Services.AddSingleton<BotMitigationOptionsProvider>();
 
@@ -419,6 +427,33 @@ builder.Services
         UseProxy = false,
         ConnectCallback = SamlMetadataConnection.ConnectAsync,
     });
+
+// **Pleasanter のログインで管理画面へ入る**（Issue #464）。SAML と同じく、
+// 外部設定 → DB → 既定値の順で要求ごとに読み、管理画面から再起動なしで変えられる。
+// **外部設定の書き間違いは起動時に落とす**（有効・無効は DB 側と組み合わさるので、形だけ確かめる）
+_ = PleasanterSsoOptions.FromValues(key =>
+    key == PleasanterSsoOptions.EnabledKey ? null : builder.Configuration[key]);
+if (builder.Configuration[PleasanterSsoOptions.EnabledKey] is { Length: > 0 } pleasanterSsoEnabled
+    && !bool.TryParse(pleasanterSsoEnabled.Trim(), out _))
+{
+    throw new InvalidOperationException($"{PleasanterSsoOptions.EnabledKey} must be true or false.");
+}
+builder.Services.AddSingleton<IPleasanterSsoOptionsProvider, PleasanterSsoOptionsProvider>();
+builder.Services.AddSingleton<IPleasanterSessionVerifier, PleasanterSessionVerifier>();
+builder.Services.AddSingleton<PleasanterSsoAuthenticator>();
+builder.Services.AddSingleton<PleasanterSsoSessionRevalidator>();
+builder.Services
+    // **時間切れは要求ごとに設定の値で掛ける**（PleasanterSessionVerifier）。ここでは無限にしておく
+    .AddHttpClient(PleasanterSessionVerifier.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        // ⚠️ **cookie を覚えさせない。** 覚えると、ある管理者の cookie が別の管理者の問い合わせへ混ざる。
+        // cookie は要求ごとに Cookie ヘッダで付ける
+        UseCookies = false,
+
+        // ⚠️ **転送を追わない。** ログイン画面への転送などを成功と取り違えない
+        AllowAutoRedirect = false,
+    });
 builder.Services.AddSingleton<AdminUserService>();
 
 // ---- bot 対策 --------------------------------------------------------------
@@ -636,6 +671,18 @@ builder.Services
             sharedRateLimits,
             rateLimitLogger));
 
+    // **Pleasanter のログインの確認は別枠にする**（Issue #464）。
+    // 画面は Pleasanter でのログインを待つ間この入口を繰り返し呼ぶため、
+    // ログインの試行の枠に混ぜると数十秒で使い切り、合言葉のログインまで止まる
+    options.AddPolicy(AdminPleasanterSsoEndpoints.CheckRateLimitPolicy, context =>
+        RateLimitPartitions.FixedWindow(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            "pleasanter-sso",
+            AdminPleasanterSsoEndpoints.CheckRequestsPer5Minutes,
+            TimeSpan.FromMinutes(5),
+            sharedRateLimits,
+            rateLimitLogger));
+
     // **救済トークンは合言葉と同じ上限値の専用枠にする。**
     // 通常の管理画面表示で枠を消費せず、救済への攻撃で通常ログインまで妨害されないため。
     options.AddPolicy(AdminAuthSchemes.RescueRateLimitPolicy, context =>
@@ -742,6 +789,15 @@ if (transportSecurity.AllowInsecure)
         + "and SAML may not work.");
 }
 
+if (pathBase.IsConfigured)
+{
+    // **英語で書く。** Azure の Kudu の Debug console で日本語が化ける（Issue #225）
+    app.Logger.LogInformation(
+        "Path base is set to {PathBase} by QUESTIONNAIRE_PATH_BASE. "
+        + "Requests outside this path return 404 except /healthz and /ready.",
+        pathBase.Value.Value);
+}
+
 if (usesSqlite)
 {
     // **英語で書く。** Azure の Kudu の Debug console で日本語が化ける（Issue #225）
@@ -777,6 +833,13 @@ foreach (var network in ForwardedProxyNetworks.Parse(
     forwardedHeadersOptions.KnownIPNetworks.Add(network);
 }
 app.UseForwardedHeaders(forwardedHeadersOptions);
+
+// **サブパスを剥がしてから経路を照合する**（Issue #465）。
+// ⚠️ **`UseRouting` を明示する。** 書かないと WebApplication がパイプラインの先頭に
+// 自動で入れ、**サブパスを剥がす前の Path で経路を照合してしまう。**
+// これより後ろ（レート制限・認証・認可）は、今までどおり経路の値と口の宣言を読める
+app.UseQuestionnairePathBase(pathBase);
+app.UseRouting();
 
 // **転送ヘッダから本当の送信元へ直した後で照合する。**
 // 先に置くと、リバースプロキシ配下では全要求がプロキシ自身の IP に見える。
@@ -882,8 +945,9 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 回答画面（TypeScript + Vite + Svelte のビルド成果物）
-app.UseDefaultFiles();
+// 回答画面（TypeScript + Vite + Svelte のビルド成果物）。
+// **入口の HTML は静的ファイルとして返さない。** 配置先の経路を埋めてから返す（HtmlShell）。
+// 下の `MapMethods("/", ...)` などの口が先に当たるので、UseStaticFiles は素の HTML を返さない
 
 // **キャッシュの指示を必ず付ける**（Issue #425）。
 //
@@ -909,6 +973,8 @@ app.MapAdminSessionEndpoints();
 // した**ので、起動時に決めると変更のたびに再起動が要る。
 // **無効な間は各入口が 404 を返すことで、外から見た姿は変わらない**
 app.MapAdminSamlEndpoints(adminPath);
+// **Pleasanter のログインも同じ**（Issue #464）。無効な間は確認の入口が 404 を返す
+app.MapAdminPleasanterSsoEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();
@@ -941,43 +1007,13 @@ if (openApiExposure.Enabled)
 }
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない。
-// 画面が組み立てる経路の基準を meta 要素へ埋めるため、素のファイルではなく差し替えた本文を返す。
-//
-// ⚠️ **起動時に読まない。** `wwwroot` はフロントエンドを組み立てて初めて出来るもので、
-// **無い状態でも起動はできなければならない**（`dotnet run` だけした手元、Issue #406 と同じ筋）。
-// 起動時に読むと `WebRootPath` が `null` のまま落ち、**DB も設定も正しいのにアプリが上がらない。**
-// 1 度読んだら覚えておき、2 度目からはディスクを触らない
-var adminHtml = new Lazy<string?>(() =>
-{
-    var webRoot = app.Environment.WebRootPath;
-    if (string.IsNullOrEmpty(webRoot))
-    {
-        return null;
-    }
-
-    var file = Path.Combine(webRoot, "admin.html");
-    if (!File.Exists(file))
-    {
-        return null;
-    }
-
-    const string placeholder = "__QUESTIONNAIRE_ADMIN_PATH__";
-    var template = File.ReadAllText(file);
-
-    // **埋め込み先が無いのは組み立ての不備。** 既定のパスなら動いてしまうので黙らせない
-    if (!template.Contains(placeholder, StringComparison.Ordinal))
-    {
-        throw new InvalidOperationException("admin.html に管理画面パスの埋め込み先がありません。");
-    }
-
-    return template.Replace(
-        placeholder,
-        System.Text.Encodings.Web.HtmlEncoder.Default.Encode(adminPath.Path),
-        StringComparison.Ordinal);
-});
+// 画面が組み立てる経路の基準を meta 要素へ埋めるため、素のファイルではなく差し替えた本文を返す（HtmlShell）。
 
 // ⚠️ **ここは UseStaticFiles の設定を通らない**ので、キャッシュの指示を自分で付ける（Issue #425）
-IResult AdminPage(HttpContext context, AdminPasswordSignInPolicy passwordSignIn)
+IResult AdminPage(
+    HttpContext context,
+    AdminPasswordSignInPolicy passwordSignIn,
+    HtmlShell shell)
 {
     context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
 
@@ -992,11 +1028,12 @@ IResult AdminPage(HttpContext context, AdminPasswordSignInPolicy passwordSignIn)
         AuditNotes.RecordRead(context);
         AuditNotes.SetTarget(context, "AdminRescue", targetId: null);
         AuditNotes.Add(context, "result", granted ? "succeeded" : "failed");
-        return Results.Redirect(adminPath.Path);
+        // **戻り先はサブパス込み。** Location はサブパスを自動では足さない
+        return Results.Redirect(context.Request.PathBase.Add(adminPath.Path).ToUriComponent());
     }
 
     // **画面が置かれていないときは、今までどおり見つからないものとして返す。**
-    return adminHtml.Value is { } html
+    return shell.Admin(context) is { } html
         ? Results.Content(html, "text/html; charset=utf-8")
         : Results.NotFound();
 }
@@ -1019,10 +1056,22 @@ if (attachmentOptions.VirusScan is
 
 // **`/f/{publicId}` は画面側で解釈する。** サーバは同じ入口を返すだけ。
 // 存在しない公開 ID でも同じ応答にして、総当たりで実在が分からないようにする
-app.MapFallbackToFile("/f/{**path}", "index.html", new StaticFileOptions
+// 入口の HTML は配置先の経路を埋めてから返す（HtmlShell。Issue #465）。
+// ⚠️ **ここは UseStaticFiles の設定を通らない**ので、キャッシュの指示を自分で付ける（Issue #425）
+static IResult IndexPage(HttpContext context, HtmlShell shell)
 {
-    OnPrepareResponse = StaticCachePolicy.Apply,
-});
+    context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
+    return shell.Index(context) is { } html
+        ? Results.Content(html, "text/html; charset=utf-8")
+        : Results.NotFound();
+}
+
+app.MapFallback("/f/{**path}", IndexPage);
+app.MapMethods("/", [HttpMethods.Get, HttpMethods.Head], IndexPage);
+app.MapMethods($"/{HtmlShell.IndexFile}", [HttpMethods.Get, HttpMethods.Head], IndexPage);
+
+// **管理画面の素の HTML は配らない。** 入口は設定した管理画面パスだけにする
+app.MapMethods($"/{HtmlShell.AdminFile}", [HttpMethods.Get, HttpMethods.Head], () => Results.NotFound());
 
 // 生存確認。**アンケートの情報を出さない**
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))

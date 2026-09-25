@@ -71,6 +71,13 @@ public static class AdminPermissions
     /// <remarks>認証の入口を変えるため、特権管理者だけに持たせる。</remarks>
     public const string SamlSettings = "settings.saml";
 
+    /// <summary>Pleasanter のログインで入る設定の閲覧・変更（Issue #464）。</summary>
+    /// <remarks>
+    /// 認証の入口を変え、JIT で作る役割も決めるため、特権管理者だけに持たせる。
+    /// **アプリケーション設定（<see cref="SettingsManage"/>）とは分ける**（SAML と同じ）。
+    /// </remarks>
+    public const string PleasanterSsoSettings = "settings.pleasanterSso";
+
     /// <summary>アプリケーション設定の閲覧・変更。</summary>
     /// <remarks>システム全体の挙動を変えるため、特権管理者だけに持たせる。</remarks>
     public const string SettingsManage = "settings.manage";
@@ -96,6 +103,7 @@ public static class AdminPermissions
         UsersWrite,
         UsersResetTwoFactor,
         SamlSettings,
+        PleasanterSsoSettings,
         SettingsManage,
         MaintenanceManage,
     ];

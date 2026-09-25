@@ -102,6 +102,37 @@ public static class AdminSessionGuard
             return;
         }
 
+        // **Pleasanter のログインで入った人は、一定間隔で Pleasanter に確かめ直す**（Issue #464）。
+        // Pleasanter でログアウト・無効化された人を、本アプリに残さない
+        if (kind == AdminSessionKind.Session
+            && context.HttpContext.RequestServices.GetService<PleasanterSsoSessionRevalidator>()
+                is { } revalidator)
+        {
+            var revalidation = await revalidator
+                .RevalidateAsync(
+                    context.HttpContext,
+                    principal,
+                    restored.Value.Entry.AdminSessionId,
+                    context.HttpContext.RequestAborted)
+                .ConfigureAwait(false);
+
+            if (revalidation is PleasanterSsoRevalidation.Rejected or PleasanterSsoRevalidation.UpstreamError)
+            {
+                if (revalidation is PleasanterSsoRevalidation.UpstreamError)
+                {
+                    // **401 ではなく 503 を返させる印**（AdminAuthSchemes.Configure）。
+                    // 画面が「ログアウトされた」ではなく「確かめられなかった」と出せるように
+                    context.HttpContext.Items[PleasanterSsoSessionRevalidator.UpstreamErrorItemKey] = true;
+                }
+
+                await context.HttpContext.RequestServices.GetRequiredService<IAdminSessionStore>()
+                    .DeleteAsync(restored.Value.Entry.AdminSessionId, context.HttpContext.RequestAborted)
+                    .ConfigureAwait(false);
+                await RejectAsync(context).ConfigureAwait(false);
+                return;
+            }
+        }
+
         context.ReplacePrincipal(principal);
     }
 

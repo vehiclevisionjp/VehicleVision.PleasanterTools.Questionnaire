@@ -13,7 +13,7 @@ public class AdminPasswordSignInPolicyTests
     {
         var policy = Policy(enabled: true);
 
-        Assert.True(policy.IsAllowed(new DefaultHttpContext(), samlEnabled: true));
+        Assert.True(policy.IsAllowed(new DefaultHttpContext(), ssoEnabled: true));
     }
 
     [Fact]
@@ -21,7 +21,7 @@ public class AdminPasswordSignInPolicyTests
     {
         var policy = Policy(enabled: false);
 
-        Assert.False(policy.IsAllowed(new DefaultHttpContext(), samlEnabled: true));
+        Assert.False(policy.IsAllowed(new DefaultHttpContext(), ssoEnabled: true));
     }
 
     [Fact]
@@ -29,7 +29,7 @@ public class AdminPasswordSignInPolicyTests
     {
         var policy = Policy(enabled: false);
 
-        Assert.True(policy.IsAllowed(new DefaultHttpContext(), samlEnabled: false));
+        Assert.True(policy.IsAllowed(new DefaultHttpContext(), ssoEnabled: false));
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class AdminPasswordSignInPolicyTests
         Assert.NotEmpty(setCookie);
         var request = new DefaultHttpContext();
         request.Request.Headers.Cookie = setCookie[..setCookie.IndexOf(';')];
-        Assert.True(policy.IsAllowed(request, samlEnabled: true));
+        Assert.True(policy.IsAllowed(request, ssoEnabled: true));
     }
 
     [Fact]

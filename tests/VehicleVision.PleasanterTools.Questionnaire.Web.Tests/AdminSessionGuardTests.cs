@@ -155,9 +155,12 @@ public class AdminSessionGuardTests
             UpdatedAt = new DateTime(2026, 8, 21, 0, 0, 0, DateTimeKind.Utc),
         };
 
-    private static ClaimsPrincipal Principal(Guid? adminUserId = null, string? role = "Administrator")
+    private static ClaimsPrincipal Principal(
+        Guid? adminUserId = null,
+        string? role = "Administrator",
+        IEnumerable<Claim>? extraClaims = null)
     {
-        var claims = new List<Claim>();
+        var claims = new List<Claim>(extraClaims ?? []);
         if (adminUserId is { } id)
         {
             claims.Add(new Claim(ClaimTypes.NameIdentifier, id.ToString()));
@@ -173,7 +176,8 @@ public class AdminSessionGuardTests
 
     private static async Task<(CookieValidatePrincipalContext Context, FakeAuthenticationService Auth)> ValidateAsync(
         AdminUser? user,
-        ClaimsPrincipal principal)
+        ClaimsPrincipal principal,
+        Action<IServiceCollection>? configure = null)
     {
         var time = TimeProvider.System;
         var store = new FakeAdminUserStore(time);
@@ -183,7 +187,7 @@ public class AdminSessionGuardTests
         }
 
         var auth = new FakeAuthenticationService();
-        var services = new ServiceCollection()
+        var collection = new ServiceCollection()
             .AddSingleton<IAdminUserStore>(store)
             .AddSingleton<IAdminSessionStore, FakeAdminSessionStore>()
             .AddSingleton<IAuthenticationService>(auth)
@@ -191,8 +195,9 @@ public class AdminSessionGuardTests
             .AddDataProtection()
             .Services
             .AddLogging()
-            .AddSingleton<AdminSessionManager>()
-            .BuildServiceProvider();
+            .AddSingleton<AdminSessionManager>();
+        configure?.Invoke(collection);
+        var services = collection.BuildServiceProvider();
 
         var httpContext = new DefaultHttpContext
         {
@@ -348,5 +353,84 @@ public class AdminSessionGuardTests
 
         Assert.Null(context.Principal);
         Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+    }
+    // ---- Pleasanter のログインで入ったセッション（Issue #464） ----------------
+
+    private static IEnumerable<Claim> PleasanterClaims(int userId = 7, DateTimeOffset? verifiedAt = null) =>
+        PleasanterSsoClaims.Create(
+            new PleasanterIdentity(1, userId, "admin", null),
+            verifiedAt ?? DateTimeOffset.UtcNow.AddHours(-1));
+
+    private static Action<IServiceCollection> Pleasanter(PleasanterSessionResult result) =>
+        services => services
+            .AddSingleton<IPleasanterSsoOptionsProvider>(new StaticPleasanterSsoOptionsProvider(
+                new PleasanterSsoOptions
+                {
+                    Enabled = true,
+                    InternalBaseUrl = new Uri("http://pleasanter/"),
+                    LoginUrl = "/users/login",
+                }))
+            .AddSingleton<IPleasanterSessionVerifier>(new FakePleasanterSessionVerifier(result))
+            .AddSingleton<PleasanterSsoSessionRevalidator>();
+
+    [Fact]
+    public async Task Pleasanterで同じ人のままならセッションを残す()
+    {
+        var (context, auth) = await ValidateAsync(
+            User(),
+            Principal(AdminUserId, extraClaims: PleasanterClaims()),
+            Pleasanter(new PleasanterSessionResult(
+                PleasanterSessionStatus.Authenticated,
+                new PleasanterIdentity(1, 7, "admin", null))));
+
+        Assert.NotNull(context.Principal);
+        Assert.Empty(auth.SignedOutSchemes);
+    }
+
+    [Fact]
+    public async Task Pleasanterでログアウトしていれば本アプリからも落とす()
+    {
+        var (context, auth) = await ValidateAsync(
+            User(),
+            Principal(AdminUserId, extraClaims: PleasanterClaims()),
+            Pleasanter(PleasanterSessionResult.Unauthenticated("http-401")));
+
+        Assert.Null(context.Principal);
+        Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+        Assert.Null(context.HttpContext.Items[PleasanterSsoSessionRevalidator.UpstreamErrorItemKey]);
+
+        // **セッションも消す。** cookie だけ消してストアに残すと、一覧に生きたまま出る
+        var store = context.HttpContext.RequestServices.GetRequiredService<IAdminSessionStore>();
+        Assert.Empty(await store.ListAsync(AdminUserId));
+    }
+
+    [Fact]
+    public async Task Pleasanterに問い合わせられなければ落として503の印を付ける()
+    {
+        var (context, auth) = await ValidateAsync(
+            User(),
+            Principal(AdminUserId, extraClaims: PleasanterClaims()),
+            Pleasanter(PleasanterSessionResult.Error("timeout")));
+
+        Assert.Null(context.Principal);
+        Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+        Assert.Equal(true, context.HttpContext.Items[PleasanterSsoSessionRevalidator.UpstreamErrorItemKey]);
+    }
+
+    [Fact]
+    public async Task 合言葉で入ったセッションはPleasanterに問い合わせない()
+    {
+        var verifier = new FakePleasanterSessionVerifier(PleasanterSessionResult.Error("unused"));
+        var (context, _) = await ValidateAsync(
+            User(),
+            Principal(AdminUserId),
+            services => services
+                .AddSingleton<IPleasanterSsoOptionsProvider>(
+                    new StaticPleasanterSsoOptionsProvider(new PleasanterSsoOptions()))
+                .AddSingleton<IPleasanterSessionVerifier>(verifier)
+                .AddSingleton<PleasanterSsoSessionRevalidator>());
+
+        Assert.NotNull(context.Principal);
+        Assert.Equal(0, verifier.Calls);
     }
 }

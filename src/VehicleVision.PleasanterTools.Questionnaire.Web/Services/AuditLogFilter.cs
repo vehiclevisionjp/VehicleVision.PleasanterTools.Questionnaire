@@ -73,6 +73,12 @@ public sealed partial class AuditLogFilter(
 
         var result = await next(context).ConfigureAwait(false);
 
+        // **入口が「何も起きなかった」と明示したものは残さない**（AuditNotes.Skip）
+        if (AuditNotes.ShouldSkip(http))
+        {
+            return result;
+        }
+
         // **記録が失敗しても操作は通す。** 操作はもう済んでおり、
         // ここで例外にすると「通ったのに失敗と伝える」ことになる
         try

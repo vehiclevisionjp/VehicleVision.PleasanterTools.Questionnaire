@@ -33,7 +33,18 @@ internal static class E2EDatabase
         }
     }
 
-    public static string AppConnectionString => Provider switch
+    /// <summary>本アプリ（HTTP で当てる側）の DB。</summary>
+    /// <remarks>
+    /// **<c>QUESTIONNAIRE_E2E_APP_CONNECTIONSTRING</c> があればそれを使う。**
+    /// 手元で本アプリを <c>dotnet run</c> で別の DB へ向けて動かし、そこへ当てるときのため。
+    /// CI は設定しない（compose の既定の DB を使う）。
+    /// </remarks>
+    public static string AppConnectionString =>
+        Environment.GetEnvironmentVariable("QUESTIONNAIRE_E2E_APP_CONNECTIONSTRING") is { Length: > 0 } overridden
+            ? overridden
+            : DefaultAppConnectionString;
+
+    private static string DefaultAppConnectionString => Provider switch
     {
         DatabaseProvider.SqlServer =>
             $"Server=localhost,11433;Database=Questionnaire;UID=sa;Password={Password};TrustServerCertificate=True",
