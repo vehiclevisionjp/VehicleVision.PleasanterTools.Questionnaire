@@ -709,6 +709,8 @@ export const es: Partial<Record<MessageKey, string>> = {
   "notifications.kind.ResponseLimitReached": "La recepción se detuvo porque se alcanzó el límite de respuestas",
   "notifications.kind.MailDeadLettered": "No se pudo entregar un correo y está retenido",
   "notifications.kind.ResponseReceived": "Se recibieron respuestas nuevas",
+  "notifications.kind.ClamAvUnavailable": "El análisis de ClamAV no está disponible",
+  "notifications.kind.ClamAvRecovered": "El análisis de ClamAV se ha restablecido",
   "notifications.kind.Unknown": "Notificación desconocida",
 
   // ---- 分岐（ジャンプ） ---------------------------------------------------

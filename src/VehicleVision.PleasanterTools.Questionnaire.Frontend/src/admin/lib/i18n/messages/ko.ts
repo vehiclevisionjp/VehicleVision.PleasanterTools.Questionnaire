@@ -665,6 +665,8 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'notifications.kind.ResponseLimitReached': '답변 수의 상한에 도달했기 때문에 접수를 중지했습니다.',
   'notifications.kind.MailDeadLettered': '메일을 보낼 수 없어 보류했습니다.',
   'notifications.kind.ResponseReceived': '새로운 답변이 도착했습니다.',
+  "notifications.kind.ClamAvUnavailable": "ClamAV 검사를 사용할 수 없습니다",
+  "notifications.kind.ClamAvRecovered": "ClamAV 검사가 복구되었습니다",
   'notifications.kind.Unknown': '알 수 없는 알림',
   'branching.choiceNext': '선택했을 때의 목적지',
   'branching.pageNext': '이 페이지를 마치면',

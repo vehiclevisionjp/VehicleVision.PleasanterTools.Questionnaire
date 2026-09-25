@@ -671,6 +671,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   "notifications.kind.ResponseLimitReached": "Aufnahme gestoppt, weil das Ansprechlimit erreicht wurde",
   "notifications.kind.MailDeadLettered": "Eine E-Mail konnte nicht zugestellt werden und ist auf Eis gelegt",
   "notifications.kind.ResponseReceived": "Neue Antworten gingen ein",
+  "notifications.kind.ClamAvUnavailable": "ClamAV-Prüfung ist nicht verfügbar",
+  "notifications.kind.ClamAvRecovered": "ClamAV-Prüfung ist wieder verfügbar",
   "notifications.kind.Unknown": "Unbekannte Meldung",
   "branching.choiceNext": "Wohin diese Wahl geht",
   "branching.pageNext": "Wenn diese Seite fertig ist",
