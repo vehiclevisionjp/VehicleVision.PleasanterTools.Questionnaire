@@ -52,6 +52,12 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 
 ## 環境変数
 
+主なものだけを並べる。**全件と既定値・読む場所は
+[`_documents/設定パラメータ一覧.md`](../../_documents/設定パラメータ一覧.md)。**
+v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasanter のログイン（`QUESTIONNAIRE_PLEASANTERSSO_*`）は
+[`_documents/サブパス配置-運用手順書.md`](../../_documents/サブパス配置-運用手順書.md) と
+[`_documents/Pleasanter-SSO-運用手順書.md`](../../_documents/Pleasanter-SSO-運用手順書.md) を参照。
+
 | 変数 | 内容 |
 |---|---|
 | `QUESTIONNAIRE_DB_PROVIDER` | `SqlServer` / `PostgreSql` / `MySql` / `Sqlite`。`Sqlite` は簡易セットアップ・デバッグ専用 |

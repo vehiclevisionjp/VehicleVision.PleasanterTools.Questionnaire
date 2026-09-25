@@ -11,7 +11,7 @@
 - 保存先: `src/VehicleVision.PleasanterTools.Questionnaire.Data/SamlSettingStore.cs`、
   `Migrations/M0024_SamlSettings.cs`
 - 使っているライブラリ: [ITfoxtec.Identity.Saml2](https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2)
-  4.20.1（BSD-3-Clause。2026-09-09 参照）
+  4.21.0（BSD-3-Clause。版は `Web` の `.csproj` と [`NOTICE`](../NOTICE)。2026-09-25 参照）
 
 > **往復は CI で毎回確かめています**（Issue #190）。検証用の IdP（Keycloak）を
 > `compose.yaml` の `saml` プロファイルで起こし、`SamlEndToEndTests` が
@@ -37,7 +37,7 @@
 |---|---|
 | 起点 | **SP 起動のみ**（本アプリのログイン画面の釦から始める） |
 | 要求の送り方 | HTTP Redirect Binding（`AuthnRequest`） |
-| 応答の受け方 | HTTP POST Binding（`/api/admin/saml/acs`） |
+| 応答の受け方 | HTTP POST Binding（`/api/admin/saml/acs`。サブパス配置では `/questionnaire/api/admin/saml/acs` など。4.2 節） |
 | 利用者の突き合わせ | **ログイン ID**（既定は `NameID`。属性からも取れる） |
 | 未登録の利用者 | **拒絶**（既定）か **その場で登録**（JIT）を選べる |
 | 単一ログアウト | **対応**（Issue #191）。`QUESTIONNAIRE_SAML_SINGLELOGOUTURL` を設定したときだけ使う。SP 起点・IdP 起点の両方を受ける |
@@ -83,7 +83,8 @@ sequenceDiagram
       ここを抜け道にできると、IdP から入る限り必須の設定が効かない
 - **JIT で作った利用者はパスワードを持たない。** 誰も知らない値を入れるので、
   パスワードのログインでは通らない
-- **戻り先は `/admin` の下だけ**（オープンリダイレクトにしない）
+- **戻り先は管理画面の入口（`QUESTIONNAIRE_ADMIN_PATH`。サブパス配置ではサブパス込み）の下だけ**（オープンリダイレクトにしない。
+  `Endpoints/AdminSamlEndpoints.cs` の `LocalReturnUrl`）
 - **失敗の理由は画面へ返さない。** 決まった文言を出し、詳しい理由はサーバのログと
   操作の記録（`AuditLogs`）に残す
 - **最初の管理者を作る画面には SAML の釦を出さない。**
@@ -299,7 +300,7 @@ ACS URL が正しく組み立たない（[`サブパス配置-運用手順書.md
     - **エンティティ ID** → `QUESTIONNAIRE_SAML_IDPENTITYID`
     - **証明書** をダウンロード（`.pem`）→ `QUESTIONNAIRE_SAML_IDPCERTIFICATE`
 5. **「サービス プロバイダの詳細」**へ次を入れる
-    - **ACS の URL**: `https://{本アプリのホスト}/api/admin/saml/acs`
+    - **ACS の URL**: `https://{本アプリのホスト}/api/admin/saml/acs`（サブパス配置ではサブパスを挟む。4.2 節）
     - **エンティティ ID**: `QUESTIONNAIRE_SAML_ENTITYID` と同じ値
     - **名前 ID の形式**: `EMAIL`
     - **名前 ID**: `基本情報 > メインのメール`
@@ -310,7 +311,7 @@ ACS URL が正しく組み立たない（[`サブパス配置-運用手順書.md
 
 ### 確かめること
 
-1. 管理画面（`/admin`）を開き、**「シングルサインオンでログイン」の釦が出ている**こと
+1. 管理画面（既定は `/admin`。`QUESTIONNAIRE_ADMIN_PATH` で変えていればその入口）を開き、**「シングルサインオンでログイン」の釦が出ている**こと
 2. 釦を押して Google のログインへ飛ぶこと
 3. 戻ってきて管理画面に入れること（`Reject` のときは、
    本アプリ側に同じログイン ID の管理者を先に作っておく）

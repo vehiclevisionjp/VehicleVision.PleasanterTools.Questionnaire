@@ -122,6 +122,82 @@ kubectl create secret tls questionnaire-tls \
 Production ではアプリが HTTPS へリダイレクトするため、Ingress を有効にする場合は
 host と TLS Secret の両方が必須である。
 
+### サブパス配置と Pleasanter のログイン
+
+v0.7.0 のサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と、Pleasanter のログインで管理画面へ入る機能
+（`QUESTIONNAIRE_PLEASANTERSSO_*`）は、チャート 0.2.0（v0.7.1）から values で渡せる。
+**0.1.0（v0.7.0 まで）のチャートにはこれらの値が無く、Ingress のパスも `/` 固定だった**（Issue #479）。
+
+Pleasanter のログインは、**本アプリと Pleasanter を同じホスト名に置き、本アプリをサブパスにする**ことが前提
+（[`Pleasanter-SSO-運用手順書.md`](Pleasanter-SSO-運用手順書.md) 4 章、
+[`サブパス配置-運用手順書.md`](サブパス配置-運用手順書.md)）。AKS では次の形になる。
+
+```mermaid
+flowchart LR
+    B["ブラウザ<br>https://pleasanter.example.com"] --> I["Application Routing Ingress<br>（同じホスト名）"]
+    I -->|"/questionnaire（Prefix。接頭辞を残す）"| Q["本アプリの Service<br>このチャートの Ingress"]
+    I -->|"/"| P["Pleasanter の Service<br>チャートの外の Ingress"]
+    Q -.->|"内部 URL（クラスター内）"| P
+```
+
+| 値 | 渡す環境変数 | 既定 | 内容 |
+| --- | --- | --- | --- |
+| `config.pathBase` | `QUESTIONNAIRE_PATH_BASE` | `""`（渡さない。`/` で動く） | 例 `/questionnaire`。書式はサブパス配置-運用手順書 2 章。`values.schema.json` でも書式を検査する |
+| `config.pleasanterSso.<項目>` | `QUESTIONNAIRE_PLEASANTERSSO_<項目の大文字>` | `{}`（何も渡さない。無効） | 項目は `enabled`・`internalBaseUrl`・`loginUrl`・`logoutUrl`・`cookieNames`・`unknownUser`・`registerRole`・`revalidateMinutes`・`timeoutSeconds`・`buttonLabel`。綴り違いは schema で止まる |
+| `ingress.path` | — | `""`（`config.pathBase`、それも無ければ `/`） | Ingress で本アプリへ振り分けるパス。`config.pathBase` で始まらない値は `helm template` の時点で止まる |
+| `ingress.pathType` | — | `Prefix` | `Prefix`・`Exact`・`ImplementationSpecific` |
+
+- **`config.pleasanterSso` は書いた項目だけを渡す。** 外部設定に値がある項目は管理画面から変えられなくなる
+  （Pleasanter-SSO-運用手順書 7.1）ため、既定では 1 つも渡さず、`null` と空文字も渡さない。
+  管理画面から設定する運用なら、この値は書かなくてよい。秘密を含む項目は無いので ConfigMap に載せる
+- **`internalBaseUrl` はクラスター内の Pleasanter の Service を直接指してよい**
+  （例 `http://pleasanter.pleasanter.svc.cluster.local`。Pleasanter-SSO-運用手順書 7.1）。
+  `loginUrl`・`logoutUrl` はブラウザが開くので、同じホスト名のパス（`/users/login` など）にする
+- **ConfigMap が変わると Pod を入れ替える。** サブパスなどは起動時に 1 度だけ読むため、
+  Pod テンプレートに ConfigMap の `checksum/config` 注釈を付けている（チャート 0.2.0 から）
+- **`/healthz`・`/ready` はサブパスの外でも応答する**（`DatabaseStartupMigration.IsAvailableBeforeMigration`）。
+  サブパスを設定しても probe の path は変えない
+
+Ingress について気を付けること。
+
+- **接頭辞を剥がさない。** `nginx.ingress.kubernetes.io/rewrite-target` などで `/questionnaire` を書き換えると、
+  本アプリはサブパスの外の要求として 404 を返す。`ingress.annotations` に書き換えの注釈を足さない
+- **Pleasanter の Ingress はチャートの外で、同じホスト名の `/` に用意する。** Application Routing の NGINX は
+  同じホスト名の Ingress を束ね、パスを長い順に照合する。`/questionnaire` は `/` より先に当たる
+  （ingress-nginx の Path Ordering）。Pleasanter を `/` 以外に置くと cookie が本アプリへ届かない
+- **同じホスト名のどれか 1 つの Ingress に `use-regex` か `rewrite-target` があると、そのホストの全パスが
+  大文字小文字を区別しない正規表現の照合になる**（同上）。Pleasanter の Ingress の注釈も確かめる
+- TLS Secret は Ingress と同じ Namespace に要る。Pleasanter と別の Namespace に入れるなら、同じ証明書の
+  TLS Secret を本アプリの Namespace にも作る（`ingress.tlsSecretName`）
+- `config.forwardedNetworks` の考え方は変わらない
+- **AKS の実機では未検証**（2026-09-25 時点。`helm lint`・`helm template` での描画だけを確認した）。
+  Application Routing の NGINX は 2026 年 11 月で Microsoft のサポートが終わり、後継は Gateway API である
+  （AKS Application Routing の文書）。このチャートは Ingress だけを描き、Gateway API の HTTPRoute は描かない
+
+`values-subpath-sso.example.yaml` を `values-production.example.yaml` に重ねた例。
+
+```bash
+helm template questionnaire deploy/aks/questionnaire \
+  --namespace questionnaire \
+  --values questionnaire-production.yaml \
+  --values deploy/aks/questionnaire/values-subpath-sso.example.yaml
+```
+
+```yaml
+# 描画結果の抜粋（ConfigMap）
+  QUESTIONNAIRE_PATH_BASE: "/questionnaire"
+  QUESTIONNAIRE_PLEASANTERSSO_ENABLED: "true"
+  QUESTIONNAIRE_PLEASANTERSSO_INTERNALBASEURL: "http://pleasanter.pleasanter.svc.cluster.local"
+  QUESTIONNAIRE_PLEASANTERSSO_LOGINURL: "/users/login"
+  QUESTIONNAIRE_PLEASANTERSSO_LOGOUTURL: "/users/logout"
+# 描画結果の抜粋（Ingress）
+    - host: "pleasanter.example.com"
+      http:
+        paths:
+          - path: "/questionnaire"
+            pathType: Prefix
+```
+
 ## イメージを ACR へ発行する
 
 `.github/workflows/aks-image.yml` を手動実行する。GitHub Environment
@@ -171,7 +247,29 @@ helm upgrade --install questionnaire deploy/aks/questionnaire \
 
 Helm の `pre-install` hook がマイグレーション Job を1 Podだけ起動し、成功してから
 Deployment を作る。DB 接続に失敗するかマイグレーションに失敗した場合、導入は止まる。
-各アプリ Pod でマイグレーションを実行しないため、スケールアウト時に競合しない。
+アプリ Pod の起動時の自動適用（`QUESTIONNAIRE_DB_AUTO_MIGRATE`）は v0.5.0 から既定で有効である。
+チャートは既定ではこの値を渡さず、アプリの既定（有効）に従う。hook が先に当て終えているので、
+Pod は未適用が無いことを確かめるだけで起動する。複数 Pod が同時に起動しても DB の排他で 1 つずつ処理するため、
+スケールアウト時に競合しない（[`導入-更新運用手順書.md`](導入-更新運用手順書.md) 3.3）。
+
+| 値 | 渡す環境変数 | 既定 | 内容 |
+| --- | --- | --- | --- |
+| `migration.autoMigrateOnStartup` | `QUESTIONNAIRE_DB_AUTO_MIGRATE` | `null`（渡さない。アプリの既定の `true`） | `false` で Pod 起動時の自動適用を止め、未適用があれば起動を止める |
+| `migration.startupLockTimeoutSeconds` | `QUESTIONNAIRE_DB_MIGRATION_LOCK_TIMEOUT_SECONDS` | `null`（渡さない。アプリの既定の `300`） | Pod 起動時の自動適用で DB の排他を待つ上限秒 |
+
+**既定を「渡さない（有効）」にした理由。** hook Job が先に適用するので、有効のままでも Pod は確かめるだけで、
+余分なスキーマ変更は起きない。一方で hook を通らない経路（`kubectl set image` で直接イメージを変えた場合など）でも
+Pod が自分で追いつける。複数 Pod の同時起動は DB の排他（`DatabaseMigrationLock`）で直列になり、
+待つ上限が `startupLockTimeoutSeconds` である。待つ間も `/healthz` は応答し、`/ready` は 503 を返すので、
+startupProbe で落とされずに Ready を待つ。
+
+アプリ用の DB アカウントからスキーマ変更の権限を外す場合は `migration.autoMigrateOnStartup: false` にする。
+**ただし hook Job も同じ Secret の `QUESTIONNAIRE_DB_CONNECTIONSTRING` を使う**ので、チャートだけでは
+Job と Pod の権限を分けられない。分けるなら、導入-更新運用手順書 3.3 の手動コマンドを別の資格情報で流す運用をチャートの外で組む。
+
+> 0.1.0 のチャートの手順書は、`QUESTIONNAIRE_DB_AUTO_MIGRATE=false` を事前作成した Secret に入れるよう
+> 案内していた。Secret と ConfigMap に同じ鍵があると、`envFrom` で後に並ぶ Secret が勝つ
+> （`templates/deployment.yaml`）。values へ移したら Secret からは消す。
 
 確認する。
 
@@ -186,6 +284,9 @@ kubectl rollout status deployment/questionnaire-questionnaire \
 curl --fail https://questionnaire.example.com/healthz
 curl --fail https://questionnaire.example.com/ready
 ```
+
+サブパスに置いた場合は、同じホスト名の `/healthz` が Pleasanter へ振り分けられるので、
+`https://pleasanter.example.com/questionnaire/healthz` と `/questionnaire/ready` で確かめる。
 
 リソース名は release 名と chart 名から作る。`questionnaire` 以外の release 名を使った場合は
 `kubectl get` で実名を確認する。
@@ -279,3 +380,10 @@ kubectl get events --namespace questionnaire --sort-by=.lastTimestamp
 - [ACR Tasks の概要](https://learn.microsoft.com/azure/container-registry/container-registry-tasks-overview)
 - [GitHub Actions から Azure への OpenID Connect](https://learn.microsoft.com/azure/developer/github/connect-from-azure-openid-connect)
 - [Helm chart hook](https://helm.sh/docs/topics/charts_hooks/)
+
+2026-09-25 参照。
+
+- [ingress-nginx: Path Ordering and Matching](https://kubernetes.github.io/ingress-nginx/user-guide/ingress-path-matching/)
+  — パスを長い順に並べる。同じホストの Ingress の `use-regex`・`rewrite-target` は全パスに効く
+- [AKS Application Routing（NGINX）](https://learn.microsoft.com/azure/aks/app-routing)
+  — NGINX のアドオンへの Microsoft のサポートは 2026 年 11 月まで。後継は Gateway API

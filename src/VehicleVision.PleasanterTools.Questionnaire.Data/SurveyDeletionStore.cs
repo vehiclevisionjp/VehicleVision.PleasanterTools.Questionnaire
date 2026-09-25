@@ -167,6 +167,10 @@ public sealed class SurveyDeletionStore(
             "AttachmentRejections",
             "SurveyAssets",
             "AdminNotifications",
+            // **回答通知メールの集約も消す**（Issue #480）。残すと、24 時間枠の途中で
+            // 消したアンケートについて「削除されたアンケート」宛の通知メールが後から積まれ、
+            // 件数と時刻も完全削除後に残り続ける
+            "ResponseNotificationDigests",
             "AssetTickets",
             "AssetHistoryOutbox",
             "ResponseEditTokens",

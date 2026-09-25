@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Base32（RFC 4648）を復号する。
@@ -38,6 +39,12 @@ function decodeBase32(input: string): Buffer {
  * 製品のコードではない。
  */
 export function totp(secretBase32: string, at: Date = new Date()): string {
+  // **空の共有鍵を黙って通さない。** 空の鍵でも HMAC は計算できてしまい、
+  // 「コードが一致しません」という別の症状になって原因が見えなくなる（Issue #484）
+  if (secretBase32.trim() === '') {
+    throw new Error('共有鍵が空のまま 6 桁のコードを作ろうとした。画面に共有鍵が出る前に読んでいないか確かめること');
+  }
+
   const step = Math.floor(at.getTime() / 1000 / 30);
 
   const counter = Buffer.alloc(8);
@@ -72,4 +79,19 @@ export async function totpInNewWindow(secretBase32: string, usedAt: Date): Promi
 
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
+}
+
+/**
+ * 2 要素の登録画面に出た共有鍵を読む。
+ *
+ * ⚠️ **見出しが出た時点では、共有鍵はまだ空。** 登録画面は出てから
+ * `/api/admin/enroll/begin` を呼び、応答が返ってから共有鍵を描く（`EnrollPanel.svelte`）。
+ * 見出しを待っただけで読むと空の文字列を拾い、登録が「コードが一致しません」で断られる
+ * （Issue #484。応答が遅れた回だけ落ちる）。**共有鍵が描かれるまで待ってから読む。**
+ */
+export async function readEnrollmentSecret(page: Page): Promise<string> {
+  const code = page.locator('.secret code');
+  // **Base32 の文字が描かれるまで待つ。** 固定の時間は待たない
+  await expect(code).toHaveText(/[A-Z2-7]{4}/, { timeout: 15_000 });
+  return (await code.innerText()).replace(/\s/g, '');
 }

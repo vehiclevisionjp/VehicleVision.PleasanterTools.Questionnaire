@@ -11,6 +11,7 @@ Playwright を入れずに済む。
 ⚠️ **検証環境専用。** 自己署名の証明書を確かめずに繋ぐので、本番へ向けて使わないこと。
 """
 import http.cookiejar
+import os
 import re
 import ssl
 import sys
@@ -18,7 +19,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-APP = "https://localhost:8443"
+# **サブパス配置を試すときは DEV_PATH_BASE に合わせる**（例: /questionnaire）。
+# compose.yaml と同じ変数名にしてある。Git Bash では MSYS_NO_PATHCONV=1 を付けること
+# （付けないと /questionnaire が C:/Program Files/Git/questionnaire に書き換わる）
+APP = "https://localhost:8443" + os.environ.get("DEV_PATH_BASE", "").rstrip("/")
 CTX = ssl._create_unverified_context()  # 開発用の自己署名証明書
 
 

@@ -1,0 +1,18 @@
+# Pleasanter と同じホスト名のサブパス（/questionnaire/）に置き、Pleasanter のログインで管理画面へ入る例。
+# values-production.example.yaml に重ねて使う（helm の --values を 2 つ並べる）。
+# Pleasanter 側の Ingress は同じホスト名の / へ振り分けること（このチャートの外で用意する）。
+config:
+  pathBase: /questionnaire
+  pleasanterSso:
+    enabled: true
+    # 本アプリの Pod から Pleasanter へ直接届く URL（クラスター内の Service でよい）。
+    internalBaseUrl: http://pleasanter.pleasanter.svc.cluster.local
+    # ブラウザが開く URL。同じホスト名の Pleasanter のログイン画面。
+    loginUrl: /users/login
+    logoutUrl: /users/logout
+
+ingress:
+  enabled: true
+  # Pleasanter と同じホスト名にする。
+  host: pleasanter.example.com
+  # path は空のまま（config.pathBase の /questionnaire が使われる）。接頭辞は剥がさない。

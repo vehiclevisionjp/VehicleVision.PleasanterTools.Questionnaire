@@ -19,8 +19,8 @@ spec:
     - host: {{ .Values.ingress.host | quote }}
       http:
         paths:
-          - path: /
-            pathType: Prefix
+          - path: {{ include "questionnaire.ingressPath" . | quote }}
+            pathType: {{ .Values.ingress.pathType }}
             backend:
               service:
                 name: {{ include "questionnaire.fullname" . }}

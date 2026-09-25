@@ -367,9 +367,10 @@ public static class ServerMessages
             [ServerMessageKeys.DeadLetterNotFound] = "Diese Antwort wurde nicht gefunden. Sie wurde möglicherweise bereits zurückgestellt oder bereits gesendet.",
         };
 
-        // **2 言語ぶんの書き方は残す。** 既存の 46 件を書き換えない
+        // **2 言語ぶんの書き方は残す。** 既存の Add 呼び出しを書き換えない
         // ⚠️ **3 言語目からは言語ごとの辞書で足すこと。**
-        // 引数を増やしていくと、**言語が 1 つ増えるたびに 67 か所すべてを書き換える**ことになり、
+        // 引数を増やしていくと、**言語が 1 つ増えるたびに Add 呼び出しのすべて**
+        // （2026-09-25 時点で 67 か所）**を書き換える**ことになり、
         // 言語ごとに分けて進めている作業が必ずぶつかる。
         var byOtherLanguage = new Dictionary<string, IReadOnlyDictionary<string, string>>(
             StringComparer.Ordinal)

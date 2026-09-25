@@ -13,6 +13,15 @@ config:
   pleasanterUrl: ""
   timezone: Asia/Tokyo
   forwardedNetworks: []
+  # サブパス配置（QUESTIONNAIRE_PATH_BASE）。例: /questionnaire。
+  # 空なら渡さず、従来どおり根（/）で動く。変えたら ingress.path も合わせる（空なら自動で合う）。
+  pathBase: ""
+  # Pleasanter のログインで管理画面へ入る機能（QUESTIONNAIRE_PLEASANTERSSO_*）。
+  # 書いた項目だけを環境変数として渡す。渡した項目は管理画面から変えられなくなる（外部設定が勝つ）。
+  # 既定は何も渡さない（無効のまま。管理画面から設定できる）。秘密を含む項目は無い。
+  # 書ける項目: enabled / internalBaseUrl / loginUrl / logoutUrl / cookieNames /
+  #   unknownUser / registerRole / revalidateMinutes / timeoutSeconds / buttonLabel
+  pleasanterSso: {}
 
 serviceAccount:
   annotations: {}
@@ -25,6 +34,10 @@ ingress:
   className: webapprouting.kubernetes.azure.com
   annotations: {}
   host: ""
+  # Ingress で本アプリへ振り分けるパス。空なら config.pathBase（未設定なら /）を使う。
+  # 接頭辞は剥がさずに本アプリへ渡すこと（rewrite-target 等で書き換えない）。
+  path: ""
+  pathType: Prefix
   tlsSecretName: ""
 
 resources:
@@ -54,3 +67,9 @@ migration:
   waitSeconds: 180
   activeDeadlineSeconds: 300
   backoffLimit: 2
+  # Pod 起動時の自動適用（QUESTIONNAIRE_DB_AUTO_MIGRATE）。null なら渡さず、アプリの既定（true）に従う。
+  # 上の hook Job が先に適用し終えるので、既定のままでも Pod は未適用が無いことを確かめるだけになる。
+  autoMigrateOnStartup: null
+  # 起動時の自動適用で DB の排他を待つ上限秒（QUESTIONNAIRE_DB_MIGRATION_LOCK_TIMEOUT_SECONDS）。
+  # null なら渡さず、アプリの既定（300）に従う。
+  startupLockTimeoutSeconds: null

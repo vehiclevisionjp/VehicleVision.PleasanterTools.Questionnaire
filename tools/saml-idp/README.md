@@ -23,6 +23,28 @@ DEV_SAML_ENABLED=true docker compose --profile sqlserver --profile saml up -d --
 | IdP のログイン | `https://localhost:8543/realms/questionnaire/` |
 | IdP の管理画面 | `https://localhost:8543/admin/`（`admin` / `idp-test-admin`） |
 
+### サブパス配置で試すとき
+
+realm の `redirectUris` には、根の URL に加えて **`/questionnaire` 配下の ACS・SLO も登録してある**
+（Issue #480）。本アプリは ACS URL を要求の PathBase から組み立てて AuthnRequest に載せ、
+Keycloak はそれを `redirectUris` と照合する。**登録の無いサブパスはログイン画面を出さずに拒否される。**
+`roundtrip.py` の起点も `DEV_PATH_BASE` に合わせる。
+
+```bash
+MSYS_NO_PATHCONV=1 DEV_PATH_BASE=/questionnaire DEV_SAML_ENABLED=true \
+    docker compose --profile sqlserver --profile saml up -d --wait
+MSYS_NO_PATHCONV=1 DEV_PATH_BASE=/questionnaire \
+    python tools/saml-idp/roundtrip.py admin@example.jp idp-test-password
+```
+
+- **`/questionnaire` 以外のサブパスは登録していない。** 使うなら realm の `redirectUris` へ足す
+- ⚠️ **単一ログアウト（SLO）は根の URL のまま。** IdP から送る先
+  （`saml_single_logout_service_url_*`）は 1 つしか持てないため、サブパスでは SLO が往復しない
+- 確かめた範囲（2026-09-25）: Keycloak 26.7.3 を単体で起こし、ACS に
+  `https://localhost:8443/questionnaire/api/admin/saml/acs` を載せた AuthnRequest で
+  ログインし、その URL へ SAMLResponse を返すことを確認した。未登録のサブパスは拒否された。
+  **本アプリと組み合わせた往復（`roundtrip.py`）は未確認**
+
 ## 用意してある利用者
 
 | 利用者 | パスワード | 用途 |

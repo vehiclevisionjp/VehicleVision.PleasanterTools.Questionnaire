@@ -18,7 +18,18 @@ extract_rules() {
         inhdr                     { next }
         /^<!-- AGENT-RULES:END/   { body = 0; next }
         body                      { print }
-    ' "$SRC" | sed 's|(\.\./_reference/README\.md)|(_reference/README.md)|'
+    ' "$SRC" | rebase_links
+}
+
+# 相対リンクを AGENTS.md（リポジトリ直下）から見た位置へ書き換える。
+# 参照元は .github/ にあるため、`../NOTICE` は `NOTICE` に、
+# `instructions/x.md` は `.github/instructions/x.md` にしないと壊れる（Issue #480）。
+# 1. スキーム（`:` を含む）・絶対パス・アンカーを除く相対リンクへ `.github/` を前置する
+# 2. `.github/../` を打ち消す
+rebase_links() {
+    sed -E \
+        -e 's#\]\(([^)/:#][^):]*)\)#](.github/\1)#g' \
+        -e 's#\]\(\.github/\.\./#](#g'
 }
 
 build() {
