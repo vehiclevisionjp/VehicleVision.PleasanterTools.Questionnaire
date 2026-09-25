@@ -106,6 +106,8 @@
     switch (reason) {
       case 'unknown-user':
         return t('signIn.pleasanterError.unknownUser');
+      case 'not-allowed':
+        return t('signIn.pleasanterError.notAllowed');
       case 'disabled':
         return t('signIn.pleasanterError.disabled');
       case 'setup-required':

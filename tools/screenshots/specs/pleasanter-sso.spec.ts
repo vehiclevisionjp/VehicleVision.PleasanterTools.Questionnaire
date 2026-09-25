@@ -117,6 +117,7 @@ test('設定画面から Pleasanter のログインを有効にする', async ({
     await page.getByLabel('Pleasanter の内部 URL').fill(`http://${pleasanterHost}:${pleasanterPort}/`);
     await page.getByLabel('Pleasanter のログイン画面').fill(`${browserPleasanterUrl}/users/login`);
     // **往復で使う利用者は本アプリに居ないので、その場で登録させる**（役割は既定の編集者）
+    await page.getByLabel('許可する組織 ID').fill('5051');
     await page.getByLabel('未登録の利用者').selectOption('Register');
     await page.getByLabel('その場で登録するときの役割').selectOption('Editor');
 
@@ -129,6 +130,7 @@ test('設定画面から Pleasanter のログインを有効にする', async ({
     const saved = (await (await context.request.get(settingsPath)).json()) as Record<string, unknown>;
     expect(saved['enabled']).toBe(true);
     expect(saved['unknownUser']).toBe('Register');
+    expect(saved['allowedDeptIds']).toBe('5051');
   } finally {
     await context.close();
   }

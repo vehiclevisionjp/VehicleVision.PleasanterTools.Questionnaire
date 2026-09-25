@@ -9,6 +9,33 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 /// <summary>Pleasanter のログインで入る設定の読み取り（Issue #464）。</summary>
 public class PleasanterSsoOptionsTests
 {
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("abc")]
+    [InlineData("1,a")]
+    [InlineData("1 2")]
+    [InlineData(",,,")]
+    [InlineData("2147483648")]
+    public void 所属の不正なIDを黙って無制限にしない(string value)
+    {
+        foreach (var key in new[] { PleasanterSsoOptions.AllowedDeptIdsKey, PleasanterSsoOptions.AllowedGroupIdsKey })
+        {
+            Assert.Throws<InvalidOperationException>(() => PleasanterSsoOptions.FromValues(k => k == key ? value : null));
+        }
+    }
+
+    [Fact]
+    public void 所属のIDはカンマか改行で読み重複は取り除く()
+    {
+        var options = PleasanterSsoOptions.FromValues(k => k == PleasanterSsoOptions.AllowedDeptIdsKey ? " 10,20\n10 " : null);
+        Assert.Equal([10, 20], options.AllowedDeptIds.ToArray());
+        Assert.True(options.HasMembershipRestriction);
+        Assert.False(PleasanterSsoOptions.FromValues(_ => null).HasMembershipRestriction);
+        Assert.Throws<InvalidOperationException>(() => PleasanterSsoOptions.FromValues(k =>
+            k == PleasanterSsoOptions.AllowedGroupIdsKey ? string.Join(',', Enumerable.Range(1, 65)) : null));
+    }
+
     private static PleasanterSsoOptions Read(Dictionary<string, string?> values) =>
         PleasanterSsoOptions.FromValues(key => values.GetValueOrDefault(key));
 
@@ -223,6 +250,24 @@ public class PleasanterSsoOptionsProviderTests
 
         Assert.Equal("http://kept/", store.Values.InternalBaseUrl);
         Assert.Equal("true", store.Values.Enabled);
+    }
+
+    [Fact]
+    public async Task 所属の設定も外部優先で保存とプレビューに反映する()
+    {
+        var store = new FakeStore(new PleasanterSsoSettingValues { AllowedDeptIds = "10", AllowedGroupIds = "20" });
+        var provider = Create(new() { [PleasanterSsoOptions.AllowedDeptIdsKey] = "30" }, store);
+        var request = new PleasanterSsoSettingValues { AllowedDeptIds = "40", AllowedGroupIds = "50" };
+        var preview = await provider.PreviewAsync(request, forceEnabled: false);
+        Assert.Equal([30], preview.Options.AllowedDeptIds.ToArray());
+        Assert.Equal([50], preview.Options.AllowedGroupIds.ToArray());
+        Assert.Equal("20", store.Values.AllowedGroupIds);
+        var saved = await provider.SaveAsync(request);
+        Assert.Contains(PleasanterSsoOptions.AllowedDeptIdsKey, saved.FixedKeys);
+        Assert.Equal("10", store.Values.AllowedDeptIds);
+        Assert.Equal("50", store.Values.AllowedGroupIds);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.SaveAsync(request with { AllowedGroupIds = "broken" }));
+        Assert.Equal("50", store.Values.AllowedGroupIds);
     }
 
     [Fact]

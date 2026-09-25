@@ -35,6 +35,8 @@ public enum PleasanterSsoUnknownUserPolicy
 /// </remarks>
 public sealed class PleasanterSsoOptions
 {
+    public const string AllowedDeptIdsKey = "QUESTIONNAIRE_PLEASANTERSSO_ALLOWEDDEPTIDS";
+    public const string AllowedGroupIdsKey = "QUESTIONNAIRE_PLEASANTERSSO_ALLOWEDGROUPIDS";
     public const string EnabledKey = "QUESTIONNAIRE_PLEASANTERSSO_ENABLED";
     public const string InternalBaseUrlKey = "QUESTIONNAIRE_PLEASANTERSSO_INTERNALBASEURL";
     public const string LoginUrlKey = "QUESTIONNAIRE_PLEASANTERSSO_LOGINURL";
@@ -69,6 +71,13 @@ public sealed class PleasanterSsoOptions
     /// </remarks>
     public const string OwnCookiePrefix = "q.";
 
+    /// <summary>許可する組織・グループの ID。どちらかに所属していれば許可する。</summary>
+    public ImmutableArray<int> AllowedDeptIds { get; init; } = [];
+
+    public ImmutableArray<int> AllowedGroupIds { get; init; } = [];
+
+    public bool HasMembershipRestriction => !AllowedDeptIds.IsDefaultOrEmpty || !AllowedGroupIds.IsDefaultOrEmpty;
+
     /// <summary>Pleasanter のログインを使うか。**既定は使わない。**</summary>
     public bool Enabled { get; init; }
 
@@ -97,7 +106,7 @@ public sealed class PleasanterSsoOptions
     /// <summary>JIT で作る利用者の役割。**既定は <see cref="AdminRole.Editor"/>。**</summary>
     /// <remarks>
     /// ⚠️ **ここを <see cref="AdminRole.Administrator"/> にすると、
-    /// Pleasanter に居る全員が全権を持つ。**
+    /// 許可した組織・グループの利用者が全権を持つ。**
     /// </remarks>
     public AdminRole RegisterRole { get; init; } = AdminRole.Editor;
 
@@ -181,6 +190,8 @@ public sealed class PleasanterSsoOptions
         return new PleasanterSsoOptions
         {
             Enabled = enabled,
+            AllowedDeptIds = ParseAllowedIds(valueOf(AllowedDeptIdsKey), AllowedDeptIdsKey),
+            AllowedGroupIds = ParseAllowedIds(valueOf(AllowedGroupIdsKey), AllowedGroupIdsKey),
             InternalBaseUrl = internalUri,
             LoginUrl = loginUrl,
             LogoutUrl = logoutUrl,
@@ -289,6 +300,37 @@ public sealed class PleasanterSsoOptions
             throw new InvalidOperationException(
                 $"{key} は / で始まる同じホストのパスか、http(s) の絶対 URL で書いてください: {value}");
         }
+    }
+
+    /// <summary>正の ID をカンマまたは改行で区切る。誤記を空の許可リストに変換しない。</summary>
+    private static ImmutableArray<int> ParseAllowedIds(string? raw, string key)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return [];
+        }
+
+        var parts = raw.Split([',', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (raw.Length > 1024 || parts.Length is 0 or > 64)
+        {
+            throw new InvalidOperationException($"{key} は正の ID を 64 件以内、1024 文字以内で指定してください。");
+        }
+
+        var ids = ImmutableArray.CreateBuilder<int>();
+        foreach (var part in parts)
+        {
+            if (!int.TryParse(part, NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= 0)
+            {
+                throw new InvalidOperationException($"{key} は正の ID をカンマか改行で区切って指定してください。");
+            }
+
+            if (!ids.Contains(id))
+            {
+                ids.Add(id);
+            }
+        }
+
+        return ids.ToImmutable();
     }
 
     private static string Trim(string? value) => value?.Trim() ?? string.Empty;

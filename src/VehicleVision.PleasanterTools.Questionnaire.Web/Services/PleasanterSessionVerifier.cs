@@ -18,6 +18,9 @@ public enum PleasanterSessionStatus
     /// <summary>Pleasanter にログインしていない。</summary>
     Unauthenticated,
 
+    /// <summary>本人だが、許可した組織・グループに所属していない。</summary>
+    NotAllowed,
+
     /// <summary>
     /// 問い合わせが成り立たなかった（接続できない・時間切れ・想定外の応答）。
     /// **成功とは決して扱わない。**
@@ -26,7 +29,7 @@ public enum PleasanterSessionStatus
 }
 
 /// <summary>Pleasanter が返した本人。</summary>
-public sealed record PleasanterIdentity(int TenantId, int UserId, string LoginId, string? Name);
+public sealed record PleasanterIdentity(int TenantId, int UserId, string LoginId, string? Name, int? DeptId = null);
 
 /// <summary>Pleasanter へ問い合わせた結果。</summary>
 /// <param name="Reason">
@@ -85,7 +88,7 @@ public interface IPleasanterSessionVerifier
 /// 覚える設定だと、ある管理者の cookie が別の管理者の問い合わせへ混ざる。
 /// </para>
 /// </remarks>
-public sealed class PleasanterSessionVerifier(
+public sealed partial class PleasanterSessionVerifier(
     IHttpClientFactory clientFactory,
     IPleasanterOptionsProvider pleasanterOptionsProvider,
     ILogger<PleasanterSessionVerifier> logger,
@@ -142,6 +145,10 @@ public sealed class PleasanterSessionVerifier(
         try
         {
             result = await VerifyOwnUserAsync(options, cookieHeader, timeout.Token).ConfigureAwait(false);
+            if (result.Status == PleasanterSessionStatus.Authenticated && options.HasMembershipRestriction)
+            {
+                result = await VerifyMembershipAsync(result.Identity!, options, timeout.Token).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -530,9 +537,12 @@ public sealed class PleasanterSessionVerifier(
                 ? nameElement.GetString()
                 : null;
 
+        int? deptId = row.TryGetProperty("DeptId", out var dept)
+            && dept.ValueKind == JsonValueKind.Number && dept.TryGetInt32(out var id) && id >= 0 ? id : null;
+
         return new PleasanterSessionResult(
             PleasanterSessionStatus.Authenticated,
-            new PleasanterIdentity(tenantId, userId, loginIdElement.GetString()!.Trim(), name));
+            new PleasanterIdentity(tenantId, userId, loginIdElement.GetString()!.Trim(), name, deptId));
     }
 
     private static bool TryGetObject(JsonElement element, string name, out JsonElement value) =>
@@ -559,6 +569,9 @@ public sealed class PleasanterSessionVerifier(
                     result.Identity!.TenantId,
                     result.Identity.UserId,
                     elapsedMs);
+                break;
+            case PleasanterSessionStatus.NotAllowed:
+                logger.LogInformation("Pleasanter SSO の許可した所属に該当しないため拒否しました（{Reason}）。", result.Reason);
                 break;
             case PleasanterSessionStatus.Unauthenticated:
                 logger.LogInformation(

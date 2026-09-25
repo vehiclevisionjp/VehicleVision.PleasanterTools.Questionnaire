@@ -20,6 +20,9 @@ public enum PleasanterSsoSignInOutcome
 
     /// <summary>止められている利用者。</summary>
     Disabled,
+
+    /// <summary>許可する所属を設定していないため自動登録しない。</summary>
+    NotAllowed,
 }
 
 /// <summary>Pleasanter から来た利用者の扱いの結果。</summary>
@@ -70,6 +73,12 @@ public sealed class PleasanterSsoAuthenticator(
                     "Pleasanter から来た利用者 {LoginId} は本アプリに居ないため通しませんでした。",
                     LogSafe.Text(trimmed));
                 return new PleasanterSsoSignInResult(PleasanterSsoSignInOutcome.Unknown);
+            }
+
+            if (!options.HasMembershipRestriction)
+            {
+                logger.LogWarning("Pleasanter SSO の許可する所属が未設定のため自動登録を拒否しました。");
+                return new PleasanterSsoSignInResult(PleasanterSsoSignInOutcome.NotAllowed);
             }
 
             user = await RegisterAsync(trimmed, options.RegisterRole, cancellationToken)

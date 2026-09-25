@@ -52,6 +52,8 @@ public class PleasanterSsoSettingStoreTests
         var longUrl = "https://pleasanter.example.jp/" + new string('a', 2048 - 30);
         var values = new PleasanterSsoSettingValues
         {
+            AllowedDeptIds = "10,20",
+            AllowedGroupIds = "30,40",
             Enabled = "true",
             InternalBaseUrl = longUrl,
             LoginUrl = "https://pleasanter.example.jp/users/login",

@@ -85,3 +85,16 @@ WHERE NOT EXISTS (SELECT 1 FROM [Users] WHERE [LoginId] = source.[LoginId]);
 SELECT [UserId], [LoginId], [EnableSecondaryAuthentication], [PasswordExpirationTime]
 FROM [Users]
 WHERE [LoginId] IN (SELECT [LoginId] FROM @Users);
+
+-- 所属制限の試験（Issue #505）。検証用に予約した組織 ID を使い、対象外の人は未所属のまま残す。
+IF EXISTS (SELECT 1 FROM [Depts] WHERE [DeptId] = 5051 AND [DeptName] <> N'SSO E2E Allowed')
+    THROW 50001, 'Reserved SSO test department ID is already in use.', 1;
+IF NOT EXISTS (SELECT 1 FROM [Depts] WHERE [DeptId] = 5051)
+BEGIN
+    SET IDENTITY_INSERT [Depts] ON;
+    INSERT INTO [Depts] ([DeptId], [TenantId], [DeptCode], [DeptName], [Creator], [Updator])
+    VALUES (5051, @TenantId, N'sso-e2e', N'SSO E2E Allowed', 1, 1);
+    SET IDENTITY_INSERT [Depts] OFF;
+END;
+UPDATE [Users] SET [DeptId] = 5051 WHERE [LoginId] IN (N'sso-e2e-plain', N'sso-e2e-mail');
+UPDATE [Users] SET [DeptId] = 0 WHERE [LoginId] = N'sso-e2e-stranger';
