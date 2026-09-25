@@ -60,6 +60,7 @@ docker compose --profile sqlserver up -d --wait
   `_reference/` は事実確認のための参照専用
 - **依存は寛容ライセンス（MIT / BSD 系 / Apache-2.0）に限ること。**
   追加時にライセンスを**一次情報で確認**し、[`NOTICE`](NOTICE) へ追記する
+  （**フォントに限り SIL OFL 1.1 も可**。[`.github/copilot-instructions.md`](.github/copilot-instructions.md) の規約 7）
 - **Pleasanter の API キーをブラウザへ渡さないこと**
 - **コミットメッセージに `[skip ci]` を含めないこと**
 
