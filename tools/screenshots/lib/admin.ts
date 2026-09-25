@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import type { Browser } from '@playwright/test';
 import { demoAdmin } from './setup';
-import { totp } from './totp';
+import { readEnrollmentSecret, totp } from './totp';
 
 /**
  * 管理画面へログインした状態を用意する。
@@ -66,7 +66,7 @@ export async function ensureAdminStorageState(
 
     // **2 要素の登録まで通さないと管理画面へ入れない**
     await page.getByRole('heading', { name: '2 要素認証を登録する' }).waitFor();
-    const secret = (await page.locator('.secret code').innerText()).replace(/\s/g, '');
+    const secret = await readEnrollmentSecret(page);
 
     await page.getByLabel('認証アプリに表示された 6 桁のコード').fill(totp(secret));
     await page.getByRole('button', { name: '登録する' }).click();
