@@ -17,6 +17,11 @@ DEV_SAML_ENABLED=true docker compose --profile sqlserver --profile saml up -d --
 本アプリは `https://localhost:8443`、IdP は `https://localhost:8543` を使う。
 どちらも自己署名なので、ブラウザは警告を出す（「詳細設定」から進む）。
 
+⚠️ **この IdP はサブパス無しの本アプリを前提にしている。** realm の `redirectUris` は
+`https://localhost:8443/api/admin/saml/acs` などの根の URL で、`roundtrip.py` の起点（`APP`）も
+`https://localhost:8443` 固定。`DEV_PATH_BASE`（`QUESTIONNAIRE_PATH_BASE`）を設定すると ACS URL が
+`/questionnaire/api/admin/saml/acs` に変わるため、そのままでは往復できない見込み（未確認。2026-09-25）。
+
 | 役割 | URL |
 | --- | --- |
 | 管理画面 | `https://localhost:8443/admin` |
