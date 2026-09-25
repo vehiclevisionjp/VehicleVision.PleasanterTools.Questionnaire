@@ -55,6 +55,7 @@ public class SurveyDeletionStoreTests
             "AssetTickets",
             "MailOutbox",
             "AdminNotifications",
+            "ResponseNotificationDigests",
             "SurveyAssets",
             "Pages",
             "Questions",
@@ -298,6 +299,13 @@ public class SurveyDeletionStoreTests
                     + " [FirstOccurredAt], [LastOccurredAt]) "
                     + "VALUES (@Id, 0, @SurveyId, 1, @Now, @Now)",
                 new { Id = Guid.NewGuid(), SurveyId = surveyId, Now = now }),
+            (
+                // **送り残しのある集約**（Count > MailQueuedCount）。通知メールの対象に残る形
+                "INSERT INTO [ResponseNotificationDigests] "
+                    + "([SurveyId], [Count], [MailQueuedCount], [FirstOccurredAt], "
+                    + " [LastOccurredAt], [LastMailQueuedAt]) "
+                    + "VALUES (@SurveyId, 2, 1, @Now, @Now, NULL)",
+                new { SurveyId = surveyId, Now = now }),
             (
                 "INSERT INTO [SurveyAssets] "
                     + "([AssetId], [SurveyId], [ContentType], [FileName], [ByteSize], "

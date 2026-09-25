@@ -151,3 +151,8 @@ jobs:
         # タスクが壊れると F5 が通らず、開発が止まる。
         # **2 日続けて壊し、2 回とも利用者が踏んで初めて分かった**ので機械で見る
         run: bash ./scripts/vscode-task-check.sh
+
+      - name: AGENTS.md が参照元と同期しているか検査する
+        # **AGENTS.md は .github/copilot-instructions.md からの生成物。**
+        # 参照元だけ直して生成し忘れると、Codex CLI などへ古い規約が届く（Issue #480）
+        run: bash ./scripts/sync-agents.sh --check
