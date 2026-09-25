@@ -749,6 +749,8 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'notifications.kind.ResponseLimitReached': '已达到回答数量上限，停止接收回答',
   'notifications.kind.MailDeadLettered': '电子邮件无法发送，已暂缓处理',
   'notifications.kind.ResponseReceived': '收到新回答',
+  "notifications.kind.ClamAvUnavailable": "ClamAV 扫描不可用",
+  "notifications.kind.ClamAvRecovered": "ClamAV 扫描已恢复",
   'notifications.kind.Unknown': '未知通知',
 
   // ---- 分岐（ジャンプ） ---------------------------------------------------

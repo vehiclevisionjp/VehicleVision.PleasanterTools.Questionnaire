@@ -139,10 +139,7 @@ jobs:
               return 1
           }
 
-          wait_for "SQL Server" 60 \
-              docker exec ${{ job.services.sqlserver.id }} \
-              /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$TESTENV_SA_PASSWORD" \
-              -C -b -Q "SELECT 1"
+          python3 scripts/wait_sqlserver.py "${{ job.services.sqlserver.id }}"
 
           wait_for "PostgreSQL" 60 \
               docker exec ${{ job.services.postgres.id }} pg_isready -U postgres
@@ -150,6 +147,18 @@ jobs:
           wait_for "MySQL" 60 \
               docker exec ${{ job.services.mysql.id }} \
               mysqladmin ping -h 127.0.0.1 -uroot -p"$TESTENV_SA_PASSWORD"
+
+      - name: SQL Server の起動診断を残す
+        if: failure()
+        run: python3 scripts/wait_sqlserver.py "${{ job.services.sqlserver.id }}" --diagnose-only
+
+      - name: SQL Server の起動診断を保存する
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: SQLServer起動診断-結合テスト
+          path: TestResults/sqlserver-startup/
+          if-no-files-found: ignore
 
       - name: DB を検証環境と同じ状態にする
         run: |

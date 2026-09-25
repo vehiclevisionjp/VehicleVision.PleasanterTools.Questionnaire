@@ -279,6 +279,9 @@ if (attachmentOptions.VirusScan.Enabled)
                 new ClamAvVirusScanner(
                     attachmentOptions.VirusScan,
                     serviceProvider.GetRequiredService<ILogger<ClamAvVirusScanner>>()));
+            // ClamAV 有効時だけ監視する。Defender へ定期的なファイル送信は行わない。
+            builder.Services.AddSingleton<ClamAvHealthMonitor>();
+            builder.Services.AddHostedService<ClamAvHealthMonitorHostedService>();
             break;
 
         case VirusScanProvider.DefenderForStorage:

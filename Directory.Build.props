@@ -18,7 +18,7 @@
        セマンティックバージョニング（_documents/リリース手順書.md）。
        1.0.0 未満は互換を保証しない -->
   <PropertyGroup>
-    <VersionPrefix>0.7.1</VersionPrefix>
+    <VersionPrefix>0.8.0</VersionPrefix>
   </PropertyGroup>
 
   <PropertyGroup>

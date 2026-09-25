@@ -59,6 +59,9 @@ jobs:
           # 版は global.json を単一の情報源にする（SDK 10.0.100）
           global-json-file: global.json
 
+      - name: SQL Server の起動待ちスクリプトを検証する
+        run: python3 -m unittest discover -s scripts/tests -p 'test_wait_sqlserver.py' -v
+
       - name: 依存を復元する
         run: dotnet restore VehicleVision.PleasanterTools.Questionnaire.slnx
 

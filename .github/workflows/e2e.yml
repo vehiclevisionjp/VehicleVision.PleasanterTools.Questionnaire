@@ -40,6 +40,8 @@ on:
       - "src/**"
       - "tests/**"
       - "tools/**"
+      - "scripts/wait_sqlserver.py"
+      - "scripts/tests/test_wait_sqlserver.py"
       - "compose.yaml"
       - "Dockerfile"
       - "Directory.Build.props"
@@ -123,6 +125,13 @@ jobs:
           echo "DEV_DB_CONNECTIONSTRING=$connection_string" >> "$GITHUB_ENV"
           echo "QUESTIONNAIRE_E2E_PROVIDER=$provider" >> "$GITHUB_ENV"
           echo "::notice title=E2E database provider::$provider"
+
+      - name: SQL Server を先に起動して確かめる
+        if: matrix.profile == 'sqlserver'
+        run: |
+          set -euo pipefail
+          docker compose --profile sqlserver up -d db
+          python3 scripts/wait_sqlserver.py "$(docker compose ps -aq db)"
 
       - name: Pleasanter と本アプリを起動する
         # **サービスコンテナを使わない。** CodeDefiner は「走り切って終了する」係で、
@@ -348,6 +357,22 @@ jobs:
           --logger "trx;LogFileName=e2e.trx"
           --results-directory "$GITHUB_WORKSPACE/TestResults"
 
+      - name: SQL Server の診断を残す
+        if: failure() && matrix.profile == 'sqlserver'
+        run: |
+          id="$(docker compose ps -aq db)"
+          if [ -n "$id" ]; then
+              python3 scripts/wait_sqlserver.py "$id" --diagnose-only
+          fi
+
+      - name: SQL Server の起動診断を保存する
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: SQLServer起動診断-E2E-${{ matrix.profile }}
+          path: TestResults/sqlserver-startup/
+          if-no-files-found: ignore
+
       - name: 失敗したときは容器のログを残す
         if: failure()
         run: |
@@ -410,6 +435,12 @@ jobs:
         # spec はイメージへ焼き込まれるため、毎回現在のソースから作る
         run: docker compose --profile screenshots build screenshots
 
+      - name: SQL Server を先に起動して確かめる
+        run: |
+          set -euo pipefail
+          docker compose --profile sqlserver up -d db
+          python3 scripts/wait_sqlserver.py "$(docker compose ps -aq db)"
+
       - name: Pleasanter と本アプリを起動する
         # アプリの変更も現在のソースから検証する
         run: docker compose --profile sqlserver up -d --build --wait
@@ -454,6 +485,22 @@ jobs:
       - name: 写しの一式を実行する
         # 初期設定を先に撮る順序と単発確認用 spec の除外は npm run shot に集約してある
         run: docker compose --profile sqlserver --profile screenshots run --rm screenshots
+
+      - name: SQL Server の診断を残す
+        if: failure()
+        run: |
+          id="$(docker compose ps -aq db)"
+          if [ -n "$id" ]; then
+              python3 scripts/wait_sqlserver.py "$id" --diagnose-only
+          fi
+
+      - name: SQL Server の起動診断を保存する
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: SQLServer起動診断-写し
+          path: TestResults/sqlserver-startup/
+          if-no-files-found: ignore
 
       - name: 失敗したときは写しの報告書を残す
         if: failure()

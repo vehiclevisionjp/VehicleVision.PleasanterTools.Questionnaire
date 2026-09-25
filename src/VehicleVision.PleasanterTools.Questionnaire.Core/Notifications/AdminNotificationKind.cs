@@ -43,4 +43,10 @@ public enum AdminNotificationKind
     /// <summary>新しい回答を受け付けた（Issue #357）。</summary>
     /// <remarks>⚠️ **回答の中身は持たない。** 件数・時刻・アンケートだけを知らせる。</remarks>
     ResponseReceived = 7,
+
+    /// <summary>ClamAV の定期確認で検査できない状態を検知した。</summary>
+    ClamAvUnavailable = 8,
+
+    /// <summary>同じインスタンスで異常を検知した後、ClamAV の検査が復旧した。</summary>
+    ClamAvRecovered = 9,
 }

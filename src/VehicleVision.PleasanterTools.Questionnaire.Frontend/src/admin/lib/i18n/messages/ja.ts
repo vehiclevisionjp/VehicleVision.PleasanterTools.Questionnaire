@@ -747,6 +747,8 @@ export const ja = {
   'notifications.kind.ResponseLimitReached': '回答数の上限に達したので受付を止めました',
   'notifications.kind.MailDeadLettered': 'メールを送れず保留にしました',
   'notifications.kind.ResponseReceived': '新しい回答が届きました',
+  "notifications.kind.ClamAvUnavailable": "ClamAV の検査が利用できません",
+  "notifications.kind.ClamAvRecovered": "ClamAV の検査が復旧しました",
   'notifications.kind.Unknown': '不明なお知らせ',
 
   // ---- 分岐（ジャンプ） ---------------------------------------------------

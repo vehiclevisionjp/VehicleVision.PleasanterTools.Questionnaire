@@ -24,6 +24,8 @@
     ResponseLimitReached: 'notifications.kind.ResponseLimitReached',
     MailDeadLettered: 'notifications.kind.MailDeadLettered',
     ResponseReceived: 'notifications.kind.ResponseReceived',
+    ClamAvUnavailable: 'notifications.kind.ClamAvUnavailable',
+    ClamAvRecovered: 'notifications.kind.ClamAvRecovered',
   };
 
   let items = $state<AdminNotification[]>([]);

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { ensureAdminStorageState } from '../lib/admin';
 import { prepareDraftSurvey } from '../lib/draft';
 
@@ -25,6 +25,21 @@ let allowedPublicId = '';
 /** 許していないアンケート。**既定の側。** */
 let deniedPublicId = '';
 
+/** 入力後の保存を待つ。画面の更新と localStorage への保存は同時とは限らない（Issue #462）。 */
+async function expectSavedDraft(
+  page: Page,
+  publicId: string,
+  questionId: string,
+  values: string[],
+): Promise<void> {
+  await expect.poll(
+    () => page.evaluate(({ publicId, questionId }) => {
+      const raw = localStorage.getItem(`questionnaire.draft.${publicId}`);
+      return raw === null ? null : JSON.parse(raw).answers?.[questionId]?.values;
+    }, { publicId, questionId }),
+    { message: '入力した回答が端末の下書きへ保存されるまで待つ' },
+  ).toEqual(values);
+}
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser, baseURL }) => {
@@ -65,6 +80,9 @@ test.describe('回答の下書き', () => {
     await page.getByLabel('ご意見').fill('途中まで書いた内容');
     await page.getByLabel('お名前').fill('山田');
 
+    await expectSavedDraft(page, allowedPublicId, 'q-free', ['途中まで書いた内容']);
+    await expectSavedDraft(page, allowedPublicId, 'q-name', ['山田']);
+
     // **端末に入っていること**を直接見る
     const stored = await page.evaluate(
       (publicId) => localStorage.getItem(`questionnaire.draft.${publicId}`),
@@ -82,6 +100,7 @@ test.describe('回答の下書き', () => {
 
     await page.goto(`/f/${allowedPublicId}`);
     await page.getByLabel('ご意見').fill('前の人が書いた内容');
+    await expectSavedDraft(page, allowedPublicId, 'q-free', ['前の人が書いた内容']);
 
     await page.reload();
 
@@ -99,6 +118,7 @@ test.describe('回答の下書き', () => {
 
     await page.goto(`/f/${allowedPublicId}`);
     await page.getByLabel('ご意見').fill('消したい内容');
+    await expectSavedDraft(page, allowedPublicId, 'q-free', ['消したい内容']);
     await page.reload();
 
     await page.getByRole('button', { name: '破棄する' }).click();
@@ -135,6 +155,7 @@ test.describe('回答の下書き', () => {
 
     await page.goto(`/f/${allowedPublicId}`);
     await page.getByLabel('ご意見').fill('送る内容');
+    await expectSavedDraft(page, allowedPublicId, 'q-free', ['送る内容']);
 
     // 最短時間の関門を越えるまで待つ
     await page.waitForTimeout(4000);
