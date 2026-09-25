@@ -40,6 +40,7 @@ public class PleasanterSsoAuthenticatorTests
             LoginUrl = "/users/login",
             UnknownUser = unknownUser,
             RegisterRole = registerRole,
+            AllowedDeptIds = [10],
         };
 
     private static async Task<AdminUser> AddAsync(Harness harness, bool isDisabled = false)
@@ -95,6 +96,26 @@ public class PleasanterSsoAuthenticatorTests
         Assert.Equal(AdminRole.SurveyAdministrator, stored.Role);
         Assert.False(harness.Hasher.Verify(string.Empty, stored.PasswordHash).Verified);
         Assert.False(harness.Hasher.Verify(LoginId, stored.PasswordHash).Verified);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task 所属未設定では登録済みだけ通し自動登録は拒否する(bool existing)
+    {
+        var harness = Create();
+        if (existing)
+        {
+            await AddAsync(harness);
+        }
+
+        var result = await harness.Authenticator.SignInAsync(LoginId, new PleasanterSsoOptions
+        {
+            UnknownUser = PleasanterSsoUnknownUserPolicy.Register,
+        });
+        Assert.Equal(existing ? PleasanterSsoSignInOutcome.SignedIn : PleasanterSsoSignInOutcome.NotAllowed, result.Outcome);
+        Assert.False(result.Registered);
+        Assert.Equal(existing ? 1 : 0, (await harness.Store.ListAsync()).Count);
     }
 
     [Fact]
@@ -243,6 +264,17 @@ public class PleasanterSsoSessionRevalidatorTests
         var result = await revalidator.RevalidateAsync(Request(), Principal(Now.AddHours(-1)), SessionId);
 
         Assert.Equal(PleasanterSsoRevalidation.Rejected, result);
+    }
+
+    [Fact]
+    public async Task 所属を外れた既存ユーザーも再確認で落とす()
+    {
+        var (revalidator, verifier, time) = Create(Same());
+        await revalidator.RevalidateAsync(Request(), Principal(Now.AddHours(-1)), SessionId);
+        verifier.Result = new PleasanterSessionResult(PleasanterSessionStatus.NotAllowed, Reason: "membership-not-allowed");
+        time.Advance(TimeSpan.FromMinutes(6));
+        Assert.Equal(PleasanterSsoRevalidation.Rejected,
+            await revalidator.RevalidateAsync(Request(), Principal(Now.AddHours(-1)), SessionId));
     }
 
     [Fact]

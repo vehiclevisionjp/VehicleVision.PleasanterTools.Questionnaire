@@ -13,6 +13,7 @@ export type PleasanterSsoCheckResponse =
 /** 失敗の理由。**画面の文言を選ぶためだけに使う。** */
 export type PleasanterSsoFailure =
   | 'unknown-user'
+  | 'not-allowed'
   | 'disabled'
   | 'setup-required'
   | 'upstream-error'
@@ -68,6 +69,7 @@ export function classifyCheck(result: CheckResult): PleasanterSsoCheckOutcome {
       : '';
 
   switch (code) {
+    case 'not-allowed':
     case 'unknown-user':
     case 'disabled':
     case 'setup-required':

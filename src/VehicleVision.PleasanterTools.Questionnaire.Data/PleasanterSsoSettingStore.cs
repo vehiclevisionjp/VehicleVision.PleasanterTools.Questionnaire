@@ -10,6 +10,10 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// </remarks>
 public sealed record PleasanterSsoSettingValues
 {
+    public string? AllowedDeptIds { get; init; }
+
+    public string? AllowedGroupIds { get; init; }
+
     public string? Enabled { get; init; }
 
     public string? InternalBaseUrl { get; init; }
@@ -56,7 +60,7 @@ public sealed class PleasanterSsoSettingStore(IDbConnectionFactory connectionFac
         return await connection.QuerySingleAsync<PleasanterSsoSettingValues>(Sql(
             "SELECT [Enabled], [InternalBaseUrl], [LoginUrl], [LogoutUrl], "
             + "       [CookieNames], [UnknownUser], [RegisterRole], [RevalidateMinutes], "
-            + "       [TimeoutSeconds], [ButtonLabel] "
+            + "       [TimeoutSeconds], [ButtonLabel], [AllowedDeptIds], [AllowedGroupIds] "
             + "FROM [PleasanterSsoSettings] WHERE [PleasanterSsoSettingId] = 1",
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -75,7 +79,8 @@ public sealed class PleasanterSsoSettingStore(IDbConnectionFactory connectionFac
             + "[LoginUrl] = @LoginUrl, [LogoutUrl] = @LogoutUrl, "
             + "[CookieNames] = @CookieNames, [UnknownUser] = @UnknownUser, "
             + "[RegisterRole] = @RegisterRole, [RevalidateMinutes] = @RevalidateMinutes, "
-            + "[TimeoutSeconds] = @TimeoutSeconds, [ButtonLabel] = @ButtonLabel "
+            + "[TimeoutSeconds] = @TimeoutSeconds, [ButtonLabel] = @ButtonLabel, "
+            + "[AllowedDeptIds] = @AllowedDeptIds, [AllowedGroupIds] = @AllowedGroupIds "
             + "WHERE [PleasanterSsoSettingId] = 1",
             values,
             cancellationToken: cancellationToken)).ConfigureAwait(false);

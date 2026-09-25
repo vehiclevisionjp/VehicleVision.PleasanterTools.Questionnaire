@@ -46,7 +46,7 @@ describe('classifyCheck', () => {
   });
 
   it('サーバが返した理由の印で失敗を分ける', () => {
-    for (const code of ['unknown-user', 'disabled', 'setup-required', 'upstream-error'] as const) {
+    for (const code of ['not-allowed', 'unknown-user', 'disabled', 'setup-required', 'upstream-error'] as const) {
       expect(classifyCheck({ ok: false, status: 403, body: { code } })).toEqual({
         kind: 'failed',
         reason: code,
