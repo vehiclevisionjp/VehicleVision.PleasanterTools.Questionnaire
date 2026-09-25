@@ -3,10 +3,14 @@
 **Pleasanter をバックエンドにした Web アンケート・Web フォームアプリ。**
 
 - 回答画面は **Google Forms / Microsoft Forms に近い見た目・操作感**
-- **アンケートの項目定義（設問・選択肢・必須有無）は Pleasanter 側のサイト設定で行う。**
-  本アプリに独自のフォーム定義を持たない
+- **アンケートの定義（設問・選択肢・分岐・テーマなど）は本アプリの管理画面で作り、本アプリの DB に持つ。**
+  Pleasanter のサイトの列へは、設問ごとのマッピングで回答を写す
+  （[`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) 7・8 章）
 - **回答データは Pleasanter のレコードとして蓄積する**
 - **Pleasanter 本体は改造しない。** 標準 Web API を利用する独立したアプリ
+
+主な機能は [`_documents/機能一覧.md`](_documents/機能一覧.md)、作り方は
+[`_documents/アンケート作成-運用手順書.md`](_documents/アンケート作成-運用手順書.md) を参照。
 
 ## 構成
 
@@ -16,11 +20,13 @@ flowchart LR
     subgraph APP["本アプリ（ASP.NET Core / net10.0）"]
         SPA["回答画面<br/>TypeScript + Svelte"]
         BFF["BFF"]
+        QDB[("本アプリの DB<br/>アンケート定義・送信待ち")]
     end
     PL["Pleasanter<br/>標準 API"]
 
     U --> SPA --> BFF
-    BFF -->|"GetSite で項目定義を取得<br/>Create で回答を保存<br/>（APIキーはサーバ側のみ）"| PL
+    BFF --> QDB
+    BFF -->|"回答を列へ写して保存<br/>GetSite で列を調べる<br/>（APIキーはサーバ側のみ）"| PL
 ```
 
 **API キーはサーバ側だけが持つ。** Pleasanter の API キーはリクエストボディに載せる方式のため、
@@ -47,11 +53,17 @@ Pleasanter 本体（`Pleasanter_1.5.8.1`）に揃えている。
 ## 導入する
 
 GitHub Release には、Azure App Service（Windows Web App）とオンプレミス IIS で共用できる
-配置用 ZIP と SHA-256 を添付する。**Pleasanter の DB とは別に本アプリ専用 DB を作り、
-アプリの通常起動前にマイグレーションを明示的に適用する。**
+配置用 ZIP と SHA-256 を添付する。**Pleasanter の DB とは別に本アプリ専用 DB を作る。**
+マイグレーションは起動時に自動で当たる（v0.5.0 から既定。無効にして手で当てることもできる）。
 
 初回導入、設定、DB作成、更新、ロールバックは
 [`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md)を参照する。
+
+- Pleasanter と同じホスト名のサブパス（例 `/questionnaire/`）に置く:
+  [`_documents/サブパス配置-運用手順書.md`](_documents/サブパス配置-運用手順書.md)
+- Pleasanter のログインで管理画面へ入る（シングルサインオン。v0.7.0）:
+  [`_documents/Pleasanter-SSO-運用手順書.md`](_documents/Pleasanter-SSO-運用手順書.md)
+- 設定の一覧: [`_documents/設定パラメータ一覧.md`](_documents/設定パラメータ一覧.md)
 
 ## 開発をはじめる
 
@@ -141,10 +153,17 @@ QUESTIONNAIRE_INTEGRATION=1 dotnet test tests/VehicleVision.PleasanterTools.Ques
 | [`_documents/アプリケーション設計.md`](_documents/アプリケーション設計.md) | プロジェクト構成・API・送信ワーカー |
 | [`_documents/画面設計.md`](_documents/画面設計.md) | 回答画面・管理アプリ |
 | [`_documents/非機能設計.md`](_documents/非機能設計.md) | セキュリティ・障害時・テスト・運用 |
+| [`_documents/多言語対応方針.md`](_documents/多言語対応方針.md) | 画面の言語（7 言語）と文言の持ち方 |
+| [`_documents/開発環境.md`](_documents/開発環境.md) | Docker の検証環境・VS Code・結合テスト |
 | [`_documents/ブランチ運用方針.md`](_documents/ブランチ運用方針.md) | ブランチ・保護ルール |
 | [`_documents/リリース手順書.md`](_documents/リリース手順書.md) | バージョンの付け方・リリース手順 |
 | [`_documents/AKS-導入更新運用手順書.md`](_documents/AKS-導入更新運用手順書.md) | AKS への導入・ACR 発行・更新・ロールバック |
 | [`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md) | Azure Web App／オンプレミス IIS への導入・DB作成・更新 |
+| [`_documents/サブパス配置-運用手順書.md`](_documents/サブパス配置-運用手順書.md) | Pleasanter と同じホスト名のサブパスへの配置（IIS・Apache・Nginx・Azure） |
+| [`_documents/Pleasanter-SSO-運用手順書.md`](_documents/Pleasanter-SSO-運用手順書.md) | Pleasanter のログインで管理画面へ入る（シングルサインオン） |
+| [`_documents/SAML認証-運用手順書.md`](_documents/SAML認証-運用手順書.md) | SAML 2.0 でのログイン |
+| [`_documents/設定パラメータ一覧.md`](_documents/設定パラメータ一覧.md) | `QUESTIONNAIRE_*` 設定の一覧 |
+| [`_documents/アンケート作成-運用手順書.md`](_documents/アンケート作成-運用手順書.md) | アンケートの作成から公開まで |
 | [`_documents/添付ファイル検査-運用手順書.md`](_documents/添付ファイル検査-運用手順書.md) | ウイルススキャンの構成と運用 |
 | [`_documents/管理者の棚卸し-運用手順書.md`](_documents/管理者の棚卸し-運用手順書.md) | 管理者アカウントの定期見直し |
 | [`tools/pleasanter-testenv/`](tools/pleasanter-testenv/README.md) | 検証環境（Docker） |

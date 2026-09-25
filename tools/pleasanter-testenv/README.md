@@ -9,6 +9,9 @@ Pleasanter 本体は**公式イメージを起動するだけ**で、ソース�
 > **開発環境ひとそろい（Pleasanter ＋ 3 RDBMS ＋ 本アプリ）はリポジトリ直下の
 > [`compose.yaml`](../../compose.yaml) にある。** こちらは **Pleasanter 単体の検証専用**。
 > **同時に起動しないこと。ポートが衝突する。**
+> 直下の `compose.yaml` は、このディレクトリの `docker-compose.yml` を `include` して Pleasanter を起こしている。
+> 本アプリの Pleasanter のログイン（Issue #464）を試すときは、さらに `compose.pleasanter-sso.yaml` を重ねる
+> （[`_documents/Pleasanter-SSO-運用手順書.md`](../../_documents/Pleasanter-SSO-運用手順書.md)）。
 
 ## 構成
 

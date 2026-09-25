@@ -137,8 +137,23 @@ docker compose --profile sqlserver --profile screenshots run --rm     screenshot
 | `admin-09-audit-log` | 操作の記録 |
 | `admin-10-outbox` | 送信状況 |
 | `admin-11-preview` | プレビュー |
+| `admin-12-users` | 管理者の一覧 |
+| `admin-13-invitation` | 招待の URL |
+| `admin-14-my-account` | 自分のアカウント |
+| `admin-15-flowchart` | 分岐のフローチャート（`specs/flowchart.spec.ts`） |
+| `admin-16-flowchart-problems` | フローチャートの問題の表示（同上） |
+| `admin-17-readability-dark` | 管理画面の暗い配色（`specs/readability.spec.ts`） |
+| `admin-18-readability-large` | 管理画面の特大文字（同上） |
+| `answer-06-readability-default` | 回答画面（作成者のテーマと標準文字。同上） |
+| `answer-07-readability-large` | 回答画面の特大文字（同上） |
+| `answer-08-readability-contrast` | 回答画面の高コントラスト（同上） |
+| `answer-09-readability-dark` | 回答画面の暗い配色（同上） |
+| `answer-10-readability-required-error` | 高コントラストでの必須の入力漏れの表示（同上） |
 | `admin-19-pleasanter-sso-settings` | Pleasanter ログイン設定（`specs/pleasanter-sso.spec.ts`） |
 | `admin-20-pleasanter-login` | ログイン（「Pleasanter でログイン」の釦） |
+
+`admin-12`〜`admin-14` は `specs/manual.spec.ts` が撮る。
+`admin-19`・`admin-20` は `shots/` にコミットしていない（2026-09-25 時点。e2e.yml の写しの一式で撮られる）。
 
 ## 秘密の値は伏せる
 

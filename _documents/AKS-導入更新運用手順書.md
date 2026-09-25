@@ -122,6 +122,19 @@ kubectl create secret tls questionnaire-tls \
 Production ではアプリが HTTPS へリダイレクトするため、Ingress を有効にする場合は
 host と TLS Secret の両方が必須である。
 
+### サブパス配置と Pleasanter のログイン（v0.7.0）
+
+v0.7.0 のサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と、Pleasanter のログインで管理画面へ入る機能
+（`QUESTIONNAIRE_PLEASANTERSSO_*`）は、**このチャートでは値として用意していない**。
+チャートの Ingress は `path: /` 固定で、ConfigMap にもこれらの鍵が無い
+（`deploy/aks/questionnaire/templates/ingress.yaml`、`templates/configmap.yaml`、2026-09-25 確認）。
+
+- Pleasanter のログインは、**本アプリと Pleasanter を同じホスト名に置き、本アプリをサブパスにする**ことが前提
+  （[`Pleasanter-SSO-運用手順書.md`](Pleasanter-SSO-運用手順書.md) 4 章、
+  [`サブパス配置-運用手順書.md`](サブパス配置-運用手順書.md)）。AKS で使うには、Pleasanter と本アプリへ
+  パスで振り分ける Ingress をチャートの外で用意する必要がある。**AKS での構成は未検証**
+- `/healthz`・`/ready` はサブパスの外でも応答するので、サブパスを設定しても probe の path は変えなくてよい
+
 ## イメージを ACR へ発行する
 
 `.github/workflows/aks-image.yml` を手動実行する。GitHub Environment
@@ -171,7 +184,13 @@ helm upgrade --install questionnaire deploy/aks/questionnaire \
 
 Helm の `pre-install` hook がマイグレーション Job を1 Podだけ起動し、成功してから
 Deployment を作る。DB 接続に失敗するかマイグレーションに失敗した場合、導入は止まる。
-各アプリ Pod でマイグレーションを実行しないため、スケールアウト時に競合しない。
+アプリ Pod の起動時の自動適用（`QUESTIONNAIRE_DB_AUTO_MIGRATE`）は v0.5.0 から既定で有効で、
+チャートはこれを無効にしていない。hook が先に当て終えているので、Pod は未適用が無いことを確かめるだけで起動する。
+複数 Pod が同時に確かめても DB の排他で 1 つずつ処理するため、スケールアウト時に競合しない
+（[`導入-更新運用手順書.md`](導入-更新運用手順書.md) 3.3）。
+アプリ用の DB アカウントからスキーマ変更の権限を外す場合は、`QUESTIONNAIRE_DB_AUTO_MIGRATE=false` を
+Pod へ渡す。チャートの values にはこの項目が無いため、事前作成した Secret（`envFrom` で全キーが環境変数になる）に
+含める（`deploy/aks/questionnaire/templates/deployment.yaml`、`templates/configmap.yaml`、2026-09-25 確認）。
 
 確認する。
 
