@@ -363,43 +363,26 @@ IIS のサブアプリケーションでは PathBase を IIS が渡すので、�
 </PropertyGroup>
 ```
 
-### 8.2 Apache（サブディレクトリへのリバースプロキシ）
+### 8.2 Apache・Nginx（サブディレクトリへのリバースプロキシ）
 
-```text
-ProxyPreserveHost On
-RequestHeader set X-Forwarded-Proto "https"
+**設定例は [サブパス配置-運用手順書](サブパス配置-運用手順書.md) の 3.2（Apache）・3.3（Nginx）を使う。**
+ここに写しを置くと食い違うので、設定そのものは載せない。シングルサインオンのために気を付けるのは次の 3 点。
 
-# 具体的なパスを先に書く
-ProxyPass        /questionnaire/ http://127.0.0.1:8081/questionnaire/
-ProxyPassReverse /questionnaire/ http://127.0.0.1:8081/questionnaire/
+- **Pleasanter は `/` のまま置く**（`pathBase` を設定しない）。Pleasanter の cookie は Pleasanter の PathBase に
+  閉じるので、Pleasanter をサブパスに置くと `/questionnaire/` にいる本アプリへ届かない（4.1）
+- **`Host` を元のまま渡す**（Apache は `ProxyPreserveHost On`、Nginx は `proxy_set_header Host $host`）。
+  ブラウザから見たホスト名が 1 つにそろえば、cookie は両方へ届く
+- **本アプリの「内部 URL」（`QUESTIONNAIRE_PLEASANTERSSO_INTERNALBASEURL`）はプロキシを通さず Pleasanter を直接指してよい**
+  （例 `http://127.0.0.1:8080`）。本アプリのサーバから Pleasanter へ届けばよい。
+  ログイン画面の URL（`LOGINURL`）はブラウザが開くので、プロキシ越しの URL（例 `/users/login`）にする
 
-ProxyPass        / http://127.0.0.1:8080/
-ProxyPassReverse / http://127.0.0.1:8080/
-```
-
-### 8.3 Nginx（`location /questionnaire/`）
-
-```text
-location /questionnaire/ {
-    # URI を付けない proxy_pass はパスをそのまま渡す（プレフィックスを剥がさない）
-    proxy_pass http://127.0.0.1:8081;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-
-location / {
-    proxy_pass http://127.0.0.1:8080;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
+2026-09-25 に、サブパス配置-運用手順書 3.2・3.3 の例で Nginx 1.29 と Apache httpd 2.4 を立て、
+シングルサインオンの往復を確かめた（10 章）。
 
 本アプリの `QUESTIONNAIRE_FORWARDED_NETWORKS` などの転送ヘッダの設定は
 [`導入-更新運用手順書.md`](導入-更新運用手順書.md) に従う。
 
-### 8.4 Azure
+### 8.3 Azure
 
 App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現行の想定構成では、cookie が届かない。
 次のいずれかで同じホスト名にまとめる（[サブパス配置-運用手順書](サブパス配置-運用手順書.md) と同じ。出典は参照 2026-09-24）。
@@ -461,9 +444,20 @@ App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現
 | Pleasanter でログアウトした後、再検証で締め出される | **自動試験**（同上。間隔は最短の 1 分。本アプリの cookie を持ったままでも入れず、管理 API は 401） |
 | Pleasanter の TOTP・メールのワンタイムパスワード | TOTP は 2026-09-25 に `users/get` で実機確認（2.2）。**メールのワンタイムパスワードは自動試験**（同上。パスワードだけ・違うコードでは入れず、正しいコードの後に入れる。コードは Pleasanter の DB から読み、メールの配送そのものは見ていない） |
 | 利用者ごとの API 禁止（`DisableApi` 以外の禁止） | **未検証**（`UserSettings.AllowApi` の同じ判定に入る） |
-| 複数テナント | **未検証**（検証環境のテナントは 1 つ） |
+| 複数テナント | **対象外**（テナントと本アプリは 1 対 1 で置く前提。API キーの持ち主と利用者のテナントは一致する） |
 | PostgreSQL・MySQL の Pleasanter | DBMS に依らない（SQL を書かない）が実機では**未検証** |
 | ブラウザでの往復（「Pleasanter でログイン」→ 別窓で Pleasanter にログイン → 別窓が閉じて本アプリの 2 要素の登録 → 管理画面） | **自動試験**（写しの一式 `tools/screenshots/specs/pleasanter-sso.spec.ts`。未登録の利用者はその場で登録する設定） |
 | 設定画面（画面から有効にして保存・固定項目のロック表示） | **自動試験**（同上。ロック表示は応答の `fixedFields` を書き換えて確かめる。サーバ側の固定は `PleasanterSsoEndToEndTests`） |
 | ブラウザでの自動確認（ログイン画面を開いただけで入る）・ログアウトの印 | **未検証** |
-| サブパス配置（8 章） | **未検証。** 本アプリ単体のサブパス配信は #465 で確認済み。IIS・Apache・Nginx・Azure の実機での SSO は未確認 |
+| サブパス配置: Nginx・Apache（8.2） | **確認済み**（2026-09-25。Docker の Nginx 1.29・Apache httpd 2.4 ＋ Pleasanter 1.5.8.1 ＋ `QUESTIONNAIRE_PATH_BASE=/questionnaire` の本アプリ。下記） |
+| サブパス配置: IIS（8.1）・Azure（8.3） | **未検証** |
+
+**Nginx・Apache での確認の結果**（どちらも同じ結果。Pleasanter へのログインと本アプリへの要求は、すべてプロキシ越し）:
+
+| 手順 | 結果 |
+| --- | --- |
+| Pleasanter にログインしたときの cookie | `.AspNetCore.Cookies`・`Pleasanter_SessionGuid` とも Path `/`（本アプリへ届く） |
+| `POST /questionnaire/api/admin/pleasanter-sso/check` | 200（`signedIn`）。管理 API も 200 |
+| Pleasanter でログアウトした直後 | 本アプリの cookie（Path `/questionnaire`）は消えずに残る（4.4 の巻き添えは起きない） |
+| 再検証の間隔（1 分）の後 | 管理 API が 401 で締め出される |
+| 本アプリに未登録の Pleasanter 利用者 | 403（`unknown-user`） |
