@@ -680,6 +680,8 @@ export interface SamlSettings {
 
 /** Pleasanter のログインで入る設定（Issue #464）。**秘密の値は無い。** */
 export interface PleasanterSsoSettings {
+  allowedDeptIds: string;
+  allowedGroupIds: string;
   enabled: boolean;
   internalBaseUrl: string;
   loginUrl: string;
@@ -694,6 +696,8 @@ export interface PleasanterSsoSettings {
 }
 
 export type PleasanterSsoSettingField =
+  | 'allowedDeptIds'
+  | 'allowedGroupIds'
   | 'enabled'
   | 'internalBaseUrl'
   | 'loginUrl'
@@ -707,7 +711,7 @@ export type PleasanterSsoSettingField =
 
 /** 設定画面の「接続の試験」の結果（Issue #464）。 */
 export interface PleasanterSsoTestResult {
-  status: 'Authenticated' | 'Unauthenticated' | 'UpstreamError';
+  status: 'Authenticated' | 'Unauthenticated' | 'UpstreamError' | 'NotAllowed';
   reason?: string;
   tenantId?: number;
   userId?: number;
@@ -715,6 +719,7 @@ export interface PleasanterSsoTestResult {
   name?: string | null;
   /** 返ったログイン ID の管理者が本アプリに居るか。 */
   registered?: boolean;
+  registrationAllowed?: boolean;
 }
 
 export type SamlSettingField =

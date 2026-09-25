@@ -85,6 +85,11 @@ public static class AdminPleasanterSsoEndpoints
                     AuditNotes.Skip(context);
                     return Results.Ok(new { status = "unauthenticated" });
 
+                case PleasanterSessionStatus.NotAllowed:
+                    AuditNotes.Add(context, "result", "not-allowed");
+                    AuditNotes.Add(context, "reason", verification.Reason);
+                    return Results.Json(new { code = "not-allowed" }, statusCode: StatusCodes.Status403Forbidden);
+
                 case PleasanterSessionStatus.UpstreamError:
                     AuditNotes.Add(context, "result", "upstream-error");
                     AuditNotes.Add(context, "reason", verification.Reason);
@@ -130,6 +135,11 @@ public static class AdminPleasanterSsoEndpoints
                     await AdminAuthEndpoints.SignInPendingAsync(context, result.User!, secret: null, claims)
                         .ConfigureAwait(false);
                     return Results.Ok(new { status = "signedIn", next = "enroll" });
+
+                case PleasanterSsoSignInOutcome.NotAllowed:
+                    AuditNotes.Add(context, "result", "not-allowed");
+                    AuditNotes.Add(context, "reason", "membership-not-configured");
+                    return Results.Json(new { code = "not-allowed" }, statusCode: StatusCodes.Status403Forbidden);
 
                 case PleasanterSsoSignInOutcome.Disabled:
                     AuditNotes.Add(context, "result", "disabled");
@@ -237,6 +247,8 @@ public static class AdminPleasanterSsoEndpoints
                 loginId = identity.LoginId,
                 name = identity.Name,
                 registered = matched is not null,
+                registrationAllowed = options.UnknownUser == PleasanterSsoUnknownUserPolicy.Register
+                    && options.HasMembershipRestriction,
             });
         }).RequireAuthorization(policy).RequireRateLimiting(CheckRateLimitPolicy);
     }
@@ -258,6 +270,8 @@ public static class AdminPleasanterSsoEndpoints
             }
         }
 
+        Add("allowedDeptIds", PleasanterSsoOptions.AllowedDeptIdsKey, old.AllowedDeptIds, next.AllowedDeptIds);
+        Add("allowedGroupIds", PleasanterSsoOptions.AllowedGroupIdsKey, old.AllowedGroupIds, next.AllowedGroupIds);
         Add("enabled", PleasanterSsoOptions.EnabledKey, old.Enabled, next.Enabled);
         Add("internalBaseUrl", PleasanterSsoOptions.InternalBaseUrlKey, old.InternalBaseUrl, next.InternalBaseUrl);
         Add("loginUrl", PleasanterSsoOptions.LoginUrlKey, old.LoginUrl, next.LoginUrl);
@@ -288,6 +302,8 @@ public static class AdminPleasanterSsoEndpoints
             loginUrl = values.LoginUrl,
             logoutUrl = values.LogoutUrl,
             cookieNames = values.CookieNames,
+            allowedDeptIds = values.AllowedDeptIds,
+            allowedGroupIds = values.AllowedGroupIds,
             unknownUser = values.UnknownUser,
             registerRole = values.RegisterRole,
             revalidateMinutes = values.RevalidateMinutes,
@@ -299,6 +315,8 @@ public static class AdminPleasanterSsoEndpoints
                 internalBaseUrl = Fixed(PleasanterSsoOptions.InternalBaseUrlKey),
                 loginUrl = Fixed(PleasanterSsoOptions.LoginUrlKey),
                 logoutUrl = Fixed(PleasanterSsoOptions.LogoutUrlKey),
+                allowedDeptIds = Fixed(PleasanterSsoOptions.AllowedDeptIdsKey),
+                allowedGroupIds = Fixed(PleasanterSsoOptions.AllowedGroupIdsKey),
                 cookieNames = Fixed(PleasanterSsoOptions.CookieNamesKey),
                 unknownUser = Fixed(PleasanterSsoOptions.UnknownUserKey),
                 registerRole = Fixed(PleasanterSsoOptions.RegisterRoleKey),
@@ -323,7 +341,9 @@ public static class AdminPleasanterSsoEndpoints
         string? RegisterRole,
         string? RevalidateMinutes,
         string? TimeoutSeconds,
-        string? ButtonLabel)
+        string? ButtonLabel,
+        string? AllowedDeptIds = null,
+        string? AllowedGroupIds = null)
     {
         public PleasanterSsoSettingValues ToValues() => new()
         {
@@ -332,6 +352,8 @@ public static class AdminPleasanterSsoEndpoints
             LoginUrl = LoginUrl,
             LogoutUrl = LogoutUrl,
             CookieNames = CookieNames,
+            AllowedDeptIds = AllowedDeptIds,
+            AllowedGroupIds = AllowedGroupIds,
             UnknownUser = UnknownUser,
             RegisterRole = RegisterRole,
             RevalidateMinutes = RevalidateMinutes,

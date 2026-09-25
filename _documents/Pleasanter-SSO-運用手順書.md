@@ -25,15 +25,15 @@
 ## 1. できること
 
 | 項目 | 内容 |
-|---|---|
+| --- | --- |
 | 起点 | 本アプリのログイン画面の「Pleasanter でログイン」釦。**ログイン画面を開いた時点で一度だけ黙って確かめ、既に Pleasanter にログインしていればそのまま入る** |
 | Pleasanter 未ログインのとき | Pleasanter のログイン画面を別窓で開き、2 秒ごとに確かめる。ログインが済むと自動で入る（最長 5 分） |
 | 利用者の突き合わせ | **ログイン ID**（Pleasanter の `LoginId` を本アプリのログイン ID として扱う。SAML と同じ） |
 | 本人の確かめ方 | **標準の API**: `/api/users/get` を 1 回、読むだけ。利用者の API 利用が禁止されていれば本アプリの API キーで引き直す（[2.3](#23-利用者の-api-利用を禁止しているとき)） |
-| 未登録の利用者 | **拒絶**（既定）か **その場で登録**（JIT）を選べる。JIT の役割も選べる |
+| 未登録の利用者 | **拒絶**（既定）か **その場で登録**（JIT）を選べる。JIT の役割も選べる。許可する組織・グループが空の場合は自動登録しない |
 | Pleasanter 側の 2 要素 | **終えた人しか通らない**（TOTP・メールのワンタイムパスワードとも実機で確認。[6 章](#6-2-要素認証の扱い)） |
 | 本アプリの 2 要素 | **SAML と同じ扱い**（登録済みなら通す、`required` なら登録させる） |
-| 再検証 | 既定 5 分ごとに Pleasanter に確かめ直す。Pleasanter でログアウト・無効化された人は本アプリからも落とす |
+| 再検証 | 既定 5 分ごとに Pleasanter に確かめ直す。Pleasanter でログアウト・無効化された人、許可した所属を外れた人は本アプリからも落とす |
 | ログアウト | 本アプリから落とす。設定すれば続けて Pleasanter のログアウト画面へ移す |
 | 設定の反映 | DB の設定は**再起動なし**で反映する（30 秒以内） |
 | 設定できる人 | `Administrator` だけ（権限 `settings.pleasanterSso`） |
@@ -86,7 +86,7 @@ sequenceDiagram
 ### 2.1 ソースでの根拠（`_reference/Implem.Pleasanter`、`Pleasanter_1.5.8.1` / `626a173e`）
 
 | 事実 | 根拠 |
-|---|---|
+| --- | --- |
 | API は cookie でも認証される（API キーが無ければ `User.Identity.Name` で利用者を引く） | `Implem.Pleasanter/Libraries/Requests/Context.cs:489-508` |
 | `/api/users/get` は認証されていなければ 401 | `Implem.Pleasanter/Controllers/Api/UsersController.cs:21-38` |
 | 利用者 ID の絞り込みの `Own` はログイン中の利用者 ID に置き換わる | `Implem.Pleasanter/Libraries/Settings/View.cs:2439-2482`（`ConvertedValue` / `ConvertedOwn`） |
@@ -103,7 +103,7 @@ sequenceDiagram
 **`users/get` と代わりの経路（2026-09-25）:**
 
 | 手順 | 結果 |
-|---|---|
+| --- | --- |
 | 一般利用者（`sso-user1`）の cookie で `users/get`（`UserId = Own`） | 200、`TotalCount` 1、`LoginId` `sso-user1`（UserId=2） |
 | `Administrator` の cookie で同じ | 200、`TotalCount` 1、`LoginId` `Administrator` |
 | 偽の `Pleasanter_SessionGuid` だけ | 401 |
@@ -121,7 +121,7 @@ cookie の認証（`context.Authenticated`）と本アプリ側の流れは本�
 記録として残す。
 
 | 手順 | 結果 |
-|---|---|
+| --- | --- |
 | ログアウト後の（古い）cookie | 401 |
 | **メールのワンタイムパスワード有効**・パスワードだけ | 401 |
 | **メールのワンタイムパスワード有効**・コード入力後 | 200 |
@@ -134,7 +134,7 @@ cookie の認証（`context.Authenticated`）と本アプリ側の流れは本�
 `/api/users/get` は **403** になる（2.1 の表）。このときは次のように扱う。
 
 | 本アプリの Pleasanter 接続設定 | 扱い |
-|---|---|
+| --- | --- |
 | `QUESTIONNAIRE_PLEASANTER_BASEURL` と `QUESTIONNAIRE_PLEASANTER_APIKEY` がある | **代わりの経路**で本人を確かめる（下の 2 回） |
 | API キーが無い | **接続不可**（`http-403`）。ログに設定を案内する警告を出す。API キーを設定する |
 
@@ -169,7 +169,7 @@ cookie の認証（`context.Authenticated`）と本アプリ側の流れは本�
 ## 3. 決めていること（変えないこと）
 
 - ⚠️ **Pleasanter の API キーをブラウザへ渡さない**（規約 8）。**cookie を転送する問い合わせに API キーを載せない。**
-  API キーを使うのは 2.3 の代わりの経路の 2 回目だけで、そのときは cookie を送らない。宛先は本アプリの接続設定の URL だけ
+  API キーは 2.3 の代わりの経路とグループの所属確認に使い、そのときは cookie を送らない。宛先は本アプリの接続設定の URL だけ
 - ⚠️ **本アプリの cookie（`q.` で始まるもの）は Pleasanter へ送らない。** 設定で `q` や `q.admin` を
   転送対象に書くことも拒否する
 - ⚠️ **成功と判断するのは、JSON の業務ステータスが 200 で、TenantId・UserId（1 以上の整数）・LoginId が
@@ -301,13 +301,15 @@ SAML と同じ。**外部設定（環境変数・`App_Data/Parameters` など）
 更新後にマイグレーション 32 を適用する（自動適用が既定）。
 
 | 鍵 | 意味 | 既定値 |
-|---|---|---|
+| --- | --- | --- |
 | `QUESTIONNAIRE_PLEASANTERSSO_ENABLED` | 有効にするか | `false` |
 | `QUESTIONNAIRE_PLEASANTERSSO_INTERNALBASEURL` | 本アプリのサーバから Pleasanter へ届く URL（**有効時は必須**） | なし |
 | `QUESTIONNAIRE_PLEASANTERSSO_LOGINURL` | ブラウザで開く Pleasanter のログイン画面（**有効時は必須**。`/users/login` など） | なし |
 | `QUESTIONNAIRE_PLEASANTERSSO_LOGOUTURL` | 本アプリのログアウト後に開く Pleasanter のログアウト画面（`/users/logout` など） | なし（本アプリだけ落とす） |
 | `QUESTIONNAIRE_PLEASANTERSSO_COOKIENAMES` | 転送する cookie の名前（前方一致、カンマ区切り） | `.AspNetCore.Cookies,Pleasanter_SessionGuid` |
 | `QUESTIONNAIRE_PLEASANTERSSO_UNKNOWNUSER` | 未登録の利用者（`Reject` / `Register`） | `Reject` |
+| `QUESTIONNAIRE_PLEASANTERSSO_ALLOWEDDEPTIDS` | 許可する組織 ID（正の整数、カンマまたは改行区切り、64 件・1024 文字以内） | 空 |
+| `QUESTIONNAIRE_PLEASANTERSSO_ALLOWEDGROUPIDS` | 許可するグループ ID（形式と上限は組織と同じ） | 空 |
 | `QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE` | JIT で作るときの役割 | `Editor` |
 | `QUESTIONNAIRE_PLEASANTERSSO_REVALIDATEMINUTES` | 確かめ直す間隔（分、1〜60） | `5` |
 | `QUESTIONNAIRE_PLEASANTERSSO_TIMEOUTSECONDS` | 問い合わせを待つ時間（秒、1〜30） | `5` |
@@ -320,7 +322,7 @@ SAML と同じ。**外部設定（環境変数・`App_Data/Parameters` など）
   Pleasanter の cookie 名を変えている場合だけ書き換える
 - **`users/get` で 403 が返ったときは、本アプリの Pleasanter 接続設定（`QUESTIONNAIRE_PLEASANTER_BASEURL`・
   `QUESTIONNAIRE_PLEASANTER_APIKEY`）を使う**（2.3）。新しい鍵は無い
-- ⚠️ **`REGISTERROLE` を `Administrator` にすると、Pleasanter に居る全員が全権を持つ**
+- ⚠️ **`REGISTERROLE` を `Administrator` にすると、許可した組織・グループの利用者が全権を持つ**
 - **外部設定の書き間違いは起動時に落とす**（英語のメッセージを出して起動しない）。
   DB の値は保存時に検証するので、読めない値は保存されない
 
@@ -342,6 +344,55 @@ SAML と同じ。**外部設定（環境変数・`App_Data/Parameters` など）
 本アプリからログアウトすると、ブラウザ（localStorage）に印を置き、自動では確かめない。**
 「Pleasanter でログイン」釦を押すと印は外れる。Pleasanter からもログアウトさせたいときは
 `LOGOUTURL` を設定する。
+
+### 7.4 組織・グループで利用者を制限する（Issue #505）
+
+管理画面の「許可する組織 ID」「許可するグループ ID」に Pleasanter の ID を入力する。
+**いずれかの組織またはグループに所属していれば許可する（OR）。** 名前や組織コードでは照合しない。
+組織は利用者の `DeptId` と一致するものだけを許可する。組織の階層はたどらない。
+グループは直接のユーザーメンバー、組織メンバー、子グループのメンバーを含む。無効なグループは許可しない。
+
+| 設定 | 登録済みの利用者 | 未登録の利用者（自動登録 ON） |
+| --- | --- | --- |
+| 組織・グループとも空 | 従来どおりログイン可能 | **登録せず拒否** |
+| どちらかに指定あり | 所属一致が必要 | 所属一致した場合だけ登録 |
+| 所属を取得できない・応答が不正 | 拒否 | 登録せず拒否 |
+
+**既存環境への影響:** これまで許可先を指定せず自動登録していた環境では、更新後は新規登録されない。
+自動登録を続ける場合は、対象の組織かグループを管理画面または外部設定で指定する。
+登録済み利用者にも指定した制限が適用されるため、設定前に管理者自身の所属を確認する。
+ローカルのパスワード認証・救済ログイン・SAML はこの制限の対象外。
+
+グループの確認には、本アプリの Pleasanter 接続設定の API キーを使う。
+キーには対象ユーザーとグループを取得できる権限が必要で、同じ Pleasanter・テナントの接続を設定する。
+ブラウザの cookie で取得した本人と、API キーで取得した `TenantId`・`UserId`・`LoginId`・`DeptId` を照合する。
+API キーは接続設定の URL へだけ送り、cookie と同じリクエストには載せない。
+組織が一致した場合は OR 条件を満たすので、グループを取得する必要はない。
+
+所属はログイン時と既存セッションの再確認時に調べる。所属を外れた人のセッションは、
+再確認間隔（既定 5 分）を過ぎた最初の管理 API 要求で終了する。
+DB 設定は各インスタンスで最大 30 秒保持するため、設定変更の反映もその分遅れる場合がある。
+取得失敗時はセッションを延長しない。許可対象外はログインの入口で `403 / not-allowed`、
+取得失敗は `503 / upstream-error` を返し、理由をサーバーログと操作記録へ残す。
+
+子グループを含めて最大 64 グループを確認する。循環は同じグループを再取得しない。
+上限超過・欠落したグループ・不正なメンバー形式・権限不足・時間切れは許可しない。
+本人確認から所属確認までを、既存の「問い合わせの時間切れ」の 1 回分の予算で行う。
+
+根拠（2026-09-25 確認、Pleasanter 1.5.8.1）:
+
+- [UserApiModel.cs][user-api-model]: `DeptId`。
+- [GroupUtilities.cs][group-utilities]:
+  `GroupMembers` / `AddMember` / `GroupChildren` / `AddChild` / `GetByApi`。
+- 専用 SQL Server 検証環境の標準 API で組織・グループを作成し、`POST /api/users/1/get` の `DeptId`、
+  `POST /api/groups/{id}/get` の `GroupMembers: ["User,1,False", "Dept,1,False"]` と
+  `GroupChildren: ["Group,1,"]` の形式を確認した（メンバーごとに作成・取得して確認）。
+- 本アプリの実装: `Services/PleasanterSessionVerifier.Membership.cs`、
+  `Services/PleasanterSsoAuthenticator.cs`、`Migrations/M0033_PleasanterSsoMembership.cs`。
+- 試験: `PleasanterSsoMembershipTests`、`PleasanterSsoSessionRevalidatorTests`、
+  `tools/screenshots/specs/pleasanter-sso-membership.spec.ts`。後者は専用の空 DB を使い、
+  `SSO_MEMBERSHIP_E2E=1`、`QUESTIONNAIRE_BASE_URL`、`SSO_MEMBERSHIP_PLEASANTER_URL`、
+  `SSO_MEMBERSHIP_API_KEY` を指定して `npx playwright test specs/pleasanter-sso-membership.spec.ts --project=desktop` で実行する。
 
 ## 8. 配置例
 
@@ -388,7 +439,7 @@ App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現
 次のいずれかで同じホスト名にまとめる（[サブパス配置-運用手順書](サブパス配置-運用手順書.md) と同じ。出典は参照 2026-09-24）。
 
 | 方式 | 要点 | 注意 |
-|---|---|---|
+| --- | --- | --- |
 | **App Service（Windows）の仮想アプリケーション** | Pleasanter の App Service の「構成 → パスのマッピング」に `/questionnaire` の仮想アプリケーションを足す。IIS のサブアプリと同じ形で、**追加の部品も費用も要らない** | **Windows のみ。** 仮想アプリは同じワーカープロセスを共有するため**インプロセス同士は同居できない**（ANCM 500.35）。**本アプリを `OutOfProcess` にする**。スケールは Pleasanter と一緒 |
 | Azure Front Door（Standard） | ルート `/questionnaire/*` → 本アプリ、`/*` → Pleasanter | 同じカスタムドメインを同じスタンプの 2 つの App Service へは付けられない。origin には既定ホスト名で渡すことになり、**Host から組み立てる絶対 URL** に注意。App Service 側は `AzureFrontDoor.Backend` ＋ `X-Azure-FDID` で直アクセスを塞ぐ |
 | Application Gateway v2 | パスベースのルールで同様に振り分け。VNet 内・WAF | Front Door と同じホスト名の注意。固定費が高め |
@@ -410,10 +461,10 @@ App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現
 **cookie の値はどちらにも出ない。**
 
 | 症状 | 記録・ログの理由 | 原因と対処 |
-|---|---|---|
+| --- | --- | --- |
 | 釦が出ない | — | 無効、または管理者が 0 人（最初の管理者を先に作る）、またはログイン画面の URL が未設定 |
 | 別窓でログインしても入れず待ち続ける | 記録なし（未ログイン扱い） | **ホスト名が違う**ため Pleasanter の cookie が本アプリへ届いていない（4.1）。Pleasanter の cookie のパスが本アプリの下に届かない配置（Pleasanter をサブパス）も同じ |
-| 「管理者として登録されていません」 | `result=unknown-user` | 本アプリにそのログイン ID の管理者が居ない。先に作るか、`UNKNOWNUSER=Register` にする |
+| 「管理者として登録されていません」 | `result=unknown-user` | 本アプリにそのログイン ID の管理者が居ない。先に作るか、許可する所属を設定して `UNKNOWNUSER=Register` にする |
 | 「利用を停止されています」 | `result=disabled` | 本アプリ側で止められている |
 | 「Pleasanter に問い合わせできませんでした」 | `redirect` | 内部 URL が Pleasanter 以外（ログイン画面など）を指している |
 | 同上 | `http-403` | 利用者の API 利用が禁止されていて、本アプリに API キーが無い（2.3）。API キーを設定する。IP 制限（4.3）・`TokenCheck: true`（4.2）でも起きる |
@@ -433,7 +484,7 @@ App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現
 ## 10. 検証の状況
 
 | 項目 | 状況 |
-|---|---|
+| --- | --- |
 | 検証サービスの判定（本文の `Own`・401・業務ステータス 401・転送・HTML・4xx/5xx・時間切れ・接続不可・壊れた JSON・1 行ちょうどと `TotalCount`・UserId 0 / 文字列 / 小数・大きすぎる応答・cookie の選別・403 で API キーの有無による分岐・代わりの経路の 401 と利用者 ID 違い・API キーをログにも cookie 付きの要求にも出さないこと・時間切れが全体に掛かること） | 単体テスト（`PleasanterSessionVerifierTests`） |
 | 設定の読み取り・優先順位・保存 | 単体テスト（`PleasanterSsoOptionsTests`） |
 | 未登録の扱い・本アプリの 2 要素 | 単体テスト（`PleasanterSsoAuthenticatorTests`） |
@@ -461,3 +512,6 @@ App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現
 | Pleasanter でログアウトした直後 | 本アプリの cookie（Path `/questionnaire`）は消えずに残る（4.4 の巻き添えは起きない） |
 | 再検証の間隔（1 分）の後 | 管理 API が 401 で締め出される |
 | 本アプリに未登録の Pleasanter 利用者 | 403（`unknown-user`） |
+
+[user-api-model]: https://github.com/Implem/Implem.Pleasanter/blob/Pleasanter_1.5.8.1/Implem.Pleasanter/Models/Users/UserApiModel.cs
+[group-utilities]: https://github.com/Implem/Implem.Pleasanter/blob/Pleasanter_1.5.8.1/Implem.Pleasanter/Models/Groups/GroupUtilities.cs

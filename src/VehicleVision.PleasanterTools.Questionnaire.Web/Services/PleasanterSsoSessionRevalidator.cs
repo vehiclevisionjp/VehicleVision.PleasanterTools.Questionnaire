@@ -180,9 +180,10 @@ public sealed class PleasanterSsoSessionRevalidator(
                 Forget(adminSessionId);
                 return PleasanterSsoRevalidation.Rejected;
 
+            case PleasanterSessionStatus.NotAllowed:
             case PleasanterSessionStatus.Unauthenticated:
                 logger.LogInformation(
-                    "Pleasanter からログアウトされていたため、セッション {SessionId} を終了します（{Reason}）。",
+                    "Pleasanter でのログインまたは所属が許可されないため、セッション {SessionId} を終了します（{Reason}）。",
                     adminSessionId,
                     result.Reason);
                 Forget(adminSessionId);

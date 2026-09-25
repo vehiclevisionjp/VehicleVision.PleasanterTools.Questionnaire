@@ -48,6 +48,8 @@ public sealed class PleasanterSsoOptionsProvider(
 
     private static readonly (string Key, Func<PleasanterSsoSettingValues, string?> Read)[] Fields =
     [
+        (PleasanterSsoOptions.AllowedDeptIdsKey, values => values.AllowedDeptIds),
+        (PleasanterSsoOptions.AllowedGroupIdsKey, values => values.AllowedGroupIds),
         (PleasanterSsoOptions.EnabledKey, values => values.Enabled),
         (PleasanterSsoOptions.InternalBaseUrlKey, values => values.InternalBaseUrl),
         (PleasanterSsoOptions.LoginUrlKey, values => values.LoginUrl),
@@ -128,6 +130,8 @@ public sealed class PleasanterSsoOptionsProvider(
         PleasanterSsoSettingValues requested,
         PleasanterSsoSettingValues current) => new()
         {
+            AllowedDeptIds = Mutable(PleasanterSsoOptions.AllowedDeptIdsKey, requested.AllowedDeptIds, current.AllowedDeptIds),
+            AllowedGroupIds = Mutable(PleasanterSsoOptions.AllowedGroupIdsKey, requested.AllowedGroupIds, current.AllowedGroupIds),
             Enabled = Mutable(PleasanterSsoOptions.EnabledKey, requested.Enabled, current.Enabled),
             InternalBaseUrl = Mutable(
                 PleasanterSsoOptions.InternalBaseUrlKey, requested.InternalBaseUrl, current.InternalBaseUrl),
@@ -164,6 +168,8 @@ public sealed class PleasanterSsoOptionsProvider(
 
         var effective = new PleasanterSsoSettingValues
         {
+            AllowedDeptIds = ValueOf(PleasanterSsoOptions.AllowedDeptIdsKey) ?? string.Empty,
+            AllowedGroupIds = ValueOf(PleasanterSsoOptions.AllowedGroupIdsKey) ?? string.Empty,
             Enabled = forceEnabled ? "true" : OrDefault(ValueOf(PleasanterSsoOptions.EnabledKey), "false"),
             InternalBaseUrl = ValueOf(PleasanterSsoOptions.InternalBaseUrlKey) ?? string.Empty,
             LoginUrl = ValueOf(PleasanterSsoOptions.LoginUrlKey) ?? string.Empty,

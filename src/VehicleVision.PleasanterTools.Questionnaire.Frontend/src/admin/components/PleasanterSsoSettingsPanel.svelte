@@ -87,14 +87,18 @@
         userId: value.userId ?? '',
         tenantId: value.tenantId ?? '',
       });
-      if (value.registered === false) {
-        testError = t('pleasanterSso.testNotRegistered');
+      if (value.registered === false && !value.registrationAllowed) {
+        testError = settings.unknownUser === 'Register'
+          ? t('signIn.pleasanterError.notAllowed')
+          : t('pleasanterSso.testNotRegistered');
       }
       return;
     }
 
     testError =
-      value.status === 'Unauthenticated'
+      value.status === 'NotAllowed'
+        ? t('signIn.pleasanterError.notAllowed')
+        : value.status === 'Unauthenticated'
         ? t('pleasanterSso.testUnauthenticated')
         : t('pleasanterSso.testUpstreamError', { reason: value.reason ?? '' });
   }
@@ -176,6 +180,20 @@
             <option value="Auditor">{t('users.role.Auditor')}</option>
             <option value="Administrator">{t('users.role.Administrator')}</option>
           </select>
+        </label>
+      </div>
+
+      <p class="hint">{t('pleasanterSso.membershipHint')}</p>
+      <div class="row">
+        <label>
+          {t('pleasanterSso.allowedDeptIds')}
+          {#if fixed('allowedDeptIds')}<span class="fixed">{t('pleasanterSso.fixed')}</span>{/if}
+          <input type="text" maxlength="1024" bind:value={settings.allowedDeptIds} disabled={fixed('allowedDeptIds')} />
+        </label>
+        <label>
+          {t('pleasanterSso.allowedGroupIds')}
+          {#if fixed('allowedGroupIds')}<span class="fixed">{t('pleasanterSso.fixed')}</span>{/if}
+          <input type="text" maxlength="1024" bind:value={settings.allowedGroupIds} disabled={fixed('allowedGroupIds')} />
         </label>
       </div>
 
