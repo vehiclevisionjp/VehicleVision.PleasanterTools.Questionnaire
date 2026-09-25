@@ -31,8 +31,8 @@
 ## プロジェクト情報
 
 **Pleasanter をバックエンドにした Web アンケート・Web フォームアプリ。**
-Google Forms / Microsoft Forms に近い回答画面を提供し、**アンケートの項目定義は Pleasanter 側の
-サイト設定で行い、回答データも Pleasanter へ蓄積する。** 本アプリは Pleasanter 本体を改造せず、
+Google Forms / Microsoft Forms に近い回答画面を提供する。**アンケートの設問は本アプリの管理画面で定義して
+本アプリの DB に保存し、回答データを Pleasanter へ蓄積する。** 本アプリは Pleasanter 本体を改造せず、
 標準 API を利用する独立したアプリ。
 
 - 言語・ランタイムは **Pleasanter 本体に揃える**（[`_documents/アーキテクチャ方針.md`](../_documents/アーキテクチャ方針.md)）
