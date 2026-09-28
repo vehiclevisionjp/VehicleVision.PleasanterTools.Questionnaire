@@ -499,6 +499,7 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--surface);
+    color: var(--text);
   }
 
   /* **本物と見分けが付くようにする** */
