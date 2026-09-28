@@ -1212,13 +1212,23 @@
 
   .head {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     align-items: center;
   }
 
   .title {
-    flex: 1;
+    flex: 1 1 12rem;
+    min-width: 0;
     font-weight: 600;
+  }
+
+  .head > select {
+    flex: 1 1 14rem;
+    min-width: 0;
+    max-width: 100%;
+    background: var(--surface);
+    color: var(--text);
   }
 
   input[type='text'],
@@ -1457,7 +1467,9 @@
 
   .actions {
     display: flex;
+    flex-shrink: 0;
     gap: 0.25rem;
+    margin-left: auto;
   }
 
   .icon {
