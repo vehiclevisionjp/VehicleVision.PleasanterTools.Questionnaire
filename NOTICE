@@ -16,7 +16,7 @@ Copyright (C) PMC Co.,Ltd.
 
 名称 / バージョン / ライセンス / 入手元
 
-  Dapper 2.1.86 / Apache-2.0 / https://www.nuget.org/packages/Dapper
+  Dapper 2.1.89 / Apache-2.0 / https://www.nuget.org/packages/Dapper
   FluentMigrator 8.0.1 / Apache-2.0 / https://www.nuget.org/packages/FluentMigrator
   FluentMigrator.Runner 8.0.1 / Apache-2.0
   FluentMigrator.Runner.SqlServer 8.0.1 / Apache-2.0
@@ -30,7 +30,7 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Data.SqlClient 7.1.0 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
-  StackExchange.Redis 3.3.0 / MIT / https://www.nuget.org/packages/StackExchange.Redis/3.3.0
+  StackExchange.Redis 3.3.1 / MIT / https://www.nuget.org/packages/StackExchange.Redis/3.3.0
     （大規模構成で選択できる管理者セッションストア。既定は本アプリの DB）
   Microsoft.Extensions.DependencyInjection 10.0.12 / MIT
   Microsoft.Extensions.Configuration.Abstractions 10.0.12 / MIT
@@ -40,7 +40,7 @@ Copyright (C) PMC Co.,Ltd.
   Scalar.AspNetCore 2.17.6 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.17.6
     （OpenAPI 文書を読む画面。画面本体は埋め込みアセットで同梱し、CDN の既定フォントと
       利用状況テレメトリーは無効化する）
-  Jint 4.16.3 / BSD-2-Clause / https://github.com/sebastienros/jint
+  Jint 4.16.4 / BSD-2-Clause / https://github.com/sebastienros/jint
     （変換スクリプトの実行エンジン。Acornima などを推移的に伴う）
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
   nClam 9.0.0 / Apache-2.0 / https://github.com/tekmaven/nClam
@@ -58,11 +58,11 @@ Copyright (C) PMC Co.,Ltd.
     （Azure Communication Services の送信経路。**マネージド ID で通る**。Issue #198）
   Azure.Identity 1.21.0 / MIT / https://github.com/Azure/azure-sdk-for-net
     （マネージド ID から資格情報を取る。Azure.Core などを推移的に伴う）
-  MailKit 4.18.0 / MIT / https://github.com/jstedfast/MailKit
+  MailKit 4.18.1 / MIT / https://github.com/jstedfast/MailKit
     （メールの送信。**認証付きリレーの 587 番は Azure でブロックされない**ので、
       これ 1 本で SendGrid・Amazon SES・Azure Communication Services・
       Microsoft 365 へ送れる。**送信先ごとの純正 SDK は足さない**）
-  MimeKit 4.18.0 / MIT / https://github.com/jstedfast/MimeKit
+  MimeKit 4.18.1 / MIT / https://github.com/jstedfast/MimeKit
     （MailKit が推移的に伴う。メールの組み立て）
   BouncyCastle.Cryptography 2.6.2 / MIT / https://github.com/bcgit/bc-csharp
     （MimeKit が推移的に伴う）
@@ -71,11 +71,11 @@ Copyright (C) PMC Co.,Ltd.
 残りはビルド時だけ使う）
 
   svelte 5.57.1 / MIT / https://www.npmjs.com/package/svelte
-  vite 8.3.0 / MIT / https://www.npmjs.com/package/vite
-  @sveltejs/vite-plugin-svelte 7.3.0 / MIT
+  vite 8.3.1 / MIT / https://www.npmjs.com/package/vite
+  @sveltejs/vite-plugin-svelte 7.3.1 / MIT
   svelte-check 4.7.6 / MIT
   vitest 5.0.1 / MIT / https://www.npmjs.com/package/vitest
-  sass 1.104.1 / MIT
+  sass 1.105.0 / MIT
   typescript 6.0.3 / Apache-2.0
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
   @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://github.com/DefinitelyTyped/DefinitelyTyped
@@ -111,7 +111,7 @@ Copyright (C) PMC Co.,Ltd.
   Valkey 9.1.2 / BSD-3-Clause / https://github.com/valkey-io/valkey
     （Redis 互換セッションストアの検証用。
       **別のコンテナとして立てるだけで、成果物には含まれない**）
-  coverlet.collector 10.0.1 / MIT
+  coverlet.collector 10.1.0 / MIT
   Microsoft.Extensions.Configuration 10.0.12 / MIT
     （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
   Microsoft.Extensions.TimeProvider.Testing 10.10.0 / MIT
