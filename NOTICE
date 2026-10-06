@@ -37,7 +37,7 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.Hosting.Abstractions 10.0.12 / MIT
   Microsoft.Extensions.Logging.Abstractions 10.0.12 / MIT
   Microsoft.AspNetCore.OpenApi 10.0.12 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.OpenApi
-  Scalar.AspNetCore 2.17.13 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.17.13
+  Scalar.AspNetCore 2.17.14 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.17.14
     （OpenAPI 文書を読む画面。画面本体は埋め込みアセットで同梱し、CDN の既定フォントと
       利用状況テレメトリーは無効化する）
   Jint 4.16.4 / BSD-2-Clause / https://github.com/sebastienros/jint
@@ -48,7 +48,7 @@ Copyright (C) PMC Co.,Ltd.
   ITfoxtec.Identity.Saml2 4.21.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
   ITfoxtec.Identity.Saml2.MvcCore 4.21.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
     （Microsoft.IdentityModel.* と Newtonsoft.Json を推移的に伴う。いずれも MIT）
-  Azure.Storage.Blobs 12.30.0 / MIT / https://github.com/Azure/azure-sdk-for-net
+  Azure.Storage.Blobs 12.30.1 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
   AWSSDK.SimpleEmailV2 4.0.106.1 / Apache-2.0 / https://github.com/aws/aws-sdk-net
     （Amazon SES の送信経路。**IAM ロールで通るので、保管する秘密が 0 になる**。Issue #198）
@@ -70,8 +70,8 @@ Copyright (C) PMC Co.,Ltd.
 フロントエンド（**成果物へ含まれるのは svelte のランタイム・qrcode・同梱した書体のみ。**
 残りはビルド時だけ使う）
 
-  svelte 5.57.1 / MIT / https://www.npmjs.com/package/svelte
-  vite 8.3.2 / MIT / https://www.npmjs.com/package/vite
+  svelte 5.57.2 / MIT / https://www.npmjs.com/package/svelte
+  vite 8.3.3 / MIT / https://www.npmjs.com/package/vite
   @sveltejs/vite-plugin-svelte 7.3.1 / MIT
   svelte-check 4.7.6 / MIT
   vitest 5.0.3 / MIT / https://www.npmjs.com/package/vitest
