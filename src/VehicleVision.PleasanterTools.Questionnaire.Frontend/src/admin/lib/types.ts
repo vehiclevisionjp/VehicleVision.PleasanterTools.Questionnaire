@@ -447,6 +447,13 @@ export interface SurveyDraft {
   assetHistoryMapping?: MappingDefinition | null;
   /** **保存時に照合する版。** 合わなければ他の人が更新している */
   revision: number;
+  /**
+   * 公開状態（`SurveySummary.status` と同じ値）。
+   *
+   * **編集は下書きにしか効かない**ので、下書き以外ではその旨と次の操作を出し分けるために使う。
+   * 古いサーバが返さなかったときは下書きとして扱う。
+   */
+  status?: number;
 }
 
 export interface SurveySummary {
