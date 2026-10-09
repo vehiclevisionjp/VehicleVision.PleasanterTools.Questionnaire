@@ -152,6 +152,7 @@ QUESTIONNAIRE_INTEGRATION=1 dotnet test tests/VehicleVision.PleasanterTools.Ques
 | [`_documents/データモデル設計.md`](_documents/データモデル設計.md) | DB スキーマ・版管理・3 RDBMS の型対応 |
 | [`_documents/アプリケーション設計.md`](_documents/アプリケーション設計.md) | プロジェクト構成・API・送信ワーカー |
 | [`_documents/画面設計.md`](_documents/画面設計.md) | 回答画面・管理アプリ |
+| [`_documents/アンケート公開状態-フロー.md`](_documents/アンケート公開状態-フロー.md) | 公開状態の遷移と、編集が効く先 |
 | [`_documents/非機能設計.md`](_documents/非機能設計.md) | セキュリティ・障害時・テスト・運用 |
 | [`_documents/多言語対応方針.md`](_documents/多言語対応方針.md) | 画面の言語（7 言語）と文言の持ち方 |
 | [`_documents/開発環境.md`](_documents/開発環境.md) | Docker の検証環境・VS Code・結合テスト |
