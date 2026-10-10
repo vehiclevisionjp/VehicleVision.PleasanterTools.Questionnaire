@@ -474,6 +474,12 @@ export const en: Record<MessageKey, string> = {
   'editor.removePage': 'Remove this page',
   'editor.addQuestion': 'Add a question',
   'editor.addPage': 'Add a page (page break)',
+  'editor.tabs': 'Sections',
+  'editor.tabQuestions': 'Questions and mapping',
+  'editor.tabSettings': 'Basics',
+  'editor.tabExtras': 'Appearance and auto-reply',
+  'editor.pageTabs': 'Pages',
+  'editor.pageTab': 'Page {number}',
   'editor.shuffleQuestions': 'Shuffle the questions on this page for each respondent',
   'editor.shuffleQuestionsHint':
     'Note blocks stay where they are; only the questions between them are shuffled. The order is fixed for the whole response.',
