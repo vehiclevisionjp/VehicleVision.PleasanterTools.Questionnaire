@@ -286,12 +286,15 @@ jobs:
           package_name="VehicleVision.PleasanterTools.Questionnaire-$VERSION-portable.zip"
           package_path="$RUNNER_TEMP/$package_name"
 
+          # デバッグ記号（pdb）は配置先に要らない。サイズと内部情報の露出を減らす。
+          # **後から消すのではなく、作らない。** DebugType=none ＋ DebugSymbols=false を発行に渡す
+          # （2026-10-10 実測: 何も渡さないと 7 個、CopyOutputSymbolsToPublishDirectory=false だけでは
+          # 参照先プロジェクトの分が残って 6 個、この 2 つで 0 個）
           dotnet publish src/VehicleVision.PleasanterTools.Questionnaire.Web \
-            --no-restore -c Release -o "$publish_dir"
+            --no-restore -c Release -o "$publish_dir" \
+            -p:DebugType=none -p:DebugSymbols=false
 
-          # デバッグ記号は配置先に要らない。サイズと内部情報の露出を減らす。
-          # 依存パッケージの記号も含めて全部外す
-          find "$publish_dir" -name '*.pdb' -delete
+          # 渡し忘れや SDK の挙動変更で、pdb が混ざったまま出さないための検査
           remaining_pdb="$(find "$publish_dir" -name '*.pdb')"
           if [ -n "$remaining_pdb" ]; then
             echo "NG: 配置用 ZIP に pdb が残っている: $remaining_pdb" >&2
