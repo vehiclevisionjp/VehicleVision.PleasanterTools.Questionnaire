@@ -580,7 +580,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'mapping.attachmentReplaceHint': '답변을 다시 제출하면 Pleasanter 측 첨부가 새 파일로 바뀝니다.',
   'mapping.rowUnset': '(행 선택)',
   'mapping.refreshColumnAvailability': '되돌리다',
-  'mapping.budgetBasisSite': '실제 Pleasanter 사이트의 열 수로 계산됩니다.',
+  'mapping.budgetBasisSite': '유형별 표준 26개 열에, Pleasanter 사이트에서 확인된 항목 확장 열을 더해 계산합니다.',
   'mapping.budgetBasisStandard': 'Pleasanter 사이트의 열 수를 가져올 수 없기 때문에 표준 개수(유형당 26 열)로 계산합니다.',
   'mapping.budgetEntry': '{prefix}: {used} / {available} 열',
   'mapping.budgetOver': '{prefixes}의 열 수를 초과했습니다. 할당을 확인합니다.',

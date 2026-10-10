@@ -585,7 +585,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "mapping.attachmentReplaceHint": "Việc gửi lại phản hồi sẽ thay thế các tệp đính kèm ở phía Pleasanter.",
   "mapping.rowUnset": "(chọn một hàng)",
   "mapping.refreshColumnAvailability": "Làm mới",
-  "mapping.budgetBasisSite": "Đếm các cột có sẵn trên trang Pleasanter.",
+  "mapping.budgetBasisSite": "Đếm theo 26 cột tiêu chuẩn cho mỗi loại, cộng thêm các cột mở rộng tìm thấy trên trang Pleasanter.",
   "mapping.budgetBasisStandard": "Các cột của trang Pleasanter không có sẵn, vì vậy mỗi loại sẽ có 26 cột tiêu chuẩn.",
   "mapping.budgetEntry": "{prefix}: {used} của {available}",
   "mapping.budgetOver": "{prefixes} vượt quá số cột có sẵn. Kiểm tra bài tập.",
