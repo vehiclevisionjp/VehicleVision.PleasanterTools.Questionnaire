@@ -98,6 +98,46 @@ public class AdminSurveyListTests
     }
 
     [Fact]
+    public void GetSiteの項目名は利用者が付けたものだけを物理名ごとに返す()
+    {
+        var response = JsonNode.Parse(
+            """
+            {
+              "Response": {
+                "Data": {
+                  "SiteSettings": {
+                    "Columns": [
+                      { "ColumnName": "ClassA", "LabelText": "部署名" },
+                      { "ColumnName": "NumA", "LabelText": "numa" },
+                      { "ColumnName": "ClassB", "LabelText": "" },
+                      { "ColumnName": "DateA" },
+                      { "ColumnName": "Title", "LabelText": "件名" }
+                    ]
+                  }
+                }
+              }
+            }
+            """);
+
+        var labels = AdminSurveyEndpoints.LabelsFrom(response);
+
+        // **物理名と同じ文字列は返さない。** 本アプリの同期が書く値で、添えても情報が増えない
+        Assert.Equal(2, labels.Count);
+        Assert.Equal("部署名", labels["ClassA"]);
+        Assert.Equal("部署名", labels["classa"]);
+        Assert.Equal("件名", labels["Title"]);
+    }
+
+    [Fact]
+    public void GetSiteの列定義が無ければ項目名は空で返す()
+    {
+        var response = JsonNode.Parse("""{ "Response": { "Data": { "SiteSettings": {} } } }""");
+
+        Assert.Empty(AdminSurveyEndpoints.LabelsFrom(response));
+        Assert.Empty(AdminSurveyEndpoints.LabelsFrom(null));
+    }
+
+    [Fact]
     public void GetSiteの列定義が無ければ標準の本数へ戻す()
     {
         var response = JsonNode.Parse("""{ "Response": { "Data": { "SiteSettings": {} } } }""");

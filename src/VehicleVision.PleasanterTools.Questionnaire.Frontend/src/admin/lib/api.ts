@@ -522,6 +522,11 @@ export const importQuestions = (
 export interface ColumnAvailabilityResponse {
   source: 'site' | 'standard';
   availableByPrefix: Record<string, number>;
+  /**
+   * 列の物理名ごとの項目名（Pleasanter 側で付けた論理名。Issue #549）。
+   * **名前を付けた列だけ。** 古いサーバは返さないので省略可
+   */
+  labels?: Record<string, string>;
 }
 
 export const loadColumnAvailability = (surveyId: string) =>

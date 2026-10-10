@@ -446,12 +446,16 @@ public static class AdminSurveyEndpoints
             var availableByPrefix = response.IsSuccess
                 ? AvailableColumnsFrom(response.Body)
                 : null;
+            // **項目名は、取れたものだけ添える。** 取れなくても編集は止めない
+            var labels = response.IsSuccess
+                ? LabelsFrom(response.Body)
+                : new Dictionary<string, string>();
 
             // **取得に失敗しても編集を止めない。** 項目拡張のない標準構成なら正しい本数であり、
             // 取得できないことを理由に、利用者が下書きを直せなくなる方を避ける。
             return Results.Ok(availableByPrefix is null
-                ? new ColumnAvailabilityResponse("standard", new Dictionary<string, int>())
-                : new ColumnAvailabilityResponse("site", availableByPrefix));
+                ? new ColumnAvailabilityResponse("standard", new Dictionary<string, int>(), labels)
+                : new ColumnAvailabilityResponse("site", availableByPrefix, labels));
         });
 
         // ---- マッピング先サイトの同期 ---------------------------------------
@@ -1728,6 +1732,40 @@ public static class AdminSurveyEndpoints
     /// Pleasanter の <c>GetSite</c> は <c>Response.Data.SiteSettings.Columns</c> に
     /// <c>ColumnName</c> を持つ。列定義が無ければ、取得できなかったものとして標準値へ戻す。
     /// </remarks>
+    /// <summary>
+    /// <c>GetSite</c> 応答から、列の物理名ごとの項目名（<c>LabelText</c>）を取り出す（Issue #549）。
+    /// </summary>
+    /// <remarks>
+    /// **項目名が空のもの、物理名と同じものは出さない。** 後者は本アプリの同期が書く値
+    /// （<c>SiteSettingsSynchronizer</c>）で、利用者が付けた名前ではなく、添えても情報が増えない。
+    /// 物理名の大文字小文字は区別しない。
+    /// </remarks>
+    public static IReadOnlyDictionary<string, string> LabelsFrom(JsonNode? body)
+    {
+        var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var columns = body?["Response"]?["Data"]?["SiteSettings"]?["Columns"]?.AsArray();
+        if (columns is null)
+        {
+            return labels;
+        }
+
+        foreach (var column in columns)
+        {
+            var columnName = column?["ColumnName"]?.GetValue<string>();
+            var labelText = column?["LabelText"]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(columnName)
+                || string.IsNullOrWhiteSpace(labelText)
+                || string.Equals(columnName, labelText, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            labels[columnName] = labelText;
+        }
+
+        return labels;
+    }
+
     public static IReadOnlyDictionary<string, int>? AvailableColumnsFrom(JsonNode? body)
     {
         var columns = body?["Response"]?["Data"]?["SiteSettings"]?["Columns"]?.AsArray();
@@ -1799,7 +1837,8 @@ public static class AdminSurveyEndpoints
     /// <summary>マッピング編集画面で使う列数。</summary>
     public sealed record ColumnAvailabilityResponse(
         string Source,
-        IReadOnlyDictionary<string, int> AvailableByPrefix);
+        IReadOnlyDictionary<string, int> AvailableByPrefix,
+        IReadOnlyDictionary<string, string> Labels);
 
     /// <summary>取り込み元のページ。**ページそのものは取り込まない。**</summary>
     public sealed record QuestionImportPageResponse(
