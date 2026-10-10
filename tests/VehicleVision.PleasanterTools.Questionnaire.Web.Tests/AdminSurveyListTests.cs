@@ -92,9 +92,55 @@ public class AdminSurveyListTests
         var availableByPrefix = AdminSurveyEndpoints.AvailableColumnsFrom(response);
 
         Assert.NotNull(availableByPrefix);
-        Assert.Equal(2, availableByPrefix["Class"]);
-        Assert.Equal(1, availableByPrefix["Num"]);
+        // **標準の 26 本を下限に、項目拡張の最大の番号（Class001 → 1）を上乗せする**（Issue #551）
+        Assert.Equal(27, availableByPrefix["Class"]);
+        Assert.Equal(26, availableByPrefix["Num"]);
         Assert.DoesNotContain("Title", availableByPrefix.Keys);
+    }
+
+    [Fact]
+    public void GetSiteは設定を付けた列だけを返すので件数を本数にしない()
+    {
+        // **実機の応答の形**（Issue #551）。ClassA〜ClassD のうち、設定を初期化した列は載らない。
+        // 件数（3）を本数にすると、実際は 26 本使えるのに足りないと誤判定する
+        var response = JsonNode.Parse("""
+            {
+              "Response": {
+                "Data": {
+                  "SiteSettings": {
+                    "Columns": [
+                      { "ColumnName": "ClassA", "LabelText": "部署" },
+                      { "ColumnName": "ClassB", "LabelText": "取引先" },
+                      { "ColumnName": "ClassD", "LabelText": "区分" }
+                    ]
+                  }
+                }
+              }
+            }
+            """);
+
+        var availableByPrefix = AdminSurveyEndpoints.AvailableColumnsFrom(response);
+
+        Assert.NotNull(availableByPrefix);
+        Assert.Equal(26, availableByPrefix["Class"]);
+    }
+
+    [Fact]
+    public void GetSiteの項目拡張は最大の番号を標準の本数へ上乗せする()
+    {
+        var response = JsonNode.Parse("""
+            {
+              "Response": { "Data": { "SiteSettings": { "Columns": [
+                { "ColumnName": "Class003" }, { "ColumnName": "Class012" }, { "ColumnName": "Num001" }
+              ] } } }
+            }
+            """);
+
+        var availableByPrefix = AdminSurveyEndpoints.AvailableColumnsFrom(response);
+
+        Assert.NotNull(availableByPrefix);
+        Assert.Equal(38, availableByPrefix["Class"]);
+        Assert.Equal(27, availableByPrefix["Num"]);
     }
 
     [Fact]

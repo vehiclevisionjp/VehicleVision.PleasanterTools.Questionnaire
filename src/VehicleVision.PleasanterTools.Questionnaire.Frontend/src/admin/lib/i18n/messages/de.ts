@@ -585,7 +585,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "mapping.attachmentReplaceHint": "Das Senden einer Antwort ersetzt erneut die Anhänge auf der Pleasanter-Seite.",
   "mapping.rowUnset": "(wählen Sie eine Zeile)",
   "mapping.refreshColumnAvailability": "Erfrischend",
-  "mapping.budgetBasisSite": "Zählen der auf der Pleasanter-Website verfügbaren Spalten.",
+  "mapping.budgetBasisSite": "Gezählt werden die standardmäßigen 26 Spalten je Typ plus die auf der Pleasanter-Site gefundenen erweiterten Spalten.",
   "mapping.budgetBasisStandard": "Die Pleasanter Site Spalten sind nicht verfügbar, so dass die Standard 26 Spalten pro Typ gezählt werden.",
   "mapping.budgetEntry": "{prefix}: {used} von {available}",
   "mapping.budgetOver": "{prefixes} überschreitet die verfügbaren Spalten. Überprüfen Sie die Zuordnungen.",

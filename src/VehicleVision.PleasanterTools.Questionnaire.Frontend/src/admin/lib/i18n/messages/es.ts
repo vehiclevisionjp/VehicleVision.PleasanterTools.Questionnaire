@@ -613,7 +613,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "mapping.attachmentReplaceHint": "Al volver a enviar una respuesta se sustituyen los datos adjuntos en Pleasanter.",
   "mapping.rowUnset": "(elija una fila)",
   "mapping.refreshColumnAvailability": "Actualizar",
-  "mapping.budgetBasisSite": "Se cuentan las columnas disponibles en el sitio de Pleasanter.",
+  "mapping.budgetBasisSite": "Se cuentan las 26 columnas estándar por tipo más las columnas ampliadas encontradas en el sitio de Pleasanter.",
   "mapping.budgetBasisStandard": "Las columnas del sitio de Pleasanter no están disponibles, por lo que se cuentan las 26 columnas estándar de cada tipo.",
   "mapping.budgetEntry": "{prefix}: {used} de {available}",
   "mapping.budgetOver": "{prefixes} supera las columnas disponibles. Revise las asignaciones.",

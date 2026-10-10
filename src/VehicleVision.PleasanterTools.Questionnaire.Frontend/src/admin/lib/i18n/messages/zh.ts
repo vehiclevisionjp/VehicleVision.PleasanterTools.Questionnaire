@@ -654,7 +654,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'mapping.attachmentReplaceHint': '再次提交回答时，Pleasanter 中的附件会被新文件替换。',
   'mapping.rowUnset': '（选择行）',
   'mapping.refreshColumnAvailability': '刷新',
-  'mapping.budgetBasisSite': '当前按 Pleasanter 站点实际可用的列数计算。',
+  'mapping.budgetBasisSite': '按每种类型标准的 26 列，加上在 Pleasanter 站点中确认到的扩展列来计算。',
   'mapping.budgetBasisStandard': '无法获取 Pleasanter 站点的列数，因此按每种类型标准的 26 列计算。',
   'mapping.budgetEntry': '{prefix}: {used} / {available} 列',
   'mapping.budgetOver': '{prefixes} 超出了可用列数。请检查分配。',
