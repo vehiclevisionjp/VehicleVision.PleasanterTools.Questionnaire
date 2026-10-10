@@ -201,25 +201,13 @@ function Get-ReleasePackage {
 
     $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion-portable.zip"
     $archivePath = Join-Path $DestinationDirectory $assetName
+    $sha256Path = "$archivePath.sha256"
     $releaseBaseUri =
         "https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Questionnaire/releases/download/v$normalizedVersion"
 
     Write-Host "Application version: $normalizedVersion"
     Write-Host "Downloading release package: $assetName"
-    try {
-        Invoke-WebRequest -Uri "$releaseBaseUri/$assetName" -OutFile $archivePath
-    }
-    catch {
-        # v0.9.3 and earlier are published without the -portable suffix.
-        Write-Host "Asset $assetName was not found. Trying the legacy name."
-        if (Test-Path -LiteralPath $archivePath) {
-            Remove-Item -LiteralPath $archivePath -Force
-        }
-        $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion.zip"
-        $archivePath = Join-Path $DestinationDirectory $assetName
-        Invoke-WebRequest -Uri "$releaseBaseUri/$assetName" -OutFile $archivePath
-    }
-    $sha256Path = "$archivePath.sha256"
+    Invoke-WebRequest -Uri "$releaseBaseUri/$assetName" -OutFile $archivePath
     Invoke-WebRequest -Uri "$releaseBaseUri/$assetName.sha256" -OutFile $sha256Path
 
     return @{

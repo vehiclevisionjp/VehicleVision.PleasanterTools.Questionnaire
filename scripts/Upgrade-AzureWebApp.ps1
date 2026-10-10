@@ -320,23 +320,11 @@ try {
 
     $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion-portable.zip"
     $zipPath = Join-Path $temporaryDirectory $assetName
+    $checksumPath = "$zipPath.sha256"
     $releaseBaseUri = "https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Questionnaire/releases/download/v$normalizedVersion"
 
     Write-Host "Downloading release $normalizedVersion."
-    try {
-        Invoke-WebRequest -Uri "$releaseBaseUri/$assetName" -OutFile $zipPath
-    }
-    catch {
-        # v0.9.3 and earlier are published without the -portable suffix.
-        Write-Host "Asset $assetName was not found. Trying the legacy name."
-        if (Test-Path -LiteralPath $zipPath) {
-            Remove-Item -LiteralPath $zipPath -Force
-        }
-        $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion.zip"
-        $zipPath = Join-Path $temporaryDirectory $assetName
-        Invoke-WebRequest -Uri "$releaseBaseUri/$assetName" -OutFile $zipPath
-    }
-    $checksumPath = "$zipPath.sha256"
+    Invoke-WebRequest -Uri "$releaseBaseUri/$assetName" -OutFile $zipPath
     Invoke-WebRequest -Uri "$releaseBaseUri/$assetName.sha256" -OutFile $checksumPath
 
     $expectedHash = ((Get-Content -LiteralPath $checksumPath -Raw).Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)[0]).ToLowerInvariant()
