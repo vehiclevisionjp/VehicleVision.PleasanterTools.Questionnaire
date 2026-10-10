@@ -1835,6 +1835,8 @@ public static class AdminSurveyEndpoints
                 .Select(item => item?["SiteId"]?.GetValue<long>())
                 .Where(siteId => siteId is > 0)
                 .Select(siteId => siteId!.Value.ToString(CultureInfo.InvariantCulture))
+                // **同じサイトを複数書けるので、重複は除く**（「参照先: 1, 1」と出さない。Issue #558）
+                .Distinct(StringComparer.Ordinal)
                 .ToList();
             return siteIds.Count == 0 ? null : siteIds;
         }

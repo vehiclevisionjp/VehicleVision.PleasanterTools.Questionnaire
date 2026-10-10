@@ -556,7 +556,8 @@
     }
   }
 
-  async function doPublish() {
+  /** テスト公開する。**公開できたかを返す。** */
+  async function doPublish(): Promise<boolean> {
     saving = true;
     error = '';
     notice = '';
@@ -580,12 +581,13 @@
         publishFlow = body.flow;
       }
 
-      return;
+      return false;
     }
 
     warnings = result.value.warnings;
     notice = t('editor.testPublished', { version: result.value.version });
     await load(surveyId);
+    return true;
   }
 
   /**
@@ -610,9 +612,12 @@
       return;
     }
 
-    // **ここから先で失敗しても下書きに戻っている。** 画面を実際の状態に合わせる
-    status = 0;
-    await doPublish();
+    // **処理が終わるまで表示は切り替えない**（下書きに戻した時点で切り替えると、
+    // 「テスト公開に反映する」が一瞬「テスト公開する」に変わる。Issue #558）。
+    // **公開に失敗したときは、実際に下書きへ戻っているので、その状態に合わせる**
+    if (!(await doPublish())) {
+      status = 0;
+    }
   }
 
   /**

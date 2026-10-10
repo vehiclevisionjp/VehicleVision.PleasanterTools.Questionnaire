@@ -238,7 +238,7 @@ public class AdminSurveyListTests
                     "Columns": [
                       { "ColumnName": "ClassA", "LabelText": "簡易", "ChoicesText": "[[1,NoAddButton]]", "Link": true },
                       { "ColumnName": "ClassB", "LabelText": "JSON",
-                        "ChoicesText": "[{\"SiteId\":1,\"NoAddButton\":true,\"Priority\":1},{\"SiteId\":2}]" },
+                        "ChoicesText": "[{\"SiteId\":1,\"NoAddButton\":true,\"Priority\":1},{\"SiteId\":2},{\"SiteId\":1}]" },
                       { "ColumnName": "ClassC", "ChoicesText": "[1,2,3]" },
                       { "ColumnName": "ClassD", "ChoicesText": "[壊れた" }
                     ]
@@ -258,6 +258,7 @@ public class AdminSurveyListTests
         // JSON の形は `Link` が無くてもリンクと分かり、SiteId を参照先に返す。選択肢は無い
         Assert.True(details["ClassB"].IsLink);
         Assert.Equal("Json", details["ClassB"].LinkFormat);
+        // 同じ SiteId が複数あっても、参照先は重複なく返す（Issue #558）
         Assert.Equal(["1", "2"], details["ClassB"].References);
         Assert.Equal(0, details["ClassB"].ChoiceCount);
 
