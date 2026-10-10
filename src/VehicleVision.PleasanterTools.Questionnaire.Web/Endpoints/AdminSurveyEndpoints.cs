@@ -294,6 +294,34 @@ public static class AdminSurveyEndpoints
             return draft is null ? Results.NotFound() : Results.Ok(draft);
         });
 
+        // ---- 固めた版を読む（Issue #544）--------------------------------------
+        // **読むだけ。** 版は不変なので、ここからは何も書き換えない。
+        // 編集へ読み込んで保存するかどうかは、画面側で利用者が決める
+        group.MapGet("/{surveyId:guid}/versions", async (
+            Guid surveyId,
+            ISurveySnapshotStore snapshots,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await snapshots.ListAsync(surveyId, cancellationToken).ConfigureAwait(false)));
+
+        group.MapGet("/{surveyId:guid}/versions/{version:int}", async (
+            Guid surveyId,
+            int version,
+            ISurveySnapshotStore snapshots,
+            CancellationToken cancellationToken) =>
+        {
+            var snapshot = await snapshots.FindAsync(surveyId, version, cancellationToken)
+                .ConfigureAwait(false);
+            return snapshot is null
+                ? Results.NotFound()
+                : Results.Ok(new
+                {
+                    definition = snapshot.Definition,
+                    mapping = snapshot.Mapping,
+                    assetHistorySiteId = snapshot.AssetHistorySiteId,
+                    assetHistoryMapping = snapshot.AssetHistoryMapping,
+                });
+        });
+
         // ---- ほかのアンケートから設問を取り込む（Issue #358）----------------
         // **読み取りにも取り込み先を含める。** URL の surveyId を変えて、
         // アーカイブ済みやテンプレートを編集先にできないようにする。

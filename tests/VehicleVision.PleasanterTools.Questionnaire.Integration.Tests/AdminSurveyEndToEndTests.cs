@@ -707,6 +707,34 @@ public class AdminSurveyEndToEndTests
     }
 
     [Fact]
+    public async Task 固めた版を一覧し中身を読める()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // Issue #544。**読むだけで、版は書き換わらない**
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+
+        using var list = await http.GetAsync($"/api/admin/surveys/{surveyId}/versions");
+        list.EnsureSuccessStatusCode();
+        var versions = (await ReadAsync(list))!.AsArray();
+        Assert.Single(versions);
+        Assert.Equal(1, versions[0]!["version"]!.GetValue<int>());
+
+        using var detail = await http.GetAsync($"/api/admin/surveys/{surveyId}/versions/1");
+        detail.EnsureSuccessStatusCode();
+        var body = await ReadAsync(detail);
+        Assert.NotNull(body!["definition"]);
+        Assert.NotNull(body["mapping"]);
+
+        using var missing = await http.GetAsync($"/api/admin/surveys/{surveyId}/versions/99");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
     public async Task 停止して再開できる()
     {
         if (!Enabled)

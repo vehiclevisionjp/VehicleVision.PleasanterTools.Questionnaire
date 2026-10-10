@@ -82,6 +82,23 @@ public sealed class SurveySnapshotStore(IDbConnectionFactory connectionFactory) 
             row.AssetHistorySiteId,
             assetHistoryMapping);
     }
+
+    public async Task<IReadOnlyList<SurveyVersionSummary>> ListAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // ⚠️ **SELECT の並びは `SurveyVersionSummary` の構築子と同じ順**（`Row` と同じ理由）
+        var rows = await connection.QueryAsync<SurveyVersionSummary>(Sql(
+            "SELECT [Version], [PublishedAt] FROM [SurveyVersions] "
+            + "WHERE [SurveyId] = @SurveyId ORDER BY [Version] DESC",
+            new { SurveyId = surveyId },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return [.. rows];
+    }
 }
 
 /// <summary>アンケートと公開済みの版を書き込む。</summary>
