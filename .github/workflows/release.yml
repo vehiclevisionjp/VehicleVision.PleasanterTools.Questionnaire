@@ -292,8 +292,9 @@ jobs:
           # デバッグ記号は配置先に要らない。サイズと内部情報の露出を減らす。
           # 依存パッケージの記号も含めて全部外す
           find "$publish_dir" -name '*.pdb' -delete
-          if find "$publish_dir" -name '*.pdb' | grep -q .; then
-            echo "NG: 配置用 ZIP に pdb が残っている" >&2
+          remaining_pdb="$(find "$publish_dir" -name '*.pdb')"
+          if [ -n "$remaining_pdb" ]; then
+            echo "NG: 配置用 ZIP に pdb が残っている: $remaining_pdb" >&2
             exit 1
           fi
 
