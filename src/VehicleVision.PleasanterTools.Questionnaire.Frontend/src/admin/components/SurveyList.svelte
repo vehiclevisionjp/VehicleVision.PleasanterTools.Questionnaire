@@ -300,6 +300,21 @@
   }
 
   async function changePublication(survey: SurveySummary, publishNow: boolean) {
+    // **本公開中・停止中から戻すと回答画面が閉じる**（Issue #542）。確認を挟む。
+    // テスト公開からの戻しは、もともと本番の回答を受けていないので挟まない
+    if (
+      !publishNow &&
+      (survey.status === 1 || survey.status === 2) &&
+      !(await confirmAction({
+        title: t('list.revertToDraft'),
+        message: t('list.revertLiveConfirm', { title: survey.title }),
+        confirmLabel: t('list.revertToDraft'),
+        danger: true,
+      }))
+    ) {
+      return;
+    }
+
     const result = publishNow
       ? await publish(survey.surveyId)
       : await revertToDraft(survey.surveyId);
@@ -881,6 +896,9 @@
             {#if survey.archivedAt == null && (survey.status === 1 || survey.status === 2)}
               <button type="button" class="secondary" onclick={() => toggle(survey)}>
                 {survey.status === 1 ? t('list.suspend') : t('list.resume')}
+              </button>
+              <button type="button" class="secondary" onclick={() => changePublication(survey, false)}>
+                {t('list.revertToDraft')}
               </button>
               <!-- **公開していないものには出さない。** 出しても読めない URL になる -->
               <button type="button" class="secondary" onclick={() => toggleQr(survey)}>

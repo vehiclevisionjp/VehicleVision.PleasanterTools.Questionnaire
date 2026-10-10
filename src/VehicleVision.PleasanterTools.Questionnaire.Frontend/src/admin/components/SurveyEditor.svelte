@@ -50,6 +50,7 @@
   import { addQuestionAssignment } from '../lib/mappingSelection';
   import { assetMarkup as markupForAsset } from '../lib/asset';
   import { requiredPortCount } from '../lib/columnBudget';
+  import { confirmAction } from '../lib/confirmation.svelte';
 
   interface Props {
     surveyId: string;
@@ -528,6 +529,38 @@
     await doPublish();
   }
 
+  /**
+   * 本公開中・停止中のアンケートを下書きへ戻す（Issue #542）。
+   *
+   * **回答画面が閉じる**ので確認を挟む。戻したあと、直してテスト公開すると次の版ができる。
+   * **未保存の編集は先に保存する。** 戻した後の読み直しで消えるため。
+   * 保存できなかったら先へ進まない（`republish` と同じ）
+   */
+  async function revertLive() {
+    const confirmed = await confirmAction({
+      title: t('list.revertToDraft'),
+      message: t('editor.revertLiveConfirm'),
+      confirmLabel: t('list.revertToDraft'),
+      danger: true,
+    });
+    if (!confirmed) return;
+
+    if (hasUnsavedChanges && !(await save())) return;
+
+    saving = true;
+    error = '';
+    notice = '';
+    const reverted = await revertToDraft(surveyId);
+    saving = false;
+
+    if (!reverted.ok) {
+      error = reverted.message;
+      return;
+    }
+
+    await load(surveyId);
+  }
+
   function describe(problem: MappingProblem): string {
     // **知らない符号でも落とさない。** 符号そのものを出す
     const key = problemKey(problem.code);
@@ -658,6 +691,10 @@
     {:else if status === 3}
       <button type="button" onclick={republish} disabled={saving || loading}>
         {t('editor.republish')}
+      </button>
+    {:else if status === 1 || status === 2}
+      <button type="button" onclick={revertLive} disabled={saving || loading}>
+        {t('list.revertToDraft')}
       </button>
     {/if}
   </div>
