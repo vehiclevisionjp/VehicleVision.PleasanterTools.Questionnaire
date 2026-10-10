@@ -11,12 +11,17 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// <param name="Definition">設問の定義。<see cref="SurveyDefinition.Version"/> は**次に公開される版**。</param>
 /// <param name="Mapping">Pleasanter の列への割り当て。</param>
 /// <param name="Revision">下書きの版。**保存時に照合して、黙った上書きを防ぐ。**</param>
+/// <param name="Status">
+/// 公開状態（<see cref="SurveyStatus"/>）。**編集画面が、いま押せる操作と
+/// 「編集は下書きにだけ効く」旨の表示を出し分けるために返す。**
+/// </param>
 public sealed record SurveyDraft(
     SurveyDefinition Definition,
     MappingDefinition Mapping,
     int Revision,
     long AssetHistorySiteId = 0,
-    MappingDefinition? AssetHistoryMapping = null);
+    MappingDefinition? AssetHistoryMapping = null,
+    int Status = (int)SurveyStatus.Draft);
 
 /// <summary>一覧に出すアンケートの要約。</summary>
 /// <param name="SuspendedReason">
@@ -240,7 +245,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         int? PublishedVersion,
         int DraftRevision,
         long AssetHistorySiteId,
-        string? AssetHistoryMappingJson);
+        string? AssetHistoryMappingJson,
+        int Status);
 
     private sealed record PageRow(
         string PageId,
@@ -456,7 +462,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "       [ConfirmationMessageJson], [FallbackLanguage], [DisplayMode], [ShowProgress], "
             + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], [AssetDeliveryJson], "
             + "       [PublishedVersion], "
-            + "       [DraftRevision], [AssetHistorySiteId], [AssetHistoryMappingJson] "
+            + "       [DraftRevision], [AssetHistorySiteId], [AssetHistoryMappingJson], [Status] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
@@ -608,7 +614,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             mapping,
             survey.DraftRevision,
             survey.AssetHistorySiteId,
-            assetHistoryMapping);
+            assetHistoryMapping,
+            survey.Status);
     }
 
     public async Task<int> SaveAsync(
