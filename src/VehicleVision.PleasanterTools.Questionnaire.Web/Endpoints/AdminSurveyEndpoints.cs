@@ -1186,7 +1186,10 @@ public static class AdminSurveyEndpoints
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
-        // ---- テスト公開から下書きへ戻す --------------------------------------
+        // ---- 下書きへ戻す ----------------------------------------------------
+        // **テスト公開・本公開・停止中のどれからでも戻せる**（Issue #542）。
+        // 版は不変なので、戻しても固めた版は消えない。直して再度テスト公開すると次の版ができる。
+        // ⚠️ **戻している間、回答画面は閉じる。** 画面側で確認を挟む
         group.MapPost("/{surveyId:guid}/revert-to-draft", async (
             Guid surveyId,
             HttpContext context,
@@ -1205,7 +1208,9 @@ public static class AdminSurveyEndpoints
                 return ArchivedSurvey(context);
             }
 
-            if (record.Status != (int)SurveyStatus.TestPublished)
+            if (record.Status is not ((int)SurveyStatus.TestPublished
+                or (int)SurveyStatus.Published
+                or (int)SurveyStatus.Suspended))
             {
                 return Results.BadRequest(new
                 {
@@ -1214,12 +1219,18 @@ public static class AdminSurveyEndpoints
                 });
             }
 
+            // **停止の理由と時刻は消す。** 残すと、下書きに停止の理由が付いて見える
             await surveys.SaveAsync(
-                record with { Status = (int)SurveyStatus.Draft },
+                record with
+                {
+                    Status = (int)SurveyStatus.Draft,
+                    SuspendedReason = null,
+                    SuspendedAt = null,
+                },
                 cancellationToken).ConfigureAwait(false);
 
             AuditNotes.SetTarget(context, "survey", surveyId.ToString());
-            AuditNotes.Add(context, "fromStatus", SurveyStatus.TestPublished.ToString());
+            AuditNotes.Add(context, "fromStatus", ((SurveyStatus)record.Status).ToString());
             AuditNotes.Add(context, "toStatus", SurveyStatus.Draft.ToString());
             return Results.Ok(new { status = SurveyStatus.Draft.ToString() });
         })
