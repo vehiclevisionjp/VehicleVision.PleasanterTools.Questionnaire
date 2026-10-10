@@ -8,6 +8,7 @@
     loadAssetOptions,
     loadDraft,
     loadEmbedOptions,
+    revertToDraft,
     testPublish,
     saveDraft,
     uploadContentAsset,
@@ -124,6 +125,13 @@
   let assetHistoryMapping = $state<MappingDefinition>({ assignments: [] });
   let savedAssetHistoryMapping = $state<MappingDefinition>({ assignments: [] });
   let revision = $state(0);
+  /**
+   * 公開状態。0 下書き / 1 本公開 / 2 停止中 / 3 テスト公開中。
+   *
+   * **編集は下書きにしか効かない。** 下書き以外では「テスト公開する」を出さない
+   * （サーバは下書き以外を断る）。
+   */
+  let status = $state(0);
   let columnAvailability = $state<ColumnAvailabilityResponse>({
     source: 'standard',
     availableByPrefix: {},
@@ -247,6 +255,7 @@
     selectedQuestionId = null;
     importWarnings = [];
     revision = result.value.revision;
+    status = result.value.status ?? 0;
     await refreshColumnAvailability(id);
   }
 
@@ -410,8 +419,9 @@
     return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
   }
 
-  async function save() {
-    if (!definition) return;
+  /** 下書きを保存する。**保存できたかを返す。** */
+  async function save(): Promise<boolean> {
+    if (!definition) return false;
 
     saving = true;
     error = '';
@@ -433,7 +443,7 @@
         conflict = true;
       }
       error = result.message;
-      return;
+      return false;
     }
 
     revision = result.value.revision;
@@ -442,6 +452,7 @@
     savedAssetHistorySiteId = assetHistorySiteId;
     savedAssetHistoryMapping = assetHistoryMapping;
     notice = t('editor.saved');
+    return true;
   }
 
   async function hasUnsavedChangesGuard(): Promise<boolean> {
@@ -488,6 +499,33 @@
     warnings = result.value.warnings;
     notice = t('editor.testPublished', { version: result.value.version });
     await load(surveyId);
+  }
+
+  /**
+   * テスト公開中の編集を、動いている版へ反映する。
+   *
+   * **保存 → 下書きへ戻す → テスト公開 を 1 回で行う。** 反映するには版を固め直すしかなく
+   * （版は不変）、利用者に 3 つの操作を順に踏ませない。
+   * **保存できなかったら先へ進まない。** 版が合わない（他の人の更新）まま戻すと、
+   * 編集を失う。
+   */
+  async function republish() {
+    if (hasUnsavedChanges && !(await save())) return;
+
+    saving = true;
+    error = '';
+    notice = '';
+    const reverted = await revertToDraft(surveyId);
+    saving = false;
+
+    if (!reverted.ok) {
+      error = reverted.message;
+      return;
+    }
+
+    // **ここから先で失敗しても下書きに戻っている。** 画面を実際の状態に合わせる
+    status = 0;
+    await doPublish();
   }
 
   function describe(problem: MappingProblem): string {
@@ -612,11 +650,24 @@
     <button type="button" class="secondary" onclick={save} disabled={saving || loading}>
       {saving ? t('editor.working') : t('editor.saveDraft')}
     </button>
-    <button type="button" onclick={doPublish} disabled={saving || loading}>
-      {t('editor.testPublish')}
-    </button>
+    <!-- **押せる操作は状態で決まる。** サーバは下書き以外のテスト公開を断る -->
+    {#if status === 0}
+      <button type="button" onclick={doPublish} disabled={saving || loading}>
+        {t('editor.testPublish')}
+      </button>
+    {:else if status === 3}
+      <button type="button" onclick={republish} disabled={saving || loading}>
+        {t('editor.republish')}
+      </button>
+    {/if}
   </div>
 </header>
+
+{#if status !== 0}
+  <p class="notice" role="status">
+    {status === 3 ? t('editor.draftOnlyTest') : t('editor.draftOnlyLive')}
+  </p>
+{/if}
 
 {#if conflict}
   <div class="conflict" role="alert">

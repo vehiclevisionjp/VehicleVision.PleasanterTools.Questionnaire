@@ -143,7 +143,9 @@ test.describe('取説用の写し（ログイン済み）', { tag: '@standalone'
     await shoot(page, 'admin-05-survey-list');
 
     await page.goto(`/admin/surveys/${survey.surveyId}`);
-    await expect(page.getByRole('button', { name: '公開する' })).toBeVisible();
+    // **どの公開状態でも出るボタンで待つ。** 以前は「テスト公開する」が部分一致する
+    // 「公開する」で待っていたが、本公開済みでは出さなくなった（Issue #537）
+    await expect(page.getByRole('button', { name: '下書きを保存' })).toBeVisible();
     await shoot(page, 'admin-06-survey-editor');
   });
 
