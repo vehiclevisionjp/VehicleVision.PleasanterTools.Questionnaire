@@ -17,6 +17,8 @@ import type {
   MappingProblem,
   SurveyDefinition,
   SurveyDraft,
+  SurveyVersionContent,
+  SurveyVersionSummary,
   QuestionImportResult,
   QuestionImportSource,
   SurveyPage,
@@ -482,6 +484,14 @@ export const deleteTemplate = (templateId: string) =>
 // ---- アンケートの下書き -----------------------------------------------------
 
 export const loadDraft = (surveyId: string) => call<SurveyDraft>(`/api/admin/surveys/${surveyId}`);
+
+/** 固めた版の一覧（新しい順）。Issue #544 */
+export const listVersions = (surveyId: string) =>
+  call<SurveyVersionSummary[]>(`/api/admin/surveys/${surveyId}/versions`);
+
+/** 固めた版の中身。**読むだけ。** 編集へ読み込むかどうかは画面が決める */
+export const loadVersion = (surveyId: string, version: number) =>
+  call<SurveyVersionContent>(`/api/admin/surveys/${surveyId}/versions/${version}`);
 
 /** 取り込み元のページと設問を読む。**マッピングは返さない。** */
 export const loadQuestionImportSource = (surveyId: string, sourceSurveyId: string) =>

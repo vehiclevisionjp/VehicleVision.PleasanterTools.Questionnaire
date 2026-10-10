@@ -456,6 +456,21 @@ export interface SurveyDraft {
   status?: number;
 }
 
+/** 固めた版の一覧の 1 行（Issue #544）。 */
+export interface SurveyVersionSummary {
+  version: number;
+  /** 固めた時刻（UTC）。 */
+  publishedAt: string;
+}
+
+/** 固めた版の中身。編集へ読み込むために使う。 */
+export interface SurveyVersionContent {
+  definition: SurveyDefinition;
+  mapping: MappingDefinition;
+  assetHistorySiteId?: number;
+  assetHistoryMapping?: MappingDefinition | null;
+}
+
 export interface SurveySummary {
   surveyId: string;
   publicId: string;

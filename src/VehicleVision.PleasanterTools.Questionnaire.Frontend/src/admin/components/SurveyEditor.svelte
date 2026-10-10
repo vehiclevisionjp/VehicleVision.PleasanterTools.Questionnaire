@@ -7,7 +7,9 @@
     loadColumnAvailability,
     loadAssetOptions,
     loadDraft,
+    listVersions,
     loadEmbedOptions,
+    loadVersion,
     revertToDraft,
     testPublish,
     saveDraft,
@@ -25,6 +27,7 @@
     type Question,
     type QuestionImportResult,
     type SurveyDefinition,
+    type SurveyVersionSummary,
   } from '../lib/types';
   import {
     flowKey,
@@ -41,7 +44,7 @@
     SUPPORTED_LANGUAGES,
     type Language,
   } from '../../lib/i18n/language';
-  import { language, t } from '../lib/i18n/state.svelte';
+  import { formatDateTime, language, t } from '../lib/i18n/state.svelte';
   import MappingEditor from './MappingEditor.svelte';
   import QuestionEditor from './QuestionEditor.svelte';
   import AutoReplyEditor from './AutoReplyEditor.svelte';
@@ -232,6 +235,70 @@
       }
     })();
   });
+
+  /** 過去の版の一覧を開いているか（Issue #544）。 */
+  let versionsOpen = $state(false);
+  let versions = $state<SurveyVersionSummary[]>([]);
+  let versionsLoading = $state(false);
+
+  async function toggleVersions() {
+    versionsOpen = !versionsOpen;
+    if (!versionsOpen) return;
+
+    versionsLoading = true;
+    const result = await listVersions(surveyId);
+    versionsLoading = false;
+    if (!result.ok) {
+      error = result.message;
+      versionsOpen = false;
+      return;
+    }
+
+    versions = result.value;
+  }
+
+  /**
+   * 過去の版を、編集へ読み込む。
+   *
+   * **読み込むだけで、保存はしない。** 保存するまで下書きは変わらず、
+   * 読み込みを取り消すなら、保存せずに読み直せばよい。
+   * **版は不変**なので固めた版は書き換わらない。保存して、テスト公開すると次の版になる。
+   * **版番号（次に固める版）は今の下書きのものを残す。**
+   * 過去の版の番号を持ち込むと、固める版が重なる
+   */
+  async function restoreVersion(version: number) {
+    if (!definition) return;
+
+    const confirmed = await confirmAction({
+      title: t('editor.versionLoad'),
+      message: t('editor.versionLoadConfirm', { version }),
+      confirmLabel: t('editor.versionLoad'),
+      danger: hasUnsavedChanges,
+    });
+    if (!confirmed) return;
+
+    error = '';
+    notice = '';
+    const result = await loadVersion(surveyId, version);
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    definition = { ...result.value.definition, version: definition.version };
+    mapping = result.value.mapping;
+    assetHistorySiteId = result.value.assetHistorySiteId ?? 0;
+    assetHistoryMapping = result.value.assetHistoryMapping ?? { assignments: [] };
+    selectedQuestionId = null;
+    versionsOpen = false;
+    notice = t('editor.versionLoaded', { version });
+  }
+
+  function formatVersionTime(value: string): string {
+    // **保存されているのは UTC。** 見る人の時間帯で出す
+    const parsed = new Date(value.endsWith('Z') ? value : `${value}Z`);
+    return Number.isNaN(parsed.getTime()) ? value : formatDateTime(parsed);
+  }
 
   async function load(id: string) {
     loading = true;
@@ -683,6 +750,11 @@
     <button type="button" class="secondary" onclick={save} disabled={saving || loading}>
       {saving ? t('editor.working') : t('editor.saveDraft')}
     </button>
+    {#if status === 0}
+      <button type="button" class="secondary" onclick={toggleVersions} disabled={saving || loading}>
+        {t('editor.versions')}
+      </button>
+    {/if}
     <!-- **押せる操作は状態で決まる。** サーバは下書き以外のテスト公開を断る -->
     {#if status === 0}
       <button type="button" onclick={doPublish} disabled={saving || loading}>
@@ -704,6 +776,28 @@
   <p class="notice" role="status">
     {status === 3 ? t('editor.draftOnlyTest') : t('editor.draftOnlyLive')}
   </p>
+{/if}
+
+{#if versionsOpen}
+  <section class="versions" aria-label={t('editor.versions')}>
+    <h3>{t('editor.versionsTitle')}</h3>
+    {#if versionsLoading}
+      <p class="status">{t('app.loading')}</p>
+    {:else if versions.length === 0}
+      <p class="status">{t('editor.versionsEmpty')}</p>
+    {:else}
+      <ul>
+        {#each versions as item (item.version)}
+          <li>
+            <span>{t('editor.versionLabel', { version: item.version, publishedAt: formatVersionTime(item.publishedAt) })}</span>
+            <button type="button" class="secondary" onclick={() => restoreVersion(item.version)}>
+              {t('editor.versionLoad')}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
 {/if}
 
 {#if conflict}
@@ -1529,6 +1623,32 @@
 
   .notice {
     color: var(--success);
+  }
+
+  .versions {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+
+    h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1rem;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.25rem 0;
+    }
   }
 
   .error {
