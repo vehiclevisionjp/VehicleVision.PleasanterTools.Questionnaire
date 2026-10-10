@@ -318,7 +318,7 @@ try {
         }
     }
 
-    $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion.zip"
+    $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion-portable.zip"
     $zipPath = Join-Path $temporaryDirectory $assetName
     $checksumPath = "$zipPath.sha256"
     $releaseBaseUri = "https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Questionnaire/releases/download/v$normalizedVersion"

@@ -27,6 +27,11 @@ public sealed record SurveySnapshot(
         AssetHistorySiteId > 0 && AssetHistoryMapping is { Assignments.Length: > 0 };
 }
 
+/// <summary>固めた版の一覧の 1 行。</summary>
+/// <param name="Version">版。</param>
+/// <param name="PublishedAt">固めた時刻（UTC）。</param>
+public sealed record SurveyVersionSummary(int Version, DateTime PublishedAt);
+
 /// <summary>版を指定してスナップショットを引く。</summary>
 public interface ISurveySnapshotStore
 {
@@ -34,4 +39,16 @@ public interface ISurveySnapshotStore
         Guid surveyId,
         int version,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 固めた版を新しい順に並べる（Issue #544）。管理画面が、過去の版を編集へ読み込むために使う。
+    /// </summary>
+    /// <remarks>
+    /// 既定は空。**回答画面や送信ワーカーが使う実装（試験の偽物を含む）に、
+    /// 管理画面だけの口を強いない**ための既定実装。
+    /// </remarks>
+    Task<IReadOnlyList<SurveyVersionSummary>> ListAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SurveyVersionSummary>>([]);
 }

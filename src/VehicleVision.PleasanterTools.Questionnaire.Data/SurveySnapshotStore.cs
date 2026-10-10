@@ -82,6 +82,23 @@ public sealed class SurveySnapshotStore(IDbConnectionFactory connectionFactory) 
             row.AssetHistorySiteId,
             assetHistoryMapping);
     }
+
+    public async Task<IReadOnlyList<SurveyVersionSummary>> ListAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // ⚠️ **SELECT の並びは `SurveyVersionSummary` の構築子と同じ順**（`Row` と同じ理由）
+        var rows = await connection.QueryAsync<SurveyVersionSummary>(Sql(
+            "SELECT [Version], [PublishedAt] FROM [SurveyVersions] "
+            + "WHERE [SurveyId] = @SurveyId ORDER BY [Version] DESC",
+            new { SurveyId = surveyId },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return [.. rows];
+    }
 }
 
 /// <summary>アンケートと公開済みの版を書き込む。</summary>
@@ -515,6 +532,21 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         {
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return PleasanterSiteUpdateResult.Updated;
+        }
+
+        // ⚠️ **本番の回答が 1 件でもあれば変えさせない**（Issue #542）。
+        // 本公開から下書きへ戻せるようになったので、本公開前だけという前提は崩れた。
+        // 回答の対応表（`ResponseTokens`）は旧サイトのレコードを指したままになり、
+        // 次の編集が新サイトの別のレコードを更新しに行く。**テスト回答は捨てられるので数えない**
+        var realResponses = await connection.ExecuteScalarAsync<int>(Sql(
+            "SELECT COUNT(*) FROM [ResponseTokens] WHERE [SurveyId] = @SurveyId AND [IsTest] = @IsTest",
+            new { SurveyId = surveyId, IsTest = false },
+            transaction,
+            cancellationToken)).ConfigureAwait(false);
+        if (realResponses > 0)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return PleasanterSiteUpdateResult.NotEditable;
         }
 
         // **数えるのは送信待ちだけ**（`Pending` と `Sending`）。どちらのサイトへ行くかが

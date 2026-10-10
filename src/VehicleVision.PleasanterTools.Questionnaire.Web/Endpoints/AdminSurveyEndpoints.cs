@@ -294,6 +294,34 @@ public static class AdminSurveyEndpoints
             return draft is null ? Results.NotFound() : Results.Ok(draft);
         });
 
+        // ---- 固めた版を読む（Issue #544）--------------------------------------
+        // **読むだけ。** 版は不変なので、ここからは何も書き換えない。
+        // 編集へ読み込んで保存するかどうかは、画面側で利用者が決める
+        group.MapGet("/{surveyId:guid}/versions", async (
+            Guid surveyId,
+            ISurveySnapshotStore snapshots,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await snapshots.ListAsync(surveyId, cancellationToken).ConfigureAwait(false)));
+
+        group.MapGet("/{surveyId:guid}/versions/{version:int}", async (
+            Guid surveyId,
+            int version,
+            ISurveySnapshotStore snapshots,
+            CancellationToken cancellationToken) =>
+        {
+            var snapshot = await snapshots.FindAsync(surveyId, version, cancellationToken)
+                .ConfigureAwait(false);
+            return snapshot is null
+                ? Results.NotFound()
+                : Results.Ok(new
+                {
+                    definition = snapshot.Definition,
+                    mapping = snapshot.Mapping,
+                    assetHistorySiteId = snapshot.AssetHistorySiteId,
+                    assetHistoryMapping = snapshot.AssetHistoryMapping,
+                });
+        });
+
         // ---- ほかのアンケートから設問を取り込む（Issue #358）----------------
         // **読み取りにも取り込み先を含める。** URL の surveyId を変えて、
         // アーカイブ済みやテンプレートを編集先にできないようにする。
@@ -418,12 +446,16 @@ public static class AdminSurveyEndpoints
             var availableByPrefix = response.IsSuccess
                 ? AvailableColumnsFrom(response.Body)
                 : null;
+            // **項目名・リンク・選択肢は、取れたものだけ添える。** 取れなくても編集は止めない
+            var details = response.IsSuccess
+                ? ColumnDetailsFrom(response.Body)
+                : new Dictionary<string, ColumnDetail>();
 
             // **取得に失敗しても編集を止めない。** 項目拡張のない標準構成なら正しい本数であり、
             // 取得できないことを理由に、利用者が下書きを直せなくなる方を避ける。
             return Results.Ok(availableByPrefix is null
-                ? new ColumnAvailabilityResponse("standard", new Dictionary<string, int>())
-                : new ColumnAvailabilityResponse("site", availableByPrefix));
+                ? new ColumnAvailabilityResponse("standard", new Dictionary<string, int>(), details)
+                : new ColumnAvailabilityResponse("site", availableByPrefix, details));
         });
 
         // ---- マッピング先サイトの同期 ---------------------------------------
@@ -1186,7 +1218,10 @@ public static class AdminSurveyEndpoints
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
-        // ---- テスト公開から下書きへ戻す --------------------------------------
+        // ---- 下書きへ戻す ----------------------------------------------------
+        // **テスト公開・本公開・停止中のどれからでも戻せる**（Issue #542）。
+        // 版は不変なので、戻しても固めた版は消えない。直して再度テスト公開すると次の版ができる。
+        // ⚠️ **戻している間、回答画面は閉じる。** 画面側で確認を挟む
         group.MapPost("/{surveyId:guid}/revert-to-draft", async (
             Guid surveyId,
             HttpContext context,
@@ -1205,7 +1240,9 @@ public static class AdminSurveyEndpoints
                 return ArchivedSurvey(context);
             }
 
-            if (record.Status != (int)SurveyStatus.TestPublished)
+            if (record.Status is not ((int)SurveyStatus.TestPublished
+                or (int)SurveyStatus.Published
+                or (int)SurveyStatus.Suspended))
             {
                 return Results.BadRequest(new
                 {
@@ -1214,12 +1251,18 @@ public static class AdminSurveyEndpoints
                 });
             }
 
+            // **停止の理由と時刻は消す。** 残すと、下書きに停止の理由が付いて見える
             await surveys.SaveAsync(
-                record with { Status = (int)SurveyStatus.Draft },
+                record with
+                {
+                    Status = (int)SurveyStatus.Draft,
+                    SuspendedReason = null,
+                    SuspendedAt = null,
+                },
                 cancellationToken).ConfigureAwait(false);
 
             AuditNotes.SetTarget(context, "survey", surveyId.ToString());
-            AuditNotes.Add(context, "fromStatus", SurveyStatus.TestPublished.ToString());
+            AuditNotes.Add(context, "fromStatus", ((SurveyStatus)record.Status).ToString());
             AuditNotes.Add(context, "toStatus", SurveyStatus.Draft.ToString());
             return Results.Ok(new { status = SurveyStatus.Draft.ToString() });
         })
@@ -1684,10 +1727,193 @@ public static class AdminSurveyEndpoints
         return new SurveyPageResponse([.. rows.Take(take)], rows.Count > take);
     }
 
-    /// <summary><c>GetSite</c> 応答から接頭辞ごとの列数を取り出す。</summary>
+    /// <summary>
+    /// <c>GetSite</c> 応答から、列の物理名ごとの設定（項目名・リンク・選択肢）を取り出す（Issue #549）。
+    /// </summary>
     /// <remarks>
-    /// Pleasanter の <c>GetSite</c> は <c>Response.Data.SiteSettings.Columns</c> に
-    /// <c>ColumnName</c> を持つ。列定義が無ければ、取得できなかったものとして標準値へ戻す。
+    /// <para>
+    /// **編集画面の項目名（<c>LabelText</c>）と、一覧の項目名（<c>GridLabelText</c>）は別。**
+    /// 実機（Pleasanter 1.5.8.1）で、両方が別々に返ることを確かめた。両方を返す。
+    /// </para>
+    /// <para>
+    /// **選択肢は <c>ChoicesText</c>**（1 行 1 件で <c>値,表示文字列</c>）。
+    /// **リンクの指定は 2 通り**（実機 Pleasanter 1.5.8.1 で確認）。
+    /// </para>
+    /// <list type="bullet">
+    /// <item>
+    /// <description>
+    /// 行の形: <c>[[サイト ID]]</c>（<c>[[1,NoAddButton]]</c> のように options を続けられる）。
+    /// 選択肢と混在できる。<c>Link: true</c> が付く。
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// JSON の形: <c>ChoicesText</c> 全体が <c>[{"SiteId":1,...},{"SiteId":2}]</c> のリンク定義の配列。
+    /// <b><c>Link: true</c> は付かない</b>ので、<c>Link</c> だけでは見分けられない。
+    /// </description>
+    /// </item>
+    /// </list>
+    /// <para>
+    /// 参照先のレコードは列挙できないので、参照先（サイト ID など）だけを返す。
+    /// </para>
+    /// <para>
+    /// **名前を付けていない列は応答に載らない**（実機）。設定を初期化した列も載らなくなる。
+    /// 空のもの、物理名と同じ項目名は返さない（本アプリの同期が書く値で、情報が増えない）。
+    /// 物理名の大文字小文字は区別しない。
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyDictionary<string, ColumnDetail> ColumnDetailsFrom(JsonNode? body)
+    {
+        var details = new Dictionary<string, ColumnDetail>(StringComparer.OrdinalIgnoreCase);
+        var columns = body?["Response"]?["Data"]?["SiteSettings"]?["Columns"]?.AsArray();
+        if (columns is null)
+        {
+            return details;
+        }
+
+        foreach (var column in columns)
+        {
+            var columnName = column?["ColumnName"]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(columnName))
+            {
+                continue;
+            }
+
+            var label = UserLabel(columnName, column?["LabelText"]?.GetValue<string>());
+            var gridLabel = UserLabel(columnName, column?["GridLabelText"]?.GetValue<string>());
+            var choicesText = column?["ChoicesText"]?.GetValue<string>();
+            var jsonReferences = ParseJsonLinks(choicesText);
+            var (choices, references, choiceCount) = jsonReferences is null
+                ? ParseChoices(choicesText)
+                : ((IReadOnlyList<ColumnChoice>)[], jsonReferences, 0);
+            // **JSON の形は `Link: true` が付かない**ので、参照先があることからもリンクと判断する
+            var isLink = (column?["Link"]?.GetValue<bool>() ?? false) || references.Count > 0;
+            var linkFormat = !isLink ? null : jsonReferences is null ? "Lines" : "Json";
+            var choicesControlType = column?["ChoicesControlType"]?.GetValue<string>();
+            if (label is null && gridLabel is null && !isLink && choiceCount == 0)
+            {
+                continue;
+            }
+
+            details[columnName] = new ColumnDetail(
+                label,
+                gridLabel,
+                isLink,
+                linkFormat,
+                choices,
+                choiceCount,
+                references,
+                choiceCount > 0 && !string.IsNullOrWhiteSpace(choicesControlType)
+                    ? choicesControlType
+                    : null);
+        }
+
+        return details;
+    }
+
+    /// <summary>
+    /// <c>ChoicesText</c> が JSON のリンク定義（<c>[{"SiteId":1,...}]</c>）なら、参照先のサイト ID を返す。
+    /// そうでなければ <c>null</c>。**サイト ID を持つ要素が 1 つも無ければ「JSON のリンク」とは見なさない。**
+    /// </summary>
+    private static IReadOnlyList<string>? ParseJsonLinks(string? choicesText)
+    {
+        var text = choicesText?.Trim();
+        // **`[[1]]` の行の形と取り違えない。** こちらは先頭が `[[` で、JSON の配列として読めない
+        if (string.IsNullOrEmpty(text) || text[0] != '[' || text.StartsWith("[[", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (JsonNode.Parse(text) is not JsonArray array)
+            {
+                return null;
+            }
+
+            var siteIds = array
+                .Select(item => item?["SiteId"]?.GetValue<long>())
+                .Where(siteId => siteId is > 0)
+                .Select(siteId => siteId!.Value.ToString(CultureInfo.InvariantCulture))
+                // **同じサイトを複数書けるので、重複は除く**（「参照先: 1, 1」と出さない。Issue #558）
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            return siteIds.Count == 0 ? null : siteIds;
+        }
+        catch (Exception exception) when (exception is System.Text.Json.JsonException or InvalidOperationException)
+        {
+            // **読めない形は、リンクではなく選択肢の行として扱う。** 画面を止めない
+            return null;
+        }
+    }
+
+    /// <summary>画面へ返す選択肢の上限。**全部返すと応答が膨らむ**（件数は別に返す）。</summary>
+    private const int MaxReturnedChoices = 50;
+
+    /// <summary>
+    /// <c>ChoicesText</c> を選択肢と参照先へ分ける。**1 行 1 件。**
+    /// <c>[[…]]</c> の行は参照先（リンク・利用者・部署など）で、選択肢には数えない。
+    /// <c>値,表示文字列</c> の形で、表示文字列が無ければ値をそのまま表示に使う。
+    /// </summary>
+    private static (IReadOnlyList<ColumnChoice> Choices, IReadOnlyList<string> References, int Count)
+        ParseChoices(string? choicesText)
+    {
+        var choices = new List<ColumnChoice>();
+        var references = new List<string>();
+        var count = 0;
+        foreach (var raw in (choicesText ?? string.Empty).Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            if (line.StartsWith("[[", StringComparison.Ordinal)
+                && line.EndsWith("]]", StringComparison.Ordinal))
+            {
+                references.Add(line[2..^2]);
+                continue;
+            }
+
+            count++;
+            if (choices.Count >= MaxReturnedChoices)
+            {
+                continue;
+            }
+
+            var comma = line.IndexOf(',', StringComparison.Ordinal);
+            choices.Add(comma < 0
+                ? new ColumnChoice(line, line)
+                : new ColumnChoice(line[..comma].Trim(), line[(comma + 1)..].Trim()));
+        }
+
+        return (choices, references, count);
+    }
+
+    /// <summary>利用者が付けた名前だけを返す。空と、物理名と同じものは「名前なし」。</summary>
+    private static string? UserLabel(string columnName, string? text) =>
+        string.IsNullOrWhiteSpace(text)
+        || string.Equals(columnName, text, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : text;
+
+    /// <summary><c>GetSite</c> 応答から、接頭辞ごとの使える列の本数を見積もる（Issue #551）。</summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠️ **<c>Columns</c> の件数は使える本数ではない。** 実機（Pleasanter 1.5.8.1）で、
+    /// <c>GetSite</c> は**設定を付けた列だけ**を返し、付けていない列も、設定を初期化した列も載らない
+    /// ことを確かめた（<c>_documents/実機検証結果.md</c> 11 章）。載っている数を本数にすると、
+    /// 名前を付けた列が数本あるだけで「使える本数はその数本」と見なされ、足りないと誤判定する。
+    /// </para>
+    /// <para>
+    /// **見積もりは「標準の 26 本」を下限にする。** 項目拡張の列（<c>Class001</c> など）は、
+    /// 応答に載っていた最大の番号を上乗せする。**実際の本数の下限**であり、
+    /// 応答からは項目拡張の本数そのものは分からない。**足りないと誤って言わない側に倒す。**
+    /// </para>
+    /// <para>
+    /// 認識できる列が 1 つも載っていなければ <c>null</c>（標準の本数として扱う）。
+    /// </para>
     /// </remarks>
     public static IReadOnlyDictionary<string, int>? AvailableColumnsFrom(JsonNode? body)
     {
@@ -1697,7 +1923,7 @@ public static class AdminSurveyEndpoints
             return null;
         }
 
-        var availableByPrefix = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var extensionMaxByPrefix = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var column in columns)
         {
             var columnName = column?["ColumnName"]?.GetValue<string>();
@@ -1707,10 +1933,24 @@ public static class AdminSurveyEndpoints
             }
 
             var prefix = ColumnBudget.PrefixOf(columnName);
-            availableByPrefix[prefix] = availableByPrefix.GetValueOrDefault(prefix) + 1;
+            // 英字 1 文字（ClassA）は標準の 26 本の中。数字（Class012）は項目拡張で、番号が本数の下限になる
+            var extensionIndex = int.TryParse(
+                columnName.AsSpan(prefix.Length),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var index)
+                    ? index
+                    : 0;
+            extensionMaxByPrefix[prefix] = Math.Max(
+                extensionMaxByPrefix.GetValueOrDefault(prefix), extensionIndex);
         }
 
-        return availableByPrefix.Count == 0 ? null : availableByPrefix;
+        return extensionMaxByPrefix.Count == 0
+            ? null
+            : extensionMaxByPrefix.ToDictionary(
+                pair => pair.Key,
+                pair => ColumnBudget.StandardColumnsPerType + pair.Value,
+                StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>不備を画面に出せる形にする。</summary>
@@ -1760,7 +2000,30 @@ public static class AdminSurveyEndpoints
     /// <summary>マッピング編集画面で使う列数。</summary>
     public sealed record ColumnAvailabilityResponse(
         string Source,
-        IReadOnlyDictionary<string, int> AvailableByPrefix);
+        IReadOnlyDictionary<string, int> AvailableByPrefix,
+        IReadOnlyDictionary<string, ColumnDetail> Columns);
+
+    /// <summary>列の設定。編集画面と一覧で別の項目名を付けられるので両方持つ。</summary>
+    /// <param name="Label">編集画面の項目名（<c>LabelText</c>）。</param>
+    /// <param name="GridLabel">一覧の項目名（<c>GridLabelText</c>）。</param>
+    /// <param name="IsLink">リンク項目か（<c>Link: true</c>、または JSON のリンク定義がある）。</param>
+    /// <param name="LinkFormat">リンクの指定の形。<c>Lines</c>（<c>[[サイト ID]]</c> の行）か <c>Json</c>。リンクでなければ <c>null</c>。</param>
+    /// <param name="Choices">選択肢（上限あり。全件の数は <paramref name="ChoiceCount"/>）。</param>
+    /// <param name="ChoiceCount">選択肢の全件数。</param>
+    /// <param name="References">参照先（<c>[[…]]</c> の中身、または JSON の <c>SiteId</c>。サイト ID・Users・Depts など）。</param>
+    /// <param name="ChoicesControlType">選択肢の見せ方（<c>Radio</c> など。選択肢があるときだけ）。</param>
+    public sealed record ColumnDetail(
+        string? Label,
+        string? GridLabel,
+        bool IsLink,
+        string? LinkFormat,
+        IReadOnlyList<ColumnChoice> Choices,
+        int ChoiceCount,
+        IReadOnlyList<string> References,
+        string? ChoicesControlType);
+
+    /// <summary>選択肢 1 件。<c>値,表示文字列</c>。</summary>
+    public sealed record ColumnChoice(string Value, string Text);
 
     /// <summary>取り込み元のページ。**ページそのものは取り込まない。**</summary>
     public sealed record QuestionImportPageResponse(

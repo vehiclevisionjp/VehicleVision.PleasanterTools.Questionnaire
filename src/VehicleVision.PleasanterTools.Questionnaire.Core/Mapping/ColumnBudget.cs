@@ -20,8 +20,9 @@ public sealed record ColumnUsage(string Prefix, int Used, int Available)
 /// <remarks>
 /// <para>
 /// **標準の列は型ごとに 26 本**（<c>A</c>〜<c>Z</c>。
-/// <c>_documents/実機検証結果.md</c>）。項目拡張で増やせるので、実際のサイトから
-/// 数えられるときはその本数を使う。
+/// <c>_documents/実機検証結果.md</c>）。項目拡張で増やせるので、実際のサイトで
+/// 確認できた項目拡張の列を上乗せした本数を使う（<c>GetSite</c> は設定を付けた列だけを返すので、
+/// 返ってきた件数をそのまま本数にはしない。Issue #551）。
 /// </para>
 /// <para>
 /// **グリッドは 1 設問で行数ぶんの列を食う**（Issue #54）。

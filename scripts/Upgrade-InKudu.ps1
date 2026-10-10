@@ -42,7 +42,7 @@ pwsh .\Upgrade-InKudu.ps1
 pwsh .\Upgrade-InKudu.ps1 -Version 1.2.3 -BackupRetentionCount 3
 
 .EXAMPLE
-pwsh .\Upgrade-InKudu.ps1 -PackagePath .\packages\VehicleVision.PleasanterTools.Questionnaire-1.2.3.zip
+pwsh .\Upgrade-InKudu.ps1 -PackagePath .\packages\VehicleVision.PleasanterTools.Questionnaire-1.2.3-portable.zip
 
 .EXAMPLE
 pwsh .\Upgrade-InKudu.ps1 -Rollback .\backup\Questionnaire-wwwroot-20260916-120000000.zip
@@ -199,7 +199,7 @@ function Get-ReleasePackage {
         }
     }
 
-    $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion.zip"
+    $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion-portable.zip"
     $archivePath = Join-Path $DestinationDirectory $assetName
     $sha256Path = "$archivePath.sha256"
     $releaseBaseUri =

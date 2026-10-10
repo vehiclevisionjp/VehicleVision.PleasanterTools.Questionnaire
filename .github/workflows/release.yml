@@ -282,11 +282,24 @@ jobs:
           set -euo pipefail
 
           publish_dir="$RUNNER_TEMP/questionnaire-publish"
-          package_name="VehicleVision.PleasanterTools.Questionnaire-$VERSION.zip"
+          # OS・CPU を指定しない発行なので portable と名乗る（win-x64 などとは名乗らない）
+          package_name="VehicleVision.PleasanterTools.Questionnaire-$VERSION-portable.zip"
           package_path="$RUNNER_TEMP/$package_name"
 
+          # デバッグ記号（pdb）は配置先に要らない。サイズと内部情報の露出を減らす。
+          # **後から消すのではなく、作らない。** DebugType=none ＋ DebugSymbols=false を発行に渡す
+          # （2026-10-10 実測: 何も渡さないと 7 個、CopyOutputSymbolsToPublishDirectory=false だけでは
+          # 参照先プロジェクトの分が残って 6 個、この 2 つで 0 個）
           dotnet publish src/VehicleVision.PleasanterTools.Questionnaire.Web \
-            --no-restore -c Release -o "$publish_dir"
+            --no-restore -c Release -o "$publish_dir" \
+            -p:DebugType=none -p:DebugSymbols=false
+
+          # 渡し忘れや SDK の挙動変更で、pdb が混ざったまま出さないための検査
+          remaining_pdb="$(find "$publish_dir" -name '*.pdb')"
+          if [ -n "$remaining_pdb" ]; then
+            echo "NG: 配置用 ZIP に pdb が残っている: $remaining_pdb" >&2
+            exit 1
+          fi
 
           # Dockerfile と同じ構成にする。資格情報の実値は含めず、設定の説明と
           # ライセンスだけを足す。ZIP の直下がそのまま wwwroot になる形にする。
@@ -324,8 +337,8 @@ jobs:
         with:
           name: deployment-package
           path: |
-            ${{ runner.temp }}/VehicleVision.PleasanterTools.Questionnaire-${{ steps.version.outputs.version }}.zip
-            ${{ runner.temp }}/VehicleVision.PleasanterTools.Questionnaire-${{ steps.version.outputs.version }}.zip.sha256
+            ${{ runner.temp }}/VehicleVision.PleasanterTools.Questionnaire-${{ steps.version.outputs.version }}-portable.zip
+            ${{ runner.temp }}/VehicleVision.PleasanterTools.Questionnaire-${{ steps.version.outputs.version }}-portable.zip.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -442,8 +455,8 @@ jobs:
           BODY_FILE: ${{ steps.notes.outputs.body_file }}
           REPOSITORY: ${{ github.repository }}
           SERVER_URL: ${{ github.server_url }}
-          DEPLOYMENT_ZIP: ${{ runner.temp }}/deployment-package/VehicleVision.PleasanterTools.Questionnaire-${{ needs.verify.outputs.version }}.zip
-          DEPLOYMENT_SHA256: ${{ runner.temp }}/deployment-package/VehicleVision.PleasanterTools.Questionnaire-${{ needs.verify.outputs.version }}.zip.sha256
+          DEPLOYMENT_ZIP: ${{ runner.temp }}/deployment-package/VehicleVision.PleasanterTools.Questionnaire-${{ needs.verify.outputs.version }}-portable.zip
+          DEPLOYMENT_SHA256: ${{ runner.temp }}/deployment-package/VehicleVision.PleasanterTools.Questionnaire-${{ needs.verify.outputs.version }}-portable.zip.sha256
         run: |
           set -euo pipefail
 

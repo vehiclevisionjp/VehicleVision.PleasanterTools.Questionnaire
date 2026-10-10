@@ -640,6 +640,101 @@ public class AdminSurveyEndToEndTests
     }
 
     [Fact]
+    public async Task 本公開中と停止中から下書きへ戻して直し次の版を固められる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // Issue #542。**戻しても固めた版は消えず、直して再度テスト公開すると次の版ができる**
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+
+        using (var reverted = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/revert-to-draft", new { }))
+        {
+            reverted.EnsureSuccessStatusCode();
+            Assert.Equal("Draft", (await ReadAsync(reverted))!["status"]!.GetValue<string>());
+        }
+
+        using (var again = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { }))
+        {
+            again.EnsureSuccessStatusCode();
+            Assert.Equal(2, (await ReadAsync(again))!["version"]!.GetValue<int>());
+        }
+
+        using (var published = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/publish", new { }))
+        {
+            published.EnsureSuccessStatusCode();
+        }
+
+        // **停止中からも戻せる。** 停止の理由は下書きに残さない
+        using (var suspend = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/suspend", new { }))
+        {
+            suspend.EnsureSuccessStatusCode();
+        }
+
+        using (var reverted = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/revert-to-draft", new { }))
+        {
+            reverted.EnsureSuccessStatusCode();
+        }
+
+        var summary = await SummaryAsync(http, surveyId);
+        Assert.Equal(0, summary["status"]!.GetValue<int>());
+        Assert.Null(summary["suspendedReason"]);
+    }
+
+    [Fact]
+    public async Task 下書きのアンケートは下書きへ戻せない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using var reverted = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/revert-to-draft", new { });
+
+        Assert.Equal(HttpStatusCode.BadRequest, reverted.StatusCode);
+    }
+
+    [Fact]
+    public async Task 固めた版を一覧し中身を読める()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // Issue #544。**読むだけで、版は書き換わらない**
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+
+        using var list = await http.GetAsync($"/api/admin/surveys/{surveyId}/versions");
+        list.EnsureSuccessStatusCode();
+        var versions = (await ReadAsync(list))!.AsArray();
+        Assert.Single(versions);
+        Assert.Equal(1, versions[0]!["version"]!.GetValue<int>());
+
+        using var detail = await http.GetAsync($"/api/admin/surveys/{surveyId}/versions/1");
+        detail.EnsureSuccessStatusCode();
+        var body = await ReadAsync(detail);
+        Assert.NotNull(body!["definition"]);
+        Assert.NotNull(body["mapping"]);
+
+        using var missing = await http.GetAsync($"/api/admin/surveys/{surveyId}/versions/99");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
     public async Task 停止して再開できる()
     {
         if (!Enabled)

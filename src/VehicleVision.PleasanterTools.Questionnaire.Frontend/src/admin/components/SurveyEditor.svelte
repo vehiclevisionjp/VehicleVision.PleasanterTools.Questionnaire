@@ -7,7 +7,9 @@
     loadColumnAvailability,
     loadAssetOptions,
     loadDraft,
+    listVersions,
     loadEmbedOptions,
+    loadVersion,
     revertToDraft,
     testPublish,
     saveDraft,
@@ -25,6 +27,7 @@
     type Question,
     type QuestionImportResult,
     type SurveyDefinition,
+    type SurveyVersionSummary,
   } from '../lib/types';
   import {
     flowKey,
@@ -41,7 +44,7 @@
     SUPPORTED_LANGUAGES,
     type Language,
   } from '../../lib/i18n/language';
-  import { language, t } from '../lib/i18n/state.svelte';
+  import { formatDateTime, language, t } from '../lib/i18n/state.svelte';
   import MappingEditor from './MappingEditor.svelte';
   import QuestionEditor from './QuestionEditor.svelte';
   import AutoReplyEditor from './AutoReplyEditor.svelte';
@@ -50,6 +53,7 @@
   import { addQuestionAssignment } from '../lib/mappingSelection';
   import { assetMarkup as markupForAsset } from '../lib/asset';
   import { requiredPortCount } from '../lib/columnBudget';
+  import { confirmAction } from '../lib/confirmation.svelte';
 
   interface Props {
     surveyId: string;
@@ -145,6 +149,19 @@
   let conflict = $state(false);
   let warnings = $state<MappingProblem[]>([]);
   let selectedQuestionId = $state<string | null>(null);
+
+  /**
+   * 開いているタブ（Issue #546）。**見せ方だけで、編集の内容・保存・公開は変わらない。**
+   * 設問と割り当てを同じ画面に置き、基本設定と見た目・自動返信は別のタブへ分ける。
+   */
+  let tab = $state<'settings' | 'questions' | 'extras'>('questions');
+  /** 開いているページのタブ。**無い・消えた ID のときは先頭のページ。** */
+  let activePageId = $state<string | null>(null);
+  const currentPageId = $derived(
+    definition?.pages.some((page) => page.pageId === activePageId)
+      ? activePageId
+      : (definition?.pages[0]?.pageId ?? null),
+  );
   let assetUploading = $state(false);
   let assetMarkup = $state('');
   let assetError = $state('');
@@ -232,6 +249,70 @@
     })();
   });
 
+  /** 過去の版の一覧を開いているか（Issue #544）。 */
+  let versionsOpen = $state(false);
+  let versions = $state<SurveyVersionSummary[]>([]);
+  let versionsLoading = $state(false);
+
+  async function toggleVersions() {
+    versionsOpen = !versionsOpen;
+    if (!versionsOpen) return;
+
+    versionsLoading = true;
+    const result = await listVersions(surveyId);
+    versionsLoading = false;
+    if (!result.ok) {
+      error = result.message;
+      versionsOpen = false;
+      return;
+    }
+
+    versions = result.value;
+  }
+
+  /**
+   * 過去の版を、編集へ読み込む。
+   *
+   * **読み込むだけで、保存はしない。** 保存するまで下書きは変わらず、
+   * 読み込みを取り消すなら、保存せずに読み直せばよい。
+   * **版は不変**なので固めた版は書き換わらない。保存して、テスト公開すると次の版になる。
+   * **版番号（次に固める版）は今の下書きのものを残す。**
+   * 過去の版の番号を持ち込むと、固める版が重なる
+   */
+  async function restoreVersion(version: number) {
+    if (!definition) return;
+
+    const confirmed = await confirmAction({
+      title: t('editor.versionLoad'),
+      message: t('editor.versionLoadConfirm', { version }),
+      confirmLabel: t('editor.versionLoad'),
+      danger: hasUnsavedChanges,
+    });
+    if (!confirmed) return;
+
+    error = '';
+    notice = '';
+    const result = await loadVersion(surveyId, version);
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    definition = { ...result.value.definition, version: definition.version };
+    mapping = result.value.mapping;
+    assetHistorySiteId = result.value.assetHistorySiteId ?? 0;
+    assetHistoryMapping = result.value.assetHistoryMapping ?? { assignments: [] };
+    selectedQuestionId = null;
+    versionsOpen = false;
+    notice = t('editor.versionLoaded', { version });
+  }
+
+  function formatVersionTime(value: string): string {
+    // **保存されているのは UTC。** 見る人の時間帯で出す
+    const parsed = new Date(value.endsWith('Z') ? value : `${value}Z`);
+    return Number.isNaN(parsed.getTime()) ? value : formatDateTime(parsed);
+  }
+
   async function load(id: string) {
     loading = true;
     conflict = false;
@@ -305,15 +386,21 @@
 
   function addPage() {
     if (!definition) return;
+    const pageId = newId('page');
     definition = {
       ...definition,
-      pages: [...definition.pages, { pageId: newId('page'), questions: [] }],
+      pages: [...definition.pages, { pageId, questions: [] }],
     };
+    // **足したページをすぐ開く。** タブの外に追加されると、追加したのに見えない
+    activePageId = pageId;
   }
 
   function removePage(index: number) {
     if (!definition) return;
-    definition = { ...definition, pages: definition.pages.filter((_, i) => i !== index) };
+    const remaining = definition.pages.filter((_, i) => i !== index);
+    // **消したページの隣を開く。** 先頭へ飛ばすと、続きの作業の位置を見失う
+    activePageId = (remaining[index] ?? remaining[index - 1] ?? remaining[0])?.pageId ?? null;
+    definition = { ...definition, pages: remaining };
   }
 
   function addQuestion(pageIndex: number) {
@@ -469,7 +556,8 @@
     }
   }
 
-  async function doPublish() {
+  /** テスト公開する。**公開できたかを返す。** */
+  async function doPublish(): Promise<boolean> {
     saving = true;
     error = '';
     notice = '';
@@ -493,12 +581,13 @@
         publishFlow = body.flow;
       }
 
-      return;
+      return false;
     }
 
     warnings = result.value.warnings;
     notice = t('editor.testPublished', { version: result.value.version });
     await load(surveyId);
+    return true;
   }
 
   /**
@@ -523,9 +612,44 @@
       return;
     }
 
-    // **ここから先で失敗しても下書きに戻っている。** 画面を実際の状態に合わせる
-    status = 0;
-    await doPublish();
+    // **処理が終わるまで表示は切り替えない**（下書きに戻した時点で切り替えると、
+    // 「テスト公開に反映する」が一瞬「テスト公開する」に変わる。Issue #558）。
+    // **公開に失敗したときは、実際に下書きへ戻っているので、その状態に合わせる**
+    if (!(await doPublish())) {
+      status = 0;
+    }
+  }
+
+  /**
+   * 本公開中・停止中のアンケートを下書きへ戻す（Issue #542）。
+   *
+   * **回答画面が閉じる**ので確認を挟む。戻したあと、直してテスト公開すると次の版ができる。
+   * **未保存の編集は先に保存する。** 戻した後の読み直しで消えるため。
+   * 保存できなかったら先へ進まない（`republish` と同じ）
+   */
+  async function revertLive() {
+    const confirmed = await confirmAction({
+      title: t('list.revertToDraft'),
+      message: t('editor.revertLiveConfirm'),
+      confirmLabel: t('list.revertToDraft'),
+      danger: true,
+    });
+    if (!confirmed) return;
+
+    if (hasUnsavedChanges && !(await save())) return;
+
+    saving = true;
+    error = '';
+    notice = '';
+    const reverted = await revertToDraft(surveyId);
+    saving = false;
+
+    if (!reverted.ok) {
+      error = reverted.message;
+      return;
+    }
+
+    await load(surveyId);
   }
 
   function describe(problem: MappingProblem): string {
@@ -618,6 +742,9 @@
   /** 全体図から該当ページの編集位置へ戻る。 */
   async function editPageFromFlowchart(pageId: string) {
     flowcharting = false;
+    // **移動先のページは、開いていないと DOM に無い。** 先に開く
+    tab = 'questions';
+    activePageId = pageId;
     await tick();
     const page = document.getElementById(`page-${pageId}`);
     page?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -650,6 +777,11 @@
     <button type="button" class="secondary" onclick={save} disabled={saving || loading}>
       {saving ? t('editor.working') : t('editor.saveDraft')}
     </button>
+    {#if status === 0}
+      <button type="button" class="secondary" onclick={toggleVersions} disabled={saving || loading}>
+        {t('editor.versions')}
+      </button>
+    {/if}
     <!-- **押せる操作は状態で決まる。** サーバは下書き以外のテスト公開を断る -->
     {#if status === 0}
       <button type="button" onclick={doPublish} disabled={saving || loading}>
@@ -659,6 +791,10 @@
       <button type="button" onclick={republish} disabled={saving || loading}>
         {t('editor.republish')}
       </button>
+    {:else if status === 1 || status === 2}
+      <button type="button" onclick={revertLive} disabled={saving || loading}>
+        {t('list.revertToDraft')}
+      </button>
     {/if}
   </div>
 </header>
@@ -667,6 +803,28 @@
   <p class="notice" role="status">
     {status === 3 ? t('editor.draftOnlyTest') : t('editor.draftOnlyLive')}
   </p>
+{/if}
+
+{#if versionsOpen}
+  <section class="versions" aria-label={t('editor.versions')}>
+    <h3>{t('editor.versionsTitle')}</h3>
+    {#if versionsLoading}
+      <p class="status">{t('app.loading')}</p>
+    {:else if versions.length === 0}
+      <p class="status">{t('editor.versionsEmpty')}</p>
+    {:else}
+      <ul>
+        {#each versions as item (item.version)}
+          <li>
+            <span>{t('editor.versionLabel', { version: item.version, publishedAt: formatVersionTime(item.publishedAt) })}</span>
+            <button type="button" class="secondary" onclick={() => restoreVersion(item.version)}>
+              {t('editor.versionLoad')}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
 {/if}
 
 {#if conflict}
@@ -775,6 +933,23 @@
     <p class="hint">{t('editor.fallbackLanguageHint')}</p>
   </section>
 
+  <!-- **タブで分ける。** 1 枚に全部並べると縦に長く、設問と割り当てが離れる（Issue #546） -->
+  <div class="tabs" role="tablist" aria-label={t('editor.tabs')}>
+    {#each [['questions', 'editor.tabQuestions'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras']] as const as [key, label] (key)}
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        class:active={tab === key}
+        aria-selected={tab === key}
+        onclick={() => (tab = key)}
+      >
+        {t(label)}
+      </button>
+    {/each}
+  </div>
+
+  {#if tab === 'settings'}
   <section class="survey">
     <label class="big">
       {t('editor.title')}
@@ -947,7 +1122,9 @@
       <span class="next-version">{t('editor.nextVersion', { version: definition.version })}</span>
     </div>
   </section>
+  {/if}
 
+  {#if tab === 'extras'}
   <!-- **見た目は設問と同じく定義の一部**（Issue #56）。
        保存も公開も、設問とまとめてこの画面の釦で行う -->
   <ThemeEditor
@@ -971,12 +1148,33 @@
     onchange={(next) => (definition = { ...definition!, autoReply: next })}
   />
 
+  {/if}
+
+  {#if tab === 'questions'}
   <div class="editor-columns">
     <div class="question-column">
+  <!-- **ページの境目はタブ。** 開いているページだけを出す -->
+  <div class="page-tabs" role="tablist" aria-label={t('editor.pageTabs')}>
+    {#each definition.pages as page, pageIndex (page.pageId)}
+      <button
+        type="button"
+        role="tab"
+        class="page-tab"
+        class:active={page.pageId === currentPageId}
+        aria-selected={page.pageId === currentPageId}
+        onclick={() => (activePageId = page.pageId)}
+      >
+        {displayText(page.title, editing) || t('editor.pageTab', { number: pageIndex + 1 })}
+      </button>
+    {/each}
+    <button type="button" class="page-tab add" onclick={addPage}>＋ {t('editor.addPage')}</button>
+  </div>
+
   {#each definition.pages as page, pageIndex (page.pageId)}
     {@const targets = jumpTargets(pageIndex)}
     {@const stale = staleTargetId(page.next, targets.map((target) => target.pageId))}
     {@const hasVisibility = page.questions.some((question) => question.visibleWhen)}
+    {#if page.pageId === currentPageId}
     <section class="page" id={`page-${page.pageId}`} tabindex="-1">
       <div class="page-head">
         <!-- **ページの区切りがそのまま改ページになる** -->
@@ -1082,9 +1280,8 @@
         </span>
       </div>
     </section>
+    {/if}
   {/each}
-
-  <button type="button" class="secondary" onclick={addPage}>{t('editor.addPage')}</button>
     </div>
 
     <div class="mapping-column">
@@ -1141,6 +1338,7 @@
       </section>
     </div>
   </div>
+  {/if}
 {/if}
 
 <!--
@@ -1273,9 +1471,62 @@
     min-width: 0;
   }
 
+  /* **割り当ては設問のそばに付いてくる。** 設問を下へ編集しても、割り当てが画面から消えない。
+     1 列に畳む幅では固定しない（下の @media） */
+  .mapping-column {
+    position: sticky;
+    top: 0.75rem;
+    max-height: calc(100vh - 1.5rem);
+    overflow-y: auto;
+  }
+
+  .tabs,
+  .page-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0 0 1rem;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .tab,
+  .page-tab {
+    margin-bottom: -2px;
+    padding: 0.5rem 1rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 6px 6px 0 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    cursor: pointer;
+
+    &.active {
+      border-bottom-color: var(--accent, currentColor);
+      background: var(--surface, transparent);
+      color: inherit;
+      font-weight: 600;
+    }
+  }
+
+  .page-tab.add {
+    color: var(--accent, inherit);
+  }
+
+  .page-tabs {
+    margin-top: 0;
+    border-bottom-width: 1px;
+  }
+
   @media (max-width: 75rem) {
     .editor-columns {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mapping-column {
+      position: static;
+      max-height: none;
+      overflow-y: visible;
     }
   }
 
@@ -1492,6 +1743,32 @@
 
   .notice {
     color: var(--success);
+  }
+
+  .versions {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+
+    h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1rem;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.25rem 0;
+    }
   }
 
   .error {
