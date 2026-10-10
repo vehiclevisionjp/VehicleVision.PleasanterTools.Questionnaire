@@ -149,6 +149,19 @@
   let conflict = $state(false);
   let warnings = $state<MappingProblem[]>([]);
   let selectedQuestionId = $state<string | null>(null);
+
+  /**
+   * 開いているタブ（Issue #546）。**見せ方だけで、編集の内容・保存・公開は変わらない。**
+   * 設問と割り当てを同じ画面に置き、基本設定と見た目・自動返信は別のタブへ分ける。
+   */
+  let tab = $state<'settings' | 'questions' | 'extras'>('questions');
+  /** 開いているページのタブ。**無い・消えた ID のときは先頭のページ。** */
+  let activePageId = $state<string | null>(null);
+  const currentPageId = $derived(
+    definition?.pages.some((page) => page.pageId === activePageId)
+      ? activePageId
+      : (definition?.pages[0]?.pageId ?? null),
+  );
   let assetUploading = $state(false);
   let assetMarkup = $state('');
   let assetError = $state('');
@@ -373,15 +386,21 @@
 
   function addPage() {
     if (!definition) return;
+    const pageId = newId('page');
     definition = {
       ...definition,
-      pages: [...definition.pages, { pageId: newId('page'), questions: [] }],
+      pages: [...definition.pages, { pageId, questions: [] }],
     };
+    // **足したページをすぐ開く。** タブの外に追加されると、追加したのに見えない
+    activePageId = pageId;
   }
 
   function removePage(index: number) {
     if (!definition) return;
-    definition = { ...definition, pages: definition.pages.filter((_, i) => i !== index) };
+    const remaining = definition.pages.filter((_, i) => i !== index);
+    // **消したページの隣を開く。** 先頭へ飛ばすと、続きの作業の位置を見失う
+    activePageId = (remaining[index] ?? remaining[index - 1] ?? remaining[0])?.pageId ?? null;
+    definition = { ...definition, pages: remaining };
   }
 
   function addQuestion(pageIndex: number) {
@@ -718,6 +737,9 @@
   /** 全体図から該当ページの編集位置へ戻る。 */
   async function editPageFromFlowchart(pageId: string) {
     flowcharting = false;
+    // **移動先のページは、開いていないと DOM に無い。** 先に開く
+    tab = 'questions';
+    activePageId = pageId;
     await tick();
     const page = document.getElementById(`page-${pageId}`);
     page?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -906,6 +928,23 @@
     <p class="hint">{t('editor.fallbackLanguageHint')}</p>
   </section>
 
+  <!-- **タブで分ける。** 1 枚に全部並べると縦に長く、設問と割り当てが離れる（Issue #546） -->
+  <div class="tabs" role="tablist" aria-label={t('editor.tabs')}>
+    {#each [['questions', 'editor.tabQuestions'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras']] as const as [key, label] (key)}
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        class:active={tab === key}
+        aria-selected={tab === key}
+        onclick={() => (tab = key)}
+      >
+        {t(label)}
+      </button>
+    {/each}
+  </div>
+
+  {#if tab === 'settings'}
   <section class="survey">
     <label class="big">
       {t('editor.title')}
@@ -1078,7 +1117,9 @@
       <span class="next-version">{t('editor.nextVersion', { version: definition.version })}</span>
     </div>
   </section>
+  {/if}
 
+  {#if tab === 'extras'}
   <!-- **見た目は設問と同じく定義の一部**（Issue #56）。
        保存も公開も、設問とまとめてこの画面の釦で行う -->
   <ThemeEditor
@@ -1102,12 +1143,33 @@
     onchange={(next) => (definition = { ...definition!, autoReply: next })}
   />
 
+  {/if}
+
+  {#if tab === 'questions'}
   <div class="editor-columns">
     <div class="question-column">
+  <!-- **ページの境目はタブ。** 開いているページだけを出す -->
+  <div class="page-tabs" role="tablist" aria-label={t('editor.pageTabs')}>
+    {#each definition.pages as page, pageIndex (page.pageId)}
+      <button
+        type="button"
+        role="tab"
+        class="page-tab"
+        class:active={page.pageId === currentPageId}
+        aria-selected={page.pageId === currentPageId}
+        onclick={() => (activePageId = page.pageId)}
+      >
+        {displayText(page.title, editing) || t('editor.pageTab', { number: pageIndex + 1 })}
+      </button>
+    {/each}
+    <button type="button" class="page-tab add" onclick={addPage}>＋ {t('editor.addPage')}</button>
+  </div>
+
   {#each definition.pages as page, pageIndex (page.pageId)}
     {@const targets = jumpTargets(pageIndex)}
     {@const stale = staleTargetId(page.next, targets.map((target) => target.pageId))}
     {@const hasVisibility = page.questions.some((question) => question.visibleWhen)}
+    {#if page.pageId === currentPageId}
     <section class="page" id={`page-${page.pageId}`} tabindex="-1">
       <div class="page-head">
         <!-- **ページの区切りがそのまま改ページになる** -->
@@ -1213,9 +1275,8 @@
         </span>
       </div>
     </section>
+    {/if}
   {/each}
-
-  <button type="button" class="secondary" onclick={addPage}>{t('editor.addPage')}</button>
     </div>
 
     <div class="mapping-column">
@@ -1272,6 +1333,7 @@
       </section>
     </div>
   </div>
+  {/if}
 {/if}
 
 <!--
@@ -1404,9 +1466,62 @@
     min-width: 0;
   }
 
+  /* **割り当ては設問のそばに付いてくる。** 設問を下へ編集しても、割り当てが画面から消えない。
+     1 列に畳む幅では固定しない（下の @media） */
+  .mapping-column {
+    position: sticky;
+    top: 0.75rem;
+    max-height: calc(100vh - 1.5rem);
+    overflow-y: auto;
+  }
+
+  .tabs,
+  .page-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0 0 1rem;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .tab,
+  .page-tab {
+    margin-bottom: -2px;
+    padding: 0.5rem 1rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 6px 6px 0 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    cursor: pointer;
+
+    &.active {
+      border-bottom-color: var(--accent, currentColor);
+      background: var(--surface, transparent);
+      color: inherit;
+      font-weight: 600;
+    }
+  }
+
+  .page-tab.add {
+    color: var(--accent, inherit);
+  }
+
+  .page-tabs {
+    margin-top: 0;
+    border-bottom-width: 1px;
+  }
+
   @media (max-width: 75rem) {
     .editor-columns {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mapping-column {
+      position: static;
+      max-height: none;
+      overflow-y: visible;
     }
   }
 
