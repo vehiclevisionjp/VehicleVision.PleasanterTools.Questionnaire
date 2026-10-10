@@ -670,7 +670,7 @@ export const en: Record<MessageKey, string> = {
     'Sending a response again replaces the attachments on the Pleasanter side.',
   'mapping.rowUnset': '(choose a row)',
   'mapping.refreshColumnAvailability': 'Refresh',
-  'mapping.budgetBasisSite': 'Counting the columns available in the Pleasanter site.',
+  'mapping.budgetBasisSite': 'Counted as the standard 26 columns per type plus the extended columns found on the Pleasanter site.',
   'mapping.budgetBasisStandard':
     'The Pleasanter site columns are unavailable, so counting the standard 26 columns per type.',
   'mapping.budgetEntry': '{prefix}: {used} of {available}',

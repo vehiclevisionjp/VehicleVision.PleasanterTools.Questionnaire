@@ -1727,11 +1727,6 @@ public static class AdminSurveyEndpoints
         return new SurveyPageResponse([.. rows.Take(take)], rows.Count > take);
     }
 
-    /// <summary><c>GetSite</c> 応答から接頭辞ごとの列数を取り出す。</summary>
-    /// <remarks>
-    /// Pleasanter の <c>GetSite</c> は <c>Response.Data.SiteSettings.Columns</c> に
-    /// <c>ColumnName</c> を持つ。列定義が無ければ、取得できなかったものとして標準値へ戻す。
-    /// </remarks>
     /// <summary>
     /// <c>GetSite</c> 応答から、列の物理名ごとの設定（項目名・リンク・選択肢）を取り出す（Issue #549）。
     /// </summary>
@@ -1901,6 +1896,23 @@ public static class AdminSurveyEndpoints
             ? null
             : text;
 
+    /// <summary><c>GetSite</c> 応答から、接頭辞ごとの使える列の本数を見積もる（Issue #551）。</summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠️ **<c>Columns</c> の件数は使える本数ではない。** 実機（Pleasanter 1.5.8.1）で、
+    /// <c>GetSite</c> は**設定を付けた列だけ**を返し、付けていない列も、設定を初期化した列も載らない
+    /// ことを確かめた（<c>_documents/実機検証結果.md</c> 11 章）。載っている数を本数にすると、
+    /// 名前を付けた列が数本あるだけで「使える本数はその数本」と見なされ、足りないと誤判定する。
+    /// </para>
+    /// <para>
+    /// **見積もりは「標準の 26 本」を下限にする。** 項目拡張の列（<c>Class001</c> など）は、
+    /// 応答に載っていた最大の番号を上乗せする。**実際の本数の下限**であり、
+    /// 応答からは項目拡張の本数そのものは分からない。**足りないと誤って言わない側に倒す。**
+    /// </para>
+    /// <para>
+    /// 認識できる列が 1 つも載っていなければ <c>null</c>（標準の本数として扱う）。
+    /// </para>
+    /// </remarks>
     public static IReadOnlyDictionary<string, int>? AvailableColumnsFrom(JsonNode? body)
     {
         var columns = body?["Response"]?["Data"]?["SiteSettings"]?["Columns"]?.AsArray();
@@ -1909,7 +1921,7 @@ public static class AdminSurveyEndpoints
             return null;
         }
 
-        var availableByPrefix = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var extensionMaxByPrefix = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var column in columns)
         {
             var columnName = column?["ColumnName"]?.GetValue<string>();
@@ -1919,10 +1931,24 @@ public static class AdminSurveyEndpoints
             }
 
             var prefix = ColumnBudget.PrefixOf(columnName);
-            availableByPrefix[prefix] = availableByPrefix.GetValueOrDefault(prefix) + 1;
+            // 英字 1 文字（ClassA）は標準の 26 本の中。数字（Class012）は項目拡張で、番号が本数の下限になる
+            var extensionIndex = int.TryParse(
+                columnName.AsSpan(prefix.Length),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var index)
+                    ? index
+                    : 0;
+            extensionMaxByPrefix[prefix] = Math.Max(
+                extensionMaxByPrefix.GetValueOrDefault(prefix), extensionIndex);
         }
 
-        return availableByPrefix.Count == 0 ? null : availableByPrefix;
+        return extensionMaxByPrefix.Count == 0
+            ? null
+            : extensionMaxByPrefix.ToDictionary(
+                pair => pair.Key,
+                pair => ColumnBudget.StandardColumnsPerType + pair.Value,
+                StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>不備を画面に出せる形にする。</summary>

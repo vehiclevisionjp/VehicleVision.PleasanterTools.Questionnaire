@@ -652,7 +652,7 @@ export const ja = {
   'mapping.attachmentReplaceHint': '回答を再送信すると、Pleasanter 側の添付は新しいファイルに置き換わります。',
   'mapping.rowUnset': '（行を選択）',
   'mapping.refreshColumnAvailability': '取り直す',
-  'mapping.budgetBasisSite': '実際の Pleasanter サイトの列数で数えています。',
+  'mapping.budgetBasisSite': '標準の本数（型ごとに 26 列）に、Pleasanter サイトで確認できた項目拡張の列を加えて数えています。',
   'mapping.budgetBasisStandard': 'Pleasanter サイトの列数を取得できないため、標準の本数（型ごとに 26 列）で数えています。',
   'mapping.budgetEntry': '{prefix}: {used} / {available} 列',
   'mapping.budgetOver': '{prefixes} の列数を超えています。割り当てを確認してください。',
