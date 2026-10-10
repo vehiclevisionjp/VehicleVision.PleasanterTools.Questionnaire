@@ -449,7 +449,7 @@ public static class AdminSurveyEndpoints
             // **項目名は、取れたものだけ添える。** 取れなくても編集は止めない
             var labels = response.IsSuccess
                 ? LabelsFrom(response.Body)
-                : new Dictionary<string, string>();
+                : new Dictionary<string, ColumnLabel>();
 
             // **取得に失敗しても編集を止めない。** 項目拡張のない標準構成なら正しい本数であり、
             // 取得できないことを理由に、利用者が下書きを直せなくなる方を避ける。
@@ -1733,16 +1733,24 @@ public static class AdminSurveyEndpoints
     /// <c>ColumnName</c> を持つ。列定義が無ければ、取得できなかったものとして標準値へ戻す。
     /// </remarks>
     /// <summary>
-    /// <c>GetSite</c> 応答から、列の物理名ごとの項目名（<c>LabelText</c>）を取り出す（Issue #549）。
+    /// <c>GetSite</c> 応答から、列の物理名ごとの項目名を取り出す（Issue #549）。
     /// </summary>
     /// <remarks>
-    /// **項目名が空のもの、物理名と同じものは出さない。** 後者は本アプリの同期が書く値
+    /// <para>
+    /// **編集画面の項目名（<c>LabelText</c>）と、一覧の項目名（<c>GridLabelText</c>）は別。**
+    /// 実機（Pleasanter 1.5.8.1）で、両方が別々に返ることを確かめた。
+    /// 見る場所によって名前が違い得るので、両方を返す。
+    /// </para>
+    /// <para>
+    /// **空のもの、物理名と同じものは返さない。** 後者は本アプリの同期が書く値
     /// （<c>SiteSettingsSynchronizer</c>）で、利用者が付けた名前ではなく、添えても情報が増えない。
+    /// **名前を付けていない列は応答に載らない**（実機）ので、そのときは何も返らない。
     /// 物理名の大文字小文字は区別しない。
+    /// </para>
     /// </remarks>
-    public static IReadOnlyDictionary<string, string> LabelsFrom(JsonNode? body)
+    public static IReadOnlyDictionary<string, ColumnLabel> LabelsFrom(JsonNode? body)
     {
-        var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var labels = new Dictionary<string, ColumnLabel>(StringComparer.OrdinalIgnoreCase);
         var columns = body?["Response"]?["Data"]?["SiteSettings"]?["Columns"]?.AsArray();
         if (columns is null)
         {
@@ -1752,19 +1760,30 @@ public static class AdminSurveyEndpoints
         foreach (var column in columns)
         {
             var columnName = column?["ColumnName"]?.GetValue<string>();
-            var labelText = column?["LabelText"]?.GetValue<string>();
-            if (string.IsNullOrWhiteSpace(columnName)
-                || string.IsNullOrWhiteSpace(labelText)
-                || string.Equals(columnName, labelText, StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(columnName))
             {
                 continue;
             }
 
-            labels[columnName] = labelText;
+            var label = UserLabel(columnName, column?["LabelText"]?.GetValue<string>());
+            var gridLabel = UserLabel(columnName, column?["GridLabelText"]?.GetValue<string>());
+            if (label is null && gridLabel is null)
+            {
+                continue;
+            }
+
+            labels[columnName] = new ColumnLabel(label, gridLabel);
         }
 
         return labels;
     }
+
+    /// <summary>利用者が付けた名前だけを返す。空と、物理名と同じものは「名前なし」。</summary>
+    private static string? UserLabel(string columnName, string? text) =>
+        string.IsNullOrWhiteSpace(text)
+        || string.Equals(columnName, text, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : text;
 
     public static IReadOnlyDictionary<string, int>? AvailableColumnsFrom(JsonNode? body)
     {
@@ -1838,7 +1857,12 @@ public static class AdminSurveyEndpoints
     public sealed record ColumnAvailabilityResponse(
         string Source,
         IReadOnlyDictionary<string, int> AvailableByPrefix,
-        IReadOnlyDictionary<string, string> Labels);
+        IReadOnlyDictionary<string, ColumnLabel> Labels);
+
+    /// <summary>列の項目名。編集画面と一覧で別の名前を付けられるので両方持つ。</summary>
+    /// <param name="Label">編集画面の項目名（<c>LabelText</c>）。</param>
+    /// <param name="GridLabel">一覧の項目名（<c>GridLabelText</c>）。</param>
+    public sealed record ColumnLabel(string? Label, string? GridLabel);
 
     /// <summary>取り込み元のページ。**ページそのものは取り込まない。**</summary>
     public sealed record QuestionImportPageResponse(

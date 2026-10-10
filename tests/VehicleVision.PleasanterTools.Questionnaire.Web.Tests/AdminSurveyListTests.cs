@@ -107,9 +107,10 @@ public class AdminSurveyListTests
                 "Data": {
                   "SiteSettings": {
                     "Columns": [
-                      { "ColumnName": "ClassA", "LabelText": "部署名" },
+                      { "ColumnName": "ClassA", "LabelText": "部署名", "GridLabelText": "部署" },
                       { "ColumnName": "NumA", "LabelText": "numa" },
                       { "ColumnName": "ClassB", "LabelText": "" },
+                      { "ColumnName": "ClassC", "GridLabelText": "区分" },
                       { "ColumnName": "DateA" },
                       { "ColumnName": "Title", "LabelText": "件名" }
                     ]
@@ -122,10 +123,13 @@ public class AdminSurveyListTests
         var labels = AdminSurveyEndpoints.LabelsFrom(response);
 
         // **物理名と同じ文字列は返さない。** 本アプリの同期が書く値で、添えても情報が増えない
-        Assert.Equal(2, labels.Count);
-        Assert.Equal("部署名", labels["ClassA"]);
-        Assert.Equal("部署名", labels["classa"]);
-        Assert.Equal("件名", labels["Title"]);
+        Assert.Equal(3, labels.Count);
+        // **編集画面と一覧は別々に返す**（実機で別々に返ることを確かめた）
+        Assert.Equal("部署名", labels["ClassA"].Label);
+        Assert.Equal("部署", labels["classa"].GridLabel);
+        Assert.Null(labels["ClassC"].Label);
+        Assert.Equal("区分", labels["ClassC"].GridLabel);
+        Assert.Equal("件名", labels["Title"].Label);
     }
 
     [Fact]

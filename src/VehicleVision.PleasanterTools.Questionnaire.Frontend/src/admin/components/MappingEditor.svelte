@@ -11,7 +11,7 @@
     type MappingSystemValue,
   } from '../lib/types';
   import { measure, STANDARD_COLUMNS_PER_TYPE } from '../lib/columnBudget';
-  import type { ColumnAvailabilityResponse } from '../lib/api';
+  import type { ColumnAvailabilityResponse, ColumnLabel } from '../lib/api';
   import type { Language } from '../../lib/i18n/language';
   import { t } from '../lib/i18n/state.svelte';
   import type { MessageKey } from '../lib/i18n/messages';
@@ -86,12 +86,26 @@
   /** 物理名（小文字）から項目名を引く。**大文字小文字は区別しない。** */
   const labelByColumn = $derived(
     new Map(
-      Object.entries(availability.labels ?? {}).map(([column, label]) => [
+      Object.entries(availability.labels ?? {}).map(([column, entry]) => [
         column.toLowerCase(),
-        label,
+        entry,
       ]),
     ),
   );
+
+  /**
+   * 項目名の見せ方。**編集画面と一覧で名前が違うときだけ、両方を場所つきで出す。**
+   * 一覧の名前が無ければ Pleasanter は編集画面の名前を使うので、片方だけなら単に添える
+   */
+  function describeLabel(entry: ColumnLabel | undefined): string {
+    if (!entry) return '';
+    const { label, gridLabel } = entry;
+    if (label && gridLabel && label !== gridLabel) {
+      return `${t('mapping.labelEditor')}: ${label} / ${t('mapping.labelGrid')}: ${gridLabel}`;
+    }
+
+    return label ?? (gridLabel ? `${t('mapping.labelGrid')}: ${gridLabel}` : '');
+  }
 
   /** 足りていない型。**あれば公開できない。** */
   const overflowing = $derived(usage.filter((entry) => !entry.fits));
@@ -280,8 +294,8 @@
     <option value="ProgressRate" label="ProgressRate（期限付きテーブルのみ）"></option>
     <option value="RemainingWorkValue" label="RemainingWorkValue（期限付きテーブルのみ）"></option>
     <!-- **Pleasanter 側で名前を付けた列。** 物理名だけでは何の列か分からない -->
-    {#each Object.entries(availability.labels ?? {}) as [column, label] (column)}
-      <option value={column} label={`${column}（${label}）`}></option>
+    {#each Object.entries(availability.labels ?? {}) as [column, entry] (column)}
+      <option value={column} label={`${column}（${entry.label ?? entry.gridLabel}）`}></option>
     {/each}
   </datalist>
 
@@ -546,9 +560,9 @@
                   value={assignment.targetColumn}
                   oninput={(event) => patch(index, { targetColumn: event.currentTarget.value })}
                 />
-                {#if labelByColumn.get(assignment.targetColumn.trim().toLowerCase())}
+                {#if describeLabel(labelByColumn.get(assignment.targetColumn.trim().toLowerCase()))}
                   <span class="column-label">
-                    {labelByColumn.get(assignment.targetColumn.trim().toLowerCase())}
+                    {describeLabel(labelByColumn.get(assignment.targetColumn.trim().toLowerCase()))}
                   </span>
                 {/if}
               </td>

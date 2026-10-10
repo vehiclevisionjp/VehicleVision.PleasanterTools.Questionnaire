@@ -627,6 +627,8 @@ export const ja = {
   'mapping.attachmentLead': '添付の設問 1 つを添付列にそのまま割り当てます。変換は使用できません。',
   'mapping.empty': 'まだ割り当てがありません。このままでも公開できますが、回答は Pleasanter に保存されません。',
   'mapping.targetColumn': '書き込み先の列',
+  'mapping.labelEditor': '編集画面',
+  'mapping.labelGrid': '一覧',
   'mapping.targetColumnPlaceholder': 'Title / ClassA / NumA など',
   'mapping.attachmentColumnPlaceholder': 'AttachmentsA など',
   'mapping.converterFixed': '変換なし（添付では変更できません）',

@@ -560,6 +560,8 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "mapping.attachmentLead": "Một câu hỏi tải lên tệp sẽ kết nối thẳng đến cột đính kèm và không thể áp dụng trình chuyển đổi nào.",
   "mapping.empty": "Chưa có gì được giao. Bạn vẫn có thể xuất bản nhưng sẽ không có phản hồi nào được lưu giữ trong Pleasanter.",
   "mapping.targetColumn": "Cột mục tiêu",
+  "mapping.labelEditor": "Trình chỉnh sửa",
+  "mapping.labelGrid": "Danh sách",
   "mapping.targetColumnPlaceholder": "Tiêu đề/ClassA/NumA chẳng hạn",
   "mapping.attachmentColumnPlaceholder": "Tệp đính kèmA, ví dụ",
   "mapping.converterFixed": "Không có bộ chuyển đổi (cố định cho tệp đính kèm)",

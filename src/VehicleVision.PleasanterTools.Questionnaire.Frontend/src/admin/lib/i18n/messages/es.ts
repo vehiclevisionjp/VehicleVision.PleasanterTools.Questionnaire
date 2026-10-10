@@ -588,6 +588,8 @@ export const es: Partial<Record<MessageKey, string>> = {
   "mapping.attachmentLead": "Una pregunta de carga de archivos se conecta directamente a una columna de datos adjuntos y no admite conversores.",
   "mapping.empty": "Todavía no hay ninguna asignación. Puede publicar, pero no se guardará ninguna respuesta en Pleasanter.",
   "mapping.targetColumn": "Columna de destino",
+  "mapping.labelEditor": "Editor",
+  "mapping.labelGrid": "Lista",
   "mapping.targetColumnPlaceholder": "Por ejemplo, Title / ClassA / NumA",
   "mapping.attachmentColumnPlaceholder": "Por ejemplo, AttachmentsA",
   "mapping.converterFixed": "Sin conversor (fijo para datos adjuntos)",

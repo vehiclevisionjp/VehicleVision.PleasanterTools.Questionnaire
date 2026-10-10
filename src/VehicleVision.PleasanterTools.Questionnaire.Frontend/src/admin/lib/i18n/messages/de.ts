@@ -560,6 +560,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   "mapping.attachmentLead": "Eine Datei-Upload-Frage verbindet sich direkt mit einer Anhangspalte, und es kann kein Konverter angewendet werden.",
   "mapping.empty": "Noch ist nichts zugewiesen. Sie können immer noch veröffentlichen, aber keine Antwort wird in Pleasanter gespeichert.",
   "mapping.targetColumn": "Zielspalte",
+  "mapping.labelEditor": "Editor",
+  "mapping.labelGrid": "Liste",
   "mapping.targetColumnPlaceholder": "Titel / ClassA / NumA, zum Beispiel",
   "mapping.attachmentColumnPlaceholder": "AttachmentsA, beispielsweise",
   "mapping.converterFixed": "Kein Konverter (fest für Anhänge)",

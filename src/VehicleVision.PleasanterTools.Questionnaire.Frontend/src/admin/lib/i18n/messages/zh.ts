@@ -629,6 +629,8 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'mapping.attachmentLead': '一个文件上传问题可直接连接到一个附件列，且不能使用转换器。',
   'mapping.empty': '尚未分配任何内容。仍可直接发布，但回答不会保存到 Pleasanter。',
   'mapping.targetColumn': '目标列',
+  'mapping.labelEditor': '编辑页面',
+  'mapping.labelGrid': '列表',
   'mapping.targetColumnPlaceholder': '例如 Title / ClassA / NumA',
   'mapping.attachmentColumnPlaceholder': '例如 AttachmentsA',
   'mapping.converterFixed': '无转换器（附件不可更改）',
