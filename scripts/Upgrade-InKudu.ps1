@@ -42,7 +42,7 @@ pwsh .\Upgrade-InKudu.ps1
 pwsh .\Upgrade-InKudu.ps1 -Version 1.2.3 -BackupRetentionCount 3
 
 .EXAMPLE
-pwsh .\Upgrade-InKudu.ps1 -PackagePath .\packages\VehicleVision.PleasanterTools.Questionnaire-1.2.3.zip
+pwsh .\Upgrade-InKudu.ps1 -PackagePath .\packages\VehicleVision.PleasanterTools.Questionnaire-1.2.3-portable.zip
 
 .EXAMPLE
 pwsh .\Upgrade-InKudu.ps1 -Rollback .\backup\Questionnaire-wwwroot-20260916-120000000.zip
@@ -199,15 +199,27 @@ function Get-ReleasePackage {
         }
     }
 
-    $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion.zip"
+    $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion-portable.zip"
     $archivePath = Join-Path $DestinationDirectory $assetName
-    $sha256Path = "$archivePath.sha256"
     $releaseBaseUri =
         "https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Questionnaire/releases/download/v$normalizedVersion"
 
     Write-Host "Application version: $normalizedVersion"
     Write-Host "Downloading release package: $assetName"
-    Invoke-WebRequest -Uri "$releaseBaseUri/$assetName" -OutFile $archivePath
+    try {
+        Invoke-WebRequest -Uri "$releaseBaseUri/$assetName" -OutFile $archivePath
+    }
+    catch {
+        # v0.9.3 and earlier are published without the -portable suffix.
+        Write-Host "Asset $assetName was not found. Trying the legacy name."
+        if (Test-Path -LiteralPath $archivePath) {
+            Remove-Item -LiteralPath $archivePath -Force
+        }
+        $assetName = "VehicleVision.PleasanterTools.Questionnaire-$normalizedVersion.zip"
+        $archivePath = Join-Path $DestinationDirectory $assetName
+        Invoke-WebRequest -Uri "$releaseBaseUri/$assetName" -OutFile $archivePath
+    }
+    $sha256Path = "$archivePath.sha256"
     Invoke-WebRequest -Uri "$releaseBaseUri/$assetName.sha256" -OutFile $sha256Path
 
     return @{
