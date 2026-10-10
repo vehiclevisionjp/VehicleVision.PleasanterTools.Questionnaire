@@ -565,6 +565,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "mapping.columnChoices": "Lựa chọn",
   "mapping.columnChoicesMore": "+{count} mục nữa",
   "mapping.columnLink": "Cột liên kết",
+  "mapping.columnLinkJson": "Cột liên kết (JSON)",
   "mapping.columnReferences": "tham chiếu: {targets}",
   "mapping.targetColumnPlaceholder": "Tiêu đề/ClassA/NumA chẳng hạn",
   "mapping.attachmentColumnPlaceholder": "Tệp đính kèmA, ví dụ",

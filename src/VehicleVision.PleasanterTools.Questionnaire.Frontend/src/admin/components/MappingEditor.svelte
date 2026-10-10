@@ -122,9 +122,10 @@
   /** リンク項目か、参照先があるか。**参照先のレコードは列挙できない**ので、参照先だけを出す。 */
   function describeLink(entry: ColumnDetail | undefined): string {
     if (!entry || (!entry.isLink && entry.references.length === 0)) return '';
+    const kind = entry.linkFormat === 'Json' ? t('mapping.columnLinkJson') : t('mapping.columnLink');
     return entry.references.length > 0
-      ? `${t('mapping.columnLink')}（${t('mapping.columnReferences', { targets: entry.references.join(', ') })}）`
-      : t('mapping.columnLink');
+      ? `${kind}（${t('mapping.columnReferences', { targets: entry.references.join(', ') })}）`
+      : kind;
   }
 
   /** 足りていない型。**あれば公開できない。** */
@@ -592,7 +593,10 @@
                 {/if}
                 {#if describeChoices(detailByColumn.get(assignment.targetColumn.trim().toLowerCase()))}
                   <span class="column-label">
-                    {t('mapping.columnChoices')}: {describeChoices(
+                    {t('mapping.columnChoices')}{detailByColumn.get(assignment.targetColumn.trim().toLowerCase())
+                      ?.choicesControlType
+                      ? `（${detailByColumn.get(assignment.targetColumn.trim().toLowerCase())?.choicesControlType}）`
+                      : ''}: {describeChoices(
                       detailByColumn.get(assignment.targetColumn.trim().toLowerCase()),
                     )}
                   </span>

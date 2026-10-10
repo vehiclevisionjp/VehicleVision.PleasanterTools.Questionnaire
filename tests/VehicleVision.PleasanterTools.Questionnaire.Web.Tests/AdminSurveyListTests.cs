@@ -160,6 +160,7 @@ public class AdminSurveyListTests
         var department = details["ClassA"];
         Assert.False(department.IsLink);
         Assert.Equal(3, department.ChoiceCount);
+        Assert.Equal("Radio", department.ChoicesControlType);
         Assert.Equal("1", department.Choices[0].Value);
         Assert.Equal("営業", department.Choices[0].Text);
         Assert.Empty(department.References);
@@ -176,6 +177,47 @@ public class AdminSurveyListTests
         Assert.Equal(2, mixed.ChoiceCount);
         Assert.Equal("BBB", mixed.Choices[1].Text);
         Assert.Equal(["1"], mixed.References);
+    }
+
+    [Fact]
+    public void GetSiteのリンクはJSONの形でもサイトIDを参照先として返す()
+    {
+        // **実機（Pleasanter 1.5.8.1）の応答の形そのまま。** JSON の形は `Link: true` が付かない
+        var response = JsonNode.Parse(
+            """
+            {
+              "Response": {
+                "Data": {
+                  "SiteSettings": {
+                    "Columns": [
+                      { "ColumnName": "ClassA", "LabelText": "簡易", "ChoicesText": "[[1,NoAddButton]]", "Link": true },
+                      { "ColumnName": "ClassB", "LabelText": "JSON",
+                        "ChoicesText": "[{\"SiteId\":1,\"NoAddButton\":true,\"Priority\":1},{\"SiteId\":2}]" },
+                      { "ColumnName": "ClassC", "ChoicesText": "[1,2,3]" },
+                      { "ColumnName": "ClassD", "ChoicesText": "[壊れた" }
+                    ]
+                  }
+                }
+              }
+            }
+            """);
+
+        var details = AdminSurveyEndpoints.ColumnDetailsFrom(response);
+
+        // 行の形。options はそのまま参照先に残る
+        Assert.True(details["ClassA"].IsLink);
+        Assert.Equal("Lines", details["ClassA"].LinkFormat);
+        Assert.Equal(["1,NoAddButton"], details["ClassA"].References);
+
+        // JSON の形は `Link` が無くてもリンクと分かり、SiteId を参照先に返す。選択肢は無い
+        Assert.True(details["ClassB"].IsLink);
+        Assert.Equal("Json", details["ClassB"].LinkFormat);
+        Assert.Equal(["1", "2"], details["ClassB"].References);
+        Assert.Equal(0, details["ClassB"].ChoiceCount);
+
+        // **SiteId を持たない配列や、読めない形は、リンクにしない。** 選択肢の行として扱い、画面を止めない
+        Assert.DoesNotContain("ClassC", details.Keys.Where(key => details[key].IsLink));
+        Assert.False(details["ClassD"].IsLink);
     }
 
     [Fact]

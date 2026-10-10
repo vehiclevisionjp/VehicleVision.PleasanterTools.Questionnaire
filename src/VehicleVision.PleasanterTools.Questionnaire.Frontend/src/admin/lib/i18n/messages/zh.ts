@@ -634,6 +634,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'mapping.columnChoices': '选项',
   'mapping.columnChoicesMore': '另有 {count} 项',
   'mapping.columnLink': '链接项目',
+  'mapping.columnLinkJson': '链接项目（JSON 指定）',
   'mapping.columnReferences': '引用目标：{targets}',
   'mapping.targetColumnPlaceholder': '例如 Title / ClassA / NumA',
   'mapping.attachmentColumnPlaceholder': '例如 AttachmentsA',

@@ -565,6 +565,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "mapping.columnChoices": "Auswahl",
   "mapping.columnChoicesMore": "+{count} weitere",
   "mapping.columnLink": "Verknüpfte Spalte",
+  "mapping.columnLinkJson": "Verknüpfte Spalte (JSON)",
   "mapping.columnReferences": "verweist auf: {targets}",
   "mapping.targetColumnPlaceholder": "Titel / ClassA / NumA, zum Beispiel",
   "mapping.attachmentColumnPlaceholder": "AttachmentsA, beispielsweise",

@@ -593,6 +593,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "mapping.columnChoices": "Opciones",
   "mapping.columnChoicesMore": "+{count} más",
   "mapping.columnLink": "Columna de enlace",
+  "mapping.columnLinkJson": "Columna de enlace (JSON)",
   "mapping.columnReferences": "hace referencia a: {targets}",
   "mapping.targetColumnPlaceholder": "Por ejemplo, Title / ClassA / NumA",
   "mapping.attachmentColumnPlaceholder": "Por ejemplo, AttachmentsA",

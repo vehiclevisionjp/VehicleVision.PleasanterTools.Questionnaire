@@ -632,6 +632,7 @@ export const ja = {
   'mapping.columnChoices': '選択肢',
   'mapping.columnChoicesMore': '他 {count} 件',
   'mapping.columnLink': 'リンク項目',
+  'mapping.columnLinkJson': 'リンク項目（JSON 指定）',
   'mapping.columnReferences': '参照先: {targets}',
   'mapping.targetColumnPlaceholder': 'Title / ClassA / NumA など',
   'mapping.attachmentColumnPlaceholder': 'AttachmentsA など',

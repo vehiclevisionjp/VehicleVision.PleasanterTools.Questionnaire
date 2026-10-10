@@ -560,6 +560,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'mapping.columnChoices': '선택지',
   'mapping.columnChoicesMore': '외 {count}건',
   'mapping.columnLink': '링크 항목',
+  'mapping.columnLinkJson': '링크 항목(JSON 지정)',
   'mapping.columnReferences': '참조 대상: {targets}',
   'mapping.targetColumnPlaceholder': 'Title / ClassA / NumA 등',
   'mapping.attachmentColumnPlaceholder': 'AttachmentsA 등',

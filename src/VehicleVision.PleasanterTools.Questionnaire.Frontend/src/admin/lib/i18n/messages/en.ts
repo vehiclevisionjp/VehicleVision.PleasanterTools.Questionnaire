@@ -648,6 +648,7 @@ export const en: Record<MessageKey, string> = {
   'mapping.columnChoices': 'Choices',
   'mapping.columnChoicesMore': '+{count} more',
   'mapping.columnLink': 'Link column',
+  'mapping.columnLinkJson': 'Link column (JSON)',
   'mapping.columnReferences': 'refers to: {targets}',
   'mapping.targetColumnPlaceholder': 'Title / ClassA / NumA, for example',
   'mapping.attachmentColumnPlaceholder': 'AttachmentsA, for example',

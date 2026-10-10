@@ -1741,9 +1741,25 @@ public static class AdminSurveyEndpoints
     /// 実機（Pleasanter 1.5.8.1）で、両方が別々に返ることを確かめた。両方を返す。
     /// </para>
     /// <para>
-    /// **リンクは <c>Link: true</c>**、選択肢は <c>ChoicesText</c>（1 行 1 件で <c>値,表示文字列</c>）。
-    /// リンク項目の参照先は <c>ChoicesText</c> の <c>[[サイト ID]]</c> の行で、
-    /// 選択肢と混在できる（実機で確認）。参照先のレコードは列挙できないので、参照先だけを返す。
+    /// **選択肢は <c>ChoicesText</c>**（1 行 1 件で <c>値,表示文字列</c>）。
+    /// **リンクの指定は 2 通り**（実機 Pleasanter 1.5.8.1 で確認）。
+    /// </para>
+    /// <list type="bullet">
+    /// <item>
+    /// <description>
+    /// 行の形: <c>[[サイト ID]]</c>（<c>[[1,NoAddButton]]</c> のように options を続けられる）。
+    /// 選択肢と混在できる。<c>Link: true</c> が付く。
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// JSON の形: <c>ChoicesText</c> 全体が <c>[{"SiteId":1,...},{"SiteId":2}]</c> のリンク定義の配列。
+    /// <b><c>Link: true</c> は付かない</b>ので、<c>Link</c> だけでは見分けられない。
+    /// </description>
+    /// </item>
+    /// </list>
+    /// <para>
+    /// 参照先のレコードは列挙できないので、参照先（サイト ID など）だけを返す。
     /// </para>
     /// <para>
     /// **名前を付けていない列は応答に載らない**（実機）。設定を初期化した列も載らなくなる。
@@ -1770,20 +1786,68 @@ public static class AdminSurveyEndpoints
 
             var label = UserLabel(columnName, column?["LabelText"]?.GetValue<string>());
             var gridLabel = UserLabel(columnName, column?["GridLabelText"]?.GetValue<string>());
-            var isLink = column?["Link"]?.GetValue<bool>() ?? false;
-            var (choices, references, choiceCount) =
-                ParseChoices(column?["ChoicesText"]?.GetValue<string>());
-            if (label is null && gridLabel is null && !isLink && choiceCount == 0
-                && references.Count == 0)
+            var choicesText = column?["ChoicesText"]?.GetValue<string>();
+            var jsonReferences = ParseJsonLinks(choicesText);
+            var (choices, references, choiceCount) = jsonReferences is null
+                ? ParseChoices(choicesText)
+                : ((IReadOnlyList<ColumnChoice>)[], jsonReferences, 0);
+            // **JSON の形は `Link: true` が付かない**ので、参照先があることからもリンクと判断する
+            var isLink = (column?["Link"]?.GetValue<bool>() ?? false) || references.Count > 0;
+            var linkFormat = !isLink ? null : jsonReferences is null ? "Lines" : "Json";
+            var choicesControlType = column?["ChoicesControlType"]?.GetValue<string>();
+            if (label is null && gridLabel is null && !isLink && choiceCount == 0)
             {
                 continue;
             }
 
             details[columnName] = new ColumnDetail(
-                label, gridLabel, isLink, choices, choiceCount, references);
+                label,
+                gridLabel,
+                isLink,
+                linkFormat,
+                choices,
+                choiceCount,
+                references,
+                choiceCount > 0 && !string.IsNullOrWhiteSpace(choicesControlType)
+                    ? choicesControlType
+                    : null);
         }
 
         return details;
+    }
+
+    /// <summary>
+    /// <c>ChoicesText</c> が JSON のリンク定義（<c>[{"SiteId":1,...}]</c>）なら、参照先のサイト ID を返す。
+    /// そうでなければ <c>null</c>。**サイト ID を持つ要素が 1 つも無ければ「JSON のリンク」とは見なさない。**
+    /// </summary>
+    private static IReadOnlyList<string>? ParseJsonLinks(string? choicesText)
+    {
+        var text = choicesText?.Trim();
+        // **`[[1]]` の行の形と取り違えない。** こちらは先頭が `[[` で、JSON の配列として読めない
+        if (string.IsNullOrEmpty(text) || text[0] != '[' || text.StartsWith("[[", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (JsonNode.Parse(text) is not JsonArray array)
+            {
+                return null;
+            }
+
+            var siteIds = array
+                .Select(item => item?["SiteId"]?.GetValue<long>())
+                .Where(siteId => siteId is > 0)
+                .Select(siteId => siteId!.Value.ToString(CultureInfo.InvariantCulture))
+                .ToList();
+            return siteIds.Count == 0 ? null : siteIds;
+        }
+        catch (Exception exception) when (exception is System.Text.Json.JsonException or InvalidOperationException)
+        {
+            // **読めない形は、リンクではなく選択肢の行として扱う。** 画面を止めない
+            return null;
+        }
     }
 
     /// <summary>画面へ返す選択肢の上限。**全部返すと応答が膨らむ**（件数は別に返す）。</summary>
@@ -1914,17 +1978,21 @@ public static class AdminSurveyEndpoints
     /// <summary>列の設定。編集画面と一覧で別の項目名を付けられるので両方持つ。</summary>
     /// <param name="Label">編集画面の項目名（<c>LabelText</c>）。</param>
     /// <param name="GridLabel">一覧の項目名（<c>GridLabelText</c>）。</param>
-    /// <param name="IsLink">リンク項目か（<c>Link: true</c>）。</param>
+    /// <param name="IsLink">リンク項目か（<c>Link: true</c>、または JSON のリンク定義がある）。</param>
+    /// <param name="LinkFormat">リンクの指定の形。<c>Lines</c>（<c>[[サイト ID]]</c> の行）か <c>Json</c>。リンクでなければ <c>null</c>。</param>
     /// <param name="Choices">選択肢（上限あり。全件の数は <paramref name="ChoiceCount"/>）。</param>
     /// <param name="ChoiceCount">選択肢の全件数。</param>
-    /// <param name="References">参照先（<c>[[…]]</c> の中身。サイト ID・Users・Depts など）。</param>
+    /// <param name="References">参照先（<c>[[…]]</c> の中身、または JSON の <c>SiteId</c>。サイト ID・Users・Depts など）。</param>
+    /// <param name="ChoicesControlType">選択肢の見せ方（<c>Radio</c> など。選択肢があるときだけ）。</param>
     public sealed record ColumnDetail(
         string? Label,
         string? GridLabel,
         bool IsLink,
+        string? LinkFormat,
         IReadOnlyList<ColumnChoice> Choices,
         int ChoiceCount,
-        IReadOnlyList<string> References);
+        IReadOnlyList<string> References,
+        string? ChoicesControlType);
 
     /// <summary>選択肢 1 件。<c>値,表示文字列</c>。</summary>
     public sealed record ColumnChoice(string Value, string Text);

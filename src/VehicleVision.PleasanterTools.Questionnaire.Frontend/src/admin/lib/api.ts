@@ -530,13 +530,17 @@ export interface ColumnDetail {
   label?: string;
   /** 一覧の項目名。 */
   gridLabel?: string;
-  /** リンク項目か。 */
+  /** リンク項目か（`Link: true`、または JSON のリンク定義がある）。 */
   isLink: boolean;
+  /** リンクの指定の形。**JSON の形は `Link: true` が付かない**ので、別に持つ。 */
+  linkFormat?: 'Lines' | 'Json';
   /** 選択肢（上限あり。全件の数は `choiceCount`）。 */
   choices: ColumnChoice[];
   choiceCount: number;
-  /** 参照先（`[[…]]` の中身。サイト ID・Users・Depts など）。 */
+  /** 参照先（`[[…]]` の中身、または JSON の `SiteId`。サイト ID・Users・Depts など）。 */
   references: string[];
+  /** 選択肢の見せ方（`Radio` など）。選択肢があるときだけ。 */
+  choicesControlType?: string;
 }
 
 /** マッピング先サイトの列数。取得できないときは標準の本数を使う。 */
