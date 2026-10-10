@@ -649,6 +649,13 @@ export const en: Record<MessageKey, string> = {
   'mapping.empty':
     'Nothing is assigned yet. You can still publish, but no response will be kept in Pleasanter.',
   'mapping.targetColumn': 'Target column',
+  'mapping.labelEditor': 'Editor',
+  'mapping.labelGrid': 'List',
+  'mapping.columnChoices': 'Choices',
+  'mapping.columnChoicesMore': '+{count} more',
+  'mapping.columnLink': 'Link column',
+  'mapping.columnLinkJson': 'Link column (JSON)',
+  'mapping.columnReferences': 'refers to: {targets}',
   'mapping.targetColumnPlaceholder': 'Title / ClassA / NumA, for example',
   'mapping.attachmentColumnPlaceholder': 'AttachmentsA, for example',
   'mapping.converterFixed': 'No converter (fixed for attachments)',
