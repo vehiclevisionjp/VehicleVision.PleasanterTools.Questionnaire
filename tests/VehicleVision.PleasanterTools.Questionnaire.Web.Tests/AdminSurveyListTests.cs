@@ -120,7 +120,7 @@ public class AdminSurveyListTests
             }
             """);
 
-        var labels = AdminSurveyEndpoints.LabelsFrom(response);
+        var labels = AdminSurveyEndpoints.ColumnDetailsFrom(response);
 
         // **物理名と同じ文字列は返さない。** 本アプリの同期が書く値で、添えても情報が増えない
         Assert.Equal(3, labels.Count);
@@ -133,12 +133,74 @@ public class AdminSurveyListTests
     }
 
     [Fact]
+    public void GetSiteのリンクと選択肢と参照先を分けて返す()
+    {
+        // **実機（Pleasanter 1.5.8.1）の応答の形そのまま**（Issue #549）
+        var response = JsonNode.Parse(
+            """
+            {
+              "Response": {
+                "Data": {
+                  "SiteSettings": {
+                    "Columns": [
+                      { "ColumnName": "ClassA", "LabelText": "部署",
+                        "ChoicesText": "1,営業\n2,開発\n3,総務", "ChoicesControlType": "Radio" },
+                      { "ColumnName": "ClassB", "LabelText": "取引先", "ChoicesText": "[[1]]", "Link": true },
+                      { "ColumnName": "ClassD", "LabelText": "選択肢とリンク",
+                        "ChoicesText": "1,AAA\nBBB\n[[1]]", "Link": true }
+                    ]
+                  }
+                }
+              }
+            }
+            """);
+
+        var details = AdminSurveyEndpoints.ColumnDetailsFrom(response);
+
+        var department = details["ClassA"];
+        Assert.False(department.IsLink);
+        Assert.Equal(3, department.ChoiceCount);
+        Assert.Equal("1", department.Choices[0].Value);
+        Assert.Equal("営業", department.Choices[0].Text);
+        Assert.Empty(department.References);
+
+        // **リンクの参照先は選択肢に数えない。** 参照先のレコードは列挙できない
+        var partner = details["ClassB"];
+        Assert.True(partner.IsLink);
+        Assert.Equal(0, partner.ChoiceCount);
+        Assert.Equal(["1"], partner.References);
+
+        // 選択肢とリンクは混在できる。表示文字列が無い行は値をそのまま表示に使う
+        var mixed = details["ClassD"];
+        Assert.True(mixed.IsLink);
+        Assert.Equal(2, mixed.ChoiceCount);
+        Assert.Equal("BBB", mixed.Choices[1].Text);
+        Assert.Equal(["1"], mixed.References);
+    }
+
+    [Fact]
+    public void GetSiteの選択肢は上限までしか返さず全件の数は返す()
+    {
+        var lines = string.Join("\\n", Enumerable.Range(1, 120).Select(i => $"{i},項目{i}"));
+        var response = JsonNode.Parse(
+            $$"""
+            { "Response": { "Data": { "SiteSettings": { "Columns": [
+              { "ColumnName": "ClassA", "ChoicesText": "{{lines}}" } ] } } } }
+            """);
+
+        var detail = AdminSurveyEndpoints.ColumnDetailsFrom(response)["ClassA"];
+
+        Assert.Equal(120, detail.ChoiceCount);
+        Assert.Equal(50, detail.Choices.Count);
+    }
+
+    [Fact]
     public void GetSiteの列定義が無ければ項目名は空で返す()
     {
         var response = JsonNode.Parse("""{ "Response": { "Data": { "SiteSettings": {} } } }""");
 
-        Assert.Empty(AdminSurveyEndpoints.LabelsFrom(response));
-        Assert.Empty(AdminSurveyEndpoints.LabelsFrom(null));
+        Assert.Empty(AdminSurveyEndpoints.ColumnDetailsFrom(response));
+        Assert.Empty(AdminSurveyEndpoints.ColumnDetailsFrom(null));
     }
 
     [Fact]

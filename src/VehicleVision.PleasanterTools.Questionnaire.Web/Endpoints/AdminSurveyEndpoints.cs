@@ -446,16 +446,16 @@ public static class AdminSurveyEndpoints
             var availableByPrefix = response.IsSuccess
                 ? AvailableColumnsFrom(response.Body)
                 : null;
-            // **項目名は、取れたものだけ添える。** 取れなくても編集は止めない
-            var labels = response.IsSuccess
-                ? LabelsFrom(response.Body)
-                : new Dictionary<string, ColumnLabel>();
+            // **項目名・リンク・選択肢は、取れたものだけ添える。** 取れなくても編集は止めない
+            var details = response.IsSuccess
+                ? ColumnDetailsFrom(response.Body)
+                : new Dictionary<string, ColumnDetail>();
 
             // **取得に失敗しても編集を止めない。** 項目拡張のない標準構成なら正しい本数であり、
             // 取得できないことを理由に、利用者が下書きを直せなくなる方を避ける。
             return Results.Ok(availableByPrefix is null
-                ? new ColumnAvailabilityResponse("standard", new Dictionary<string, int>(), labels)
-                : new ColumnAvailabilityResponse("site", availableByPrefix, labels));
+                ? new ColumnAvailabilityResponse("standard", new Dictionary<string, int>(), details)
+                : new ColumnAvailabilityResponse("site", availableByPrefix, details));
         });
 
         // ---- マッピング先サイトの同期 ---------------------------------------
@@ -1733,28 +1733,31 @@ public static class AdminSurveyEndpoints
     /// <c>ColumnName</c> を持つ。列定義が無ければ、取得できなかったものとして標準値へ戻す。
     /// </remarks>
     /// <summary>
-    /// <c>GetSite</c> 応答から、列の物理名ごとの項目名を取り出す（Issue #549）。
+    /// <c>GetSite</c> 応答から、列の物理名ごとの設定（項目名・リンク・選択肢）を取り出す（Issue #549）。
     /// </summary>
     /// <remarks>
     /// <para>
     /// **編集画面の項目名（<c>LabelText</c>）と、一覧の項目名（<c>GridLabelText</c>）は別。**
-    /// 実機（Pleasanter 1.5.8.1）で、両方が別々に返ることを確かめた。
-    /// 見る場所によって名前が違い得るので、両方を返す。
+    /// 実機（Pleasanter 1.5.8.1）で、両方が別々に返ることを確かめた。両方を返す。
     /// </para>
     /// <para>
-    /// **空のもの、物理名と同じものは返さない。** 後者は本アプリの同期が書く値
-    /// （<c>SiteSettingsSynchronizer</c>）で、利用者が付けた名前ではなく、添えても情報が増えない。
-    /// **名前を付けていない列は応答に載らない**（実機）ので、そのときは何も返らない。
+    /// **リンクは <c>Link: true</c>**、選択肢は <c>ChoicesText</c>（1 行 1 件で <c>値,表示文字列</c>）。
+    /// リンク項目の参照先は <c>ChoicesText</c> の <c>[[サイト ID]]</c> の行で、
+    /// 選択肢と混在できる（実機で確認）。参照先のレコードは列挙できないので、参照先だけを返す。
+    /// </para>
+    /// <para>
+    /// **名前を付けていない列は応答に載らない**（実機）。設定を初期化した列も載らなくなる。
+    /// 空のもの、物理名と同じ項目名は返さない（本アプリの同期が書く値で、情報が増えない）。
     /// 物理名の大文字小文字は区別しない。
     /// </para>
     /// </remarks>
-    public static IReadOnlyDictionary<string, ColumnLabel> LabelsFrom(JsonNode? body)
+    public static IReadOnlyDictionary<string, ColumnDetail> ColumnDetailsFrom(JsonNode? body)
     {
-        var labels = new Dictionary<string, ColumnLabel>(StringComparer.OrdinalIgnoreCase);
+        var details = new Dictionary<string, ColumnDetail>(StringComparer.OrdinalIgnoreCase);
         var columns = body?["Response"]?["Data"]?["SiteSettings"]?["Columns"]?.AsArray();
         if (columns is null)
         {
-            return labels;
+            return details;
         }
 
         foreach (var column in columns)
@@ -1767,15 +1770,64 @@ public static class AdminSurveyEndpoints
 
             var label = UserLabel(columnName, column?["LabelText"]?.GetValue<string>());
             var gridLabel = UserLabel(columnName, column?["GridLabelText"]?.GetValue<string>());
-            if (label is null && gridLabel is null)
+            var isLink = column?["Link"]?.GetValue<bool>() ?? false;
+            var (choices, references, choiceCount) =
+                ParseChoices(column?["ChoicesText"]?.GetValue<string>());
+            if (label is null && gridLabel is null && !isLink && choiceCount == 0
+                && references.Count == 0)
             {
                 continue;
             }
 
-            labels[columnName] = new ColumnLabel(label, gridLabel);
+            details[columnName] = new ColumnDetail(
+                label, gridLabel, isLink, choices, choiceCount, references);
         }
 
-        return labels;
+        return details;
+    }
+
+    /// <summary>画面へ返す選択肢の上限。**全部返すと応答が膨らむ**（件数は別に返す）。</summary>
+    private const int MaxReturnedChoices = 50;
+
+    /// <summary>
+    /// <c>ChoicesText</c> を選択肢と参照先へ分ける。**1 行 1 件。**
+    /// <c>[[…]]</c> の行は参照先（リンク・利用者・部署など）で、選択肢には数えない。
+    /// <c>値,表示文字列</c> の形で、表示文字列が無ければ値をそのまま表示に使う。
+    /// </summary>
+    private static (IReadOnlyList<ColumnChoice> Choices, IReadOnlyList<string> References, int Count)
+        ParseChoices(string? choicesText)
+    {
+        var choices = new List<ColumnChoice>();
+        var references = new List<string>();
+        var count = 0;
+        foreach (var raw in (choicesText ?? string.Empty).Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            if (line.StartsWith("[[", StringComparison.Ordinal)
+                && line.EndsWith("]]", StringComparison.Ordinal))
+            {
+                references.Add(line[2..^2]);
+                continue;
+            }
+
+            count++;
+            if (choices.Count >= MaxReturnedChoices)
+            {
+                continue;
+            }
+
+            var comma = line.IndexOf(',', StringComparison.Ordinal);
+            choices.Add(comma < 0
+                ? new ColumnChoice(line, line)
+                : new ColumnChoice(line[..comma].Trim(), line[(comma + 1)..].Trim()));
+        }
+
+        return (choices, references, count);
     }
 
     /// <summary>利用者が付けた名前だけを返す。空と、物理名と同じものは「名前なし」。</summary>
@@ -1857,12 +1909,25 @@ public static class AdminSurveyEndpoints
     public sealed record ColumnAvailabilityResponse(
         string Source,
         IReadOnlyDictionary<string, int> AvailableByPrefix,
-        IReadOnlyDictionary<string, ColumnLabel> Labels);
+        IReadOnlyDictionary<string, ColumnDetail> Columns);
 
-    /// <summary>列の項目名。編集画面と一覧で別の名前を付けられるので両方持つ。</summary>
+    /// <summary>列の設定。編集画面と一覧で別の項目名を付けられるので両方持つ。</summary>
     /// <param name="Label">編集画面の項目名（<c>LabelText</c>）。</param>
     /// <param name="GridLabel">一覧の項目名（<c>GridLabelText</c>）。</param>
-    public sealed record ColumnLabel(string? Label, string? GridLabel);
+    /// <param name="IsLink">リンク項目か（<c>Link: true</c>）。</param>
+    /// <param name="Choices">選択肢（上限あり。全件の数は <paramref name="ChoiceCount"/>）。</param>
+    /// <param name="ChoiceCount">選択肢の全件数。</param>
+    /// <param name="References">参照先（<c>[[…]]</c> の中身。サイト ID・Users・Depts など）。</param>
+    public sealed record ColumnDetail(
+        string? Label,
+        string? GridLabel,
+        bool IsLink,
+        IReadOnlyList<ColumnChoice> Choices,
+        int ChoiceCount,
+        IReadOnlyList<string> References);
+
+    /// <summary>選択肢 1 件。<c>値,表示文字列</c>。</summary>
+    public sealed record ColumnChoice(string Value, string Text);
 
     /// <summary>取り込み元のページ。**ページそのものは取り込まない。**</summary>
     public sealed record QuestionImportPageResponse(

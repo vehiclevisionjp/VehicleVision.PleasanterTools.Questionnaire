@@ -518,12 +518,25 @@ export const importQuestions = (
     },
   );
 
-/** 列の項目名。 */
-export interface ColumnLabel {
+/** 選択肢 1 件（`値,表示文字列`）。 */
+export interface ColumnChoice {
+  value: string;
+  text: string;
+}
+
+/** 列の設定。**編集画面と一覧で別の項目名を付けられる**ので両方持つ（どちらも省略可）。 */
+export interface ColumnDetail {
   /** 編集画面の項目名。 */
   label?: string;
   /** 一覧の項目名。 */
   gridLabel?: string;
+  /** リンク項目か。 */
+  isLink: boolean;
+  /** 選択肢（上限あり。全件の数は `choiceCount`）。 */
+  choices: ColumnChoice[];
+  choiceCount: number;
+  /** 参照先（`[[…]]` の中身。サイト ID・Users・Depts など）。 */
+  references: string[];
 }
 
 /** マッピング先サイトの列数。取得できないときは標準の本数を使う。 */
@@ -531,11 +544,10 @@ export interface ColumnAvailabilityResponse {
   source: 'site' | 'standard';
   availableByPrefix: Record<string, number>;
   /**
-   * 列の物理名ごとの項目名（Pleasanter 側で付けた論理名。Issue #549）。
-   * **名前を付けた列だけ。** 古いサーバは返さないので省略可。
-   * **編集画面と一覧で別の名前を付けられる**ので両方持つ（どちらも省略可）
+   * 列の物理名ごとの設定（項目名・リンク・選択肢。Issue #549）。
+   * **設定を付けた列だけ**（Pleasanter は付けていない列を返さない）。古いサーバは返さないので省略可
    */
-  labels?: Record<string, ColumnLabel>;
+  columns?: Record<string, ColumnDetail>;
 }
 
 export const loadColumnAvailability = (surveyId: string) =>
