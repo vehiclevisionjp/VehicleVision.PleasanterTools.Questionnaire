@@ -12,9 +12,12 @@ public sealed class M0034_PublishedDraftRevision : Migration
             .AddColumn("PublishedDraftRevision").AsInt32().Nullable();
 
         // 既に公開済みの行は、移行直後に警告を出さない。
-        Execute.Sql(
-            "UPDATE Surveys SET PublishedDraftRevision = DraftRevision "
-            + "WHERE PublishedVersion IS NOT NULL");
+        IfDatabase("MySql").Execute.Sql(
+            "UPDATE `Surveys` SET `PublishedDraftRevision` = `DraftRevision` "
+            + "WHERE `PublishedVersion` IS NOT NULL");
+        IfDatabase("Postgres", "Sqlite", "SqlServer").Execute.Sql(
+            "UPDATE \"Surveys\" SET \"PublishedDraftRevision\" = \"DraftRevision\" "
+            + "WHERE \"PublishedVersion\" IS NOT NULL");
     }
 
     public override void Down()
