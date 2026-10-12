@@ -12,6 +12,11 @@
 主な機能は [`_documents/機能一覧.md`](_documents/機能一覧.md)、作り方は
 [`_documents/アンケート作成-運用手順書.md`](_documents/アンケート作成-運用手順書.md) を参照。
 
+## マニュアル
+
+導入・設定・使い方・バージョンごとの対応は、
+[Questionnaire の公開マニュアル](https://pleasanter.docs.vehiclevision.jp/tools/questionnaire-overview)をご覧ください。
+
 ## 構成
 
 ```mermaid
