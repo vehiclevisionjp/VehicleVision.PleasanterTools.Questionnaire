@@ -12,6 +12,7 @@
     resolveTheme,
     safeColor,
     type SurveyTheme,
+    type ThemeColorScheme,
     type ThemeFont,
   } from '../../lib/theme';
 
@@ -128,6 +129,7 @@
     const next: SurveyTheme = { ...(theme ?? {}), ...patch };
 
     const isDefault =
+      !next.colorScheme &&
       !next.accentColor &&
       !next.backgroundColor &&
       !next.textColor &&
@@ -193,6 +195,23 @@
 <section class="theme">
   <h2>{t('theme.title')}</h2>
   <p class="hint">{t('theme.lead')}</p>
+  <label class="color-scheme">
+    {t('theme.colorScheme')}
+    <select
+      value={theme?.colorScheme ?? 'System'}
+      onchange={(event) =>
+        update({
+          colorScheme:
+            event.currentTarget.value === 'System'
+              ? null
+              : (event.currentTarget.value as ThemeColorScheme),
+        })}
+    >
+      <option value="System">{t('theme.colorScheme.system')}</option>
+      <option value="Light">{t('theme.colorScheme.light')}</option>
+      <option value="Dark">{t('theme.colorScheme.dark')}</option>
+    </select>
+  </label>
 
   <div class="presets">
     <span class="caption">{t('theme.preset')}</span>
@@ -450,6 +469,17 @@
   }
 
   .font select {
+    display: block;
+    margin-top: 0.2rem;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font: inherit;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .color-scheme select {
     display: block;
     margin-top: 0.2rem;
     padding: 0.3rem 0.4rem;

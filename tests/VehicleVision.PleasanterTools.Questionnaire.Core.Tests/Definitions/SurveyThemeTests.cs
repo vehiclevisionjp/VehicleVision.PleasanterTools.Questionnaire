@@ -67,6 +67,20 @@ public class SurveyThemeTests
     }
 
     [Fact]
+    public void 配色固定だけを指定しても既定ではない()
+    {
+        Assert.False(new SurveyTheme { ColorScheme = ThemeColorScheme.Dark }.IsDefault);
+    }
+
+    [Fact]
+    public void 範囲外の配色固定はOSに合わせる指定へ落とす()
+    {
+        var theme = new SurveyTheme { ColorScheme = (ThemeColorScheme)999 }.Sanitized();
+
+        Assert.Null(theme.ColorScheme);
+    }
+
+    [Fact]
     public void 形の違う色は項目名で報告する()
     {
         var theme = new SurveyTheme

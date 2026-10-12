@@ -51,7 +51,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   'readability.fontSize.large': 'Groß',
   'readability.fontSize.extraLarge': 'Sehr groß',
   'readability.colorMode': 'Farben',
-  'readability.colorMode.creator': 'Thema des Erstellers',
+  'readability.colorMode.system': 'Wie das Betriebssystem',
+  'readability.colorMode.light': 'Hell',
   'readability.colorMode.highContrast': 'Hoher Kontrast',
   'readability.colorMode.dark': 'Dunkel',
   'analytics.notice':

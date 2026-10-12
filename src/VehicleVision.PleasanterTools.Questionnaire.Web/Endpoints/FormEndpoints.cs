@@ -86,7 +86,8 @@ public sealed record FormResponse(
     bool RequiresProofOfWork,
     bool AllowsDraft = false,
     bool IsTest = false,
-    bool RecordsAssetHistory = false);
+    bool RecordsAssetHistory = false,
+    ThemeColorScheme ColorScheme = ThemeColorScheme.System);
 
 /// <summary>回答画面向けの口。**認証は無い。**</summary>
 public static class FormEndpoints
@@ -117,6 +118,7 @@ public static class FormEndpoints
             HttpContext context,
             ResponseIntake intake,
             MaintenanceMode maintenance,
+            IAppSettingsProvider appSettings,
             CancellationToken cancellationToken) =>
         {
             // **同じ URL でも枠内申告で応答が変わる。**
@@ -133,13 +135,17 @@ public static class FormEndpoints
                     : ToProblem(rejection);
             }
 
+            var settings = await appSettings.GetAsync(cancellationToken).ConfigureAwait(false);
+            var colorScheme = form.Definition.Theme?.ColorScheme
+                ?? ColorSchemeOptions.FromSnapshot(settings).ColorScheme;
             return Results.Ok(new FormResponse(
                     publicId,
                     form.Definition,
                     form.RequiresProofOfWork,
                     form.AllowsDraft,
                     form.IsTest,
-                    form.RecordsAssetHistory));
+                    form.RecordsAssetHistory,
+                    colorScheme));
         });
 
         // **ヘッダ画像を配る**（Issue #56）。
