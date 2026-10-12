@@ -454,6 +454,12 @@ export interface SurveyDraft {
    * 古いサーバが返さなかったときは下書きとして扱う。
    */
   status?: number;
+  /**
+   * 公開中の版へ反映していない下書きの保存があるか。
+   *
+   * API は false を返すが、古いサーバが返さない場合は false として扱う。
+   */
+  hasUnpublishedChanges?: boolean;
 }
 
 /** 固めた版の一覧の 1 行（Issue #544）。 */
@@ -524,6 +530,8 @@ export interface SurveySummary {
   testResponseCount: number;
   /** アーカイブした時刻。**無ければ通常のアンケート。** */
   archivedAt?: string | null;
+  /** 公開中の版へ反映していない下書きの保存があるか。 */
+  hasUnpublishedChanges?: boolean;
 }
 
 /**

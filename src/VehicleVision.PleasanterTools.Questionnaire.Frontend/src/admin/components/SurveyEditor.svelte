@@ -136,6 +136,7 @@
    * （サーバは下書き以外を断る）。
    */
   let status = $state(0);
+  let hasUnpublishedChanges = $state(false);
   let columnAvailability = $state<ColumnAvailabilityResponse>({
     source: 'standard',
     availableByPrefix: {},
@@ -337,6 +338,7 @@
     importWarnings = [];
     revision = result.value.revision;
     status = result.value.status ?? 0;
+    hasUnpublishedChanges = result.value.hasUnpublishedChanges ?? false;
     await refreshColumnAvailability(id);
   }
 
@@ -538,6 +540,7 @@
     savedMapping = mapping;
     savedAssetHistorySiteId = assetHistorySiteId;
     savedAssetHistoryMapping = assetHistoryMapping;
+    hasUnpublishedChanges = status === 1 || status === 2 || status === 3;
     notice = t('editor.saved');
     return true;
   }
@@ -800,8 +803,12 @@
 </header>
 
 {#if status !== 0}
-  <p class="notice" role="status">
-    {status === 3 ? t('editor.draftOnlyTest') : t('editor.draftOnlyLive')}
+  <p class:unpublished-changes-warning={hasUnpublishedChanges} class="notice" role={hasUnpublishedChanges ? 'alert' : 'status'}>
+    {#if hasUnpublishedChanges}
+      {status === 3 ? t('editor.unpublishedChangesTest') : t('editor.unpublishedChangesLive')}
+    {:else}
+      {status === 3 ? t('editor.draftOnlyTest') : t('editor.draftOnlyLive')}
+    {/if}
   </p>
 {/if}
 
@@ -1743,6 +1750,16 @@
 
   .notice {
     color: var(--success);
+  }
+
+  .unpublished-changes-warning {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    color: var(--warning-text);
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: 6px;
+    font-weight: 600;
   }
 
   .versions {
