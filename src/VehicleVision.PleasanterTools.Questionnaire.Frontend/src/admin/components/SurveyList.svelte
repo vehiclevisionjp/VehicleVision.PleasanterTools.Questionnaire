@@ -857,6 +857,9 @@
               <span class="status-marker" aria-hidden="true">{statusMarker(survey)}</span>
               {survey.archivedAt == null ? t(surveyStatusKey(survey.status)) : t('archive.archived')}
             </span>
+            {#if survey.hasUnpublishedChanges}
+              <span class="unpublished-changes">{t('list.unpublishedChanges')}</span>
+            {/if}
             <!--
               **なぜ止まっているのかが分かること**（_documents/データモデル設計.md 2.1）。
               理由の付いていない古い停止では、鍵が無いので何も出さない
@@ -1299,6 +1302,18 @@
   .status-marker {
     display: inline-block;
     width: 1.25em;
+  }
+
+  .unpublished-changes {
+    display: inline-block;
+    margin: 0.2rem 0 0;
+    padding: 0.1rem 0.35rem;
+    color: var(--warning-text);
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
   }
 
   .status {
