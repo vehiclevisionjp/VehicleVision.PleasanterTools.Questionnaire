@@ -915,6 +915,8 @@ export interface AdminSessionRow {
   expiresAt: string;
   ipAddress?: string | null;
   userAgent?: string | null;
+  /** ログインに使った方式（`Password` / `Saml` / `PleasanterSso`）。古いセッションでは無い。 */
+  loginMethod?: string | null;
 }
 
 /**

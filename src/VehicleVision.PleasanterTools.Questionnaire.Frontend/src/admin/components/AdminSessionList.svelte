@@ -7,6 +7,7 @@
   import type { AdminSessionRow } from '../lib/types';
   import { confirmAction } from '../lib/confirmation.svelte';
   import { t } from '../lib/i18n/state.svelte';
+  import { loginMethodKey } from '../lib/signInAudit';
 
   interface Props {
     /** 無ければ自分のセッションを扱う。 */
@@ -108,6 +109,7 @@
         <thead>
           <tr>
             <th>{t('sessions.device')}</th>
+            <th>{t('sessions.method')}</th>
             <th>{t('sessions.ipAddress')}</th>
             <th>{t('sessions.signedInAt')}</th>
             <th>{t('sessions.expiresAt')}</th>
@@ -120,6 +122,13 @@
               <td class="device">
                 {session.userAgent ?? t('sessions.unknown')}
                 {#if session.current}<strong>{t('sessions.current')}</strong>{/if}
+              </td>
+              <td>
+                {#if loginMethodKey(session.loginMethod) !== null}
+                  {t(loginMethodKey(session.loginMethod)!)}
+                {:else}
+                  {t('sessions.unknown')}
+                {/if}
               </td>
               <td>{session.ipAddress ?? t('sessions.unknown')}</td>
               <td>{when(session.createdAt)}</td>
