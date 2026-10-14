@@ -679,6 +679,9 @@
   /* **狭い画面では横へ流す。** 3 列の対応が読めなくなるので畳まない */
   .table-wrap {
     overflow-x: auto;
+    /* **細いスクロールバーで、色は枠と揃える**（Issue #582） */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface);

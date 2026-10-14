@@ -548,18 +548,18 @@
       <!-- **拒否はしないが伝える。** 気付かずに公開すると回答が Pleasanter に残らない -->
       <span class="unmapped">{t('question.unmapped')}</span>
     {:else}
-      <span class="mapped">{t('question.mapped', { columns: mappedColumns.join(' / ') })}</span>
+      <!-- **押すと割り当てタブの該当の行へ飛ぶ**（Issue #582） -->
+      <button
+        type="button"
+        class="mapped"
+        title={t('question.showAssignments')}
+        onclick={onselect}
+      >
+        {t('question.mapped', { columns: mappedColumns.join(' / ') })}
+      </button>
     {/if}
 
     {#if !displayOnly}
-      <button
-        type="button"
-        class="secondary small select"
-        aria-pressed={selected}
-        onclick={onselect}
-      >
-        {t('question.showAssignments')}
-      </button>
       <button type="button" class="secondary small assign" onclick={onassign}>
         {t('question.assign')}
       </button>
@@ -1289,15 +1289,28 @@
     gap: 0.3rem;
   }
 
+  /* **未割り当ては目立たせる。** 気付かずに公開すると回答が Pleasanter に残らない */
   .unmapped {
+    padding: 0.1rem 0.5rem;
     color: var(--warning-text);
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: 999px;
+    font-weight: 600;
   }
 
   .mapped {
+    padding: 0;
     color: var(--success);
+    background: transparent;
+    border: 0;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
   }
 
-  .select {
+  .assign {
     margin-left: auto;
   }
 

@@ -171,7 +171,7 @@
    * 開いているタブ（Issue #546）。**見せ方だけで、編集の内容・保存・公開は変わらない。**
    * 設問と割り当てを同じ画面に置き、基本設定と見た目・自動返信は別のタブへ分ける。
    */
-  let tab = $state<'settings' | 'questions' | 'extras' | 'publish'>('questions');
+  let tab = $state<'settings' | 'questions' | 'mapping' | 'extras' | 'publish'>('questions');
   /** 開いているページのタブ。**無い・消えた ID のときは先頭のページ。** */
   let activePageId = $state<string | null>(null);
   const currentPageId = $derived(
@@ -500,8 +500,22 @@
   }
 
   function assignQuestion(questionId: string) {
-    selectedQuestionId = questionId;
     mapping = addQuestionAssignment(mapping, questionId);
+    void showMapping(questionId);
+  }
+
+  /**
+   * 割り当てタブを開き、その設問の割り当ての行までスクロールして強調する（Issue #582）。
+   *
+   * **タブを分けたので、行は開くまで DOM に無い。** 先に開いて描かせてから探す。
+   * 入力内容は `definition` / `mapping` が持っているので、タブを往復しても消えない。
+   */
+  async function showMapping(questionId: string) {
+    selectedQuestionId = questionId;
+    tab = 'mapping';
+    await tick();
+    const row = document.querySelector<HTMLElement>('.mapping-panel tr.selected');
+    row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function moveQuestion(pageIndex: number, questionIndex: number, direction: -1 | 1) {
@@ -965,7 +979,7 @@
 
   <!-- **タブで分ける。** 1 枚に全部並べると縦に長く、設問と割り当てが離れる（Issue #546） -->
   <div class="tabs" role="tablist" aria-label={t('editor.tabs')}>
-    {#each [['questions', 'editor.tabQuestions'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras'], ['publish', 'editor.tabPublish']] as const as [key, label] (key)}
+    {#each [['questions', 'editor.tabQuestions'], ['mapping', 'editor.tabMapping'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras'], ['publish', 'editor.tabPublish']] as const as [key, label] (key)}
       <button
         type="button"
         role="tab"
@@ -1196,8 +1210,6 @@
   {/if}
 
   {#if tab === 'questions'}
-  <div class="editor-columns">
-    <div class="question-column">
   <!-- **ページの境目はタブ。** 開いているページだけを出す -->
   <div class="page-tabs" role="tablist" aria-label={t('editor.pageTabs')}>
     {#each definition.pages as page, pageIndex (page.pageId)}
@@ -1255,7 +1267,7 @@
           priorQuestions={priorQuestions(pageIndex, questionIndex)}
           branchTakenBy={branchTakenBy(pageIndex, questionIndex)}
           {allowedEmbedHosts}
-          onselect={() => (selectedQuestionId = question.questionId)}
+          onselect={() => showMapping(question.questionId)}
           onassign={() => assignQuestion(question.questionId)}
           onchange={(next) => updateQuestion(pageIndex, questionIndex, next)}
           onremove={() => removeQuestion(pageIndex, questionIndex)}
@@ -1327,9 +1339,11 @@
     </section>
     {/if}
   {/each}
-    </div>
+  {/if}
 
-    <div class="mapping-column">
+  {#if tab === 'mapping'}
+    <!-- **全幅で 1 本のスクロールに乗せる。** 設問と並べて貼り付けると二重スクロールになる（Issue #582） -->
+    <div class="mapping-panel">
       <p class="column-estimate" role="status">
         {t('questionImport.columnEstimate', { count: estimatedRequiredColumns })}
       </p>
@@ -1382,7 +1396,6 @@
         {/if}
       </section>
     </div>
-  </div>
   {/if}
 {/if}
 
@@ -1504,27 +1517,6 @@
     background: var(--bg);
   }
 
-  .editor-columns {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-    gap: 1.25rem;
-    align-items: start;
-  }
-
-  .question-column,
-  .mapping-column {
-    min-width: 0;
-  }
-
-  /* **割り当ては設問のそばに付いてくる。** 設問を下へ編集しても、割り当てが画面から消えない。
-     1 列に畳む幅では固定しない（下の @media） */
-  .mapping-column {
-    position: sticky;
-    top: 0.75rem;
-    max-height: calc(100vh - 1.5rem);
-    overflow-y: auto;
-  }
-
   .tabs,
   .page-tabs {
     display: flex;
@@ -1561,18 +1553,6 @@
   .page-tabs {
     margin-top: 0;
     border-bottom-width: 1px;
-  }
-
-  @media (max-width: 75rem) {
-    .editor-columns {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .mapping-column {
-      position: static;
-      max-height: none;
-      overflow-y: visible;
-    }
   }
 
   label {
