@@ -482,6 +482,12 @@ export const en: Record<MessageKey, string> = {
   'editor.tabQuestions': 'Questions and mapping',
   'editor.tabSettings': 'Basics',
   'editor.tabExtras': 'Appearance and auto-reply',
+  'editor.tabPublish': 'Publish',
+  'publish.title': 'Publishing',
+  'publish.notPublished': 'This survey is not published yet. Once published, the answer URL and QR code appear here.',
+  'publish.immediateNotice': 'Unlike the other tabs, saving here takes effect on the live answer page immediately. You do not need to publish again.',
+  'publish.readOnly': 'Changing these settings requires the publish permission. You can only view them here.',
+  'publish.saved': 'Saved. The change is now live on the answer page.',
   'editor.pageTabs': 'Pages',
   'editor.pageTab': 'Page {number}',
   'editor.shuffleQuestions': 'Shuffle the questions on this page for each respondent',
@@ -995,7 +1001,6 @@ export const en: Record<MessageKey, string> = {
   'preview.edit': 'Edit my response',
   'preview.answerAgain': 'Send another response',
   // ---- 回答用 URL の QR コード（Issue #57） ----
-  'qr.open': 'QR code',
   'qr.title': 'QR code for "{title}"',
   'qr.description':
     'Drawn in this browser only. It is never sent to the server, so the answer URL is not added to any server-side log.',
@@ -1168,8 +1173,6 @@ export const en: Record<MessageKey, string> = {
   'list.responseCountOfLimit': '{count} of {limit}',
   'status.suspendedManually': 'Paused by an administrator',
   'status.suspendedByLimit': 'Paused automatically: response limit reached',
-  'settings.open': 'Settings',
-  'settings.title': 'Settings for "{title}"',
   'settings.responseLimit': 'Response limit (optional)',
   'settings.responseLimitHint':
     'Leave it empty for no limit. Responses stop being accepted once the limit is reached. '

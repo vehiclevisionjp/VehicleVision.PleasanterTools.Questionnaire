@@ -49,6 +49,7 @@
   import QuestionEditor from './QuestionEditor.svelte';
   import AutoReplyEditor from './AutoReplyEditor.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
+  import PublishPanel from './PublishPanel.svelte';
   import { adminAssetUrl } from '../lib/api';
   import { addQuestionAssignment } from '../lib/mappingSelection';
   import { assetMarkup as markupForAsset } from '../lib/asset';
@@ -63,6 +64,8 @@
     testRecipient: string;
     /** ログイン ID をメールアドレスとして使えるか。 */
     testRecipientAvailable: boolean;
+    /** 公開設定を保存してよい相手か（`surveys.publish`）。「公開」タブを読み取り専用にするかを決める。 */
+    canPublish: boolean;
     onback: () => void;
     onbreadcrumbchange: (title: string | null) => void;
     onnavigationguardchange: (guard: (() => Promise<boolean>) | null) => void;
@@ -73,6 +76,7 @@
     mailEnabled,
     testRecipient,
     testRecipientAvailable,
+    canPublish,
     onback,
     onbreadcrumbchange,
     onnavigationguardchange,
@@ -137,6 +141,18 @@
    */
   let status = $state(0);
   let hasUnpublishedChanges = $state(false);
+  /**
+   * 公開設定（Issue #580）。**定義ではなく運用の設定**なので、下書きの保存・未保存の判定
+   * （`hasUnsavedChanges`）とは切り離し、「公開」タブの保存釦で別に保存する。
+   * 既定値はサーバと同じ（上限なし・proof-of-work 有効・下書き無効・埋め込み無効）。
+   */
+  let publicId = $state('');
+  let publishSettings = $state({
+    responseLimit: null as number | null,
+    requireProofOfWork: true,
+    allowDraft: false,
+    allowEmbedding: false,
+  });
   let columnAvailability = $state<ColumnAvailabilityResponse>({
     source: 'standard',
     availableByPrefix: {},
@@ -155,7 +171,7 @@
    * 開いているタブ（Issue #546）。**見せ方だけで、編集の内容・保存・公開は変わらない。**
    * 設問と割り当てを同じ画面に置き、基本設定と見た目・自動返信は別のタブへ分ける。
    */
-  let tab = $state<'settings' | 'questions' | 'extras'>('questions');
+  let tab = $state<'settings' | 'questions' | 'extras' | 'publish'>('questions');
   /** 開いているページのタブ。**無い・消えた ID のときは先頭のページ。** */
   let activePageId = $state<string | null>(null);
   const currentPageId = $derived(
@@ -339,6 +355,13 @@
     revision = result.value.revision;
     status = result.value.status ?? 0;
     hasUnpublishedChanges = result.value.hasUnpublishedChanges ?? false;
+    publicId = result.value.publicId ?? '';
+    publishSettings = {
+      responseLimit: result.value.responseLimit ?? null,
+      requireProofOfWork: result.value.requireProofOfWork ?? true,
+      allowDraft: result.value.allowDraft ?? false,
+      allowEmbedding: result.value.allowEmbedding ?? false,
+    };
     await refreshColumnAvailability(id);
   }
 
@@ -942,7 +965,7 @@
 
   <!-- **タブで分ける。** 1 枚に全部並べると縦に長く、設問と割り当てが離れる（Issue #546） -->
   <div class="tabs" role="tablist" aria-label={t('editor.tabs')}>
-    {#each [['questions', 'editor.tabQuestions'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras']] as const as [key, label] (key)}
+    {#each [['questions', 'editor.tabQuestions'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras'], ['publish', 'editor.tabPublish']] as const as [key, label] (key)}
       <button
         type="button"
         role="tab"
@@ -1155,6 +1178,21 @@
     onchange={(next) => (definition = { ...definition!, autoReply: next })}
   />
 
+  {/if}
+
+  {#if tab === 'publish'}
+  <PublishPanel
+    {surveyId}
+    title={displayText(definition.title, language())}
+    {publicId}
+    {status}
+    {canPublish}
+    responseLimit={publishSettings.responseLimit}
+    requireProofOfWork={publishSettings.requireProofOfWork}
+    allowDraft={publishSettings.allowDraft}
+    allowEmbedding={publishSettings.allowEmbedding}
+    onsaved={(values) => (publishSettings = values)}
+  />
   {/if}
 
   {#if tab === 'questions'}
