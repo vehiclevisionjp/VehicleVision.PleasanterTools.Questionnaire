@@ -66,6 +66,10 @@ Copyright (C) PMC Co.,Ltd.
     （MailKit が推移的に伴う。メールの組み立て）
   BouncyCastle.Cryptography 2.6.2 / MIT / https://github.com/bcgit/bc-csharp
     （MimeKit が推移的に伴う）
+  System.Security.Cryptography.Pkcs 10.0.13 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Pkcs
+    （MimeKit・Microsoft.Data.SqlClient が推移的に伴う。脆弱性の修正版へ固定している）
+  System.Security.Cryptography.Xml 10.0.13 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Xml
+    （ITfoxtec.Identity.Saml2 が推移的に伴う。テストプロジェクトのみ脆弱性の修正版へ固定している）
 
 フロントエンド（**成果物へ含まれるのは svelte のランタイム・qrcode・同梱した書体のみ。**
 残りはビルド時だけ使う）
@@ -74,7 +78,7 @@ Copyright (C) PMC Co.,Ltd.
   vite 8.3.4 / MIT / https://www.npmjs.com/package/vite
   @sveltejs/vite-plugin-svelte 7.3.1 / MIT
   svelte-check 4.7.6 / MIT
-  vitest 5.0.3 / MIT / https://www.npmjs.com/package/vitest
+  vitest 5.0.4 / MIT / https://www.npmjs.com/package/vitest
   sass 1.105.1 / MIT
   typescript 6.0.3 / Apache-2.0
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
