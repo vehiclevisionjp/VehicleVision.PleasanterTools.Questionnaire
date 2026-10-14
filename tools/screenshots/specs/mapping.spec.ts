@@ -126,6 +126,8 @@ test.describe('マッピングの編集画面', () => {
       test.skip(surveyId === '', '先の試験でアンケートを作れていない');
 
       await page.goto(`/admin/surveys/${surveyId}`);
+      // **割り当ては別タブ**（Issue #582）。開かないと表は DOM に無い
+      await page.getByRole('tab', { name: '割り当て' }).click();
       const mapping = page.getByRole('table', {
         name: '割り当ての一覧。1 行が Pleasanter の 1 列への割り当てです。',
       });
@@ -142,12 +144,14 @@ test.describe('マッピングの編集画面', () => {
       test.skip(surveyId === '', '先の試験でアンケートを作れていない');
 
       await page.goto(`/admin/surveys/${surveyId}`);
+      // **割り当ては別タブ**（Issue #582）。開かないと表は DOM に無い
+      await page.getByRole('tab', { name: '割り当て' }).click();
 
       // **不備の行は数に入れない。** 割り当てそのものは 3 つ
       const rows = page.locator('table tbody tr:not(.notes)');
       await expect.poll(() => rows.count()).toBe(3);
 
-      // **画面全体から拾わない。** 2 カラム表示では設問側にも入力欄があるため、
+      // **画面全体から拾わない。** 設問と割り当てを別タブに分けても、
       // 割り当ての行を起点にターゲットを確かめる
       await expect(rows.nth(0).locator('td.target input')).toHaveValue('ClassA');
       await expect(rows.nth(1).locator('td.target input')).toHaveValue('ClassB');
@@ -157,6 +161,8 @@ test.describe('マッピングの編集画面', () => {
       test.skip(surveyId === '', '先の試験でアンケートを作れていない');
 
       await page.goto(`/admin/surveys/${surveyId}`);
+      // **割り当ては別タブ**（Issue #582）。開かないと表は DOM に無い
+      await page.getByRole('tab', { name: '割り当て' }).click();
       const rows = page.locator('table tbody tr:not(.notes)');
       await expect.poll(() => rows.count()).toBe(3);
 
@@ -185,6 +191,8 @@ test.describe('マッピングの編集画面', () => {
       test.skip(surveyId === '', '先の試験でアンケートを作れていない');
 
       await page.goto(`/admin/surveys/${surveyId}`);
+      // **割り当ては別タブ**（Issue #582）。開かないと表は DOM に無い
+      await page.getByRole('tab', { name: '割り当て' }).click();
       const rows = page.locator('table tbody tr');
 
       // 3 つの割り当て ＋ 3 つ目の不備で 4 行
@@ -203,6 +211,8 @@ test.describe('マッピングの編集画面', () => {
       test.skip(surveyId === '', '先の試験でアンケートを作れていない');
 
       await page.goto(`/admin/surveys/${surveyId}`);
+      // **割り当ては別タブ**（Issue #582）。開かないと表は DOM に無い
+      await page.getByRole('tab', { name: '割り当て' }).click();
       const rows = page.locator('table tbody tr:not(.notes)');
       await expect.poll(() => rows.count()).toBe(3);
 
