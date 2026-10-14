@@ -116,6 +116,7 @@ public class ExternalStoreIntegrationTests
             ExpiresAt = DateTime.UtcNow.AddMinutes(5),
             IpAddress = "192.0.2.1",
             UserAgent = "integration-test",
+            LoginMethod = AdminLoginMethod.PleasanterSso,
         };
 
         try

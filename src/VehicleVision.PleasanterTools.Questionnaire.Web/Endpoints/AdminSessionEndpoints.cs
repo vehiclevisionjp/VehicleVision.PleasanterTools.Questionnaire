@@ -155,6 +155,8 @@ public static class AdminSessionEndpoints
                 expiresAt = AsUtc(session.ExpiresAt),
                 ipAddress = session.IpAddress,
                 userAgent = session.UserAgent,
+                // 方式の名前だけ。**文言は画面が言語に合わせて作る**
+                loginMethod = session.LoginMethod?.ToString(),
             })
             .ToList();
     }

@@ -119,6 +119,11 @@ public class AdminAuthEndToEndTests
         Assert.True(session!["authenticated"]!.GetValue<bool>());
         Assert.Equal("admin", session["loginId"]!.GetValue<string>());
         Assert.Equal("Administrator", session["role"]!.GetValue<string>());
+
+        // **端末の一覧に、入った方式が出る**（Issue #602）。パスワード → 2 要素の途中状態をまたいで残る
+        using var sessions = await http.GetAsync("/api/admin/me/sessions");
+        var rows = (await ReadAsync(sessions))!["sessions"]!.AsArray();
+        Assert.Equal("Password", rows.Single()!["loginMethod"]!.GetValue<string>());
     }
 
     [Fact]

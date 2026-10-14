@@ -119,20 +119,26 @@ public static class AdminPleasanterSsoEndpoints
             {
                 case PleasanterSsoSignInOutcome.SignedIn:
                     AuditNotes.Add(context, "result", "signed-in");
-                    await AdminAuthEndpoints.SignInSessionAsync(context, result.User!, extraClaims: claims)
+                    await AdminAuthEndpoints.SignInSessionAsync(
+                        context,
+                        result.User!,
+                        extraClaims: claims,
+                        method: AdminLoginMethod.PleasanterSso)
                         .ConfigureAwait(false);
                     return Results.Ok(new { status = "signedIn", next = "done" });
 
                 case PleasanterSsoSignInOutcome.NeedsSecondFactor:
                     // **本アプリで 2 要素を登録済みなら通す**（SAML と同じ）
                     AuditNotes.Add(context, "result", "second-factor");
-                    await AdminAuthEndpoints.SignInPendingAsync(context, result.User!, secret: null, claims)
+                    await AdminAuthEndpoints.SignInPendingAsync(
+                        context, result.User!, secret: null, claims, AdminLoginMethod.PleasanterSso)
                         .ConfigureAwait(false);
                     return Results.Ok(new { status = "signedIn", next = "totp" });
 
                 case PleasanterSsoSignInOutcome.NeedsTotpEnrollment:
                     AuditNotes.Add(context, "result", "enroll");
-                    await AdminAuthEndpoints.SignInPendingAsync(context, result.User!, secret: null, claims)
+                    await AdminAuthEndpoints.SignInPendingAsync(
+                        context, result.User!, secret: null, claims, AdminLoginMethod.PleasanterSso)
                         .ConfigureAwait(false);
                     return Results.Ok(new { status = "signedIn", next = "enroll" });
 
