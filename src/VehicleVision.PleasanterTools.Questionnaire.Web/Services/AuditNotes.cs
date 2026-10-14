@@ -21,6 +21,7 @@ public static class AuditNotes
     private const string TargetsKey = "questionnaire:audit_targets";
     private const string RecordReadKey = "questionnaire:audit_record_read";
     private const string SkipKey = "questionnaire:audit_skip";
+    private const string StatusKey = "questionnaire:audit_status";
 
     /// <summary>補足を 1 つ預ける。</summary>
     /// <remarks>**制御文字は落として長さも切る**（<see cref="LogSafe"/>）。</remarks>
@@ -67,6 +68,20 @@ public static class AuditNotes
 
     internal static bool ShouldSkip(HttpContext context) =>
         context.Items[SkipKey] is true;
+
+    /// <summary>応答の状態とは別に、監査ログへ残す状態を指定する（Issue #602）。</summary>
+    /// <remarks>
+    /// **断っても HTTP の応答が 302 になる入口のためにある。** SAML の受け口は、
+    /// 失敗しても管理画面へ戻すので、そのまま残すと「失敗した操作のみ」に出てこない。
+    /// </remarks>
+    public static void SetStatus(HttpContext context, int statusCode)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        context.Items[StatusKey] = statusCode;
+    }
+
+    internal static int? StatusOf(HttpContext context) =>
+        context.Items[StatusKey] as int?;
 
     /// <summary>この操作が何に対して行われたかを明示する。</summary>
     /// <remarks>

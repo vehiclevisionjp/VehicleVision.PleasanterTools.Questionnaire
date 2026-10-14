@@ -357,6 +357,15 @@ public partial class SamlEndToEndTests
         var before = await SessionAsync(cookies);
         Assert.True(before!["authenticated"]!.GetValue<bool>());
 
+        // **端末の一覧に「SAML で入った」と出る**（Issue #602）。2 要素の途中状態をまたいでも残る
+        using (var http = CreateClient(cookies, followRedirects: true))
+        {
+            var sessions = JsonNode.Parse(await http.GetStringAsync("/api/admin/me/sessions"));
+            var current = sessions!["sessions"]!.AsArray()
+                .Single(row => row!["current"]!.GetValue<bool>());
+            Assert.Equal("Saml", current!["loginMethod"]!.GetValue<string>());
+        }
+
         using (var http = CreateClient(cookies, followRedirects: true))
         {
             // **SP 起点の単一ログアウト。** IdP まで往復して戻ってくる
