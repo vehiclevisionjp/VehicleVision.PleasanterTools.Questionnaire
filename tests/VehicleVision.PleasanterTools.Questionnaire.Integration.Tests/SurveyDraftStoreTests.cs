@@ -17,6 +17,22 @@ public class SurveyDraftStoreTests
     public static TheoryData<DatabaseProvider, string> Providers() =>
         DatabaseMigrationTests.Providers();
 
+    public static TheoryData<DatabaseProvider, string, SurveyStatus, bool> UnpublishedChangeCases()
+    {
+        var cases = new TheoryData<DatabaseProvider, string, SurveyStatus, bool>();
+        foreach (var values in Providers())
+        {
+            var provider = (DatabaseProvider)values[0];
+            var connectionString = (string)values[1];
+            cases.Add(provider, connectionString, SurveyStatus.TestPublished, true);
+            cases.Add(provider, connectionString, SurveyStatus.Published, true);
+            cases.Add(provider, connectionString, SurveyStatus.Suspended, true);
+            cases.Add(provider, connectionString, SurveyStatus.Draft, false);
+        }
+
+        return cases;
+    }
+
     private static (ISurveyDraftStore Drafts, ISurveyRepository Surveys) Create(
         DatabaseProvider provider,
         string connectionString)
@@ -445,6 +461,64 @@ public class SurveyDraftStoreTests
 
         var afterPublish = await drafts.LoadAsync(surveyId);
         Assert.Equal(2, afterPublish!.Definition.Version);
+    }
+
+    [Theory]
+    [MemberData(nameof(UnpublishedChangeCases))]
+    public async Task 公開中の下書き保存だけを未反映の変更として返す(
+        DatabaseProvider provider,
+        string connectionString,
+        SurveyStatus status,
+        bool expected)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (drafts, surveys) = Create(provider, connectionString);
+        var surveyId = await CreateSurveyAsync(surveys);
+        var revision = await drafts.SaveAsync(
+            surveyId,
+            Definition(surveyId, "q1"),
+            new MappingDefinition(),
+            expectedRevision: 0);
+        var draft = await drafts.LoadAsync(surveyId);
+        Assert.NotNull(draft);
+
+        await surveys.PublishWithAssetHistoryAsync(
+            surveyId,
+            version: 1,
+            draft.Definition,
+            draft.Mapping,
+            publishedBy: null,
+            assetHistorySiteId: 0,
+            assetHistoryMapping: null,
+            publishedDraftRevision: revision);
+
+        var record = await surveys.FindBySurveyIdAsync(surveyId);
+        Assert.NotNull(record);
+        await surveys.SaveAsync(record with { Status = (int)status });
+
+        // 公開直後は、保存した下書きの版と公開時に記録した版が同じ。
+        Assert.False((await drafts.LoadAsync(surveyId))!.HasUnpublishedChanges);
+        Assert.False((await drafts.ListAsync(new SurveyListQuery()))
+            .Single(summary => summary.SurveyId == surveyId)
+            .HasUnpublishedChanges);
+
+        await drafts.SaveAsync(
+            surveyId,
+            Definition(surveyId, "q1", "q2"),
+            new MappingDefinition(),
+            expectedRevision: revision);
+
+        // 下書き状態では、公開済みの版が残っていても警告を出さない。
+        Assert.Equal(expected, (await drafts.LoadAsync(surveyId))!.HasUnpublishedChanges);
+        Assert.Equal(
+            expected,
+            (await drafts.ListAsync(new SurveyListQuery()))
+                .Single(summary => summary.SurveyId == surveyId)
+                .HasUnpublishedChanges);
     }
 
     [Theory]
