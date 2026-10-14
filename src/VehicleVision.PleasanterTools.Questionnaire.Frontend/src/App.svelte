@@ -34,12 +34,12 @@
   import { isDisplayOnly, text } from './lib/types';
   import { embedHost, embedSource } from './lib/embed';
   import { validatePage } from './lib/validation';
+  import { availableLanguages } from './lib/surveyLanguages';
   import {
     applyDocumentLanguage,
     browserLanguages,
     LANGUAGE_NAMES,
     negotiateLanguage,
-    SUPPORTED_LANGUAGES,
     type Language,
   } from './lib/i18n/language';
   import { serverValidationKey, translator, type MessageKey } from './lib/i18n/messages';
@@ -134,6 +134,12 @@
   let screen = $state<Screen>('loading');
   let rejection = $state<RejectionReason>();
   let definition = $state<SurveyDefinition>();
+
+  /**
+   * アンケートが文言を持つ言語（Issue #592）。**2 つ以上のときだけ切り替えを出す。**
+   * 1 言語しか無いのに言語の切り替えが並ぶと、押しても何も変わらないうえ画面がうるさい。
+   */
+  const languages = $derived(definition ? availableLanguages(definition) : []);
   let colorScheme = $state<ThemeColorScheme>();
   let publicId = $state('');
   let responseToken = $state('');
@@ -716,24 +722,10 @@
 </script>
 
 <main>
-  <!-- **言語の切り替えは URL を書き換えるだけ。**
-       どこにも保存しないので、回答者を追う材料にならない
-       （`_documents/多言語対応方針.md` 3 章） -->
   <div class="display-settings">
-    <div class="language">
-      <label for="language">{t('form.languageLabel')}</label>
-      <select
-        id="language"
-        value={language}
-        onchange={(event) => changeLanguage(event.currentTarget.value as Language)}
-      >
-        {#each SUPPORTED_LANGUAGES as option (option)}
-          <option value={option}>{LANGUAGE_NAMES[option]}</option>
-        {/each}
-      </select>
-    </div>
     <ReadabilityControls
       id="answer-readability"
+      compact
       preferences={readability}
       onchange={changeReadability}
       labels={{
@@ -952,6 +944,28 @@
     </form>
   {/if}
 
+  <!-- **言語の切り替えは画面の下に、言語自身の名前のリンクで並べる**（Issue #592）。
+       URL を書き換えるだけで、どこにも保存しない。回答者を追う材料にならない
+       （`_documents/多言語対応方針.md` 3 章）。**文言を持つ言語が 2 つ以上のときだけ出す** -->
+  {#if languages.length > 1}
+    <nav class="languages" aria-label={t('form.languageLabel')}>
+      {#each languages as option (option)}
+        <a
+          href={`?lang=${option}`}
+          lang={option}
+          hreflang={option}
+          aria-current={option === language ? 'true' : undefined}
+          onclick={(event) => {
+            event.preventDefault();
+            changeLanguage(option);
+          }}
+        >
+          {LANGUAGE_NAMES[option]}
+        </a>
+      {/each}
+    </nav>
+  {/if}
+
   {#if analytics.showNotice}
     <!-- **外部へ送っていることを伏せない**（Issue #162） -->
     <p class="analytics-notice">
@@ -1104,20 +1118,25 @@
     color: var(--muted);
   }
 
-  .language {
+  /* **画面の下に横並び。** 今の言語は印を付け、リンクにしない見た目で示す */
+  .languages {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 1rem;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.85rem;
 
-    select {
-      font: inherit;
-      padding: 0.25rem 0.4rem;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      /* **地と文字を対で追随させる**（Issue #109）。
-         片方だけテーマに従わせると、白地に白い文字のような組み合わせが作れてしまう */
-      background: var(--surface);
+    a {
+      color: var(--accent);
+    }
+
+    a[aria-current='true'] {
       color: var(--text);
+      font-weight: 600;
+      text-decoration: none;
     }
   }
 

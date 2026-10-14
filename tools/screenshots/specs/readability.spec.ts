@@ -109,6 +109,17 @@ test.describe('読みやすさ設定の写し', () => {
     }
   });
 
+  /** 回答画面の文字・配色は、選択肢のアイコンを押して選ぶ（Issue #592）。 */
+  async function chooseAnswerReadability(
+    page: Page,
+    kind: 'font-size' | 'color-mode',
+    value: string,
+  ): Promise<void> {
+    const button = page.locator(`#answer-readability-${kind}-${value}`);
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+  }
+
   async function openAnswer(page: Page): Promise<Locator> {
     await page.goto(`/f/${publicId}`);
     await expect(page.getByRole('heading', { name: '読みやすさ設定の見本' })).toBeVisible();
@@ -126,7 +137,7 @@ test.describe('読みやすさ設定の写し', () => {
 
   test('回答画面：特大文字', async ({ page }) => {
     const answer = await openAnswer(page);
-    await page.locator('#answer-readability-font-size').selectOption('extraLarge');
+    await chooseAnswerReadability(page, 'font-size', 'extraLarge');
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe(
       '20px',
     );
@@ -136,7 +147,7 @@ test.describe('読みやすさ設定の写し', () => {
 
   test('回答画面：高コントラスト', async ({ page }) => {
     const answer = await openAnswer(page);
-    await page.locator('#answer-readability-color-mode').selectOption('highContrast');
+    await chooseAnswerReadability(page, 'color-mode', 'highContrast');
     await expectColors(page, highContrast);
     expect(await cssVariable(page, '--accent')).not.toBe(forest.accent);
     await shoot(page, answer, 'answer-08-readability-contrast');
@@ -144,7 +155,7 @@ test.describe('読みやすさ設定の写し', () => {
 
   test('回答画面：ダーク', async ({ page }) => {
     const answer = await openAnswer(page);
-    await page.locator('#answer-readability-color-mode').selectOption('dark');
+    await chooseAnswerReadability(page, 'color-mode', 'dark');
     await expectColors(page, dark);
     expect(await cssVariable(page, '--bg')).not.toBe(forest.background);
     await shoot(page, answer, 'answer-09-readability-dark');
@@ -153,7 +164,7 @@ test.describe('読みやすさ設定の写し', () => {
   test('回答画面：高コントラストの必須エラーと単一選択', async ({ page }) => {
     await page.goto(`/f/${requiredPublicId}`);
     await expect(page.getByRole('heading', { name: '必須とページ送りの見本' })).toBeVisible();
-    await page.locator('#answer-readability-color-mode').selectOption('highContrast');
+    await chooseAnswerReadability(page, 'color-mode', 'highContrast');
     await expectColors(page, highContrast);
 
     await page.getByLabel('メール').check();
