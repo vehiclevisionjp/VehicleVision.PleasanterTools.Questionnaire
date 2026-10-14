@@ -150,7 +150,6 @@ test.describe('重ねて開く画面', () => {
 
 function answerTabOrder(page: Page): Locator[] {
   return [
-    page.getByLabel('言語'),
     page.getByLabel('文字'),
     page.getByLabel('配色'),
     page.getByLabel('お名前'),
