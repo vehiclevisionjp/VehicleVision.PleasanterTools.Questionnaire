@@ -454,6 +454,26 @@ export interface SurveyDraft {
    * 古いサーバが返さなかったときは下書きとして扱う。
    */
   status?: number;
+  /**
+   * 公開中の版へ反映していない下書きの保存があるか。
+   *
+   * API は false を返すが、古いサーバが返さない場合は false として扱う。
+   */
+  hasUnpublishedChanges?: boolean;
+  /**
+   * 回答用 URL に使う公開用 ID（Issue #580）。「公開」タブが URL と QR コードを出すために使う。
+   *
+   * 古いサーバが返さなかったときは「無い」。
+   */
+  publicId?: string;
+  /** 回答数の上限。**「無い」なら上限なし。** */
+  responseLimit?: number | null;
+  /** proof-of-work を課すか。**「無い」なら課す**（サーバは null の項目を落とす）。 */
+  requireProofOfWork?: boolean;
+  /** 下書きを端末へ残すか。**「無い」なら残さない。** */
+  allowDraft?: boolean;
+  /** 許可済みの親サイトへ埋め込んでよいか。**「無い」なら不可。** */
+  allowEmbedding?: boolean;
 }
 
 /** 固めた版の一覧の 1 行（Issue #544）。 */
@@ -524,6 +544,8 @@ export interface SurveySummary {
   testResponseCount: number;
   /** アーカイブした時刻。**無ければ通常のアンケート。** */
   archivedAt?: string | null;
+  /** 公開中の版へ反映していない下書きの保存があるか。 */
+  hasUnpublishedChanges?: boolean;
 }
 
 /**

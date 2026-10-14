@@ -1,6 +1,7 @@
 import type { AltchaChallenge } from './altcha';
 import { DEFAULT_LANGUAGE, type Language } from './i18n/language';
 import type { SurveyTheme } from './theme';
+import type { ThemeColorScheme } from './theme';
 
 /** サーバから来る設問の形式。`.Core` の QuestionType と対応する。 */
 export type QuestionType =
@@ -265,6 +266,8 @@ export interface FormResponse {
   isTest?: boolean;
   /** 配布資料の受取履歴を回答と結び付けて記録するか。 */
   recordsAssetHistory?: boolean;
+  /** テーマに指定が無い場合の運用側の配色固定。 */
+  colorScheme?: ThemeColorScheme;
 }
 
 /** 送信する回答 1 件。 */

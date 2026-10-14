@@ -1,19 +1,16 @@
 <script lang="ts">
   import { appUrl } from '../../lib/basePath';
-  import { onMount } from 'svelte';
   import {
     archiveSurvey,
     createSurvey,
     deleteSurvey,
     duplicateSurvey,
     listSurveys,
-    loadEmbedParentOptions,
     publish,
     revertToDraft,
     resume,
     restoreSurvey,
     saveAsTemplate,
-    saveSurveySettings,
     previewSiteSettingsSync,
     suspend,
     syncSiteSettings,
@@ -28,8 +25,6 @@
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
   import { canConfirmSurveyDeletion, deletionResponseCount } from '../lib/surveyDeletion';
   import { confirmAction } from '../lib/confirmation.svelte';
-  import { iframeTag } from '../lib/iframeTag';
-  import SurveyQrCode from './SurveyQrCode.svelte';
   import TemplatePanel from './TemplatePanel.svelte';
 
   interface Props {
@@ -96,13 +91,6 @@
   /** 二重送信で 2 つ複製されないようにする */
   let duplicateBusy = $state(false);
 
-  /**
-   * QR コードを出しているアンケート（Issue #57）。**1 度に 1 つだけ。**
-   *
-   * **描くのは画面の中だけ。** サーバへ URL を送らない
-   */
-  let showingQr = $state<SurveySummary | null>(null);
-
   /** テンプレートの一覧を開いているか（Issue #58）。 */
   let showingTemplates = $state(false);
 
@@ -112,29 +100,6 @@
   /** テンプレートにできたことを伝える。**一覧の見た目は変わらないため。** */
   let templateSaved = $state(false);
 
-  /** 公開設定を開いているアンケート。**1 度に 1 つだけ開く。** */
-  let settingsFor = $state<SurveySummary | null>(null);
-  /** 回答数の上限。**空欄は「上限なし」。** */
-  let settingsLimit = $state('');
-  /**
-   * proof-of-work を課すか（Issue #66）。
-   *
-   * **サーバは null の項目を落として返す**ので `?? true` で受ける。
-   * **既定は有効**なので、分からないときは有効側に倒す。
-   */
-  let settingsProofOfWork = $state(true);
-  /**
-   * 下書きを端末へ残すか（Issue #59）。
-   *
-   * **既定は無効**なので、分からないときは無効側に倒す。
-   * 端末は共有され得るため、こちらは「分からないなら残さない」が安全側。
-   */
-  let settingsAllowDraft = $state(false);
-  /** 回答画面を許可済みの親サイトへ埋め込んでよいか。 */
-  let settingsAllowEmbedding = $state(false);
-  /** 運用側が親サイトを 1 つ以上許可しているか。 */
-  let embedParentsEnabled = $state(false);
-  let settingsBusy = $state(false);
   let siteFor = $state<SurveySummary | null>(null);
   let siteId = $state('');
   let siteBusy = $state(false);
@@ -148,13 +113,6 @@
   // **絞り込みとページを変えたら読み直す。** $effect が依存を拾う
   $effect(() => {
     void reload(offset, titleFilter, statusFilter, includeArchived);
-  });
-
-  onMount(async () => {
-    const result = await loadEmbedParentOptions();
-    if (result.ok) {
-      embedParentsEnabled = result.value.enabled;
-    }
   });
 
   async function reload(
@@ -387,59 +345,6 @@
     }
 
     siteFor = null;
-    await reload(offset, titleFilter, statusFilter, includeArchived);
-  }
-
-  function toggleQr(survey: SurveySummary) {
-    // **同じ行をもう一度押したら閉じる。** 開きっぱなしで表が押し下げられない
-    showingQr = showingQr?.surveyId === survey.surveyId ? null : survey;
-  }
-
-  function openSettings(survey: SurveySummary) {
-    error = '';
-    settingsFor = survey;
-    settingsLimit = survey.responseLimit == null ? '' : String(survey.responseLimit);
-    settingsProofOfWork = survey.requireProofOfWork ?? true;
-    settingsAllowDraft = survey.allowDraft ?? false;
-    settingsAllowEmbedding = survey.allowEmbedding ?? false;
-  }
-
-  async function saveSettings(event: SubmitEvent) {
-    event.preventDefault();
-    const target = settingsFor;
-    if (target === null || settingsBusy) {
-      return;
-    }
-
-    error = '';
-
-    // **空欄は「上限なし」。** 0 を送らない（サーバも断るが、ここで伝える方が早い）
-    const trimmed = settingsLimit.trim();
-    let limit: number | null = null;
-    if (trimmed !== '') {
-      limit = Number(trimmed);
-      if (!Number.isInteger(limit) || limit <= 0) {
-        error = t('settings.limitInvalid');
-        return;
-      }
-    }
-
-    settingsBusy = true;
-    const result = await saveSurveySettings(
-      target.surveyId,
-      limit,
-      settingsProofOfWork,
-      settingsAllowDraft,
-      settingsAllowEmbedding,
-    );
-    settingsBusy = false;
-
-    if (!result.ok) {
-      error = result.message;
-      return;
-    }
-
-    settingsFor = null;
     await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
@@ -683,15 +588,6 @@
   </form>
 {/if}
 
-{#if showingQr}
-  <SurveyQrCode
-    url={formUrl(showingQr.publicId)}
-    title={showingQr.title}
-    publicId={showingQr.publicId}
-    onclose={() => (showingQr = null)}
-  />
-{/if}
-
 {#if templating}
   <div class="create">
     <h2>{t('template.saveTitle', { title: templating.title })}</h2>
@@ -711,70 +607,6 @@
 
 {#if showingTemplates && canUseTemplates}
   <TemplatePanel oncreated={onopen} />
-{/if}
-
-{#if settingsFor}
-  <form class="create" onsubmit={saveSettings}>
-    <h2>{t('settings.title', { title: settingsFor.title })}</h2>
-    <label>
-      {t('settings.responseLimit')}
-      <input type="text" inputmode="numeric" bind:value={settingsLimit} />
-      <span class="hint">{t('settings.responseLimitHint')}</span>
-    </label>
-    <!--
-      **上限を引き上げても勝手には再開しない**（_documents/データモデル設計.md 2.1）。
-      押す人がそれを知らないと、止まったままなのを不具合だと受け取る
-    -->
-    <p class="hint">{t('settings.noAutoResume')}</p>
-    <!--
-      **proof-of-work の要否**（Issue #66）。**公開し直さずに切り替えられる。**
-      **切っても他の bot 対策は外れない**ことを併せて出す。
-      出さないと「切る＝無防備」と受け取られ、切ってよい場面でも切れない
-    -->
-    <label class="check">
-      <input type="checkbox" bind:checked={settingsProofOfWork} />
-      {t('settings.proofOfWork')}
-    </label>
-    <p class="hint">{t('settings.proofOfWorkHint')}</p>
-
-    <!--
-      **既定は無効。** 端末は共有され得る（店頭のタブレット、共用 PC）。
-      **入れると何が起きるかを、入れる前に読ませる**
-    -->
-    <label class="check">
-      <input type="checkbox" bind:checked={settingsAllowDraft} />
-      {t('settings.allowDraft')}
-    </label>
-    <p class="hint">{t('settings.allowDraftHint')}</p>
-    {#if settingsAllowDraft}
-      <p class="warn">{t('settings.allowDraftWarning')}</p>
-    {/if}
-    <label class="check">
-      <input type="checkbox" bind:checked={settingsAllowEmbedding} />
-      {t('settings.allowEmbedding')}
-    </label>
-    <p class="hint">{t('settings.allowEmbeddingHint')}</p>
-    {#if !embedParentsEnabled}
-      <p class="warn">{t('settings.allowEmbeddingUnavailable')}</p>
-    {:else if settingsAllowEmbedding}
-      <label>
-        {t('settings.iframeTag')}
-        <textarea
-          readonly
-          rows="3"
-          value={iframeTag(formUrl(settingsFor.publicId), settingsFor.title, settingsFor.publicId)}
-        ></textarea>
-      </label>
-      <p class="hint">{t('settings.iframeTagHint')}</p>
-    {/if}
-    <p class="hint">{t('settings.proofOfWorkKeepsOthers')}</p>
-    <div class="actions">
-      <button type="submit" disabled={settingsBusy}>{t('settings.submit')}</button>
-      <button type="button" class="secondary" onclick={() => (settingsFor = null)}>
-        {t('settings.cancel')}
-      </button>
-    </div>
-  </form>
 {/if}
 
 {#if deleting}
@@ -857,6 +689,9 @@
               <span class="status-marker" aria-hidden="true">{statusMarker(survey)}</span>
               {survey.archivedAt == null ? t(surveyStatusKey(survey.status)) : t('archive.archived')}
             </span>
+            {#if survey.hasUnpublishedChanges}
+              <span class="unpublished-changes">{t('list.unpublishedChanges')}</span>
+            {/if}
             <!--
               **なぜ止まっているのかが分かること**（_documents/データモデル設計.md 2.1）。
               理由の付いていない古い停止では、鍵が無いので何も出さない
@@ -901,9 +736,6 @@
                 {t('list.revertToDraft')}
               </button>
               <!-- **公開していないものには出さない。** 出しても読めない URL になる -->
-              <button type="button" class="secondary" onclick={() => toggleQr(survey)}>
-                {t('qr.open')}
-              </button>
             {/if}
             {#if survey.archivedAt == null && survey.status === 3}
               <button type="button" onclick={() => changePublication(survey, true)}>
@@ -912,18 +744,10 @@
               <button type="button" class="secondary" onclick={() => changePublication(survey, false)}>
                 {t('list.revertToDraft')}
               </button>
-              <button type="button" class="secondary" onclick={() => toggleQr(survey)}>
-                {t('qr.open')}
-              </button>
             {/if}
             {#if survey.archivedAt == null && (survey.status === 0 || survey.status === 3)}
               <button type="button" class="secondary" onclick={() => openSite(survey)}>
                 {t('siteId.open')}
-              </button>
-            {/if}
-            {#if survey.archivedAt == null}
-              <button type="button" class="secondary" onclick={() => openSettings(survey)}>
-                {t('settings.open')}
               </button>
             {/if}
             {#if canDuplicate && survey.archivedAt == null}
@@ -1299,6 +1123,18 @@
   .status-marker {
     display: inline-block;
     width: 1.25em;
+  }
+
+  .unpublished-changes {
+    display: inline-block;
+    margin: 0.2rem 0 0;
+    padding: 0.1rem 0.35rem;
+    color: var(--warning-text);
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
   }
 
   .status {

@@ -109,6 +109,19 @@ public enum ThemePreset
     Midnight,
 }
 
+/// <summary>回答画面の配色固定。</summary>
+public enum ThemeColorScheme
+{
+    /// <summary>OS の設定に従う。</summary>
+    System,
+
+    /// <summary>ライト配色を使う。</summary>
+    Light,
+
+    /// <summary>ダーク配色を使う。</summary>
+    Dark,
+}
+
 /// <summary>回答画面の見た目（Issue #56）。</summary>
 /// <remarks>
 /// <para>
@@ -130,6 +143,11 @@ public enum ThemePreset
 /// </remarks>
 public sealed record SurveyTheme
 {
+    /// <summary>
+    /// 配色固定。<c>null</c> は OS の設定に従う。
+    /// </summary>
+    public ThemeColorScheme? ColorScheme { get; init; }
+
     /// <summary>釦・進捗バー・強調に使う色。</summary>
     public string? AccentColor { get; init; }
 
@@ -184,7 +202,8 @@ public sealed record SurveyTheme
 
     /// <summary>何も指定していないか。**保存も配信も省ける。**</summary>
     public bool IsDefault =>
-        AccentColor is null
+        ColorScheme is null
+        && AccentColor is null
         && BackgroundColor is null
         && TextColor is null
         && AccentTextColor is null
@@ -235,6 +254,9 @@ public sealed record SurveyTheme
     /// </remarks>
     public SurveyTheme Sanitized() => new()
     {
+        ColorScheme = ColorScheme is { } colorScheme && Enum.IsDefined(colorScheme)
+            ? colorScheme
+            : null,
         AccentColor = ThemeColor.Normalize(AccentColor),
         BackgroundColor = ThemeColor.Normalize(BackgroundColor),
         TextColor = ThemeColor.Normalize(TextColor),

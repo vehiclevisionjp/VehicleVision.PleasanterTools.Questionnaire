@@ -15,13 +15,27 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// 公開状態（<see cref="SurveyStatus"/>）。**編集画面が、いま押せる操作と
 /// 「編集は下書きにだけ効く」旨の表示を出し分けるために返す。**
 /// </param>
+/// <param name="HasUnpublishedChanges">
+/// 公開中の版へ反映していない下書きの保存があるか（Issue #577）。
+/// </param>
+/// <param name="PublicId">回答用 URL に使う公開用 ID。編集画面の「公開」タブが URL と QR コードを出すために返す。</param>
+/// <param name="ResponseLimit">受け付ける回答の上限。<c>null</c> なら上限なし。</param>
+/// <param name="RequireProofOfWork">回答の送信に proof-of-work を課すか。**既定は有効。**</param>
+/// <param name="AllowDraft">回答の下書きを端末へ残すか。**既定は無効。**</param>
+/// <param name="AllowEmbedding">回答画面を許可済みの親サイトへ埋め込んでよいか。**既定は無効。**</param>
 public sealed record SurveyDraft(
     SurveyDefinition Definition,
     MappingDefinition Mapping,
     int Revision,
     long AssetHistorySiteId = 0,
     MappingDefinition? AssetHistoryMapping = null,
-    int Status = (int)SurveyStatus.Draft);
+    int Status = (int)SurveyStatus.Draft,
+    bool HasUnpublishedChanges = false,
+    string PublicId = "",
+    int? ResponseLimit = null,
+    bool RequireProofOfWork = true,
+    bool AllowDraft = false,
+    bool AllowEmbedding = false);
 
 /// <summary>一覧に出すアンケートの要約。</summary>
 /// <param name="SuspendedReason">
@@ -46,6 +60,9 @@ public sealed record SurveyDraft(
 /// 回答画面を許可済みの親サイトへ埋め込んでよいか（Issue #334）。**既定は無効。**
 /// </param>
 /// <param name="ArchivedAt">アーカイブした時刻（UTC）。アーカイブしていなければ <c>null</c>。</param>
+/// <param name="HasUnpublishedChanges">
+/// 公開中の版へ反映していない下書きの保存があるか（Issue #577）。
+/// </param>
 public sealed record SurveySummary(
     Guid SurveyId,
     string PublicId,
@@ -62,7 +79,8 @@ public sealed record SurveySummary(
     bool AllowDraft = false,
     bool AllowEmbedding = false,
     int TestResponseCount = 0,
-    DateTime? ArchivedAt = null);
+    DateTime? ArchivedAt = null,
+    bool HasUnpublishedChanges = false);
 
 /// <summary>複製で作るアンケートの、**写さない値**（Issue #46）。</summary>
 /// <param name="SurveyId">複製先の内部 ID。</param>
@@ -244,9 +262,15 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string? AssetDeliveryJson,
         int? PublishedVersion,
         int DraftRevision,
+        int? PublishedDraftRevision,
         long AssetHistorySiteId,
         string? AssetHistoryMappingJson,
-        int Status);
+        int Status,
+        string PublicId,
+        int? ResponseLimit,
+        bool RequireProofOfWork,
+        bool AllowDraft,
+        bool AllowEmbedding);
 
     private sealed record PageRow(
         string PageId,
@@ -313,6 +337,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         public int Status { get; set; }
 
         public int? PublishedVersion { get; set; }
+
+        public bool HasUnpublishedChanges { get; set; }
 
         public int? SuspendedReason { get; set; }
 
@@ -387,6 +413,11 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         var rows = await connection.QueryAsync<SummaryRow>(Sql(
             "SELECT s.[SurveyId], s.[PublicId], s.[Title], s.[PleasanterSiteId], "
             + "       s.[Status], s.[PublishedVersion], s.[UpdatedAt], s.[ArchivedAt], "
+            + "       CASE WHEN s.[Status] IN (1, 2, 3) "
+            + "                 AND s.[PublishedVersion] IS NOT NULL "
+            + "                 AND s.[PublishedDraftRevision] IS NOT NULL "
+            + "                 AND s.[DraftRevision] <> s.[PublishedDraftRevision] "
+            + "            THEN 1 ELSE 0 END AS [HasUnpublishedChanges], "
             + "       s.[SuspendedReason], s.[SuspendedAt], s.[ResponseLimit], "
             + "       s.[RequireProofOfWork], s.[AllowDraft], s.[AllowEmbedding], "
             + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
@@ -418,7 +449,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 row.AllowDraft,
                 row.AllowEmbedding,
                 (int)row.TestResponseCount,
-                row.ArchivedAt)),
+                row.ArchivedAt,
+                row.HasUnpublishedChanges)),
         ];
     }
 
@@ -462,7 +494,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "       [ConfirmationMessageJson], [FallbackLanguage], [DisplayMode], [ShowProgress], "
             + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], [AssetDeliveryJson], "
             + "       [PublishedVersion], "
-            + "       [DraftRevision], [AssetHistorySiteId], [AssetHistoryMappingJson], [Status] "
+            + "       [DraftRevision], [PublishedDraftRevision], [AssetHistorySiteId], "
+            + "       [AssetHistoryMappingJson], [Status], [PublicId], [ResponseLimit], "
+            + "       [RequireProofOfWork], [AllowDraft], [AllowEmbedding] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
@@ -615,7 +649,18 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             survey.DraftRevision,
             survey.AssetHistorySiteId,
             assetHistoryMapping,
-            survey.Status);
+            survey.Status,
+            (survey.Status is (int)SurveyStatus.Published
+                or (int)SurveyStatus.Suspended
+                or (int)SurveyStatus.TestPublished)
+                && survey.PublishedVersion is not null
+                && survey.PublishedDraftRevision is not null
+                && survey.DraftRevision != survey.PublishedDraftRevision,
+            survey.PublicId,
+            survey.ResponseLimit,
+            survey.RequireProofOfWork,
+            survey.AllowDraft,
+            survey.AllowEmbedding);
     }
 
     public async Task<int> SaveAsync(

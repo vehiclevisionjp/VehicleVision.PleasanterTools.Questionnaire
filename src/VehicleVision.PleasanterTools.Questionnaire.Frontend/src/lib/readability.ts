@@ -1,7 +1,8 @@
 import { contrastRatio } from './theme';
 
 export type FontSize = 'standard' | 'large' | 'extraLarge';
-export type ColorMode = 'default' | 'highContrast' | 'dark';
+export type ColorMode = 'system' | 'default' | 'highContrast' | 'dark';
+export type ColorScheme = 'System' | 'Light' | 'Dark';
 
 export interface ReadabilityPreferences {
   fontSize: FontSize;
@@ -23,7 +24,7 @@ interface StoredReadabilityPreferences {
 export type ReadabilityPreferenceName = 'fontSize' | 'colorMode';
 
 export const FONT_SIZES: FontSize[] = ['standard', 'large', 'extraLarge'];
-export const COLOR_MODES: ColorMode[] = ['default', 'highContrast', 'dark'];
+export const COLOR_MODES: ColorMode[] = ['system', 'default', 'highContrast', 'dark'];
 
 export const READABILITY_STORAGE_KEY = 'questionnaire.readability';
 
@@ -85,20 +86,39 @@ const FONT_SIZE_PERCENT: Record<FontSize, string> = {
 export function resolveReadabilityPreferences(
   stored: StoredReadabilityPreferences | null,
   system: SystemReadabilityPreferences,
+  colorScheme: ColorScheme | null | undefined = null,
 ): ReadabilityPreferences {
   return {
     fontSize: stored?.fontSize ?? 'standard',
-    colorMode: stored?.colorMode ?? (system.highContrast ? 'highContrast' : system.dark ? 'dark' : 'default'),
+    colorMode:
+      stored?.colorMode ??
+      (colorScheme === 'Light' ? 'default' : colorScheme === 'Dark' ? 'dark' : 'system'),
     reducedMotion: system.reducedMotion,
   };
+}
+
+/** OS に従う指定を、実際に当てる配色へ解決する。 */
+export function resolvedColorMode(
+  colorMode: ColorMode,
+  system: SystemReadabilityPreferences,
+): Exclude<ColorMode, 'system'> {
+  return colorMode === 'system'
+    ? system.highContrast
+      ? 'highContrast'
+      : system.dark
+        ? 'dark'
+        : 'default'
+    : colorMode;
 }
 
 /** 読みやすさ設定を CSSOM へ渡す値に変換する。 */
 export function readabilityCssProperties(
   preferences: ReadabilityPreferences,
+  system: SystemReadabilityPreferences = { dark: false, highContrast: false, reducedMotion: false },
 ): Record<string, string | null> {
+  const colorMode = resolvedColorMode(preferences.colorMode, system);
   const colors =
-    preferences.colorMode === 'default' ? null : READABILITY_COLORS[preferences.colorMode];
+    colorMode === 'default' ? null : READABILITY_COLORS[colorMode];
 
   return {
     'font-size': FONT_SIZE_PERCENT[preferences.fontSize],
@@ -133,10 +153,11 @@ export function readabilityCssProperties(
 export function applyReadability(
   target: HTMLElement | null | undefined,
   preferences: ReadabilityPreferences,
+  system: SystemReadabilityPreferences,
 ): void {
   if (!target) return;
 
-  for (const [name, value] of Object.entries(readabilityCssProperties(preferences))) {
+  for (const [name, value] of Object.entries(readabilityCssProperties(preferences, system))) {
     if (value === null) {
       target.style.removeProperty(name);
     } else {
@@ -203,7 +224,7 @@ export function saveReadabilityPreferences(
 }
 
 /** 配色内で本文に使う組み合わせの最小コントラスト比。 */
-export function readabilityContrastRatios(mode: Exclude<ColorMode, 'default'>): number[] {
+export function readabilityContrastRatios(mode: Exclude<ColorMode, 'default' | 'system'>): number[] {
   const colors = READABILITY_COLORS[mode];
   return [
     contrastRatio(colors.text, colors.background)!,

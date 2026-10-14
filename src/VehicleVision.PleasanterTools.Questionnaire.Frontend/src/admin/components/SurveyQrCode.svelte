@@ -19,7 +19,8 @@
     title: string;
     /** 保存する画像の名前に使う。**題名は使わない**（ファイル名に使えない文字が入る）。 */
     publicId: string;
-    onclose: () => void;
+    /** 閉じる釦の動作。**無ければ釦を出さない**（編集画面の「公開」タブへ埋め込むとき）。 */
+    onclose?: () => void;
   }
 
   let { url, title, publicId, onclose }: Props = $props();
@@ -72,7 +73,9 @@
            公開用 URL がサーバの記録に増えない -->
       <a class="download" href={dataUrl} download="qr-{publicId}.png">{t('qr.download')}</a>
     {/if}
-    <button type="button" class="secondary" onclick={onclose}>{t('qr.close')}</button>
+    {#if onclose}
+      <button type="button" class="secondary" onclick={onclose}>{t('qr.close')}</button>
+    {/if}
   </div>
 </div>
 

@@ -49,6 +49,7 @@
   import QuestionEditor from './QuestionEditor.svelte';
   import AutoReplyEditor from './AutoReplyEditor.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
+  import PublishPanel from './PublishPanel.svelte';
   import { adminAssetUrl } from '../lib/api';
   import { addQuestionAssignment } from '../lib/mappingSelection';
   import { assetMarkup as markupForAsset } from '../lib/asset';
@@ -63,6 +64,8 @@
     testRecipient: string;
     /** ログイン ID をメールアドレスとして使えるか。 */
     testRecipientAvailable: boolean;
+    /** 公開設定を保存してよい相手か（`surveys.publish`）。「公開」タブを読み取り専用にするかを決める。 */
+    canPublish: boolean;
     onback: () => void;
     onbreadcrumbchange: (title: string | null) => void;
     onnavigationguardchange: (guard: (() => Promise<boolean>) | null) => void;
@@ -73,6 +76,7 @@
     mailEnabled,
     testRecipient,
     testRecipientAvailable,
+    canPublish,
     onback,
     onbreadcrumbchange,
     onnavigationguardchange,
@@ -136,6 +140,19 @@
    * （サーバは下書き以外を断る）。
    */
   let status = $state(0);
+  let hasUnpublishedChanges = $state(false);
+  /**
+   * 公開設定（Issue #580）。**定義ではなく運用の設定**なので、下書きの保存・未保存の判定
+   * （`hasUnsavedChanges`）とは切り離し、「公開」タブの保存釦で別に保存する。
+   * 既定値はサーバと同じ（上限なし・proof-of-work 有効・下書き無効・埋め込み無効）。
+   */
+  let publicId = $state('');
+  let publishSettings = $state({
+    responseLimit: null as number | null,
+    requireProofOfWork: true,
+    allowDraft: false,
+    allowEmbedding: false,
+  });
   let columnAvailability = $state<ColumnAvailabilityResponse>({
     source: 'standard',
     availableByPrefix: {},
@@ -154,7 +171,7 @@
    * 開いているタブ（Issue #546）。**見せ方だけで、編集の内容・保存・公開は変わらない。**
    * 設問と割り当てを同じ画面に置き、基本設定と見た目・自動返信は別のタブへ分ける。
    */
-  let tab = $state<'settings' | 'questions' | 'extras'>('questions');
+  let tab = $state<'settings' | 'questions' | 'mapping' | 'extras' | 'publish'>('questions');
   /** 開いているページのタブ。**無い・消えた ID のときは先頭のページ。** */
   let activePageId = $state<string | null>(null);
   const currentPageId = $derived(
@@ -337,6 +354,14 @@
     importWarnings = [];
     revision = result.value.revision;
     status = result.value.status ?? 0;
+    hasUnpublishedChanges = result.value.hasUnpublishedChanges ?? false;
+    publicId = result.value.publicId ?? '';
+    publishSettings = {
+      responseLimit: result.value.responseLimit ?? null,
+      requireProofOfWork: result.value.requireProofOfWork ?? true,
+      allowDraft: result.value.allowDraft ?? false,
+      allowEmbedding: result.value.allowEmbedding ?? false,
+    };
     await refreshColumnAvailability(id);
   }
 
@@ -475,8 +500,22 @@
   }
 
   function assignQuestion(questionId: string) {
-    selectedQuestionId = questionId;
     mapping = addQuestionAssignment(mapping, questionId);
+    void showMapping(questionId);
+  }
+
+  /**
+   * 割り当てタブを開き、その設問の割り当ての行までスクロールして強調する（Issue #582）。
+   *
+   * **タブを分けたので、行は開くまで DOM に無い。** 先に開いて描かせてから探す。
+   * 入力内容は `definition` / `mapping` が持っているので、タブを往復しても消えない。
+   */
+  async function showMapping(questionId: string) {
+    selectedQuestionId = questionId;
+    tab = 'mapping';
+    await tick();
+    const row = document.querySelector<HTMLElement>('.mapping-panel tr.selected');
+    row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function moveQuestion(pageIndex: number, questionIndex: number, direction: -1 | 1) {
@@ -538,6 +577,7 @@
     savedMapping = mapping;
     savedAssetHistorySiteId = assetHistorySiteId;
     savedAssetHistoryMapping = assetHistoryMapping;
+    hasUnpublishedChanges = status === 1 || status === 2 || status === 3;
     notice = t('editor.saved');
     return true;
   }
@@ -800,8 +840,12 @@
 </header>
 
 {#if status !== 0}
-  <p class="notice" role="status">
-    {status === 3 ? t('editor.draftOnlyTest') : t('editor.draftOnlyLive')}
+  <p class:unpublished-changes-warning={hasUnpublishedChanges} class="notice" role={hasUnpublishedChanges ? 'alert' : 'status'}>
+    {#if hasUnpublishedChanges}
+      {status === 3 ? t('editor.unpublishedChangesTest') : t('editor.unpublishedChangesLive')}
+    {:else}
+      {status === 3 ? t('editor.draftOnlyTest') : t('editor.draftOnlyLive')}
+    {/if}
   </p>
 {/if}
 
@@ -935,7 +979,7 @@
 
   <!-- **タブで分ける。** 1 枚に全部並べると縦に長く、設問と割り当てが離れる（Issue #546） -->
   <div class="tabs" role="tablist" aria-label={t('editor.tabs')}>
-    {#each [['questions', 'editor.tabQuestions'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras']] as const as [key, label] (key)}
+    {#each [['questions', 'editor.tabQuestions'], ['mapping', 'editor.tabMapping'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras'], ['publish', 'editor.tabPublish']] as const as [key, label] (key)}
       <button
         type="button"
         role="tab"
@@ -1150,9 +1194,22 @@
 
   {/if}
 
+  {#if tab === 'publish'}
+  <PublishPanel
+    {surveyId}
+    title={displayText(definition.title, language())}
+    {publicId}
+    {status}
+    {canPublish}
+    responseLimit={publishSettings.responseLimit}
+    requireProofOfWork={publishSettings.requireProofOfWork}
+    allowDraft={publishSettings.allowDraft}
+    allowEmbedding={publishSettings.allowEmbedding}
+    onsaved={(values) => (publishSettings = values)}
+  />
+  {/if}
+
   {#if tab === 'questions'}
-  <div class="editor-columns">
-    <div class="question-column">
   <!-- **ページの境目はタブ。** 開いているページだけを出す -->
   <div class="page-tabs" role="tablist" aria-label={t('editor.pageTabs')}>
     {#each definition.pages as page, pageIndex (page.pageId)}
@@ -1210,7 +1267,7 @@
           priorQuestions={priorQuestions(pageIndex, questionIndex)}
           branchTakenBy={branchTakenBy(pageIndex, questionIndex)}
           {allowedEmbedHosts}
-          onselect={() => (selectedQuestionId = question.questionId)}
+          onselect={() => showMapping(question.questionId)}
           onassign={() => assignQuestion(question.questionId)}
           onchange={(next) => updateQuestion(pageIndex, questionIndex, next)}
           onremove={() => removeQuestion(pageIndex, questionIndex)}
@@ -1282,9 +1339,11 @@
     </section>
     {/if}
   {/each}
-    </div>
+  {/if}
 
-    <div class="mapping-column">
+  {#if tab === 'mapping'}
+    <!-- **全幅で 1 本のスクロールに乗せる。** 設問と並べて貼り付けると二重スクロールになる（Issue #582） -->
+    <div class="mapping-panel">
       <p class="column-estimate" role="status">
         {t('questionImport.columnEstimate', { count: estimatedRequiredColumns })}
       </p>
@@ -1337,7 +1396,6 @@
         {/if}
       </section>
     </div>
-  </div>
   {/if}
 {/if}
 
@@ -1459,27 +1517,6 @@
     background: var(--bg);
   }
 
-  .editor-columns {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-    gap: 1.25rem;
-    align-items: start;
-  }
-
-  .question-column,
-  .mapping-column {
-    min-width: 0;
-  }
-
-  /* **割り当ては設問のそばに付いてくる。** 設問を下へ編集しても、割り当てが画面から消えない。
-     1 列に畳む幅では固定しない（下の @media） */
-  .mapping-column {
-    position: sticky;
-    top: 0.75rem;
-    max-height: calc(100vh - 1.5rem);
-    overflow-y: auto;
-  }
-
   .tabs,
   .page-tabs {
     display: flex;
@@ -1516,18 +1553,6 @@
   .page-tabs {
     margin-top: 0;
     border-bottom-width: 1px;
-  }
-
-  @media (max-width: 75rem) {
-    .editor-columns {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .mapping-column {
-      position: static;
-      max-height: none;
-      overflow-y: visible;
-    }
   }
 
   label {
@@ -1743,6 +1768,16 @@
 
   .notice {
     color: var(--success);
+  }
+
+  .unpublished-changes-warning {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    color: var(--warning-text);
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: 6px;
+    font-weight: 600;
   }
 
   .versions {

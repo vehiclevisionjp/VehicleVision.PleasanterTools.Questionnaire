@@ -73,6 +73,7 @@ public class SurveyThemeStoreTests
 
         var theme = new SurveyTheme
         {
+            ColorScheme = ThemeColorScheme.Dark,
             AccentColor = "#175cd3",
             BackgroundColor = "#ffffff",
             TextColor = "#101828",

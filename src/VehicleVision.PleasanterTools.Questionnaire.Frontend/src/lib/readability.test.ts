@@ -24,7 +24,7 @@ describe('resolveReadabilityPreferences', () => {
         highContrast: true,
         reducedMotion: false,
       }).colorMode,
-    ).toBe('highContrast');
+    ).toBe('system');
   });
 
   it('高コントラストでなければ OS のダーク設定を使う', () => {
@@ -34,7 +34,7 @@ describe('resolveReadabilityPreferences', () => {
         highContrast: false,
         reducedMotion: false,
       }).colorMode,
-    ).toBe('dark');
+    ).toBe('system');
   });
 
   it('文字寸法だけを保存した場合は配色に OS の設定を使う', () => {
@@ -43,7 +43,37 @@ describe('resolveReadabilityPreferences', () => {
         { fontSize: 'large' },
         { dark: true, highContrast: false, reducedMotion: false },
       ),
-    ).toEqual({ fontSize: 'large', colorMode: 'dark', reducedMotion: false });
+    ).toEqual({ fontSize: 'large', colorMode: 'system', reducedMotion: false });
+  });
+
+  it('保存が無ければアンケートと運用側の固定を OS 設定より優先する', () => {
+    expect(
+      resolveReadabilityPreferences(
+        null,
+        { dark: true, highContrast: false, reducedMotion: false },
+        'Light',
+      ).colorMode,
+    ).toBe('default');
+  });
+
+  it('保存した選択は固定より優先する', () => {
+    expect(
+      resolveReadabilityPreferences(
+        { colorMode: 'highContrast' },
+        { dark: false, highContrast: false, reducedMotion: false },
+        'Dark',
+      ).colorMode,
+    ).toBe('highContrast');
+  });
+
+  it('OS に合わせる選択は高コントラストをダークより優先する', () => {
+    expect(
+      resolveReadabilityPreferences(
+        { colorMode: 'system' },
+        { dark: true, highContrast: true, reducedMotion: false },
+        'Dark',
+      ).colorMode,
+    ).toBe('system');
   });
 });
 
@@ -82,7 +112,7 @@ describe('readabilityCssProperties', () => {
 });
 
 describe('見る人が選べる配色', () => {
-  it.each(COLOR_MODES.filter((mode) => mode !== 'default'))(
+  it.each(COLOR_MODES.filter((mode) => mode !== 'default' && mode !== 'system'))(
     '%s の本文に使う全組み合わせが WCAG 2.1 AA を満たす',
     (mode) => {
       for (const ratio of readabilityContrastRatios(mode)) {
