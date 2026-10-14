@@ -1385,6 +1385,7 @@
 
     select {
       flex: 1;
+      min-width: 0;
       max-width: 22rem;
     }
   }
@@ -1429,12 +1430,19 @@
 
   .choice-label {
     flex: 2;
+    min-width: 0;
   }
 
   .choice-value {
     flex: 1;
+    min-width: 0;
     font-family: var(--font-mono);
     font-size: 0.85rem;
+  }
+
+  .choice .inline {
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .range {
