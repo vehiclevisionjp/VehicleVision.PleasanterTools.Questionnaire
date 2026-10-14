@@ -37,9 +37,9 @@
 
   /** 文字の大きさのアイコンで「A」を縮尺する倍率。 */
   const FONT_ICON_SCALE: Record<FontSize, number> = {
-    standard: 0.65,
-    large: 0.85,
-    extraLarge: 1.05,
+    standard: 0.75,
+    large: 1,
+    extraLarge: 1.3,
   };
 </script>
 
@@ -63,7 +63,7 @@
           <path
             d="M12 3 5 16h3l1.2-2.8h5.6L16 16h3L12 3Zm0 5.2 1.8 4H10.2L12 8.2Z"
             fill="currentColor"
-            transform={`translate(12 21) scale(${FONT_ICON_SCALE[fontSize]}) translate(-12 -21)`}
+            transform={`translate(12 20) scale(${FONT_ICON_SCALE[fontSize]}) translate(-12 -16)`}
           />
         </svg>
       </button>
@@ -164,8 +164,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
+    width: 2.25rem;
+    height: 2.25rem;
     padding: 0;
     border: 1px solid transparent;
     border-radius: 0.35rem;
@@ -186,8 +186,8 @@
   }
 
   .icon svg {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
   }
 
   fieldset {
