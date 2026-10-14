@@ -58,9 +58,10 @@
   let readability = $state<ReadabilityPreferences>(
     resolveReadabilityPreferences(readReadabilityPreferences(), systemReadabilityPreferences()),
   );
+  let systemReadability = $state(systemReadabilityPreferences());
 
   $effect(() => {
-    applyReadability(document.documentElement, readability);
+    applyReadability(document.documentElement, readability, systemReadability);
   });
 
   function changeReadability(
@@ -518,7 +519,8 @@
             },
             colorMode: t('readability.colorMode'),
             colorModes: {
-              default: t('readability.colorMode.standard'),
+              system: t('readability.colorMode.system'),
+              default: t('readability.colorMode.light'),
               highContrast: t('readability.colorMode.highContrast'),
               dark: t('readability.colorMode.dark'),
             },

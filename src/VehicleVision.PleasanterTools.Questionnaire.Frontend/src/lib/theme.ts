@@ -22,6 +22,7 @@ export const THEME_FONTS: ThemeFont[] = ['System', 'Sans', 'Serif', 'Rounded', '
  * 組み合わせに名前を付けて選ばせるのが、その歯止めになる。
  */
 export type ThemePreset = 'None' | 'Indigo' | 'Forest' | 'Crimson' | 'Sand' | 'Midnight';
+export type ThemeColorScheme = 'System' | 'Light' | 'Dark';
 
 /** 画面に出す並び。**指定なしが先頭。** */
 export const THEME_PRESETS: ThemePreset[] = [
@@ -40,6 +41,8 @@ export const THEME_PRESETS: ThemePreset[] = [
  * **すべて省略なら既定の見た目**（今までと同じ）。
  */
 export interface SurveyTheme {
+  /** 配色固定。無ければ OS の設定に従う。 */
+  colorScheme?: ThemeColorScheme | null;
   accentColor?: string | null;
   backgroundColor?: string | null;
   textColor?: string | null;

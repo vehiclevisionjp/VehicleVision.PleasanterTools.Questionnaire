@@ -50,7 +50,8 @@ export const ja = {
   'readability.fontSize.large': '大',
   'readability.fontSize.extraLarge': '特大',
   'readability.colorMode': '配色',
-  'readability.colorMode.creator': '作成者のテーマ',
+  'readability.colorMode.system': 'OS に合わせる',
+  'readability.colorMode.light': 'ライト',
   'readability.colorMode.highContrast': '高コントラスト',
   'readability.colorMode.dark': 'ダーク',
   // ---- アクセス解析の告知（Issue #162）----------------------------------------

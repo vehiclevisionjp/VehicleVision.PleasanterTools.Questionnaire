@@ -43,13 +43,14 @@
     type Language,
   } from './lib/i18n/language';
   import { serverValidationKey, translator, type MessageKey } from './lib/i18n/messages';
-  import { applyTheme, headerImageUrl } from './lib/theme';
+  import { applyTheme, headerImageUrl, type ThemeColorScheme } from './lib/theme';
   import { clearDraft, hasDraft, readDraft, saveDraft } from './lib/draft';
   import { noteBlocks } from './lib/note';
   import { heightReportTargetOrigin, isFramed, shouldReportHeight } from './lib/framed';
   import {
     applyReadability,
     readReadabilityPreferences,
+    resolvedColorMode,
     resolveReadabilityPreferences,
     saveReadabilityPreferences,
     systemReadabilityPreferences,
@@ -120,6 +121,7 @@
   let readability = $state<ReadabilityPreferences>(
     resolveReadabilityPreferences(readReadabilityPreferences(), systemReadabilityPreferences()),
   );
+  let systemReadability = $state(systemReadabilityPreferences());
 
   function changeReadability(
     next: ReadabilityPreferences,
@@ -132,8 +134,28 @@
   let screen = $state<Screen>('loading');
   let rejection = $state<RejectionReason>();
   let definition = $state<SurveyDefinition>();
+  let colorScheme = $state<ThemeColorScheme>();
   let publicId = $state('');
   let responseToken = $state('');
+
+  $effect(() => {
+    const queries = [
+      window.matchMedia('(prefers-color-scheme: dark)'),
+      window.matchMedia('(prefers-contrast: more)'),
+      window.matchMedia('(prefers-reduced-motion: reduce)'),
+    ];
+    const update = () => (systemReadability = systemReadabilityPreferences());
+    queries.forEach((query) => query.addEventListener('change', update));
+    return () => queries.forEach((query) => query.removeEventListener('change', update));
+  });
+
+  $effect(() => {
+    readability = resolveReadabilityPreferences(
+      readReadabilityPreferences(),
+      systemReadability,
+      definition?.theme?.colorScheme ?? colorScheme,
+    );
+  });
 
   $effect(() => {
     const targetOrigin = heightReportTargetOrigin(isFramed(), document.referrer);
@@ -244,14 +266,14 @@
   $effect(() => {
     const target = document.documentElement;
 
-    if (readability.colorMode === 'default') {
+    if (resolvedColorMode(readability.colorMode, systemReadability) === 'default') {
       // **先に前回の上書きを消し、その後で作成者のテーマを戻す。**
-      applyReadability(target, readability);
+      applyReadability(target, readability, systemReadability);
       applyTheme(target, definition?.theme);
     } else {
       // **見る人の選択を最後に当てる。** 作成者のテーマより必ず優先する。
       applyTheme(target, definition?.theme);
-      applyReadability(target, readability);
+      applyReadability(target, readability, systemReadability);
     }
   });
 
@@ -359,6 +381,7 @@
     const ticketForm = await redeemAssetTicket(publicId);
     if (ticketForm) {
       definition = ticketForm.definition;
+      colorScheme = ticketForm.colorScheme;
       recordsAssetHistory = ticketForm.recordsAssetHistory ?? false;
       assetTicketVisit = true;
       screen = 'completed';
@@ -373,6 +396,7 @@
     }
 
     definition = result.form.definition;
+    colorScheme = result.form.colorScheme;
 
     // **サーバが null の項目を落として返す**ので、`?? true` で受ける。
     // **分からなければ解く側に倒す**（解かずに送って断られる方が重い）
@@ -722,7 +746,8 @@
         },
         colorMode: t('readability.colorMode'),
         colorModes: {
-          default: t('readability.colorMode.creator'),
+          system: t('readability.colorMode.system'),
+          default: t('readability.colorMode.light'),
           highContrast: t('readability.colorMode.highContrast'),
           dark: t('readability.colorMode.dark'),
         },

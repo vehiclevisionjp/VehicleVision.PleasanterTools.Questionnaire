@@ -12,7 +12,8 @@ export const en: Record<MessageKey, string> = {
   'readability.fontSize.large': 'Large',
   'readability.fontSize.extraLarge': 'Extra large',
   'readability.colorMode': 'Colors',
-  'readability.colorMode.standard': 'Standard',
+  'readability.colorMode.system': 'Match OS',
+  'readability.colorMode.light': 'Light',
   'readability.colorMode.highContrast': 'High contrast',
   'readability.colorMode.dark': 'Dark',
   'app.networkError': 'Could not reach the server.',
@@ -1117,6 +1118,10 @@ export const en: Record<MessageKey, string> = {
   'autoReply.testQueued': 'Queued a test message to {recipient}.',
   // ---- Theme ----
   'theme.title': 'Look of the answer screen',
+  'theme.colorScheme': 'Color scheme',
+  'theme.colorScheme.system': 'Match OS',
+  'theme.colorScheme.light': 'Light',
+  'theme.colorScheme.dark': 'Dark',
   'theme.lead':
     'Set the colors, the typeface and a header image. Leave them alone to keep the default look. Changes take effect when you publish.',
   'theme.accentColor': 'Accent color',

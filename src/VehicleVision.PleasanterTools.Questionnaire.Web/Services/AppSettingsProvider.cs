@@ -1,6 +1,7 @@
 ﻿using System.Collections.Frozen;
 using System.Globalization;
 using System.Net.Mail;
+using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Scripting;
@@ -202,6 +203,16 @@ public sealed class AppSettingsProvider(
             "Enter comma-separated hosts. www.example.net allows only that host; *.example.net allows only its subdomains.",
             MaximumLength: 2000,
             StringNormalizer: EmbedHostSettings.Normalize),
+        new(
+            ColorSchemeOptions.ColorSchemeKey,
+            AppSettingValueType.String,
+            ThemeColorScheme.System.ToString(),
+            "回答画面の配色固定",
+            "Answer screen color scheme",
+            "System は回答者の OS 設定に従います。Light または Dark を選ぶと、回答者が配色を選んでいない場合だけ固定します。",
+            "System follows the respondent's OS. Light or Dark applies only when the respondent has not selected a color scheme.",
+            MaximumLength: 16,
+            StringNormalizer: ColorSchemeOptions.Normalize),
         new(
             MailEnabledKey,
             AppSettingValueType.Boolean,
