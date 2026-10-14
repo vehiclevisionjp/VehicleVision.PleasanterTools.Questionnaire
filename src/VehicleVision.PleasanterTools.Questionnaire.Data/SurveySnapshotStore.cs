@@ -124,6 +124,7 @@ public interface ISurveyRepository
         Guid? publishedBy,
         long assetHistorySiteId,
         MappingDefinition? assetHistoryMapping,
+        int? publishedDraftRevision = null,
         CancellationToken cancellationToken = default) =>
         PublishAsync(surveyId, version, definition, mapping, publishedBy, cancellationToken);
 
@@ -384,6 +385,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             publishedBy,
             0,
             null,
+            null,
             cancellationToken).ConfigureAwait(false);
 
     public async Task PublishWithAssetHistoryAsync(
@@ -394,6 +396,7 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
         Guid? publishedBy,
         long assetHistorySiteId,
         MappingDefinition? assetHistoryMapping,
+        int? publishedDraftRevision = null,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -433,9 +436,17 @@ public sealed class SurveyRepository(IDbConnectionFactory connectionFactory) : I
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         await connection.ExecuteAsync(Sql(
-            "UPDATE [Surveys] SET [PublishedVersion] = @Version, [UpdatedAt] = @Now "
+            "UPDATE [Surveys] SET [PublishedVersion] = @Version, "
+            + "[PublishedDraftRevision] = COALESCE(@PublishedDraftRevision, [DraftRevision]), "
+            + "[UpdatedAt] = @Now "
             + "WHERE [SurveyId] = @SurveyId",
-            new { SurveyId = surveyId, Version = version, Now = DbTime.UtcNowTruncated() },
+            new
+            {
+                SurveyId = surveyId,
+                Version = version,
+                PublishedDraftRevision = publishedDraftRevision,
+                Now = DbTime.UtcNowTruncated(),
+            },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 

@@ -1140,6 +1140,7 @@ public static class AdminSurveyEndpoints
                     publishedBy,
                     draft.AssetHistorySiteId,
                     draft.AssetHistoryMapping,
+                    draft.Revision,
                     cancellationToken).ConfigureAwait(false);
             }
             catch (InvalidOperationException)
