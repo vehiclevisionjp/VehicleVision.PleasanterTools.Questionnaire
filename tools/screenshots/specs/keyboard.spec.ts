@@ -150,8 +150,13 @@ test.describe('重ねて開く画面', () => {
 
 function answerTabOrder(page: Page): Locator[] {
   return [
-    page.getByLabel('文字'),
-    page.getByLabel('配色'),
+    page.locator('#answer-readability-font-size-standard'),
+    page.locator('#answer-readability-font-size-large'),
+    page.locator('#answer-readability-font-size-extraLarge'),
+    page.locator('#answer-readability-color-mode-system'),
+    page.locator('#answer-readability-color-mode-default'),
+    page.locator('#answer-readability-color-mode-highContrast'),
+    page.locator('#answer-readability-color-mode-dark'),
     page.getByLabel('お名前'),
     page.getByLabel('ご意見'),
     page.getByRole('radio', { name: '第一候補' }).first(),

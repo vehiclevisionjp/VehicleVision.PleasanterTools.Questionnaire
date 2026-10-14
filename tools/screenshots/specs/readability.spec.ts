@@ -109,23 +109,15 @@ test.describe('読みやすさ設定の写し', () => {
     }
   });
 
-  /**
-   * 回答画面の文字・配色は、アイコンのボタンを押して次の値へ巡らせる（Issue #592）。
-   * 目的の値（`data-value`）になるまで押す。
-   */
+  /** 回答画面の文字・配色は、選択肢のアイコンを押して選ぶ（Issue #592）。 */
   async function chooseAnswerReadability(
     page: Page,
     kind: 'font-size' | 'color-mode',
     value: string,
   ): Promise<void> {
-    const button = page.locator(`#answer-readability-${kind}`);
-    for (let count = 0; count < 5; count += 1) {
-      if ((await button.getAttribute('data-value')) === value) {
-        return;
-      }
-      await button.click();
-    }
-    await expect(button).toHaveAttribute('data-value', value);
+    const button = page.locator(`#answer-readability-${kind}-${value}`);
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
   }
 
   async function openAnswer(page: Page): Promise<Locator> {
