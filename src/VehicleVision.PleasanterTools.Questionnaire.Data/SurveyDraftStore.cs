@@ -18,6 +18,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// <param name="HasUnpublishedChanges">
 /// 公開中の版へ反映していない下書きの保存があるか（Issue #577）。
 /// </param>
+/// <param name="PublicId">回答用 URL に使う公開用 ID。編集画面の「公開」タブが URL と QR コードを出すために返す。</param>
+/// <param name="ResponseLimit">受け付ける回答の上限。<c>null</c> なら上限なし。</param>
+/// <param name="RequireProofOfWork">回答の送信に proof-of-work を課すか。**既定は有効。**</param>
+/// <param name="AllowDraft">回答の下書きを端末へ残すか。**既定は無効。**</param>
+/// <param name="AllowEmbedding">回答画面を許可済みの親サイトへ埋め込んでよいか。**既定は無効。**</param>
 public sealed record SurveyDraft(
     SurveyDefinition Definition,
     MappingDefinition Mapping,
@@ -25,7 +30,12 @@ public sealed record SurveyDraft(
     long AssetHistorySiteId = 0,
     MappingDefinition? AssetHistoryMapping = null,
     int Status = (int)SurveyStatus.Draft,
-    bool HasUnpublishedChanges = false);
+    bool HasUnpublishedChanges = false,
+    string PublicId = "",
+    int? ResponseLimit = null,
+    bool RequireProofOfWork = true,
+    bool AllowDraft = false,
+    bool AllowEmbedding = false);
 
 /// <summary>一覧に出すアンケートの要約。</summary>
 /// <param name="SuspendedReason">
@@ -255,7 +265,12 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         int? PublishedDraftRevision,
         long AssetHistorySiteId,
         string? AssetHistoryMappingJson,
-        int Status);
+        int Status,
+        string PublicId,
+        int? ResponseLimit,
+        bool RequireProofOfWork,
+        bool AllowDraft,
+        bool AllowEmbedding);
 
     private sealed record PageRow(
         string PageId,
@@ -480,7 +495,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "       [AllowEditingAfterSubmit], [ThemeJson], [AutoReplyJson], [AssetDeliveryJson], "
             + "       [PublishedVersion], "
             + "       [DraftRevision], [PublishedDraftRevision], [AssetHistorySiteId], "
-            + "       [AssetHistoryMappingJson], [Status] "
+            + "       [AssetHistoryMappingJson], [Status], [PublicId], [ResponseLimit], "
+            + "       [RequireProofOfWork], [AllowDraft], [AllowEmbedding] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
@@ -639,7 +655,12 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 or (int)SurveyStatus.TestPublished)
                 && survey.PublishedVersion is not null
                 && survey.PublishedDraftRevision is not null
-                && survey.DraftRevision != survey.PublishedDraftRevision);
+                && survey.DraftRevision != survey.PublishedDraftRevision,
+            survey.PublicId,
+            survey.ResponseLimit,
+            survey.RequireProofOfWork,
+            survey.AllowDraft,
+            survey.AllowEmbedding);
     }
 
     public async Task<int> SaveAsync(
