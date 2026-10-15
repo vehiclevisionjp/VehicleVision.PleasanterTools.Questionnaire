@@ -697,10 +697,6 @@ export interface AppSettingField {
   isFixed: boolean;
   defaultValue: string;
   isDefault: boolean;
-  labelJa: string;
-  labelEn: string;
-  descriptionJa: string;
-  descriptionEn: string;
   minimum: number | null;
   maximum: number | null;
   maximumLength: number | null;

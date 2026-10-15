@@ -619,10 +619,6 @@ public class AppSettingsProviderTests
             "QUESTIONNAIRE_TEST_SECRET",
             AppSettingValueType.String,
             string.Empty,
-            "試験用の秘密",
-            "Test secret",
-            string.Empty,
-            string.Empty,
             IsSecret: true);
         var snapshot = new AppSettingsSnapshot(
             [definition],
@@ -839,7 +835,7 @@ public class AppSettingsProviderTests
         int? minimum = null,
         int? maximum = null,
         int? maximumLength = null) =>
-        new("TEST", type, string.Empty, "テスト", "Test", string.Empty, string.Empty,
+        new("TEST", type, string.Empty,
             Minimum: minimum, Maximum: maximum, MaximumLength: maximumLength);
 
     private static AppSettingRecord Record(string value) => new(
