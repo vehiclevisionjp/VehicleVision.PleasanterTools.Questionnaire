@@ -60,6 +60,11 @@ public sealed class AdminSessionManager
                 ExpiresAt = now.Add(lifetime),
                 IpAddress = IpAddressOf(context),
                 UserAgent = Trim(context.Request.Headers.UserAgent.ToString(), 512),
+                LoginMethod = Enum.TryParse<AdminLoginMethod>(
+                        principal.FindFirstValue(AdminAuthSchemes.LoginMethodClaim), out var method)
+                    && Enum.IsDefined(method)
+                        ? method
+                        : null,
             },
             context.RequestAborted).ConfigureAwait(false);
 

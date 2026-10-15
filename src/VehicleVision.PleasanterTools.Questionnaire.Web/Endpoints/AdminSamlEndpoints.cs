@@ -164,7 +164,8 @@ public static class AdminSamlEndpoints
             {
                 // **こちらが出した要求と結び付かない応答は受け取らない**
                 logger.LogWarning("SAML の応答に、対応する要求が見つかりませんでした。");
-                return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
+                return FailedAudited(
+                    context, AdminEntry(context, adminPath.Path), SamlFailure.Invalid, "relay-missing");
             }
 
             var configuration = options.ToSaml2Configuration();
@@ -181,7 +182,8 @@ public static class AdminSamlEndpoints
                 {
                     logger.LogWarning(
                         "IdP が認証を断りました: {Status}", response.Status);
-                    return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
+                    return FailedAudited(
+                    context, AdminEntry(context, adminPath.Path), SamlFailure.Invalid, "idp-refused");
                 }
 
                 // **署名・発行者・宛先・有効期間を確かめるのはここ**
@@ -196,21 +198,24 @@ public static class AdminSamlEndpoints
             {
                 // **理由は外へ返さない。** 何が通らなかったかは手掛かりになる
                 logger.LogWarning(exception, "SAML の応答を受け取れませんでした。");
-                return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
+                return FailedAudited(
+                    context, AdminEntry(context, adminPath.Path), SamlFailure.Invalid, "response-invalid");
             }
 
             // **出した要求への応答であることを確かめる**
             if (!string.Equals(response.InResponseToAsString, relay.RequestId, StringComparison.Ordinal))
             {
                 logger.LogWarning("SAML の応答が、こちらの出した要求のものではありませんでした。");
-                return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
+                return FailedAudited(
+                    context, AdminEntry(context, adminPath.Path), SamlFailure.Invalid, "in-response-to-mismatch");
             }
 
             var loginId = ReadLoginId(response.ClaimsIdentity, options);
             if (string.IsNullOrWhiteSpace(loginId))
             {
                 logger.LogWarning("SAML の応答にログイン ID として使える値がありませんでした。");
-                return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Invalid);
+                return FailedAudited(
+                    context, AdminEntry(context, adminPath.Path), SamlFailure.Invalid, "login-id-missing");
             }
 
             // **誰が来たかを記録に残す**（AuditNotes は本文へ触らない）
@@ -229,25 +234,31 @@ public static class AdminSamlEndpoints
             switch (result.Outcome)
             {
                 case SamlSignInOutcome.SignedIn:
+                    AuditNotes.Add(context, "result", "signed-in");
                     // **単一ログアウトに要る手掛かりだけを預ける**（Issue #191）
                     await AdminAuthEndpoints.SignInSessionAsync(
-                        context, result.User!, ReadSessionKeys(response.ClaimsIdentity))
+                        context,
+                        result.User!,
+                        ReadSessionKeys(response.ClaimsIdentity),
+                        method: AdminLoginMethod.Saml)
                         .ConfigureAwait(false);
                     return Results.Redirect(relay.ReturnUrl);
 
                 case SamlSignInOutcome.NeedsSecondFactor:
                 case SamlSignInOutcome.NeedsTotpEnrollment:
+                    AuditNotes.Add(context, "result", "second-factor");
                     // **2 要素を登録済みなら通し、必須なら登録させる**（Issue #154）。
                     // どちらも「途中状態」で管理画面へ戻し、画面が続きを出す
-                    await AdminAuthEndpoints.SignInPendingAsync(context, result.User!, secret: null)
+                    await AdminAuthEndpoints.SignInPendingAsync(
+                        context, result.User!, secret: null, method: AdminLoginMethod.Saml)
                         .ConfigureAwait(false);
                     return Results.Redirect(relay.ReturnUrl);
 
                 case SamlSignInOutcome.Disabled:
-                    return Failed(AdminEntry(context, adminPath.Path), SamlFailure.Disabled);
+                    return FailedAudited(context, AdminEntry(context, adminPath.Path), SamlFailure.Disabled);
 
                 default:
-                    return Failed(AdminEntry(context, adminPath.Path), SamlFailure.UnknownUser);
+                    return FailedAudited(context, AdminEntry(context, adminPath.Path), SamlFailure.UnknownUser);
             }
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
@@ -663,6 +674,31 @@ public static class AdminSamlEndpoints
     /// <summary>サブパス込みの SAML の経路。**cookie の Path に使う。**</summary>
     private static string SamlCookiePath(HttpContext context) =>
         context.Request.PathBase.Add("/api/admin/saml").ToUriComponent();
+
+    /// <summary>失敗の理由を監査ログへ残して、管理画面へ戻す（Issue #602）。</summary>
+    /// <remarks>
+    /// **応答は 302 のままだが、監査ログには失敗として残す**（<see cref="AuditNotes.SetStatus"/>）。
+    /// 理由は画面へは返さず（<see cref="SamlFailure"/>）、管理者が読む記録にだけ書く。
+    /// </remarks>
+    private static IResult FailedAudited(
+        HttpContext context,
+        string adminPath,
+        string failure,
+        string? reason = null)
+    {
+        AuditNotes.Add(context, "result", failure);
+        if (reason is not null)
+        {
+            AuditNotes.Add(context, "reason", reason);
+        }
+
+        AuditNotes.SetStatus(
+            context,
+            failure == SamlFailure.Invalid
+                ? StatusCodes.Status401Unauthorized
+                : StatusCodes.Status403Forbidden);
+        return Failed(adminPath, failure);
+    }
 
     /// <summary>失敗の印を付けて管理画面へ戻す。</summary>
     private static IResult Failed(string adminPath, string failure) =>
