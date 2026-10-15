@@ -115,7 +115,39 @@ public sealed record AppSettingDefinition(
 }
 
 /// <summary>設定の入力または更新要求を受け付けられない。</summary>
-public sealed class AppSettingValidationException(string message) : Exception(message);
+public sealed class AppSettingValidationException : Exception
+{
+    public AppSettingValidationException(string message)
+        : base(message)
+    {
+    }
+
+    private AppSettingValidationException(string message, string messageKey, object[] arguments)
+        : base(message)
+    {
+        MessageKey = messageKey;
+        Arguments = arguments;
+    }
+
+    /// <summary>画面へ返す文言の鍵（Issue #605）。**日本語直書きの例外では <c>null</c>。**</summary>
+    public string? MessageKey { get; }
+
+    /// <summary>文言へ差し込む値（<c>{0}</c> から順）。</summary>
+    public IReadOnlyList<object> Arguments { get; } = [];
+
+    /// <summary>鍵と引数で作る。<see cref="Exception.Message"/> は日本語（ログ・フォールバック用）。</summary>
+    public static AppSettingValidationException Of(string messageKey, params object[] arguments) =>
+        new(
+            Localization.ServerMessages.Get(messageKey, "ja", arguments),
+            messageKey,
+            arguments);
+
+    /// <summary>画面の言語に合わせた文言。**鍵を持たない例外は <see cref="Exception.Message"/> のまま。**</summary>
+    public string MessageFor(string? language) =>
+        MessageKey is null
+            ? Message
+            : Localization.ServerMessages.Get(MessageKey, language, [.. Arguments]);
+}
 
 /// <summary>外部設定、DB、既定値から解決したアプリケーション設定。</summary>
 public sealed record AppSettingsSnapshot(

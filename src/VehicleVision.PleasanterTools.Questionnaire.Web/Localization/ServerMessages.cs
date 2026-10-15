@@ -92,6 +92,17 @@ public static class ServerMessages
         [ServerMessageKeys.ResponseLimitReached] = "답변 수가 한도에 도달했습니다({0} / {1}건). 다시 시작하려면 먼저 한도를 늘리세요.",
         [ServerMessageKeys.ResponseTokenRequired] = "되돌릴 답변을 지정하세요.",
         [ServerMessageKeys.DeadLetterNotFound] = "해당 답변을 찾을 수 없습니다. 이미 전송 대기로 되돌렸거나 전송이 완료되었을 수 있습니다.",
+        [ServerMessageKeys.SettingsValuesRequired] = "설정 값을 지정하세요.",
+        [ServerMessageKeys.PleasanterConnectionRequired] = "Pleasanter의 URL과 API 키를 지정하세요.",
+        [ServerMessageKeys.PleasanterConnectionFailed] = "Pleasanter에 연결할 수 없습니다. URL, API 키, 연결 대상의 상태를 확인하세요.",
+        [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "로그인 ID가 이메일 주소가 아니므로 테스트 전송을 할 수 없습니다.",
+        [ServerMessageKeys.MaintenanceMessageTooLong] = "메시지는 {0}자 이내로 입력하세요.",
+        [ServerMessageKeys.SettingKeyNotManaged] = "관리 대상이 아닌 설정입니다: {0}",
+        [ServerMessageKeys.SettingFixedExternally] = "설정 “{0}”은(는) 외부 설정으로 고정되어 있어 화면에서 변경할 수 없습니다.",
+        [ServerMessageKeys.ProofOfWorkRangeInvalid] = "proof-of-work의 탐색 하한은 탐색 상한 이하로 지정하세요.",
+        [ServerMessageKeys.LinkedSitesUnreachable] = "연결된 사이트를 가져올 수 없습니다. 대상 사이트 ID와 API 키 사용자의 권한을 확인하세요.",
+        [ServerMessageKeys.FallbackLanguageUnsupported] = "대체 언어 코드가 지원되지 않는 언어입니다.",
+        [ServerMessageKeys.PleasanterSiteWriteFailed] = "Pleasanter에서 사이트를 만들거나 업데이트할 수 없습니다. 권한과 설정을 확인하세요.",
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static readonly FrozenDictionary<string, LocalizedText> Catalog = Build();
@@ -212,6 +223,17 @@ public static class ServerMessages
             [ServerMessageKeys.ResponseLimitReached] = "回答数已达到上限（{0} / {1} 条）。请先提高上限后再继续。",
             [ServerMessageKeys.ResponseTokenRequired] = "请指定要恢复的回答。",
             [ServerMessageKeys.DeadLetterNotFound] = "未找到该回答。它可能已恢复为等待发送状态，或已发送完成。",
+            [ServerMessageKeys.SettingsValuesRequired] = "请指定设置值。",
+            [ServerMessageKeys.PleasanterConnectionRequired] = "请指定 Pleasanter 的 URL 和 API 密钥。",
+            [ServerMessageKeys.PleasanterConnectionFailed] = "无法连接到 Pleasanter。请检查 URL、API 密钥和连接目标的状态。",
+            [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "登录 ID 不是电子邮件地址，因此无法试发。",
+            [ServerMessageKeys.MaintenanceMessageTooLong] = "消息请在 {0} 个字符以内输入。",
+            [ServerMessageKeys.SettingKeyNotManaged] = "这不是受管理的设置：{0}",
+            [ServerMessageKeys.SettingFixedExternally] = "设置“{0}”由外部配置固定，无法在界面中更改。",
+            [ServerMessageKeys.ProofOfWorkRangeInvalid] = "proof-of-work 的搜索下限必须小于或等于搜索上限。",
+            [ServerMessageKeys.LinkedSitesUnreachable] = "无法获取链接目标的站点。请检查对方站点 ID 以及 API 密钥所属用户的权限。",
+            [ServerMessageKeys.FallbackLanguageUnsupported] = "指定的回退语言代码不是受支持的语言。",
+            [ServerMessageKeys.PleasanterSiteWriteFailed] = "无法在 Pleasanter 中创建或更新站点。请检查权限和设置。",
         };
 
         var spanish = new Dictionary<string, string>
@@ -289,6 +311,17 @@ public static class ServerMessages
             [ServerMessageKeys.ResponseLimitReached] = "Se ha alcanzado el límite de respuestas ({0} de {1}). Aumente el límite antes de reanudar.",
             [ServerMessageKeys.ResponseTokenRequired] = "Especifique qué respuesta desea devolver.",
             [ServerMessageKeys.DeadLetterNotFound] = "No se encontró esa respuesta. Es posible que ya se haya devuelto o que se haya enviado.",
+            [ServerMessageKeys.SettingsValuesRequired] = "Especifique los valores de configuración.",
+            [ServerMessageKeys.PleasanterConnectionRequired] = "Especifique la URL y la clave de API de Pleasanter.",
+            [ServerMessageKeys.PleasanterConnectionFailed] = "No se pudo conectar con Pleasanter. Compruebe la URL, la clave de API y el estado del destino.",
+            [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "El ID de inicio de sesión no es una dirección de correo, por lo que no se puede enviar una prueba.",
+            [ServerMessageKeys.MaintenanceMessageTooLong] = "Introduzca un mensaje de {0} caracteres como máximo.",
+            [ServerMessageKeys.SettingKeyNotManaged] = "Esta configuración no está administrada: {0}",
+            [ServerMessageKeys.SettingFixedExternally] = "La configuración «{0}» está fijada por la configuración externa y no se puede cambiar desde la pantalla.",
+            [ServerMessageKeys.ProofOfWorkRangeInvalid] = "El valor mínimo de búsqueda de proof-of-work no debe superar el máximo.",
+            [ServerMessageKeys.LinkedSitesUnreachable] = "No se pudo obtener el sitio vinculado. Compruebe el ID del sitio de destino y los permisos del usuario de la clave de API.",
+            [ServerMessageKeys.FallbackLanguageUnsupported] = "El código del idioma de reserva no es un idioma admitido.",
+            [ServerMessageKeys.PleasanterSiteWriteFailed] = "No se pudo crear ni actualizar el sitio en Pleasanter. Compruebe los permisos y la configuración.",
         };
 
         // **言語ごとの辞書で受ける。** 3 言語目を足すときに、
@@ -365,6 +398,17 @@ public static class ServerMessages
             [ServerMessageKeys.ResponseLimitReached] = "Die Antwortgrenze wurde erreicht ({0} von {1}). Erhöhen Sie die Grenze vor der Fortsetzung.",
             [ServerMessageKeys.ResponseTokenRequired] = "Geben Sie an, welche Antwort zurückgesetzt werden soll.",
             [ServerMessageKeys.DeadLetterNotFound] = "Diese Antwort wurde nicht gefunden. Sie wurde möglicherweise bereits zurückgestellt oder bereits gesendet.",
+            [ServerMessageKeys.SettingsValuesRequired] = "Geben Sie die Einstellungswerte an.",
+            [ServerMessageKeys.PleasanterConnectionRequired] = "Geben Sie die Pleasanter-URL und den API-Schlüssel an.",
+            [ServerMessageKeys.PleasanterConnectionFailed] = "Die Verbindung zu Pleasanter ist fehlgeschlagen. Prüfen Sie URL, API-Schlüssel und den Zustand des Ziels.",
+            [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "Die Anmelde-ID ist keine E-Mail-Adresse, daher kann keine Testnachricht gesendet werden.",
+            [ServerMessageKeys.MaintenanceMessageTooLong] = "Geben Sie eine Nachricht mit höchstens {0} Zeichen ein.",
+            [ServerMessageKeys.SettingKeyNotManaged] = "Diese Einstellung wird nicht verwaltet: {0}",
+            [ServerMessageKeys.SettingFixedExternally] = "Die Einstellung „{0}“ ist durch externe Konfiguration festgelegt und kann auf dem Bildschirm nicht geändert werden.",
+            [ServerMessageKeys.ProofOfWorkRangeInvalid] = "Der untere Suchwert für Proof-of-Work darf den oberen nicht überschreiten.",
+            [ServerMessageKeys.LinkedSitesUnreachable] = "Die verknüpfte Site konnte nicht abgerufen werden. Prüfen Sie die ID der Zielsite und die Berechtigungen des API-Schlüssel-Benutzers.",
+            [ServerMessageKeys.FallbackLanguageUnsupported] = "Der Code der Rückfallsprache ist keine unterstützte Sprache.",
+            [ServerMessageKeys.PleasanterSiteWriteFailed] = "Die Site konnte in Pleasanter nicht erstellt oder aktualisiert werden. Prüfen Sie Berechtigungen und Einstellungen.",
         };
 
         // **2 言語ぶんの書き方は残す。** 既存の Add 呼び出しを書き換えない
@@ -832,6 +876,73 @@ public static class ServerMessages
             "その回答は見つかりません。すでに送信待ちに戻されたか、送信が完了した可能性があります。",
             "That response was not found. It may have already been put back, or it may have been sent.",
             "Không tìm thấy câu trả lời đó. Có thể câu trả lời đã được đưa lại vào hàng đợi hoặc đã gửi xong.");
+
+        // ---- 設定・保守・アンケートの応答（Issue #605） ------------------------------
+        Add(
+            ServerMessageKeys.SettingsValuesRequired,
+            "設定値を指定してください。",
+            "Specify the setting values.",
+            "Vui lòng chỉ định giá trị cài đặt.");
+
+        Add(
+            ServerMessageKeys.PleasanterConnectionRequired,
+            "Pleasanter の URL と API キーを指定してください。",
+            "Specify the Pleasanter URL and API key.",
+            "Vui lòng chỉ định URL và khóa API của Pleasanter.");
+
+        Add(
+            ServerMessageKeys.PleasanterConnectionFailed,
+            "Pleasanter へ接続できませんでした。URL、API キー、接続先の状態をご確認ください。",
+            "Could not connect to Pleasanter. Check the URL, the API key and the state of the server.",
+            "Không thể kết nối đến Pleasanter. Vui lòng kiểm tra URL, khóa API và trạng thái của máy chủ.");
+
+        Add(
+            ServerMessageKeys.SettingsTestSendLoginIdNotEmail,
+            "ログイン ID がメールアドレスではないため、試験送信できません。",
+            "The sign-in ID is not an email address, so a test message cannot be sent.",
+            "ID đăng nhập không phải là địa chỉ email nên không thể gửi thử.");
+
+        Add(
+            ServerMessageKeys.MaintenanceMessageTooLong,
+            "メッセージは{0}文字以内で入力してください。",
+            "Enter a message of {0} characters or fewer.",
+            "Vui lòng nhập thông báo không quá {0} ký tự.");
+
+        Add(
+            ServerMessageKeys.SettingKeyNotManaged,
+            "管理対象ではない設定です: {0}",
+            "This setting is not managed: {0}",
+            "Đây không phải là cài đặt được quản lý: {0}");
+
+        Add(
+            ServerMessageKeys.SettingFixedExternally,
+            "設定「{0}」は外部設定で固定されているため、画面から変更できません。",
+            "The setting “{0}” is fixed by external configuration and cannot be changed from the screen.",
+            "Cài đặt “{0}” được cố định bởi cấu hình bên ngoài nên không thể thay đổi từ màn hình.");
+
+        Add(
+            ServerMessageKeys.ProofOfWorkRangeInvalid,
+            "proof-of-work の探索下限は探索上限以下で指定してください。",
+            "The proof-of-work minimum search value must not exceed the maximum.",
+            "Giá trị tìm kiếm tối thiểu của proof-of-work không được lớn hơn giá trị tối đa.");
+
+        Add(
+            ServerMessageKeys.LinkedSitesUnreachable,
+            "リンク先のサイトを引けませんでした。相手サイト ID か、API キーの利用者の権限を確認してください。",
+            "The linked site could not be retrieved. Check the target site ID and the permissions of the API key's user.",
+            "Không thể truy xuất trang được liên kết. Vui lòng kiểm tra ID trang đích và quyền của người dùng khóa API.");
+
+        Add(
+            ServerMessageKeys.FallbackLanguageUnsupported,
+            "落とし先の言語に対応していない言語コードが指定されています。",
+            "The fallback language code is not a supported language.",
+            "Mã ngôn ngữ dự phòng không phải là ngôn ngữ được hỗ trợ.");
+
+        Add(
+            ServerMessageKeys.PleasanterSiteWriteFailed,
+            "Pleasanter でサイトを作成または更新できませんでした。権限と設定を確認してください。",
+            "The site could not be created or updated in Pleasanter. Check the permissions and settings.",
+            "Không thể tạo hoặc cập nhật trang trong Pleasanter. Vui lòng kiểm tra quyền và cấu hình.");
 
         return catalog.ToFrozenDictionary(StringComparer.Ordinal);
     }

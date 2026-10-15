@@ -580,8 +580,8 @@ public static class AdminSurveyEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "リンク先のサイトを引けませんでした。"
-                        + "相手サイト ID か、API キーの利用者の権限を確認してください。",
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.LinkedSitesUnreachable, RequestLanguage.Of(context)),
                     unreachableSiteIds = unreachable,
                 });
             }
@@ -627,7 +627,8 @@ public static class AdminSurveyEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "落とし先の言語に対応していない言語コードが指定されています。",
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.FallbackLanguageUnsupported, RequestLanguage.Of(context)),
                     fields = new[] { "fallbackLanguage" },
                 });
             }
@@ -1616,7 +1617,8 @@ public static class AdminSurveyEndpoints
             new
             {
                 message = string.IsNullOrWhiteSpace(response.Message)
-                    ? "Pleasanter でサイトを作成または更新できませんでした。権限と設定を確認してください。"
+                    ? ServerMessages.Get(
+                        ServerMessageKeys.PleasanterSiteWriteFailed, RequestLanguage.Of(context))
                     : response.Message,
             },
             statusCode: response.StatusCode ?? StatusCodes.Status502BadGateway);
