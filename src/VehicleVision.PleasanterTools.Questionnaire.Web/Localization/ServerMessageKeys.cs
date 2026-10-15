@@ -209,4 +209,39 @@ public static class ServerMessageKeys
     /// 戻す先が見つからない。**既に誰かが戻した / 送信できて消えた場合を含む。**
     /// </summary>
     public const string DeadLetterNotFound = "outbox.deadLetterNotFound";
+
+    // ---- 設定・保守・アンケートの応答（Issue #605） ------------------------------
+
+    /// <summary>設定値が要求に無い。</summary>
+    public const string SettingsValuesRequired = "settings.valuesRequired";
+
+    /// <summary>接続確認に要る Pleasanter の URL と API キーが無い。</summary>
+    public const string PleasanterConnectionRequired = "settings.pleasanterConnectionRequired";
+
+    /// <summary>Pleasanter へ接続できなかった。</summary>
+    public const string PleasanterConnectionFailed = "settings.pleasanterConnectionFailed";
+
+    /// <summary>メール設定の試験送信の宛先（ログイン ID）がメールアドレスではない。</summary>
+    public const string SettingsTestSendLoginIdNotEmail = "settings.testSendLoginIdNotEmail";
+
+    /// <summary>メンテナンスのメッセージが長すぎる。**上限（`{0}`）を差し込む。**</summary>
+    public const string MaintenanceMessageTooLong = "maintenance.messageTooLong";
+
+    /// <summary>管理対象ではない設定の鍵が指定された。**設定の鍵（`{0}`）を差し込む。**</summary>
+    public const string SettingKeyNotManaged = "settings.keyNotManaged";
+
+    /// <summary>外部設定で固定されている設定を画面から変えようとした。**項目名ではなく設定の鍵（`{0}`）で示す**（言語ごとの項目名を例外に持たせない）。</summary>
+    public const string SettingFixedExternally = "settings.fixedExternally";
+
+    /// <summary>proof-of-work の探索下限が探索上限を超えている。</summary>
+    public const string ProofOfWorkRangeInvalid = "settings.proofOfWorkRangeInvalid";
+
+    /// <summary>リンク先のサイトを Pleasanter から引けなかった。</summary>
+    public const string LinkedSitesUnreachable = "surveys.linkedSitesUnreachable";
+
+    /// <summary>落とし先の言語が対応外。</summary>
+    public const string FallbackLanguageUnsupported = "surveys.fallbackLanguageUnsupported";
+
+    /// <summary>Pleasanter がサイトの作成・更新を断り、理由も返さなかった。</summary>
+    public const string PleasanterSiteWriteFailed = "surveys.pleasanterSiteWriteFailed";
 }
