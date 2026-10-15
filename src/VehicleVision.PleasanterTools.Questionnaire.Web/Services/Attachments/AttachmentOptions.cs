@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
 
@@ -188,7 +189,7 @@ public sealed class AttachmentOptions
             .ToImmutableArray();
         if (extensions.IsEmpty)
         {
-            throw new AppSettingValidationException("回答添付の許可拡張子は空にできません。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.AttachmentExtensionsEmpty);
         }
 
         return string.Join(", ", extensions);

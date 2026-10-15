@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -66,8 +67,7 @@ internal static class EmbedHostSettings
         if (hosts.Any(host => host.Length == 0
             || EmbedPolicy.ToCspSources([host]).Length != 1))
         {
-            throw new AppSettingValidationException(
-                "埋め込み先は www.example.net または *.example.net の形式で、読点区切りで指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.EmbedHostsInvalid);
         }
 
         return string.Join(", ", hosts.Distinct(StringComparer.OrdinalIgnoreCase));
