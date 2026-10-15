@@ -1,4 +1,5 @@
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -23,8 +24,7 @@ public sealed class ColorSchemeOptions
         if (!Enum.TryParse<ThemeColorScheme>(value, ignoreCase: true, out var colorScheme)
             || !Enum.IsDefined(colorScheme))
         {
-            throw new AppSettingValidationException(
-                "回答画面の配色固定は System、Light、Dark のいずれかで指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.ColorSchemeInvalid);
         }
 
         return colorScheme.ToString();

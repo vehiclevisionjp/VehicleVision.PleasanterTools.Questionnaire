@@ -423,7 +423,8 @@ public static class AdminAuthEndpoints
             await SignInSessionAsync(
                     context,
                     user,
-                    extraClaims: PleasanterSsoClaims.Carry(pending.Principal))
+                    extraClaims: PleasanterSsoClaims.Carry(pending.Principal),
+                    method: LoginMethodOf(pending.Principal))
                 .ConfigureAwait(false);
 
             // **復旧コードを返せるのはここだけ。** 保存しているのはハッシュのみ
@@ -492,7 +493,8 @@ public static class AdminAuthEndpoints
                 await SignInSessionAsync(
                         context,
                         user,
-                        extraClaims: PleasanterSsoClaims.Carry(pending.Principal))
+                        extraClaims: PleasanterSsoClaims.Carry(pending.Principal),
+                    method: LoginMethodOf(pending.Principal))
                     .ConfigureAwait(false);
                 return Results.Ok(new { authenticated = true });
 
@@ -517,6 +519,14 @@ public static class AdminAuthEndpoints
         }
     }
 
+    /// <summary>途中状態へ載せたログイン方式。**無ければパスワード**（この claim を足す前の途中状態）。</summary>
+    internal static AdminLoginMethod LoginMethodOf(ClaimsPrincipal? principal) =>
+        Enum.TryParse<AdminLoginMethod>(
+            principal?.FindFirstValue(AdminAuthSchemes.LoginMethodClaim), out var method)
+        && Enum.IsDefined(method)
+            ? method
+            : AdminLoginMethod.Password;
+
     /// <summary>途中状態の claim から利用者を組み立てる。</summary>
     /// <remarks>
     /// **照合に要る値だけを持つ。** パスワードのハッシュなどは cookie に入れない。
@@ -535,17 +545,22 @@ public static class AdminAuthEndpoints
     /// <param name="extraClaims">
     /// ログイン後へ引き継ぐ claim（Pleasanter のログインで来た印など。Issue #464）。
     /// </param>
+    /// <param name="method">
+    /// ログインに使った方式（Issue #602）。**ログイン後のセッションへ引き継ぎ、端末の一覧に出す。**
+    /// </param>
     internal static async Task SignInPendingAsync(
         HttpContext context,
         AdminUser user,
         string? secret,
-        IEnumerable<Claim>? extraClaims = null)
+        IEnumerable<Claim>? extraClaims = null,
+        AdminLoginMethod method = AdminLoginMethod.Password)
     {
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.AdminUserId.ToString()),
             new(ClaimTypes.Name, user.LoginId),
             new(ClaimTypes.Role, user.Role.ToString()),
+            new(AdminAuthSchemes.LoginMethodClaim, method.ToString()),
         };
 
         if (secret is not null)
@@ -576,6 +591,7 @@ public static class AdminAuthEndpoints
     /// SAML で入ったときの <c>NameID</c> と <c>SessionIndex</c>（Issue #191）。
     /// **単一ログアウトの要求に載せるのに要る。** それ以外の入り方では <c>null</c>。
     /// </param>
+    /// <param name="method">ログインに使った方式（Issue #602）。2 要素の途中状態から来るときは引き継ぐ。</param>
     /// <param name="extraClaims">
     /// セッションへ足す claim。**Pleasanter のログインで入ったときの本人と確かめた時刻**
     /// （<see cref="PleasanterSsoClaims"/>。Issue #464）。再検証に使う。
@@ -584,7 +600,8 @@ public static class AdminAuthEndpoints
         HttpContext context,
         AdminUser user,
         SamlSessionKeys? samlSession = null,
-        IEnumerable<Claim>? extraClaims = null)
+        IEnumerable<Claim>? extraClaims = null,
+        AdminLoginMethod method = AdminLoginMethod.Password)
     {
         // **途中状態は必ず消す。** ストアにも共有鍵を残さない
         await context.RequestServices.GetRequiredService<AdminSessionManager>()
@@ -595,6 +612,7 @@ public static class AdminAuthEndpoints
             new Claim(ClaimTypes.NameIdentifier, user.AdminUserId.ToString()),
             new Claim(ClaimTypes.Name, user.LoginId),
             new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim(AdminAuthSchemes.LoginMethodClaim, method.ToString()),
         ];
 
         // **IdP へログアウトを頼むのに要る値だけを持つ**（Issue #191）。
@@ -659,6 +677,9 @@ public static class AdminAuthSchemes
     /// ⚠️ **ログイン ID と同じとは限らない**（属性から取る設定があるため）。
     /// </remarks>
     public const string SamlNameIdClaim = "q.saml.nameid";
+
+    /// <summary>ログインに使った方式（<see cref="AdminLoginMethod"/> の名前。Issue #602）。</summary>
+    public const string LoginMethodClaim = "q.signin.method";
 
     /// <summary>SAML で入ったときの <c>SessionIndex</c>（Issue #191）。</summary>
     /// <remarks>

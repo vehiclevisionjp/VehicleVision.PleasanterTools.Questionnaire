@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Attachments;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
 
@@ -127,14 +128,14 @@ public sealed class AssetOptions
             .ToImmutableArray();
         if (extensions.IsEmpty)
         {
-            throw new AppSettingValidationException("配布資産の許可拡張子は空にできません。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.AssetExtensionsEmpty);
         }
 
         foreach (var extension in extensions)
         {
             if (ForbiddenExtensions.Contains(extension) || !ContentTypes.ContainsKey(extension))
             {
-                throw new AppSettingValidationException($"配布資産へ許可できない拡張子です: {extension}");
+                throw AppSettingValidationException.Of(ServerMessageKeys.AssetExtensionNotAllowed, extension);
             }
         }
 

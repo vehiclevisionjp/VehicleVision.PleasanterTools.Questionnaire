@@ -83,7 +83,7 @@ public sealed partial class AuditLogFilter(
         // ここで例外にすると「通ったのに失敗と伝える」ことになる
         try
         {
-            await WriteAsync(http, StatusCodeOf(result, http)).ConfigureAwait(false);
+            await WriteAsync(http, AuditNotes.StatusOf(http) ?? StatusCodeOf(result, http)).ConfigureAwait(false);
         }
         catch (Exception exception)
         {

@@ -697,10 +697,6 @@ export interface AppSettingField {
   isFixed: boolean;
   defaultValue: string;
   isDefault: boolean;
-  labelJa: string;
-  labelEn: string;
-  descriptionJa: string;
-  descriptionEn: string;
   minimum: number | null;
   maximum: number | null;
   maximumLength: number | null;
@@ -915,6 +911,8 @@ export interface AdminSessionRow {
   expiresAt: string;
   ipAddress?: string | null;
   userAgent?: string | null;
+  /** ログインに使った方式（`Password` / `Saml` / `PleasanterSso`）。古いセッションでは無い。 */
+  loginMethod?: string | null;
 }
 
 /**

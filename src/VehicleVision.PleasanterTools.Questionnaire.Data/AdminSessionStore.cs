@@ -19,6 +19,20 @@ public enum AdminSessionKind
     Reenroll = 2,
 }
 
+/// <summary>ログインに使った方式（Issue #602）。</summary>
+/// <remarks>⚠️ **値を振り直さないこと。** DB へ整数で入る（<c>AdminSessions.LoginMethod</c>）。</remarks>
+public enum AdminLoginMethod
+{
+    /// <summary>本アプリのログイン ID とパスワード。</summary>
+    Password = 0,
+
+    /// <summary>SAML（IdP 経由）。</summary>
+    Saml = 1,
+
+    /// <summary>Pleasanter のログイン。</summary>
+    PleasanterSso = 2,
+}
+
 /// <summary>サーバ側に置く管理者セッション。</summary>
 public sealed record AdminSessionEntry
 {
@@ -30,6 +44,9 @@ public sealed record AdminSessionEntry
     public required DateTime ExpiresAt { get; init; }
     public string? IpAddress { get; init; }
     public string? UserAgent { get; init; }
+
+    /// <summary>入った方式。**この列を足す前に作られたセッションは <c>null</c>。**</summary>
+    public AdminLoginMethod? LoginMethod { get; init; }
 }
 
 /// <summary>管理者セッションの入れ物。</summary>
@@ -72,9 +89,9 @@ public sealed class DatabaseAdminSessionStore(IDbConnectionFactory connectionFac
         await connection.ExecuteAsync(Sql(
             "INSERT INTO [AdminSessions] "
             + "([AdminSessionId], [AdminUserId], [Kind], [ProtectedPayload], [CreatedAt], "
-            + "[ExpiresAt], [IpAddress], [UserAgent]) "
+            + "[ExpiresAt], [IpAddress], [UserAgent], [LoginMethod]) "
             + "VALUES (@AdminSessionId, @AdminUserId, @Kind, @ProtectedPayload, @CreatedAt, "
-            + "@ExpiresAt, @IpAddress, @UserAgent)",
+            + "@ExpiresAt, @IpAddress, @UserAgent, @LoginMethod)",
             Parameters(entry),
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -86,7 +103,7 @@ public sealed class DatabaseAdminSessionStore(IDbConnectionFactory connectionFac
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         return await connection.QueryFirstOrDefaultAsync<AdminSessionEntry>(Sql(
             "SELECT [AdminSessionId], [AdminUserId], [Kind], [ProtectedPayload], "
-            + "[CreatedAt], [ExpiresAt], [IpAddress], [UserAgent] "
+            + "[CreatedAt], [ExpiresAt], [IpAddress], [UserAgent], [LoginMethod] "
             + "FROM [AdminSessions] WHERE [AdminSessionId] = @AdminSessionId",
             new { AdminSessionId = adminSessionId },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -99,7 +116,7 @@ public sealed class DatabaseAdminSessionStore(IDbConnectionFactory connectionFac
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var rows = await connection.QueryAsync<AdminSessionEntry>(Sql(
             "SELECT [AdminSessionId], [AdminUserId], [Kind], [ProtectedPayload], "
-            + "[CreatedAt], [ExpiresAt], [IpAddress], [UserAgent] "
+            + "[CreatedAt], [ExpiresAt], [IpAddress], [UserAgent], [LoginMethod] "
             + "FROM [AdminSessions] "
             + "WHERE [AdminUserId] = @AdminUserId AND [Kind] = @Kind "
             + "ORDER BY [CreatedAt] DESC",
@@ -174,6 +191,7 @@ public sealed class DatabaseAdminSessionStore(IDbConnectionFactory connectionFac
         ExpiresAt = DbTime.ForDb(entry.ExpiresAt),
         entry.IpAddress,
         entry.UserAgent,
+        LoginMethod = (int?)entry.LoginMethod,
     };
 
     private CommandDefinition Sql(

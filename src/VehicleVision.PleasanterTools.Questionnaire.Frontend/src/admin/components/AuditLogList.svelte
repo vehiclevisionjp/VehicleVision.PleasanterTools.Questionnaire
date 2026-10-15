@@ -2,6 +2,7 @@
   import { listAuditLogs } from '../lib/api';
   import type { AuditLogEntry, AuditLogFilter } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
+  import { AUDIT_KIND_OPTIONS, auditKindOf, readSignInNote } from '../lib/signInAudit';
 
   interface Props {
     onback: () => void;
@@ -123,6 +124,18 @@
     </label>
 
     <label>
+      <span>{t('audit.filterKind')}</span>
+      <select
+        value={auditKindOf(draft.action)}
+        onchange={(event) => (draft.action = event.currentTarget.value)}
+      >
+        {#each AUDIT_KIND_OPTIONS as option (option.value)}
+          <option value={option.value}>{t(option.label)}</option>
+        {/each}
+      </select>
+    </label>
+
+    <label>
       <span>{t('audit.filterAction')}</span>
       <input type="search" bind:value={draft.action} />
     </label>
@@ -183,7 +196,23 @@
                 **必ず逃がして描く。** Svelte の `{}` は逃がすが、
                 `{@html}` にしないことが約束（記録側でも HTML に効く文字は逃がしてある）
               -->
-              <td class="mono detail">{entry.detail ?? ''}</td>
+              <td class="mono detail">
+                {entry.detail ?? ''}
+                {#if readSignInNote(entry.action, entry.detail) !== null}
+                  {@const note = readSignInNote(entry.action, entry.detail)!}
+                  <!-- **ログインの結果と理由を、画面の言語で補う**（Issue #602）。知らない値は原文のまま -->
+                  <span class="sign-in-note">
+                    {#if note.result !== undefined}
+                      {t('audit.signIn.resultLabel')}:
+                      {note.resultKey !== undefined ? t(note.resultKey) : note.result}
+                    {/if}
+                    {#if note.reason !== undefined}
+                      {t('audit.signIn.reasonLabel')}:
+                      {note.reasonKey !== undefined ? t(note.reasonKey) : note.reason}
+                    {/if}
+                  </span>
+                {/if}
+              </td>
               <td class="nowrap">{entry.ipAddress ?? ''}</td>
             </tr>
           {/each}
@@ -260,7 +289,8 @@
     gap: 0.4rem;
   }
 
-  .filters input {
+  .filters input,
+  .filters select {
     font: inherit;
     padding: 0.35rem 0.5rem;
     border: 1px solid var(--border);
@@ -330,6 +360,13 @@
   /* **断られた操作は目で追えるようにする。** 色だけに頼らず、左端に印も付ける */
   tr.refused td:first-child {
     border-left: 3px solid var(--error);
+  }
+
+  .sign-in-note {
+    display: block;
+    margin-top: 0.25rem;
+    font-family: inherit;
+    color: var(--muted);
   }
 
   tr.refused td {

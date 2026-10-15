@@ -4,6 +4,7 @@ using System.Security.Claims;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -38,7 +39,7 @@ public static class AdminSettingsEndpoints
         {
             if (request.Values is null)
             {
-                return Results.BadRequest(new { message = "設定値を指定してください。" });
+                return Results.BadRequest(new { message = ServerMessages.Get(ServerMessageKeys.SettingsValuesRequired, RequestLanguage.Of(context)) });
             }
 
             try
@@ -87,12 +88,13 @@ public static class AdminSettingsEndpoints
             }
             catch (AppSettingValidationException exception)
             {
-                return Results.BadRequest(new { message = exception.Message });
+                return Results.BadRequest(new { message = exception.MessageFor(RequestLanguage.Of(context)) });
             }
         });
 
         group.MapPost("/test", async (
             AppSettingsRequest request,
+            HttpContext context,
             IAppSettingsProvider provider,
             IConfiguration configuration,
             IHttpClientFactory httpClientFactory,
@@ -100,7 +102,7 @@ public static class AdminSettingsEndpoints
         {
             if (request.Values is null)
             {
-                return Results.BadRequest(new { message = "設定値を指定してください。" });
+                return Results.BadRequest(new { message = ServerMessages.Get(ServerMessageKeys.SettingsValuesRequired, RequestLanguage.Of(context)) });
             }
 
             try
@@ -112,7 +114,8 @@ public static class AdminSettingsEndpoints
                 {
                     return Results.BadRequest(new
                     {
-                        message = "Pleasanter の URL と API キーを指定してください。",
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.PleasanterConnectionRequired, RequestLanguage.Of(context)),
                     });
                 }
 
@@ -125,12 +128,13 @@ public static class AdminSettingsEndpoints
                     ? Results.Ok(new ConnectionTestResponse(true))
                     : Results.BadRequest(new
                     {
-                        message = "Pleasanter へ接続できませんでした。URL、API キー、接続先の状態をご確認ください。",
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.PleasanterConnectionFailed, RequestLanguage.Of(context)),
                     });
             }
             catch (AppSettingValidationException exception)
             {
-                return Results.BadRequest(new { message = exception.Message });
+                return Results.BadRequest(new { message = exception.MessageFor(RequestLanguage.Of(context)) });
             }
         });
 
@@ -143,7 +147,7 @@ public static class AdminSettingsEndpoints
         {
             if (request.Values is null)
             {
-                return Results.BadRequest(new { message = "設定値を指定してください。" });
+                return Results.BadRequest(new { message = ServerMessages.Get(ServerMessageKeys.SettingsValuesRequired, RequestLanguage.Of(context)) });
             }
 
             var recipient = principal.Identity?.Name;
@@ -151,7 +155,8 @@ public static class AdminSettingsEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "ログイン ID がメールアドレスではないため、試験送信できません。",
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SettingsTestSendLoginIdNotEmail, RequestLanguage.Of(context)),
                 });
             }
 
@@ -164,7 +169,7 @@ public static class AdminSettingsEndpoints
             }
             catch (AppSettingValidationException exception)
             {
-                return Results.BadRequest(new { message = exception.Message });
+                return Results.BadRequest(new { message = exception.MessageFor(RequestLanguage.Of(context)) });
             }
             catch (MailDeliveryException exception)
             {
@@ -204,8 +209,7 @@ public static class AdminSettingsEndpoints
             definitions);
         if (minimum > maximum)
         {
-            throw new AppSettingValidationException(
-                "proof-of-work の探索下限は探索上限以下で指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.ProofOfWorkRangeInvalid);
         }
     }
 
@@ -222,10 +226,6 @@ public static class AdminSettingsEndpoints
             snapshot.FixedKeys.Contains(definition.Key),
             definition.DefaultValue,
             string.Equals(snapshot[definition.Key], definition.DefaultValue, StringComparison.Ordinal),
-            definition.LabelJa,
-            definition.LabelEn,
-            definition.DescriptionJa,
-            definition.DescriptionEn,
             definition.Minimum,
             definition.Maximum,
             definition.MaximumLength,
@@ -246,7 +246,7 @@ public static class AdminSettingsEndpoints
         {
             if (!definitions.TryGetValue(key, out var definition))
             {
-                throw new AppSettingValidationException($"管理対象ではない設定です: {key}");
+                throw AppSettingValidationException.Of(ServerMessageKeys.SettingKeyNotManaged, key);
             }
 
             if (current.FixedKeys.Contains(key))
@@ -256,8 +256,8 @@ public static class AdminSettingsEndpoints
                     definition.Normalize(requestedValue),
                     StringComparison.Ordinal))
                 {
-                    throw new AppSettingValidationException(
-                        $"{definition.LabelJa}は外部設定で固定されているため、画面から変更できません。");
+                    throw AppSettingValidationException.Of(
+                        ServerMessageKeys.SettingFixedExternally, key);
                 }
 
                 continue;
@@ -295,10 +295,6 @@ public static class AdminSettingsEndpoints
         bool IsFixed,
         string DefaultValue,
         bool IsDefault,
-        string LabelJa,
-        string LabelEn,
-        string DescriptionJa,
-        string DescriptionEn,
         int? Minimum,
         int? Maximum,
         int? MaximumLength,

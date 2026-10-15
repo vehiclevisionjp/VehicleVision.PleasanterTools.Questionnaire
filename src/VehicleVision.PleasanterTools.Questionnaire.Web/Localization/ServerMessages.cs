@@ -92,6 +92,44 @@ public static class ServerMessages
         [ServerMessageKeys.ResponseLimitReached] = "답변 수가 한도에 도달했습니다({0} / {1}건). 다시 시작하려면 먼저 한도를 늘리세요.",
         [ServerMessageKeys.ResponseTokenRequired] = "되돌릴 답변을 지정하세요.",
         [ServerMessageKeys.DeadLetterNotFound] = "해당 답변을 찾을 수 없습니다. 이미 전송 대기로 되돌렸거나 전송이 완료되었을 수 있습니다.",
+        [ServerMessageKeys.SettingsValuesRequired] = "설정 값을 지정하세요.",
+        [ServerMessageKeys.PleasanterConnectionRequired] = "Pleasanter의 URL과 API 키를 지정하세요.",
+        [ServerMessageKeys.PleasanterConnectionFailed] = "Pleasanter에 연결할 수 없습니다. URL, API 키, 연결 대상의 상태를 확인하세요.",
+        [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "로그인 ID가 이메일 주소가 아니므로 테스트 전송을 할 수 없습니다.",
+        [ServerMessageKeys.MaintenanceMessageTooLong] = "메시지는 {0}자 이내로 입력하세요.",
+        [ServerMessageKeys.SettingKeyNotManaged] = "관리 대상이 아닌 설정입니다: {0}",
+        [ServerMessageKeys.SettingFixedExternally] = "설정 “{0}”은(는) 외부 설정으로 고정되어 있어 화면에서 변경할 수 없습니다.",
+        [ServerMessageKeys.ProofOfWorkRangeInvalid] = "proof-of-work의 탐색 하한은 탐색 상한 이하로 지정하세요.",
+        [ServerMessageKeys.LinkedSitesUnreachable] = "연결된 사이트를 가져올 수 없습니다. 대상 사이트 ID와 API 키 사용자의 권한을 확인하세요.",
+        [ServerMessageKeys.FallbackLanguageUnsupported] = "대체 언어 코드가 지원되지 않는 언어입니다.",
+        [ServerMessageKeys.PleasanterSiteWriteFailed] = "Pleasanter에서 사이트를 만들거나 업데이트할 수 없습니다. 권한과 설정을 확인하세요.",
+        [ServerMessageKeys.SettingValueTooLong] = "{0}: {1}자 이내로 입력하세요.",
+        [ServerMessageKeys.SettingNotBoolean] = "{0}: true 또는 false로 지정하세요.",
+        [ServerMessageKeys.SettingNotInteger] = "{0}: 정수로 지정하세요.",
+        [ServerMessageKeys.SettingBelowMinimum] = "{0}: {1} 이상으로 지정하세요.",
+        [ServerMessageKeys.SettingAboveMaximum] = "{0}: {1} 이하로 지정하세요.",
+        [ServerMessageKeys.MailFromAddressRequired] = "메일 전송을 활성화하려면 발신자 이메일 주소가 필요합니다.",
+        [ServerMessageKeys.MailBaseUrlRequired] = "메일 전송을 활성화하려면 공개 URL이 필요합니다.",
+        [ServerMessageKeys.SmtpHostRequired] = "SMTP를 사용하려면 SMTP 서버가 필요합니다.",
+        [ServerMessageKeys.SesRegionRequired] = "Amazon SES를 사용하려면 리전이 필요합니다.",
+        [ServerMessageKeys.AcsEndpointRequired] = "Azure Communication Services를 사용하려면 엔드포인트가 필요합니다.",
+        [ServerMessageKeys.MailTransportInvalid] = "전송 방식은 Smtp, AmazonSes, AzureCommunicationServices 중에서 선택하세요.",
+        [ServerMessageKeys.SmtpSecurityInvalid] = "SMTP 암호화는 StartTls, ImplicitTls, None 중에서 선택하세요.",
+        [ServerMessageKeys.MailAddressInvalid] = "이메일 주소 형식이 올바르지 않습니다.",
+        [ServerMessageKeys.HttpsUrlRequired] = "HTTPS 절대 URL을 입력하세요.",
+        [ServerMessageKeys.HttpUrlRequired] = "http:// 또는 https://로 시작하는 절대 URL을 입력하세요.",
+        [ServerMessageKeys.PleasanterUrlInvalid] = "Pleasanter의 URL은 http 또는 https 절대 URL로 지정하세요.",
+        [ServerMessageKeys.PleasanterApiVersionInvalid] = "Pleasanter API 버전은 0보다 큰 숫자로 지정하세요.",
+        [ServerMessageKeys.PleasanterTimeZoneRequired] = "Pleasanter API 키 사용자의 시간대를 지정하세요.",
+        [ServerMessageKeys.PleasanterTimeZoneNotFound] = "Pleasanter API 키 사용자의 시간대를 찾을 수 없습니다.",
+        [ServerMessageKeys.DefaultTimeZoneRequired] = "기본 시간대는 비워 둘 수 없습니다.",
+        [ServerMessageKeys.TimeZoneIdUnresolved] = "시간대 ID를 해석할 수 없습니다: {0}",
+        [ServerMessageKeys.TimeZoneIdInvalid] = "시간대 ID가 올바르지 않습니다: {0}",
+        [ServerMessageKeys.AssetExtensionsEmpty] = "배포 자산의 허용 확장자는 비워 둘 수 없습니다.",
+        [ServerMessageKeys.AssetExtensionNotAllowed] = "배포 자산에 허용할 수 없는 확장자입니다: {0}",
+        [ServerMessageKeys.AttachmentExtensionsEmpty] = "답변 첨부의 허용 확장자는 비워 둘 수 없습니다.",
+        [ServerMessageKeys.ColorSchemeInvalid] = "답변 화면의 고정 색 구성은 System, Light, Dark 중 하나로 지정하세요.",
+        [ServerMessageKeys.EmbedHostsInvalid] = "삽입 대상은 www.example.net 또는 *.example.net 형식으로 쉼표로 구분하여 지정하세요.",
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static readonly FrozenDictionary<string, LocalizedText> Catalog = Build();
@@ -212,6 +250,44 @@ public static class ServerMessages
             [ServerMessageKeys.ResponseLimitReached] = "回答数已达到上限（{0} / {1} 条）。请先提高上限后再继续。",
             [ServerMessageKeys.ResponseTokenRequired] = "请指定要恢复的回答。",
             [ServerMessageKeys.DeadLetterNotFound] = "未找到该回答。它可能已恢复为等待发送状态，或已发送完成。",
+            [ServerMessageKeys.SettingsValuesRequired] = "请指定设置值。",
+            [ServerMessageKeys.PleasanterConnectionRequired] = "请指定 Pleasanter 的 URL 和 API 密钥。",
+            [ServerMessageKeys.PleasanterConnectionFailed] = "无法连接到 Pleasanter。请检查 URL、API 密钥和连接目标的状态。",
+            [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "登录 ID 不是电子邮件地址，因此无法试发。",
+            [ServerMessageKeys.MaintenanceMessageTooLong] = "消息请在 {0} 个字符以内输入。",
+            [ServerMessageKeys.SettingKeyNotManaged] = "这不是受管理的设置：{0}",
+            [ServerMessageKeys.SettingFixedExternally] = "设置“{0}”由外部配置固定，无法在界面中更改。",
+            [ServerMessageKeys.ProofOfWorkRangeInvalid] = "proof-of-work 的搜索下限必须小于或等于搜索上限。",
+            [ServerMessageKeys.LinkedSitesUnreachable] = "无法获取链接目标的站点。请检查对方站点 ID 以及 API 密钥所属用户的权限。",
+            [ServerMessageKeys.FallbackLanguageUnsupported] = "指定的回退语言代码不是受支持的语言。",
+            [ServerMessageKeys.PleasanterSiteWriteFailed] = "无法在 Pleasanter 中创建或更新站点。请检查权限和设置。",
+            [ServerMessageKeys.SettingValueTooLong] = "{0}：请在 {1} 个字符以内输入。",
+            [ServerMessageKeys.SettingNotBoolean] = "{0}：请指定 true 或 false。",
+            [ServerMessageKeys.SettingNotInteger] = "{0}：请指定整数。",
+            [ServerMessageKeys.SettingBelowMinimum] = "{0}：请指定 {1} 或更大的值。",
+            [ServerMessageKeys.SettingAboveMaximum] = "{0}：请指定 {1} 或更小的值。",
+            [ServerMessageKeys.MailFromAddressRequired] = "启用邮件发送需要发件人邮箱地址。",
+            [ServerMessageKeys.MailBaseUrlRequired] = "启用邮件发送需要公开 URL。",
+            [ServerMessageKeys.SmtpHostRequired] = "使用 SMTP 需要 SMTP 服务器。",
+            [ServerMessageKeys.SesRegionRequired] = "使用 Amazon SES 需要区域。",
+            [ServerMessageKeys.AcsEndpointRequired] = "使用 Azure Communication Services 需要终结点。",
+            [ServerMessageKeys.MailTransportInvalid] = "发送方式请从 Smtp、AmazonSes、AzureCommunicationServices 中选择。",
+            [ServerMessageKeys.SmtpSecurityInvalid] = "SMTP 加密方式请从 StartTls、ImplicitTls、None 中选择。",
+            [ServerMessageKeys.MailAddressInvalid] = "电子邮件地址格式不正确。",
+            [ServerMessageKeys.HttpsUrlRequired] = "请输入 HTTPS 的绝对 URL。",
+            [ServerMessageKeys.HttpUrlRequired] = "请输入以 http:// 或 https:// 开头的绝对 URL。",
+            [ServerMessageKeys.PleasanterUrlInvalid] = "Pleasanter 的 URL 请指定为 http 或 https 的绝对 URL。",
+            [ServerMessageKeys.PleasanterApiVersionInvalid] = "Pleasanter API 版本请指定为大于 0 的数值。",
+            [ServerMessageKeys.PleasanterTimeZoneRequired] = "请指定 Pleasanter API 密钥所属用户的时区。",
+            [ServerMessageKeys.PleasanterTimeZoneNotFound] = "找不到 Pleasanter API 密钥所属用户的时区。",
+            [ServerMessageKeys.DefaultTimeZoneRequired] = "默认时区不能为空。",
+            [ServerMessageKeys.TimeZoneIdUnresolved] = "无法解析时区 ID：{0}",
+            [ServerMessageKeys.TimeZoneIdInvalid] = "时区 ID 无效：{0}",
+            [ServerMessageKeys.AssetExtensionsEmpty] = "分发资源的允许扩展名不能为空。",
+            [ServerMessageKeys.AssetExtensionNotAllowed] = "分发资源不能允许此扩展名：{0}",
+            [ServerMessageKeys.AttachmentExtensionsEmpty] = "回答附件的允许扩展名不能为空。",
+            [ServerMessageKeys.ColorSchemeInvalid] = "回答页面的固定配色请指定为 System、Light、Dark 之一。",
+            [ServerMessageKeys.EmbedHostsInvalid] = "嵌入来源请按 www.example.net 或 *.example.net 的形式指定，并用逗号分隔。",
         };
 
         var spanish = new Dictionary<string, string>
@@ -289,6 +365,44 @@ public static class ServerMessages
             [ServerMessageKeys.ResponseLimitReached] = "Se ha alcanzado el límite de respuestas ({0} de {1}). Aumente el límite antes de reanudar.",
             [ServerMessageKeys.ResponseTokenRequired] = "Especifique qué respuesta desea devolver.",
             [ServerMessageKeys.DeadLetterNotFound] = "No se encontró esa respuesta. Es posible que ya se haya devuelto o que se haya enviado.",
+            [ServerMessageKeys.SettingsValuesRequired] = "Especifique los valores de configuración.",
+            [ServerMessageKeys.PleasanterConnectionRequired] = "Especifique la URL y la clave de API de Pleasanter.",
+            [ServerMessageKeys.PleasanterConnectionFailed] = "No se pudo conectar con Pleasanter. Compruebe la URL, la clave de API y el estado del destino.",
+            [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "El ID de inicio de sesión no es una dirección de correo, por lo que no se puede enviar una prueba.",
+            [ServerMessageKeys.MaintenanceMessageTooLong] = "Introduzca un mensaje de {0} caracteres como máximo.",
+            [ServerMessageKeys.SettingKeyNotManaged] = "Esta configuración no está administrada: {0}",
+            [ServerMessageKeys.SettingFixedExternally] = "La configuración «{0}» está fijada por la configuración externa y no se puede cambiar desde la pantalla.",
+            [ServerMessageKeys.ProofOfWorkRangeInvalid] = "El valor mínimo de búsqueda de proof-of-work no debe superar el máximo.",
+            [ServerMessageKeys.LinkedSitesUnreachable] = "No se pudo obtener el sitio vinculado. Compruebe el ID del sitio de destino y los permisos del usuario de la clave de API.",
+            [ServerMessageKeys.FallbackLanguageUnsupported] = "El código del idioma de reserva no es un idioma admitido.",
+            [ServerMessageKeys.PleasanterSiteWriteFailed] = "No se pudo crear ni actualizar el sitio en Pleasanter. Compruebe los permisos y la configuración.",
+            [ServerMessageKeys.SettingValueTooLong] = "{0}: introduzca {1} caracteres como máximo.",
+            [ServerMessageKeys.SettingNotBoolean] = "{0}: especifique true o false.",
+            [ServerMessageKeys.SettingNotInteger] = "{0}: especifique un número entero.",
+            [ServerMessageKeys.SettingBelowMinimum] = "{0}: especifique {1} o más.",
+            [ServerMessageKeys.SettingAboveMaximum] = "{0}: especifique {1} o menos.",
+            [ServerMessageKeys.MailFromAddressRequired] = "Se necesita una dirección de correo del remitente para habilitar el envío de correo.",
+            [ServerMessageKeys.MailBaseUrlRequired] = "Se necesita una URL pública para habilitar el envío de correo.",
+            [ServerMessageKeys.SmtpHostRequired] = "Se necesita un servidor SMTP para usar SMTP.",
+            [ServerMessageKeys.SesRegionRequired] = "Se necesita una región para usar Amazon SES.",
+            [ServerMessageKeys.AcsEndpointRequired] = "Se necesita un punto de conexión para usar Azure Communication Services.",
+            [ServerMessageKeys.MailTransportInvalid] = "Elija el método de envío entre Smtp, AmazonSes o AzureCommunicationServices.",
+            [ServerMessageKeys.SmtpSecurityInvalid] = "Elija el cifrado SMTP entre StartTls, ImplicitTls o None.",
+            [ServerMessageKeys.MailAddressInvalid] = "El formato de la dirección de correo no es válido.",
+            [ServerMessageKeys.HttpsUrlRequired] = "Introduzca una URL absoluta HTTPS.",
+            [ServerMessageKeys.HttpUrlRequired] = "Introduzca una URL absoluta que empiece por http:// o https://.",
+            [ServerMessageKeys.PleasanterUrlInvalid] = "Especifique la URL de Pleasanter como una URL absoluta http o https.",
+            [ServerMessageKeys.PleasanterApiVersionInvalid] = "Especifique la versión de la API de Pleasanter como un número mayor que 0.",
+            [ServerMessageKeys.PleasanterTimeZoneRequired] = "Especifique la zona horaria del usuario de la clave de API de Pleasanter.",
+            [ServerMessageKeys.PleasanterTimeZoneNotFound] = "No se encontró la zona horaria del usuario de la clave de API de Pleasanter.",
+            [ServerMessageKeys.DefaultTimeZoneRequired] = "La zona horaria predeterminada no puede estar vacía.",
+            [ServerMessageKeys.TimeZoneIdUnresolved] = "No se pudo resolver el ID de zona horaria: {0}",
+            [ServerMessageKeys.TimeZoneIdInvalid] = "El ID de zona horaria no es válido: {0}",
+            [ServerMessageKeys.AssetExtensionsEmpty] = "Las extensiones permitidas para los recursos distribuidos no pueden estar vacías.",
+            [ServerMessageKeys.AssetExtensionNotAllowed] = "Esta extensión no se puede permitir para los recursos distribuidos: {0}",
+            [ServerMessageKeys.AttachmentExtensionsEmpty] = "Las extensiones permitidas para los adjuntos de respuestas no pueden estar vacías.",
+            [ServerMessageKeys.ColorSchemeInvalid] = "Especifique el esquema de color fijo de la pantalla de respuestas como System, Light o Dark.",
+            [ServerMessageKeys.EmbedHostsInvalid] = "Especifique los hosts de incrustación como www.example.net o *.example.net, separados por comas.",
         };
 
         // **言語ごとの辞書で受ける。** 3 言語目を足すときに、
@@ -365,6 +479,44 @@ public static class ServerMessages
             [ServerMessageKeys.ResponseLimitReached] = "Die Antwortgrenze wurde erreicht ({0} von {1}). Erhöhen Sie die Grenze vor der Fortsetzung.",
             [ServerMessageKeys.ResponseTokenRequired] = "Geben Sie an, welche Antwort zurückgesetzt werden soll.",
             [ServerMessageKeys.DeadLetterNotFound] = "Diese Antwort wurde nicht gefunden. Sie wurde möglicherweise bereits zurückgestellt oder bereits gesendet.",
+            [ServerMessageKeys.SettingsValuesRequired] = "Geben Sie die Einstellungswerte an.",
+            [ServerMessageKeys.PleasanterConnectionRequired] = "Geben Sie die Pleasanter-URL und den API-Schlüssel an.",
+            [ServerMessageKeys.PleasanterConnectionFailed] = "Die Verbindung zu Pleasanter ist fehlgeschlagen. Prüfen Sie URL, API-Schlüssel und den Zustand des Ziels.",
+            [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "Die Anmelde-ID ist keine E-Mail-Adresse, daher kann keine Testnachricht gesendet werden.",
+            [ServerMessageKeys.MaintenanceMessageTooLong] = "Geben Sie eine Nachricht mit höchstens {0} Zeichen ein.",
+            [ServerMessageKeys.SettingKeyNotManaged] = "Diese Einstellung wird nicht verwaltet: {0}",
+            [ServerMessageKeys.SettingFixedExternally] = "Die Einstellung „{0}“ ist durch externe Konfiguration festgelegt und kann auf dem Bildschirm nicht geändert werden.",
+            [ServerMessageKeys.ProofOfWorkRangeInvalid] = "Der untere Suchwert für Proof-of-Work darf den oberen nicht überschreiten.",
+            [ServerMessageKeys.LinkedSitesUnreachable] = "Die verknüpfte Site konnte nicht abgerufen werden. Prüfen Sie die ID der Zielsite und die Berechtigungen des API-Schlüssel-Benutzers.",
+            [ServerMessageKeys.FallbackLanguageUnsupported] = "Der Code der Rückfallsprache ist keine unterstützte Sprache.",
+            [ServerMessageKeys.PleasanterSiteWriteFailed] = "Die Site konnte in Pleasanter nicht erstellt oder aktualisiert werden. Prüfen Sie Berechtigungen und Einstellungen.",
+            [ServerMessageKeys.SettingValueTooLong] = "{0}: Geben Sie höchstens {1} Zeichen ein.",
+            [ServerMessageKeys.SettingNotBoolean] = "{0}: Geben Sie true oder false an.",
+            [ServerMessageKeys.SettingNotInteger] = "{0}: Geben Sie eine ganze Zahl an.",
+            [ServerMessageKeys.SettingBelowMinimum] = "{0}: Geben Sie mindestens {1} an.",
+            [ServerMessageKeys.SettingAboveMaximum] = "{0}: Geben Sie höchstens {1} an.",
+            [ServerMessageKeys.MailFromAddressRequired] = "Zum Aktivieren des E-Mail-Versands ist eine Absenderadresse erforderlich.",
+            [ServerMessageKeys.MailBaseUrlRequired] = "Zum Aktivieren des E-Mail-Versands ist eine öffentliche URL erforderlich.",
+            [ServerMessageKeys.SmtpHostRequired] = "Zur Verwendung von SMTP ist ein SMTP-Server erforderlich.",
+            [ServerMessageKeys.SesRegionRequired] = "Zur Verwendung von Amazon SES ist eine Region erforderlich.",
+            [ServerMessageKeys.AcsEndpointRequired] = "Zur Verwendung von Azure Communication Services ist ein Endpunkt erforderlich.",
+            [ServerMessageKeys.MailTransportInvalid] = "Wählen Sie die Versandart aus Smtp, AmazonSes oder AzureCommunicationServices.",
+            [ServerMessageKeys.SmtpSecurityInvalid] = "Wählen Sie die SMTP-Verschlüsselung aus StartTls, ImplicitTls oder None.",
+            [ServerMessageKeys.MailAddressInvalid] = "Das Format der E-Mail-Adresse ist ungültig.",
+            [ServerMessageKeys.HttpsUrlRequired] = "Geben Sie eine absolute HTTPS-URL ein.",
+            [ServerMessageKeys.HttpUrlRequired] = "Geben Sie eine absolute URL ein, die mit http:// oder https:// beginnt.",
+            [ServerMessageKeys.PleasanterUrlInvalid] = "Geben Sie die Pleasanter-URL als absolute http- oder https-URL an.",
+            [ServerMessageKeys.PleasanterApiVersionInvalid] = "Geben Sie die Pleasanter-API-Version als Zahl größer als 0 an.",
+            [ServerMessageKeys.PleasanterTimeZoneRequired] = "Geben Sie die Zeitzone des Pleasanter-API-Schlüssel-Benutzers an.",
+            [ServerMessageKeys.PleasanterTimeZoneNotFound] = "Die Zeitzone des Pleasanter-API-Schlüssel-Benutzers wurde nicht gefunden.",
+            [ServerMessageKeys.DefaultTimeZoneRequired] = "Die Standardzeitzone darf nicht leer sein.",
+            [ServerMessageKeys.TimeZoneIdUnresolved] = "Die Zeitzonen-ID konnte nicht aufgelöst werden: {0}",
+            [ServerMessageKeys.TimeZoneIdInvalid] = "Die Zeitzonen-ID ist ungültig: {0}",
+            [ServerMessageKeys.AssetExtensionsEmpty] = "Die erlaubten Erweiterungen für verteilte Ressourcen dürfen nicht leer sein.",
+            [ServerMessageKeys.AssetExtensionNotAllowed] = "Diese Erweiterung kann für verteilte Ressourcen nicht erlaubt werden: {0}",
+            [ServerMessageKeys.AttachmentExtensionsEmpty] = "Die erlaubten Erweiterungen für Antwortanhänge dürfen nicht leer sein.",
+            [ServerMessageKeys.ColorSchemeInvalid] = "Geben Sie das feste Farbschema der Antwortseite als System, Light oder Dark an.",
+            [ServerMessageKeys.EmbedHostsInvalid] = "Geben Sie Einbettungs-Hosts als www.example.net oder *.example.net an, durch Kommas getrennt.",
         };
 
         // **2 言語ぶんの書き方は残す。** 既存の Add 呼び出しを書き換えない
@@ -832,6 +984,236 @@ public static class ServerMessages
             "その回答は見つかりません。すでに送信待ちに戻されたか、送信が完了した可能性があります。",
             "That response was not found. It may have already been put back, or it may have been sent.",
             "Không tìm thấy câu trả lời đó. Có thể câu trả lời đã được đưa lại vào hàng đợi hoặc đã gửi xong.");
+
+        // ---- 設定・保守・アンケートの応答（Issue #605） ------------------------------
+        Add(
+            ServerMessageKeys.SettingsValuesRequired,
+            "設定値を指定してください。",
+            "Specify the setting values.",
+            "Vui lòng chỉ định giá trị cài đặt.");
+
+        Add(
+            ServerMessageKeys.PleasanterConnectionRequired,
+            "Pleasanter の URL と API キーを指定してください。",
+            "Specify the Pleasanter URL and API key.",
+            "Vui lòng chỉ định URL và khóa API của Pleasanter.");
+
+        Add(
+            ServerMessageKeys.PleasanterConnectionFailed,
+            "Pleasanter へ接続できませんでした。URL、API キー、接続先の状態をご確認ください。",
+            "Could not connect to Pleasanter. Check the URL, the API key and the state of the server.",
+            "Không thể kết nối đến Pleasanter. Vui lòng kiểm tra URL, khóa API và trạng thái của máy chủ.");
+
+        Add(
+            ServerMessageKeys.SettingsTestSendLoginIdNotEmail,
+            "ログイン ID がメールアドレスではないため、試験送信できません。",
+            "The sign-in ID is not an email address, so a test message cannot be sent.",
+            "ID đăng nhập không phải là địa chỉ email nên không thể gửi thử.");
+
+        Add(
+            ServerMessageKeys.MaintenanceMessageTooLong,
+            "メッセージは{0}文字以内で入力してください。",
+            "Enter a message of {0} characters or fewer.",
+            "Vui lòng nhập thông báo không quá {0} ký tự.");
+
+        Add(
+            ServerMessageKeys.SettingKeyNotManaged,
+            "管理対象ではない設定です: {0}",
+            "This setting is not managed: {0}",
+            "Đây không phải là cài đặt được quản lý: {0}");
+
+        Add(
+            ServerMessageKeys.SettingFixedExternally,
+            "設定「{0}」は外部設定で固定されているため、画面から変更できません。",
+            "The setting “{0}” is fixed by external configuration and cannot be changed from the screen.",
+            "Cài đặt “{0}” được cố định bởi cấu hình bên ngoài nên không thể thay đổi từ màn hình.");
+
+        Add(
+            ServerMessageKeys.ProofOfWorkRangeInvalid,
+            "proof-of-work の探索下限は探索上限以下で指定してください。",
+            "The proof-of-work minimum search value must not exceed the maximum.",
+            "Giá trị tìm kiếm tối thiểu của proof-of-work không được lớn hơn giá trị tối đa.");
+
+        Add(
+            ServerMessageKeys.LinkedSitesUnreachable,
+            "リンク先のサイトを引けませんでした。相手サイト ID か、API キーの利用者の権限を確認してください。",
+            "The linked site could not be retrieved. Check the target site ID and the permissions of the API key's user.",
+            "Không thể truy xuất trang được liên kết. Vui lòng kiểm tra ID trang đích và quyền của người dùng khóa API.");
+
+        Add(
+            ServerMessageKeys.FallbackLanguageUnsupported,
+            "落とし先の言語に対応していない言語コードが指定されています。",
+            "The fallback language code is not a supported language.",
+            "Mã ngôn ngữ dự phòng không phải là ngôn ngữ được hỗ trợ.");
+
+        Add(
+            ServerMessageKeys.PleasanterSiteWriteFailed,
+            "Pleasanter でサイトを作成または更新できませんでした。権限と設定を確認してください。",
+            "The site could not be created or updated in Pleasanter. Check the permissions and settings.",
+            "Không thể tạo hoặc cập nhật trang trong Pleasanter. Vui lòng kiểm tra quyền và cấu hình.");
+
+        // ---- 設定の検証（Issue #607） --------------------------------------------
+        Add(
+            ServerMessageKeys.SettingValueTooLong,
+            "{0} は {1} 文字以内で入力してください。",
+            "{0}: enter {1} characters or fewer.",
+            "{0}: vui lòng nhập tối đa {1} ký tự.");
+
+        Add(
+            ServerMessageKeys.SettingNotBoolean,
+            "{0} は真偽値（true / false）で指定してください。",
+            "{0}: specify true or false.",
+            "{0}: vui lòng chỉ định true hoặc false.");
+
+        Add(
+            ServerMessageKeys.SettingNotInteger,
+            "{0} は整数で指定してください。",
+            "{0}: specify an integer.",
+            "{0}: vui lòng chỉ định một số nguyên.");
+
+        Add(
+            ServerMessageKeys.SettingBelowMinimum,
+            "{0} は {1} 以上で指定してください。",
+            "{0}: specify {1} or more.",
+            "{0}: vui lòng chỉ định từ {1} trở lên.");
+
+        Add(
+            ServerMessageKeys.SettingAboveMaximum,
+            "{0} は {1} 以下で指定してください。",
+            "{0}: specify {1} or less.",
+            "{0}: vui lòng chỉ định từ {1} trở xuống.");
+
+        Add(
+            ServerMessageKeys.MailFromAddressRequired,
+            "メール送信を有効にするには差出人メールアドレスが必要です。",
+            "A sender email address is required to enable mail sending.",
+            "Cần có địa chỉ email người gửi để bật chức năng gửi email.");
+
+        Add(
+            ServerMessageKeys.MailBaseUrlRequired,
+            "メール送信を有効にするには公開 URL が必要です。",
+            "A public URL is required to enable mail sending.",
+            "Cần có URL công khai để bật chức năng gửi email.");
+
+        Add(
+            ServerMessageKeys.SmtpHostRequired,
+            "SMTP を使うには SMTP サーバーが必要です。",
+            "An SMTP server is required to use SMTP.",
+            "Cần có máy chủ SMTP để sử dụng SMTP.");
+
+        Add(
+            ServerMessageKeys.SesRegionRequired,
+            "Amazon SES を使うにはリージョンが必要です。",
+            "A region is required to use Amazon SES.",
+            "Cần có khu vực (region) để sử dụng Amazon SES.");
+
+        Add(
+            ServerMessageKeys.AcsEndpointRequired,
+            "Azure Communication Services を使うにはエンドポイントが必要です。",
+            "An endpoint is required to use Azure Communication Services.",
+            "Cần có điểm cuối (endpoint) để sử dụng Azure Communication Services.");
+
+        Add(
+            ServerMessageKeys.MailTransportInvalid,
+            "送信方式は Smtp、AmazonSes、AzureCommunicationServices から選んでください。",
+            "Choose the sending method from Smtp, AmazonSes or AzureCommunicationServices.",
+            "Vui lòng chọn phương thức gửi từ Smtp, AmazonSes hoặc AzureCommunicationServices.");
+
+        Add(
+            ServerMessageKeys.SmtpSecurityInvalid,
+            "SMTP の暗号化は StartTls、ImplicitTls、None から選んでください。",
+            "Choose the SMTP encryption from StartTls, ImplicitTls or None.",
+            "Vui lòng chọn mã hóa SMTP từ StartTls, ImplicitTls hoặc None.");
+
+        Add(
+            ServerMessageKeys.MailAddressInvalid,
+            "メールアドレスの形式が正しくありません。",
+            "The email address format is not valid.",
+            "Định dạng địa chỉ email không hợp lệ.");
+
+        Add(
+            ServerMessageKeys.HttpsUrlRequired,
+            "HTTPS の絶対 URL を入力してください。",
+            "Enter an absolute HTTPS URL.",
+            "Vui lòng nhập URL tuyệt đối dùng HTTPS.");
+
+        Add(
+            ServerMessageKeys.HttpUrlRequired,
+            "http:// または https:// から始まる絶対 URL を入力してください。",
+            "Enter an absolute URL that starts with http:// or https://.",
+            "Vui lòng nhập URL tuyệt đối bắt đầu bằng http:// hoặc https://.");
+
+        Add(
+            ServerMessageKeys.PleasanterUrlInvalid,
+            "Pleasanter の URL は http または https の絶対 URL で指定してください。",
+            "Specify the Pleasanter URL as an absolute http or https URL.",
+            "Vui lòng chỉ định URL của Pleasanter là URL tuyệt đối http hoặc https.");
+
+        Add(
+            ServerMessageKeys.PleasanterApiVersionInvalid,
+            "Pleasanter API バージョンは 0 より大きい数値で指定してください。",
+            "Specify the Pleasanter API version as a number greater than 0.",
+            "Vui lòng chỉ định phiên bản API Pleasanter là số lớn hơn 0.");
+
+        Add(
+            ServerMessageKeys.PleasanterTimeZoneRequired,
+            "Pleasanter API キー利用者のタイムゾーンを指定してください。",
+            "Specify the time zone of the Pleasanter API key user.",
+            "Vui lòng chỉ định múi giờ của người dùng khóa API Pleasanter.");
+
+        Add(
+            ServerMessageKeys.PleasanterTimeZoneNotFound,
+            "Pleasanter API キー利用者のタイムゾーンが見つかりません。",
+            "The time zone of the Pleasanter API key user was not found.",
+            "Không tìm thấy múi giờ của người dùng khóa API Pleasanter.");
+
+        Add(
+            ServerMessageKeys.DefaultTimeZoneRequired,
+            "既定タイムゾーンは空にできません。",
+            "The default time zone cannot be empty.",
+            "Múi giờ mặc định không được để trống.");
+
+        Add(
+            ServerMessageKeys.TimeZoneIdUnresolved,
+            "タイムゾーン ID を解釈できません: {0}",
+            "The time zone ID could not be resolved: {0}",
+            "Không thể phân giải ID múi giờ: {0}");
+
+        Add(
+            ServerMessageKeys.TimeZoneIdInvalid,
+            "タイムゾーン ID が不正です: {0}",
+            "The time zone ID is invalid: {0}",
+            "ID múi giờ không hợp lệ: {0}");
+
+        Add(
+            ServerMessageKeys.AssetExtensionsEmpty,
+            "配布資産の許可拡張子は空にできません。",
+            "The allowed extensions for distributed assets cannot be empty.",
+            "Danh sách phần mở rộng được phép của tài sản phân phối không được để trống.");
+
+        Add(
+            ServerMessageKeys.AssetExtensionNotAllowed,
+            "配布資産へ許可できない拡張子です: {0}",
+            "This extension cannot be allowed for distributed assets: {0}",
+            "Không thể cho phép phần mở rộng này cho tài sản phân phối: {0}");
+
+        Add(
+            ServerMessageKeys.AttachmentExtensionsEmpty,
+            "回答添付の許可拡張子は空にできません。",
+            "The allowed extensions for response attachments cannot be empty.",
+            "Danh sách phần mở rộng được phép của tệp đính kèm câu trả lời không được để trống.");
+
+        Add(
+            ServerMessageKeys.ColorSchemeInvalid,
+            "回答画面の配色固定は System、Light、Dark のいずれかで指定してください。",
+            "Specify the fixed color scheme of the answer screen as System, Light or Dark.",
+            "Vui lòng chỉ định bảng màu cố định của màn hình trả lời là System, Light hoặc Dark.");
+
+        Add(
+            ServerMessageKeys.EmbedHostsInvalid,
+            "埋め込み先は www.example.net または *.example.net の形式で、カンマ区切りで指定してください。",
+            "Specify embedding hosts as www.example.net or *.example.net, separated by commas.",
+            "Vui lòng chỉ định nơi nhúng theo dạng www.example.net hoặc *.example.net, phân cách bằng dấu phẩy.");
 
         return catalog.ToFrozenDictionary(StringComparer.Ordinal);
     }

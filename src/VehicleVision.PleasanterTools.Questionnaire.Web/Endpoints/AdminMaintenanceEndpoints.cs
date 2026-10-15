@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -33,7 +34,13 @@ public static class AdminMaintenanceEndpoints
             if (request.MessageJa?.Length > MessageLength
                 || request.MessageEn?.Length > MessageLength)
             {
-                return Results.BadRequest(new { message = "メッセージは500文字以内で入力してください。" });
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.MaintenanceMessageTooLong,
+                        RequestLanguage.Of(context),
+                        MessageLength),
+                });
             }
 
             if (!Guid.TryParse(

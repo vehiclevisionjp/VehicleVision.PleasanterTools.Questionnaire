@@ -327,6 +327,12 @@ ACS URL が正しく組み立たない（[`サブパス配置-運用手順書.md
 | `disabled` | 利用を停止されています | 本アプリ側でその利用者を止めていないか |
 | `invalid` | 完了できませんでした | **サーバのログを見る**（下記） |
 
+**管理者の「操作の記録」にも理由が残る**（Issue #602。`POST /api/admin/saml/acs`）。
+画面へは返さない詳しい理由を、`detail` の `result` と `reason` で読める
+（`relay-missing`・`idp-refused`・`response-invalid`・`in-response-to-mismatch`・`login-id-missing`）。
+HTTP の応答は画面へ戻す 302 のままだが、記録は失敗（401 / 403）として残るので
+「失敗した操作のみ」でも絞れる。
+
 `invalid` のときにログへ出る主な理由。
 
 | ログ | 原因 |
