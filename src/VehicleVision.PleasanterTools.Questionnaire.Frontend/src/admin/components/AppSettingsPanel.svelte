@@ -6,7 +6,8 @@
     testAppSettingsMail,
   } from '../lib/api';
   import type { AppSettingField, AppSettings } from '../lib/types';
-  import { language, t } from '../lib/i18n/state.svelte';
+  import type { MessageKey } from '../lib/i18n/messages';
+  import { t } from '../lib/i18n/state.svelte';
 
   interface Props {
     onback: () => void;
@@ -47,12 +48,13 @@
     );
   }
 
+  /** 項目名と説明は画面のカタログから引く（Issue #608）。**サーバは設定の鍵だけを返す。** */
   function label(field: AppSettingField): string {
-    return language() === 'ja' ? field.labelJa : field.labelEn;
+    return t(`settings.label.${field.key}` as MessageKey);
   }
 
   function description(field: AppSettingField): string {
-    return language() === 'ja' ? field.descriptionJa : field.descriptionEn;
+    return t(`settings.help.${field.key}` as MessageKey);
   }
 
   function setBoolean(field: AppSettingField, checked: boolean) {

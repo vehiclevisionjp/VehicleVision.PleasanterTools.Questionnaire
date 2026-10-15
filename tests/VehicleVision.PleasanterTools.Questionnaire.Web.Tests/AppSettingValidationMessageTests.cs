@@ -49,7 +49,7 @@ public class AppSettingValidationMessageTests
         int? minimum = null,
         int? maximum = null,
         int? maximumLength = null) =>
-        new("TEST_KEY", type, string.Empty, "テスト", "Test", string.Empty, string.Empty,
+        new("TEST_KEY", type, string.Empty,
             Minimum: minimum, Maximum: maximum, MaximumLength: maximumLength);
 
     [Fact]
