@@ -244,4 +244,87 @@ public static class ServerMessageKeys
 
     /// <summary>Pleasanter がサイトの作成・更新を断り、理由も返さなかった。</summary>
     public const string PleasanterSiteWriteFailed = "surveys.pleasanterSiteWriteFailed";
+
+    // ---- 設定の検証（Issue #607） --------------------------------------------
+
+    /// <summary>設定値が長すぎる。**設定の鍵（`{0}`）と上限（`{1}`）を差し込む。**</summary>
+    public const string SettingValueTooLong = "settings.valueTooLong";
+
+    /// <summary>真偽値として読めない。**設定の鍵（`{0}`）を差し込む。**</summary>
+    public const string SettingNotBoolean = "settings.notBoolean";
+
+    /// <summary>整数として読めない。**設定の鍵（`{0}`）を差し込む。**</summary>
+    public const string SettingNotInteger = "settings.notInteger";
+
+    /// <summary>下限を下回っている。**設定の鍵（`{0}`）と下限（`{1}`）を差し込む。**</summary>
+    public const string SettingBelowMinimum = "settings.belowMinimum";
+
+    /// <summary>上限を上回っている。**設定の鍵（`{0}`）と上限（`{1}`）を差し込む。**</summary>
+    public const string SettingAboveMaximum = "settings.aboveMaximum";
+
+    /// <summary>メール送信を有効にするのに差出人が無い。</summary>
+    public const string MailFromAddressRequired = "settings.mailFromAddressRequired";
+
+    /// <summary>メール送信を有効にするのに公開 URL が無い。</summary>
+    public const string MailBaseUrlRequired = "settings.mailBaseUrlRequired";
+
+    /// <summary>SMTP の送信方式で SMTP サーバーが無い。</summary>
+    public const string SmtpHostRequired = "settings.smtpHostRequired";
+
+    /// <summary>Amazon SES の送信方式でリージョンが無い。</summary>
+    public const string SesRegionRequired = "settings.sesRegionRequired";
+
+    /// <summary>Azure Communication Services の送信方式でエンドポイントが無い。</summary>
+    public const string AcsEndpointRequired = "settings.acsEndpointRequired";
+
+    /// <summary>送信方式が選択肢に無い。</summary>
+    public const string MailTransportInvalid = "settings.mailTransportInvalid";
+
+    /// <summary>SMTP の暗号化が選択肢に無い。</summary>
+    public const string SmtpSecurityInvalid = "settings.smtpSecurityInvalid";
+
+    /// <summary>メールアドレスの形式が正しくない。</summary>
+    public const string MailAddressInvalid = "settings.mailAddressInvalid";
+
+    /// <summary>HTTPS の絶対 URL でない。</summary>
+    public const string HttpsUrlRequired = "settings.httpsUrlRequired";
+
+    /// <summary>http または https の絶対 URL でない。</summary>
+    public const string HttpUrlRequired = "settings.httpUrlRequired";
+
+    /// <summary>Pleasanter の URL の形が正しくない。</summary>
+    public const string PleasanterUrlInvalid = "settings.pleasanterUrlInvalid";
+
+    /// <summary>Pleasanter の API バージョンが 0 以下。</summary>
+    public const string PleasanterApiVersionInvalid = "settings.pleasanterApiVersionInvalid";
+
+    /// <summary>API キー利用者のタイムゾーンが空。</summary>
+    public const string PleasanterTimeZoneRequired = "settings.pleasanterTimeZoneRequired";
+
+    /// <summary>API キー利用者のタイムゾーンを解決できない。</summary>
+    public const string PleasanterTimeZoneNotFound = "settings.pleasanterTimeZoneNotFound";
+
+    /// <summary>既定のタイムゾーンが空。</summary>
+    public const string DefaultTimeZoneRequired = "settings.defaultTimeZoneRequired";
+
+    /// <summary>タイムゾーン ID が見つからない。**指定された値（`{0}`）を差し込む。**</summary>
+    public const string TimeZoneIdUnresolved = "settings.timeZoneIdUnresolved";
+
+    /// <summary>タイムゾーン ID が壊れている。**指定された値（`{0}`）を差し込む。**</summary>
+    public const string TimeZoneIdInvalid = "settings.timeZoneIdInvalid";
+
+    /// <summary>配布資産の許可拡張子が空。</summary>
+    public const string AssetExtensionsEmpty = "settings.assetExtensionsEmpty";
+
+    /// <summary>配布資産へ許可できない拡張子。**拡張子（`{0}`）を差し込む。**</summary>
+    public const string AssetExtensionNotAllowed = "settings.assetExtensionNotAllowed";
+
+    /// <summary>回答添付の許可拡張子が空。</summary>
+    public const string AttachmentExtensionsEmpty = "settings.attachmentExtensionsEmpty";
+
+    /// <summary>回答画面の配色固定が System・Light・Dark のどれでもない。</summary>
+    public const string ColorSchemeInvalid = "settings.colorSchemeInvalid";
+
+    /// <summary>埋め込み先のホストの書き方が正しくない。**区切りは半角のカンマ**（コードがそう分けている）。</summary>
+    public const string EmbedHostsInvalid = "settings.embedHostsInvalid";
 }

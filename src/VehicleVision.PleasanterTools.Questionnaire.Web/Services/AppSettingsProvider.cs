@@ -5,6 +5,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Scripting;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services.Attachments;
 using VehicleVision.PleasanterTools.Questionnaire.Worker;
 
@@ -65,8 +66,8 @@ public sealed record AppSettingDefinition(
     {
         if (MaximumLength is { } maximumLength && value.Length > maximumLength)
         {
-            throw new AppSettingValidationException(
-                $"{LabelJa}は {maximumLength} 文字以内で入力してください。");
+            throw AppSettingValidationException.Of(
+                ServerMessageKeys.SettingValueTooLong, Key, maximumLength);
         }
 
         return StringNormalizer?.Invoke(value) ?? value;
@@ -82,7 +83,7 @@ public sealed record AppSettingDefinition(
 
         if (!bool.TryParse(value, out var parsed))
         {
-            throw new AppSettingValidationException($"{LabelJa}は真偽値で指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.SettingNotBoolean, Key);
         }
 
         return parsed ? "true" : "false";
@@ -92,7 +93,7 @@ public sealed record AppSettingDefinition(
     {
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
         {
-            throw new AppSettingValidationException($"{LabelJa}は整数で指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.SettingNotInteger, Key);
         }
 
         if (!enforceRange)
@@ -102,12 +103,12 @@ public sealed record AppSettingDefinition(
 
         if (Minimum is { } minimum && parsed < minimum)
         {
-            throw new AppSettingValidationException($"{LabelJa}は {minimum} 以上で指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.SettingBelowMinimum, Key, minimum);
         }
 
         if (Maximum is { } maximum && parsed > maximum)
         {
-            throw new AppSettingValidationException($"{LabelJa}は {maximum} 以下で指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.SettingAboveMaximum, Key, maximum);
         }
 
         return parsed.ToString(CultureInfo.InvariantCulture);
@@ -936,7 +937,7 @@ public sealed class AppSettingsProvider(
         {
             if (!Definitions.TryGetValue(key, out var definition))
             {
-                throw new AppSettingValidationException($"管理対象ではない設定です: {key}");
+                throw AppSettingValidationException.Of(ServerMessageKeys.SettingKeyNotManaged, key);
             }
 
             if (definition.IsSecret && string.IsNullOrWhiteSpace(requestedValue))
@@ -952,8 +953,8 @@ public sealed class AppSettingsProvider(
                     continue;
                 }
 
-                throw new AppSettingValidationException(
-                    $"{definition.LabelJa}は外部設定で固定されているため、画面から変更できません。");
+                throw AppSettingValidationException.Of(
+                    ServerMessageKeys.SettingFixedExternally, key);
             }
 
             normalized[key] = value;
@@ -984,23 +985,22 @@ public sealed class AppSettingsProvider(
 
         if (values[MailFromAddressKey].Length == 0)
         {
-            throw new AppSettingValidationException("メール送信を有効にするには差出人メールアドレスが必要です。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.MailFromAddressRequired);
         }
 
         if (values[MailBaseUrlKey].Length == 0)
         {
-            throw new AppSettingValidationException("メール送信を有効にするには公開 URL が必要です。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.MailBaseUrlRequired);
         }
 
         switch (Enum.Parse<MailTransportKind>(values[MailTransportKey]))
         {
             case MailTransportKind.Smtp when values[MailSmtpHostKey].Length == 0:
-                throw new AppSettingValidationException("SMTP を使うには SMTP サーバーが必要です。");
+                throw AppSettingValidationException.Of(ServerMessageKeys.SmtpHostRequired);
             case MailTransportKind.AmazonSes when values[MailSesRegionKey].Length == 0:
-                throw new AppSettingValidationException("Amazon SES を使うにはリージョンが必要です。");
+                throw AppSettingValidationException.Of(ServerMessageKeys.SesRegionRequired);
             case MailTransportKind.AzureCommunicationServices when values[MailAcsEndpointKey].Length == 0:
-                throw new AppSettingValidationException(
-                    "Azure Communication Services を使うにはエンドポイントが必要です。");
+                throw AppSettingValidationException.Of(ServerMessageKeys.AcsEndpointRequired);
         }
     }
 
@@ -1008,15 +1008,13 @@ public sealed class AppSettingsProvider(
         Enum.TryParse<MailTransportKind>(value, ignoreCase: true, out var parsed)
             && Enum.IsDefined(parsed)
                 ? parsed.ToString()
-                : throw new AppSettingValidationException(
-                    "送信方式は Smtp、AmazonSes、AzureCommunicationServices から選んでください。");
+                : throw AppSettingValidationException.Of(ServerMessageKeys.MailTransportInvalid);
 
     private static string NormalizeSmtpSecurity(string value) =>
         Enum.TryParse<SmtpSecurity>(value, ignoreCase: true, out var parsed)
             && Enum.IsDefined(parsed)
                 ? parsed.ToString()
-                : throw new AppSettingValidationException(
-                    "SMTP の暗号化は StartTls、ImplicitTls、None から選んでください。");
+                : throw AppSettingValidationException.Of(ServerMessageKeys.SmtpSecurityInvalid);
 
     private static string NormalizeMailAddress(string value, bool required)
     {
@@ -1028,7 +1026,7 @@ public sealed class AppSettingsProvider(
         return MailAddress.TryCreate(value, out var address)
             && string.Equals(address.Address, value, StringComparison.OrdinalIgnoreCase)
                 ? address.Address
-                : throw new AppSettingValidationException("メールアドレスの形式が正しくありません。");
+                : throw AppSettingValidationException.Of(ServerMessageKeys.MailAddressInvalid);
     }
 
     private static string NormalizeHttpUrl(string value) =>
@@ -1048,10 +1046,8 @@ public sealed class AppSettingsProvider(
             || (requireHttps ? uri.Scheme != Uri.UriSchemeHttps
                 : uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            throw new AppSettingValidationException(
-                requireHttps
-                    ? "HTTPS の絶対 URL を入力してください。"
-                    : "http:// または https:// から始まる絶対 URL を入力してください。");
+            throw AppSettingValidationException.Of(
+                requireHttps ? ServerMessageKeys.HttpsUrlRequired : ServerMessageKeys.HttpUrlRequired);
         }
 
         return value.TrimEnd('/');
@@ -1073,8 +1069,7 @@ public sealed class AppSettingsProvider(
             || !string.IsNullOrEmpty(uri.Query)
             || !string.IsNullOrEmpty(uri.Fragment))
         {
-            throw new AppSettingValidationException(
-                "Pleasanter の URL は http または https の絶対 URL で指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.PleasanterUrlInvalid);
         }
 
         return value.TrimEnd('/');
@@ -1113,7 +1108,7 @@ public sealed class AppSettingsProvider(
             logger?.LogWarning(
                 "The value of {Setting} is invalid and the default value is used instead. {Reason}",
                 definition.Key,
-                exception.Message);
+                exception.MessageFor("en"));
             return definition.Normalize(definition.DefaultValue);
         }
     }
@@ -1127,8 +1122,7 @@ public sealed class AppSettingsProvider(
             out var version)
             || version <= 0)
         {
-            throw new AppSettingValidationException(
-                "Pleasanter API バージョンは 0 より大きい数値で指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.PleasanterApiVersionInvalid);
         }
 
         return version.ToString(CultureInfo.InvariantCulture);
@@ -1138,8 +1132,7 @@ public sealed class AppSettingsProvider(
     {
         if (value.Length == 0)
         {
-            throw new AppSettingValidationException(
-                "Pleasanter API キー利用者のタイムゾーンを指定してください。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.PleasanterTimeZoneRequired);
         }
 
         try
@@ -1150,8 +1143,7 @@ public sealed class AppSettingsProvider(
         catch (Exception exception)
             when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
         {
-            throw new AppSettingValidationException(
-                "Pleasanter API キー利用者のタイムゾーンが見つかりません。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.PleasanterTimeZoneNotFound);
         }
     }
 
@@ -1159,7 +1151,7 @@ public sealed class AppSettingsProvider(
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new AppSettingValidationException("既定タイムゾーンは空にできません。");
+            throw AppSettingValidationException.Of(ServerMessageKeys.DefaultTimeZoneRequired);
         }
 
         try
@@ -1168,11 +1160,11 @@ public sealed class AppSettingsProvider(
         }
         catch (TimeZoneNotFoundException)
         {
-            throw new AppSettingValidationException($"タイムゾーン ID を解釈できません: {value}");
+            throw AppSettingValidationException.Of(ServerMessageKeys.TimeZoneIdUnresolved, value);
         }
         catch (InvalidTimeZoneException)
         {
-            throw new AppSettingValidationException($"タイムゾーン ID が不正です: {value}");
+            throw AppSettingValidationException.Of(ServerMessageKeys.TimeZoneIdInvalid, value);
         }
     }
 }

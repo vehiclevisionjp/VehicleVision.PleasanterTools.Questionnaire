@@ -43,4 +43,45 @@ public class AppSettingValidationMessageTests
 
         Assert.Equal(exception.MessageFor("en"), exception.MessageFor("xx"));
     }
+
+    private static AppSettingDefinition Definition(
+        AppSettingValueType type,
+        int? minimum = null,
+        int? maximum = null,
+        int? maximumLength = null) =>
+        new("TEST_KEY", type, string.Empty, "テスト", "Test", string.Empty, string.Empty,
+            Minimum: minimum, Maximum: maximum, MaximumLength: maximumLength);
+
+    [Fact]
+    public void 型の検証は設定の鍵を差し込んだ要求の言語の文言を返す()
+    {
+        var cases = new (string Key, Action Act, string English)[]
+        {
+            (ServerMessageKeys.SettingValueTooLong,
+                () => Definition(AppSettingValueType.String, maximumLength: 3).Normalize("abcd"),
+                "TEST_KEY: enter 3 characters or fewer."),
+            (ServerMessageKeys.SettingNotBoolean,
+                () => Definition(AppSettingValueType.Boolean).Normalize("yes"),
+                "TEST_KEY: specify true or false."),
+            (ServerMessageKeys.SettingNotInteger,
+                () => Definition(AppSettingValueType.Integer).Normalize("x"),
+                "TEST_KEY: specify an integer."),
+            (ServerMessageKeys.SettingBelowMinimum,
+                () => Definition(AppSettingValueType.Integer, minimum: 1, maximum: 10).Normalize("0"),
+                "TEST_KEY: specify 1 or more."),
+            (ServerMessageKeys.SettingAboveMaximum,
+                () => Definition(AppSettingValueType.Integer, minimum: 1, maximum: 10).Normalize("11"),
+                "TEST_KEY: specify 10 or less."),
+        };
+
+        foreach (var (key, act, english) in cases)
+        {
+            var exception = Assert.Throws<AppSettingValidationException>(act);
+
+            Assert.Equal(key, exception.MessageKey);
+            Assert.Equal(english, exception.MessageFor("en"));
+            Assert.Contains("TEST_KEY", exception.MessageFor("ja"), StringComparison.Ordinal);
+            Assert.NotEqual(exception.MessageFor("en"), exception.MessageFor("ja"));
+        }
+    }
 }
