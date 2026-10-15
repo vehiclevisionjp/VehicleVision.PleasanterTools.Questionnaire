@@ -12,8 +12,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 /// </remarks>
 public class SettingLabelCatalogTests
 {
-    /// <summary>項目名と説明を持っているべき言語。**訳した言語を足していき、最後は 7 言語になる。**</summary>
-    private static readonly string[] Languages = ["ja", "en", "zh", "ko"];
+    /// <summary>項目名と説明を持っているべき言語。**7 言語すべて。**</summary>
+    private static readonly string[] Languages = ["ja", "en", "zh", "ko", "de", "es", "vi"];
 
     private static IReadOnlyList<string> DefinitionKeys() =>
         ((IEnumerable<AppSettingDefinition>)typeof(AppSettingsProvider)
