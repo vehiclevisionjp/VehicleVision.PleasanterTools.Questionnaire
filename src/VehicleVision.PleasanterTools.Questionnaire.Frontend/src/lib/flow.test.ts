@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toSteps, tracePath } from './flow';
+import { conditionSatisfied, isAllowedButtonUrl, toSteps, tracePath } from './flow';
 import type { AnswerState, Choice, Page, Question, SurveyDefinition } from './types';
 
 /**
@@ -258,6 +258,28 @@ describe('toSteps', () => {
 
     // **題名だけの空ページを見せない**
     expect(steps.map((step) => step.page.pageId)).toEqual(['p1']);
+  });
+
+  describe('ページ下部の釦条件', () => {
+    it('設問の表示と同じ規則で条件を評価する', () => {
+      const condition = {
+        match: 'All' as const,
+        rules: [{ questionId: 'q1', operator: 'Equals' as const, value: 'yes' }],
+      };
+      expect(conditionSatisfied(condition, answered({ q1: ['yes'] }), new Set(['q1']))).toBe(true);
+      expect(conditionSatisfied(condition, answered({ q1: ['yes'] }), new Set())).toBe(false);
+    });
+
+    it.each([
+      ['https://example.com', true],
+      ['http://example.com', true],
+      ['mailto:info@example.com', true],
+      ['javascript:alert(1)', false],
+      ['data:text/html,hello', false],
+      ['/relative', false],
+    ])('%s の許可判定は %s', (url, expected) => {
+      expect(isAllowedButtonUrl(url)).toBe(expected);
+    });
   });
 
   it('1 問 1 ページ表示では設問ごとに区切る', () => {

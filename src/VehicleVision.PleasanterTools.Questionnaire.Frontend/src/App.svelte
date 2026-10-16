@@ -28,9 +28,15 @@
     type CaptchaChallenge,
     type CaptchaWidget,
   } from './lib/captcha';
-  import { toSteps, tracePath } from './lib/flow';
+  import { conditionSatisfied, isAllowedButtonUrl, toSteps, tracePath } from './lib/flow';
   import { applyShuffle, createShuffleSeed } from './lib/shuffle';
-  import type { AnswerState, PayloadAnswer, RejectionReason, SurveyDefinition } from './lib/types';
+  import type {
+    AnswerState,
+    PageButtonCondition,
+    PayloadAnswer,
+    RejectionReason,
+    SurveyDefinition,
+  } from './lib/types';
   import { isDisplayOnly, text } from './lib/types';
   import { embedHost, embedSource } from './lib/embed';
   import { validatePage } from './lib/validation';
@@ -294,6 +300,21 @@
   const currentStep = $derived(steps[Math.min(stepIndex, Math.max(steps.length - 1, 0))]);
   const currentPage = $derived(currentStep?.page);
   const isLastStep = $derived(stepIndex >= steps.length - 1);
+
+  function buttonVisible(button: PageButtonCondition | null | undefined): boolean {
+    return conditionSatisfied(button?.visibleWhen, answers, path.visible);
+  }
+
+  function buttonEnabled(button: PageButtonCondition | null | undefined): boolean {
+    return conditionSatisfied(button?.enabledWhen, answers, path.visible);
+  }
+
+  const linkButtons = $derived(
+    (currentPage?.buttons?.links ?? [])
+      .filter((link) => isAllowedButtonUrl(link.url) && buttonVisible(link))
+      .slice()
+      .sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0)),
+  );
 
   /**
    * この回答ぶんの並べ替えの種（Issue #103）。
@@ -693,6 +714,10 @@
       if (result.errors) {
         const mapped: Record<string, string> = {};
         for (const [questionId, codes] of Object.entries(result.errors)) {
+          if (codes.includes('SubmitButtonConditionNotMet')) {
+            submitError = serverValidationMessage('SubmitButtonConditionNotMet');
+            continue;
+          }
           mapped[questionId] = codes.map(serverValidationMessage).join(' / ');
         }
         errors = mapped;
@@ -930,15 +955,62 @@
       {/if}
 
       <nav class="actions">
-        {#if stepIndex > 0}
-          <button type="button" class="secondary" onclick={goBack}>{t('form.back')}</button>
+        {#if stepIndex > 0 && buttonVisible(currentPage.buttons?.previous)}
+          <span class="action-item">
+            <button
+              type="button"
+              class="secondary"
+              onclick={goBack}
+              disabled={!buttonEnabled(currentPage.buttons?.previous)}
+            >{t('form.back')}</button>
+            {#if !buttonEnabled(currentPage.buttons?.previous)}
+              <span class="disabled-reason">{t('form.buttonDisabled')}</span>
+            {/if}
+          </span>
         {/if}
-        {#if isLastStep}
-          <button type="button" onclick={submit} disabled={submitting}>
-            {submitting ? t('form.submitting') : t('form.submit')}
-          </button>
-        {:else}
-          <button type="button" onclick={goNext}>{t('form.next')}</button>
+        {#each linkButtons as link (link.buttonId)}
+          <span class="action-item">
+            {#if buttonEnabled(link)}
+              <a
+                class="button-link secondary"
+                href={link.url}
+                target={link.openInNewTab ? '_blank' : undefined}
+                rel="noopener noreferrer"
+              >
+                {text(link.label, language, definition.fallbackLanguage)}
+              </a>
+            {:else}
+              <span class="button-link secondary disabled" role="link" aria-disabled="true">
+                {text(link.label, language, definition.fallbackLanguage)}
+              </span>
+              <span class="disabled-reason">{t('form.buttonDisabled')}</span>
+            {/if}
+          </span>
+        {/each}
+        {#if isLastStep && buttonVisible(currentPage.buttons?.submit)}
+          <span class="action-item">
+            <button
+              type="button"
+              onclick={submit}
+              disabled={submitting || !buttonEnabled(currentPage.buttons?.submit)}
+            >
+              {submitting ? t('form.submitting') : t('form.submit')}
+            </button>
+            {#if !submitting && !buttonEnabled(currentPage.buttons?.submit)}
+              <span class="disabled-reason">{t('form.buttonDisabled')}</span>
+            {/if}
+          </span>
+        {:else if !isLastStep && buttonVisible(currentPage.buttons?.next)}
+          <span class="action-item">
+            <button
+              type="button"
+              onclick={goNext}
+              disabled={!buttonEnabled(currentPage.buttons?.next)}
+            >{t('form.next')}</button>
+            {#if !buttonEnabled(currentPage.buttons?.next)}
+              <span class="disabled-reason">{t('form.buttonDisabled')}</span>
+            {/if}
+          </span>
         {/if}
       </nav>
     </form>
@@ -1097,6 +1169,39 @@
     margin-top: 1.5rem;
   }
 
+  .action-item {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .disabled-reason {
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin-top: 0.2rem;
+    text-align: center;
+  }
+
+  .button-link {
+    display: inline-block;
+    font: inherit;
+    padding: 0.6rem 1.25rem;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    text-decoration: none;
+    text-align: center;
+  }
+
+  .button-link.secondary {
+    background: var(--surface);
+    color: var(--accent);
+  }
+
+  .button-link.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   /* **横幅に収める。** 縦横比は保つ（縦長の画像で画面が埋まらないよう上限を置く） */
   .header-image {
     display: block;
@@ -1151,7 +1256,7 @@
 
     &:disabled {
       opacity: 0.6;
-      cursor: progress;
+      cursor: not-allowed;
     }
 
     &.secondary {

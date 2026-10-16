@@ -24,6 +24,9 @@
     type MappingDefinition,
     type MappingProblem,
     type Page,
+    type PageButtonCondition,
+    type PageButtons,
+    type PageLinkButton,
     type Question,
     type QuestionImportResult,
     type SurveyDefinition,
@@ -47,6 +50,7 @@
   import { formatDateTime, language, t } from '../lib/i18n/state.svelte';
   import MappingEditor from './MappingEditor.svelte';
   import QuestionEditor from './QuestionEditor.svelte';
+  import ConditionEditor from './ConditionEditor.svelte';
   import AutoReplyEditor from './AutoReplyEditor.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
   import PublishPanel from './PublishPanel.svelte';
@@ -55,6 +59,14 @@
   import { assetMarkup as markupForAsset } from '../lib/asset';
   import { requiredPortCount } from '../lib/columnBudget';
   import { confirmAction } from '../lib/confirmation.svelte';
+
+  const standardButtonKinds = ['previous', 'next', 'submit'] as const;
+
+  function standardButtonTitle(kind: (typeof standardButtonKinds)[number]): string {
+    if (kind === 'previous') return t('pageButtons.previous');
+    if (kind === 'next') return t('pageButtons.next');
+    return t('pageButtons.submit');
+  }
 
   interface Props {
     surveyId: string;
@@ -407,6 +419,43 @@
       ...definition,
       pages: definition.pages.map((page, i) => (i === index ? { ...page, ...patch } : page)),
     };
+  }
+
+  function updatePageButtons(index: number, patch: Partial<PageButtons>) {
+    const page = definition?.pages[index];
+    if (!page) return;
+    updatePage(index, { buttons: { ...(page.buttons ?? {}), ...patch } });
+  }
+
+  function updateStandardButton(
+    pageIndex: number,
+    kind: 'submit' | 'next' | 'previous',
+    patch: Partial<PageButtonCondition>,
+  ) {
+    const current = definition?.pages[pageIndex]?.buttons?.[kind] ?? {};
+    updatePageButtons(pageIndex, { [kind]: { ...current, ...patch } });
+  }
+
+  function updateLinkButton(pageIndex: number, linkIndex: number, patch: Partial<PageLinkButton>) {
+    const links = definition?.pages[pageIndex]?.buttons?.links ?? [];
+    updatePageButtons(pageIndex, {
+      links: links.map((link, index) => index === linkIndex ? { ...link, ...patch } : link),
+    });
+  }
+
+  function addLinkButton(pageIndex: number) {
+    const links = definition?.pages[pageIndex]?.buttons?.links ?? [];
+    updatePageButtons(pageIndex, {
+      links: [
+        ...links,
+        {
+          buttonId: newId('button'),
+          label: withText(undefined, t('pageButtons.defaultLinkLabel'), editing),
+          url: 'https://',
+          sortOrder: links.length,
+        },
+      ],
+    });
   }
 
   function addPage() {
@@ -1336,6 +1385,96 @@
           {hasVisibility ? t('editor.shuffleBlockedByVisibility') : t('editor.shuffleQuestionsHint')}
         </span>
       </div>
+
+      <details class="page-buttons">
+        <summary>{t('pageButtons.title')}</summary>
+        <p class="hint">{t('pageButtons.hint')}</p>
+
+        {#each standardButtonKinds as kind (kind)}
+          {@const button = page.buttons?.[kind]}
+          <section class="button-settings">
+            <h3>{standardButtonTitle(kind)}</h3>
+            <ConditionEditor
+              title={t('pageButtons.visibleWhen')}
+              condition={button?.visibleWhen}
+              priorQuestions={priorQuestions(pageIndex, page.questions.length)}
+              {editing}
+              onchange={(visibleWhen) =>
+                updateStandardButton(pageIndex, kind, { visibleWhen })}
+            />
+            <ConditionEditor
+              title={t('pageButtons.enabledWhen')}
+              condition={button?.enabledWhen}
+              priorQuestions={priorQuestions(pageIndex, page.questions.length)}
+              {editing}
+              onchange={(enabledWhen) =>
+                updateStandardButton(pageIndex, kind, { enabledWhen })}
+            />
+          </section>
+        {/each}
+
+        <h3>{t('pageButtons.links')}</h3>
+        <p class="hint">{t('pageButtons.linksHint')}</p>
+        {#each page.buttons?.links ?? [] as link, linkIndex (link.buttonId)}
+          <section class="button-settings link-settings">
+            <label>
+              {t('pageButtons.linkLabel')}
+              <input
+                type="text"
+                value={text(link.label, editing)}
+                oninput={(event) =>
+                  updateLinkButton(pageIndex, linkIndex, {
+                    label: withText(link.label, event.currentTarget.value, editing),
+                  })}
+              />
+            </label>
+            <label>
+              {t('pageButtons.linkUrl')}
+              <input
+                type="url"
+                value={link.url}
+                oninput={(event) => updateLinkButton(pageIndex, linkIndex, { url: event.currentTarget.value })}
+              />
+            </label>
+            <label class="inline">
+              <input
+                type="checkbox"
+                checked={link.openInNewTab ?? false}
+                onchange={(event) =>
+                  updateLinkButton(pageIndex, linkIndex, { openInNewTab: event.currentTarget.checked })}
+              />
+              {t('pageButtons.openInNewTab')}
+            </label>
+            <ConditionEditor
+              title={t('pageButtons.visibleWhen')}
+              condition={link.visibleWhen}
+              priorQuestions={priorQuestions(pageIndex, page.questions.length)}
+              {editing}
+              onchange={(visibleWhen) => updateLinkButton(pageIndex, linkIndex, { visibleWhen })}
+            />
+            <ConditionEditor
+              title={t('pageButtons.enabledWhen')}
+              condition={link.enabledWhen}
+              priorQuestions={priorQuestions(pageIndex, page.questions.length)}
+              {editing}
+              onchange={(enabledWhen) => updateLinkButton(pageIndex, linkIndex, { enabledWhen })}
+            />
+            <button
+              type="button"
+              class="secondary small danger"
+              onclick={() =>
+                updatePageButtons(pageIndex, {
+                  links: (page.buttons?.links ?? []).filter((_, index) => index !== linkIndex),
+                })}
+            >
+              {t('pageButtons.removeLink')}
+            </button>
+          </section>
+        {/each}
+        <button type="button" class="secondary small" onclick={() => addLinkButton(pageIndex)}>
+          {t('pageButtons.addLink')}
+        </button>
+      </details>
     </section>
     {/if}
   {/each}
@@ -1750,6 +1889,35 @@
     .hint {
       color: var(--muted);
     }
+  }
+
+  .page-buttons {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+    }
+  }
+
+  .button-settings {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+
+    h3 {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+  }
+
+  .link-settings {
+    display: grid;
+    gap: 0.5rem;
   }
 
   .problems {

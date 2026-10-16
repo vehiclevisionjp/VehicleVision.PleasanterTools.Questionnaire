@@ -6,6 +6,7 @@ import type {
   Question,
   QuestionType,
   SurveyDefinition,
+  VisibilityCondition,
 } from './types';
 
 /**
@@ -154,41 +155,120 @@ function validateConditions(definition: SurveyDefinition, problems: FlowProblem[
 
   for (const page of definition.pages) {
     for (const question of page.questions) {
-      for (const rule of question.visibleWhen?.rules ?? []) {
-        const referenced = byId.get(rule.questionId);
-        if (!referenced) {
-          problems.push({
-            code: 'UnknownConditionQuestion',
-            pageId: page.pageId,
-            questionId: question.questionId,
-            detail: rule.questionId,
-          });
-          continue;
-        }
+      validateConditionRules(
+        question.visibleWhen,
+        page.pageId,
+        question.questionId,
+        position.get(question.questionId) ?? 0,
+        byId,
+        position,
+        problems,
+      );
+    }
 
-        // **後ろを見る条件は成立しようがない。** その時点でまだ答えていない
-        if ((position.get(rule.questionId) ?? 0) >= (position.get(question.questionId) ?? 0)) {
-          problems.push({
-            code: 'ForwardConditionReference',
-            pageId: page.pageId,
-            questionId: question.questionId,
-            detail: rule.questionId,
-          });
-          continue;
-        }
+    const buttonPosition = page.questions.length === 0
+      ? index
+      : Math.max(...page.questions.map((question) => position.get(question.questionId) ?? 0)) + 1;
+    const buttons = page.buttons;
+    if (!buttons) continue;
 
-        // **無い選択肢を見ている条件は、永久に成立しない。**
-        // 選択肢の値を変えたときの直し忘れがここで見つかる
-        if (isUnknownChoiceValue(referenced, rule.operator, rule.value)) {
-          problems.push({
-            code: 'UnknownChoiceValue',
-            pageId: page.pageId,
-            questionId: question.questionId,
-            detail: rule.value,
-          });
-        }
+    const conditions: [string, VisibilityCondition | null | undefined][] = [
+      ['button:submit:visible', buttons.submit?.visibleWhen],
+      ['button:submit:enabled', buttons.submit?.enabledWhen],
+      ['button:next:visible', buttons.next?.visibleWhen],
+      ['button:next:enabled', buttons.next?.enabledWhen],
+      ['button:previous:visible', buttons.previous?.visibleWhen],
+      ['button:previous:enabled', buttons.previous?.enabledWhen],
+      ...(buttons.links ?? []).flatMap((link): [string, VisibilityCondition | null | undefined][] => [
+        [`button:${link.buttonId}:visible`, link.visibleWhen],
+        [`button:${link.buttonId}:enabled`, link.enabledWhen],
+      ]),
+    ];
+    for (const [owner, condition] of conditions) {
+      validateConditionRules(condition, page.pageId, owner, buttonPosition, byId, position, problems);
+    }
+
+    for (const link of buttons.links ?? []) {
+      if (!isAllowedButtonUrl(link.url)) {
+        problems.push({
+          code: 'InvalidButtonUrl',
+          pageId: page.pageId,
+          questionId: `button:${link.buttonId}`,
+          detail: link.url,
+        });
       }
     }
+
+    const ids = new Set<string>();
+    for (const link of buttons.links ?? []) {
+      if (ids.has(link.buttonId)) {
+        problems.push({ code: 'DuplicateButtonId', pageId: page.pageId, detail: link.buttonId });
+      }
+      ids.add(link.buttonId);
+    }
+
+    const visible = [
+      buttons.submit?.visibleWhen,
+      buttons.next?.visibleWhen,
+      buttons.previous?.visibleWhen,
+      ...(buttons.links ?? []).map((link) => link.visibleWhen),
+    ];
+    if (
+      visible.length > 0 &&
+      visible.every((condition) => (condition?.rules.length ?? 0) > 0) &&
+      visible.slice(1).every((condition) => JSON.stringify(condition) === JSON.stringify(visible[0]))
+    ) {
+      problems.push({ code: 'AllButtonsMayBeHidden', pageId: page.pageId });
+    }
+  }
+}
+
+function validateConditionRules(
+  condition: VisibilityCondition | null | undefined,
+  pageId: string,
+  ownerId: string,
+  ownerPosition: number,
+  byId: Map<string, Question>,
+  position: Map<string, number>,
+  problems: FlowProblem[],
+): void {
+  for (const rule of condition?.rules ?? []) {
+    const referenced = byId.get(rule.questionId);
+    if (!referenced) {
+      problems.push({
+        code: 'UnknownConditionQuestion',
+        pageId,
+        questionId: ownerId,
+        detail: rule.questionId,
+      });
+      continue;
+    }
+    if ((position.get(rule.questionId) ?? 0) >= ownerPosition) {
+      problems.push({
+        code: 'ForwardConditionReference',
+        pageId,
+        questionId: ownerId,
+        detail: rule.questionId,
+      });
+      continue;
+    }
+    if (isUnknownChoiceValue(referenced, rule.operator, rule.value)) {
+      problems.push({
+        code: 'UnknownChoiceValue',
+        pageId,
+        questionId: ownerId,
+        detail: rule.value,
+      });
+    }
+  }
+}
+
+function isAllowedButtonUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return ['https:', 'http:', 'mailto:'].includes(parsed.protocol);
+  } catch {
+    return false;
   }
 }
 

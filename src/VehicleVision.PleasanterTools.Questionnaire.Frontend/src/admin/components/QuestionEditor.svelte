@@ -1,33 +1,25 @@
 <script lang="ts">
   import {
-    conditionOperatorKey,
-    conditionOperators,
-    displayText,
     hasChoices,
     hasRows,
     isDisplayOnly,
-    needsConditionValue,
-    picksFromChoices,
     questionTypeKey,
     questionTypes,
     text,
     withText,
-    type ConditionMatch,
-    type ConditionOperator,
-    type ConditionRule,
     type Question,
     type EmbedSource,
   } from '../lib/types';
   import {
     canCarryTransitions,
     hasChoiceTransitions,
-    isUnknownChoiceValue,
     staleTargetId,
     toTransition,
     transitionValue,
   } from '../lib/flow';
   import type { Language } from '../../lib/i18n/language';
   import { t } from '../lib/i18n/state.svelte';
+  import ConditionEditor from './ConditionEditor.svelte';
 
   /**
    * 説明文の文字数の上限（Issue #108 / #267）。
@@ -109,9 +101,6 @@
 
   /** 飛び先に出せるページ ID。**一覧から外れた飛び先を見つけるのに使う。** */
   const targetIds = $derived(jumpTargets.map((target) => target.pageId));
-
-  const rules = $derived(question.visibleWhen?.rules ?? []);
-  const match = $derived(question.visibleWhen?.match ?? 'All');
 
   /** 正規表現を指定できる設問か（Issue #102）。**自由入力だけ。** */
   const showPattern = $derived(question.type === 'Text' || question.type === 'Paragraph');
@@ -328,94 +317,6 @@
     });
   }
 
-  // ---- 表示条件 -------------------------------------------------------------
-
-  /**
-   * 表示条件を書き換える。
-   *
-   * **条件が 0 件になったら器ごと外す。** 空の器を残すと、
-   * 保存した JSON に「条件あり」の跡が残って読み手を惑わせる。
-   */
-  function updateCondition(next: { match?: ConditionMatch; rules?: ConditionRule[] }) {
-    const nextRules = next.rules ?? rules;
-
-    update({
-      visibleWhen:
-        nextRules.length === 0 ? null : { match: next.match ?? match, rules: nextRules },
-    });
-  }
-
-  function addRule() {
-    const first = priorQuestions[0];
-    if (!first) return;
-
-    updateCondition({
-      rules: [...rules, { questionId: first.questionId, operator: 'Equals', value: firstValue(first) }],
-    });
-  }
-
-  function patchRule(index: number, patch: Partial<ConditionRule>) {
-    updateCondition({ rules: rules.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)) });
-  }
-
-  function removeRule(index: number) {
-    updateCondition({ rules: rules.filter((_, i) => i !== index) });
-  }
-
-  /** その条件が見に行く設問。**一覧に無ければ `undefined`。** */
-  function referenced(rule: ConditionRule): Question | undefined {
-    return priorQuestions.find((prior) => prior.questionId === rule.questionId);
-  }
-
-  /** 条件へ入れる最初の値。確認はチェック済み、選択肢を持たない設問では空。 */
-  function firstValue(target: Question): string {
-    return target.type === 'Confirm' ? 'true' : (target.choices[0]?.value ?? '');
-  }
-
-  /**
-   * 条件が見に行く設問を替える。
-   *
-   * **値も選び直す。** 前の設問の選択肢が残ると、成立しない条件になる。
-   */
-  function changeRuleQuestion(index: number, questionId: string) {
-    const rule = rules[index];
-    const target = priorQuestions.find((prior) => prior.questionId === questionId);
-    if (!rule || !target) return;
-
-    patchRule(index, {
-      questionId,
-      value: picksFromChoices(rule.operator) ? firstValue(target) : rule.value,
-    });
-  }
-
-  /** 条件の比べ方を替える。**値が要らない比べ方にしたら値も落とす。** */
-  function changeRuleOperator(index: number, operator: ConditionOperator) {
-    const rule = rules[index];
-    if (!rule) return;
-
-    if (!needsConditionValue(operator)) {
-      patchRule(index, { operator, value: null });
-      return;
-    }
-
-    const target = referenced(rule);
-    const pickFromChoices =
-      picksFromChoices(operator) &&
-      (target?.type === 'Confirm' || (target?.choices.length ?? 0) > 0);
-
-    patchRule(index, {
-      operator,
-      value:
-        pickFromChoices && target && isUnknownChoiceValue(target, operator, rule.value ?? '')
-          ? firstValue(target)
-          : (rule.value ?? ''),
-    });
-  }
-
-  /** 設問の見出し。**回答画面で出る文字列と同じ見え方にする。** */
-  function questionLabel(target: Question): string {
-    return displayText(target.title, editing) || target.questionId;
-  }
 </script>
 
 <article class="question" class:selected aria-current={selected ? 'true' : undefined}>
@@ -1074,125 +975,14 @@
     <p class="hint">{t('question.shuffleChoicesHint')}</p>
   {/if}
 
-  <!-- **同じページの中で出し分けるのがこちら。** ページを飛ばすのはジャンプ。
-       **前に設問が無く条件も無いときは、置き場所ごと出さない** -->
-  {#if priorQuestions.length > 0 || rules.length > 0}
-    <div class="visibility">
-      <div class="visibility-head">
-        <span class="section-title">{t('condition.title')}</span>
-        {#if rules.length > 1}
-          <label class="inline">
-            {t('condition.match')}
-            <select
-              value={match}
-              onchange={(event) =>
-                updateCondition({ match: event.currentTarget.value as ConditionMatch })}
-            >
-              <option value="All">{t('condition.matchAll')}</option>
-              <option value="Any">{t('condition.matchAny')}</option>
-            </select>
-          </label>
-        {/if}
-      </div>
-
-      {#if priorQuestions.length === 0}
-        <!-- **設問を動かすと前方参照になる。** 条件は残して直させる -->
-        <p class="warn">{t('condition.noEarlierQuestion')}</p>
-      {:else if rules.length === 0}
-        <p class="hint">{t('condition.none')}</p>
-      {/if}
-
-      {#each rules as rule, index (index)}
-        {@const target = referenced(rule)}
-        {@const unknownChoice = target
-          ? isUnknownChoiceValue(target, rule.operator, rule.value)
-          : false}
-        <div class="rule">
-          <select
-            value={rule.questionId}
-            onchange={(event) => changeRuleQuestion(index, event.currentTarget.value)}
-          >
-            {#if !target}
-              <!-- **前に無い設問を黙って別の設問に付け替えない** -->
-              <option value={rule.questionId}>
-                {t('condition.invalidReference', { questionId: rule.questionId })}
-              </option>
-            {/if}
-            {#each priorQuestions as prior, priorIndex (priorIndex)}
-              <option value={prior.questionId}>{questionLabel(prior)}</option>
-            {/each}
-          </select>
-
-          <select
-            value={rule.operator}
-            onchange={(event) =>
-              changeRuleOperator(index, event.currentTarget.value as ConditionOperator)}
-          >
-            {#each conditionOperators as operator (operator)}
-              <option value={operator}>{t(conditionOperatorKey(operator))}</option>
-            {/each}
-          </select>
-
-          {#if needsConditionValue(rule.operator)}
-            {#if target?.type === 'Confirm' && picksFromChoices(rule.operator)}
-              <select
-                value={rule.value ?? 'true'}
-                onchange={(event) => patchRule(index, { value: event.currentTarget.value })}
-              >
-                <option value="true">{t('condition.confirmed')}</option>
-                <option value="false">{t('condition.notConfirmed')}</option>
-              </select>
-            {:else if target && picksFromChoices(rule.operator) && target.choices.length > 0}
-              <!-- **無い選択肢を書かせない。** 選択肢から選ばせる -->
-              <select
-                value={rule.value ?? ''}
-                onchange={(event) => patchRule(index, { value: event.currentTarget.value })}
-              >
-                {#if unknownChoice}
-                  <option value={rule.value ?? ''}>
-                    {t('condition.staleValue', { value: rule.value ?? '' })}
-                  </option>
-                {/if}
-                {#each target.choices as choice, choiceIndex (choiceIndex)}
-                  <option value={choice.value}>
-                    {displayText(choice.label, editing) || choice.value}
-                  </option>
-                {/each}
-              </select>
-            {:else}
-              <input
-                type="text"
-                placeholder={t('condition.valuePlaceholder')}
-                value={rule.value ?? ''}
-                oninput={(event) => patchRule(index, { value: event.currentTarget.value })}
-              />
-            {/if}
-          {/if}
-
-          <button
-            type="button"
-            class="icon danger"
-            onclick={() => removeRule(index)}
-            aria-label={t('condition.remove')}
-          >
-            ×
-          </button>
-        </div>
-
-        {#if unknownChoice}
-          <!-- **選択肢を消したときに気付けるように。** 永久に成立しない条件になる -->
-          <p class="warn">{t('condition.unknownChoice')}</p>
-        {/if}
-      {/each}
-
-      {#if priorQuestions.length > 0}
-        <button type="button" class="secondary small" onclick={addRule}>
-          {t('condition.add')}
-        </button>
-
-        <p class="hint">{t('condition.earlierOnly')}</p>
-      {/if}
-    </div>
+  {#if priorQuestions.length > 0 || question.visibleWhen}
+    <ConditionEditor
+      title={t('condition.title')}
+      condition={question.visibleWhen}
+      {priorQuestions}
+      {editing}
+      onchange={(visibleWhen) => update({ visibleWhen })}
+    />
   {/if}
 </article>
 
@@ -1400,38 +1190,6 @@
       flex: 1;
       min-width: 0;
       max-width: 22rem;
-    }
-  }
-
-  .visibility {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px dashed var(--border);
-  }
-
-  .visibility-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.4rem;
-    font-size: 0.85rem;
-  }
-
-  .section-title {
-    font-weight: 600;
-  }
-
-  .rule {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin-bottom: 0.4rem;
-
-    select,
-    input[type='text'] {
-      flex: 1;
-      min-width: 0;
     }
   }
 

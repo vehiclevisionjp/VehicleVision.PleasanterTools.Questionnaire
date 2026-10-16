@@ -40,6 +40,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   'form.next': 'Siguiente',
   'form.submit': 'Enviar',
   'form.submitting': 'Enviando…',
+  'form.buttonDisabled': 'Este botón no está disponible hasta que se cumplan las condiciones',
   'form.languageLabel': 'Idioma',
   'form.trapLabel': 'Deje este campo vacío',
   'readability.group': 'Legibilidad',
@@ -144,5 +145,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   'serverValidation.PatternMismatch': 'Introduzca el valor en el formato solicitado',
   'serverValidation.ScannerUnavailable':
     'No se pueden revisar los archivos adjuntos ahora, así que aún no se pueden aceptar',
+  'serverValidation.SubmitButtonConditionNotMet': 'No se cumplen las condiciones para enviar',
   'serverValidation.unknown': 'Compruebe lo que ha introducido',
 };

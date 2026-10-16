@@ -93,6 +93,7 @@ public static class SurveyFlowValidator
         IReadOnlyDictionary<string, int> order,
         ImmutableArray<FlowProblem>.Builder problems)
     {
+        var questionsBeforePage = 0;
         foreach (var page in definition.Pages)
         {
             CheckTransition(page.Next, order, page.PageId, questionId: null, problems);
@@ -202,7 +203,13 @@ public static class SurveyFlowValidator
                 }
             }
 
-            ValidateButtonConditions(page, byId, position, problems);
+            ValidateButtonConditions(
+                page,
+                questionsBeforePage + page.Questions.Length,
+                byId,
+                position,
+                problems);
+            questionsBeforePage += page.Questions.Length;
         }
     }
 
@@ -254,6 +261,7 @@ public static class SurveyFlowValidator
 
     private static void ValidateButtonConditions(
         Page page,
+        int ownerPosition,
         IReadOnlyDictionary<string, Question> byId,
         IReadOnlyDictionary<string, int> position,
         ImmutableArray<FlowProblem>.Builder problems)
@@ -262,10 +270,6 @@ public static class SurveyFlowValidator
         {
             return;
         }
-
-        var ownerPosition = page.Questions.IsDefaultOrEmpty
-            ? definitionPositionBeforePage(page, position)
-            : page.Questions.Max(question => position[question.QuestionId]) + 1;
 
         var conditions = new List<(string Owner, VisibilityCondition? Condition)>
         {
@@ -330,15 +334,6 @@ public static class SurveyFlowValidator
                 page.PageId));
         }
 
-        static int definitionPositionBeforePage(
-            Page targetPage,
-            IReadOnlyDictionary<string, int> allPositions)
-        {
-            var positions = targetPage.Questions
-                .Where(question => allPositions.ContainsKey(question.QuestionId))
-                .Select(question => allPositions[question.QuestionId]);
-            return positions.DefaultIfEmpty(allPositions.Count).Min();
-        }
     }
 
     private static bool SameCondition(
