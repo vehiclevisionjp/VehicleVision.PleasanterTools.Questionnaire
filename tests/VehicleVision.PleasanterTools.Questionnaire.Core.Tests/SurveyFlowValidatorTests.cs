@@ -253,4 +253,69 @@ public class SurveyFlowValidatorTests
 
         Assert.Empty(SurveyFlowValidator.Validate(definition));
     }
+
+    [Fact]
+    public void 釦条件は同じページの設問を参照できる()
+    {
+        var definition = Definition(PageOf("p1", Radio("q1", "はい", "いいえ")) with
+        {
+            Buttons = new PageButtons
+            {
+                Submit = new PageButtonCondition
+                {
+                    EnabledWhen = new VisibilityCondition
+                    {
+                        Rules = [new ConditionRule("q1", ConditionOperator.Equals, "はい")],
+                    },
+                },
+            },
+        });
+
+        Assert.Empty(SurveyFlowValidator.Validate(definition));
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("data:text/html,hello")]
+    [InlineData("/relative")]
+    public void 任意リンクの危険なURLを咎める(string url)
+    {
+        var definition = Definition(PageOf("p1", Text("q1")) with
+        {
+            Buttons = new PageButtons
+            {
+                Links =
+                [
+                    new PageLinkButton
+                    {
+                        ButtonId = "link-1",
+                        Label = LocalizedText.Japanese("リンク"),
+                        Url = url,
+                    },
+                ],
+            },
+        });
+
+        Assert.Contains(FlowProblemCode.InvalidButtonUrl, Codes(definition));
+    }
+
+    [Fact]
+    public void 全釦が同じ表示条件なら操作不能になり得ると咎める()
+    {
+        var condition = new VisibilityCondition
+        {
+            Rules = [new ConditionRule("q1", ConditionOperator.Answered)],
+        };
+        var definition = Definition(PageOf("p1", Text("q1")) with
+        {
+            Buttons = new PageButtons
+            {
+                Submit = new PageButtonCondition { VisibleWhen = condition },
+                Next = new PageButtonCondition { VisibleWhen = condition },
+                Previous = new PageButtonCondition { VisibleWhen = condition },
+            },
+        });
+
+        Assert.Contains(FlowProblemCode.AllButtonsMayBeHidden, Codes(definition));
+    }
 }
