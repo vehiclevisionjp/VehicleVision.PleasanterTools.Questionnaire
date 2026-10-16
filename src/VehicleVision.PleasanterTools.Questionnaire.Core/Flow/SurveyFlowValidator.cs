@@ -93,7 +93,6 @@ public static class SurveyFlowValidator
         IReadOnlyDictionary<string, int> order,
         ImmutableArray<FlowProblem>.Builder problems)
     {
-        var questionsBeforePage = 0;
         foreach (var page in definition.Pages)
         {
             CheckTransition(page.Next, order, page.PageId, questionId: null, problems);
@@ -181,6 +180,7 @@ public static class SurveyFlowValidator
             .Select((question, index) => (question.QuestionId, index))
             .ToDictionary(entry => entry.QuestionId, entry => entry.index, StringComparer.Ordinal);
 
+        var questionsBeforePage = 0;
         foreach (var page in definition.Pages)
         {
             foreach (var question in page.Questions)
