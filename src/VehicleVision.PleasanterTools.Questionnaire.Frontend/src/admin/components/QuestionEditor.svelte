@@ -74,6 +74,7 @@
     onchange: (question: Question) => void;
     onremove: () => void;
     onmove: (direction: -1 | 1) => void;
+    onreorder: () => void;
   }
 
   let {
@@ -92,6 +93,7 @@
     onchange,
     onremove,
     onmove,
+    onreorder,
   }: Props = $props();
 
   const showChoices = $derived(hasChoices(question.type));
@@ -474,6 +476,9 @@
         onclick={() => onmove(1)}
         aria-label={t('question.moveDown')}>↓</button
       >
+      <button type="button" class="secondary small" onclick={onreorder}>
+        {t('editor.move')}
+      </button>
       <button type="button" class="icon danger" onclick={onremove} aria-label={t('question.remove')}>
         ×
       </button>
