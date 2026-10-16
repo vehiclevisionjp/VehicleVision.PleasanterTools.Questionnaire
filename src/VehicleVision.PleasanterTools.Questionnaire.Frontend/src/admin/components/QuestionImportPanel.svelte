@@ -302,4 +302,9 @@
   .error {
     color: var(--error);
   }
+
+  .small {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.75rem;
+  }
 </style>

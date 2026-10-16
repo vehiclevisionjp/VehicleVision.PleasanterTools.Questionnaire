@@ -753,6 +753,12 @@
     cursor: pointer;
   }
 
+  :global(input::placeholder),
+  :global(textarea::placeholder) {
+    color: var(--muted);
+    opacity: 1;
+  }
+
   /*
     **アイコンの下地**（Issue #152）。同梱した Material Icons を使う。
 
