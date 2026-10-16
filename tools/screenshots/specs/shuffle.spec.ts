@@ -35,7 +35,7 @@ const attempts = 6;
 
 /** 画面に出ている選択肢を、出ている順に読む。 */
 async function choiceOrder(page: Page): Promise<string[]> {
-  return page.locator('label.choice span').allInnerTexts();
+  return page.locator('label.choice span:not(.choice-content)').allInnerTexts();
 }
 
 /**

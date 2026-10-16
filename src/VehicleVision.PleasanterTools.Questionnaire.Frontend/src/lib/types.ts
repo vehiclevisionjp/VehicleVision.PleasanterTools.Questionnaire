@@ -61,6 +61,8 @@ export interface VisibilityCondition {
 export interface Choice {
   value: string;
   label: LocalizedText;
+  /** ラベルの下に回答者へ見せる補足。 */
+  remark?: LocalizedText | null;
   /** 「その他」（自由記述を伴う選択肢）か。 */
   isOther: boolean;
   /** これを選んだときの行き先。**無ければページ末尾の行き先に従う。** */
