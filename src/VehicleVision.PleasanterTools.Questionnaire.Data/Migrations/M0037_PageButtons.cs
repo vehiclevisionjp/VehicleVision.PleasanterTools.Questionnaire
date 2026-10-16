@@ -2,8 +2,8 @@ using FluentMigrator;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
-[Migration(36, "ページ下部の釦設定")]
-public sealed class M0036_PageButtons : Migration
+[Migration(37, "ページ下部の釦設定")]
+public sealed class M0037_PageButtons : Migration
 {
     public override void Up()
     {
