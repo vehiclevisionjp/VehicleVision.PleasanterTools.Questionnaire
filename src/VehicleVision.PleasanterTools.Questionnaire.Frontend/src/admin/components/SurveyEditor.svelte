@@ -55,6 +55,11 @@
   import { assetMarkup as markupForAsset } from '../lib/asset';
   import { requiredPortCount } from '../lib/columnBudget';
   import { confirmAction } from '../lib/confirmation.svelte';
+  import {
+    movePageTo,
+    moveQuestionTo,
+    type QuestionDestination,
+  } from '../lib/reorder';
   import { hasUnsavedQuestion } from '../lib/questionUnsaved';
 
   interface Props {
@@ -101,11 +106,18 @@
   let previewing = $state(false);
   /** 分岐の全体図を開いているか。**保存前の下書きを読み取り専用で見る。** */
   let flowcharting = $state(false);
+  type ReorderRequest =
+    | { kind: 'question'; questionId: string }
+    | { kind: 'page'; pageId: string };
+  type ReorderDestination = QuestionDestination & { label: string };
+
+  let reorder = $state<ReorderRequest | null>(null);
+  let reorderReturnFocus = $state<HTMLElement | null>(null);
 
   $effect(() => {
     // **開いている間は下敷きを巻き取らせない。**
     // 重ねて出しているのに背後が動くと、どちらを操作しているのか分からなくなる
-    if (!previewing && !flowcharting) {
+    if (!previewing && !flowcharting && !reorder) {
       return;
     }
 
@@ -117,6 +129,7 @@
       if (event.key === 'Escape') {
         previewing = false;
         flowcharting = false;
+        closeReorder();
       }
     };
 
@@ -542,6 +555,123 @@
     questions[questionIndex] = swapped;
     questions[target] = moved;
     updatePage(pageIndex, { questions });
+  }
+
+  function openQuestionReorder(questionId: string) {
+    reorderReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    reorder = { kind: 'question', questionId };
+    void tick().then(() => document.getElementById('reorder-first-destination')?.focus());
+  }
+
+  function openPageReorder(pageId: string) {
+    reorderReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    reorder = { kind: 'page', pageId };
+    void tick().then(() => document.getElementById('reorder-first-destination')?.focus());
+  }
+
+  function closeReorder() {
+    if (reorder === null) return;
+    reorder = null;
+    void tick().then(() => reorderReturnFocus?.focus());
+  }
+
+  function questionDestinations(questionId: string): ReorderDestination[] {
+    if (!definition) return [];
+
+    return definition.pages.flatMap((page, pageIndex) => {
+      const questions = page.questions.filter((question) => question.questionId !== questionId);
+      return Array.from({ length: questions.length + 1 }, (_, questionIndex) => ({
+        pageId: page.pageId,
+        questionIndex,
+        label:
+          questionIndex === 0
+            ? `${pageLabel(pageIndex)}: ${t('reorder.atStart')}`
+            : questionIndex === questions.length
+              ? `${pageLabel(pageIndex)}: ${t('reorder.atEnd')}`
+              : `${pageLabel(pageIndex)}: ${t('reorder.before', {
+                  item: questionLabel(questions[questionIndex]?.questionId ?? ''),
+                })}`,
+      }));
+    });
+  }
+
+  function pageDestinations(pageId: string): { pageIndex: number; label: string }[] {
+    if (!definition) return [];
+
+    const currentDefinition = definition;
+    const pages = currentDefinition.pages.filter((page) => page.pageId !== pageId);
+    return Array.from({ length: pages.length + 1 }, (_, pageIndex) => ({
+      pageIndex,
+      label:
+        pageIndex === 0
+          ? t('reorder.atStart')
+          : pageIndex === pages.length
+            ? t('reorder.atEnd')
+            : t('reorder.before', {
+                item: pageLabel(currentDefinition.pages.indexOf(pages[pageIndex]!)),
+              }),
+    }));
+  }
+
+  function reorderWarnings(next: SurveyDefinition): FlowProblem[] {
+    return validateFlow(next).filter(
+      (problem) =>
+        problem.code === 'BackwardTransition' ||
+        problem.code === 'SelfTransition' ||
+        problem.code === 'ForwardConditionReference',
+    );
+  }
+
+  function questionWarnings(questionId: string, destination: QuestionDestination): FlowProblem[] {
+    return definition
+      ? reorderWarnings(moveQuestionTo(definition, questionId, destination))
+      : [];
+  }
+
+  function pageWarnings(pageId: string, pageIndex: number): FlowProblem[] {
+    return definition ? reorderWarnings(movePageTo(definition, pageId, pageIndex)) : [];
+  }
+
+  function moveQuestionToDestination(questionId: string, destination: QuestionDestination) {
+    if (!definition) return;
+    definition = moveQuestionTo(definition, questionId, destination);
+    activePageId = destination.pageId;
+    notice = t('reorder.done');
+    closeReorder();
+  }
+
+  function movePageToDestination(pageId: string, pageIndex: number) {
+    if (!definition) return;
+    definition = movePageTo(definition, pageId, pageIndex);
+    activePageId = pageId;
+    notice = t('reorder.done');
+    closeReorder();
+  }
+
+  function handleReorderKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeReorder();
+      return;
+    }
+
+    if (event.key !== 'Tab') return;
+
+    const dialog = event.currentTarget as HTMLElement;
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input, select, textarea'),
+    );
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   /**
@@ -1262,6 +1392,9 @@
         >
           ×
         </button>
+        <button type="button" class="secondary small" onclick={() => openPageReorder(page.pageId)}>
+          {t('editor.move')}
+        </button>
       </div>
 
       {#each page.questions as question, questionIndex (question.questionId)}
@@ -1282,6 +1415,7 @@
           onchange={(next) => updateQuestion(pageIndex, questionIndex, next)}
           onremove={() => removeQuestion(pageIndex, questionIndex)}
           onmove={(direction) => moveQuestion(pageIndex, questionIndex, direction)}
+          onreorder={() => openQuestionReorder(question.questionId)}
         />
       {/each}
 
@@ -1441,6 +1575,73 @@
         onclose={() => (flowcharting = false)}
         onpage={editPageFromFlowchart}
       />
+    </div>
+  </div>
+{/if}
+
+{#if reorder && definition}
+  <div class="reorder-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && closeReorder()}>
+    <div
+      class="reorder-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reorder-dialog-title"
+      aria-describedby="reorder-dialog-description"
+      tabindex="-1"
+      onkeydown={handleReorderKeydown}
+    >
+      <h2 id="reorder-dialog-title">
+        {reorder.kind === 'question' ? t('reorder.questionTitle') : t('reorder.pageTitle')}
+      </h2>
+      <p id="reorder-dialog-description">{t('reorder.chooseDestination')}</p>
+      <div class="reorder-destinations">
+        {#if reorder.kind === 'question'}
+          {@const questionId = reorder.questionId}
+          {#each questionDestinations(questionId) as destination, index (`${destination.pageId}-${destination.questionIndex}`)}
+            {@const warnings = questionWarnings(questionId, destination)}
+            <div class="reorder-destination">
+              <button
+                type="button"
+                class="secondary"
+                id={index === 0 ? 'reorder-first-destination' : undefined}
+                onclick={() => moveQuestionToDestination(questionId, destination)}
+              >
+                {destination.label}
+              </button>
+              {#if warnings.length > 0}
+                <p class="reorder-warning" role="status">
+                  {t('reorder.warning')} {warnings.map(describeFlow).join(' / ')}
+                </p>
+              {/if}
+            </div>
+          {/each}
+        {:else}
+          {@const pageId = reorder.pageId}
+          {#each pageDestinations(pageId) as destination, index (destination.pageIndex)}
+            {@const warnings = pageWarnings(pageId, destination.pageIndex)}
+            <div class="reorder-destination">
+              <button
+                type="button"
+                class="secondary"
+                id={index === 0 ? 'reorder-first-destination' : undefined}
+                onclick={() => movePageToDestination(pageId, destination.pageIndex)}
+              >
+                {destination.label}
+              </button>
+              {#if warnings.length > 0}
+                <p class="reorder-warning" role="status">
+                  {t('reorder.warning')} {warnings.map(describeFlow).join(' / ')}
+                </p>
+              {/if}
+            </div>
+          {/each}
+        {/if}
+      </div>
+      <div class="reorder-actions">
+        <button type="button" class="secondary" onclick={closeReorder}>
+          {t('list.cancel')}
+        </button>
+      </div>
     </div>
   </div>
 {/if}
@@ -1843,5 +2044,59 @@
   .small {
     font-size: 0.85rem;
     padding: 0.35rem 0.75rem;
+  }
+
+  .reorder-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(16 24 40 / 55%);
+  }
+
+  .reorder-dialog {
+    width: min(42rem, 100%);
+    max-height: min(42rem, 100%);
+    overflow-y: auto;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 1rem 2.5rem rgb(16 24 40 / 25%);
+
+    h2 {
+      margin: 0;
+      font-size: 1.15rem;
+    }
+
+    > p {
+      margin: 0.75rem 0 0;
+    }
+  }
+
+  .reorder-destinations {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+
+  .reorder-destination {
+    padding: 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  .reorder-warning {
+    margin: 0.5rem 0 0;
+    color: var(--warning-text);
+    font-size: 0.85rem;
+  }
+
+  .reorder-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
   }
 </style>
