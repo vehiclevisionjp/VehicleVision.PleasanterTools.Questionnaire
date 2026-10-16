@@ -746,6 +746,18 @@
               ×
             </button>
           </div>
+          <input
+            type="text"
+            class="choice-remark"
+            placeholder={t('question.choiceRemarkPlaceholder')}
+            value={text(choice.remark ?? undefined, editing)}
+            oninput={(event) => {
+              const remark = withText(choice.remark ?? undefined, event.currentTarget.value, editing);
+              updateChoice(index, {
+                remark: Object.keys(remark).length === 0 ? undefined : remark,
+              });
+            }}
+          />
 
           {#if canBranch}
             <!-- **選べるのは後ろのページだけ。** 前を向いた行き先は一覧に出さない -->
@@ -1401,6 +1413,12 @@
       min-width: 0;
       max-width: 22rem;
     }
+  }
+
+  .choice-remark {
+    width: calc(100% - 1rem);
+    margin: 0.25rem 0 0 1rem;
+    box-sizing: border-box;
   }
 
   .visibility {

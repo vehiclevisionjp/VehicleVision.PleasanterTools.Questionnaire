@@ -661,6 +661,7 @@ export const en: Record<MessageKey, string> = {
   'question.showAssignments': 'Show matching assignments',
   'question.assign': 'Assign this question',
   'question.choiceLabelPlaceholder': 'Text shown on screen',
+  'question.choiceRemarkPlaceholder': 'Remark shown to respondents (optional)',
   'question.choiceValuePlaceholder': 'Value that is stored',
   'question.choiceIsOther': 'Other',
   'question.removeChoice': 'Remove this choice',

@@ -620,6 +620,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "question.showAssignments": "Mostrar las asignaciones correspondientes",
   "question.assign": "Asignar esta pregunta",
   "question.choiceLabelPlaceholder": "Texto mostrado en pantalla",
+  "question.choiceRemarkPlaceholder": "Nota para las personas que responden (opcional)",
   "question.choiceValuePlaceholder": "Valor que se guarda",
   "question.choiceIsOther": "Otra",
   "question.removeChoice": "Quitar esta opción",

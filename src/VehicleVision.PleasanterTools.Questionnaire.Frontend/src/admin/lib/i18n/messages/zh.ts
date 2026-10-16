@@ -654,6 +654,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'question.showAssignments': '显示对应的分配',
   'question.assign': '分配此问题',
   'question.choiceLabelPlaceholder': '界面上显示的文字',
+  'question.choiceRemarkPlaceholder': '向答题者显示的备注（可选）',
   'question.choiceValuePlaceholder': '要保存的值',
   'question.choiceIsOther': '其他',
   'question.removeChoice': '移除此选项',
