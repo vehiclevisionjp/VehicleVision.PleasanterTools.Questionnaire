@@ -39,7 +39,14 @@ public class SurveyJsonTests
                         IsRequired = true,
                         Choices =
                         [
-                            new Choice("5", LocalizedText.Japanese("とても満足")),
+                            new Choice(
+                                "5",
+                                LocalizedText.Japanese("とても満足"),
+                                Remark: new LocalizedText(new Dictionary<string, string>
+                                {
+                                    ["ja"] = "最も高い評価です",
+                                    ["en"] = "Highest rating",
+                                })),
                             new Choice("other", LocalizedText.Japanese("その他"), IsOther: true),
                         ],
                         Settings = new QuestionSettings
@@ -103,6 +110,9 @@ public class SurveyJsonTests
         Assert.Equal(QuestionType.Radio, question.Type);
         Assert.True(question.IsRequired);
         Assert.Equal(2, question.Choices.Length);
+        Assert.Equal("最も高い評価です", question.Choices[0].Remark!.Get("ja"));
+        Assert.Equal("Highest rating", question.Choices[0].Remark!.Get("en"));
+        Assert.Null(question.Choices[1].Remark);
         Assert.True(question.Choices[1].IsOther);
         Assert.Equal(100, question.Settings.MaxLength);
         Assert.Equal(DescriptionFormat.Markup, question.Settings.DescriptionFormat);
@@ -196,6 +206,14 @@ public class SurveyJsonTests
         var json = SurveyJson.Serialize(LocalizedText.Japanese("こんにちは"));
 
         Assert.Equal("{\"ja\":\"こんにちは\"}", json);
+    }
+
+    [Fact]
+    public void 選択肢の備考が無ければJSONへ書かない()
+    {
+        var json = SurveyJson.Serialize(new Choice("value", LocalizedText.Japanese("表示")));
+
+        Assert.DoesNotContain("remark", json);
     }
 
     [Fact]
