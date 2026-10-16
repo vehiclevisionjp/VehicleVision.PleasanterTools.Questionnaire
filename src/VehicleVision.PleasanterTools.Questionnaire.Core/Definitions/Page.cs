@@ -84,5 +84,7 @@ public sealed record PageLinkButton
     /// <summary>画面へ出してよい絶対 URL か。</summary>
     public bool HasAllowedUrl =>
         Uri.TryCreate(Url, UriKind.Absolute, out var uri)
-        && uri.Scheme is Uri.UriSchemeHttp or Uri.UriSchemeHttps or Uri.UriSchemeMailto;
+        && (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(uri.Scheme, Uri.UriSchemeMailto, StringComparison.OrdinalIgnoreCase));
 }

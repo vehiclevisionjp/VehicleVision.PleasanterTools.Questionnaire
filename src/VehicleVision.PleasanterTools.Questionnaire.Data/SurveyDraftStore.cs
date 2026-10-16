@@ -277,7 +277,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string? TitleJson,
         string? DescriptionJson,
         string? NextJson,
-        bool ShuffleQuestions);
+        bool ShuffleQuestions,
+        string? ButtonsJson);
 
     private sealed record QuestionRow(
         string QuestionId,
@@ -508,7 +509,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         }
 
         var pages = (await connection.QueryAsync<PageRow>(Sql(
-            "SELECT [PageId], [TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions] "
+            "SELECT [PageId], [TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions], "
+            + "[ButtonsJson] "
             + "FROM [Pages] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
@@ -620,6 +622,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     Questions = questionsByPage.GetValueOrDefault(page.PageId, []),
                     Next = Read<PageTransition>(page.NextJson),
                     ShuffleQuestions = page.ShuffleQuestions,
+                    Buttons = Read<PageButtons>(page.ButtonsJson),
                 })
                 .ToImmutableArray(),
         };
@@ -1026,9 +1029,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
             await connection.ExecuteAsync(Sql(
                 "INSERT INTO [Pages] ([PageId], [SurveyId], [SortOrder], "
-                + "[TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions]) "
+                + "[TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions], [ButtonsJson]) "
                 + "VALUES (@PageId, @SurveyId, @SortOrder, @TitleJson, @DescriptionJson, "
-                + "@NextJson, @ShuffleQuestions)",
+                + "@NextJson, @ShuffleQuestions, @ButtonsJson)",
                 new
                 {
                     page.PageId,
@@ -1038,6 +1041,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     DescriptionJson = WriteText(page.Description),
                     NextJson = Write(page.Next),
                     page.ShuffleQuestions,
+                    ButtonsJson = Write(page.Buttons),
                 },
                 transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
