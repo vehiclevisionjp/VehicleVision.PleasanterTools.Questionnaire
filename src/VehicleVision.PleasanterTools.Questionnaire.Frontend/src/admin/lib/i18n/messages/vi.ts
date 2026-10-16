@@ -594,6 +594,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "question.required": "Bắt buộc",
   "question.displayOnly": "Phần tử này chỉ hiển thị và không có câu trả lời.",
   "question.unmapped": "Chưa được chỉ định (sẽ không có gì được lưu giữ trong Pleasanter)",
+  "question.unsaved": "Chưa lưu",
   "question.mapped": "→ {columns}",
   "question.showAssignments": "Hiển thị bài tập phù hợp",
   "question.assign": "Đặt câu hỏi này",

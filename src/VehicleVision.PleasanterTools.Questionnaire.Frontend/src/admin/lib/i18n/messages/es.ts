@@ -616,6 +616,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "question.required": "Obligatorio",
   "question.displayOnly": "Este elemento solo se muestra y no admite respuesta.",
   "question.unmapped": "Sin asignar (no se guardará nada en Pleasanter)",
+  "question.unsaved": "Sin guardar",
   "question.mapped": "→ {columns}",
   "question.showAssignments": "Mostrar las asignaciones correspondientes",
   "question.assign": "Asignar esta pregunta",

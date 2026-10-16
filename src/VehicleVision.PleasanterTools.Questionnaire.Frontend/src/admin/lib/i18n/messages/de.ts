@@ -594,6 +594,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "question.required": "erforderlich",
   "question.displayOnly": "Dieses Element ist nur Display und nimmt keine Antwort.",
   "question.unmapped": "Nicht zugewiesen (nichts wird in Pleasanter aufbewahrt)",
+  "question.unsaved": "Nicht gespeichert",
   "question.mapped": "→ {columns}",
   "question.showAssignments": "Vergleichende Zuordnungen anzeigen",
   "question.assign": "Diese Frage zuweisen",

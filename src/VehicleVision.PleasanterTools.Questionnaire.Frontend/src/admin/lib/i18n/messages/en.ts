@@ -657,6 +657,7 @@ export const en: Record<MessageKey, string> = {
   'question.required': 'Required',
   'question.displayOnly': 'This element is display-only and takes no answer.',
   'question.unmapped': 'Not assigned (nothing will be kept in Pleasanter)',
+  'question.unsaved': 'Unsaved',
   'question.mapped': '→ {columns}',
   'question.showAssignments': 'Show matching assignments',
   'question.assign': 'Assign this question',

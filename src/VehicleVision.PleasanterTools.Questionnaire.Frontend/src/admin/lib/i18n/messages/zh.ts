@@ -650,6 +650,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'question.required': '必填',
   'question.displayOnly': '此元素仅用于显示，不接收回答。',
   'question.unmapped': '未分配（不会保存到 Pleasanter）',
+  'question.unsaved': '未保存',
   'question.mapped': '→ {columns}',
   'question.showAssignments': '显示对应的分配',
   'question.assign': '分配此问题',
