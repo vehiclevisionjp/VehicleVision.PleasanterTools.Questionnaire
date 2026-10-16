@@ -596,6 +596,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'question.showAssignments': '해당 할당 표시',
   'question.assign': '이 질문을 할당',
   'question.choiceLabelPlaceholder': '화면에 표시할 텍스트',
+  'question.choiceRemarkPlaceholder': '응답자에게 보여 줄 비고(선택 사항)',
   'question.choiceValuePlaceholder': 'Pleasanter에 저장할 값',
   'question.choiceIsOther': '기타',
   'question.removeChoice': '선택사항 삭제',

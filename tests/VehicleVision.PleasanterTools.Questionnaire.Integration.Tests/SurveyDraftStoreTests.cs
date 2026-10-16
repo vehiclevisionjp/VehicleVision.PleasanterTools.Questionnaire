@@ -206,7 +206,8 @@ public class SurveyDraftStoreTests
                                 new Choice(
                                     "good",
                                     LocalizedText.Japanese("よい"),
-                                    Next: PageTransition.Submit),
+                                    Next: PageTransition.Submit,
+                                    Remark: LocalizedText.Japanese("満足した場合")),
                                 new Choice("bad", LocalizedText.Japanese("わるい")),
                             ],
                         },
@@ -238,9 +239,11 @@ public class SurveyDraftStoreTests
         var page = loaded.Definition.Pages[0];
         Assert.Equal("page-3", page.Next!.PageId);
         Assert.Equal(PageTransitionKind.Submit, page.Questions[0].Choices[0].Next!.Kind);
+        Assert.Equal("満足した場合", page.Questions[0].Choices[0].Remark!.Get("ja"));
 
-        // **行き先を持たない選択肢は NULL のまま**
+        // **行き先と備考を持たない選択肢は NULL のまま**
         Assert.Null(page.Questions[0].Choices[1].Next);
+        Assert.Null(page.Questions[0].Choices[1].Remark);
 
         var condition = page.Questions[1].VisibleWhen;
         Assert.NotNull(condition);

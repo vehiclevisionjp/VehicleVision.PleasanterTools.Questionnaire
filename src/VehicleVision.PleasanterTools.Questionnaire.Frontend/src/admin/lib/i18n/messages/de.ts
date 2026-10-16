@@ -598,6 +598,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "question.showAssignments": "Vergleichende Zuordnungen anzeigen",
   "question.assign": "Diese Frage zuweisen",
   "question.choiceLabelPlaceholder": "Text auf dem Bildschirm angezeigt",
+  "question.choiceRemarkPlaceholder": "Hinweis für Befragte (optional)",
   "question.choiceValuePlaceholder": "Wert, der gespeichert wird",
   "question.choiceIsOther": "andere",
   "question.removeChoice": "Entfernen Sie diese Auswahl",

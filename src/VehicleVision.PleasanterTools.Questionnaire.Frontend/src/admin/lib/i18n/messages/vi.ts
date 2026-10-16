@@ -598,6 +598,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "question.showAssignments": "Hiển thị bài tập phù hợp",
   "question.assign": "Đặt câu hỏi này",
   "question.choiceLabelPlaceholder": "Văn bản hiển thị trên màn hình",
+  "question.choiceRemarkPlaceholder": "Ghi chú hiển thị cho người trả lời (không bắt buộc)",
   "question.choiceValuePlaceholder": "Giá trị được lưu trữ",
   "question.choiceIsOther": "Khác",
   "question.removeChoice": "Xóa lựa chọn này",

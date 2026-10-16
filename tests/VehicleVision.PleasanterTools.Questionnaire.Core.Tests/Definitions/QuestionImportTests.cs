@@ -29,7 +29,8 @@ public class QuestionImportTests
                 new Choice(
                     "yes",
                     LocalizedText.Japanese("はい"),
-                    Next: PageTransition.To("page-next")),
+                    Next: PageTransition.To("page-next"),
+                    Remark: LocalizedText.Japanese("賛成の場合")),
                 new Choice("no", LocalizedText.Japanese("いいえ")),
             ],
             VisibleWhen = new VisibilityCondition
@@ -42,6 +43,7 @@ public class QuestionImportTests
         var imported = Assert.Single(result.Questions);
 
         Assert.All(imported.Choices, choice => Assert.Null(choice.Next));
+        Assert.Equal("賛成の場合", imported.Choices[0].Remark!.Get("ja"));
         Assert.Null(imported.VisibleWhen);
         Assert.Equal(1, result.RemovedChoiceTransitions);
         Assert.Equal(1, result.RemovedVisibilityConditions);

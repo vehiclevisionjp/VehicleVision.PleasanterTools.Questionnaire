@@ -105,6 +105,32 @@ describe('設問の説明文', () => {
   });
 });
 
+describe('選択肢の備考', () => {
+  it('ラベルの下にプレーンテキストとして描画する', () => {
+    const question: Question = {
+      ...confirmQuestion(),
+      type: 'Radio',
+      title: { ja: '用途' },
+      choices: [
+        {
+          value: 'personal',
+          label: { ja: '個人利用' },
+          remark: { ja: 'ご自身だけで利用する場合はこちらです。<script>' },
+          isOther: false,
+        },
+      ],
+    };
+
+    const { body } = render(QuestionField, {
+      props: { question, language: 'ja', answer: { values: [], otherText: '' } },
+    });
+
+    expect(body).toContain('class="choice-remark');
+    expect(body).toContain('ご自身だけで利用する場合はこちらです。&lt;script>');
+    expect(body).not.toContain('<script>');
+  });
+});
+
 describe('回答の自動変換', () => {
   it('有効な設問では回答者へ自動変換を伝える', () => {
     const question: Question = {

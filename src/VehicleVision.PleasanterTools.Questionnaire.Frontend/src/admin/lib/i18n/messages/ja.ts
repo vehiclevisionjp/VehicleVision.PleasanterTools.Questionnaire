@@ -652,6 +652,7 @@ export const ja = {
   'question.showAssignments': '対応する割り当てを表示',
   'question.assign': 'この設問を割り当てる',
   'question.choiceLabelPlaceholder': '画面に表示するテキスト',
+  'question.choiceRemarkPlaceholder': '回答者へ見せる備考（任意）',
   'question.choiceValuePlaceholder': 'Pleasanter に保存する値',
   'question.choiceIsOther': 'その他',
   'question.removeChoice': '選択肢を削除',
