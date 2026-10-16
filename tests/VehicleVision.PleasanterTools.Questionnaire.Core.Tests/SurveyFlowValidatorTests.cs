@@ -318,4 +318,50 @@ public class SurveyFlowValidatorTests
 
         Assert.Contains(FlowProblemCode.AllButtonsMayBeHidden, Codes(definition));
     }
+
+    [Fact]
+    public void ページを移動して前を向く分岐を咎める()
+    {
+        // p1 から p3 への分岐は正しいが、p3 を先頭へ移すと後ろ向きになる。
+        // ページ ID は変えず、並び順だけで妥当性を判定する。
+        var definition = Definition(
+            PageOf("p3", Text("q3")),
+            PageOf("p1", Text("q1")) with { Next = PageTransition.To("p3") },
+            PageOf("p2", Text("q2")));
+
+        Assert.Contains(
+            SurveyFlowValidator.Validate(definition),
+            problem => problem is
+            {
+                Code: FlowProblemCode.BackwardTransition,
+                PageId: "p1",
+                Detail: "p3",
+            });
+    }
+
+    [Fact]
+    public void 設問を移動して後ろを見る表示条件を咎める()
+    {
+        // q2 は q1 を見ている。q2 を先頭へ移すと、ID を保ったまま前方参照になる。
+        var definition = Definition(PageOf(
+            "p1",
+            Text("q2") with
+            {
+                VisibleWhen = new VisibilityCondition
+                {
+                    Rules = [new ConditionRule("q1", ConditionOperator.Answered)],
+                },
+            },
+            Text("q1")));
+
+        Assert.Contains(
+            SurveyFlowValidator.Validate(definition),
+            problem => problem is
+            {
+                Code: FlowProblemCode.ForwardConditionReference,
+                PageId: "p1",
+                QuestionId: "q2",
+                Detail: "q1",
+            });
+    }
 }
