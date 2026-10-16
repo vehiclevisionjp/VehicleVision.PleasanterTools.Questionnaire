@@ -648,6 +648,7 @@ export const ja = {
   'question.required': '必須',
   'question.displayOnly': '回答欄のない、表示専用の要素です。',
   'question.unmapped': '未割り当て（Pleasanter に保存されません）',
+  'question.unsaved': '未保存',
   'question.mapped': '→ {columns}',
   'question.showAssignments': '対応する割り当てを表示',
   'question.assign': 'この設問を割り当てる',

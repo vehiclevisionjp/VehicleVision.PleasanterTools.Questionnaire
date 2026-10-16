@@ -41,6 +41,8 @@
     question: Question;
     /** 入力欄が書き込む言語。**管理画面の表示言語とは別。** */
     editing: Language;
+    /** 保存済みの内容と異なる設問か。 */
+    unsaved: boolean;
     /** 割り当て先の列。**無いと「Pleasanter に残らない」ことが分からない** */
     mappedColumns: string[];
     /** 左右の対応を見失わないよう、右の行を示している設問を強調する。 */
@@ -79,6 +81,7 @@
   let {
     question,
     editing,
+    unsaved,
     mappedColumns,
     selected,
     canMoveUp,
@@ -418,7 +421,12 @@
   }
 </script>
 
-<article class="question" class:selected aria-current={selected ? 'true' : undefined}>
+<article
+  class="question"
+  class:unsaved
+  class:selected
+  aria-current={selected ? 'true' : undefined}
+>
   <div class="head">
     <input
       class="title"
@@ -530,6 +538,10 @@
 
   <div class="meta">
     <code class="id">{question.questionId}</code>
+
+    {#if unsaved}
+      <span class="unsaved-indicator" aria-label={t('question.unsaved')}>{t('question.unsaved')}</span>
+    {/if}
 
     {#if !displayOnly}
       <label class="inline">
@@ -1222,6 +1234,11 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
   }
 
+  .question.unsaved {
+    background: var(--warning-surface);
+    border-color: var(--warning-border);
+  }
+
   .head {
     display: flex;
     flex-wrap: wrap;
@@ -1306,6 +1323,15 @@
     padding: 0.1rem 0.5rem;
     color: var(--warning-text);
     background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: 999px;
+    font-weight: 600;
+  }
+
+  .unsaved-indicator {
+    padding: 0.1rem 0.5rem;
+    color: var(--warning-text);
+    background: var(--surface);
     border: 1px solid var(--warning-border);
     border-radius: 999px;
     font-weight: 600;

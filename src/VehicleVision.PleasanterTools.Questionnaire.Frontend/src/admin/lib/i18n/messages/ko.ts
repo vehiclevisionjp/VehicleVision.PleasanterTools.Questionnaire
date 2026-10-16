@@ -592,6 +592,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'question.required': '필수',
   'question.displayOnly': '답변란이 없는 표시 전용 요소입니다.',
   'question.unmapped': '할당되지 않음(Pleasanter에 저장되지 않음)',
+  'question.unsaved': '저장되지 않음',
   'question.mapped': '→ {columns}',
   'question.showAssignments': '해당 할당 표시',
   'question.assign': '이 질문을 할당',
