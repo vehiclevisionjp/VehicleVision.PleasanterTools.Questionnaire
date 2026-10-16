@@ -184,6 +184,8 @@ export interface VisibilityCondition {
 export interface Choice {
   value: string;
   label: LocalizedText;
+  /** ラベルの下に回答者へ見せる補足。 */
+  remark?: LocalizedText | null;
   isOther?: boolean;
   /**
    * これを選んだときの行き先（Issue #41）。

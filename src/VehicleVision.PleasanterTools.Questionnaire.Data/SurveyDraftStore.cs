@@ -295,7 +295,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string Value,
         string LabelJson,
         bool IsOther,
-        string? NextJson);
+        string? NextJson,
+        string? RemarkJson);
 
     private sealed record AssignmentRow(
         Guid AssignmentId,
@@ -527,7 +528,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
         // **設問の一覧で絞る。** アンケートを跨いだ選択肢が混ざらないようにする
         var choices = (await connection.QueryAsync<ChoiceRow>(Sql(
-            "SELECT [QuestionId], [Value], [LabelJson], [IsOther], [NextJson] "
+            "SELECT [QuestionId], [Value], [LabelJson], [IsOther], [NextJson], [RemarkJson] "
             + "FROM [QuestionChoices] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
@@ -559,7 +560,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     .Select(choice => new Choice(
                         choice.Value, ReadText(choice.LabelJson) ?? LocalizedText.Japanese(choice.Value),
                         choice.IsOther,
-                        Read<PageTransition>(choice.NextJson)))
+                        Read<PageTransition>(choice.NextJson),
+                        ReadText(choice.RemarkJson)))
                     .ToImmutableArray(),
                 StringComparer.Ordinal);
 
@@ -1079,9 +1081,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     await connection.ExecuteAsync(Sql(
                         "INSERT INTO [QuestionChoices] ([ChoiceId], [SurveyId], "
                         + "[QuestionId], [SortOrder], [Value], [LabelJson], "
-                        + "[IsOther], [NextJson]) "
+                        + "[IsOther], [NextJson], [RemarkJson]) "
                         + "VALUES (@ChoiceId, @SurveyId, @QuestionId, @SortOrder, @Value, "
-                        + "@LabelJson, @IsOther, @NextJson)",
+                        + "@LabelJson, @IsOther, @NextJson, @RemarkJson)",
                         new
                         {
                             ChoiceId = Guid.NewGuid(),
@@ -1092,6 +1094,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                             LabelJson = WriteText(choice.Label),
                             choice.IsOther,
                             NextJson = Write(choice.Next),
+                            RemarkJson = WriteText(choice.Remark),
                         },
                         transaction,
                         cancellationToken: cancellationToken)).ConfigureAwait(false);

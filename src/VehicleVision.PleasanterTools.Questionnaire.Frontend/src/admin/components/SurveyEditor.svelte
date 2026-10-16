@@ -59,6 +59,7 @@
   import { assetMarkup as markupForAsset } from '../lib/asset';
   import { requiredPortCount } from '../lib/columnBudget';
   import { confirmAction } from '../lib/confirmation.svelte';
+  import { hasUnsavedQuestion } from '../lib/questionUnsaved';
 
   const standardButtonKinds = ['previous', 'next', 'submit'] as const;
 
@@ -212,6 +213,14 @@
   let publishFlow = $state<FlowProblem[]>([]);
 
   const allQuestions = $derived(definition?.pages.flatMap((page) => page.questions) ?? []);
+  const savedQuestionsById = $derived(
+    new Map(
+      (savedDefinition?.pages.flatMap((page) => page.questions) ?? []).map((question) => [
+        question.questionId,
+        question,
+      ]),
+    ),
+  );
   const hasUnsavedChanges = $derived(
     definition !== undefined &&
       (JSON.stringify(definition) !== JSON.stringify(savedDefinition) ||
@@ -1308,6 +1317,7 @@
         <QuestionEditor
           {question}
           {editing}
+          unsaved={hasUnsavedQuestion(question, savedQuestionsById.get(question.questionId))}
           selected={selectedQuestionId === question.questionId}
           mappedColumns={columnsFor(question.questionId)}
           canMoveUp={questionIndex > 0}

@@ -45,6 +45,9 @@
 
   /** 読み取り用。未初期化なら空の回答として扱う。 */
   const current = $derived<AnswerState>(answer ?? { values: [], otherText: '' });
+  const selectedChoice = $derived(
+    question.choices.find((choice) => choice.value === current.values[0]),
+  );
 
   const labelId = $derived(`label-${question.questionId}`);
   const errorId = $derived(`error-${question.questionId}`);
@@ -309,7 +312,12 @@
             checked={current.values.includes(choice.value)}
             onchange={() => setSingle(choice.value)}
           />
-          <span>{text(choice.label, language)}</span>
+          <span class="choice-content">
+            <span>{text(choice.label, language)}</span>
+            {#if text(choice.remark ?? undefined, language) !== ''}
+              <small class="choice-remark">{text(choice.remark ?? undefined, language)}</small>
+            {/if}
+          </span>
         </label>
       {/each}
     {:else if question.type === 'Checkbox'}
@@ -321,7 +329,12 @@
             checked={current.values.includes(choice.value)}
             onchange={(event) => toggleMultiple(choice.value, event.currentTarget.checked)}
           />
-          <span>{text(choice.label, language)}</span>
+          <span class="choice-content">
+            <span>{text(choice.label, language)}</span>
+            {#if text(choice.remark ?? undefined, language) !== ''}
+              <small class="choice-remark">{text(choice.remark ?? undefined, language)}</small>
+            {/if}
+          </span>
         </label>
       {/each}
     {:else if question.type === 'Dropdown'}
@@ -336,6 +349,11 @@
           <option value={choice.value}>{text(choice.label, language)}</option>
         {/each}
       </select>
+      {#if selectedChoice && text(selectedChoice.remark ?? undefined, language) !== ''}
+        <small class="choice-remark dropdown-remark">
+          {text(selectedChoice.remark ?? undefined, language)}
+        </small>
+      {/if}
     {:else if question.type === 'Scale'}
       <div class="scale" role="radiogroup" aria-labelledby={labelId}>
         {#if question.settings.scaleMinimumLabel}
@@ -462,7 +480,12 @@
               <span class="rank-badge">
                 {rank > 0 ? t('question.rankingRank', { rank }) : t('question.rankingUnranked')}
               </span>
-              <span>{text(choice.label, language)}</span>
+              <span class="choice-content">
+                <span>{text(choice.label, language)}</span>
+                {#if text(choice.remark ?? undefined, language) !== ''}
+                  <small class="choice-remark">{text(choice.remark ?? undefined, language)}</small>
+                {/if}
+              </span>
             </button>
 
             <!--
@@ -561,6 +584,22 @@
     gap: 0.5rem;
     padding: 0.35rem 0;
     cursor: pointer;
+  }
+
+  .choice-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .choice-remark {
+    color: var(--muted);
+    font-size: 0.85em;
+    white-space: pre-line;
+  }
+
+  .dropdown-remark {
+    display: block;
+    margin-top: 0.25rem;
   }
 
   input[type='text'],
