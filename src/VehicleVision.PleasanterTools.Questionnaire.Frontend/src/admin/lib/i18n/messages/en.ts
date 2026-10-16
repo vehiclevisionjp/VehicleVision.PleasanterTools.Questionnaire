@@ -1355,4 +1355,22 @@ export const en: Record<MessageKey, string> = {
   'settings.proofOfWorkKeepsOthers':
     'Turning it off keeps the submission ticket, the minimum time before submitting, and the '
     + 'honeypot field in effect.',
+  'pageButtons.title': 'Buttons at the bottom of the page',
+  'pageButtons.hint': 'Unconfigured buttons remain always visible and enabled.',
+  'pageButtons.previous': 'Previous',
+  'pageButtons.next': 'Next',
+  'pageButtons.submit': 'Submit',
+  'pageButtons.visibleWhen': 'Visibility condition',
+  'pageButtons.enabledWhen': 'Enable condition',
+  'pageButtons.links': 'Custom links',
+  'pageButtons.linksHint': 'Opening a link does not save or submit answers. Unsaved input will be lost.',
+  'pageButtons.defaultLinkLabel': 'Open link',
+  'pageButtons.linkLabel': 'Label',
+  'pageButtons.linkUrl': 'Destination URL (http / https / mailto)',
+  'pageButtons.openInNewTab': 'Open in a new tab',
+  'pageButtons.removeLink': 'Remove this link',
+  'pageButtons.addLink': 'Add custom link',
+  'flow.InvalidButtonUrl': 'The custom link URL is not allowed',
+  'flow.DuplicateButtonId': 'Custom link identifiers are duplicated',
+  'flow.AllButtonsMayBeHidden': 'Some answers can hide all buttons at the same time',
 };

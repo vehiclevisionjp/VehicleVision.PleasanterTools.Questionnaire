@@ -37,4 +37,54 @@ public sealed record Page
     /// </para>
     /// </remarks>
     public bool ShuffleQuestions { get; init; }
+
+    /// <summary>ページ下部の釦。未指定なら従来どおり常に表示し、有効にする。</summary>
+    public PageButtons? Buttons { get; init; }
+}
+
+/// <summary>標準釦 1 つの出し分け。</summary>
+public sealed record PageButtonCondition
+{
+    /// <summary>釦を表示する条件。未指定または空なら常に表示する。</summary>
+    public VisibilityCondition? VisibleWhen { get; init; }
+
+    /// <summary>釦を有効にする条件。未指定または空なら常に有効にする。</summary>
+    public VisibilityCondition? EnabledWhen { get; init; }
+}
+
+/// <summary>ページ下部の釦。</summary>
+public sealed record PageButtons
+{
+    public PageButtonCondition? Submit { get; init; }
+
+    public PageButtonCondition? Next { get; init; }
+
+    public PageButtonCondition? Previous { get; init; }
+
+    public ImmutableArray<PageLinkButton> Links { get; init; } = [];
+}
+
+/// <summary>回答を保存せず、任意の URL へ移動する釦。</summary>
+public sealed record PageLinkButton
+{
+    public required string ButtonId { get; init; }
+
+    public required LocalizedText Label { get; init; }
+
+    public required string Url { get; init; }
+
+    public bool OpenInNewTab { get; init; }
+
+    public int SortOrder { get; init; }
+
+    public VisibilityCondition? VisibleWhen { get; init; }
+
+    public VisibilityCondition? EnabledWhen { get; init; }
+
+    /// <summary>画面へ出してよい絶対 URL か。</summary>
+    public bool HasAllowedUrl =>
+        Uri.TryCreate(Url, UriKind.Absolute, out var uri)
+        && (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(uri.Scheme, Uri.UriSchemeMailto, StringComparison.OrdinalIgnoreCase));
 }

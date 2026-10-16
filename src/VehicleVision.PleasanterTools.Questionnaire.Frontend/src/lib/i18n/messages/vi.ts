@@ -37,6 +37,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   'form.next': 'Tiếp theo',
   'form.submit': 'Gửi',
   'form.submitting': 'Đang gửi…',
+  'form.buttonDisabled': 'Không thể nhấn cho đến khi đáp ứng điều kiện',
   'form.languageLabel': 'Ngôn ngữ',
   'form.trapLabel': 'Vui lòng không nhập vào trường này',
   'readability.group': 'Khả năng đọc',
@@ -134,5 +135,6 @@ export const vi: Partial<Record<MessageKey, string>> = {
   'serverValidation.PatternMismatch': 'Vui lòng nhập theo định dạng được chỉ định',
   'serverValidation.TooLarge': 'Nội dung gửi quá lớn',
   'serverValidation.ScannerUnavailable': 'Không thể tiếp nhận lúc này vì không thể kiểm tra tệp đính kèm',
+  'serverValidation.SubmitButtonConditionNotMet': 'Chưa đáp ứng điều kiện gửi',
   'serverValidation.unknown': 'Vui lòng kiểm tra nội dung đã nhập',
 };

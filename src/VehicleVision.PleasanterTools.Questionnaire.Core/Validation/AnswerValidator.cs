@@ -78,6 +78,21 @@ public static class AnswerValidator
             ValidateQuestion(question, answer, errors);
         }
 
+        if (pageId is null && path.Pages.LastOrDefault() is { } terminalPage)
+        {
+            var submit = terminalPage.Buttons?.Submit;
+            var visible = ConditionEvaluator.IsSatisfied(
+                submit?.VisibleWhen, answerByQuestion, path.VisibleQuestionIds);
+            var enabled = ConditionEvaluator.IsSatisfied(
+                submit?.EnabledWhen, answerByQuestion, path.VisibleQuestionIds);
+            if (!visible || !enabled)
+            {
+                errors.Add(new ValidationError(
+                    terminalPage.PageId,
+                    ValidationErrorCode.SubmitButtonConditionNotMet));
+            }
+        }
+
         return errors.ToImmutable();
     }
 

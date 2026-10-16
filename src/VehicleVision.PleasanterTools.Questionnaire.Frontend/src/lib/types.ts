@@ -222,6 +222,28 @@ export interface Page {
    * **説明文ブロックは動かさない。**
    */
   shuffleQuestions?: boolean;
+  /** ページ下部の釦。未指定なら従来どおり常に表示し、有効。 */
+  buttons?: PageButtons | null;
+}
+
+export interface PageButtonCondition {
+  visibleWhen?: VisibilityCondition | null;
+  enabledWhen?: VisibilityCondition | null;
+}
+
+export interface PageButtons {
+  submit?: PageButtonCondition | null;
+  next?: PageButtonCondition | null;
+  previous?: PageButtonCondition | null;
+  links?: PageLinkButton[];
+}
+
+export interface PageLinkButton extends PageButtonCondition {
+  buttonId: string;
+  label: LocalizedText;
+  url: string;
+  openInNewTab?: boolean;
+  sortOrder?: number;
 }
 
 export interface SurveyDefinition {

@@ -42,6 +42,7 @@ export const ja = {
   'form.next': '次へ',
   'form.submit': '送信する',
   'form.submitting': '送信しています…',
+  'form.buttonDisabled': '条件を満たしていないため押せません',
   'form.languageLabel': '言語',
   'form.trapLabel': 'この欄は入力しないでください',
   'readability.group': '読みやすさ',
@@ -153,5 +154,6 @@ export const ja = {
   'serverValidation.PatternMismatch': '指定された形式で入力してください',
   'serverValidation.TooLarge': '送信内容が大きすぎます',
   'serverValidation.ScannerUnavailable': '添付ファイルの検査ができないため、いま受け付けられません',
+  'serverValidation.SubmitButtonConditionNotMet': '送信するための条件を満たしていません',
   'serverValidation.unknown': '入力をご確認ください',
 } as const;

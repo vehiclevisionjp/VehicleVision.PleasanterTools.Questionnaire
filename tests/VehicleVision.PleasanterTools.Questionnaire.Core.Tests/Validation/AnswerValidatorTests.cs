@@ -288,4 +288,43 @@ public class AnswerValidatorTests
 
         Assert.Empty(errors);
     }
+
+    [Fact]
+    public void 送信釦の有効条件を満たさない回答を拒否する()
+    {
+        var question = Q("q1", QuestionType.Confirm);
+        var definition = Definition(question) with
+        {
+            Pages =
+            [
+                new Page
+                {
+                    PageId = "p1",
+                    Questions = [question],
+                    Buttons = new PageButtons
+                    {
+                        Submit = new PageButtonCondition
+                        {
+                            EnabledWhen = new VisibilityCondition
+                            {
+                                Rules =
+                                [
+                                    new ConditionRule(
+                                        "q1",
+                                        ConditionOperator.Equals,
+                                        "true"),
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        };
+
+        var rejected = AnswerValidator.Validate(definition, [Answer.Of("q1", "false")]);
+        var accepted = AnswerValidator.Validate(definition, [Answer.Of("q1", "true")]);
+
+        Assert.Contains(ValidationErrorCode.SubmitButtonConditionNotMet, Codes(rejected));
+        Assert.Empty(accepted);
+    }
 }

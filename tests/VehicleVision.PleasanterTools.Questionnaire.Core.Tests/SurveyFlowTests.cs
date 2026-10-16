@@ -297,4 +297,21 @@ public class SurveyFlowTests
         Assert.False(path.Visible("q2"));
         Assert.Equal(["p1", "p2", "p3"], path.Pages.Select(page => page.PageId));
     }
+
+    [Fact]
+    public void 設問と釦で同じ条件評価器を使える()
+    {
+        var question = Radio("q1", "はい", "いいえ");
+        var answers = new Dictionary<string, Answer>(StringComparer.Ordinal)
+        {
+            ["q1"] = Answer.Of("q1", "はい"),
+        };
+        var condition = new VisibilityCondition
+        {
+            Rules = [new ConditionRule("q1", ConditionOperator.Equals, "はい")],
+        };
+
+        Assert.True(ConditionEvaluator.IsSatisfied(condition, answers, ["q1"]));
+        Assert.False(ConditionEvaluator.IsSatisfied(condition, answers, []));
+    }
 }
