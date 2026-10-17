@@ -1,0 +1,15 @@
+{
+  "//": "環境別の値は同名の .local.json か環境変数で指定する。null は未指定。秘密情報の実値はコミットしない。既定値・意味は _documents/設定パラメータ一覧.md を参照。",
+  "//Dbms": "QUESTIONNAIRE_DB_PROVIDER と同じ。",
+  "Dbms": null,
+  "//UserConnectionString": "QUESTIONNAIRE_DB_CONNECTIONSTRING と同じ。",
+  "UserConnectionString": null,
+  "//AllowInsecure": "QUESTIONNAIRE_DB_ALLOW_INSECURE と同じ。",
+  "AllowInsecure": null,
+  "//AutoMigrate": "QUESTIONNAIRE_DB_AUTO_MIGRATE と同じ。",
+  "AutoMigrate": null,
+  "//SkipMigrationCheck": "QUESTIONNAIRE_DB_SKIP_MIGRATION_CHECK と同じ。",
+  "SkipMigrationCheck": null,
+  "//MigrationLockTimeoutSeconds": "QUESTIONNAIRE_DB_MIGRATION_LOCK_TIMEOUT_SECONDS と同じ。",
+  "MigrationLockTimeoutSeconds": null
+}

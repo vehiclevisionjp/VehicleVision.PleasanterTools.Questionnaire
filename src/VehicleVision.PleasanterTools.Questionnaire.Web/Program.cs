@@ -1,4 +1,4 @@
-﻿using System.Threading.RateLimiting;
+using System.Threading.RateLimiting;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
@@ -25,7 +25,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Worker;
 // **設定に書く鍵を作るための道。** 手で乱数を用意させると、短い値や使い回しが混ざる
 if (args.Contains("--generate-secret-key"))
 {
-    Console.WriteLine(SecretProtector.GenerateKey());
+    Environment.ExitCode = SecretKeyCommand.Run(args, Console.Out, Console.Error);
     return;
 }
 
@@ -93,7 +93,7 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 }
 
 // ---- 設定 ------------------------------------------------------------------
-// **資格情報の実値は設定ファイルへ書かない。** 環境変数か Key Vault から読む
+// **資格情報の実値はコミットしない。** .local.json・環境変数・Key Vault から読む
 // （App_Data/Parameters/README.md）
 var provider = Enum.Parse<DatabaseProvider>(
     builder.Configuration["QUESTIONNAIRE_DB_PROVIDER"] ?? nameof(DatabaseProvider.SqlServer));
