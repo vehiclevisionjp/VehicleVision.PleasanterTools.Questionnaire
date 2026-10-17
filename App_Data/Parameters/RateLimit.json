@@ -1,0 +1,13 @@
+{
+  "//": "環境別の値は同名の .local.json か環境変数で指定する。null は未指定。秘密情報の実値はコミットしない。既定値・意味は _documents/設定パラメータ一覧.md を参照。",
+  "//RequestsPerMin": "QUESTIONNAIRE_REQUESTS_PER_MIN と同じ。",
+  "RequestsPerMin": null,
+  "//SubmitsPerMin": "QUESTIONNAIRE_SUBMITS_PER_MIN と同じ。",
+  "SubmitsPerMin": null,
+  "//FormRequestsPerMin": "QUESTIONNAIRE_FORM_REQUESTS_PER_MIN と同じ。",
+  "FormRequestsPerMin": null,
+  "//AssetRequestsPerMin": "QUESTIONNAIRE_ASSET_REQUESTS_PER_MIN と同じ。",
+  "AssetRequestsPerMin": null,
+  "//LoginAttemptsPer5Min": "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN と同じ。",
+  "LoginAttemptsPer5Min": null
+}

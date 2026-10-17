@@ -177,4 +177,98 @@ public sealed class ParameterFilesTests : IDisposable
         Assert.Equal("1.1", configuration["QUESTIONNAIRE_PLEASANTER_APIVERSION"]);
         Assert.Equal("30", configuration["QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS"]);
     }
+
+    [Fact]
+    public void 同じ短いキーを別ファイルから混同せずに読む()
+    {
+        Write("Pleasanter.json", """{ "BaseUrl": "https://pleasanter.example.jp", "TimeoutSeconds": 45 }""");
+        Write("Mail.json", """{ "BaseUrl": "https://survey.example.jp", "TimeoutSeconds": 90, "Provider": "Smtp", "Enabled": true }""");
+        Write("VirusScan.json", """{ "TimeoutSeconds": 15, "Provider": "ClamAv", "Enabled": false }""");
+        Write("Rds.json", """{ "Dbms": "Sqlite", "UserConnectionString": "Data Source=test.db" }""");
+
+        var configuration = Build();
+
+        Assert.Equal("https://pleasanter.example.jp", configuration["QUESTIONNAIRE_PLEASANTER_BASEURL"]);
+        Assert.Equal("https://survey.example.jp", configuration["QUESTIONNAIRE_MAIL_BASEURL"]);
+        Assert.Equal("45", configuration["QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS"]);
+        Assert.Equal("90", configuration["QUESTIONNAIRE_MAIL_TIMEOUT_SECONDS"]);
+        Assert.Equal("15", configuration["QUESTIONNAIRE_VIRUSSCAN_TIMEOUTSECONDS"]);
+        Assert.Equal("Smtp", configuration["QUESTIONNAIRE_MAIL_TRANSPORT"]);
+        Assert.Equal("False", configuration["QUESTIONNAIRE_VIRUSSCAN_ENABLED"]);
+        Assert.Equal("Sqlite", configuration["QUESTIONNAIRE_DB_PROVIDER"]);
+        Assert.Equal("Data Source=test.db", configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"]);
+    }
+
+    [Fact]
+    public void 新しいファイルでもlocalが環境変数より強くnullは上書きしない()
+    {
+        Write("Mail.json", """{ "SmtpHost": "json.example.jp", "SmtpPassword": null }""");
+        Write("Mail.local.json", """{ "SmtpHost": "local.example.jp", "SmtpPassword": null, "Enabled": false }""");
+        Env("QUESTIONNAIRE_MAIL_SMTP_HOST", "env.example.jp");
+        Env("QUESTIONNAIRE_MAIL_SMTP_PASSWORD", "test-only-secret");
+        Env("QUESTIONNAIRE_MAIL_ENABLED", "true");
+
+        var configuration = Build();
+
+        Assert.Equal("local.example.jp", configuration["QUESTIONNAIRE_MAIL_SMTP_HOST"]);
+        Assert.Equal("test-only-secret", configuration["QUESTIONNAIRE_MAIL_SMTP_PASSWORD"]);
+        Assert.Equal("False", configuration["QUESTIONNAIRE_MAIL_ENABLED"]);
+        Assert.Contains("Mail.local.json", configuration[ParameterFiles.FoundFilesKey]);
+    }
+
+    [Fact]
+    public void ファイル別名でも従来の環境変数名でも全層で指定できる()
+    {
+        Write("Rds.json", """{ "Dbms": "Sqlite" }""");
+        Env("QUESTIONNAIRE_DB_PROVIDER", "SqlServer");
+        Assert.Equal("SqlServer", Build()["QUESTIONNAIRE_DB_PROVIDER"]);
+
+        Write("Rds.local.json", """{ "QUESTIONNAIRE_DB_PROVIDER": "PostgreSql" }""");
+        Assert.Equal("PostgreSql", Build()["QUESTIONNAIRE_DB_PROVIDER"]);
+
+        Write("Rds.local.json", """{ "Dbms": "MySql", "QUESTIONNAIRE_DB_PROVIDER": "PostgreSql" }""");
+        Assert.Equal("MySql", Build()["QUESTIONNAIRE_DB_PROVIDER"]);
+    }
+
+    [Fact]
+    public void 別名のない設定もファイルから読み込める()
+    {
+        Write("Security.local.json", """{ "CaptchaSecretKey": "test-only-captcha", "QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN": 25 }""");
+        Write("Service.local.json", """{ "PathBase": "/questionnaire", "AdminPath": "/manage" }""");
+        var configuration = Build();
+
+        Assert.Equal("test-only-captcha", configuration["CaptchaSecretKey"]);
+        Assert.Equal("25", configuration["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"]);
+        Assert.Equal("/questionnaire", PathBaseOptions.FromConfiguration(configuration).Value);
+    }
+
+    [Fact]
+    public void 壊れた設定ファイルでは起動を止める()
+    {
+        Write("Rds.json", """{ "Dbms": "Sqlite" """ );
+        Assert.Throws<InvalidDataException>(() => Build());
+    }
+    [Fact]
+    public void メールの実際の設定読取へ用途別ファイルの値が渡る()
+    {
+        Write("Mail.local.json", """
+        {
+            "Enabled": true,
+            "Provider": "Smtp",
+            "SmtpHost": "smtp.example.jp",
+            "SmtpPort": 587,
+            "SmtpUserName": "survey-user",
+            "SmtpPassword": "test-only-secret",
+            "FromAddress": "survey@example.jp"
+        }
+        """);
+        var options = Mail.MailOptions.FromConfiguration(Build());
+
+        Assert.True(options.Enabled);
+        Assert.Equal("smtp.example.jp", options.Host);
+        Assert.Equal(587, options.Port);
+        Assert.Equal("survey-user", options.UserName);
+        Assert.Equal("test-only-secret", options.Password);
+        Assert.Equal("survey@example.jp", options.FromAddress);
+    }
 }
