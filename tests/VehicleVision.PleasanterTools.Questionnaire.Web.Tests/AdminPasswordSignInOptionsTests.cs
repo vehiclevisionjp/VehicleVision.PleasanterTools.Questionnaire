@@ -82,4 +82,15 @@ public class AdminPasswordSignInOptionsTests
 
         Assert.Equal(token, options.RescueToken);
     }
+
+    [Fact]
+    public void 生成したトークンを救済トークンとして受け入れる()
+    {
+        var token = SecretProtector.GenerateToken();
+
+        var options = AdminPasswordSignInOptions.FromConfiguration(
+            Configuration(rescueToken: token));
+
+        Assert.Equal(token, options.RescueToken);
+    }
 }

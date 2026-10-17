@@ -66,6 +66,12 @@ public sealed class SecretProtector
     /// <summary>新しい鍵を作る。**設定に書く値を作るためのもの。**</summary>
     public static string GenerateKey() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(KeyBytes));
 
+    /// <summary>新しいトークンを作る。**URL や環境変数へ安全に書ける形にする。**</summary>
+    public static string GenerateToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(KeyBytes))
+        .TrimEnd('=')
+        .Replace('+', '-')
+        .Replace('/', '_');
+
     /// <summary>暗号化して、保存する形の文字列にする。</summary>
     public string Protect(string plaintext)
     {
