@@ -101,6 +101,7 @@ public static class ParameterFiles
 
         // ---- 2. 環境変数
         builder.AddEnvironmentVariables();
+        builder.AddSecretFileEnvironmentVariables();
 
         // ---- 3. {名前}.local.json（一番強い。git 管理外）
         foreach (var name in Names)
