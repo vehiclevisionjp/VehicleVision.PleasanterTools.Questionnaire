@@ -29,6 +29,12 @@ if (args.Contains("--generate-secret-key"))
     return;
 }
 
+if (args.Contains("--generate-token"))
+{
+    Console.WriteLine(SecretProtector.GenerateToken());
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- App_Data/Parameters の設定ファイル --------------------------------------

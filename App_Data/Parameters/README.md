@@ -13,7 +13,10 @@
     1. 環境変数（Azure App Service のアプリケーション設定）
     2. Azure Key Vault
     3. `{名前}.local.json`（`.gitignore` 済み。開発・本番共通の運用者用）
-- 上書きの優先順位は **`{名前}.local.json` ＞ 環境変数 ＞ `{名前}.json`** とする
+    4. `QUESTIONNAIRE_*_FILE` 環境変数で指定する秘密ファイル（Docker secrets /
+       Kubernetes Secret のファイルマウント）
+- 上書きの優先順位は **`{名前}.local.json` ＞ `QUESTIONNAIRE_*_FILE` ＞ 環境変数 ＞
+  `{名前}.json`** とする
 
 環境変数で指定できる設定はすべてファイルにも記述できます。
 DB は `Rds.local.json`、メールは `Mail.local.json`、認証は `Authentication.local.json` などへ、
@@ -59,6 +62,26 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 > （ここへ書かせないため）なので、写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
 
 ## 環境変数
+
+### 秘密ファイル
+
+`QUESTIONNAIRE_*` の全ての設定は、`{名前}_FILE` に**絶対パス**を指定すると、そのファイルの
+内容を `{名前}` の値として使える。例えば、Docker secrets が置く
+`/run/secrets/questionnaire_db_connectionstring` を DB 接続文字列に使う場合は次のとおり。
+
+```text
+QUESTIONNAIRE_DB_CONNECTIONSTRING_FILE=/run/secrets/questionnaire_db_connectionstring
+```
+
+末尾の改行（LF または CRLF）は 1 つだけ取り除く。それ以外の空白は変更しない。
+`{名前}` と `{名前}_FILE` を同時に指定すると、意図しない優先順位で起動しないよう、起動を
+中止する。ファイルが無い、読めない、空、または 64 KiB を超える場合も起動しない。
+
+秘密の内容はログ・例外メッセージ・画面へ出さない。ファイルのパスを含む実行設定も秘密情報と
+同じアクセス制御で扱う。Docker Compose の設定例は
+[`導入-更新運用手順書.md`](../../_documents/導入-更新運用手順書.md#533-docker--compose-で本番運用する)、
+Kubernetes でのファイルマウントは
+[`AKS-導入更新運用手順書.md`](../../_documents/AKS-導入更新運用手順書.md) を参照する。
 
 主なものだけを並べる。**全件と既定値・読む場所は
 [`_documents/設定パラメータ一覧.md`](../../_documents/設定パラメータ一覧.md)。**

@@ -7,6 +7,21 @@ public class SecretProtectorTests
     private static SecretProtector Create() => new(SecretProtector.GenerateKey());
 
     [Fact]
+    public void 生成するトークンはURL安全なBase64で四十三文字になる()
+    {
+        var token = SecretProtector.GenerateToken();
+
+        Assert.Equal(43, token.Length);
+        Assert.Matches("^[A-Za-z0-9_-]+$", token);
+    }
+
+    [Fact]
+    public void 生成するトークンは毎回異なる()
+    {
+        Assert.NotEqual(SecretProtector.GenerateToken(), SecretProtector.GenerateToken());
+    }
+
+    [Fact]
     public void 暗号化して復号すると元に戻る()
     {
         var protector = Create();

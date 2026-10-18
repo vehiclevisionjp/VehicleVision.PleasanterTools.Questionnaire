@@ -8,6 +8,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 /// **README が書いている優先順位（<c>local.json</c> ＞ 環境変数 ＞ <c>json</c>）**と、
 /// **ファイルのキーを正式な名前へ写すこと**を確かめる。
 /// </remarks>
+// プロセスの環境変数を書き換えるので、AddParameterFiles を呼ぶ他の試験と並行させない
+[Collection("ProcessEnvironment")]
 public sealed class ParameterFilesTests : IDisposable
 {
     /// <summary>試験ごとの置き場。**実際のファイルを置いて読ませる。**</summary>
@@ -43,6 +45,13 @@ public sealed class ParameterFilesTests : IDisposable
     {
         variables.Add(name);
         Environment.SetEnvironmentVariable(name, value);
+    }
+
+    private string SecretFile(string contents)
+    {
+        var path = Path.Combine(directory, Guid.NewGuid().ToString("N"));
+        File.WriteAllText(path, contents);
+        return path;
     }
 
     private IConfigurationRoot Build() =>
@@ -156,6 +165,75 @@ public sealed class ParameterFilesTests : IDisposable
     public void 何も無ければ空と言える()
     {
         Assert.Empty(Build()[ParameterFiles.FoundFilesKey]!);
+    }
+
+    [Theory]
+    [InlineData("file-secret\n")]
+    [InlineData("file-secret\r\n")]
+    public void 秘密ファイルの末尾改行を1つ除いて読む(string contents)
+    {
+        Env("QUESTIONNAIRE_TEST_SECRET_FILE", SecretFile(contents));
+
+        Assert.Equal("file-secret", Build()["QUESTIONNAIRE_TEST_SECRET"]);
+    }
+
+    [Fact]
+    public void 値とファイル指定を同時には受け付けない()
+    {
+        const string directSecret = "direct-secret-value";
+        Env("QUESTIONNAIRE_TEST_CONFLICT", directSecret);
+        Env("QUESTIONNAIRE_TEST_CONFLICT_FILE", SecretFile("file-secret-value"));
+
+        var exception = Assert.Throws<InvalidOperationException>(Build);
+
+        Assert.DoesNotContain(directSecret, exception.Message);
+        Assert.DoesNotContain("file-secret-value", exception.Message);
+    }
+
+    [Fact]
+    public void 存在しない秘密ファイルでは止める()
+    {
+        const string secretMarker = "missing-secret-marker";
+        Env(
+            "QUESTIONNAIRE_TEST_MISSING_FILE",
+            Path.Combine(directory, secretMarker));
+
+        var exception = Assert.Throws<InvalidOperationException>(Build);
+
+        Assert.Contains(secretMarker, exception.Message);
+    }
+
+    [Fact]
+    public void 空の秘密ファイルでは止める()
+    {
+        Env("QUESTIONNAIRE_TEST_EMPTY_FILE", SecretFile("\n"));
+
+        var exception = Assert.Throws<InvalidOperationException>(Build);
+
+        Assert.DoesNotContain("file-secret", exception.Message);
+    }
+
+    [Fact]
+    public void 大きすぎる秘密ファイルでは中身を出さずに止める()
+    {
+        const string secretMarker = "oversized-secret-marker";
+        Env(
+            "QUESTIONNAIRE_TEST_LARGE_FILE",
+            SecretFile(secretMarker + new string('x', SecretFileConfigurationProvider.MaximumFileSizeBytes)));
+
+        var exception = Assert.Throws<InvalidOperationException>(Build);
+
+        Assert.DoesNotContain(secretMarker, exception.Message);
+    }
+
+    [Fact]
+    public void 相対パスの秘密ファイルでは止める()
+    {
+        Env("QUESTIONNAIRE_TEST_RELATIVE_FILE", "secret-file");
+
+        var exception = Assert.Throws<InvalidOperationException>(Build);
+
+        Assert.DoesNotContain("secret-file", exception.Message);
     }
 
     [Fact]

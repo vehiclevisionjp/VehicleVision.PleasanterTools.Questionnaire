@@ -151,6 +151,12 @@ docker compose --profile sqlserver --profile screenshots run --rm     screenshot
 | `answer-10-readability-required-error` | 高コントラストでの必須の入力漏れの表示（同上） |
 | `admin-19-pleasanter-sso-settings` | Pleasanter ログイン設定（`specs/pleasanter-sso.spec.ts`） |
 | `admin-20-pleasanter-login` | ログイン（「Pleasanter でログイン」の釦） |
+| `admin-21-question-reorder` | 設問の移動（警告が出る候補） |
+| `admin-22-page-reorder` | ページの移動（警告が出る候補） |
+| `admin-23-page-buttons` | ページ下部の釦の設定 |
+| `admin-24-unsaved-question` | 未保存の設問カード |
+| `answer-11-choice-remarks-disabled-next` | 選択肢の備考と無効な「次へ」 |
+| `answer-12-disabled-submit` | 無効な「送信する」と理由 |
 
 `admin-12`〜`admin-14` は `specs/manual.spec.ts` が撮る。
 `admin-19`・`admin-20` は `shots/` にコミットしていない（2026-09-25 時点。e2e.yml の写しの一式で撮られる）。

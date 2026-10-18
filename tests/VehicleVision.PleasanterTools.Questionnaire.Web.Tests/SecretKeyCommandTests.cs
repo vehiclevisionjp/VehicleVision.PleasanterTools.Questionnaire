@@ -3,6 +3,8 @@ using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
+// AddParameterFiles はプロセスの環境変数を読む。環境変数を書き換える試験と並行させない
+[Collection("ProcessEnvironment")]
 public sealed class SecretKeyCommandTests : IDisposable
 {
     private readonly string directory = Path.Combine(Path.GetTempPath(), "questionnaire-key-" + Guid.NewGuid().ToString("N"));
