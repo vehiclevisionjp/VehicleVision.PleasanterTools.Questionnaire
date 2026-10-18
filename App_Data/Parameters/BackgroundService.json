@@ -1,0 +1,19 @@
+{
+  "//": "環境別の値は同名の .local.json か環境変数で指定する。null は未指定。秘密情報の実値はコミットしない。既定値・意味は _documents/設定パラメータ一覧.md を参照。",
+  "//SendPerMinute": "QUESTIONNAIRE_SEND_PER_MINUTE と同じ。",
+  "SendPerMinute": null,
+  "//BacklogTotal": "QUESTIONNAIRE_BACKLOG_TOTAL と同じ。",
+  "BacklogTotal": null,
+  "//BacklogPerSurvey": "QUESTIONNAIRE_BACKLOG_PER_SURVEY と同じ。",
+  "BacklogPerSurvey": null,
+  "//AuditLogRetentionDays": "QUESTIONNAIRE_AUDITLOG_RETENTION_DAYS と同じ。",
+  "AuditLogRetentionDays": null,
+  "//AttachmentRejectionRetentionDays": "QUESTIONNAIRE_ATTACHMENT_REJECTION_RETENTION_DAYS と同じ。",
+  "AttachmentRejectionRetentionDays": null,
+  "//DeadLetterRetentionDays": "QUESTIONNAIRE_DEADLETTER_RETENTION_DAYS と同じ。",
+  "DeadLetterRetentionDays": null,
+  "//NotificationRetentionDays": "QUESTIONNAIRE_NOTIFICATION_RETENTION_DAYS と同じ。",
+  "NotificationRetentionDays": null,
+  "//ResponseNotificationDigestMinutes": "QUESTIONNAIRE_RESPONSE_NOTIFICATION_DIGEST_MINUTES と同じ。",
+  "ResponseNotificationDigestMinutes": null
+}

@@ -1,0 +1,23 @@
+{
+  "//": "環境別の値は同名の .local.json か環境変数で指定する。null は未指定。秘密情報の実値はコミットしない。既定値・意味は _documents/設定パラメータ一覧.md を参照。",
+  "//Enabled": "QUESTIONNAIRE_VIRUSSCAN_ENABLED と同じ。",
+  "Enabled": null,
+  "//Provider": "QUESTIONNAIRE_VIRUSSCAN_PROVIDER と同じ。",
+  "Provider": null,
+  "//Host": "QUESTIONNAIRE_VIRUSSCAN_HOST と同じ。",
+  "Host": null,
+  "//Port": "QUESTIONNAIRE_VIRUSSCAN_PORT と同じ。",
+  "Port": null,
+  "//TimeoutSeconds": "QUESTIONNAIRE_VIRUSSCAN_TIMEOUTSECONDS と同じ。",
+  "TimeoutSeconds": null,
+  "//DefenderConnectionString": "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_CONNECTIONSTRING と同じ。",
+  "DefenderConnectionString": null,
+  "//DefenderContainer": "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_CONTAINER と同じ。",
+  "DefenderContainer": null,
+  "//DefenderContainerUrl": "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_CONTAINERURL と同じ。",
+  "DefenderContainerUrl": null,
+  "//DefenderEventGridKey": "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_EVENTGRIDKEY と同じ。",
+  "DefenderEventGridKey": null,
+  "//DefenderResultTimeoutSeconds": "QUESTIONNAIRE_VIRUSSCAN_DEFENDER_RESULTTIMEOUTSECONDS と同じ。",
+  "DefenderResultTimeoutSeconds": null
+}

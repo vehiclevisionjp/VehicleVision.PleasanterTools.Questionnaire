@@ -1,0 +1,13 @@
+{
+  "//": "環境別の値は同名の .local.json か環境変数で指定する。null は未指定。秘密情報の実値はコミットしない。既定値・意味は _documents/設定パラメータ一覧.md を参照。",
+  "//Store": "QUESTIONNAIRE_ADMIN_SESSION_STORE と同じ。",
+  "Store": null,
+  "//RedisConnectionString": "QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING と同じ。",
+  "RedisConnectionString": null,
+  "//RedisPrefix": "QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX と同じ。",
+  "RedisPrefix": null,
+  "//SharedStateStore": "QUESTIONNAIRE_SHARED_STATE_STORE と同じ。",
+  "SharedStateStore": null,
+  "//SharedStateRedisPrefix": "QUESTIONNAIRE_SHARED_STATE_REDIS_PREFIX と同じ。",
+  "SharedStateRedisPrefix": null
+}

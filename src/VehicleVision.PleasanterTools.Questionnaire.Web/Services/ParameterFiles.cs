@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
@@ -28,35 +27,16 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// 写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
 /// </para>
 /// </remarks>
-public static class ParameterFiles
+public static partial class ParameterFiles
 {
     /// <summary>既定の置き場。</summary>
     public const string DefaultDirectory = "App_Data/Parameters";
 
-    /// <summary>読む対象。**この順に積む**（後のものが勝つわけではない。別名の写しで揃える）。</summary>
+    /// <summary>既存の順序を保ち、用途別の設定ファイルを追加する。</summary>
     private static readonly ImmutableArray<string> Names =
-        ["Service", "Pleasanter", "Security", "Analytics"];
-
-    /// <summary>ファイルのキー → 正式な設定名（環境変数と同じ名前）。</summary>
-    /// <remarks>
-    /// **ここに無いキーはそのままの名前で積まれる。**
-    /// <c>Security.json</c> と <c>Analytics.json</c> は環境変数と同じ名前なので写す必要が無い。
-    /// <c>Service.json</c> の <c>Name</c> / <c>Description</c> は**どこからも読んでいない**
-    /// （表示名を出す画面が無い）。
-    /// </remarks>
-    private static readonly ImmutableDictionary<string, string> Aliases =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            // Service.json
-            ["TimeZoneDefault"] = TimeZoneDefaultKey,
-
-            // Pleasanter.json
-            ["BaseUrl"] = "QUESTIONNAIRE_PLEASANTER_BASEURL",
-            ["ApiKey"] = "QUESTIONNAIRE_PLEASANTER_APIKEY",
-            ["ApiVersion"] = "QUESTIONNAIRE_PLEASANTER_APIVERSION",
-            ["TimeoutSeconds"] = "QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS",
-            ["ApiKeyUserTimeZoneId"] = "QUESTIONNAIRE_PLEASANTER_TIMEZONE",
-        }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
+        ["Service", "Pleasanter", "Security", "Analytics", "Rds", "Mail", "Authentication",
+            "Session", "BinaryStorage", "VirusScan", "BackgroundService", "Script", "RateLimit",
+            "General", "Monitoring"];
 
     /// <summary>本アプリが日時を解釈するときの既定タイムゾーン。</summary>
     public const string TimeZoneDefaultKey = "QUESTIONNAIRE_TIMEZONE_DEFAULT";
@@ -149,31 +129,26 @@ public static class ParameterFiles
     /// **写す前に一度だけ読む。** 積んだ後の設定から読むと、
     /// 環境変数の値まで巻き込んで写してしまう。
     /// </remarks>
-    [SuppressMessage(
-        "Reliability", "CA2000:Dispose objects before losing scope",
-        Justification = "IConfigurationRoot は読み終えた時点で用済み。IDisposable は実装側の都合で、"
-            + "ここで破棄すると後続の読み取りが失敗する形にはなっていない")]
     private static IEnumerable<KeyValuePair<string, string?>> AliasesOf(string directory, bool local)
     {
         var suffix = local ? ".local.json" : ".json";
-        var files = new ConfigurationBuilder();
-
         foreach (var name in Names)
         {
-            files.AddJsonFile(Path.Combine(directory, $"{name}{suffix}"),
-                optional: true, reloadOnChange: false);
-        }
+            var configuration = new ConfigurationBuilder()
+                .AddJsonFile(Path.Combine(directory, $"{name}{suffix}"),
+                    optional: true, reloadOnChange: false)
+                .Build();
 
-        var configuration = files.Build();
+            using var lifetime = configuration as IDisposable;
 
-        foreach (var (key, setting) in Aliases)
-        {
-            var value = configuration[key];
-
-            // **null と空は写さない。** 環境変数で与えた値を塗り潰さないため
-            if (!string.IsNullOrEmpty(value))
+            foreach (var alias in Aliases.Where(alias => alias.File == name))
             {
-                yield return new KeyValuePair<string, string?>(setting, value);
+                var value = configuration[alias.Key];
+                // null と空は未指定。false と 0 は明示された値として写す。
+                if (!string.IsNullOrEmpty(value))
+                {
+                    yield return new KeyValuePair<string, string?>(alias.Setting, value);
+                }
             }
         }
     }

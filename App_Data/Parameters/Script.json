@@ -1,0 +1,9 @@
+{
+  "//": "環境別の値は同名の .local.json か環境変数で指定する。null は未指定。秘密情報の実値はコミットしない。既定値・意味は _documents/設定パラメータ一覧.md を参照。",
+  "//MemoryBytes": "QUESTIONNAIRE_SCRIPT_MEMORY_BYTES と同じ。",
+  "MemoryBytes": null,
+  "//RecursionLimit": "QUESTIONNAIRE_SCRIPT_RECURSION_LIMIT と同じ。",
+  "RecursionLimit": null,
+  "//TimeoutMs": "QUESTIONNAIRE_SCRIPT_TIMEOUT_MS と同じ。",
+  "TimeoutMs": null
+}
