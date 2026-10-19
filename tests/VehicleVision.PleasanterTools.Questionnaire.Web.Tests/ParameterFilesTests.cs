@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using VehicleVision.PleasanterTools.Questionnaire.Mail;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
@@ -340,7 +341,7 @@ public sealed class ParameterFilesTests : IDisposable
             "FromAddress": "survey@example.jp"
         }
         """);
-        var options = Mail.MailOptions.FromConfiguration(Build());
+        var options = MailOptions.FromConfiguration(Build(), QuestionnaireMailSettings.Prefix);
 
         Assert.True(options.Enabled);
         Assert.Equal("smtp.example.jp", options.Host);

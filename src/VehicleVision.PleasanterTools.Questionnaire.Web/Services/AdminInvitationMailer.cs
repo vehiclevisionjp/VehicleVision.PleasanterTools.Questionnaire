@@ -73,7 +73,7 @@ public sealed class AdminInvitationMailer(
             // 設定が無ければ送らず、画面から手で渡してもらう
             logger.LogWarning(
                 "招待メールを送れない（{Key}BASEURL が未設定）。画面の URL を手で渡すこと",
-                MailOptions.Prefix);
+                QuestionnaireMailSettings.Prefix);
             return false;
         }
 
