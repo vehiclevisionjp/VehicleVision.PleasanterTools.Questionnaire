@@ -10,9 +10,20 @@
 #   https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
 version: 2
 
+# GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの設定を外す）
+# Core.*（GitHub Packages）の更新を見るための認証。**Dependabot のシークレット** VEHICLEVISION_PACKAGES_TOKEN
+# （read:packages の PAT）を、リポジトリの Settings → Secrets and variables → Dependabot へ登録すること
+registries:
+  vehiclevision-github:
+    type: nuget-feed
+    url: https://nuget.pkg.github.com/vehiclevisionjp/index.json
+    token: ${{secrets.VEHICLEVISION_PACKAGES_TOKEN}}
+
 updates:
   # ---- .NET（NuGet） -------------------------------------------------------
   - package-ecosystem: nuget
+    registries:
+      - vehiclevision-github
     # csproj は src / tests の直下 1 階層に 1 つずつ置いてある。
     # **`directories` はワイルドカードを解釈する（`directory` は解釈しない）**
     directories:

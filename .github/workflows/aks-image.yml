@@ -28,6 +28,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read  # GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
   id-token: write
 
 jobs:
@@ -89,8 +90,13 @@ jobs:
       - name: ACRでイメージをビルドして発行する
         env:
           IMAGE_TAG: ${{ steps.image.outputs.tag }}
+          # GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
+          VEHICLEVISION_PACKAGES_USER: ${{ github.actor }}
+          VEHICLEVISION_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
           az acr build
+          --build-arg "VEHICLEVISION_PACKAGES_USER=$VEHICLEVISION_PACKAGES_USER"
+          --secret-build-arg "VEHICLEVISION_PACKAGES_TOKEN=$VEHICLEVISION_PACKAGES_TOKEN"
           --registry "$AZURE_ACR_NAME"
           --image "questionnaire:$IMAGE_TAG"
           --file Dockerfile

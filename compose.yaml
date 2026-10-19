@@ -429,6 +429,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
+      args:
+        VEHICLEVISION_PACKAGES_USER: ${VEHICLEVISION_PACKAGES_USER:-}
+        VEHICLEVISION_PACKAGES_TOKEN: ${VEHICLEVISION_PACKAGES_TOKEN:-}
     profiles: ["sqlserver", "postgres", "mysql", "app"]
     environment: *app-environment
     depends_on:
@@ -445,6 +449,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
+      args:
+        VEHICLEVISION_PACKAGES_USER: ${VEHICLEVISION_PACKAGES_USER:-}
+        VEHICLEVISION_PACKAGES_TOKEN: ${VEHICLEVISION_PACKAGES_TOKEN:-}
     profiles: ["sqlserver", "postgres", "mysql", "app"]
     environment:
       <<: *app-environment

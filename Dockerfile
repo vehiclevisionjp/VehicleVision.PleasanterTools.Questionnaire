@@ -23,6 +23,11 @@ WORKDIR /src
 
 # 依存の解決だけ先に済ませてレイヤをキャッシュする
 COPY global.json Directory.Build.props ./
+# GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
+# Core.*（GitHub Packages）を取得する設定。トークンはビルド引数で受ける（最終イメージには入らない。この build ステージだけ）
+COPY nuget.config ./
+ARG VEHICLEVISION_PACKAGES_USER
+ARG VEHICLEVISION_PACKAGES_TOKEN
 COPY VehicleVision.PleasanterTools.Questionnaire.slnx ./
 COPY src/ src/
 RUN dotnet restore src/VehicleVision.PleasanterTools.Questionnaire.Web
