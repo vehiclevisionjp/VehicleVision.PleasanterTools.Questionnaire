@@ -37,12 +37,8 @@ concurrency:
 
 permissions:
   contents: read
-  packages: read  # GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
 
 env:
-  # GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
-  VEHICLEVISION_PACKAGES_USER: ${{ github.actor }}
-  VEHICLEVISION_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   DOTNET_NOLOGO: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"

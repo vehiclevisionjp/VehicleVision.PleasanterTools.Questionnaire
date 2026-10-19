@@ -60,12 +60,8 @@ concurrency:
 # **既定は読み取りだけ。** SARIF の送信に要る権限はジョブ側で足す
 permissions:
   contents: read
-  packages: read  # GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
 
 env:
-  # GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
-  VEHICLEVISION_PACKAGES_USER: ${{ github.actor }}
-  VEHICLEVISION_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   DOTNET_NOLOGO: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
@@ -137,7 +133,6 @@ jobs:
       # SARIF の送信に要る
       security-events: write
       contents: read
-      packages: read  # GitHub Packages（nuget.org へ移るまでの暫定。移ったらこの認証の行を外す）
       # private / internal リポジトリでは、実行情報の読み取りに要る
       actions: read
     steps:
