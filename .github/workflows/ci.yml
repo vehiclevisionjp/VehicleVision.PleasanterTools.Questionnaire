@@ -32,15 +32,10 @@ concurrency:
   cancel-in-progress: true
 
 # **既定を読み取りだけにする。** 書き込みが要るジョブは無い
-# **packages: read は、Core.Mail / Core.Data（GitHub Packages）を取得するために要る。**
 permissions:
   contents: read
-  packages: read
 
 env:
-  # nuget.config が読む。GitHub Packages の認証（VehicleVision.PleasanterTools.Core.* の取得）
-  VEHICLEVISION_PACKAGES_USER: ${{ github.actor }}
-  VEHICLEVISION_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   # ビルド時の余計な出力と、初回実行時のメッセージを抑える
   DOTNET_NOLOGO: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
