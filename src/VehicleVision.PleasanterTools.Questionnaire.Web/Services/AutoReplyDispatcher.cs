@@ -238,7 +238,7 @@ public sealed class AutoReplyDispatcher(
         {
             // ⚠️ **要求の Host からは作らない**（host header injection。Issue #189）
             logger.LogWarning(
-                "再編集リンクを付けられない（{Key}BASEURL が未設定）", MailOptions.Prefix);
+                "再編集リンクを付けられない（{Key}BASEURL が未設定）", QuestionnaireMailSettings.Prefix);
             return values;
         }
 

@@ -51,7 +51,7 @@ public sealed class MailSettingsProvider(
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(values)
             .Build();
-        var options = MailOptions.FromConfiguration(configuration);
+        var options = MailOptions.FromConfiguration(configuration, QuestionnaireMailSettings.Prefix);
         return pathBase is { IsConfigured: true }
             ? options with { BaseUrl = pathBase.ComposePublicUrl(options.BaseUrl) }
             : options;
