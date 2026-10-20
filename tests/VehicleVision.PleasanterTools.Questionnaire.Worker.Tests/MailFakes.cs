@@ -20,11 +20,11 @@ public sealed class FakeMailOutbox : IMailOutbox
     public Task<bool> EnqueueAsync(
         Guid mailId,
         int kind,
-        Guid surveyId,
+        Guid? subjectId,
         string payloadProtected,
         CancellationToken cancellationToken = default)
     {
-        _pending.Enqueue(new PendingMail(mailId, kind, surveyId, payloadProtected, 0));
+        _pending.Enqueue(new PendingMail(mailId, kind, subjectId, payloadProtected, 0));
         return Task.FromResult(true);
     }
 
@@ -40,11 +40,11 @@ public sealed class FakeMailOutbox : IMailOutbox
 
     public Task RescheduleAsync(
         Guid mailId,
-        DateTime nextAttemptAtUtc,
+        DateTimeOffset nextAttemptAt,
         string? error,
         CancellationToken cancellationToken = default)
     {
-        Rescheduled.Add((mailId, nextAttemptAtUtc, error));
+        Rescheduled.Add((mailId, nextAttemptAt.UtcDateTime, error));
         return Task.CompletedTask;
     }
 

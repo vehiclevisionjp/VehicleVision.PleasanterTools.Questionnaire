@@ -165,7 +165,8 @@ public sealed class AutoReplyDispatcher(
             return await outbox.EnqueueAsync(
                 MailIdOf(payload.Token),
                 (int)MailKind.AutoReply,
-                surveyId,
+                // **紐づかない（`Guid.Empty`）なら `null`**（Core の送信待ちは、紐づかないことを `NULL` で持つ）
+                surveyId == Guid.Empty ? null : surveyId,
                 protector.Protect(mail),
                 cancellationToken).ConfigureAwait(false);
         }
@@ -238,7 +239,7 @@ public sealed class AutoReplyDispatcher(
         {
             // ⚠️ **要求の Host からは作らない**（host header injection。Issue #189）
             logger.LogWarning(
-                "再編集リンクを付けられない（{Key}BASEURL が未設定）", MailOptions.Prefix);
+                "再編集リンクを付けられない（{Key}BASEURL が未設定）", QuestionnaireMailSettings.Prefix);
             return values;
         }
 

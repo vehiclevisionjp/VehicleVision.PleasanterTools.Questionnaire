@@ -1,6 +1,8 @@
+using static VehicleVision.PleasanterTools.Core.Data.SqlDialect;
+
 namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 
-public static partial class SqlDialect
+public static partial class QuestionnaireSqlDialect
 {
     public static string ClaimPendingAssetHistory(DatabaseProvider provider) => provider switch
     {

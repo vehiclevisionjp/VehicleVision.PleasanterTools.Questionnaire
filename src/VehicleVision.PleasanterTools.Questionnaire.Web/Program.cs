@@ -106,7 +106,7 @@ var provider = Enum.Parse<DatabaseProvider>(
 var usesSqlite = provider is DatabaseProvider.Sqlite;
 var databaseStartupState = new DatabaseStartupState();
 builder.Services.AddSingleton(databaseStartupState);
-var connectionString = DatabaseConnectionString.Resolve(
+var connectionString = QuestionnaireDatabase.Instance.ResolveConnectionString(
     provider,
     builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"],
     builder.Environment.ContentRootPath);
@@ -144,7 +144,7 @@ if (sharedStateOptions.UseRedis)
 // 接続文字列は運用者が与えるのでコードからは中身が見えず、
 // 暗号化を切った設定のまま本番へ出ても気付けない（CodeQL の cs/insecure-sql-connection）。
 // **既定は厳しい側。** 検証環境は自己署名の証明書を使うので明示して緩める
-ConnectionSecurity.EnsureSecure(
+QuestionnaireDatabase.Instance.EnsureSecure(
     provider,
     connectionString,
     allowInsecure: string.Equals(
@@ -215,7 +215,7 @@ builder.Services.AddSingleton(serviceProvider =>
 // ⚠️ **ここで DB を読まない**（Issue #404）。
 // `app.StartAsync()` は**マイグレーションより前**に走る（起動中も `/healthz` を応答させる設計）。
 // その時点で `AppSettingsMonitor` がリスナーを 1 度呼び、ここが解決されるため、
-// `PleasanterOptions` を経由すると**まだ存在しない `AppSettings` を読んで落ちる。**
+// `PleasanterOptions` を経由すると**まだ存在しない `Core_AppSettings` を読んで落ちる。**
 // **空の DB へ初めて起動する経路が丸ごと死ぬ**（#382 で自動適用を既定にしたので、これが既定の道）。
 //
 // **初期値は設定だけから採れば足りる。** 直後にリスナーが `SetTimeZone` で上書きする。
@@ -1097,7 +1097,7 @@ app.MapGet("/ready", async (CancellationToken cancellationToken) =>
         return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
 
-    var failure = await DatabaseMigrator.WaitForDatabaseAsync(
+    var failure = await QuestionnaireDatabase.Instance.Migrator.WaitForDatabaseAsync(
         provider,
         connectionString,
         TimeSpan.Zero,

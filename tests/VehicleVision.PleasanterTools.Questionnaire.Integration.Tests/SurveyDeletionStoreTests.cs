@@ -53,7 +53,6 @@ public class SurveyDeletionStoreTests
             "Responses",
             "ResponseEditTokens",
             "AssetTickets",
-            "MailOutbox",
             "AdminNotifications",
             "ResponseNotificationDigests",
             "SurveyAssets",
@@ -72,6 +71,12 @@ public class SurveyDeletionStoreTests
                     new { SurveyId = surveyId }));
         }
 
+        // **メールの送信待ちは Core.Data の共有表。** アンケートへの紐づけは `SubjectId`
+        Assert.Equal(
+            0L,
+            await connection.ExecuteScalarAsync<long>(
+                Sql(provider, "SELECT COUNT(*) FROM [Core_MailOutbox] WHERE [SubjectId] = @SurveyId"),
+                new { SurveyId = surveyId }));
         Assert.Equal(
             0L,
             await connection.ExecuteScalarAsync<long>(
@@ -80,7 +85,7 @@ public class SurveyDeletionStoreTests
         Assert.Equal(
             1L,
             await connection.ExecuteScalarAsync<long>(
-                Sql(provider, "SELECT COUNT(*) FROM [AuditLogs] WHERE [TargetId] = @TargetId"),
+                Sql(provider, "SELECT COUNT(*) FROM [Core_AuditLogs] WHERE [TargetId] = @TargetId"),
                 new { TargetId = surveyId.ToString() }));
     }
 
@@ -156,7 +161,8 @@ public class SurveyDeletionStoreTests
         var surveyId = Guid.NewGuid();
         await new SurveyRepository(factory).SaveAsync(
             Record(surveyId, DbTime.UtcNowTruncated()));
-        await new MailOutbox(factory).EnqueueAsync(Guid.NewGuid(), 0, surveyId, "encrypted");
+        await new MailOutbox(factory, TimeProvider.System)
+            .EnqueueAsync(Guid.NewGuid(), 0, surveyId, "encrypted");
 
         var result = await new SurveyDeletionStore(factory)
             .DeleteAsync(surveyId, "完全削除の検証");
@@ -169,7 +175,7 @@ public class SurveyDeletionStoreTests
         DatabaseProvider provider,
         string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         return new DbConnectionFactory(provider, connectionString);
     }
 
@@ -281,8 +287,8 @@ public class SurveyDeletionStoreTests
                     Now = now,
                 }),
             (
-                "INSERT INTO [MailOutbox] "
-                    + "([MailId], [Kind], [SurveyId], [PayloadProtected], [Status], [RetryCount], "
+                "INSERT INTO [Core_MailOutbox] "
+                    + "([MailId], [Kind], [SubjectId], [PayloadProtected], [Status], [RetryCount], "
                     + " [NextAttemptAt], [CreatedAt], [UpdatedAt]) "
                     + "VALUES (@Id, 0, @SurveyId, @Payload, @Status, 0, @Now, @Now, @Now)",
                 new
@@ -372,9 +378,9 @@ public class SurveyDeletionStoreTests
                     + "VALUES (@Id, @Now, @SurveyId, 0, 1)",
                 new { Id = Guid.NewGuid(), Now = now, SurveyId = surveyId }),
             (
-                "INSERT INTO [AuditLogs] "
-                    + "([AuditLogId], [OccurredAt], [Action], [TargetType], [TargetId]) "
-                    + "VALUES (@Id, @Now, @Action, @TargetType, @TargetId)",
+                "INSERT INTO [Core_AuditLogs] "
+                    + "([AuditLogId], [OccurredAt], [Action], [Succeeded], [TargetType], [TargetId]) "
+                    + "VALUES (@Id, @Now, @Action, 1, @TargetType, @TargetId)",
                 new
                 {
                     Id = Guid.NewGuid(),

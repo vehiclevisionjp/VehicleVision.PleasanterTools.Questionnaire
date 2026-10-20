@@ -117,8 +117,9 @@ public sealed class SurveyDeletionStore(
             transaction,
             cancellationToken)).ConfigureAwait(false);
         var pendingMail = await connection.ExecuteScalarAsync<long>(Command(
-            "SELECT COUNT(*) FROM [MailOutbox] "
-            + "WHERE [SurveyId] = @SurveyId AND [Status] <> @DeadLetterStatus",
+            // **メールの送信待ちは Core.Data の共有表。** アンケートへの紐づけは `SubjectId`
+            "SELECT COUNT(*) FROM [Core_MailOutbox] "
+            + "WHERE [SubjectId] = @SurveyId AND [Status] <> @DeadLetterStatus",
             new
             {
                 SurveyId = surveyId,
@@ -174,7 +175,6 @@ public sealed class SurveyDeletionStore(
             "AssetTickets",
             "AssetHistoryOutbox",
             "ResponseEditTokens",
-            "MailOutbox",
             "Responses",
             "ResponseTokens",
             "SurveyVersions",
@@ -187,6 +187,15 @@ public sealed class SurveyDeletionStore(
                 surveyId,
                 cancellationToken).ConfigureAwait(false);
         }
+
+        // **メールの送信待ちは Core.Data の共有表**（`Core_MailOutbox`）。アンケートへの紐づけは
+        // `SurveyId` ではなく `SubjectId` なので、上の一覧とは別に消す
+        await DeleteAsync(
+            connection,
+            transaction,
+            "DELETE FROM [Core_MailOutbox] WHERE [SubjectId] = @SurveyId",
+            surveyId,
+            cancellationToken).ConfigureAwait(false);
 
         var deleted = await connection.ExecuteAsync(Command(
             "DELETE FROM [Surveys] WHERE [SurveyId] = @SurveyId "
