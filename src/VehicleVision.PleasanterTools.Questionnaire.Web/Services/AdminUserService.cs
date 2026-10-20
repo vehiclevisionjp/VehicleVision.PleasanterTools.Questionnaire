@@ -97,7 +97,7 @@ public sealed class AdminUserService(
     {
         var users = await store.ListAsync(cancellationToken).ConfigureAwait(false);
         var pending = (await invitations
-            .ListPendingAdminUserIdsAsync(Now, cancellationToken).ConfigureAwait(false)).ToHashSet();
+            .ListPendingAdminUserIdsAsync(cancellationToken).ConfigureAwait(false)).ToHashSet();
 
         return users.Select(user => new AdminUserSummary
         {
@@ -206,7 +206,7 @@ public sealed class AdminUserService(
         var invitation = await invitations
             .FindByTokenHashAsync(InvitationToken.HashOf(token), cancellationToken).ConfigureAwait(false);
 
-        if (invitation is null || invitation.UsedAt is not null || invitation.ExpiresAt <= Now)
+        if (invitation is null || invitation.UsedAt is not null || invitation.ExpiresAt.UtcDateTime <= Now)
         {
             return (AdminUserOutcome.InvitationInvalid, null, null);
         }
@@ -389,14 +389,12 @@ public sealed class AdminUserService(
         var expiresAt = Now + options.InvitationLifetime;
 
         await invitations.ReplaceAsync(
-            new AdminInvitation
-            {
-                InvitationId = Guid.NewGuid(),
-                AdminUserId = targetId,
-                TokenHash = InvitationToken.HashOf(token),
-                ExpiresAt = expiresAt,
-                CreatedBy = actorId,
-            },
+            new AdminInvitation(
+                InvitationId: Guid.NewGuid(),
+                AdminUserId: targetId,
+                TokenHash: InvitationToken.HashOf(token),
+                ExpiresAt: new DateTimeOffset(expiresAt),
+                CreatedBy: actorId),
             cancellationToken).ConfigureAwait(false);
 
         return new IssuedInvitation(targetId, token, expiresAt);

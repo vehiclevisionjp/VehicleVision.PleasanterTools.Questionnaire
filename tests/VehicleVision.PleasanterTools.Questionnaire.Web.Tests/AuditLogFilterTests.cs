@@ -29,13 +29,13 @@ public class AuditLogFilterTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<AuditLogView>> ListAsync(
+        public Task<IReadOnlyList<AuditEntry>> ListAsync(
             AuditLogQuery query,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AuditLogView>>([]);
+            Task.FromResult<IReadOnlyList<AuditEntry>>([]);
 
         public Task<int> DeleteOlderThanAsync(
-            DateTime threshold,
+            DateTimeOffset threshold,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(Written.RemoveAll(entry => entry.OccurredAt < threshold));
     }
@@ -44,7 +44,8 @@ public class AuditLogFilterTests
         string method,
         string routePattern,
         Guid? adminUserId = null,
-        (string Key, string Value)[]? routeValues = null)
+        (string Key, string Value)[]? routeValues = null,
+        string? loginId = null)
     {
         var context = new DefaultHttpContext();
         context.Request.Method = method;
@@ -64,8 +65,13 @@ public class AuditLogFilterTests
 
         if (adminUserId is { } id)
         {
-            context.User = new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim(ClaimTypes.NameIdentifier, id.ToString())], "Test"));
+            var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, id.ToString()) };
+            if (loginId is not null)
+            {
+                claims.Add(new Claim(ClaimTypes.Name, loginId));
+            }
+
+            context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
         }
 
         return context;
@@ -74,12 +80,13 @@ public class AuditLogFilterTests
     private static async Task<FakeStore> RunAsync(
         HttpContext context,
         object? result,
-        Action<FakeStore>? configure = null)
+        Action<FakeStore>? configure = null,
+        TimeProvider? time = null)
     {
         var store = new FakeStore();
         configure?.Invoke(store);
 
-        var filter = new AuditLogFilter(store, NullLogger<AuditLogFilter>.Instance);
+        var filter = new AuditLogFilter(store, NullLogger<AuditLogFilter>.Instance, time);
 
         await filter.InvokeAsync(
             EndpointFilterInvocationContext.Create(context),
@@ -130,9 +137,10 @@ public class AuditLogFilterTests
             Results.Ok());
 
         var entry = Assert.Single(store.Written);
-        Assert.Equal(actor, entry.AdminUserId);
+        Assert.Equal(actor.ToString("D"), entry.ActorKey);
         Assert.Equal("POST /api/admin/users/{adminUserId}/disable", entry.Action);
         Assert.Equal(StatusCodes.Status200OK, entry.StatusCode);
+        Assert.True(entry.Succeeded);
         Assert.Equal("AdminUser", entry.TargetType);
         Assert.Equal(target.ToString(), entry.TargetId);
     }
@@ -220,8 +228,57 @@ public class AuditLogFilterTests
             Results.Json(new { }, statusCode: StatusCodes.Status401Unauthorized));
 
         var entry = Assert.Single(store.Written);
-        Assert.Null(entry.AdminUserId);
+        Assert.Null(entry.ActorKey);
+        Assert.Null(entry.ActorLoginId);
         Assert.Equal(StatusCodes.Status401Unauthorized, entry.StatusCode);
+        Assert.False(entry.Succeeded);
+    }
+
+    [Fact]
+    public async Task 操作した管理者のログインIDも書くときに残す()
+    {
+        // **旧は読むときに管理者の表と結合して名前を出していた。** Core の記録は書くときにログイン ID を持つ
+        var actor = Guid.NewGuid();
+
+        var store = await RunAsync(
+            Request("POST", "/api/admin/users/{adminUserId}/disable", actor, loginId: "alice"),
+            Results.Ok());
+
+        var entry = Assert.Single(store.Written);
+        Assert.Equal(actor.ToString("D"), entry.ActorKey);
+        Assert.Equal("alice", entry.ActorLoginId);
+    }
+
+    [Theory]
+    [InlineData(StatusCodes.Status200OK, true)]
+    [InlineData(StatusCodes.Status302Found, true)]
+    [InlineData(StatusCodes.Status400BadRequest, false)]
+    [InlineData(StatusCodes.Status403Forbidden, false)]
+    [InlineData(StatusCodes.Status500InternalServerError, false)]
+    public async Task 結果は400以上を失敗として残す(int statusCode, bool succeeded)
+    {
+        var store = await RunAsync(
+            Request("POST", "/api/admin/login"),
+            Results.StatusCode(statusCode));
+
+        var entry = Assert.Single(store.Written);
+        Assert.Equal(statusCode, entry.StatusCode);
+        Assert.Equal(succeeded, entry.Succeeded);
+    }
+
+    [Fact]
+    public async Task 時刻はこれまでと同じ目盛りでサーバのローカル時刻の数字を残す()
+    {
+        // **旧は DateTime.Now（ローカル時刻の数字）をそのまま持っていた。** 目盛りを変えると、
+        // 旧表から写した行と新しい行で、画面の時刻が食い違う（AuditLogTime）
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(
+            new DateTimeOffset(2026, 10, 20, 0, 30, 0, TimeSpan.Zero));
+        time.SetLocalTimeZone(TimeZoneInfo.CreateCustomTimeZone("JST", TimeSpan.FromHours(9), "JST", "JST"));
+
+        var store = await RunAsync(Request("POST", "/api/admin/login"), Results.Ok(), time: time);
+
+        var entry = Assert.Single(store.Written);
+        Assert.Equal(new DateTime(2026, 10, 20, 9, 30, 0), AuditLogTime.ToWallClock(entry.OccurredAt));
     }
 
     [Fact]

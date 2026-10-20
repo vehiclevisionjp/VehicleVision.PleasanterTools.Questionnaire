@@ -61,7 +61,7 @@ public class SurveySnapshotStoreTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
         var repository = new SurveyRepository(factory);
         var snapshots = new SurveySnapshotStore(factory);
@@ -96,7 +96,7 @@ public class SurveySnapshotStoreTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
         var repository = new SurveyRepository(factory);
 
@@ -121,7 +121,7 @@ public class SurveySnapshotStoreTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
         var repository = new SurveyRepository(factory);
         var snapshots = new SurveySnapshotStore(factory);
@@ -149,7 +149,7 @@ public class SurveySnapshotStoreTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var repository = new SurveyRepository(new DbConnectionFactory(provider, connectionString));
 
         var surveyId = Guid.NewGuid();
@@ -175,7 +175,7 @@ public class SurveySnapshotStoreTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var snapshots = new SurveySnapshotStore(new DbConnectionFactory(provider, connectionString));
 
         Assert.Null(await snapshots.FindAsync(Guid.NewGuid(), 1));
@@ -192,7 +192,7 @@ public class SurveySnapshotStoreTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
         var repository = new SurveyRepository(factory);
         var tokens = new ResponseTokenStore(factory);

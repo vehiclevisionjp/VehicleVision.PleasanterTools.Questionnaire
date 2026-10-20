@@ -26,7 +26,7 @@ public class MigrationNumberTests
 {
     private static IReadOnlyList<(Type Type, long Version, string Description)> Migrations()
     {
-        return typeof(DatabaseMigrator).Assembly
+        return typeof(QuestionnaireDatabase).Assembly
             .GetTypes()
             .Select(type => (Type: type, Attribute: type.GetCustomAttribute<MigrationAttribute>()))
             .Where(pair => pair.Attribute is not null)

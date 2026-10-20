@@ -165,7 +165,8 @@ public sealed class AutoReplyDispatcher(
             return await outbox.EnqueueAsync(
                 MailIdOf(payload.Token),
                 (int)MailKind.AutoReply,
-                surveyId,
+                // **紐づかない（`Guid.Empty`）なら `null`**（Core の送信待ちは、紐づかないことを `NULL` で持つ）
+                surveyId == Guid.Empty ? null : surveyId,
                 protector.Protect(mail),
                 cancellationToken).ConfigureAwait(false);
         }

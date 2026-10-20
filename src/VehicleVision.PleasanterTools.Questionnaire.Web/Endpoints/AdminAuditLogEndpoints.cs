@@ -51,9 +51,9 @@ public static class AdminAuditLogEndpoints
                 {
                     Limit = take + 1,
                     Offset = Math.Max(offset ?? 0, 0),
-                    From = from,
-                    To = to,
-                    AdminUserId = adminUserId,
+                    From = AuditLogTime.ToStored(from),
+                    To = AuditLogTime.ToStored(to),
+                    ActorKey = adminUserId?.ToString("D"),
                     FailedOnly = failedOnly,
                     ActionContains = action,
                 },
@@ -65,9 +65,10 @@ public static class AdminAuditLogEndpoints
             {
                 entries = rows.Take(take).Select(row => new
                 {
-                    occurredAt = row.OccurredAt,
-                    adminUserId = row.AdminUserId,
-                    adminLoginId = row.AdminLoginId,
+                    // **応答の形は変えない。** 旧は列の値（時間帯の印の無い日時）をそのまま返していた
+                    occurredAt = AuditLogTime.ToWallClock(row.OccurredAt),
+                    adminUserId = Guid.TryParse(row.ActorKey, out var actorId) ? actorId : (Guid?)null,
+                    adminLoginId = row.ActorLoginId,
                     action = row.Action,
                     statusCode = row.StatusCode,
                     targetType = row.TargetType,
