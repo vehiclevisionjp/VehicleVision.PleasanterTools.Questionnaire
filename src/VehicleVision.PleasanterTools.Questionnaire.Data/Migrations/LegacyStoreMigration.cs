@@ -21,15 +21,6 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// </remarks>
 internal static class LegacyStoreMigration
 {
-    /// <summary>FluentMigrator の RDBMS の名前と、Core.Data の <see cref="DatabaseProvider"/> の対応。</summary>
-    private static readonly (string Name, DatabaseProvider Provider)[] Databases =
-    [
-        ("SqlServer", DatabaseProvider.SqlServer),
-        ("Postgres", DatabaseProvider.PostgreSql),
-        ("MySql", DatabaseProvider.MySql),
-        ("SQLite", DatabaseProvider.Sqlite),
-    ];
-
     /// <summary>旧表の行を写して、旧表を落とす。旧表が無ければ何もしない。</summary>
     /// <param name="migration">呼び出す移行。</param>
     /// <param name="legacyTable">旧表の名前。</param>
@@ -50,12 +41,33 @@ internal static class LegacyStoreMigration
             return;
         }
 
-        foreach (var (name, provider) in Databases)
+        // **RDBMS は、実際に繋いでいる接続の型で見分ける。** FluentMigrator の `IfDatabase` は名前の一致で決まり、
+        // 名前が合わないと**何も実行されないまま旧表だけが落ちて、行が消える**
+        // （PostgreSQL の処理系の名前が `Postgres` ではなく `PostgreSQL` だったために、実際に行が写らなかった）。
+        // 見分けられない接続なら例外にして、旧表を落とさない
+        migration.Execute.WithConnection((connection, transaction) =>
         {
-            migration.IfDatabase(name).Execute.Sql(SqlDialect.Format(provider, copySql(provider)));
-        }
+            var provider = ProviderOf(connection);
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = SqlDialect.Format(provider, copySql(provider));
+            command.ExecuteNonQuery();
+        });
 
         migration.Delete.Table(legacyTable);
+    }
+
+    private static DatabaseProvider ProviderOf(System.Data.IDbConnection connection)
+    {
+        var type = connection.GetType().FullName ?? string.Empty;
+        return type switch
+        {
+            _ when type.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) => DatabaseProvider.PostgreSql,
+            _ when type.Contains("MySql", StringComparison.OrdinalIgnoreCase) => DatabaseProvider.MySql,
+            _ when type.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) => DatabaseProvider.Sqlite,
+            _ when type.Contains("SqlClient", StringComparison.OrdinalIgnoreCase) => DatabaseProvider.SqlServer,
+            _ => throw new NotSupportedException($"移行で RDBMS を見分けられない接続: {type}"),
+        };
     }
 
     /// <summary>
