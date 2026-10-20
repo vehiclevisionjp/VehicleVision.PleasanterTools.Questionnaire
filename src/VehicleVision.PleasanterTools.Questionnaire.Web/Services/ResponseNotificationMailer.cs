@@ -21,7 +21,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// </remarks>
 public sealed class ResponseNotificationMailer(
     IResponseNotificationStore notifications,
-    IAdminUserStore users,
+    IAdminUserSettingsStore users,
     IMailPayloadProtector protector,
     ILogger<ResponseNotificationMailer> logger,
     ResponseNotificationMailerOptions options,

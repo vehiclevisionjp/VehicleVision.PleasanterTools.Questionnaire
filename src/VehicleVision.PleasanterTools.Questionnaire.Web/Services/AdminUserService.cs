@@ -44,7 +44,9 @@ public sealed record AdminUserSummary
 {
     public required Guid AdminUserId { get; init; }
     public required string LoginId { get; init; }
-    public required AdminRole Role { get; init; }
+
+    /// <summary>役割の名前（<see cref="AdminRole"/> のメンバー名。Core の表が持つ文字列のまま）。</summary>
+    public required string Role { get; init; }
     public required bool IsDisabled { get; init; }
 
     /// <summary>2 要素の登録が済んでいるか。</summary>
@@ -83,6 +85,7 @@ public sealed record IssuedInvitation(Guid AdminUserId, string Token, DateTime E
 /// </remarks>
 public sealed class AdminUserService(
     IAdminUserStore store,
+    IAdminSessionStore sessions,
     IAdminInvitationStore invitations,
     AdminAuthenticator authenticator,
     PasswordHasher hasher,
@@ -101,14 +104,14 @@ public sealed class AdminUserService(
 
         return users.Select(user => new AdminUserSummary
         {
-            AdminUserId = user.AdminUserId,
+            AdminUserId = user.Id,
             LoginId = user.LoginId,
             Role = user.Role,
             IsDisabled = user.IsDisabled,
-            HasTotp = user.HasTotp,
-            InvitationPending = pending.Contains(user.AdminUserId),
-            LastLoginAt = user.LastLoginAt,
-            CreatedAt = user.CreatedAt,
+            HasTotp = user.TotpEnabled,
+            InvitationPending = pending.Contains(user.Id),
+            LastLoginAt = user.LastLoginAt?.UtcDateTime,
+            CreatedAt = user.CreatedAt.UtcDateTime,
         }).ToList();
     }
 
@@ -129,29 +132,28 @@ public sealed class AdminUserService(
             return (AdminUserOutcome.InvalidInput, null);
         }
 
-        var existing = await store.FindByLoginIdAsync(normalized, cancellationToken).ConfigureAwait(false);
-        if (existing is not null)
+        // **誰も知らない値。** 既定のパスワードを配らないための埋め草であって、資格情報ではない。
+        // 同じログイン ID（大文字小文字は区別しない）が既にあれば、Core の窓口が null を返す
+        var user = await store
+            .CreateAsync(
+                normalized,
+                hasher.Hash(Guid.NewGuid().ToString()),
+                AdminRoleMap.ToName(role),
+                language: string.Empty,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (user is null)
         {
             return (AdminUserOutcome.DuplicateLoginId, null);
         }
 
-        var user = new AdminUser
-        {
-            AdminUserId = Guid.NewGuid(),
-            LoginId = normalized,
-            // **誰も知らない値。** 既定のパスワードを配らないための埋め草であって、資格情報ではない
-            PasswordHash = hasher.Hash(Guid.NewGuid().ToString()),
-            Role = role,
-        };
-
-        await store.CreateAsync(user, cancellationToken).ConfigureAwait(false);
         logger.LogInformation(
             "管理者を追加した（AdminUserId={AdminUserId}、Role={Role}、招いたのは {ActorId}）",
-            user.AdminUserId,
+            user.Id,
             role,
             actorId);
 
-        var invitation = await IssueInvitationAsync(actorId, user.AdminUserId, cancellationToken)
+        var invitation = await IssueInvitationAsync(actorId, user.Id, cancellationToken)
             .ConfigureAwait(false);
         return (AdminUserOutcome.Succeeded, invitation);
     }
@@ -232,10 +234,10 @@ public sealed class AdminUserService(
             return (AdminUserOutcome.InvitationInvalid, null, null);
         }
 
-        await store.UpdatePasswordHashAsync(user.AdminUserId, hasher.Hash(password!), cancellationToken)
+        await store.SetPasswordHashAsync(user.Id, hasher.Hash(password!), cancellationToken)
             .ConfigureAwait(false);
 
-        logger.LogInformation("招待からパスワードを決めた（AdminUserId={AdminUserId}）", user.AdminUserId);
+        logger.LogInformation("招待からパスワードを決めた（AdminUserId={AdminUserId}）", user.Id);
         return (AdminUserOutcome.Succeeded, user, null);
     }
 
@@ -270,7 +272,7 @@ public sealed class AdminUserService(
             return checkOutcome;
         }
 
-        await store.UpdatePasswordHashAsync(actorId, hasher.Hash(newPassword!), cancellationToken)
+        await store.SetPasswordHashAsync(actorId, hasher.Hash(newPassword!), cancellationToken)
             .ConfigureAwait(false);
 
         logger.LogInformation("パスワードを変えた（AdminUserId={AdminUserId}）", actorId);
@@ -327,10 +329,14 @@ public sealed class AdminUserService(
             return AdminUserOutcome.Succeeded;
         }
 
-        if (!await store.TryDisableAsync(targetId, cancellationToken).ConfigureAwait(false))
+        switch (await store.SetDisabledAsync(targetId, true, cancellationToken).ConfigureAwait(false))
         {
-            // **最後の 1 人だった。** 止めると誰も入れなくなる
-            return AdminUserOutcome.LastAdministrator;
+            case AdminChangeResult.LastAdministrator:
+                // **最後の 1 人だった。** 止めると誰も入れなくなる
+                return AdminUserOutcome.LastAdministrator;
+
+            case AdminChangeResult.NotFound:
+                return AdminUserOutcome.NotFound;
         }
 
         // **止めた相手宛ての招待は取り消す。** 止めたのにパスワードを決められては困る
@@ -354,7 +360,8 @@ public sealed class AdminUserService(
             return AdminUserOutcome.NotFound;
         }
 
-        if (target.Role == role)
+        var roleName = AdminRoleMap.ToName(role);
+        if (target.Role == roleName)
         {
             return AdminUserOutcome.Succeeded;
         }
@@ -365,10 +372,18 @@ public sealed class AdminUserService(
             return AdminUserOutcome.SelfNotAllowed;
         }
 
-        if (!await store.TrySetRoleAsync(targetId, role, cancellationToken).ConfigureAwait(false))
+        switch (await store.SetRoleAsync(targetId, roleName, cancellationToken).ConfigureAwait(false))
         {
-            return AdminUserOutcome.LastAdministrator;
+            case AdminChangeResult.LastAdministrator:
+                return AdminUserOutcome.LastAdministrator;
+
+            case AdminChangeResult.NotFound:
+                return AdminUserOutcome.NotFound;
         }
+
+        // **役割を変えたら、相手のセッションをすべて失効させる。** 降格した相手が、
+        // 古い役割のまま操作を続けられては困る（セッションは役割を持たないので、ここで切る）。再ログインで新しい役割になる
+        await sessions.DeleteForUserAsync(targetId, exceptSessionId: null, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation(
             "役割を変えた（AdminUserId={AdminUserId}、Role={Role}、操作したのは {ActorId}）",

@@ -45,16 +45,68 @@ internal static class LegacyStoreMigration
         // 名前が合わないと**何も実行されないまま旧表だけが落ちて、行が消える**
         // （PostgreSQL の処理系の名前が `Postgres` ではなく `PostgreSQL` だったために、実際に行が写らなかった）。
         // 見分けられない接続なら例外にして、旧表を落とさない
-        migration.Execute.WithConnection((connection, transaction) =>
-        {
-            var provider = ProviderOf(connection);
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = SqlDialect.Format(provider, copySql(provider));
-            command.ExecuteNonQuery();
-        });
+        WithConnection(migration, (connection, transaction, provider) =>
+            ExecuteNonQuery(connection, transaction, provider, copySql(provider)));
 
         migration.Delete.Table(legacyTable);
+    }
+
+    /// <summary>
+    /// 実際に繋いでいる接続と、その RDBMS を渡して処理を実行する。
+    /// <b>RDBMS は接続の型で見分ける</b>（<see cref="CopyThenDrop"/> の注意を参照）。見分けられなければ例外にする。
+    /// </summary>
+    /// <remarks>
+    /// <b>移行は、前の式が失敗すると後ろの式（旧表を落とす <c>Delete.Table</c>）へ進まない。</b>
+    /// 事前の検査（重複など）で例外を投げれば、旧表は残る。
+    /// </remarks>
+    public static void WithConnection(
+        Migration migration,
+        Action<System.Data.IDbConnection, System.Data.IDbTransaction?, DatabaseProvider> action)
+    {
+        ArgumentNullException.ThrowIfNull(migration);
+        ArgumentNullException.ThrowIfNull(action);
+
+        migration.Execute.WithConnection((connection, transaction) =>
+            action(connection, transaction, ProviderOf(connection)));
+    }
+
+    /// <summary>SQL を 1 文実行する。<b>識別子は角括弧で囲んで書く</b>（<see cref="SqlDialect.Format"/> が書き換える）。</summary>
+    public static int ExecuteNonQuery(
+        System.Data.IDbConnection connection,
+        System.Data.IDbTransaction? transaction,
+        DatabaseProvider provider,
+        string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = SqlDialect.Format(provider, sql);
+        return command.ExecuteNonQuery();
+    }
+
+    /// <summary>SELECT を実行し、各行を文字列の並びで返す（検査用。行数は少ない前提）。</summary>
+    public static List<string[]> Query(
+        System.Data.IDbConnection connection,
+        System.Data.IDbTransaction? transaction,
+        DatabaseProvider provider,
+        string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = SqlDialect.Format(provider, sql);
+        using var reader = command.ExecuteReader();
+        var rows = new List<string[]>();
+        while (reader.Read())
+        {
+            var row = new string[reader.FieldCount];
+            for (var index = 0; index < row.Length; index++)
+            {
+                row[index] = reader.IsDBNull(index) ? "(NULL)" : Convert.ToString(reader.GetValue(index)) ?? string.Empty;
+            }
+
+            rows.Add(row);
+        }
+
+        return rows;
     }
 
     private static DatabaseProvider ProviderOf(System.Data.IDbConnection connection)

@@ -26,9 +26,6 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// </remarks>
 public static class AdminUserEndpoints
 {
-    /// <summary>登録し直しの途中に預ける共有鍵の claim。</summary>
-    private const string ReenrollSecretClaim = "questionnaire:totp_reenrollment_secret";
-
     public static IEndpointRouteBuilder MapAdminUserEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/admin")
@@ -63,7 +60,7 @@ public static class AdminUserEndpoints
                 {
                     adminUserId = user.AdminUserId,
                     loginId = user.LoginId,
-                    role = user.Role.ToString(),
+                    role = user.Role,
                     isDisabled = user.IsDisabled,
                     hasTotp = user.HasTotp,
                     // まだ招待を受け取っていない（＝一度も入っていない）
@@ -210,7 +207,7 @@ public static class AdminUserEndpoints
 
             AuditNotes.Add(context, "target", user.LoginId);
 
-            if (!user.HasTotp)
+            if (!user.TotpEnabled)
             {
                 return Results.BadRequest(new
                 {
@@ -284,12 +281,11 @@ public static class AdminUserEndpoints
 
             // **盗まれた別端末と、飛行中の 2 要素認証を同時に締め出す。**
             // 今この操作をした通常セッションだけは残す。
-            var currentSessionId = Guid.TryParse(
-                principal.FindFirstValue(AdminSessionManager.SessionIdClaim), out var parsed)
-                ? parsed
-                : (Guid?)null;
             var revoked = await context.RequestServices.GetRequiredService<IAdminSessionStore>()
-                .DeleteAllExceptAsync(ActorId(principal), currentSessionId, cancellationToken)
+                .RevokeAllExceptAsync(
+                    ActorId(principal),
+                    principal.FindFirstValue(AdminSessionManager.SessionIdClaim),
+                    cancellationToken)
                 .ConfigureAwait(false);
             AuditNotes.SetTargets(context, "AdminSession", revoked);
             return Results.Ok(new { changed = true, revokedSessions = revoked.Count });
@@ -301,7 +297,7 @@ public static class AdminUserEndpoints
             AdminLanguageRequest request,
             HttpContext context,
             ClaimsPrincipal principal,
-            IAdminUserStore store,
+            IAdminUserSettingsStore store,
             CancellationToken cancellationToken) =>
         {
             // **空なら「選んでいない」へ戻す。** ブラウザの言語設定に従うようになる
@@ -329,7 +325,7 @@ public static class AdminUserEndpoints
         me.MapPut("/response-notification", async (
             AdminResponseNotificationRequest request,
             ClaimsPrincipal principal,
-            IAdminUserStore store,
+            IAdminUserSettingsStore store,
             CancellationToken cancellationToken) =>
         {
             await store.SetResponseNotificationEnabledAsync(
@@ -380,7 +376,7 @@ public static class AdminUserEndpoints
             }
 
             var user = await store.FindByIdAsync(actorId, cancellationToken).ConfigureAwait(false);
-            if (user is null || !user.HasTotp)
+            if (user is null || !user.TotpEnabled)
             {
                 return Results.BadRequest(new
                 {
@@ -426,16 +422,13 @@ public static class AdminUserEndpoints
             }
 
             var loginId = principal.Identity?.Name ?? string.Empty;
-            var enrollment = authenticator.BeginTotpEnrollment(loginId);
 
-            // **共有鍵は cookie 側に預ける。** 画面から送り返させると差し替えられる
-            await SignInReenrollAsync(
-                context,
-                actorId,
-                loginId,
-                principal.FindFirstValue(ClaimTypes.Role) ?? string.Empty,
-                enrollment.SecretBase32)
+            // **共有鍵はサーバ側に預ける**（「登録の途中の鍵」。暗号化して DB に置く）。
+            // 画面から送り返させると差し替えられる
+            var enrollment = await authenticator
+                .BeginTotpEnrollmentAsync(actorId, loginId, cancellationToken)
                 .ConfigureAwait(false);
+            await SignInReenrollAsync(context, actorId).ConfigureAwait(false);
 
             return Results.Ok(new { secret = enrollment.SecretBase32, uri = enrollment.OtpAuthUri });
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
@@ -451,11 +444,15 @@ public static class AdminUserEndpoints
             var reenroll = await context.AuthenticateAsync(AdminAuthSchemes.Reenroll).ConfigureAwait(false);
 
             // **同じ人の途中でなければ通さない**
+            string? secret = null;
             if (!reenroll.Succeeded
                 || !Guid.TryParse(
                     reenroll.Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var pendingId)
                 || pendingId != actorId
-                || reenroll.Principal?.FindFirstValue(ReenrollSecretClaim) is not { Length: > 0 } secret)
+                || string.IsNullOrEmpty(
+                    secret = await authenticator
+                        .GetPendingEnrollmentSecretAsync(actorId, cancellationToken)
+                        .ConfigureAwait(false)))
             {
                 return Results.BadRequest(new
                 {
@@ -529,15 +526,14 @@ public static class AdminUserEndpoints
             // **招待の出し直しはパスワードの決め直しでもある。**
             // 以前のパスワードで張られた通常・途中セッションをすべて失効させる。
             var revoked = await context.RequestServices.GetRequiredService<IAdminSessionStore>()
-                .DeleteAllExceptAsync(user!.AdminUserId, exceptSessionId: null, cancellationToken)
+                .RevokeAllExceptAsync(user!.Id, exceptSessionId: null, cancellationToken)
                 .ConfigureAwait(false);
             AuditNotes.SetTargets(context, "AdminSession", revoked);
 
             // **2 要素を登録している人は、まず 2 要素を通す**
-            if (user.HasTotp)
+            if (user.TotpEnabled)
             {
-                await AdminAuthEndpoints.SignInPendingAsync(context, user, secret: null)
-                    .ConfigureAwait(false);
+                await AdminAuthEndpoints.SignInPendingAsync(context, user.Id).ConfigureAwait(false);
                 return Results.Ok(new { next = "totp" });
             }
 
@@ -546,16 +542,15 @@ public static class AdminUserEndpoints
             // **任意や無効にしていても招待された人だけ登録を強いられていた。**
             if (options.TwoFactor is TwoFactorPolicy.Required)
             {
-                await AdminAuthEndpoints.SignInPendingAsync(context, user, secret: null)
-                    .ConfigureAwait(false);
+                await AdminAuthEndpoints.SignInPendingAsync(context, user.Id).ConfigureAwait(false);
                 return Results.Ok(new { next = "enroll" });
             }
 
             // **任意・無効なら、そのまま入れる。**
             // 後から自分で登録できる（POST /api/admin/me/totp/begin）
-            await authenticator.RecordSignInAsync(user.AdminUserId, cancellationToken)
+            await authenticator.RecordSignInAsync(user.Id, cancellationToken)
                 .ConfigureAwait(false);
-            await AdminAuthEndpoints.SignInSessionAsync(context, user).ConfigureAwait(false);
+            await AdminAuthEndpoints.SignInSessionAsync(context, user.Id).ConfigureAwait(false);
             return Results.Ok(new { next = "done" });
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
@@ -659,29 +654,14 @@ public static class AdminUserEndpoints
     private static Guid ActorId(ClaimsPrincipal principal) =>
         Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    private static async Task SignInReenrollAsync(
-        HttpContext context,
-        Guid adminUserId,
-        string loginId,
-        string role,
-        string secret)
-    {
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, adminUserId.ToString()),
-                new Claim(ClaimTypes.Name, loginId),
-                new Claim(ClaimTypes.Role, role),
-                new Claim(ReenrollSecretClaim, secret),
-            ],
-            AdminAuthSchemes.Reenroll);
-
-        await context.RequestServices.GetRequiredService<AdminSessionManager>().SignInAsync(
+    /// <summary>2 要素を登録し直している途中の状態にする（短い寿命。共有鍵はサーバ側の「登録の途中の鍵」）。</summary>
+    private static Task SignInReenrollAsync(HttpContext context, Guid adminUserId) =>
+        context.RequestServices.GetRequiredService<AdminSessionManager>().SignInAsync(
             context,
             AdminAuthSchemes.Reenroll,
-            AdminSessionKind.Reenroll,
-            new ClaimsPrincipal(identity),
-            AdminAuthSchemes.ReenrollLifetime).ConfigureAwait(false);
-    }
+            QuestionnaireSessionKinds.Reenroll,
+            adminUserId,
+            AdminAuthSchemes.ReenrollLifetime);
 
     /// <summary>追加する管理者。**パスワードは受け取らない**（招待で本人が決める）。</summary>
     public sealed record AdminUserCreateRequest(string? LoginId, string? Role);

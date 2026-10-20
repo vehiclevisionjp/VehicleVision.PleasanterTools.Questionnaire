@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
@@ -52,7 +53,7 @@ public class CoreStoreMigrationTests
         Assert.Contains(100000L, versions);
         Assert.All(versions.Where(version => version >= 100000), version => Assert.True(version > LastCoreVersion));
         Assert.Equal(
-            [100000L, 100001L, 100002L, 100003L],
+            [100000L, 100001L, 100002L, 100003L, 100004L],
             versions.Where(version => version >= 100000).Order().ToArray());
     }
 
@@ -92,8 +93,8 @@ public class CoreStoreMigrationTests
         await AssertAdminInvitationsAsync(factory, legacy);
         await AssertAppSettingsAsync(factory, legacy);
 
-        // **管理者の表は対象外。** 触らない
-        Assert.True(await TableExistsAsync(factory, "AdminUsers"));
+        // **管理者の表も写して落とす**（M100004。詳しい確認は別の試験）
+        Assert.False(await TableExistsAsync(factory, "AdminUsers"));
 
         // もう一度当てても何も起きない
         QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
@@ -117,7 +118,10 @@ public class CoreStoreMigrationTests
         await using (var connection = factory.Create())
         {
             await connection.OpenAsync();
-            foreach (var table in new[] { "AuditLogs", "MailOutbox", "AdminInvitations", "AppSettings" })
+            foreach (var table in new[]
+            {
+                "AuditLogs", "MailOutbox", "AdminInvitations", "AppSettings", "AdminSessions", "AdminRecoveryCodes", "AdminUsers",
+            })
             {
                 await connection.ExecuteAsync(SqlDialect.Format(provider, $"DROP TABLE [{table}]"));
             }
@@ -468,6 +472,442 @@ public class CoreStoreMigrationTests
 
         // Core に先にあった同じ設定名は、上書きしない
         Assert.Equal("Core の値", records["TEST_CONFLICT"].Value);
+    }
+
+    // ---- 管理者・復旧コード・初期設定の印・セッション（M100004） ----------------------
+
+    private static readonly Guid AdminA = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
+
+    private static readonly Guid AdminB = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002");
+
+    private static readonly Guid AdminC = Guid.Parse("cccccccc-0000-0000-0000-000000000003");
+
+    private static readonly Guid AdminD = Guid.Parse("dddddddd-0000-0000-0000-000000000004");
+
+    private static readonly Guid AdminE = Guid.Parse("eeeeeeee-0000-0000-0000-000000000005");
+
+    private const string TotpSecret = "JBSWY3DPEHPK3PXP";
+
+    private static readonly PasswordHasher Hasher = new();
+
+    private static readonly SecretProtector LegacyProtector = new(SecretProtector.GenerateKey());
+
+    private static string RecoveryHash(string code) => Hasher.Hash(RecoveryCode.Normalize(code));
+
+    /// <summary>旧スキーマ（M0037）の管理者・復旧コード・セッションを入れる。</summary>
+    private static async Task InsertLegacyAdminsAsync(DbConnectionFactory factory, DateTime now)
+    {
+        var provider = factory.Provider;
+        await using var connection = factory.Create();
+        await connection.OpenAsync();
+
+        async Task Run(string sql, object parameters) =>
+            await connection.ExecuteAsync(SqlDialect.Format(provider, sql), parameters);
+
+        const string insertUser =
+            "INSERT INTO [AdminUsers] ([AdminUserId], [LoginId], [PasswordHash], [Role], [IsDisabled], "
+            + "[TotpSecretEncrypted], [TotpEnabledAt], [LastLoginAt], [CreatedAt], [UpdatedAt], [FailedLoginCount], "
+            + "[LockedUntil], [TotpLastTimeStep], [Language], [ResponseNotificationEnabled]) "
+            + "VALUES (@Id, @LoginId, @Hash, @Role, @Disabled, @Secret, @TotpAt, @LastLogin, @Now, @Now, @Failed, "
+            + "@LockedUntil, @Step, @Language, @Notify)";
+
+        // A: Administrator。2 要素登録済み（暗号文は文脈を持たない旧の形）・英語・通知を受ける・失敗 3 回・締め出し中
+        await Run(insertUser, new
+        {
+            Id = AdminA,
+            LoginId = "Admin@Example.test",
+            Hash = Hasher.Hash("pw-A"),
+            Role = 1,
+            Disabled = false,
+            Secret = (string?)LegacyProtector.Protect(TotpSecret),
+            TotpAt = (DateTime?)now,
+            LastLogin = (DateTime?)now.AddDays(-1),
+            Now = now,
+            Failed = 3,
+            LockedUntil = (DateTime?)now.AddMinutes(10),
+            Step = (long?)12345,
+            Language = (string?)"en",
+            Notify = true,
+        });
+
+        // B: SurveyAdministrator。無効。言語は未選択（NULL）
+        await Run(insertUser, new
+        {
+            Id = AdminB,
+            LoginId = "survey",
+            Hash = Hasher.Hash("pw-B"),
+            Role = 2,
+            Disabled = true,
+            Secret = (string?)null,
+            TotpAt = (DateTime?)null,
+            LastLogin = (DateTime?)null,
+            Now = now,
+            Failed = 0,
+            LockedUntil = (DateTime?)null,
+            Step = (long?)null,
+            Language = (string?)null,
+            Notify = false,
+        });
+
+        // C: UserAdministrator、D: Auditor
+        foreach (var (id, loginId, role) in new[] { (AdminC, "users", 3), (AdminD, "audit", 4) })
+        {
+            await Run(insertUser, new
+            {
+                Id = id,
+                LoginId = loginId,
+                Hash = Hasher.Hash("pw"),
+                Role = role,
+                Disabled = false,
+                Secret = (string?)null,
+                TotpAt = (DateTime?)null,
+                LastLogin = (DateTime?)now,
+                Now = now,
+                Failed = 0,
+                LockedUntil = (DateTime?)null,
+                Step = (long?)null,
+                Language = (string?)"ja",
+                Notify = false,
+            });
+        }
+
+        // A の復旧コード（1 本は使用済み）
+        foreach (var (code, usedAt) in new[] { ("AAAA-1111", (DateTime?)null), ("BBBB-2222", (DateTime?)null), ("CCCC-3333", (DateTime?)now) })
+        {
+            await Run(
+                "INSERT INTO [AdminRecoveryCodes] ([RecoveryCodeId], [AdminUserId], [CodeHash], [UsedAt], [CreatedAt]) "
+                + "VALUES (@Id, @User, @Hash, @UsedAt, @Now)",
+                new { Id = Guid.NewGuid(), User = AdminA, Hash = RecoveryHash(code), UsedAt = usedAt, Now = now });
+        }
+
+        // 旧セッション（写さずに落とす）
+        foreach (var user in new[] { AdminA, AdminC })
+        {
+            await Run(
+                "INSERT INTO [AdminSessions] ([AdminSessionId], [AdminUserId], [Kind], [ProtectedPayload], [CreatedAt], "
+                + "[ExpiresAt], [IpAddress], [UserAgent], [LoginMethod]) "
+                + "VALUES (@Id, @User, 0, 'payload', @Now, @Expires, '203.0.113.1', 'agent', 1)",
+                new { Id = Guid.NewGuid(), User = user, Now = now, Expires = now.AddHours(8) });
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 旧の管理者が共有表へ写り旧セッションは失効する(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+        var now = DbTime.UtcNowTruncated();
+
+        MigrateTo(provider, database.ConnectionString, LastLegacyVersion);
+        await InsertLegacyAdminsAsync(factory, now);
+
+        MigrateTo(provider, database.ConnectionString, LastCoreVersion);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+
+        foreach (var table in new[] { "AdminUsers", "AdminRecoveryCodes", "AdminSessions" })
+        {
+            Assert.False(await TableExistsAsync(factory, table), $"旧表 {table} が残っている");
+        }
+
+        var time = new FakeTimeProvider(AsUtc(now));
+        var store = AdminTestSupport.CreateUserStore(factory, time, LegacyProtector);
+
+        // 4 人。役割は整数から名前へ。ログイン ID は元の大文字小文字のまま、検索は区別しない
+        var users = (await store.ListAsync()).ToDictionary(user => user.Id);
+        Assert.Equal(4, users.Count);
+        Assert.Equal("Administrator", users[AdminA].Role);
+        Assert.Equal("SurveyAdministrator", users[AdminB].Role);
+        Assert.Equal("UserAdministrator", users[AdminC].Role);
+        Assert.Equal("Auditor", users[AdminD].Role);
+
+        var a = users[AdminA];
+        Assert.Equal("Admin@Example.test", a.LoginId);
+        Assert.Equal("en", a.Language);
+        Assert.Equal(3, a.FailedLoginCount);
+        Assert.Equal(now.AddMinutes(10), a.LockedUntil!.Value.UtcDateTime);
+        Assert.Equal(now.AddDays(-1), a.LastLoginAt!.Value.UtcDateTime);
+        Assert.Equal(now, a.CreatedAt.UtcDateTime);
+        Assert.False(a.IsDisabled);
+        Assert.True(a.TotpEnabled);
+
+        Assert.True(users[AdminB].IsDisabled);
+        Assert.Equal(string.Empty, users[AdminB].Language);
+        Assert.False(users[AdminB].TotpEnabled);
+        Assert.Null(users[AdminB].LastLoginAt);
+
+        var found = await store.FindForLoginAsync("  admin@EXAMPLE.test ");
+        Assert.Equal(AdminA, found!.Value.User.Id);
+
+        // パスワードのハッシュは、そのまま照合できる
+        Assert.True(Hasher.Verify("pw-A", found.Value.PasswordHash).Verified);
+
+        // **旧の暗号文（文脈なし）が、新しい文脈の窓口でそのまま読める。** 共有鍵は復号しないで写している
+        Assert.Equal(TotpSecret, await store.GetTotpSecretAsync(AdminA));
+
+        // 時間枠も写っている（同じ枠は通らない）
+        Assert.False(await store.TryUseTotpStepAsync(AdminA, 12345));
+        Assert.True(await store.TryUseTotpStepAsync(AdminA, 12346));
+
+        // 復旧コード: 未使用は 2 本。塩つきのハッシュを読んで照合し、完全一致で使い切れる
+        Assert.Equal(2, await store.CountRecoveryCodesAsync(AdminA));
+        var settings = new AdminUserSettingsStore(factory);
+        var hashes = await settings.ListUnusedRecoveryCodeHashesAsync(AdminA);
+        var matched = Assert.Single(hashes, hash => Hasher.Verify(RecoveryCode.Normalize("AAAA-1111"), hash).Verified);
+        Assert.True(await store.TryUseRecoveryCodeAsync(AdminA, matched));
+        Assert.False(await store.TryUseRecoveryCodeAsync(AdminA, matched));
+        Assert.Equal(1, await store.CountRecoveryCodesAsync(AdminA));
+
+        // 回答通知メールの設定は Q の表へ（受け取る管理者の行だけ）
+        var recipient = Assert.Single(await settings.ListResponseNotificationRecipientsAsync());
+        Assert.Equal(AdminA, recipient.AdminUserId);
+        Assert.Equal("en", recipient.Language);
+        Assert.True(await settings.GetResponseNotificationEnabledAsync(AdminA));
+        Assert.False(await settings.GetResponseNotificationEnabledAsync(AdminB));
+
+        // **初期設定の印が立つ。** 最初の管理者は、もう作れない
+        Assert.Null(await store.CreateFirstAsync("attacker", "hash", string.Empty));
+
+        // **旧セッションは写さない。** 全員が再ログインになる
+        var sessions = new AdminSessionStore(factory, time);
+        Assert.Empty(await sessions.ListForUserAsync(AdminA));
+        Assert.Empty(await sessions.ListForUserAsync(AdminC));
+
+        // もう一度当てても何も起きない
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+        Assert.Equal(4, (await store.ListAsync()).Count);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 管理者が居なければ初期設定の印を立てない(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+
+        MigrateTo(provider, database.ConnectionString, LastLegacyVersion);
+        MigrateTo(provider, database.ConnectionString, LastCoreVersion);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+
+        var store = AdminTestSupport.CreateUserStore(factory, TimeProvider.System, LegacyProtector);
+        Assert.Equal(0, await store.CountAsync());
+
+        // 印が無いので、最初の管理者を作れる
+        Assert.NotNull(await store.CreateFirstAsync("first", "hash", string.Empty));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task Coreに同じキーがあれば管理者も復旧コードも重複させない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+        var now = DbTime.UtcNowTruncated();
+
+        MigrateTo(provider, database.ConnectionString, LastLegacyVersion);
+        await InsertLegacyAdminsAsync(factory, now);
+        MigrateTo(provider, database.ConnectionString, LastCoreVersion);
+
+        // 先に Core へ入れておく: A と同じ ID（同じログイン ID）、A の未使用の復旧コード 1 本、初期設定の印
+        await using (var connection = factory.Create())
+        {
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                SqlDialect.Format(
+                    provider,
+                    "INSERT INTO [Core_AdminUsers] ([Id], [LoginId], [LoginIdKey], [PasswordHash], [Role], [IsDisabled], "
+                    + "[FailedLoginCount], [CreatedAt], [Language]) "
+                    + "VALUES (@Id, 'Admin@Example.test', 'admin@example.test', 'core-hash', 'Editor', 0, 0, @Now, 'ja')"),
+                new { Id = AdminA, Now = now });
+            await connection.ExecuteAsync(
+                SqlDialect.Format(
+                    provider,
+                    "INSERT INTO [Core_AdminRecoveryCodes] ([UserId], [CodeHash]) VALUES (@Id, @Hash)"),
+                new
+                {
+                    Id = AdminA,
+                    Hash = await connection.ExecuteScalarAsync<string>(
+                        SqlDialect.Format(provider, "SELECT MIN([CodeHash]) FROM [AdminRecoveryCodes] WHERE [UsedAt] IS NULL")),
+                });
+            await connection.ExecuteAsync(SqlDialect.Format(provider, "INSERT INTO [Core_AdminSetup] ([Id]) VALUES (1)"));
+        }
+
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+
+        var store = AdminTestSupport.CreateUserStore(factory, TimeProvider.System, LegacyProtector);
+        Assert.Equal(4, await store.CountAsync());
+
+        // Core にあった行は上書きしない
+        var core = await store.FindForLoginAsync("admin@example.test");
+        Assert.Equal("core-hash", core!.Value.PasswordHash);
+        Assert.Equal("Editor", core.Value.User.Role);
+
+        // 復旧コードは旧の 3 本のうち、Core に同じ（ユーザ, ハッシュ）が先にあった 1 本は重複させず、合計 3 本
+        await using var check = factory.Create();
+        await check.OpenAsync();
+        Assert.Equal(
+            3,
+            await check.ExecuteScalarAsync<int>(SqlDialect.Format(provider, "SELECT COUNT(*) FROM [Core_AdminRecoveryCodes]")));
+        Assert.Equal(
+            1,
+            await check.ExecuteScalarAsync<int>(SqlDialect.Format(provider, "SELECT COUNT(*) FROM [Core_AdminSetup]")));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task ログインIDが大文字小文字違いで重複していれば行を示して失敗し旧表は残る(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // 大文字小文字を区別しない照合順序の RDBMS（SQL Server・MySQL）では、旧の一意索引がこの重複を許さない
+        if (provider is DatabaseProvider.SqlServer or DatabaseProvider.MySql)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+        var now = DbTime.UtcNowTruncated();
+
+        MigrateTo(provider, database.ConnectionString, LastLegacyVersion);
+        await InsertLegacyAdminsAsync(factory, now);
+        await InsertSimpleAdminAsync(factory, AdminE, "ADMIN@example.test", 1, now);
+        MigrateTo(provider, database.ConnectionString, LastCoreVersion);
+
+        var exception = Record.Exception(
+            () => QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString));
+
+        Assert.NotNull(exception);
+        var message = FlattenMessages(exception);
+        Assert.Contains("Admin@Example.test", message, StringComparison.Ordinal);
+        Assert.Contains("ADMIN@example.test", message, StringComparison.Ordinal);
+        Assert.Contains(AdminE.ToString(), message, StringComparison.OrdinalIgnoreCase);
+
+        // **旧表は落ちず、Core にも何も写っていない**
+        Assert.True(await TableExistsAsync(factory, "AdminUsers"));
+        Assert.True(await TableExistsAsync(factory, "AdminSessions"));
+        await using var check = factory.Create();
+        await check.OpenAsync();
+        Assert.Equal(
+            0,
+            await check.ExecuteScalarAsync<int>(SqlDialect.Format(provider, "SELECT COUNT(*) FROM [Core_AdminUsers]")));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 知らない役割の値があれば行を示して失敗し旧表は残る(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+        var now = DbTime.UtcNowTruncated();
+
+        MigrateTo(provider, database.ConnectionString, LastLegacyVersion);
+        await InsertSimpleAdminAsync(factory, AdminE, "mystery", 9, now);
+        MigrateTo(provider, database.ConnectionString, LastCoreVersion);
+
+        var exception = Record.Exception(
+            () => QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString));
+
+        Assert.NotNull(exception);
+        var message = FlattenMessages(exception);
+        Assert.Contains("mystery", message, StringComparison.Ordinal);
+        Assert.Contains("Role=9", message, StringComparison.Ordinal);
+        Assert.True(await TableExistsAsync(factory, "AdminUsers"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task Coreに同じログインIDの別の管理者が居れば行を示して失敗する(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+        var now = DbTime.UtcNowTruncated();
+
+        MigrateTo(provider, database.ConnectionString, LastLegacyVersion);
+        await InsertSimpleAdminAsync(factory, AdminE, "Shared@example.test", 1, now);
+        MigrateTo(provider, database.ConnectionString, LastCoreVersion);
+        await using (var connection = factory.Create())
+        {
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                SqlDialect.Format(
+                    provider,
+                    "INSERT INTO [Core_AdminUsers] ([Id], [LoginId], [LoginIdKey], [PasswordHash], [Role], [IsDisabled], "
+                    + "[FailedLoginCount], [CreatedAt], [Language]) "
+                    + "VALUES (@Id, 'shared@example.test', 'shared@example.test', 'h', 'Editor', 0, 0, @Now, '')"),
+                new { Id = Guid.NewGuid(), Now = now });
+        }
+
+        var exception = Record.Exception(
+            () => QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString));
+
+        Assert.NotNull(exception);
+        Assert.Contains("Shared@example.test", FlattenMessages(exception), StringComparison.Ordinal);
+        Assert.True(await TableExistsAsync(factory, "AdminUsers"));
+    }
+
+    private static async Task InsertSimpleAdminAsync(
+        DbConnectionFactory factory,
+        Guid id,
+        string loginId,
+        int role,
+        DateTime now)
+    {
+        await using var connection = factory.Create();
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(
+            SqlDialect.Format(
+                factory.Provider,
+                "INSERT INTO [AdminUsers] ([AdminUserId], [LoginId], [PasswordHash], [Role], [CreatedAt], [UpdatedAt]) "
+                + "VALUES (@Id, @LoginId, 'hash', @Role, @Now, @Now)"),
+            new { Id = id, LoginId = loginId, Role = role, Now = now });
+    }
+
+    private static string FlattenMessages(Exception exception)
+    {
+        var messages = new List<string>();
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            messages.Add(current.Message);
+        }
+
+        return string.Join(" / ", messages);
     }
 
     // ---- 道具 -----------------------------------------------------------------------

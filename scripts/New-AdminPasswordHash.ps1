@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-Generates a password hash for the AdminUsers table.
+Generates a password hash for the Core_AdminUsers table (PasswordHash column).
 
 .DESCRIPTION
 Produces the stored form used by PasswordHasher (PBKDF2-HMACSHA512, 210000 iterations,

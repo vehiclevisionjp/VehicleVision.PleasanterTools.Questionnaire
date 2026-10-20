@@ -39,8 +39,7 @@ public class AdminAuthEndToEndTests
     {
         await using var connection = E2EDatabase.AppFactory().Create();
         await connection.OpenAsync();
-        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"));
-        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"));
+        await AdminTestSupport.ClearAdministratorsAsync(connection, E2EDatabase.Provider);
     }
 
     /// <summary>cookie を保つ HTTP クライアント。**ブラウザと同じように往復させる。**</summary>
