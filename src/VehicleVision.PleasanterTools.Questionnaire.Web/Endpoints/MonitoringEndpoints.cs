@@ -87,7 +87,7 @@ public sealed class MonitoringService(
     public async Task<MonitoringStatusResponse> GetStatusAsync(
         CancellationToken cancellationToken = default)
     {
-        var failure = await DatabaseMigrator.WaitForDatabaseAsync(
+        var failure = await QuestionnaireDatabase.Migrator.WaitForDatabaseAsync(
             provider,
             connectionString,
             TimeSpan.Zero,

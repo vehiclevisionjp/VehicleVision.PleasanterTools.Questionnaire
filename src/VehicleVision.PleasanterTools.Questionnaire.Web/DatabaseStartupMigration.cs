@@ -44,7 +44,7 @@ public static class DatabaseStartupMigration
                 }
 
                 var timeout = ReadLockTimeout(configuration[LockTimeoutSetting]);
-                var result = await DatabaseMigrator.MigrateUpWithLockAsync(
+                var result = await QuestionnaireDatabase.Migrator.MigrateUpWithLockAsync(
                     provider,
                     connectionString,
                     timeout,
@@ -57,7 +57,7 @@ public static class DatabaseStartupMigration
             }
             else if (!skipCheck)
             {
-                var pendingMigrations = DatabaseMigrator.PendingMigrations(provider, connectionString);
+                var pendingMigrations = QuestionnaireDatabase.Migrator.PendingMigrations(provider, connectionString);
                 if (pendingMigrations.Count > 0)
                 {
                     throw new InvalidOperationException(
@@ -78,7 +78,7 @@ public static class DatabaseStartupMigration
 
             var migrationStatus = skipCheck && !autoMigrate
                 ? null
-                : DatabaseMigrator.GetStatus(provider, connectionString);
+                : QuestionnaireDatabase.Migrator.GetStatus(provider, connectionString);
             state.MarkReady(migrationStatus);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)

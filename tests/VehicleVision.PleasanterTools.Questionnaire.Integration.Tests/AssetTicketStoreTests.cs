@@ -13,7 +13,7 @@ public class AssetTicketStoreTests
 
     private static IAssetTicketStore Create(DatabaseProvider provider, string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
 
         using var connection = factory.Create();
