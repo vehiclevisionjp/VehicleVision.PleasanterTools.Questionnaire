@@ -27,7 +27,7 @@ public class AttachmentRejectionStoreTests
         DatabaseProvider provider,
         string connectionString)
     {
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
 
         // **前の試験の行を消してから始める。** 件数を数えるので、残っていると揺れる

@@ -43,7 +43,7 @@ public class AuditLogStoreTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
 
         var factory = new DbConnectionFactory(provider, connectionString);
         await ClearAsync(factory).ConfigureAwait(true);
@@ -95,7 +95,7 @@ public class AuditLogStoreTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
 
         var factory = new DbConnectionFactory(provider, connectionString);
         await ClearAsync(factory).ConfigureAwait(true);
@@ -128,7 +128,7 @@ public class AuditLogStoreTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
 
         var factory = new DbConnectionFactory(provider, connectionString);
         await ClearAsync(factory).ConfigureAwait(true);
@@ -336,7 +336,7 @@ public class AuditLogStoreTests
         DatabaseProvider provider,
         string connectionString)
     {
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
 
         var factory = new DbConnectionFactory(provider, connectionString);
         await ClearAsync(factory).ConfigureAwait(false);

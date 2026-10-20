@@ -37,7 +37,7 @@ public class AdminAuthenticationTests
         string connectionString,
         TwoFactorPolicy twoFactor = TwoFactorPolicy.Optional)
     {
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
 
         // **検証用の DB なので、毎回まっさらにしてから始める**
