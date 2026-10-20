@@ -14,7 +14,7 @@ public class ResponseEditTokenStoreTests
 
     private static IResponseEditTokenStore Create(DatabaseProvider provider, string connectionString)
     {
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
 
         using var connection = factory.Create();

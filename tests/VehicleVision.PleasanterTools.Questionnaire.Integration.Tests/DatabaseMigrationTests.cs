@@ -119,17 +119,17 @@ public class DatabaseMigrationTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
 
         // 2 回流しても壊れない（未適用のものだけ適用される）
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
 
-        Assert.False(QuestionnaireDatabase.Migrator.HasPendingMigrations(provider, connectionString));
+        Assert.False(QuestionnaireDatabase.Instance.Migrator.HasPendingMigrations(provider, connectionString));
 
         // **足りないものを名前で言えること。** 「当て忘れている」だけでは直せない
-        Assert.Empty(QuestionnaireDatabase.Migrator.PendingMigrations(provider, connectionString));
+        Assert.Empty(QuestionnaireDatabase.Instance.Migrator.PendingMigrations(provider, connectionString));
 
-        var status = QuestionnaireDatabase.Migrator.GetStatus(provider, connectionString);
+        var status = QuestionnaireDatabase.Instance.Migrator.GetStatus(provider, connectionString);
         Assert.Equal(status.LatestVersion, status.AppliedVersion);
         Assert.Equal(0, status.PendingCount);
         Assert.NotNull(status.LastAppliedAt);
@@ -146,7 +146,7 @@ public class DatabaseMigrationTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var store = new MaintenanceModeStore(new DbConnectionFactory(provider, connectionString));
         var adminUserId = Guid.NewGuid();
         var changedAt = DbTime.UtcNowTruncated();
@@ -180,7 +180,7 @@ public class DatabaseMigrationTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(DatabaseProvider.Sqlite, SqliteConnectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(DatabaseProvider.Sqlite, SqliteConnectionString);
         var factory = new DbConnectionFactory(DatabaseProvider.Sqlite, SqliteConnectionString);
         await using var first = factory.Create();
         await using var second = factory.Create();
@@ -231,7 +231,7 @@ public class DatabaseMigrationTests
         async Task<MigrationApplyResult> MigrateAsync()
         {
             await start.Task;
-            return await QuestionnaireDatabase.Migrator.MigrateUpWithLockAsync(
+            return await QuestionnaireDatabase.Instance.Migrator.MigrateUpWithLockAsync(
                 DatabaseProvider.Sqlite,
                 connectionString,
                 TimeSpan.FromSeconds(10));
@@ -247,7 +247,7 @@ public class DatabaseMigrationTests
 
             Assert.Single(results, result => result.AppliedCount > 0);
             Assert.Single(results, result => result.AppliedCount == 0);
-            Assert.False(QuestionnaireDatabase.Migrator.HasPendingMigrations(
+            Assert.False(QuestionnaireDatabase.Instance.Migrator.HasPendingMigrations(
                 DatabaseProvider.Sqlite,
                 connectionString));
         }
@@ -272,7 +272,7 @@ public class DatabaseMigrationTests
         using var acquired = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
 
-        var holder = Task.Run(() => QuestionnaireDatabase.Migrator.MigrateUpWithLockAsync(
+        var holder = Task.Run(() => QuestionnaireDatabase.Instance.Migrator.MigrateUpWithLockAsync(
             DatabaseProvider.Sqlite,
             connectionString,
             TimeSpan.FromSeconds(10),
@@ -289,7 +289,7 @@ public class DatabaseMigrationTests
         {
             Assert.True(acquired.Wait(TimeSpan.FromSeconds(5)));
             await Assert.ThrowsAsync<TimeoutException>(() =>
-                QuestionnaireDatabase.Migrator.MigrateUpWithLockAsync(
+                QuestionnaireDatabase.Instance.Migrator.MigrateUpWithLockAsync(
                     DatabaseProvider.Sqlite,
                     connectionString,
                     TimeSpan.FromMilliseconds(250)));
@@ -316,7 +316,7 @@ public class DatabaseMigrationTests
         var first = await DatabaseMigrationLock.AcquireAsync(
             provider,
             connectionString,
-            QuestionnaireDatabase.MigrationLockName,
+            QuestionnaireDatabase.Instance.MigrationLockName,
             TimeSpan.FromSeconds(5),
             CancellationToken.None);
         try
@@ -324,7 +324,7 @@ public class DatabaseMigrationTests
             var waiting = DatabaseMigrationLock.AcquireAsync(
                 provider,
                 connectionString,
-            QuestionnaireDatabase.MigrationLockName,
+            QuestionnaireDatabase.Instance.MigrationLockName,
                 TimeSpan.FromSeconds(5),
                 CancellationToken.None);
 
@@ -343,14 +343,14 @@ public class DatabaseMigrationTests
         await using var holder = await DatabaseMigrationLock.AcquireAsync(
             provider,
             connectionString,
-            QuestionnaireDatabase.MigrationLockName,
+            QuestionnaireDatabase.Instance.MigrationLockName,
             TimeSpan.FromSeconds(5),
             CancellationToken.None);
         await Assert.ThrowsAsync<TimeoutException>(() =>
             DatabaseMigrationLock.AcquireAsync(
                 provider,
                 connectionString,
-            QuestionnaireDatabase.MigrationLockName,
+            QuestionnaireDatabase.Instance.MigrationLockName,
                 TimeSpan.FromMilliseconds(250),
                 CancellationToken.None));
     }
@@ -359,7 +359,7 @@ public class DatabaseMigrationTests
     public async Task 繋がらないDBは待った末に理由を返す()
     {
         // **DB は要らない。** 届かない宛先へ繋ぎに行くだけ
-        var failure = await QuestionnaireDatabase.Migrator.WaitForDatabaseAsync(
+        var failure = await QuestionnaireDatabase.Instance.Migrator.WaitForDatabaseAsync(
             DatabaseProvider.PostgreSql,
             // 予約済みの記録用アドレス（RFC 5737）。**誰も応答しない**
             "Host=192.0.2.1;Port=15432;Database=q;Username=postgres;Password=x;Timeout=1",
@@ -392,7 +392,7 @@ public class DatabaseMigrationTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
 
         var factory = new DbConnectionFactory(provider, connectionString);
         using var connection = factory.Create();

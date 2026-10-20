@@ -23,7 +23,7 @@ public class MailOutboxTests
 
     private static IMailOutbox Create(DatabaseProvider provider, string connectionString)
     {
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
 
         // **毎回まっさらにしてから始める**（ResponseOutboxTests と同じ理由）

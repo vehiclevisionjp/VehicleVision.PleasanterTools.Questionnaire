@@ -41,7 +41,7 @@ public class AppSettingStoreTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var store = new AppSettingStore(new DbConnectionFactory(provider, connectionString));
         var firstAdminUserId = Guid.NewGuid();
         var secondAdminUserId = Guid.NewGuid();
@@ -74,7 +74,7 @@ public class AppSettingStoreTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var store = new AppSettingStore(new DbConnectionFactory(provider, connectionString));
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-09-22T00:00:00Z"));
         var configuration = new ConfigurationBuilder().Build();

@@ -22,7 +22,7 @@ public class AssetHistoryOutboxTests
             return;
         }
 
-        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
         using (var connection = factory.Create())
         {
