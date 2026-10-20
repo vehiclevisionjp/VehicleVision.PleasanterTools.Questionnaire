@@ -21,7 +21,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// </para>
 /// <para>
 /// ⚠️ **招待の URL は、それだけで管理者になれる値。**
-/// 送信待ちの行では暗号化され、送れたら行ごと消える（<c>MailOutbox</c>）。
+/// 送信待ちの行では暗号化され、送れたら行ごと消える（<c>Core_MailOutbox</c>）。
 /// </para>
 /// </remarks>
 public sealed class AdminInvitationMailer(
@@ -99,7 +99,8 @@ public sealed class AdminInvitationMailer(
             return await outbox.EnqueueAsync(
                 MailIdOf(token),
                 (int)MailKind.AdminInvitation,
-                Guid.Empty,
+                // **アンケートに紐づかないメールは `null`**（Core の送信待ちは、紐づかないことを `NULL` で持つ）
+                null,
                 protector.Protect(mail),
                 cancellationToken).ConfigureAwait(false);
         }

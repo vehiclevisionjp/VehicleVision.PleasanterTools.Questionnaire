@@ -297,8 +297,9 @@ public sealed class AdminNotificationStore(IDbConnectionFactory connectionFactor
         foreach (var mail in mails)
         {
             await connection.ExecuteAsync(Sql(
-                "INSERT INTO [MailOutbox] "
-                + "([MailId], [Kind], [SurveyId], [PayloadProtected], [Status], [RetryCount], "
+                // **送信待ちは Core.Data の共有表（`Core_MailOutbox`）。** アンケートへの紐づけは `SubjectId`
+                "INSERT INTO [Core_MailOutbox] "
+                + "([MailId], [Kind], [SubjectId], [PayloadProtected], [Status], [RetryCount], "
                 + " [NextAttemptAt], [CreatedAt], [UpdatedAt]) "
                 + "VALUES (@MailId, @Kind, @SurveyId, @PayloadProtected, 0, 0, @Now, @Now, @Now)",
                 new

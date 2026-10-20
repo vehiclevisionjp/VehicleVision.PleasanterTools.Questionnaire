@@ -45,7 +45,7 @@ public class AdminUserManagementTests
         using (var connection = factory.Create())
         {
             connection.Open();
-            foreach (var table in new[] { "AdminInvitations", "AdminRecoveryCodes", "AdminUsers" })
+            foreach (var table in new[] { "Core_AdminInvitations", "AdminRecoveryCodes", "AdminUsers" })
             {
                 using var command = connection.CreateCommand();
                 command.CommandText = $"DELETE FROM {SqlDialect.Quote(provider, table)}";
@@ -54,10 +54,10 @@ public class AdminUserManagementTests
         }
 
         var users = new AdminUserStore(factory);
-        var invitations = new AdminInvitationStore(factory);
         var hasher = new PasswordHasher();
         var options = new AdminAuthOptions();
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-08-19T00:00:00Z"));
+        var invitations = new AdminInvitationStore(factory, time);
 
         var authenticator = new AdminAuthenticator(
             users,
@@ -299,22 +299,26 @@ public class AdminUserManagementTests
         var (_, invitation) = await harness.Service
             .InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
 
-        var now = harness.Time.GetUtcNow().UtcDateTime;
         Assert.Contains(
             invitation!.AdminUserId,
-            await harness.Invitations.ListPendingAdminUserIdsAsync(now));
+            await harness.Invitations.ListPendingAdminUserIdsAsync());
 
-        // 期限を過ぎたら出ない
+        // 期限を過ぎたら出ない（時刻は各ストアが TimeProvider から取る。時計を進めて確かめる）
+        harness.Time.Advance(harness.Options.InvitationLifetime + TimeSpan.FromMinutes(1));
         Assert.DoesNotContain(
             invitation.AdminUserId,
-            await harness.Invitations.ListPendingAdminUserIdsAsync(
-                now + harness.Options.InvitationLifetime + TimeSpan.FromMinutes(1)));
+            await harness.Invitations.ListPendingAdminUserIdsAsync());
 
-        // 受け取ったら出ない
-        await harness.Service.AcceptInvitationAsync(invitation.Token, Password);
+        // 受け取ったら出ない（期限内の別の招待で確かめる）
+        var (_, fresh) = await harness.Service
+            .InviteAsync(admin.AdminUserId, "editor2", AdminRole.Editor);
+        Assert.Contains(
+            fresh!.AdminUserId,
+            await harness.Invitations.ListPendingAdminUserIdsAsync());
+        await harness.Service.AcceptInvitationAsync(fresh.Token, Password);
         Assert.DoesNotContain(
-            invitation.AdminUserId,
-            await harness.Invitations.ListPendingAdminUserIdsAsync(now));
+            fresh.AdminUserId,
+            await harness.Invitations.ListPendingAdminUserIdsAsync());
     }
 
     [Theory]

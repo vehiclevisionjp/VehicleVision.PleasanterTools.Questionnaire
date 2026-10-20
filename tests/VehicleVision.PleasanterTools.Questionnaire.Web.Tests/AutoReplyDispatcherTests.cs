@@ -17,7 +17,7 @@ public class AutoReplyDispatcherTests
     /// <summary>メールの送信待ちの代わり。</summary>
     private sealed class FakeMailOutbox : IMailOutbox
     {
-        public List<(Guid MailId, int Kind, Guid SurveyId, string Payload)> Enqueued { get; } = [];
+        public List<(Guid MailId, int Kind, Guid? SubjectId, string Payload)> Enqueued { get; } = [];
 
         /// <summary>積もうとしたときに投げる失敗。**受付を落とさないことを見る。**</summary>
         public bool Throws { get; set; }
@@ -25,7 +25,7 @@ public class AutoReplyDispatcherTests
         public Task<bool> EnqueueAsync(
             Guid mailId,
             int kind,
-            Guid surveyId,
+            Guid? subjectId,
             string payloadProtected,
             CancellationToken cancellationToken = default)
         {
@@ -40,7 +40,7 @@ public class AutoReplyDispatcherTests
                 return Task.FromResult(false);
             }
 
-            Enqueued.Add((mailId, kind, surveyId, payloadProtected));
+            Enqueued.Add((mailId, kind, subjectId, payloadProtected));
             return Task.FromResult(true);
         }
 
@@ -53,7 +53,7 @@ public class AutoReplyDispatcherTests
 
         public Task RescheduleAsync(
             Guid mailId,
-            DateTime nextAttemptAtUtc,
+            DateTimeOffset nextAttemptAt,
             string? error,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
 
@@ -190,7 +190,7 @@ public class AutoReplyDispatcherTests
 
         var entry = Assert.Single(outbox.Enqueued);
         Assert.Equal((int)MailKind.AutoReply, entry.Kind);
-        Assert.Equal(SurveyId, entry.SurveyId);
+        Assert.Equal(SurveyId, entry.SubjectId);
     }
 
     [Fact]

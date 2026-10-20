@@ -33,6 +33,12 @@
   <ItemGroup>
     <!-- DB の基盤は Core.Data（NuGet）へ集約した。名前空間を暗黙に使えるようにする -->
     <Using Include="VehicleVision.PleasanterTools.Core.Data" />
+    <!-- Core.Data の共有ストアのうち、まだ切り替えていない管理者・セッションの型は、Questionnaire.Data の同名の型を使う。
+         名前が重なるので、別名で固定する（暗黙の using だけだと「あいまいな参照」になる） -->
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Data.AdminUser" Alias="AdminUser" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Data.AdminUserStore" Alias="AdminUserStore" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Data.IAdminUserStore" Alias="IAdminUserStore" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Data.IAdminSessionStore" Alias="IAdminSessionStore" />
   </ItemGroup>
 
 </Project>
