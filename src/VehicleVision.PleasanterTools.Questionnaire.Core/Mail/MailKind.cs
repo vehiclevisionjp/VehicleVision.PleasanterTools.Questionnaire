@@ -3,7 +3,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Mail;
 /// <summary>送るメールの種類（Issue #189）。</summary>
 /// <remarks>
 /// <para>
-/// ⚠️ **値を振り直さないこと。** DB へ整数で入る（<c>MailOutbox.Kind</c>）。
+/// ⚠️ **値を振り直さないこと。** DB へ整数で入る（<c>Core_MailOutbox.Kind</c>）。
 /// 並べ替えると、既に溜まっている送信待ちの意味が変わる
 /// （<see cref="Notifications.AdminNotificationKind"/> と同じ決まり）。
 /// </para>

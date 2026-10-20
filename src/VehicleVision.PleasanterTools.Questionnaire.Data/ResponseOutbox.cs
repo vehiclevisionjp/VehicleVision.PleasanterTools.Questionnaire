@@ -241,7 +241,7 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(Sql(
-            SqlDialect.SaveResponse(Provider),
+            QuestionnaireSqlDialect.SaveResponse(Provider),
             new
             {
                 ResponseToken = responseToken,
@@ -282,21 +282,21 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         if (SqlDialect.SupportsReturning(Provider))
         {
             return await connection.QueryFirstOrDefaultAsync<PendingResponse>(Sql(
-                SqlDialect.ClaimPendingResponse(Provider),
+                QuestionnaireSqlDialect.ClaimPendingResponse(Provider),
                 parameters,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
 
         // MySQL は RETURNING が無いので、確保してから読み直す
         var affected = await connection.ExecuteAsync(Sql(
-            SqlDialect.ClaimPendingResponse(Provider),
+            QuestionnaireSqlDialect.ClaimPendingResponse(Provider),
             parameters,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return affected == 0
             ? null
             : await connection.QueryFirstOrDefaultAsync<PendingResponse>(Sql(
-                SqlDialect.ReadClaimedResponseForMySql,
+                QuestionnaireSqlDialect.ReadClaimedResponseForMySql,
                 parameters,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -426,12 +426,12 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         // 3 者で挙動が揃わない。**数えるのは一定間隔に 1 回**なので、
         // ここを 1 往復に縮めても効かない
         var total = await connection.ExecuteScalarAsync<int>(Sql(
-            SqlDialect.PendingBacklogTotal,
+            QuestionnaireSqlDialect.PendingBacklogTotal,
             new { IsTest = false },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         var rows = await connection.QueryAsync<BacklogRow>(Sql(
-            SqlDialect.PendingBacklogBySurvey,
+            QuestionnaireSqlDialect.PendingBacklogBySurvey,
             new { AtLeast = (long)perSurveyAtLeast, IsTest = false },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -473,7 +473,7 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
         var row = await connection.QueryFirstAsync<OutboxStatusRow>(Sql(
-            SqlDialect.OutboxStatus,
+            QuestionnaireSqlDialect.OutboxStatus,
             new { DeadLetterStatus = (int)ResponseStatus.DeadLetter },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -495,7 +495,7 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
         var rows = await connection.QueryAsync<DeadLetterView>(Sql(
-            SqlDialect.ListDeadLetters(Provider),
+            QuestionnaireSqlDialect.ListDeadLetters(Provider),
             new
             {
                 DeadLetterStatus = (int)ResponseStatus.DeadLetter,

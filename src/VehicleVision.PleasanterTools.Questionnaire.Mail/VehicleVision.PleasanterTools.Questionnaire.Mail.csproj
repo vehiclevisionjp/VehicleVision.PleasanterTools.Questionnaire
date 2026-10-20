@@ -4,7 +4,7 @@
     <!-- メール送信の部品（送信経路・メッセージの組み立て・MailOptions）は Core.Mail に集約した。
          ここに残すのは、アンケート固有の自動返信の組み立てとプレースホルダだけ。
          MailKit / AWSSDK / Azure.* などの送信用の依存は Core.Mail が持つ -->
-    <PackageReference Include="VehicleVision.PleasanterTools.Core.Mail" Version="0.1.0-preview.2" />
+    <PackageReference Include="VehicleVision.PleasanterTools.Core.Mail" Version="0.1.0-preview.4" />
   </ItemGroup>
 
   <ItemGroup>

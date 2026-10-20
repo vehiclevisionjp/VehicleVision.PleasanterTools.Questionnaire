@@ -28,6 +28,13 @@ Copyright (C) PMC Co.,Ltd.
     （Apache-2.0 の SQLitePCLRaw 2.1.12 と、パブリックドメインの SQLite 3.53.3 を推移的に伴う。
       https://github.com/ericsink/SQLitePCL.raw/releases/tag/v2.1.12、参照日 2026-09-21）
   Microsoft.Data.SqlClient 7.1.1 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
+  Microsoft.Data.SqlClient.SNI.runtime 7.1.0 / Microsoft Software License Terms（MICROSOFT.DATA.SQLCLIENT.SNI LIBRARY。**MIT・BSD・Apache-2.0 ではない独自の許諾**） / https://www.nuget.org/packages/Microsoft.Data.SqlClient.SNI.runtime/7.1.0
+    （Microsoft.Data.SqlClient が推移的に伴う、Windows 向けのネイティブ SNI。パッケージ内の LICENSE.txt、参照日 2026-10-20。
+      **再頒布の条件**: アプリの一部としてのみ頒布する（単体で頒布しない）／頒布先に、逆コンパイルの禁止・著作権表示の保全・
+      単体での再配布の禁止・保証の否認・責任の制限・輸出規制の遵守など、この許諾と同程度に守る条件へ同意させる／
+      アプリの頒布・利用に関する請求から Microsoft を補償する（改変していない SNI だけに基づく請求を除く）。
+      **2026-10-20 の決定**: 条件を明記したうえで許容し、「依存は寛容ライセンスに限る」の例外として扱う。
+      頒布するときは、上の条件を利用許諾（商用条件・EULA）へ反映する。法務の確認は別途）
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
   StackExchange.Redis 3.4.5 / MIT / https://www.nuget.org/packages/StackExchange.Redis/3.4.0
@@ -50,7 +57,9 @@ Copyright (C) PMC Co.,Ltd.
     （Microsoft.IdentityModel.* と Newtonsoft.Json を推移的に伴う。いずれも MIT）
   Azure.Storage.Blobs 12.30.1 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
-  VehicleVision.PleasanterTools.Core.Mail 0.1.0-preview.2 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+  VehicleVision.PleasanterTools.Core.Data 0.1.0-preview.7 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+    （DB の基盤。接続・暗号化検査・DbTime・マイグレーションと排他・SqlDialect の汎用部分。Dapper・FluentMigrator・DB ドライバは、これが推移的に伴う）
+  VehicleVision.PleasanterTools.Core.Mail 0.1.0-preview.4 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
     （メール送信の部品。以下の AWSSDK.SimpleEmailV2・Azure.Communication.Email・Azure.Identity・MailKit・MimeKit・
       System.Security.Cryptography.Pkcs は、これが推移的に伴う。Issue #670）
   AWSSDK.SimpleEmailV2 4.0.106.4 / Apache-2.0 / https://github.com/aws/aws-sdk-net

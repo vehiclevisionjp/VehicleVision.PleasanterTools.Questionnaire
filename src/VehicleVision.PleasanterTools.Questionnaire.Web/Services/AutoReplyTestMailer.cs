@@ -85,7 +85,8 @@ public sealed class AutoReplyTestMailer(
             var queued = await outbox.EnqueueAsync(
                 Guid.NewGuid(),
                 (int)MailKind.AutoReplyTest,
-                surveyId,
+                // **紐づかない（`Guid.Empty`）なら `null`**（Core の送信待ちは、紐づかないことを `NULL` で持つ）
+                surveyId == Guid.Empty ? null : surveyId,
                 protector.Protect(mail),
                 cancellationToken).ConfigureAwait(false);
             return queued
