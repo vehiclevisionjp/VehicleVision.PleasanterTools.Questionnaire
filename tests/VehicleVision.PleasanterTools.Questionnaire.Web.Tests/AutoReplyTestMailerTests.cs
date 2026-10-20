@@ -14,16 +14,16 @@ public class AutoReplyTestMailerTests
 {
     private sealed class FakeOutbox : IMailOutbox
     {
-        public List<(Guid MailId, int Kind, Guid SurveyId, string Payload)> Enqueued { get; } = [];
+        public List<(Guid MailId, int Kind, Guid? SubjectId, string Payload)> Enqueued { get; } = [];
 
         public Task<bool> EnqueueAsync(
             Guid mailId,
             int kind,
-            Guid surveyId,
+            Guid? subjectId,
             string payloadProtected,
             CancellationToken cancellationToken = default)
         {
-            Enqueued.Add((mailId, kind, surveyId, payloadProtected));
+            Enqueued.Add((mailId, kind, subjectId, payloadProtected));
             return Task.FromResult(true);
         }
 
@@ -36,7 +36,7 @@ public class AutoReplyTestMailerTests
 
         public Task RescheduleAsync(
             Guid mailId,
-            DateTime nextAttemptAtUtc,
+            DateTimeOffset nextAttemptAt,
             string? error,
             CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
@@ -144,7 +144,7 @@ public class AutoReplyTestMailerTests
         Assert.Equal(AutoReplyTestMailOutcome.Queued, outcome);
         var entry = Assert.Single(outbox.Enqueued);
         Assert.Equal((int)MailKind.AutoReplyTest, entry.Kind);
-        Assert.Equal(SurveyId, entry.SurveyId);
+        Assert.Equal(SurveyId, entry.SubjectId);
         Assert.Equal("protected", entry.Payload);
     }
 

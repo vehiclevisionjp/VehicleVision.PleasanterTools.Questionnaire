@@ -28,7 +28,7 @@ public class AuditLogEndToEndTests
     private static string BaseUrl =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_BASE_URL") ?? "http://localhost:8081";
 
-    private sealed record LogRow(string Action, int? StatusCode, Guid? AdminUserId, string? DetailJson);
+    private sealed record LogRow(string Action, int? StatusCode, string? ActorKey, string? DetailJson);
 
     [Fact]
     public async Task パスワードが違うログインも記録に残る()
@@ -50,7 +50,7 @@ public class AuditLogEndToEndTests
         var entry = Assert.Single(rows, row => row.Action.EndsWith("/login", StringComparison.Ordinal));
 
         // **誰なのかは分からない。それでも試みは残る**
-        Assert.Null(entry.AdminUserId);
+        Assert.Null(entry.ActorKey);
         Assert.Equal(401, entry.StatusCode);
 
         // **どの利用者が狙われているかが分からないと対処できない**
@@ -84,7 +84,7 @@ public class AuditLogEndToEndTests
             var entry = Assert.Single(
                 rows, row => row.Action.EndsWith("/disable", StringComparison.Ordinal));
 
-            Assert.Equal(adminUserId, entry.AdminUserId);
+            Assert.Equal(adminUserId.ToString("D"), entry.ActorKey);
             Assert.NotEqual(200, entry.StatusCode);
             Assert.Contains(adminUserId.ToString(), entry.DetailJson ?? string.Empty, StringComparison.Ordinal);
         }
@@ -298,14 +298,14 @@ public class AuditLogEndToEndTests
     {
         await using var connection = Connect();
         await connection.OpenAsync().ConfigureAwait(false);
-        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AuditLogs]")).ConfigureAwait(false);
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [Core_AuditLogs]")).ConfigureAwait(false);
     }
 
     private static async Task ClearAdministratorsAsync()
     {
         await using var connection = Connect();
         await connection.OpenAsync().ConfigureAwait(false);
-        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminInvitations]"))
+        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [Core_AdminInvitations]"))
             .ConfigureAwait(false);
         await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"))
             .ConfigureAwait(false);
@@ -319,8 +319,8 @@ public class AuditLogEndToEndTests
         await connection.OpenAsync().ConfigureAwait(false);
 
         var rows = await connection.QueryAsync<LogRow>(E2EDatabase.Sql(
-            "SELECT [Action], [StatusCode], [AdminUserId], [DetailJson] "
-            + "FROM [AuditLogs] ORDER BY [OccurredAt] DESC")).ConfigureAwait(false);
+            "SELECT [Action], [StatusCode], [ActorKey], [DetailJson] "
+            + "FROM [Core_AuditLogs] ORDER BY [OccurredAt] DESC")).ConfigureAwait(false);
 
         return rows.ToList();
     }

@@ -127,7 +127,7 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
         try
         {
             await connection.ExecuteAsync(Sql(
-                SqlDialect.InsertResponseToken,
+                QuestionnaireSqlDialect.InsertResponseToken,
                 new
                 {
                     ResponseToken = responseToken,
@@ -181,7 +181,7 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(Sql(
-            SqlDialect.SaveResponseToken(connectionFactory.Provider),
+            QuestionnaireSqlDialect.SaveResponseToken(connectionFactory.Provider),
             new
             {
                 ResponseToken = responseToken,

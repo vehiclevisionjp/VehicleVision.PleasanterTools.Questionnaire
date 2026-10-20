@@ -23,13 +23,13 @@ public class AuditLogRetentionTests
         public Task WriteAsync(AuditEntry entry, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
-        public Task<IReadOnlyList<AuditLogView>> ListAsync(
+        public Task<IReadOnlyList<AuditEntry>> ListAsync(
             AuditLogQuery query,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AuditLogView>>([]);
+            Task.FromResult<IReadOnlyList<AuditEntry>>([]);
 
         public Task<int> DeleteOlderThanAsync(
-            DateTime threshold,
+            DateTimeOffset threshold,
             CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref Attempts);
@@ -39,7 +39,8 @@ public class AuditLogRetentionTests
                 throw exception;
             }
 
-            Thresholds.Add(threshold);
+            // **掃除の基準は、書くときと同じ目盛り（ローカル時刻の数字）で渡される**（AuditLogTime）
+            Thresholds.Add(AuditLogTime.ToWallClock(threshold));
             return Task.FromResult(DeleteResult);
         }
     }

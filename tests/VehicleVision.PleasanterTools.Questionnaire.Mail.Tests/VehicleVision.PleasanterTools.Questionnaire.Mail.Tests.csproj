@@ -24,4 +24,9 @@
     <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Mail\VehicleVision.PleasanterTools.Questionnaire.Mail.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- メール送信の部品は Core.Mail（NuGet）へ集約した。名前空間を暗黙に使えるようにする -->
+    <Using Include="VehicleVision.PleasanterTools.Core.Mail" />
+  </ItemGroup>
+
 </Project>

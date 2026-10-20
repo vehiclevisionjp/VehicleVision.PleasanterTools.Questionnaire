@@ -305,7 +305,7 @@ public class AdminSurveyEndToEndTests
         // **見たいのは消えたときの 1 行**なので、値を載せている行を選ぶ
         var details = (await connection.QueryAsync<string>(
             E2EDatabase.Sql(
-                "SELECT [DetailJson] FROM [AuditLogs] "
+                "SELECT [DetailJson] FROM [Core_AuditLogs] "
                 + "WHERE [Action] = @Action AND [TargetId] = @TargetId"),
             new
             {
