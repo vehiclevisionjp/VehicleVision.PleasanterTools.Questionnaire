@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data;
@@ -26,6 +27,23 @@ public static class QuestionnaireDatabase
     /// <summary>このアプリのマイグレーション（M0001〜）を適用する。</summary>
     public static DatabaseMigrator Migrator { get; } =
         new(typeof(M0001_InitialSchema).Assembly, MigrationLockName);
+
+    /// <summary>
+    /// このアセンブリのモデル型（列挙型・record）を、SQLite の型の対応表へ知らせる。
+    /// **アセンブリの読み込み時に 1 回だけ呼ぶ**（<c>[ModuleInitializer]</c>）。
+    /// </summary>
+    /// <remarks>
+    /// Core.Data は、知らされたアセンブリの型だけを SQLite 用に登録する。知らせないと、アプリの record を Dapper が
+    /// 組み立てられない（<c>A parameterless default constructor or one matching signature … is needed</c>）。
+    /// 実際の登録は SQLite の接続を作るときだけで、ほかの RDBMS の挙動は変わらない。
+    /// </remarks>
+    // CA2255 は「ライブラリでの [ModuleInitializer]」への注意。**ここは再利用するライブラリではなく、このアプリのデータ層**。
+    // アセンブリの読み込み時に必ず通る経路が要る（ファクトリやストアを、このクラスを経由せずに作る試験や呼び出しもあるため）
+#pragma warning disable CA2255
+    [ModuleInitializer]
+#pragma warning restore CA2255
+    internal static void RegisterModelAssembly() =>
+        SqliteTypeHandlers.AddModelAssemblies(typeof(QuestionnaireDatabase).Assembly);
 
     /// <summary>接続文字列を解決する（SQLite は <c>App_Data</c> 配下へ既定のファイルを置く）。</summary>
     public static string ResolveConnectionString(
