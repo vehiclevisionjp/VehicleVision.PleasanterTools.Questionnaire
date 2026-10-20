@@ -289,7 +289,7 @@ public class AdminNotificationStoreTests
         var queued = await connection.ExecuteScalarAsync<long>(
             SqlDialect.Format(
                 provider,
-                "SELECT COUNT(*) FROM [MailOutbox] WHERE [MailId] = @MailId"),
+                "SELECT COUNT(*) FROM [Core_MailOutbox] WHERE [MailId] = @MailId"),
             new { mail.MailId }).ConfigureAwait(true);
         Assert.Equal(1, queued);
 

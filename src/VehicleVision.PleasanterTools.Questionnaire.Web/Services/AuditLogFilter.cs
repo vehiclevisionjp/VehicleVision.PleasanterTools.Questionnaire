@@ -5,7 +5,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
-/// <summary>管理操作を <c>AuditLogs</c> へ残す。</summary>
+/// <summary>管理操作を <c>Core_AuditLogs</c>（Core.Data の共有表）へ残す。</summary>
 /// <remarks>
 /// <para>
 /// **要求の本文には触らない。** 記録するのは宛先・結果・経路の値だけ。
@@ -28,8 +28,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// </remarks>
 public sealed partial class AuditLogFilter(
     IAuditLogStore store,
-    ILogger<AuditLogFilter> logger) : IEndpointFilter
+    ILogger<AuditLogFilter> logger,
+    TimeProvider? timeProvider = null) : IEndpointFilter
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     /// <summary>補足を書き出す設定。</summary>
     /// <remarks>
     /// **日本語をそのまま入れる。** 既定の設定は非 ASCII を <c>\uXXXX</c> へ逃がすので、
@@ -160,18 +163,28 @@ public sealed partial class AuditLogFilter(
             targets = [TargetOf(http)];
         }
 
+        var adminUserId = AdminUserIdOf(http);
+
+        // **誰が、をログイン ID でも残す。** Core の記録は書くときにログイン ID を持つ
+        // （読むときに管理者の表と結合しない）。認証を通っていない試みでは、ID と同じく `null`
+        var loginId = adminUserId is null ? null : http.User.FindFirstValue(ClaimTypes.Name);
+
         foreach (var (targetType, targetId) in targets)
         {
             await store.WriteAsync(
                 new AuditEntry(
-                    DateTime.Now,
-                    AdminUserIdOf(http),
-                    ActionOf(http),
-                    statusCode,
-                    targetType,
-                    targetId,
-                    DetailOf(http),
-                    IpAddressOf(http)),
+                    // **目盛りは旧と同じ（サーバのローカル時刻の数字）**。`AuditLogTime` を参照
+                    OccurredAt: AuditLogTime.ToStored(_time.GetLocalNow().DateTime),
+                    Action: ActionOf(http),
+                    // **400 以上を失敗とする**（旧の「断られた操作だけ」と同じ線）
+                    Succeeded: statusCode < StatusCodes.Status400BadRequest,
+                    StatusCode: statusCode,
+                    ActorKey: adminUserId?.ToString("D"),
+                    ActorLoginId: loginId,
+                    TargetType: targetType,
+                    TargetId: targetId,
+                    DetailJson: DetailOf(http),
+                    IpAddress: IpAddressOf(http)),
                 http.RequestAborted)
                 .ConfigureAwait(false);
         }

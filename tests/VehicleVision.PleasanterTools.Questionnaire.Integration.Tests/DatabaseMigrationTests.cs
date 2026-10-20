@@ -197,14 +197,14 @@ public class DatabaseMigrationTests
         await using var transaction = await first.BeginTransactionAsync();
         var now = DbTime.UtcNowTruncated();
         await first.ExecuteAsync(
-            "INSERT INTO \"AuditLogs\" "
-            + "(\"AuditLogId\", \"OccurredAt\", \"Action\") VALUES (@Id, @Now, @Action)",
+            "INSERT INTO \"Core_AuditLogs\" "
+            + "(\"AuditLogId\", \"OccurredAt\", \"Action\", \"Succeeded\") VALUES (@Id, @Now, @Action, 1)",
             new { Id = Guid.NewGuid(), Now = now, Action = "sqlite-lock-1" },
             transaction);
 
         var waitingWrite = Task.Run(() => second.Execute(
-            "INSERT INTO \"AuditLogs\" "
-            + "(\"AuditLogId\", \"OccurredAt\", \"Action\") VALUES (@Id, @Now, @Action)",
+            "INSERT INTO \"Core_AuditLogs\" "
+            + "(\"AuditLogId\", \"OccurredAt\", \"Action\", \"Succeeded\") VALUES (@Id, @Now, @Action, 1)",
             new { Id = Guid.NewGuid(), Now = now, Action = "sqlite-lock-2" }));
 
         await Task.Delay(100);

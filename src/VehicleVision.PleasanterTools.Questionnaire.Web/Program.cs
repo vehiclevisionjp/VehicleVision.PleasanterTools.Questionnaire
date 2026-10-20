@@ -215,7 +215,7 @@ builder.Services.AddSingleton(serviceProvider =>
 // ⚠️ **ここで DB を読まない**（Issue #404）。
 // `app.StartAsync()` は**マイグレーションより前**に走る（起動中も `/healthz` を応答させる設計）。
 // その時点で `AppSettingsMonitor` がリスナーを 1 度呼び、ここが解決されるため、
-// `PleasanterOptions` を経由すると**まだ存在しない `AppSettings` を読んで落ちる。**
+// `PleasanterOptions` を経由すると**まだ存在しない `Core_AppSettings` を読んで落ちる。**
 // **空の DB へ初めて起動する経路が丸ごと死ぬ**（#382 で自動適用を既定にしたので、これが既定の道）。
 //
 // **初期値は設定だけから採れば足りる。** 直後にリスナーが `SetTimeZone` で上書きする。
