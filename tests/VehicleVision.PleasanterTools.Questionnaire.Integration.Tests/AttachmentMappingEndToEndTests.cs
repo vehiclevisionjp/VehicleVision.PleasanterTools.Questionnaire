@@ -139,7 +139,7 @@ public class AttachmentMappingEndToEndTests
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var siteId = await CreateSiteAsync(http, $"添付 {Guid.NewGuid():N}");
 
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
@@ -226,7 +226,7 @@ public class AttachmentMappingEndToEndTests
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var siteId = await CreateSiteAsync(http, $"添付編集 {Guid.NewGuid():N}");
 
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
@@ -295,7 +295,7 @@ public class AttachmentMappingEndToEndTests
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var siteId = await CreateSiteAsync(http, $"添付差替 {Guid.NewGuid():N}");
 
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);

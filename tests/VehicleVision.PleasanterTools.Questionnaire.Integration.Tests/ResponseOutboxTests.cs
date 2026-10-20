@@ -18,7 +18,7 @@ public class ResponseOutboxTests
         DatabaseProvider provider,
         string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
 
         // **検証用の DB なので、毎回まっさらにしてから始める。**

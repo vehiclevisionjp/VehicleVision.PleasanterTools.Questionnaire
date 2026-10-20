@@ -148,21 +148,21 @@ public sealed class MailOutbox(IDbConnectionFactory connectionFactory) : IMailOu
         if (SqlDialect.SupportsReturning(Provider))
         {
             return await connection.QueryFirstOrDefaultAsync<PendingMail>(Sql(
-                SqlDialect.ClaimPendingMail(Provider),
+                QuestionnaireSqlDialect.ClaimPendingMail(Provider),
                 parameters,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
 
         // MySQL は RETURNING が無いので、確保してから読み直す
         var affected = await connection.ExecuteAsync(Sql(
-            SqlDialect.ClaimPendingMail(Provider),
+            QuestionnaireSqlDialect.ClaimPendingMail(Provider),
             parameters,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return affected == 0
             ? null
             : await connection.QueryFirstOrDefaultAsync<PendingMail>(Sql(
-                SqlDialect.ReadClaimedMailForMySql,
+                QuestionnaireSqlDialect.ReadClaimedMailForMySql,
                 parameters,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
     }

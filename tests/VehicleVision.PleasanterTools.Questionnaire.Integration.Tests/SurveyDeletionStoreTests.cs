@@ -169,7 +169,7 @@ public class SurveyDeletionStoreTests
         DatabaseProvider provider,
         string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
         return new DbConnectionFactory(provider, connectionString);
     }
 

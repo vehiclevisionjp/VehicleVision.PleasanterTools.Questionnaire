@@ -1,7 +1,9 @@
+using static VehicleVision.PleasanterTools.Core.Data.SqlDialect;
+
 namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 
 /// <summary>メールの送信待ちで、RDBMS ごとに書き方が違う部分（Issue #189）。</summary>
-public static partial class SqlDialect
+public static partial class QuestionnaireSqlDialect
 {
     /// <summary>送信待ちのメールを 1 件だけ確保する SQL。</summary>
     /// <remarks>

@@ -37,7 +37,7 @@ public class SurveyDraftStoreTests
         DatabaseProvider provider,
         string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
         return (new SurveyDraftStore(factory), new SurveyRepository(factory));
     }

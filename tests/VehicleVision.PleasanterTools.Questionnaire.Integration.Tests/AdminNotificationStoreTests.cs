@@ -35,7 +35,7 @@ public class AdminNotificationStoreTests
         DatabaseProvider provider,
         string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
 
         // **前の試験の行を消してから始める。** 件数を数えるので、残っていると揺れる

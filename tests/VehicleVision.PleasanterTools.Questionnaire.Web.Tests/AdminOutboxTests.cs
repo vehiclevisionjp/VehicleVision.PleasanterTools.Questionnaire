@@ -229,7 +229,7 @@ public class AdminOutboxTests
     [MemberData(nameof(Providers))]
     public void 滞留の状況は一度の問い合わせで読む(DatabaseProvider provider)
     {
-        var sql = SqlDialect.Format(provider, SqlDialect.OutboxStatus);
+        var sql = SqlDialect.Format(provider, QuestionnaireSqlDialect.OutboxStatus);
 
         // **表を 1 回しか見ない。** 件数と最古の時刻を別々に数えない
         Assert.Equal(1, CountOf(sql, "SELECT"));
@@ -244,7 +244,7 @@ public class AdminOutboxTests
     [MemberData(nameof(Providers))]
     public void デッドレターの一覧に回答本文を選ばない(DatabaseProvider provider)
     {
-        var sql = SqlDialect.Format(provider, SqlDialect.ListDeadLetters(provider));
+        var sql = SqlDialect.Format(provider, QuestionnaireSqlDialect.ListDeadLetters(provider));
 
         Assert.DoesNotContain("PayloadJson", sql, StringComparison.Ordinal);
         Assert.Contains("LEFT JOIN", sql, StringComparison.Ordinal);
@@ -258,7 +258,7 @@ public class AdminOutboxTests
         // **MySQL と SQLite は OFFSET/FETCH を解さない。**
         Assert.Contains(
             "OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY",
-            SqlDialect.ListDeadLetters(DatabaseProvider.SqlServer),
+            QuestionnaireSqlDialect.ListDeadLetters(DatabaseProvider.SqlServer),
             StringComparison.Ordinal);
 
         foreach (var provider in new[]
@@ -270,7 +270,7 @@ public class AdminOutboxTests
         {
             Assert.Contains(
                 "LIMIT @Limit OFFSET @Offset",
-                SqlDialect.ListDeadLetters(provider),
+                QuestionnaireSqlDialect.ListDeadLetters(provider),
                 StringComparison.Ordinal);
         }
     }
@@ -280,7 +280,7 @@ public class AdminOutboxTests
     public void 並びを二本の列で決める(DatabaseProvider provider)
     {
         // **時刻は秒までしか持たない**（DbTime）。1 本だけだとページ送りで取りこぼす
-        var sql = SqlDialect.ListDeadLetters(provider);
+        var sql = QuestionnaireSqlDialect.ListDeadLetters(provider);
 
         Assert.Contains("ORDER BY", sql, StringComparison.Ordinal);
         Assert.Contains("[UpdatedAt] DESC, r.[ResponseToken] DESC", sql, StringComparison.Ordinal);

@@ -22,7 +22,7 @@ public class AltchaChallengeStoreTests
 
     private static AltchaChallengeStore Create(DatabaseProvider provider, string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
         return new AltchaChallengeStore(new DbConnectionFactory(provider, connectionString));
     }
 

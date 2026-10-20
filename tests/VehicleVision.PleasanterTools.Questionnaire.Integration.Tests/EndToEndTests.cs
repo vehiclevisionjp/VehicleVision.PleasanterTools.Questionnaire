@@ -121,7 +121,7 @@ public class EndToEndTests
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var siteId = await CreatePleasanterSiteAsync(http, $"E2E {Guid.NewGuid():N}");
 
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
@@ -283,7 +283,7 @@ public class EndToEndTests
         var siteId = await CreatePleasanterSiteAsync(
             http, $"E2E grid {Guid.NewGuid():N}", "ClassB");
 
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
@@ -398,7 +398,7 @@ public class EndToEndTests
         var siteId = await CreatePleasanterSiteAsync(
             http, $"E2E date {Guid.NewGuid():N}", "DateA");
 
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
@@ -490,7 +490,7 @@ public class EndToEndTests
         }
 
         // **行の一部だけ答えて送れると、どこまで答えたのか誰にも分からなくなる**
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
 
         var surveys = new SurveyRepository(factory);
@@ -535,7 +535,7 @@ public class EndToEndTests
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var siteId = await CreatePleasanterSiteAsync(http, $"E2E {Guid.NewGuid():N}");
 
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
         var surveys = new SurveyRepository(factory);
 
@@ -564,7 +564,7 @@ public class EndToEndTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
         var surveys = new SurveyRepository(factory);
 
@@ -592,7 +592,7 @@ public class EndToEndTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(E2EDatabase.Provider, E2EDatabase.InProcessConnectionString);
         var factory = E2EDatabase.InProcessFactory();
         var surveys = new SurveyRepository(factory);
 

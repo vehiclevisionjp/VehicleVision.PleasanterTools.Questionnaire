@@ -27,7 +27,7 @@ public class SurveyThemeStoreTests
     private static (ISurveyDraftStore Drafts, ISurveyRepository Surveys, ISurveyAssetStore Assets)
         Create(DatabaseProvider provider, string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
         return (new SurveyDraftStore(factory), new SurveyRepository(factory), new SurveyAssetStore(factory));
     }
@@ -316,7 +316,7 @@ public class SurveyThemeStoreTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
         var surveys = new SurveyRepository(factory);
         var snapshots = new SurveySnapshotStore(factory);

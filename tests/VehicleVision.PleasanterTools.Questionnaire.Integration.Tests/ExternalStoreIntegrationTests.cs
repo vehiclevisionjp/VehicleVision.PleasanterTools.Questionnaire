@@ -144,7 +144,7 @@ public class ExternalStoreIntegrationTests
         var factory = new DbConnectionFactory(
             DatabaseProvider.SqlServer,
             DatabaseConnectionString!);
-        DatabaseMigrator.MigrateUp(DatabaseProvider.SqlServer, DatabaseConnectionString!);
+        QuestionnaireDatabase.Migrator.MigrateUp(DatabaseProvider.SqlServer, DatabaseConnectionString!);
 
         var surveyId = Guid.NewGuid();
         const string title = "外部ストアの検証";

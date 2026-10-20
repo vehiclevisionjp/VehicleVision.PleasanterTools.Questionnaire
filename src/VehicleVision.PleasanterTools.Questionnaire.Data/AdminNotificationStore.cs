@@ -189,7 +189,7 @@ public sealed class AdminNotificationStore(IDbConnectionFactory connectionFactor
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
         var rows = await connection.QueryAsync<AdminNotificationView>(Sql(
-            SqlDialect.ListAdminNotifications(Provider, query.UnreadOnly),
+            QuestionnaireSqlDialect.ListAdminNotifications(Provider, query.UnreadOnly),
             new { Limit = query.Limit, Offset = query.Offset },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 

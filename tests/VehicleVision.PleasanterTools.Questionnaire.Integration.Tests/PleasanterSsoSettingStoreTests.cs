@@ -28,7 +28,7 @@ public class PleasanterSsoSettingStoreTests
         DatabaseProvider provider,
         string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Migrator.MigrateUp(provider, connectionString);
         return new PleasanterSsoSettingStore(new DbConnectionFactory(provider, connectionString));
     }
 
