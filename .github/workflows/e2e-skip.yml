@@ -9,7 +9,7 @@
 #
 # ⚠️ **e2e.yml の paths を変えたら、こちらの paths-ignore も同じ内容へ揃えること。**
 # 片方だけ直すと、両方起動する（二重に報告される）か、どちらも起動しない（Pending で止まる）。
-name: 端から端まで通す試験（対象外）
+name: E2E Tests Skip
 
 on:
   pull_request:
@@ -33,7 +33,7 @@ permissions:
 jobs:
   e2e:
     # **e2e.yml のジョブ名と 1 文字も違えないこと。** 必須チェックは名前で照合する
-    name: 端から端まで通す試験
+    name: e2e
     runs-on: ubuntu-latest
     steps:
       - name: 回さない理由を残す

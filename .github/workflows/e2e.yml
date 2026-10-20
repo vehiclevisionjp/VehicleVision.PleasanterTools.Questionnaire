@@ -25,7 +25,7 @@
 # **Pleasanter の版は固定する**（tools/pleasanter-testenv/docker-compose.yml が
 # implem/pleasanter:1.5.8.1 を指す）。最新に追随させると、壊れた原因が
 # 自分の変更か相手の更新かを切り分けられなくなる。
-name: 端から端まで通す試験
+name: E2E Tests
 
 on:
   push:
@@ -69,7 +69,7 @@ env:
 
 jobs:
   e2e-database:
-    name: 端から端まで通す試験（${{ matrix.profile }}）
+    name: e2e / ${{ matrix.profile }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -397,7 +397,7 @@ jobs:
         run: docker compose --profile '*' down -v --remove-orphans
 
   e2e:
-    name: 端から端まで通す試験
+    name: e2e
     needs: e2e-database
     if: always()
     runs-on: ubuntu-latest
@@ -415,7 +415,7 @@ jobs:
           echo "All E2E database jobs succeeded."
 
   screenshots:
-    name: 写しの一式
+    name: screenshots
     runs-on: ubuntu-latest
     # Pleasanter と本アプリのイメージ作成を含むため、E2E と同じ上限にする
     timeout-minutes: 45
@@ -515,7 +515,7 @@ jobs:
         run: docker compose --profile '*' down -v --remove-orphans
 
   notify-failure:
-    name: 失敗を Issue で知らせる
+    name: notify-failure
     needs:
       - e2e
       - screenshots
@@ -601,7 +601,7 @@ jobs:
   # 原因を直した PR は「原因の Issue」を Closes するため、**CI が立てた Issue だけが取り残される**
   # （2026-09-23 に #394 がそうなった）。どれが現役の失敗か分からなくなる。
   close-failure-issue:
-    name: 直ったことを Issue へ知らせる
+    name: notify-recovery
     needs:
       - e2e
       - screenshots
