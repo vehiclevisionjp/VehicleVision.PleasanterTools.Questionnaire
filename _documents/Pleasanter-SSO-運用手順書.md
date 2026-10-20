@@ -186,7 +186,7 @@ cookie の認証（`context.Authenticated`）と本アプリ側の流れは本�
 - **確認の入口はログインの試行（5 分に 10 回）とは別の枠**（送信元 IP ごとに 5 分に 300 回）。
   ログインを待つ間の問い合わせで、合言葉のログインまで止めない
 - **「まだ Pleasanter にログインしていない」だけの問い合わせは操作の記録に残さない。**
-  入った・断られた・接続不可は `AuditLogs` に残す（`loginId`、`pleasanterTenantId`、`pleasanterUserId`、`result`）
+  入った・断られた・接続不可は `Core_AuditLogs` に残す（`loginId`、`pleasanterTenantId`、`pleasanterUserId`、`result`）
 - **再検証で接続できなかったときにセッションを延ばさない。** 本アプリからも落とし、管理 API は 503 を返す
 - **機能を無効にしたら、それで入っていた人も次の要求で落とす**（確かめる手段が無いため）
 

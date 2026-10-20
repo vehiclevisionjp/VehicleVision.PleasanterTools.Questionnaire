@@ -12,16 +12,16 @@ public class AdminInvitationMailerTests
     /// <summary>メールの送信待ちの代わり。**中身まで見る。**</summary>
     private sealed class FakeMailOutbox : IMailOutbox
     {
-        public List<(Guid MailId, int Kind, Guid SurveyId, string Payload)> Enqueued { get; } = [];
+        public List<(Guid MailId, int Kind, Guid? SubjectId, string Payload)> Enqueued { get; } = [];
 
         public Task<bool> EnqueueAsync(
             Guid mailId,
             int kind,
-            Guid surveyId,
+            Guid? subjectId,
             string payloadProtected,
             CancellationToken cancellationToken = default)
         {
-            Enqueued.Add((mailId, kind, surveyId, payloadProtected));
+            Enqueued.Add((mailId, kind, subjectId, payloadProtected));
             return Task.FromResult(true);
         }
 
@@ -34,7 +34,7 @@ public class AdminInvitationMailerTests
 
         public Task RescheduleAsync(
             Guid mailId,
-            DateTime nextAttemptAtUtc,
+            DateTimeOffset nextAttemptAt,
             string? error,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
 
@@ -100,14 +100,14 @@ public class AdminInvitationMailerTests
     }
 
     [Fact]
-    public async Task アンケートに紐づかないので空の識別子で積む()
+    public async Task アンケートに紐づかないので紐づけなしで積む()
     {
-        // **NULL にしない**（NULL 同士は等しくないので突き合わせが 3 者で割れる）
+        // **Core の送信待ちは、紐づかないことを NULL で持つ**（旧は空の識別子だった。写す移行で NULL にしてある）
         var (mailer, outbox) = Create();
 
         await mailer.TryEnqueueAsync("hito@example.jp", "tok-1", ExpiresAt, "ja");
 
-        Assert.Equal(Guid.Empty, outbox.Enqueued.Single().SurveyId);
+        Assert.Null(outbox.Enqueued.Single().SubjectId);
     }
 
     [Fact]

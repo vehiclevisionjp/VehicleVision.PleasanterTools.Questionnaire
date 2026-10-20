@@ -35,7 +35,7 @@ public class AdminNotificationStoreTests
         DatabaseProvider provider,
         string connectionString)
     {
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
 
         // **前の試験の行を消してから始める。** 件数を数えるので、残っていると揺れる
@@ -289,7 +289,7 @@ public class AdminNotificationStoreTests
         var queued = await connection.ExecuteScalarAsync<long>(
             SqlDialect.Format(
                 provider,
-                "SELECT COUNT(*) FROM [MailOutbox] WHERE [MailId] = @MailId"),
+                "SELECT COUNT(*) FROM [Core_MailOutbox] WHERE [MailId] = @MailId"),
             new { mail.MailId }).ConfigureAwait(true);
         Assert.Equal(1, queued);
 

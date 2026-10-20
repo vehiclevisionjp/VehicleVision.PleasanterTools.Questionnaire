@@ -244,7 +244,7 @@ internal sealed class FakeAdminInvitationStore(TimeProvider timeProvider) : IAdm
 {
     private readonly List<AdminInvitation> invitations = [];
 
-    private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
+    private DateTimeOffset Now => timeProvider.GetUtcNow();
 
     public Task ReplaceAsync(AdminInvitation invitation, CancellationToken cancellationToken = default)
     {
@@ -274,10 +274,9 @@ internal sealed class FakeAdminInvitationStore(TimeProvider timeProvider) : IAdm
     }
 
     public Task<IReadOnlyList<Guid>> ListPendingAdminUserIdsAsync(
-        DateTime nowUtc,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Guid>>(invitations
-            .Where(invitation => invitation.UsedAt is null && invitation.ExpiresAt > nowUtc)
+            .Where(invitation => invitation.UsedAt is null && invitation.ExpiresAt > Now)
             .Select(invitation => invitation.AdminUserId).ToList());
 
     public Task RevokeUnusedAsync(Guid adminUserId, CancellationToken cancellationToken = default)

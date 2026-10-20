@@ -70,7 +70,7 @@ public static class AdminSettingsEndpoints
                             ";",
                             changedKeys
                                 .Where(key => !definitions[key].IsSecret
-                                    && !key.StartsWith(MailOptions.Prefix, StringComparison.Ordinal))
+                                    && !key.StartsWith(QuestionnaireMailSettings.Prefix, StringComparison.Ordinal))
                                 .Select(key =>
                                 $"{key}:{before[key]}->{definitions[key].Normalize(request.Values[key])}")));
                 }

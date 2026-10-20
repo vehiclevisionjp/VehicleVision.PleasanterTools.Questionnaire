@@ -35,7 +35,7 @@ public class DbTimeTests
             return;
         }
 
-        DatabaseMigrator.MigrateUp(provider, connectionString);
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
         var store = new AdminUserStore(factory);
 

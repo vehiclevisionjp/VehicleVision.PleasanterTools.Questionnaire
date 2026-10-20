@@ -71,7 +71,7 @@ public class DatabaseStartupMigrationTests
 
         await DatabaseStartupMigration.RunAsync(
             configuration,
-            Data.DatabaseProvider.PostgreSql,
+            DatabaseProvider.PostgreSql,
             "Host=192.0.2.1;Database=q;Username=q;******",
             state,
             NullLogger.Instance);

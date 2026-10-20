@@ -1,0 +1,593 @@
+using System.Data.Common;
+using Dapper;
+using FluentMigrator.Runner;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
+using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
+
+namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
+
+/// <summary>
+/// 旧表（<c>AuditLogs</c> / <c>MailOutbox</c> / <c>AdminInvitations</c> / <c>AppSettings</c>）の行が、
+/// Core.Data の共有表（<c>Core_</c> 接頭辞）へ写り、旧表が消えることを 4 RDBMS で確かめる。
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>旧スキーマの段階（M0037 まで）で行を入れてから、Core の共有表（M10001〜M10007）を作り、
+/// 最後に写す移行（M100000〜）まで上げる。</b> 稼働中のデータがある導入先が、更新で通る道そのもの。
+/// 各 RDBMS に<b>使い捨ての DB</b>を作って確かめる（ほかの試験が残した表・行の影響を受けない）。
+/// </para>
+/// <para>
+/// <b>冪等であること</b>も見る: Core の表にすでに同じキーの行があれば、その行は上書きも重複もしない。
+/// </para>
+/// <para>
+/// 環境変数 <c>QUESTIONNAIRE_INTEGRATION</c> を <c>1</c> にしたときだけ実行する
+/// （<see cref="DatabaseMigrationTests"/> と同じ）。
+/// </para>
+/// </remarks>
+public class CoreStoreMigrationTests
+{
+    private const long LastLegacyVersion = 37;
+
+    private const long LastCoreVersion = 10007;
+
+    private static bool Enabled =>
+        Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
+
+    public static TheoryData<DatabaseProvider, string> Providers() =>
+        DatabaseMigrationTests.Providers();
+
+    [Fact]
+    public void 写す移行はCoreの共有表の後に動く()
+    {
+        // **Core の共有表が先にできていないと、写し先が無い。**
+        var versions = typeof(QuestionnaireDatabase).Assembly.GetTypes()
+            .Select(type => type.GetCustomAttributes(typeof(FluentMigrator.MigrationAttribute), false)
+                .Cast<FluentMigrator.MigrationAttribute>().SingleOrDefault())
+            .Where(attribute => attribute is not null)
+            .Select(attribute => attribute!.Version)
+            .ToList();
+
+        Assert.Contains(100000L, versions);
+        Assert.All(versions.Where(version => version >= 100000), version => Assert.True(version > LastCoreVersion));
+        Assert.Equal(
+            [100000L, 100001L, 100002L, 100003L],
+            versions.Where(version => version >= 100000).Order().ToArray());
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 旧表の行がCoreの共有表へ写り旧表が消える(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+
+        // 旧スキーマ（M0037 まで）。Core の共有表はまだ無い
+        MigrateTo(provider, database.ConnectionString, LastLegacyVersion);
+        var legacy = await InsertLegacyRowsAsync(factory);
+
+        // Core の共有表を作る（旧表は残ったまま）。**写す前に、Core の表へ同じキーの行を入れておく**（冪等の確認）
+        MigrateTo(provider, database.ConnectionString, LastCoreVersion);
+        await InsertAlreadyMigratedRowsAsync(factory, legacy);
+
+        // アプリが起動時に通る道（排他付きの全適用）
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+
+        Assert.False(QuestionnaireDatabase.Instance.Migrator.HasPendingMigrations(provider, database.ConnectionString));
+        foreach (var table in new[] { "AuditLogs", "MailOutbox", "AdminInvitations", "AppSettings" })
+        {
+            Assert.False(await TableExistsAsync(factory, table), $"旧表 {table} が残っている");
+        }
+
+        await AssertAuditLogsAsync(factory, legacy);
+        await AssertMailOutboxAsync(factory, legacy);
+        await AssertAdminInvitationsAsync(factory, legacy);
+        await AssertAppSettingsAsync(factory, legacy);
+
+        // **管理者の表は対象外。** 触らない
+        Assert.True(await TableExistsAsync(factory, "AdminUsers"));
+
+        // もう一度当てても何も起きない
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+        Assert.Equal(5, (await new AuditLogStore(factory).ListAsync(new AuditLogQuery())).Count);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 旧表が無ければ何もしない(DatabaseProvider provider, string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+
+        // 旧表を落としてから、写す移行を当てる（旧表が最初から無い導入先・移行をやり直した導入先）
+        MigrateTo(provider, database.ConnectionString, LastCoreVersion);
+        await using (var connection = factory.Create())
+        {
+            await connection.OpenAsync();
+            foreach (var table in new[] { "AuditLogs", "MailOutbox", "AdminInvitations", "AppSettings" })
+            {
+                await connection.ExecuteAsync(SqlDialect.Format(provider, $"DROP TABLE [{table}]"));
+            }
+        }
+
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+
+        Assert.False(QuestionnaireDatabase.Instance.Migrator.HasPendingMigrations(provider, database.ConnectionString));
+        Assert.Empty(await new AuditLogStore(factory).ListAsync(new AuditLogQuery()));
+    }
+
+    // ---- 旧表の行 -------------------------------------------------------------------
+
+    private sealed record Legacy(
+        DateTime Now,
+        Guid AdminUserId,
+        Guid MissingAdminUserId,
+        Guid SurveyId,
+        Guid[] AuditLogIds,
+        Guid[] MailIds,
+        Guid[] InvitationIds);
+
+    private const string TokenHashA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    private const string TokenHashB = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+
+    private const string TokenHashC = "cccccccccccccccccccccccccccccccccccccccccccc";
+
+    private static async Task<Legacy> InsertLegacyRowsAsync(DbConnectionFactory factory)
+    {
+        var provider = factory.Provider;
+        var legacy = new Legacy(
+            DbTime.UtcNowTruncated(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()],
+            [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()],
+            [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()]);
+
+        await using var connection = factory.Create();
+        await connection.OpenAsync();
+
+        async Task Run(string sql, object parameters) =>
+            await connection.ExecuteAsync(SqlDialect.Format(provider, sql), parameters);
+
+        // 管理者（LoginId を ActorLoginId へ引く元）。もう 1 人（MissingAdminUserId）は居ない
+        await Run(
+            "INSERT INTO [AdminUsers] ([AdminUserId], [LoginId], [PasswordHash], [Role], [CreatedAt], [UpdatedAt]) "
+            + "VALUES (@Id, @LoginId, @Hash, 0, @Now, @Now)",
+            new { Id = legacy.AdminUserId, LoginId = "alice", Hash = "hash", legacy.Now });
+
+        // 管理操作の記録。StatusCode は NULL / 200 / 302 / 400 / 403（400 以上が失敗）
+        var audits = new (int Index, Guid? Admin, string Action, int? Status)[]
+        {
+            (0, legacy.AdminUserId, "POST /a", 200),
+            (1, legacy.AdminUserId, "POST /b", 403),
+            (2, null, "POST /login", null),
+            (3, legacy.MissingAdminUserId, "POST /c", 400),
+            (4, legacy.AdminUserId, "POST /d", 302),
+        };
+        foreach (var (index, admin, action, status) in audits)
+        {
+            await Run(
+                "INSERT INTO [AuditLogs] ([AuditLogId], [OccurredAt], [AdminUserId], [Action], [StatusCode], "
+                + "[TargetType], [TargetId], [DetailJson], [IpAddress]) "
+                + "VALUES (@Id, @At, @Admin, @Action, @Status, @TargetType, @TargetId, @Detail, @Ip)",
+                new
+                {
+                    Id = legacy.AuditLogIds[index],
+                    At = legacy.Now.AddMinutes(-index),
+                    Admin = admin,
+                    Action = action,
+                    Status = status,
+                    TargetType = "Survey",
+                    TargetId = legacy.SurveyId.ToString(),
+                    Detail = "{\"surveyId\":\"" + legacy.SurveyId + "\"}",
+                    Ip = "203.0.113.10",
+                });
+        }
+
+        // メールの送信待ち。1 通目はアンケートに紐づかない（旧は Guid.Empty）
+        var mails = new (int Index, Guid Survey, int Kind, int Status, int Retry, string? Error, string? LockedBy)[]
+        {
+            (0, Guid.Empty, 5, 0, 2, "一時的な失敗", null),
+            (1, legacy.SurveyId, 1, 2, 5, "恒久的な失敗", null),
+            (2, legacy.SurveyId, 4, 1, 0, null, "worker-1:abc"),
+        };
+        foreach (var (index, survey, kind, status, retry, error, lockedBy) in mails)
+        {
+            await Run(
+                "INSERT INTO [MailOutbox] ([MailId], [Kind], [SurveyId], [PayloadProtected], [Status], [RetryCount], "
+                + "[NextAttemptAt], [LastError], [LockedBy], [LockedUntil], [CreatedAt], [UpdatedAt]) "
+                + "VALUES (@Id, @Kind, @Survey, @Payload, @Status, @Retry, @Next, @Error, @LockedBy, @LockedUntil, @Created, @Updated)",
+                new
+                {
+                    Id = legacy.MailIds[index],
+                    Kind = kind,
+                    Survey = survey,
+                    Payload = $"protected-{index}",
+                    Status = status,
+                    Retry = retry,
+                    Next = legacy.Now.AddMinutes(10),
+                    Error = error,
+                    LockedBy = lockedBy,
+                    LockedUntil = lockedBy is null ? (DateTime?)null : legacy.Now.AddMinutes(5),
+                    Created = legacy.Now.AddHours(-1),
+                    Updated = legacy.Now.AddMinutes(-1),
+                });
+        }
+
+        // 管理者の招待。未使用・使用済み・招いた人が無いもの
+        var invitations = new (int Index, string Hash, DateTime? UsedAt, Guid? CreatedBy)[]
+        {
+            (0, TokenHashA, null, legacy.AdminUserId),
+            (1, TokenHashB, legacy.Now.AddMinutes(-3), legacy.AdminUserId),
+            (2, TokenHashC, null, null),
+        };
+        foreach (var (index, hash, usedAt, createdBy) in invitations)
+        {
+            await Run(
+                "INSERT INTO [AdminInvitations] ([InvitationId], [AdminUserId], [TokenHash], [ExpiresAt], [UsedAt], "
+                + "[CreatedAt], [CreatedBy]) VALUES (@Id, @Admin, @Hash, @Expires, @UsedAt, @Created, @CreatedBy)",
+                new
+                {
+                    Id = legacy.InvitationIds[index],
+                    Admin = legacy.AdminUserId,
+                    Hash = hash,
+                    Expires = legacy.Now.AddDays(3),
+                    UsedAt = usedAt,
+                    Created = legacy.Now.AddHours(-2),
+                    CreatedBy = createdBy,
+                });
+        }
+
+        // アプリケーション設定。秘密と、そうでないもの
+        await Run(
+            "INSERT INTO [AppSettings] ([SettingKey], [Value], [IsSecret], [UpdatedAt], [UpdatedByAdminUserId]) "
+            + "VALUES (@Key, @Value, @IsSecret, @Now, @Admin)",
+            new { Key = "TEST_PLAIN", Value = "平文の値", IsSecret = false, legacy.Now, Admin = legacy.AdminUserId });
+        await Run(
+            "INSERT INTO [AppSettings] ([SettingKey], [Value], [IsSecret], [UpdatedAt], [UpdatedByAdminUserId]) "
+            + "VALUES (@Key, @Value, @IsSecret, @Now, @Admin)",
+            new { Key = "TEST_SECRET", Value = "暗号文のまま", IsSecret = true, legacy.Now, Admin = legacy.AdminUserId });
+        await Run(
+            "INSERT INTO [AppSettings] ([SettingKey], [Value], [IsSecret], [UpdatedAt], [UpdatedByAdminUserId]) "
+            + "VALUES (@Key, @Value, @IsSecret, @Now, @Admin)",
+            new { Key = "TEST_CONFLICT", Value = "旧の値", IsSecret = false, legacy.Now, Admin = legacy.AdminUserId });
+
+        return legacy;
+    }
+
+    /// <summary>写す前に、Core の表へ同じキーの行を入れておく。<b>写した後も、この行が残る</b>（上書きも重複もしない）。</summary>
+    private static async Task InsertAlreadyMigratedRowsAsync(DbConnectionFactory factory, Legacy legacy)
+    {
+        var provider = factory.Provider;
+        await using var connection = factory.Create();
+        await connection.OpenAsync();
+
+        await connection.ExecuteAsync(
+            SqlDialect.Format(
+                provider,
+                "INSERT INTO [Core_AuditLogs] ([AuditLogId], [OccurredAt], [Action], [Succeeded]) "
+                + "VALUES (@Id, @Now, @Action, 1)"),
+            new { Id = legacy.AuditLogIds[0], legacy.Now, Action = "ALREADY IN CORE" });
+        await connection.ExecuteAsync(
+            SqlDialect.Format(
+                provider,
+                "INSERT INTO [Core_MailOutbox] ([MailId], [Kind], [SubjectId], [PayloadProtected], [Status], [RetryCount], "
+                + "[NextAttemptAt], [CreatedAt], [UpdatedAt]) VALUES (@Id, 9, NULL, @Payload, 0, 0, @Now, @Now, @Now)"),
+            new { Id = legacy.MailIds[2], Payload = "already-in-core", legacy.Now });
+        await connection.ExecuteAsync(
+            SqlDialect.Format(
+                provider,
+                "INSERT INTO [Core_AdminInvitations] ([InvitationId], [AdminUserId], [TokenHash], [ExpiresAt], [CreatedAt]) "
+                + "VALUES (@Id, @Admin, @Hash, @Now, @Now)"),
+            new { Id = legacy.InvitationIds[2], Admin = legacy.AdminUserId, Hash = "already-in-core-hash", legacy.Now });
+        await connection.ExecuteAsync(
+            SqlDialect.Format(
+                provider,
+                "INSERT INTO [Core_AppSettings] ([SettingKey], [Value], [IsSecret], [UpdatedAt]) "
+                + "VALUES (@Key, @Value, 0, @Now)"),
+            new { Key = "TEST_CONFLICT", Value = "Core の値", legacy.Now });
+    }
+
+    // ---- 写った後の確認（Core のストアで読む。Core の読み方と整合していること） ----------
+
+    private static async Task AssertAuditLogsAsync(DbConnectionFactory factory, Legacy legacy)
+    {
+        var entries = await new AuditLogStore(factory).ListAsync(new AuditLogQuery { Limit = 100 });
+
+        // 5 件（Core に先にあった 1 件は重複させない）
+        Assert.Equal(5, entries.Count);
+        Assert.Equal(5, entries.Select(entry => entry.Action).Distinct().Count());
+
+        var alreadyInCore = Assert.Single(entries, entry => entry.Action == "ALREADY IN CORE");
+        Assert.Null(alreadyInCore.ActorKey);
+
+        // 管理者 ID は、ハイフン付き小文字の文字列（Core のストアが読み書きする形）。名前は旧 AdminUsers から引く
+        var succeeded = Assert.Single(entries, entry => entry.Action == "POST /d");
+        Assert.True(succeeded.Succeeded);
+        Assert.Equal(302, succeeded.StatusCode);
+        Assert.Equal(legacy.AdminUserId.ToString("D"), succeeded.ActorKey);
+        Assert.Equal("alice", succeeded.ActorLoginId);
+        Assert.Equal("Survey", succeeded.TargetType);
+        Assert.Equal(legacy.SurveyId.ToString(), succeeded.TargetId);
+        Assert.Equal("{\"surveyId\":\"" + legacy.SurveyId + "\"}", succeeded.DetailJson);
+        Assert.Equal("203.0.113.10", succeeded.IpAddress);
+        Assert.Equal(legacy.Now.AddMinutes(-4), succeeded.OccurredAt.UtcDateTime);
+
+        // 400 以上は失敗
+        var forbidden = Assert.Single(entries, entry => entry.Action == "POST /b");
+        Assert.False(forbidden.Succeeded);
+        Assert.Equal(403, forbidden.StatusCode);
+        var badRequest = Assert.Single(entries, entry => entry.Action == "POST /c");
+        Assert.False(badRequest.Succeeded);
+
+        // 居ない管理者の行は、ID は残り、名前は NULL
+        Assert.Equal(legacy.MissingAdminUserId.ToString("D"), badRequest.ActorKey);
+        Assert.Null(badRequest.ActorLoginId);
+
+        // 認証前の試み（管理者なし・結果なし）は、成功側（旧は 400 以上だけを失敗とした）。ID も名前も無い
+        var login = Assert.Single(entries, entry => entry.Action == "POST /login");
+        Assert.True(login.Succeeded);
+        Assert.Null(login.StatusCode);
+        Assert.Null(login.ActorKey);
+        Assert.Null(login.ActorLoginId);
+
+        // 失敗だけの絞り込みは、旧と同じ 2 件（403 と 400）
+        var failed = await new AuditLogStore(factory).ListAsync(new AuditLogQuery { FailedOnly = true });
+        Assert.Equal(["POST /b", "POST /c"], failed.Select(entry => entry.Action).Order().ToArray());
+
+        // 管理者での絞り込み（ActorKey）が、写した行に効く（POST /a は Core に先にあった行で、管理者を持たない）
+        var byAdmin = await new AuditLogStore(factory).ListAsync(
+            new AuditLogQuery { ActorKey = legacy.AdminUserId.ToString("D") });
+        Assert.Equal(["POST /b", "POST /d"], byAdmin.Select(entry => entry.Action).Order().ToArray());
+    }
+
+    private sealed class MailRow
+    {
+        public Guid MailId { get; set; }
+
+        public long Kind { get; set; }
+
+        public Guid? SubjectId { get; set; }
+
+        public string PayloadProtected { get; set; } = "";
+
+        public long Status { get; set; }
+
+        public long RetryCount { get; set; }
+
+        public string? LastError { get; set; }
+
+        public string? LockedBy { get; set; }
+
+        public DateTime? LockedUntil { get; set; }
+    }
+
+    private static async Task AssertMailOutboxAsync(DbConnectionFactory factory, Legacy legacy)
+    {
+        await using var connection = factory.Create();
+        await connection.OpenAsync();
+        var rows = (await connection.QueryAsync<MailRow>(SqlDialect.Format(
+            factory.Provider,
+            "SELECT [MailId], [Kind], [SubjectId], [PayloadProtected], [Status], [RetryCount], [LastError], "
+            + "[LockedBy], [LockedUntil] FROM [Core_MailOutbox]"))).ToDictionary(row => row.MailId);
+
+        Assert.Equal(3, rows.Count);
+
+        // 紐づかないメール（旧は Guid.Empty）は NULL
+        var unbound = rows[legacy.MailIds[0]];
+        Assert.Null(unbound.SubjectId);
+        Assert.Equal(5, unbound.Kind);
+        Assert.Equal("protected-0", unbound.PayloadProtected);
+        Assert.Equal(0, unbound.Status);
+        Assert.Equal(2, unbound.RetryCount);
+        Assert.Equal("一時的な失敗", unbound.LastError);
+
+        // アンケートに紐づくメールは SubjectId へ、状態・確保の情報もそのまま
+        var deadLetter = rows[legacy.MailIds[1]];
+        Assert.Equal(legacy.SurveyId, deadLetter.SubjectId);
+        Assert.Equal(2, deadLetter.Status);
+        Assert.Equal(5, deadLetter.RetryCount);
+        Assert.Equal("恒久的な失敗", deadLetter.LastError);
+
+        // Core に先にあった行は、上書きも重複もしない
+        var alreadyInCore = rows[legacy.MailIds[2]];
+        Assert.Equal("already-in-core", alreadyInCore.PayloadProtected);
+        Assert.Equal(9, alreadyInCore.Kind);
+        Assert.Null(alreadyInCore.SubjectId);
+
+        // Core のストアが、写した行を数えられる（死んだ手紙 1 通、待ち 2 通）
+        var status = await new MailOutbox(factory, TimeProvider.System).GetStatusAsync();
+        Assert.Equal(2, status.PendingCount);
+        Assert.Equal(1, status.DeadLetterCount);
+    }
+
+    private static async Task AssertAdminInvitationsAsync(DbConnectionFactory factory, Legacy legacy)
+    {
+        var store = new AdminInvitationStore(factory, new FakeTimeProvider(AsUtc(legacy.Now)));
+
+        var unused = await store.FindByTokenHashAsync(TokenHashA);
+        Assert.NotNull(unused);
+        Assert.Equal(legacy.InvitationIds[0], unused.InvitationId);
+        Assert.Equal(legacy.AdminUserId, unused.AdminUserId);
+        Assert.Null(unused.UsedAt);
+        Assert.Equal(legacy.Now.AddDays(3), unused.ExpiresAt.UtcDateTime);
+        Assert.Equal(legacy.Now.AddHours(-2), unused.CreatedAt!.Value.UtcDateTime);
+        Assert.Equal(legacy.AdminUserId, unused.CreatedBy);
+
+        // 使用済みの行も写る（使われた事実として残す）。大文字小文字を含むハッシュもそのまま引ける
+        var used = await store.FindByTokenHashAsync(TokenHashB);
+        Assert.NotNull(used);
+        Assert.Equal(legacy.Now.AddMinutes(-3), used.UsedAt!.Value.UtcDateTime);
+
+        // 招いた人が無い行は CreatedBy が NULL のまま。ただし Core に先にあった同じ ID の行は上書きしない
+        Assert.Null(await store.FindByTokenHashAsync(TokenHashC));
+        var existing = await store.FindByTokenHashAsync("already-in-core-hash");
+        Assert.NotNull(existing);
+        Assert.Equal(legacy.InvitationIds[2], existing.InvitationId);
+
+        // 招待中（未使用で期限内）の管理者。写した未使用の行と、Core に先にあった行（期限が今）
+        Assert.Equal([legacy.AdminUserId], await store.ListPendingAdminUserIdsAsync());
+
+        // 写した招待は使い切れる（同時に 2 回は通らない）
+        Assert.True(await store.TryConsumeAsync(unused.InvitationId));
+        Assert.False(await store.TryConsumeAsync(unused.InvitationId));
+    }
+
+    private static async Task AssertAppSettingsAsync(DbConnectionFactory factory, Legacy legacy)
+    {
+        var records = (await new AppSettingStore(factory, new FakeTimeProvider(AsUtc(legacy.Now))).ListAsync())
+            .ToDictionary(record => record.SettingKey);
+
+        Assert.Equal(3, records.Count);
+
+        var plain = records["TEST_PLAIN"];
+        Assert.Equal("平文の値", plain.Value);
+        Assert.False(plain.IsSecret);
+        Assert.Equal(legacy.AdminUserId, plain.UpdatedByAdminUserId);
+        Assert.Equal(legacy.Now, plain.UpdatedAt.UtcDateTime);
+
+        // 秘密は暗号文のまま（復号しない）で、秘密の印も保つ
+        var secret = records["TEST_SECRET"];
+        Assert.Equal("暗号文のまま", secret.Value);
+        Assert.True(secret.IsSecret);
+
+        // Core に先にあった同じ設定名は、上書きしない
+        Assert.Equal("Core の値", records["TEST_CONFLICT"].Value);
+    }
+
+    // ---- 道具 -----------------------------------------------------------------------
+
+    /// <summary>DB へ渡す形（種別なし）の日時を、UTC の時刻として読む（暗黙の変換は、種別なしをローカルと見なす）。</summary>
+    private static DateTimeOffset AsUtc(DateTime value) =>
+        new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
+
+    private static async Task<bool> TableExistsAsync(DbConnectionFactory factory, string table)
+    {
+        await using var connection = factory.Create();
+        await connection.OpenAsync();
+        try
+        {
+            await connection.ExecuteScalarAsync(
+                SqlDialect.Format(factory.Provider, $"SELECT COUNT(*) FROM [{table}]"));
+            return true;
+        }
+        catch (DbException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>指定の版まで当てる（<see cref="DatabaseMigrator"/> は版を指定できないので、ランナーを直接組む）。</summary>
+    private static void MigrateTo(DatabaseProvider provider, string connectionString, long version)
+    {
+        using var services = new ServiceCollection()
+            .AddFluentMigratorCore()
+            .ConfigureRunner(builder =>
+            {
+                var configured = provider switch
+                {
+                    DatabaseProvider.SqlServer => builder.AddSqlServer(),
+                    DatabaseProvider.PostgreSql => builder.AddPostgres(),
+                    DatabaseProvider.MySql => builder.AddMySql8(),
+                    DatabaseProvider.Sqlite => builder.AddSQLite(),
+                    _ => throw new NotSupportedException($"対応していない RDBMS: {provider}"),
+                };
+
+                configured
+                    .WithGlobalConnectionString(connectionString)
+                    // アプリの分と、Core.Data の共有マイグレーション（M10001〜）の両方
+                    .ScanIn(typeof(M0001_InitialSchema).Assembly, typeof(DatabaseMigrator).Assembly)
+                    .For.Migrations();
+            })
+            .BuildServiceProvider(validateScopes: false);
+        using var scope = services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp(version);
+    }
+
+    /// <summary>この試験だけの DB。ほかの試験が残した表・行の影響を受けないよう、使い捨てで作る。</summary>
+    private sealed class ScratchDatabase : IAsyncDisposable
+    {
+        private readonly DatabaseProvider provider;
+        private readonly string adminConnectionString;
+        private readonly string name;
+
+        private ScratchDatabase(
+            DatabaseProvider provider,
+            string adminConnectionString,
+            string name,
+            string connectionString)
+        {
+            this.provider = provider;
+            this.adminConnectionString = adminConnectionString;
+            this.name = name;
+            ConnectionString = connectionString;
+        }
+
+        public string ConnectionString { get; }
+
+        public static async Task<ScratchDatabase> CreateAsync(DatabaseProvider provider, string adminConnectionString)
+        {
+            if (provider is DatabaseProvider.Sqlite)
+            {
+                var path = Path.Combine(Path.GetTempPath(), $"qcore-{Guid.NewGuid():N}.db");
+                return new ScratchDatabase(provider, adminConnectionString, path, $"Data Source={path};Pooling=False");
+            }
+
+            var databaseName = $"qmig_{Guid.NewGuid():N}"[..20];
+            await using (var connection = new DbConnectionFactory(provider, adminConnectionString).Create())
+            {
+                await connection.OpenAsync();
+                await connection.ExecuteAsync($"CREATE DATABASE {SqlDialect.Quote(provider, databaseName)}");
+            }
+
+            // 接続の使い回しをやめる（消すときに残った接続が邪魔をしない）
+            var builder = new DbConnectionStringBuilder { ConnectionString = adminConnectionString };
+            builder["Database"] = databaseName;
+            builder["Pooling"] = "False";
+            return new ScratchDatabase(provider, adminConnectionString, databaseName, builder.ConnectionString);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (provider is DatabaseProvider.Sqlite)
+            {
+                foreach (var path in new[] { name, name + "-shm", name + "-wal" })
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                    }
+                }
+
+                return;
+            }
+
+            var quoted = SqlDialect.Quote(provider, name);
+            await using var connection = new DbConnectionFactory(provider, adminConnectionString).Create();
+            await connection.OpenAsync();
+            var drop = provider switch
+            {
+                DatabaseProvider.SqlServer =>
+                    $"ALTER DATABASE {quoted} SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE {quoted}",
+                DatabaseProvider.PostgreSql => $"DROP DATABASE {quoted} WITH (FORCE)",
+                _ => $"DROP DATABASE {quoted}",
+            };
+            await connection.ExecuteAsync(drop);
+        }
+    }
+}

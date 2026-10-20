@@ -110,7 +110,11 @@ public sealed class MailSender(
 
         var next = options.NextAttemptAt(_time.GetUtcNow().UtcDateTime, claimed.RetryCount);
         await outbox
-            .RescheduleAsync(claimed.MailId, next, error, cancellationToken)
+            .RescheduleAsync(
+                claimed.MailId,
+                new DateTimeOffset(DateTime.SpecifyKind(next, DateTimeKind.Utc)),
+                error,
+                cancellationToken)
             .ConfigureAwait(false);
         return SendOutcome.Rescheduled;
     }
@@ -123,7 +127,8 @@ public sealed class MailSender(
         // **黙って溜め続けない。** 通知の対象
         logger.LogError("メールをデッドレターへ回した: {Reason}", error);
         await outbox.DeadLetterAsync(claimed.MailId, error, cancellationToken).ConfigureAwait(false);
-        await NotifyAsync(claimed.SurveyId, cancellationToken).ConfigureAwait(false);
+        // **アンケートに紐づかないメール（管理者の招待）は `SubjectId` が無い。** 知らせの側は `Guid.Empty` で持つ
+        await NotifyAsync(claimed.SubjectId ?? Guid.Empty, cancellationToken).ConfigureAwait(false);
         return SendOutcome.DeadLettered;
     }
 

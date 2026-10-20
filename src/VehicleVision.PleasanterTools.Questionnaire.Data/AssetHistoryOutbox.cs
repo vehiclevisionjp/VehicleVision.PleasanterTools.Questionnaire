@@ -110,17 +110,17 @@ public sealed class AssetHistoryOutbox(IDbConnectionFactory connectionFactory) :
         if (SqlDialect.SupportsReturning(Provider))
         {
             return await connection.QueryFirstOrDefaultAsync<PendingAssetHistory>(Sql(
-                SqlDialect.ClaimPendingAssetHistory(Provider), parameters, cancellationToken))
+                QuestionnaireSqlDialect.ClaimPendingAssetHistory(Provider), parameters, cancellationToken))
                 .ConfigureAwait(false);
         }
 
         var affected = await connection.ExecuteAsync(Sql(
-            SqlDialect.ClaimPendingAssetHistory(Provider), parameters, cancellationToken))
+            QuestionnaireSqlDialect.ClaimPendingAssetHistory(Provider), parameters, cancellationToken))
             .ConfigureAwait(false);
         return affected == 0
             ? null
             : await connection.QueryFirstOrDefaultAsync<PendingAssetHistory>(Sql(
-                SqlDialect.ReadClaimedAssetHistoryForMySql, parameters, cancellationToken))
+                QuestionnaireSqlDialect.ReadClaimedAssetHistoryForMySql, parameters, cancellationToken))
                 .ConfigureAwait(false);
     }
 

@@ -37,7 +37,7 @@ public class AppSettingsProviderTests
             string settingKey,
             string value,
             bool isSecret,
-            Guid updatedByAdminUserId,
+            Guid? updatedByAdminUserId,
             CancellationToken cancellationToken = default)
         {
             SaveCount++;
@@ -45,9 +45,15 @@ public class AppSettingsProviderTests
                 settingKey,
                 value,
                 isSecret,
-                DateTime.UtcNow,
+                DateTimeOffset.UtcNow,
                 updatedByAdminUserId);
             values[settingKey] = SavedRecord;
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(string settingKey, CancellationToken cancellationToken = default)
+        {
+            values.Remove(settingKey);
             return Task.CompletedTask;
         }
     }
