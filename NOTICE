@@ -89,9 +89,9 @@ Copyright (C) PMC Co.,Ltd.
   svelte 5.57.2 / MIT / https://www.npmjs.com/package/svelte
   vite 8.3.4 / MIT / https://www.npmjs.com/package/vite
   @sveltejs/vite-plugin-svelte 7.3.1 / MIT
-  svelte-check 4.7.6 / MIT
+  svelte-check 4.7.7 / MIT
   vitest 5.0.5 / MIT / https://www.npmjs.com/package/vitest
-  sass 1.105.1 / MIT
+  sass 1.105.2 / MIT
   typescript 6.0.3 / Apache-2.0
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
   @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://github.com/DefinitelyTyped/DefinitelyTyped
