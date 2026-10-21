@@ -80,8 +80,8 @@ function seedFor(seed: number, key: string): number {
  * 並びの真ん中に現れて読みにくい。
  */
 export function orderChoices(question: Question, seed: number): Choice[] {
-  if (!question.settings.shuffleChoices) return question.choices;
-  if (question.choices.length < 2) return question.choices;
+  if (!question.settings.shuffleChoices) {return question.choices;}
+  if (question.choices.length < 2) {return question.choices;}
 
   const others = question.choices.filter((choice) => choice.isOther);
   const rest = question.choices.filter((choice) => !choice.isOther);
@@ -100,12 +100,12 @@ export function orderChoices(question: Question, seed: number): Choice[] {
  * 公開時にも弾いているが、**古い版の定義が流れてきても壊れないように**ここでも見る。
  */
 export function orderQuestions(page: Page, questions: Question[], seed: number): Question[] {
-  if (!page.shuffleQuestions) return questions;
-  if (questions.length < 2) return questions;
-  if (questions.some((question) => question.visibleWhen)) return questions;
+  if (!page.shuffleQuestions) {return questions;}
+  if (questions.length < 2) {return questions;}
+  if (questions.some((question) => question.visibleWhen)) {return questions;}
 
   const movable = questions.filter((question) => question.type !== 'Note');
-  if (movable.length < 2) return questions;
+  if (movable.length < 2) {return questions;}
 
   const order = shuffled(movable, seedFor(seed, page.pageId));
   let next = 0;

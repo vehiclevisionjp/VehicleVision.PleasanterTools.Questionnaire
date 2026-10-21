@@ -293,7 +293,7 @@
 
   async function previewSiteSync() {
     const target = siteFor;
-    if (target === null || siteBusy) return;
+    if (target === null || siteBusy) {return;}
 
     error = '';
     siteBusy = true;
@@ -309,7 +309,7 @@
 
   async function syncSite() {
     const target = siteFor;
-    if (target === null || siteBusy) return;
+    if (target === null || siteBusy) {return;}
 
     siteBusy = true;
     const result = await syncSiteSettings(target.surveyId);

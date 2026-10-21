@@ -67,14 +67,14 @@
   }
 
   function pleasanterDestinationChanged(): boolean {
-    if (!settings || settings.publishedSurveyCount === 0) return false;
+    if (!settings || settings.publishedSurveyCount === 0) {return false;}
     const current =
       settings.fields.find((field) => field.key === pleasanterBaseUrlKey)?.value ?? '';
     return current.trim().replace(/\/+$/, '') !== initialPleasanterBaseUrl.trim().replace(/\/+$/, '');
   }
 
   async function testConnection() {
-    if (!settings) return;
+    if (!settings) {return;}
 
     error = '';
     done = '';
@@ -124,7 +124,7 @@
 
   async function save(event: SubmitEvent) {
     event.preventDefault();
-    if (!settings) return;
+    if (!settings) {return;}
 
     error = '';
     done = '';
@@ -153,7 +153,7 @@
   }
 
   async function testMail() {
-    if (!settings) return;
+    if (!settings) {return;}
 
     error = '';
     done = '';

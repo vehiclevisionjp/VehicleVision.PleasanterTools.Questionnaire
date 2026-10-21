@@ -133,7 +133,7 @@
 
   function destination(edgeId: string): string {
     const edge = chart.edges.find((candidate) => candidate.id === edgeId);
-    if (!edge) return '';
+    if (!edge) {return '';}
     if (edge.missingTargetId) {
       return t('flowchart.missingDestination', { pageId: edge.missingTargetId });
     }

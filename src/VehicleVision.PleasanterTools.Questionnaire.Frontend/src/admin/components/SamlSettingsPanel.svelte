@@ -37,7 +37,7 @@
 
   async function save(event: SubmitEvent) {
     event.preventDefault();
-    if (!settings) return;
+    if (!settings) {return;}
 
     error = '';
     done = '';

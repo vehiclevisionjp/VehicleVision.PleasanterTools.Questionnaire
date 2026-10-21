@@ -138,13 +138,13 @@
   function moveRank(value: string, offset: number) {
     const index = current.values.indexOf(value);
     const target = index + offset;
-    if (index < 0 || target < 0 || target >= current.values.length) return;
+    if (index < 0 || target < 0 || target >= current.values.length) {return;}
 
     // **抜いて差し直す。** 添字への代入だと、
     // 添字で取り出した値が undefined になり得る形になる（noUncheckedIndexedAccess）
     const values = [...current.values];
     const [moved] = values.splice(index, 1);
-    if (moved === undefined) return;
+    if (moved === undefined) {return;}
 
     values.splice(target, 0, moved);
     answer = { ...current, values };
@@ -152,7 +152,7 @@
 
   /** 読み上げへ流す、今の順位。**押すたびに変わるので状態として出す。** */
   const rankingStatus = $derived.by(() => {
-    if (question.type !== 'Ranking' || current.values.length === 0) return '';
+    if (question.type !== 'Ranking' || current.values.length === 0) {return '';}
 
     const labels = new Map(question.choices.map((choice) => [choice.value, choice.label]));
 
@@ -185,15 +185,15 @@
   });
   /** 選べる数を文字で出す（Issue #101）。**選んでから弾かれるより先に伝える。** */
   const selectionLimits = $derived.by(() => {
-    if (!hasSelectionRange(question)) return '';
+    if (!hasSelectionRange(question)) {return '';}
 
     const { minSelections: minimum, maxSelections: maximum } = question.settings;
 
     if (minimum !== undefined && maximum !== undefined) {
       return t('question.selectionRange', { minimum, maximum });
     }
-    if (minimum !== undefined) return t('question.selectionMinimum', { minimum });
-    if (maximum !== undefined) return t('question.selectionMaximum', { maximum });
+    if (minimum !== undefined) {return t('question.selectionMinimum', { minimum });}
+    if (maximum !== undefined) {return t('question.selectionMaximum', { maximum });}
     return '';
   });
 

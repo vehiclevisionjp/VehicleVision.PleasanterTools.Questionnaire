@@ -170,7 +170,7 @@ function validateConditions(definition: SurveyDefinition, problems: FlowProblem[
       ? index
       : Math.max(...page.questions.map((question) => position.get(question.questionId) ?? 0)) + 1;
     const buttons = page.buttons;
-    if (!buttons) continue;
+    if (!buttons) {continue;}
 
     const conditions: [string, VisibilityCondition | null | undefined][] = [
       ['button:submit:visible', buttons.submit?.visibleWhen],
