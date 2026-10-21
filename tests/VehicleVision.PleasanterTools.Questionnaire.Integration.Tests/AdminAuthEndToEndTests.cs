@@ -267,6 +267,58 @@ public class AdminAuthEndToEndTests
         Assert.Equal(HttpStatusCode.Unauthorized, enroll.StatusCode);
     }
 
+    /// <summary>Issue #695。パスワードだけを通した途中状態から、登録済みの 2 要素を差し替えられてはならない。</summary>
+    [Fact]
+    public async Task 登録済みの人は_途中状態から二要素の登録を差し替えられない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await ClearAdministratorsAsync();
+        using var setupClient = CreateClient();
+        var (secret, _) = await EnrollAsync(setupClient, "admin");
+
+        // **パスワードだけを通した相手**（2 要素目は知らない）
+        using var attacker = CreateClient();
+        using (var login = await PostAsync(
+            attacker, "/api/admin/login", new { loginId = "admin", password = Password }))
+        {
+            login.EnsureSuccessStatusCode();
+        }
+
+        using (var begin = await PostAsync(attacker, "/api/admin/enroll/begin"))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, begin.StatusCode);
+        }
+
+        // begin を通っていなくても、complete も通さない（自分の鍵で確定させる経路を塞ぐ）
+        using (var complete = await PostAsync(attacker, "/api/admin/enroll/complete", new { code = "000000" }))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, complete.StatusCode);
+        }
+
+        using (var session = await attacker.GetAsync("/api/admin/session"))
+        {
+            // 入れていない
+            Assert.False((await ReadAsync(session))!["authenticated"]!.GetValue<bool>());
+        }
+
+        // 登録は変わっていない: もとの共有鍵で、正しく入れる
+        using var owner = CreateClient();
+        using (var login = await PostAsync(
+            owner, "/api/admin/login", new { loginId = "admin", password = Password }))
+        {
+            login.EnsureSuccessStatusCode();
+        }
+
+        using (var totp = await PostAsync(owner, "/api/admin/login/totp", new { code = Code(secret) }))
+        {
+            totp.EnsureSuccessStatusCode();
+        }
+    }
+
     [Fact]
     public async Task ログアウトすると途中状態も消える()
     {

@@ -340,6 +340,7 @@ public static class AdminAuthEndpoints
         group.MapPost("/enroll/begin", async (
             HttpContext context,
             AdminAuthenticator authenticator,
+            IAdminUserStore users,
             AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
@@ -361,6 +362,14 @@ public static class AdminAuthEndpoints
                 });
             }
 
+            // **登録済みの人には使わせない。** ここはパスワードを通っただけの途中状態で呼ばれる。
+            // 通すと、2 要素目を知らない人が、自分の共有鍵で登録を差し替えて入れてしまう（Issue #695）。
+            // 登録し直しは、ログインを終えた後の「アカウント設定」（/api/admin/me/totp/begin）で、パスワードを確かめて行う
+            if (await IsTotpEnrolledAsync(users, userId, cancellationToken).ConfigureAwait(false))
+            {
+                return TotpAlreadyEnrolled(context);
+            }
+
             // **共有鍵はサーバ側に持たせる**（「登録の途中の鍵」として、暗号化して DB に置く）。
             // 画面から送り返させると差し替えられる
             var enrollment = await authenticator
@@ -378,6 +387,7 @@ public static class AdminAuthEndpoints
             AdminCodeRequest request,
             HttpContext context,
             AdminAuthenticator authenticator,
+            IAdminUserStore users,
             AdminAuthOptions options,
             CancellationToken cancellationToken) =>
         {
@@ -388,6 +398,12 @@ public static class AdminAuthEndpoints
             }
 
             var user = ReadPending(pending.Principal);
+
+            // begin と同じ理由で、登録済みの人は通さない（Issue #695）
+            if (await IsTotpEnrolledAsync(users, user.UserId, cancellationToken).ConfigureAwait(false))
+            {
+                return TotpAlreadyEnrolled(context);
+            }
 
             // **登録の途中の鍵はサーバ側にある。** 無ければ（始めていない・壊れている）、やり直させる
             var secret = await authenticator
@@ -519,6 +535,19 @@ public static class AdminAuthEndpoints
     private readonly record struct PendingUser(Guid UserId);
 
     /// <summary>途中状態の claim から持ち主を読む。</summary>
+    private static async Task<bool> IsTotpEnrolledAsync(
+        IAdminUserStore users, Guid userId, CancellationToken cancellationToken) =>
+        await users.FindByIdAsync(userId, cancellationToken).ConfigureAwait(false) is { TotpEnabled: true };
+
+    private static IResult TotpAlreadyEnrolled(HttpContext context) =>
+        Results.Json(
+            new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.TotpAlreadyEnrolled, RequestLanguage.Of(context)),
+            },
+            statusCode: StatusCodes.Status403Forbidden);
+
     private static PendingUser ReadPending(ClaimsPrincipal principal) =>
         new(Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!));
 
