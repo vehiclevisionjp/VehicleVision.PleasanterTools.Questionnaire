@@ -119,7 +119,7 @@
    */
   const patternProblem = $derived.by(() => {
     const pattern = question.settings.pattern;
-    if (!showPattern || pattern === undefined || pattern === '') return null;
+    if (!showPattern || pattern === undefined || pattern === '') {return null;}
 
     try {
       new RegExp(`^(?:${pattern})$`, 'u');
@@ -136,7 +136,7 @@
 
   /** 選べる数の指定が矛盾していないか。**公開時にサーバ側でも同じことを見る。** */
   const selectionProblem = $derived.by(() => {
-    if (!showSelectionRange) return null;
+    if (!showSelectionRange) {return null;}
 
     const minimum = question.settings.minSelections;
     const maximum = question.settings.maxSelections;
@@ -222,7 +222,7 @@
    * **空欄は「指定なし」。** 0 や NaN を入れると、答えようのない設問になる。
    */
   function optionalCount(value: string): number | undefined {
-    if (value.trim() === '') return undefined;
+    if (value.trim() === '') {return undefined;}
     const count = Number(value);
     return Number.isFinite(count) ? count : undefined;
   }
@@ -286,11 +286,11 @@
    */
   function moveRow(index: number, offset: number) {
     const target = index + offset;
-    if (target < 0 || target >= rows.length) return;
+    if (target < 0 || target >= rows.length) {return;}
 
     const next = [...rows];
     const [moved] = next.splice(index, 1);
-    if (moved === undefined) return;
+    if (moved === undefined) {return;}
 
     next.splice(target, 0, moved);
     updateRows(next);

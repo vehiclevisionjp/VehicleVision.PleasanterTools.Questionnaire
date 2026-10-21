@@ -49,7 +49,7 @@
 
   async function save(event: SubmitEvent) {
     event.preventDefault();
-    if (!settings) return;
+    if (!settings) {return;}
 
     error = '';
     done = '';
@@ -67,7 +67,7 @@
   }
 
   async function test() {
-    if (!settings) return;
+    if (!settings) {return;}
 
     testError = '';
     testMessage = '';

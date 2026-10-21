@@ -169,7 +169,7 @@
 
   async function pollPleasanter() {
     pleasanterTimer = undefined;
-    if (!pleasanterWaiting) return;
+    if (!pleasanterWaiting) {return;}
 
     if (!shouldKeepPolling(pleasanterStartedAt, Date.now())) {
       stopPleasanterWaiting();
@@ -192,7 +192,7 @@
    * 止められたときは、リンクを出して利用者に開いてもらう。
    */
   async function startPleasanter() {
-    if (!pleasanterLoginUrl) return;
+    if (!pleasanterLoginUrl) {return;}
 
     error = '';
     pleasanterError = '';

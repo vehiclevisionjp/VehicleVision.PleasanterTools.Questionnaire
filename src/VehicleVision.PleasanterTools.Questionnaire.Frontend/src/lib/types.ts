@@ -374,7 +374,7 @@ export function text(
   language: Language,
   fallbackLanguage: Language = DEFAULT_LANGUAGE,
 ): string {
-  if (!value) return '';
+  if (!value) {return '';}
   return value[language] ?? value[fallbackLanguage] ?? '';
 }
 

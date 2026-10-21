@@ -38,7 +38,7 @@
 
   function addRule() {
     const first = priorQuestions[0];
-    if (!first) return;
+    if (!first) {return;}
     update({
       rules: [...rules, { questionId: first.questionId, operator: 'Equals', value: firstValue(first) }],
     });
@@ -55,7 +55,7 @@
   function changeQuestion(index: number, questionId: string) {
     const rule = rules[index];
     const target = priorQuestions.find((question) => question.questionId === questionId);
-    if (!rule || !target) return;
+    if (!rule || !target) {return;}
     patchRule(index, {
       questionId,
       value: picksFromChoices(rule.operator) ? firstValue(target) : rule.value,
@@ -64,7 +64,7 @@
 
   function changeOperator(index: number, operator: ConditionOperator) {
     const rule = rules[index];
-    if (!rule) return;
+    if (!rule) {return;}
     if (!needsConditionValue(operator)) {
       patchRule(index, { operator, value: null });
       return;

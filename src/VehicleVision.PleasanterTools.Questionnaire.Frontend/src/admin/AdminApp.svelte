@@ -279,34 +279,34 @@
   }
 
   const breadcrumbPage = $derived.by<AdminPage>(() => {
-    if (openSurveyId) return 'survey-editor';
-    if (openAuditLog && canSeeAuditLog) return 'audit-logs';
-    if (openOutbox && canSeeOutbox) return 'outbox';
-    if (openNotifications && canSeeNotifications) return 'notifications';
-    if (openUsers && canSeeUsers) return 'users';
-    if (openAccount) return 'account';
-    if (openAppSettings && canManageSettings) return 'app-settings';
-    if (openSamlSettings && canManageSaml) return 'saml-settings';
-    if (openPleasanterSsoSettings && canManagePleasanterSso) return 'pleasanter-sso-settings';
-    if (openHelp) return 'help';
+    if (openSurveyId) {return 'survey-editor';}
+    if (openAuditLog && canSeeAuditLog) {return 'audit-logs';}
+    if (openOutbox && canSeeOutbox) {return 'outbox';}
+    if (openNotifications && canSeeNotifications) {return 'notifications';}
+    if (openUsers && canSeeUsers) {return 'users';}
+    if (openAccount) {return 'account';}
+    if (openAppSettings && canManageSettings) {return 'app-settings';}
+    if (openSamlSettings && canManageSaml) {return 'saml-settings';}
+    if (openPleasanterSsoSettings && canManagePleasanterSso) {return 'pleasanter-sso-settings';}
+    if (openHelp) {return 'help';}
     return 'surveys';
   });
 
   function breadcrumbLabel(page: AdminPage): string {
-    if (page === 'surveys') return t('list.title');
+    if (page === 'surveys') {return t('list.title');}
     if (page === 'survey-editor') {
       return t('breadcrumb.surveyEditor', {
         title: truncateBreadcrumbTitle(surveyBreadcrumbTitle ?? ''),
       });
     }
-    if (page === 'audit-logs') return t('breadcrumb.auditLogs');
-    if (page === 'outbox') return t('breadcrumb.outbox');
-    if (page === 'notifications') return t('breadcrumb.notifications');
-    if (page === 'users') return t('breadcrumb.users');
-    if (page === 'app-settings') return t('breadcrumb.appSettings');
-    if (page === 'saml-settings') return t('breadcrumb.samlSettings');
-    if (page === 'pleasanter-sso-settings') return t('breadcrumb.pleasanterSsoSettings');
-    if (page === 'help') return t('breadcrumb.help');
+    if (page === 'audit-logs') {return t('breadcrumb.auditLogs');}
+    if (page === 'outbox') {return t('breadcrumb.outbox');}
+    if (page === 'notifications') {return t('breadcrumb.notifications');}
+    if (page === 'users') {return t('breadcrumb.users');}
+    if (page === 'app-settings') {return t('breadcrumb.appSettings');}
+    if (page === 'saml-settings') {return t('breadcrumb.samlSettings');}
+    if (page === 'pleasanter-sso-settings') {return t('breadcrumb.pleasanterSsoSettings');}
+    if (page === 'help') {return t('breadcrumb.help');}
     return t('breadcrumb.account');
   }
 

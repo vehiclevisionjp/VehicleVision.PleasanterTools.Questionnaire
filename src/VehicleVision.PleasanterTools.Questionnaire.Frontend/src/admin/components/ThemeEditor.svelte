@@ -152,7 +152,7 @@
     const file = event.currentTarget.files?.[0];
     // **同じファイルをもう一度選べるようにする。** 値を残すと `change` が起きない
     event.currentTarget.value = '';
-    if (!file) return;
+    if (!file) {return;}
 
     uploading = true;
     imageError = '';

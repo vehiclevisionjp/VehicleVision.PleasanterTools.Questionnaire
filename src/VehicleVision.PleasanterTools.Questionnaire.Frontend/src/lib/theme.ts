@@ -182,7 +182,7 @@ export function applyTheme(
   target: HTMLElement | null | undefined,
   theme: SurveyTheme | null | undefined,
 ): void {
-  if (!target) return;
+  if (!target) {return;}
 
   const resolved = resolveTheme(theme);
 
@@ -232,10 +232,10 @@ export function applyTheme(
  * 下見と本物で色が食い違う。
  */
 export function resolveTheme(theme: SurveyTheme | null | undefined): SurveyTheme {
-  if (!theme) return {};
+  if (!theme) {return {};}
 
   const preset = theme.preset && theme.preset !== 'None' ? THEME_PRESET_COLORS[theme.preset] : null;
-  if (!preset) return theme;
+  if (!preset) {return theme;}
 
   return {
     ...preset,
@@ -253,7 +253,7 @@ export function resolveTheme(theme: SurveyTheme | null | undefined): SurveyTheme
  */
 function luminance(color: string): number | null {
   const hex = safeColor(color);
-  if (hex === null) return null;
+  if (hex === null) {return null;}
 
   const body = hex.slice(1);
   const full =
@@ -286,7 +286,7 @@ export function contrastRatio(
 ): number | null {
   const a = foreground ? luminance(foreground) : null;
   const b = background ? luminance(background) : null;
-  if (a === null || b === null) return null;
+  if (a === null || b === null) {return null;}
 
   const [light, dark] = a >= b ? [a, b] : [b, a];
   return (light + 0.05) / (dark + 0.05);
@@ -306,6 +306,6 @@ export const CONTRAST_AA = 4.5;
  */
 export function headerImageUrl(publicId: string, theme: SurveyTheme | null | undefined): string | null {
   const id = theme?.headerImageId;
-  if (!id) return null;
+  if (!id) {return null;}
   return appUrl(`/api/forms/${encodeURIComponent(publicId)}/header-image?v=${encodeURIComponent(id)}`);
 }

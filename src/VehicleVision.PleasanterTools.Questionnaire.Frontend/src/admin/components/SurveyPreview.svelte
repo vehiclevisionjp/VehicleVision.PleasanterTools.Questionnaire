@@ -252,7 +252,7 @@
    */
   function withNoteBlocks(question: AnswerQuestion) {
     const blocks = parsedNotes[question.questionId] ?? null;
-    if (question.type === 'Note') return { ...question, noteBlocks: blocks };
+    if (question.type === 'Note') {return { ...question, noteBlocks: blocks };}
     if (question.settings.descriptionFormat === 'Markup') {
       return { ...question, descriptionBlocks: blocks };
     }
