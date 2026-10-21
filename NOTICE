@@ -62,6 +62,9 @@ Copyright (C) PMC Co.,Ltd.
   VehicleVision.PleasanterTools.Core.Mail 0.1.0-preview.4 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
     （メール送信の部品。以下の AWSSDK.SimpleEmailV2・Azure.Communication.Email・Azure.Identity・MailKit・MimeKit・
       System.Security.Cryptography.Pkcs は、これが推移的に伴う。Issue #670）
+  VehicleVision.PleasanterTools.Core.Web 0.1.0-preview.10 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+    （Web 層の部品。Pleasanter のログインの本人確認（PleasanterSessionVerifier）。
+      ASP.NET Core の共有フレームワークだけを使い、NuGet の依存を推移的に伴わない。Issue #706）
   AWSSDK.SimpleEmailV2 4.0.106.4 / Apache-2.0 / https://github.com/aws/aws-sdk-net
     （Amazon SES の送信経路。**IAM ロールで通るので、保管する秘密が 0 になる**。Issue #198）
   AWSSDK.S3 4.0.104.4 / Apache-2.0 / https://github.com/aws/aws-sdk-net

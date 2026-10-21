@@ -6,9 +6,13 @@
 **既定は無効。** 設定しなければ、これまでどおりログイン ID とパスワード（＋ 2 要素）、または SAML だけになる。
 
 - 実装: `src/VehicleVision.PleasanterTools.Questionnaire.Web/Services/PleasanterSsoOptions.cs`、
-  `Services/PleasanterSsoOptionsProvider.cs`、`Services/PleasanterSessionVerifier.cs`、
+  `Services/PleasanterSsoOptionsProvider.cs`、`Services/PleasanterSessionVerification.cs`、
+  `Services/PleasanterApiConnectionSource.cs`、
   `Services/PleasanterSsoAuthenticator.cs`、`Services/PleasanterSsoSessionRevalidator.cs`、
   `Endpoints/AdminPleasanterSsoEndpoints.cs`
+- 本人確認の問い合わせ（検証サービス）: Core.Web（NuGet `VehicleVision.PleasanterTools.Core.Web`）の
+  [`PleasanterSessionVerifier.cs`](https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/v0.1.0-preview.10/src/VehicleVision.PleasanterTools.Core.Web/PleasanterSessionVerifier.cs)。
+  本アプリの実装を基準に Core へ移した（Issue #706）。本アプリは鍵・設定名・ログのカテゴリと接続設定を渡す
 - 保存先: `src/VehicleVision.PleasanterTools.Questionnaire.Data/PleasanterSsoSettingStore.cs`、
   `Migrations/M0032_PleasanterSsoSettings.cs`
 - 画面: `src/VehicleVision.PleasanterTools.Questionnaire.Frontend/src/admin/components/SignInPanel.svelte`、
@@ -114,7 +118,8 @@ sequenceDiagram
 | **TOTP 有効**・パスワードだけ通した段階 | 401（`Pleasanter_SessionGuid` しか無い） |
 | **TOTP 有効**・コード入力後 | 200、本人 |
 
-いずれも本アプリの検証サービス（`PleasanterSessionVerifier`）に実際の cookie を渡して確かめた。
+いずれも本アプリの検証サービス（`PleasanterSessionVerifier`）に実際の cookie を渡して確かめた
+（当時は本アプリの実装。Issue #706 で同じ判定のまま Core.Web へ移した）。
 
 **2026-09-24 の確認（当時は本人確認に拡張 SQL を使っていた。拡張 SQL の方式はその後削除した）:**
 cookie の認証（`context.Authenticated`）と本アプリ側の流れは本人確認の問い合わせに依らないため、
@@ -387,9 +392,9 @@ DB 設定は各インスタンスで最大 30 秒保持するため、設定変�
 - 専用 SQL Server 検証環境の標準 API で組織・グループを作成し、`POST /api/users/1/get` の `DeptId`、
   `POST /api/groups/{id}/get` の `GroupMembers: ["User,1,False", "Dept,1,False"]` と
   `GroupChildren: ["Group,1,"]` の形式を確認した（メンバーごとに作成・取得して確認）。
-- 本アプリの実装: `Services/PleasanterSessionVerifier.Membership.cs`、
-  `Services/PleasanterSsoAuthenticator.cs`、`Migrations/M0033_PleasanterSsoMembership.cs`。
-- 試験: `PleasanterSsoMembershipTests`、`PleasanterSsoSessionRevalidatorTests`、
+- 実装: Core.Web の [`PleasanterSessionVerifier.Membership.cs`][core-web-membership]（Issue #706）、
+  本アプリの `Services/PleasanterSsoAuthenticator.cs`、`Migrations/M0033_PleasanterSsoMembership.cs`。
+- 試験: Core.Web の `PleasanterSsoMembershipTests`、本アプリの `PleasanterSsoSessionRevalidatorTests`、
   `tools/screenshots/specs/pleasanter-sso-membership.spec.ts`。後者は専用の空 DB を使い、
   `SSO_MEMBERSHIP_E2E=1`、`QUESTIONNAIRE_BASE_URL`、`SSO_MEMBERSHIP_PLEASANTER_URL`、
   `SSO_MEMBERSHIP_API_KEY` を指定して `npx playwright test specs/pleasanter-sso-membership.spec.ts --project=desktop` で実行する。
@@ -457,7 +462,8 @@ App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現
 
 ## 9. トラブルシューティング
 
-サーバのログ（`PleasanterSessionVerifier`）と操作の記録（`POST /api/admin/pleasanter-sso/check` の `reason`）を見る。
+サーバのログ（カテゴリ `VehicleVision.PleasanterTools.Questionnaire.Web.Services.PleasanterSessionVerifier`。
+Core.Web へ移した後も同じ名前で出す）と操作の記録（`POST /api/admin/pleasanter-sso/check` の `reason`）を見る。
 **cookie の値はどちらにも出ない。**
 
 | 症状 | 記録・ログの理由 | 原因と対処 |
@@ -485,7 +491,7 @@ App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現
 
 | 項目 | 状況 |
 | --- | --- |
-| 検証サービスの判定（本文の `Own`・401・業務ステータス 401・転送・HTML・4xx/5xx・時間切れ・接続不可・壊れた JSON・1 行ちょうどと `TotalCount`・UserId 0 / 文字列 / 小数・大きすぎる応答・cookie の選別・403 で API キーの有無による分岐・代わりの経路の 401 と利用者 ID 違い・API キーをログにも cookie 付きの要求にも出さないこと・時間切れが全体に掛かること） | 単体テスト（`PleasanterSessionVerifierTests`） |
+| 検証サービスの判定（本文の `Own`・401・業務ステータス 401・転送・HTML・4xx/5xx・時間切れ・接続不可・壊れた JSON・1 行ちょうどと `TotalCount`・UserId 0 / 文字列 / 小数・大きすぎる応答・cookie の選別・403 で API キーの有無による分岐・代わりの経路の 401 と利用者 ID 違い・API キーをログにも cookie 付きの要求にも出さないこと・時間切れが全体に掛かること） | Core.Web の単体テスト（`PleasanterSessionVerifierTests`）。本アプリが渡す値（鍵・設定名・ログのカテゴリ）と接続設定の渡し方は本アプリの単体テスト（`PleasanterSessionVerificationTests`） |
 | 設定の読み取り・優先順位・保存 | 単体テスト（`PleasanterSsoOptionsTests`） |
 | 未登録の扱い・本アプリの 2 要素 | 単体テスト（`PleasanterSsoAuthenticatorTests`） |
 | 再検証（間隔・別人・ログアウト・接続不可・機能の無効化）と `AdminSessionGuard` への組み込み | 単体テスト（`PleasanterSsoSessionRevalidatorTests`、`AdminSessionGuardTests`） |
@@ -515,3 +521,4 @@ App Service 2 つを別のホスト名（`*.azurewebsites.net`）で並べる現
 
 [user-api-model]: https://github.com/Implem/Implem.Pleasanter/blob/Pleasanter_1.5.8.1/Implem.Pleasanter/Models/Users/UserApiModel.cs
 [group-utilities]: https://github.com/Implem/Implem.Pleasanter/blob/Pleasanter_1.5.8.1/Implem.Pleasanter/Models/Groups/GroupUtilities.cs
+[core-web-membership]: https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/v0.1.0-preview.10/src/VehicleVision.PleasanterTools.Core.Web/PleasanterSessionVerifier.Membership.cs

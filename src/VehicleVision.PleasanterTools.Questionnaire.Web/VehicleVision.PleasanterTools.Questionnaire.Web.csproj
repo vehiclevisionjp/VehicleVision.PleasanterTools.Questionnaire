@@ -16,6 +16,8 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
     <PackageReference Include="Otp.NET" Version="1.4.1" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.17.14" />
+    <!-- Pleasanter のログインの本人確認（PleasanterSessionVerifier）は Core.Web（NuGet）へ集約した（Issue #706） -->
+    <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.1.0-preview.10" />
   </ItemGroup>
 
   <ItemGroup>
@@ -46,6 +48,11 @@
   <ItemGroup>
     <!-- DB の基盤は Core.Data（NuGet）へ集約した。名前空間を暗黙に使えるようにする -->
     <Using Include="VehicleVision.PleasanterTools.Core.Data" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Pleasanter のログインの本人確認は Core.Web（NuGet）へ集約した（Issue #706）。名前空間を暗黙に使えるようにする -->
+    <Using Include="VehicleVision.PleasanterTools.Core.Web" />
   </ItemGroup>
 
 </Project>
