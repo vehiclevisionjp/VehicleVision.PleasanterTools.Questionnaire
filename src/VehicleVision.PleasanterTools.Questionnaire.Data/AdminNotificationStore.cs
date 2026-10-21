@@ -189,7 +189,7 @@ public sealed class AdminNotificationStore(IDbConnectionFactory connectionFactor
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
         var rows = await connection.QueryAsync<AdminNotificationView>(Sql(
-            SqlDialect.ListAdminNotifications(Provider, query.UnreadOnly),
+            QuestionnaireSqlDialect.ListAdminNotifications(Provider, query.UnreadOnly),
             new { Limit = query.Limit, Offset = query.Offset },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -297,8 +297,9 @@ public sealed class AdminNotificationStore(IDbConnectionFactory connectionFactor
         foreach (var mail in mails)
         {
             await connection.ExecuteAsync(Sql(
-                "INSERT INTO [MailOutbox] "
-                + "([MailId], [Kind], [SurveyId], [PayloadProtected], [Status], [RetryCount], "
+                // **送信待ちは Core.Data の共有表（`Core_MailOutbox`）。** アンケートへの紐づけは `SubjectId`
+                "INSERT INTO [Core_MailOutbox] "
+                + "([MailId], [Kind], [SubjectId], [PayloadProtected], [Status], [RetryCount], "
                 + " [NextAttemptAt], [CreatedAt], [UpdatedAt]) "
                 + "VALUES (@MailId, @Kind, @SurveyId, @PayloadProtected, 0, 0, @Now, @Now, @Now)",
                 new

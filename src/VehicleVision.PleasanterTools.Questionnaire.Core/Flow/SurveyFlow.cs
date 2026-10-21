@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Globalization;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Answers;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
@@ -68,7 +67,7 @@ public static class SurveyFlow
             // **出す設問はその場で決まる。** 前の設問の答えしか見ないため
             foreach (var question in current.Questions)
             {
-                if (IsVisible(question, answerByQuestion, visible))
+                if (ConditionEvaluator.IsSatisfied(question.VisibleWhen, answerByQuestion, visible))
                 {
                     visible.Add(question.QuestionId);
                 }
@@ -78,80 +77,6 @@ public static class SurveyFlow
         }
 
         return new Path(pages.ToImmutable(), visible.ToImmutable());
-    }
-
-    /// <summary>その設問を出すか。</summary>
-    /// <remarks>
-    /// **出していない設問の答えは見ない。** 見ると、隠れている設問の答えで
-    /// 別の設問が出る、という追えない挙動になる。
-    /// </remarks>
-    private static bool IsVisible(
-        Question question,
-        IReadOnlyDictionary<string, Answer> answers,
-        IReadOnlyCollection<string> visibleSoFar)
-    {
-        if (question.VisibleWhen is not { } condition || condition.IsEmpty)
-        {
-            return true;
-        }
-
-        var results = condition.Rules.Select(rule => Matches(rule, answers, visibleSoFar));
-
-        return condition.Match is ConditionMatch.Any
-            ? results.Any(matched => matched)
-            : results.All(matched => matched);
-    }
-
-    private static bool Matches(
-        ConditionRule rule,
-        IReadOnlyDictionary<string, Answer> answers,
-        IReadOnlyCollection<string> visibleSoFar)
-    {
-        // **通らなかったページ・出していない設問は「未回答」。**
-        // 答えが残っていても、見せていない以上は無かったことにする
-        var answered = visibleSoFar.Contains(rule.QuestionId)
-            && answers.TryGetValue(rule.QuestionId, out var found)
-            && !found.IsEmpty;
-
-        var answer = answered ? answers[rule.QuestionId] : null;
-
-        return rule.Operator switch
-        {
-            ConditionOperator.Answered => answered,
-            ConditionOperator.NotAnswered => !answered,
-
-            ConditionOperator.Equals =>
-                answer is not null && answer.Values.Any(value =>
-                    string.Equals(value, rule.Value, StringComparison.Ordinal)),
-
-            // **未回答は「等しくない」に含めない。** 含めると、
-            // まだ答えていないだけの設問で条件が成立してしまう
-            ConditionOperator.NotEquals =>
-                answer is not null && !answer.Values.Any(value =>
-                    string.Equals(value, rule.Value, StringComparison.Ordinal)),
-
-            ConditionOperator.Contains =>
-                answer is not null && rule.Value is not null && answer.Values.Any(value =>
-                    value.Contains(rule.Value, StringComparison.Ordinal)),
-
-            ConditionOperator.GreaterThan => Compare(answer, rule.Value) > 0,
-            ConditionOperator.LessThan => Compare(answer, rule.Value) < 0,
-
-            _ => false,
-        };
-    }
-
-    /// <summary>数として比べる。**数で読めなければ成立しない。**</summary>
-    private static int Compare(Answer? answer, string? value)
-    {
-        if (answer?.SingleValue is not { } left
-            || !decimal.TryParse(left, NumberStyles.Number, CultureInfo.InvariantCulture, out var leftNumber)
-            || !decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var rightNumber))
-        {
-            return 0;
-        }
-
-        return leftNumber.CompareTo(rightNumber);
     }
 
     /// <summary>次に進むページ。**無ければ送信へ。**</summary>

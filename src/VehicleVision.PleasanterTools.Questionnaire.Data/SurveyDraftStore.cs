@@ -277,7 +277,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string? TitleJson,
         string? DescriptionJson,
         string? NextJson,
-        bool ShuffleQuestions);
+        bool ShuffleQuestions,
+        string? ButtonsJson);
 
     private sealed record QuestionRow(
         string QuestionId,
@@ -294,7 +295,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         string Value,
         string LabelJson,
         bool IsOther,
-        string? NextJson);
+        string? NextJson,
+        string? RemarkJson);
 
     private sealed record AssignmentRow(
         Guid AssignmentId,
@@ -508,7 +510,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         }
 
         var pages = (await connection.QueryAsync<PageRow>(Sql(
-            "SELECT [PageId], [TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions] "
+            "SELECT [PageId], [TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions], "
+            + "[ButtonsJson] "
             + "FROM [Pages] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
@@ -525,7 +528,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
         // **設問の一覧で絞る。** アンケートを跨いだ選択肢が混ざらないようにする
         var choices = (await connection.QueryAsync<ChoiceRow>(Sql(
-            "SELECT [QuestionId], [Value], [LabelJson], [IsOther], [NextJson] "
+            "SELECT [QuestionId], [Value], [LabelJson], [IsOther], [NextJson], [RemarkJson] "
             + "FROM [QuestionChoices] "
             + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
             new { SurveyId = surveyId },
@@ -557,7 +560,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     .Select(choice => new Choice(
                         choice.Value, ReadText(choice.LabelJson) ?? LocalizedText.Japanese(choice.Value),
                         choice.IsOther,
-                        Read<PageTransition>(choice.NextJson)))
+                        Read<PageTransition>(choice.NextJson),
+                        ReadText(choice.RemarkJson)))
                     .ToImmutableArray(),
                 StringComparer.Ordinal);
 
@@ -620,6 +624,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     Questions = questionsByPage.GetValueOrDefault(page.PageId, []),
                     Next = Read<PageTransition>(page.NextJson),
                     ShuffleQuestions = page.ShuffleQuestions,
+                    Buttons = Read<PageButtons>(page.ButtonsJson),
                 })
                 .ToImmutableArray(),
         };
@@ -1026,9 +1031,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
             await connection.ExecuteAsync(Sql(
                 "INSERT INTO [Pages] ([PageId], [SurveyId], [SortOrder], "
-                + "[TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions]) "
+                + "[TitleJson], [DescriptionJson], [NextJson], [ShuffleQuestions], [ButtonsJson]) "
                 + "VALUES (@PageId, @SurveyId, @SortOrder, @TitleJson, @DescriptionJson, "
-                + "@NextJson, @ShuffleQuestions)",
+                + "@NextJson, @ShuffleQuestions, @ButtonsJson)",
                 new
                 {
                     page.PageId,
@@ -1038,6 +1043,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     DescriptionJson = WriteText(page.Description),
                     NextJson = Write(page.Next),
                     page.ShuffleQuestions,
+                    ButtonsJson = Write(page.Buttons),
                 },
                 transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -1075,9 +1081,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                     await connection.ExecuteAsync(Sql(
                         "INSERT INTO [QuestionChoices] ([ChoiceId], [SurveyId], "
                         + "[QuestionId], [SortOrder], [Value], [LabelJson], "
-                        + "[IsOther], [NextJson]) "
+                        + "[IsOther], [NextJson], [RemarkJson]) "
                         + "VALUES (@ChoiceId, @SurveyId, @QuestionId, @SortOrder, @Value, "
-                        + "@LabelJson, @IsOther, @NextJson)",
+                        + "@LabelJson, @IsOther, @NextJson, @RemarkJson)",
                         new
                         {
                             ChoiceId = Guid.NewGuid(),
@@ -1088,6 +1094,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                             LabelJson = WriteText(choice.Label),
                             choice.IsOther,
                             NextJson = Write(choice.Next),
+                            RemarkJson = WriteText(choice.Remark),
                         },
                         transaction,
                         cancellationToken: cancellationToken)).ConfigureAwait(false);

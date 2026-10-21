@@ -176,7 +176,7 @@ public class ResponseNotificationMailerTests
 
     private static ResponseNotificationMailer Create(
         FakeNotificationStore notifications,
-        IAdminUserStore users,
+        IAdminUserSettingsStore users,
         ResponseNotificationMailerOptions? options = null) =>
         new(
             notifications,
@@ -192,18 +192,12 @@ public class ResponseNotificationMailerTests
                 new KeyValuePair<string, string?>(setting.Key, setting.Value)))
             .Build();
 
-    private static async Task<IAdminUserStore> UsersAsync(string loginId, string language)
+    private static async Task<IAdminUserSettingsStore> UsersAsync(string loginId, string language)
     {
         var store = new FakeAdminUserStore(new FakeTimeProvider(new DateTimeOffset(Now)));
-        await store.CreateAsync(new AdminUser
-        {
-            AdminUserId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
-            LoginId = loginId,
-            PasswordHash = "hash",
-            Role = AdminRole.Administrator,
-            Language = language,
-            ResponseNotificationEnabled = true,
-        });
+        var id = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        store.Seed(id, loginId, nameof(AdminRole.Administrator), language: language);
+        await store.SetResponseNotificationEnabledAsync(id, true);
         return store;
     }
 }

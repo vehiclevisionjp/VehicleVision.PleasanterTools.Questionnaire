@@ -1,0 +1,9 @@
+{
+  "//": "環境別の値は同名の .local.json か環境変数で指定する。null は未指定。秘密情報の実値はコミットしない。既定値・意味は _documents/設定パラメータ一覧.md を参照。",
+  "//AdminNotice": "QUESTIONNAIRE_ADMIN_NOTICE と同じ。",
+  "AdminNotice": null,
+  "//EmbedAllowedHosts": "QUESTIONNAIRE_EMBED_ALLOWEDHOSTS と同じ。",
+  "EmbedAllowedHosts": null,
+  "//EmbedAllowedParents": "QUESTIONNAIRE_EMBED_ALLOWEDPARENTS と同じ。",
+  "EmbedAllowedParents": null
+}

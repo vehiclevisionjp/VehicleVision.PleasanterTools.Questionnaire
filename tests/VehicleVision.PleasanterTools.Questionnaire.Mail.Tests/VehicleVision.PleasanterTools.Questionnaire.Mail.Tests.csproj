@@ -11,7 +11,7 @@
     <PackageReference Include="coverlet.collector" Version="10.1.0" />
     <!-- 設定の読み取りを試すのに要る（MailOptions.FromConfiguration） -->
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.12" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
   </ItemGroup>
@@ -22,6 +22,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\VehicleVision.PleasanterTools.Questionnaire.Mail\VehicleVision.PleasanterTools.Questionnaire.Mail.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- メール送信の部品は Core.Mail（NuGet）へ集約した。名前空間を暗黙に使えるようにする -->
+    <Using Include="VehicleVision.PleasanterTools.Core.Mail" />
   </ItemGroup>
 
 </Project>

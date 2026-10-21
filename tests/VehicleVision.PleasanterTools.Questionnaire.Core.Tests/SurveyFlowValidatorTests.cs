@@ -253,4 +253,115 @@ public class SurveyFlowValidatorTests
 
         Assert.Empty(SurveyFlowValidator.Validate(definition));
     }
+
+    [Fact]
+    public void 釦条件は同じページの設問を参照できる()
+    {
+        var definition = Definition(PageOf("p1", Radio("q1", "はい", "いいえ")) with
+        {
+            Buttons = new PageButtons
+            {
+                Submit = new PageButtonCondition
+                {
+                    EnabledWhen = new VisibilityCondition
+                    {
+                        Rules = [new ConditionRule("q1", ConditionOperator.Equals, "はい")],
+                    },
+                },
+            },
+        });
+
+        Assert.Empty(SurveyFlowValidator.Validate(definition));
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("data:text/html,hello")]
+    [InlineData("/relative")]
+    public void 任意リンクの危険なURLを咎める(string url)
+    {
+        var definition = Definition(PageOf("p1", Text("q1")) with
+        {
+            Buttons = new PageButtons
+            {
+                Links =
+                [
+                    new PageLinkButton
+                    {
+                        ButtonId = "link-1",
+                        Label = LocalizedText.Japanese("リンク"),
+                        Url = url,
+                    },
+                ],
+            },
+        });
+
+        Assert.Contains(FlowProblemCode.InvalidButtonUrl, Codes(definition));
+    }
+
+    [Fact]
+    public void 全釦が同じ表示条件なら操作不能になり得ると咎める()
+    {
+        var condition = new VisibilityCondition
+        {
+            Rules = [new ConditionRule("q1", ConditionOperator.Answered)],
+        };
+        var definition = Definition(PageOf("p1", Text("q1")) with
+        {
+            Buttons = new PageButtons
+            {
+                Submit = new PageButtonCondition { VisibleWhen = condition },
+                Next = new PageButtonCondition { VisibleWhen = condition },
+                Previous = new PageButtonCondition { VisibleWhen = condition },
+            },
+        });
+
+        Assert.Contains(FlowProblemCode.AllButtonsMayBeHidden, Codes(definition));
+    }
+
+    [Fact]
+    public void ページを移動して前を向く分岐を咎める()
+    {
+        // p1 から p3 への分岐は正しいが、p3 を先頭へ移すと後ろ向きになる。
+        // ページ ID は変えず、並び順だけで妥当性を判定する。
+        var definition = Definition(
+            PageOf("p3", Text("q3")),
+            PageOf("p1", Text("q1")) with { Next = PageTransition.To("p3") },
+            PageOf("p2", Text("q2")));
+
+        Assert.Contains(
+            SurveyFlowValidator.Validate(definition),
+            problem => problem is
+            {
+                Code: FlowProblemCode.BackwardTransition,
+                PageId: "p1",
+                Detail: "p3",
+            });
+    }
+
+    [Fact]
+    public void 設問を移動して後ろを見る表示条件を咎める()
+    {
+        // q2 は q1 を見ている。q2 を先頭へ移すと、ID を保ったまま前方参照になる。
+        var definition = Definition(PageOf(
+            "p1",
+            Text("q2") with
+            {
+                VisibleWhen = new VisibilityCondition
+                {
+                    Rules = [new ConditionRule("q1", ConditionOperator.Answered)],
+                },
+            },
+            Text("q1")));
+
+        Assert.Contains(
+            SurveyFlowValidator.Validate(definition),
+            problem => problem is
+            {
+                Code: FlowProblemCode.ForwardConditionReference,
+                PageId: "p1",
+                QuestionId: "q2",
+                Detail: "q1",
+            });
+    }
 }

@@ -43,6 +43,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   'form.next': 'Weiter',
   'form.submit': 'Senden',
   'form.submitting': 'Wird gesendet…',
+  'form.buttonDisabled': 'Diese Schaltfläche ist erst verfügbar, wenn die Bedingungen erfüllt sind',
   'form.languageLabel': 'Sprache',
   'form.trapLabel': 'Dieses Feld leer lassen',
   'readability.group': 'Lesbarkeit',
@@ -155,5 +156,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   'serverValidation.PatternMismatch': 'Geben Sie den Wert im angeforderten Format ein',
   'serverValidation.ScannerUnavailable':
     'Anhänge können derzeit nicht geprüft werden, daher können wir dies noch nicht annehmen',
+  'serverValidation.SubmitButtonConditionNotMet': 'Die Bedingungen zum Absenden sind nicht erfüllt',
   'serverValidation.unknown': 'Bitte überprüfen Sie Ihre Eingabe',
 };

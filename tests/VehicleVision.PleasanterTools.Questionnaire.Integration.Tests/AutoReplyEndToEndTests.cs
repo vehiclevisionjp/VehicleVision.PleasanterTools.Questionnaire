@@ -62,8 +62,7 @@ public class AutoReplyEndToEndTests
         await using (var connection = E2EDatabase.AppFactory().Create())
         {
             await connection.OpenAsync();
-            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"));
-            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"));
+            await AdminTestSupport.ClearAdministratorsAsync(connection, E2EDatabase.Provider);
         }
 
         var http = CreateClient();

@@ -42,7 +42,11 @@ public class SurveyDuplicationTests
                         Choices =
                         [
                             // 選択肢ごとの行き先
-                            new Choice("yes", LocalizedText.Japanese("はい"), Next: PageTransition.Submit),
+                            new Choice(
+                                "yes",
+                                LocalizedText.Japanese("はい"),
+                                Next: PageTransition.Submit,
+                                Remark: LocalizedText.Japanese("賛成の場合")),
                             new Choice("no", LocalizedText.Japanese("いいえ"), Next: PageTransition.To("p2")),
                         ],
                     },
@@ -151,6 +155,14 @@ public class SurveyDuplicationTests
         Assert.Equal(PageTransitionKind.Submit, choices[0].Next?.Kind);
         Assert.Equal(PageTransitionKind.Page, choices[1].Next?.Kind);
         Assert.Equal("p2", choices[1].Next?.PageId);
+    }
+
+    [Fact]
+    public void 選択肢の備考が写る()
+    {
+        var copy = SurveyDuplication.Copy(CreateDefinition(), NewSurveyId);
+
+        Assert.Equal("賛成の場合", copy.FindQuestion("q1")!.Choices[0].Remark!.Get("ja"));
     }
 
     [Fact]

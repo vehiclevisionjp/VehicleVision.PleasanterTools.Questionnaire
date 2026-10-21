@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
@@ -50,188 +50,140 @@ public class AdminSessionGuardTests
         private static readonly CancellationToken Canceled = new(canceled: true);
 
         // **作成は通す。** ログインを済ませないと、読み取りまで辿り着かない
-        public Task CreateAsync(AdminSessionEntry entry, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+        public Task<string> CreateAsync(
+            Guid userId,
+            string kind,
+            TimeSpan lifetime,
+            CancellationToken cancellationToken = default,
+            string? ipAddress = null,
+            string? userAgent = null,
+            SessionSso? sso = null) =>
+            Task.FromResult("session-id");
 
-        public Task<AdminSessionEntry?> FindAsync(
-            Guid adminSessionId,
+        public string HandleOf(string sessionId) => sessionId;
+
+        public Task<SessionSso?> GetSsoAsync(string sessionId, CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<SessionSso?>(Canceled);
+
+        public Task TouchPleasanterVerifiedAsync(
+            string sessionId,
+            DateTimeOffset verifiedAt,
             CancellationToken cancellationToken = default) =>
-            Task.FromCanceled<AdminSessionEntry?>(Canceled);
+            Task.FromCanceled(Canceled);
 
-        public Task<IReadOnlyList<AdminSessionEntry>> ListAsync(
-            Guid adminUserId,
+        public Task<SamlSessionKeys?> GetSamlKeysAsync(
+            string sessionId,
             CancellationToken cancellationToken = default) =>
-            Task.FromCanceled<IReadOnlyList<AdminSessionEntry>>(Canceled);
+            Task.FromCanceled<SamlSessionKeys?>(Canceled);
 
-        public Task<bool> DeleteAsync(Guid adminSessionId, CancellationToken cancellationToken = default) =>
-            Task.FromCanceled<bool>(Canceled);
-
-        public Task<IReadOnlyList<Guid>> DeleteAllExceptAsync(
-            Guid adminUserId,
-            Guid? keepAdminSessionId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromCanceled<IReadOnlyList<Guid>>(Canceled);
-
-        public Task<int> DeleteExpiredAsync(
-            DateTime now,
+        public Task<int> DeleteBySamlKeysAsync(
+            string nameId,
+            string? sessionIndex,
             CancellationToken cancellationToken = default) =>
             Task.FromCanceled<int>(Canceled);
 
-        public Task TouchAsync(
-            Guid adminSessionId,
-            DateTime lastSeenAt,
-            DateTime expiresAt,
+        public Task<IReadOnlyList<AdminSessionInfo>> ListForUserAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<IReadOnlyList<AdminSessionInfo>>(Canceled);
+
+        public Task<bool> DeleteByHandleAsync(
+            Guid userId,
+            string handle,
+            CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<bool>(Canceled);
+
+        public Task<AdminSession?> FindAsync(string sessionId, CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<AdminSession?>(Canceled);
+
+        public Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default) =>
+            Task.FromCanceled(Canceled);
+
+        public Task DeleteForUserAsync(
+            Guid userId,
+            string? exceptSessionId = null,
             CancellationToken cancellationToken = default) =>
             Task.FromCanceled(Canceled);
-    }
 
-    private sealed class FakeAdminSessionStore : IAdminSessionStore
-    {
-        private readonly Dictionary<Guid, AdminSessionEntry> _entries = [];
-
-        public Task CreateAsync(AdminSessionEntry entry, CancellationToken cancellationToken = default)
-        {
-            _entries.Add(entry.AdminSessionId, entry);
-            return Task.CompletedTask;
-        }
-
-        public Task<AdminSessionEntry?> FindAsync(
-            Guid adminSessionId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(_entries.GetValueOrDefault(adminSessionId));
-
-        public Task<IReadOnlyList<AdminSessionEntry>> ListAsync(
-            Guid adminUserId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AdminSessionEntry>>(
-                _entries.Values.Where(entry => entry.AdminUserId == adminUserId).ToList());
-
-        public Task<bool> DeleteAsync(
-            Guid adminSessionId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(_entries.Remove(adminSessionId));
-
-        public Task<IReadOnlyList<Guid>> DeleteAllExceptAsync(
-            Guid adminUserId,
-            Guid? exceptSessionId,
-            CancellationToken cancellationToken = default)
-        {
-            var ids = _entries.Values
-                .Where(entry => entry.AdminUserId == adminUserId
-                    && (entry.AdminSessionId != exceptSessionId
-                        || entry.Kind is not AdminSessionKind.Session))
-                .Select(entry => entry.AdminSessionId)
-                .ToList();
-            ids.ForEach(id => _entries.Remove(id));
-            return Task.FromResult<IReadOnlyList<Guid>>(ids);
-        }
-
-        public Task<int> DeleteExpiredAsync(
-            DateTime nowUtc,
-            CancellationToken cancellationToken = default)
-        {
-            var ids = _entries.Values
-                .Where(entry => entry.ExpiresAt <= nowUtc)
-                .Select(entry => entry.AdminSessionId)
-                .ToList();
-            ids.ForEach(id => _entries.Remove(id));
-            return Task.FromResult(ids.Count);
-        }
+        public Task<int> DeleteExpiredAsync(CancellationToken cancellationToken = default) =>
+            Task.FromCanceled<int>(Canceled);
     }
 
     private static readonly Guid AdminUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    private static AdminUser User(
-        Guid? adminUserId = null,
-        AdminRole role = AdminRole.Administrator,
-        bool isDisabled = false) => new()
-        {
-            AdminUserId = adminUserId ?? AdminUserId,
-            LoginId = "admin",
-            PasswordHash = "hash",
-            Role = role,
-            IsDisabled = isDisabled,
-            CreatedAt = new DateTime(2026, 8, 21, 0, 0, 0, DateTimeKind.Utc),
-            UpdatedAt = new DateTime(2026, 8, 21, 0, 0, 0, DateTimeKind.Utc),
-        };
+    private static readonly DateTimeOffset Start = DateTimeOffset.Parse("2026-09-24T00:00:00Z");
 
-    private static ClaimsPrincipal Principal(
-        Guid? adminUserId = null,
-        string? role = "Administrator",
-        IEnumerable<Claim>? extraClaims = null)
-    {
-        var claims = new List<Claim>(extraClaims ?? []);
-        if (adminUserId is { } id)
-        {
-            claims.Add(new Claim(ClaimTypes.NameIdentifier, id.ToString()));
-        }
+    /// <summary>1 回の検証に使う部品。</summary>
+    private sealed record Harness(
+        FakeAdminUserStore Users,
+        FakeAdminSessionStore Sessions,
+        FakeAuthenticationService Auth,
+        ServiceProvider Services,
+        DefaultHttpContext HttpContext,
+        ClaimsPrincipal CookiePrincipal);
 
-        if (role is not null)
-        {
-            claims.Add(new Claim(ClaimTypes.Role, role));
-        }
-
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, AdminAuthSchemes.Session));
-    }
-
-    private static async Task<(CookieValidatePrincipalContext Context, FakeAuthenticationService Auth)> ValidateAsync(
-        AdminUser? user,
-        ClaimsPrincipal principal,
+    /// <summary>
+    /// 管理者（<paramref name="role"/> など）を作り、そのセッションを張って、cookie の principal を取り出す。
+    /// <paramref name="seedUser"/> が偽なら、管理者の表には何も作らない（セッションだけが残っている状態）。
+    /// </summary>
+    private static async Task<Harness> SignInAsync(
+        bool seedUser = true,
+        string role = nameof(AdminRole.Administrator),
+        bool isDisabled = false,
+        string kind = AdminSessionKinds.Session,
+        string scheme = AdminAuthSchemes.Session,
+        SessionSso? sso = null,
         Action<IServiceCollection>? configure = null)
     {
-        var time = TimeProvider.System;
-        var store = new FakeAdminUserStore(time);
-        if (user is not null)
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(Start);
+        var users = new FakeAdminUserStore(time);
+        if (seedUser)
         {
-            await store.CreateAsync(user);
+            users.Seed(AdminUserId, "admin", role, isDisabled);
         }
 
+        var sessions = new FakeAdminSessionStore(time);
         var auth = new FakeAuthenticationService();
         var collection = new ServiceCollection()
-            .AddSingleton<IAdminUserStore>(store)
-            .AddSingleton<IAdminSessionStore, FakeAdminSessionStore>()
+            .AddSingleton<IAdminUserStore>(users)
+            .AddSingleton<IAdminSessionStore>(sessions)
             .AddSingleton<IAuthenticationService>(auth)
-            .AddSingleton(TimeProvider.System)
-            .AddDataProtection()
-            .Services
+            .AddSingleton<TimeProvider>(time)
             .AddLogging()
             .AddSingleton<AdminSessionManager>();
         configure?.Invoke(collection);
         var services = collection.BuildServiceProvider();
 
-        var httpContext = new DefaultHttpContext
-        {
-            RequestServices = services,
-        };
-        ClaimsPrincipal cookiePrincipal = principal;
-        if (principal.FindFirstValue(ClaimTypes.NameIdentifier) is not null)
-        {
-            await services.GetRequiredService<AdminSessionManager>().SignInAsync(
-                httpContext,
-                AdminAuthSchemes.Session,
-                AdminSessionKind.Session,
-                principal,
-                AdminAuthSchemes.SessionLifetime);
-            cookiePrincipal = auth.SignedInPrincipal!;
-            auth.SignedOutSchemes.Clear();
-        }
-
-        var scheme = new AuthenticationScheme(
-            AdminAuthSchemes.Session,
-            AdminAuthSchemes.Session,
-            typeof(CookieAuthenticationHandler));
-        var ticket = new AuthenticationTicket(
-            cookiePrincipal,
-            new AuthenticationProperties(),
-            AdminAuthSchemes.Session);
-        var context = new CookieValidatePrincipalContext(
+        var httpContext = new DefaultHttpContext { RequestServices = services };
+        await services.GetRequiredService<AdminSessionManager>().SignInAsync(
             httpContext,
             scheme,
-            new CookieAuthenticationOptions(),
-            ticket);
+            kind,
+            AdminUserId,
+            AdminAuthSchemes.SessionLifetime,
+            sso);
+        var cookiePrincipal = auth.SignedInPrincipal!;
+        auth.SignedOutSchemes.Clear();
 
+        return new Harness(users, sessions, auth, services, httpContext, cookiePrincipal);
+    }
+
+    private static CookieValidatePrincipalContext ContextOf(
+        HttpContext httpContext,
+        ClaimsPrincipal cookiePrincipal,
+        string scheme = AdminAuthSchemes.Session) =>
+        new(
+            httpContext,
+            new AuthenticationScheme(scheme, scheme, typeof(CookieAuthenticationHandler)),
+            new CookieAuthenticationOptions(),
+            new AuthenticationTicket(cookiePrincipal, new AuthenticationProperties(), scheme));
+
+    private static async Task<(CookieValidatePrincipalContext Context, Harness Harness)> ValidateAsync(
+        Harness harness)
+    {
+        var context = ContextOf(harness.HttpContext, harness.CookiePrincipal);
         await AdminSessionGuard.ValidateAsync(context);
-        return (context, auth);
+        return (context, harness);
     }
 
     /// <summary>
@@ -247,8 +199,6 @@ public class AdminSessionGuardTests
             .AddSingleton<IAdminSessionStore, CancellingAdminSessionStore>()
             .AddSingleton<IAuthenticationService>(auth)
             .AddSingleton(TimeProvider.System)
-            .AddDataProtection()
-            .Services
             .AddLogging()
             .AddSingleton<AdminSessionManager>()
             .BuildServiceProvider();
@@ -258,8 +208,8 @@ public class AdminSessionGuardTests
         await services.GetRequiredService<AdminSessionManager>().SignInAsync(
             signInContext,
             AdminAuthSchemes.Session,
-            AdminSessionKind.Session,
-            Principal(AdminUserId),
+            AdminSessionKinds.Session,
+            AdminUserId,
             AdminAuthSchemes.SessionLifetime);
         var cookiePrincipal = auth.SignedInPrincipal!;
         auth.SignedOutSchemes.Clear();
@@ -273,18 +223,7 @@ public class AdminSessionGuardTests
             RequestAborted = aborted.Token,
         };
 
-        var scheme = new AuthenticationScheme(
-            AdminAuthSchemes.Session,
-            AdminAuthSchemes.Session,
-            typeof(CookieAuthenticationHandler));
-        var context = new CookieValidatePrincipalContext(
-            httpContext,
-            scheme,
-            new CookieAuthenticationOptions(),
-            new AuthenticationTicket(
-                cookiePrincipal,
-                new AuthenticationProperties(),
-                AdminAuthSchemes.Session));
+        var context = ContextOf(httpContext, cookiePrincipal);
 
         // 例外が外へ出れば、ここで落ちる
         await AdminSessionGuard.ValidateAsync(context);
@@ -294,72 +233,165 @@ public class AdminSessionGuardTests
     }
 
     [Fact]
-    public async Task 有効な管理者で役割が一致すればセッションを残す()
+    public async Task 有効な管理者ならセッションを残し利用者から組み立てた情報を載せる()
     {
-        var (context, auth) = await ValidateAsync(User(), Principal(AdminUserId));
+        var (context, harness) = await ValidateAsync(await SignInAsync());
 
         Assert.False(context.ShouldRenew);
         Assert.NotNull(context.Principal);
-        Assert.Empty(auth.SignedOutSchemes);
+        Assert.Empty(harness.Auth.SignedOutSchemes);
+
+        // cookie に載るのはセッション ID だけ
         Assert.Collection(
-            auth.SignedInPrincipal!.Claims,
+            harness.Auth.SignedInPrincipal!.Claims,
             claim => Assert.Equal(AdminSessionManager.SessionIdClaim, claim.Type));
+
+        // **利用者・役割は、ストアと利用者の表から組み立て直す**（cookie の値を信じない）
+        Assert.Equal(AdminUserId.ToString(), context.Principal!.FindFirstValue(ClaimTypes.NameIdentifier));
+        Assert.Equal("admin", context.Principal.FindFirstValue(ClaimTypes.Name));
+        Assert.Equal(nameof(AdminRole.Administrator), context.Principal.FindFirstValue(ClaimTypes.Role));
+        Assert.Equal(AdminAuthSchemes.Session, context.Principal.Identity!.AuthenticationType);
     }
 
     [Fact]
-    public async Task セッションに管理者IDが無ければ拒否してCookieを消す()
+    public async Task セッションIDを持たないCookieは拒否してCookieを消す()
     {
-        var (context, auth) = await ValidateAsync(User(), Principal(adminUserId: null));
+        var harness = await SignInAsync();
+        var noSession = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, AdminUserId.ToString())],
+            AdminAuthSchemes.Session));
+        var context = ContextOf(harness.HttpContext, noSession);
+
+        await AdminSessionGuard.ValidateAsync(context);
 
         Assert.Null(context.Principal);
-        Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+        Assert.Contains(AdminAuthSchemes.Session, harness.Auth.SignedOutSchemes);
     }
 
     [Fact]
-    public async Task DBに管理者が無ければ期限切れ扱いで拒否する()
+    public async Task ストアに無いセッションIDは拒否する()
     {
-        var (context, auth) = await ValidateAsync(null, Principal(AdminUserId));
+        var harness = await SignInAsync();
+
+        // **別の ID の cookie**（ストアに無い・失効した）
+        var other = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(AdminSessionManager.SessionIdClaim, "no-such-session")],
+            AdminAuthSchemes.Session));
+        var context = ContextOf(harness.HttpContext, other);
+
+        await AdminSessionGuard.ValidateAsync(context);
 
         Assert.Null(context.Principal);
-        Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+        Assert.Contains(AdminAuthSchemes.Session, harness.Auth.SignedOutSchemes);
     }
 
     [Fact]
-    public async Task 止められた管理者は拒否する()
+    public async Task 失効させたセッションは通らない()
     {
-        var (context, auth) = await ValidateAsync(User(isDisabled: true), Principal(AdminUserId));
+        var harness = await SignInAsync();
+
+        // **パスワード変更・役割の変更などで、持ち主のセッションを失効させる**
+        await harness.Sessions.DeleteForUserAsync(AdminUserId);
+        var (context, _) = await ValidateAsync(harness);
 
         Assert.Null(context.Principal);
-        Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+        Assert.Contains(AdminAuthSchemes.Session, harness.Auth.SignedOutSchemes);
     }
 
     [Fact]
-    public async Task 役割が降格されていれば古い管理者権限のCookieを拒否する()
+    public async Task 期限が切れたセッションは通らない()
     {
-        var (context, auth) = await ValidateAsync(
-            User(role: AdminRole.Editor),
-            Principal(AdminUserId, role: "Administrator"));
+        var harness = await SignInAsync();
+        var time = (Microsoft.Extensions.Time.Testing.FakeTimeProvider)harness.Services.GetRequiredService<TimeProvider>();
+        time.Advance(AdminAuthSchemes.SessionLifetime + TimeSpan.FromMinutes(1));
+
+        var (context, _) = await ValidateAsync(harness);
 
         Assert.Null(context.Principal);
-        Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+        Assert.Contains(AdminAuthSchemes.Session, harness.Auth.SignedOutSchemes);
     }
 
     [Fact]
-    public async Task 役割の大文字小文字が違うCookieは拒否する()
+    public async Task DBに管理者が無ければ拒否してセッションも消す()
     {
-        var (context, auth) = await ValidateAsync(
-            User(role: AdminRole.Administrator),
-            Principal(AdminUserId, role: "administrator"));
+        var (context, harness) = await ValidateAsync(await SignInAsync(seedUser: false));
 
         Assert.Null(context.Principal);
-        Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+        Assert.Contains(AdminAuthSchemes.Session, harness.Auth.SignedOutSchemes);
+        Assert.Equal(0, harness.Sessions.Count);
     }
+
+    [Fact]
+    public async Task 止められた管理者は拒否してセッションも消す()
+    {
+        var (context, harness) = await ValidateAsync(await SignInAsync(isDisabled: true));
+
+        Assert.Null(context.Principal);
+        Assert.Contains(AdminAuthSchemes.Session, harness.Auth.SignedOutSchemes);
+        Assert.Equal(0, harness.Sessions.Count);
+    }
+
+    [Fact]
+    public async Task 役割は要求のたびに利用者の表から読み直す()
+    {
+        var harness = await SignInAsync();
+
+        // **cookie に役割は載っていない。** 変えた後の役割が、次の要求からそのまま効く
+        await harness.Users.SetRoleAsync(AdminUserId, nameof(AdminRole.Editor));
+        var (context, _) = await ValidateAsync(harness);
+
+        Assert.Equal(nameof(AdminRole.Editor), context.Principal!.FindFirstValue(ClaimTypes.Role));
+    }
+
+    [Fact]
+    public async Task 段階が違うセッションは通らない()
+    {
+        // **途中状態（Pending）の cookie を、ログイン済み（Session）として使えない**
+        var harness = await SignInAsync(kind: AdminSessionKinds.Pending, scheme: AdminAuthSchemes.Pending);
+        var (context, _) = await ValidateAsync(harness);
+
+        Assert.Null(context.Principal);
+    }
+
+    [Fact]
+    public async Task 登録し直しの途中は専用の段階でだけ通る()
+    {
+        var harness = await SignInAsync(
+            kind: QuestionnaireSessionKinds.Reenroll,
+            scheme: AdminAuthSchemes.Reenroll);
+
+        // **ログイン済み・途中状態としては使えない**
+        var asSession = ContextOf(harness.HttpContext, harness.CookiePrincipal);
+        await AdminSessionGuard.ValidateAsync(asSession);
+        Assert.Null(asSession.Principal);
+
+        var asPending = ContextOf(harness.HttpContext, harness.CookiePrincipal, AdminAuthSchemes.Pending);
+        await AdminSessionGuard.ValidatePendingAsync(asPending);
+        Assert.Null(asPending.Principal);
+
+        var asReenroll = ContextOf(harness.HttpContext, harness.CookiePrincipal, AdminAuthSchemes.Reenroll);
+        await AdminSessionGuard.ValidateReenrollAsync(asReenroll);
+        Assert.NotNull(asReenroll.Principal);
+    }
+
+    // ---- SAML のログインで入ったセッション（Issue #191・#602） ----------------
+
+    [Fact]
+    public async Task SAMLで入ったセッションは単一ログアウトの手掛かりを載せる()
+    {
+        var harness = await SignInAsync(
+            sso: new SessionSso(Saml: new SamlSessionKeys("name-id@example.test", "session-index-1")));
+
+        var (context, _) = await ValidateAsync(harness);
+
+        Assert.Equal("name-id@example.test", context.Principal!.FindFirstValue(AdminAuthSchemes.SamlNameIdClaim));
+        Assert.Equal("session-index-1", context.Principal!.FindFirstValue(AdminAuthSchemes.SamlSessionIndexClaim));
+    }
+
     // ---- Pleasanter のログインで入ったセッション（Issue #464） ----------------
 
-    private static IEnumerable<Claim> PleasanterClaims(int userId = 7, DateTimeOffset? verifiedAt = null) =>
-        PleasanterSsoClaims.Create(
-            new PleasanterIdentity(1, userId, "admin", null),
-            verifiedAt ?? DateTimeOffset.UtcNow.AddHours(-1));
+    private static SessionSso PleasanterSso(int userId = 7, DateTimeOffset? verifiedAt = null) =>
+        new(Pleasanter: new PleasanterSsoKeys(1, userId, verifiedAt ?? Start.AddHours(-1)));
 
     private static Action<IServiceCollection> Pleasanter(PleasanterSessionResult result) =>
         services => services
@@ -376,44 +408,44 @@ public class AdminSessionGuardTests
     [Fact]
     public async Task Pleasanterで同じ人のままならセッションを残す()
     {
-        var (context, auth) = await ValidateAsync(
-            User(),
-            Principal(AdminUserId, extraClaims: PleasanterClaims()),
-            Pleasanter(new PleasanterSessionResult(
+        var (context, harness) = await ValidateAsync(await SignInAsync(
+            sso: PleasanterSso(),
+            configure: Pleasanter(new PleasanterSessionResult(
                 PleasanterSessionStatus.Authenticated,
-                new PleasanterIdentity(1, 7, "admin", null))));
+                new PleasanterIdentity(1, 7, "admin", null)))));
 
         Assert.NotNull(context.Principal);
-        Assert.Empty(auth.SignedOutSchemes);
+        Assert.Empty(harness.Auth.SignedOutSchemes);
+
+        // **セッションの値から claim を組み立て直す**（再検証の入力になる）
+        Assert.Equal("7", context.Principal!.FindFirstValue(PleasanterSsoClaims.UserId));
     }
 
     [Fact]
     public async Task Pleasanterでログアウトしていれば本アプリからも落とす()
     {
-        var (context, auth) = await ValidateAsync(
-            User(),
-            Principal(AdminUserId, extraClaims: PleasanterClaims()),
-            Pleasanter(PleasanterSessionResult.Unauthenticated("http-401")));
+        var (context, harness) = await ValidateAsync(await SignInAsync(
+            sso: PleasanterSso(),
+            configure: Pleasanter(PleasanterSessionResult.Unauthenticated("http-401"))));
 
         Assert.Null(context.Principal);
-        Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+        Assert.Contains(AdminAuthSchemes.Session, harness.Auth.SignedOutSchemes);
         Assert.Null(context.HttpContext.Items[PleasanterSsoSessionRevalidator.UpstreamErrorItemKey]);
 
         // **セッションも消す。** cookie だけ消してストアに残すと、一覧に生きたまま出る
         var store = context.HttpContext.RequestServices.GetRequiredService<IAdminSessionStore>();
-        Assert.Empty(await store.ListAsync(AdminUserId));
+        Assert.Empty(await store.ListForUserAsync(AdminUserId));
     }
 
     [Fact]
     public async Task Pleasanterに問い合わせられなければ落として503の印を付ける()
     {
-        var (context, auth) = await ValidateAsync(
-            User(),
-            Principal(AdminUserId, extraClaims: PleasanterClaims()),
-            Pleasanter(PleasanterSessionResult.Error("timeout")));
+        var (context, harness) = await ValidateAsync(await SignInAsync(
+            sso: PleasanterSso(),
+            configure: Pleasanter(PleasanterSessionResult.Error("timeout"))));
 
         Assert.Null(context.Principal);
-        Assert.Contains(AdminAuthSchemes.Session, auth.SignedOutSchemes);
+        Assert.Contains(AdminAuthSchemes.Session, harness.Auth.SignedOutSchemes);
         Assert.Equal(true, context.HttpContext.Items[PleasanterSsoSessionRevalidator.UpstreamErrorItemKey]);
     }
 
@@ -421,14 +453,12 @@ public class AdminSessionGuardTests
     public async Task 合言葉で入ったセッションはPleasanterに問い合わせない()
     {
         var verifier = new FakePleasanterSessionVerifier(PleasanterSessionResult.Error("unused"));
-        var (context, _) = await ValidateAsync(
-            User(),
-            Principal(AdminUserId),
-            services => services
+        var (context, _) = await ValidateAsync(await SignInAsync(
+            configure: services => services
                 .AddSingleton<IPleasanterSsoOptionsProvider>(
                     new StaticPleasanterSsoOptionsProvider(new PleasanterSsoOptions()))
                 .AddSingleton<IPleasanterSessionVerifier>(verifier)
-                .AddSingleton<PleasanterSsoSessionRevalidator>());
+                .AddSingleton<PleasanterSsoSessionRevalidator>()));
 
         Assert.NotNull(context.Principal);
         Assert.Equal(0, verifier.Calls);

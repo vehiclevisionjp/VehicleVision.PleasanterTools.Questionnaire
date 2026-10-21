@@ -239,7 +239,7 @@ public sealed class AuditLogRetentionService(
                 if (adminSessions is not null)
                 {
                     var expiredSessions = await adminSessions
-                        .DeleteExpiredAsync(_time.GetUtcNow().UtcDateTime, stoppingToken)
+                        .DeleteExpiredAsync(stoppingToken)
                         .ConfigureAwait(false);
                     if (expiredSessions > 0)
                     {
@@ -281,7 +281,9 @@ public sealed class AuditLogRetentionService(
                 if (options.Enabled)
                 {
                     var threshold = now.AddDays(-options.RetentionDays);
-                    var deleted = await store.DeleteOlderThanAsync(threshold, stoppingToken)
+                    // **目盛りは書くときと同じ（サーバのローカル時刻の数字）**。`AuditLogTime` を参照
+                    var deleted = await store
+                        .DeleteOlderThanAsync(AuditLogTime.ToStored(threshold), stoppingToken)
                         .ConfigureAwait(false);
 
                     if (deleted > 0)

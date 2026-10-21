@@ -141,7 +141,7 @@ public sealed class AttachmentRejectionStore(IDbConnectionFactory connectionFact
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
         var rows = await connection.QueryAsync<AttachmentRejectionView>(Sql(
-            SqlDialect.ListAttachmentRejections(Provider),
+            QuestionnaireSqlDialect.ListAttachmentRejections(Provider),
             new { Limit = query.Limit, Offset = query.Offset },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 

@@ -12,13 +12,23 @@
   実値は次のいずれかで与える
     1. 環境変数（Azure App Service のアプリケーション設定）
     2. Azure Key Vault
-    3. `{名前}.local.json`（`.gitignore` 済み。ローカル開発用）
-- 上書きの優先順位は **`{名前}.local.json` ＞ 環境変数 ＞ `{名前}.json`** とする
+    3. `{名前}.local.json`（`.gitignore` 済み。開発・本番共通の運用者用）
+    4. `QUESTIONNAIRE_*_FILE` 環境変数で指定する秘密ファイル（Docker secrets /
+       Kubernetes Secret のファイルマウント）
+- 上書きの優先順位は **`{名前}.local.json` ＞ `QUESTIONNAIRE_*_FILE` ＞ 環境変数 ＞
+  `{名前}.json`** とする
 
-## ファイル
+環境変数で指定できる設定はすべてファイルにも記述できます。
+DB は `Rds.local.json`、メールは `Mail.local.json`、認証は `Authentication.local.json` などへ、
+用途別の短いキーまたは環境変数と同名のキーで指定してください。
+全ファイル・キーの対応と指定例は[設定ファイル対応一覧](../../_documents/設定ファイル対応一覧.md)を参照してください。
+秘密情報も `.local.json` に指定できます。実値はコミットせず、読み取り権限を制限してください。
+設定変更後はアプリの再起動が必要です。
+
+## 既存ファイル
 
 | ファイル | 内容 | 読まれているか |
-|---|---|---|
+| --- | --- | --- |
 | `Service.json` | 既定タイムゾーン | **読まれている** |
 | `Pleasanter.json` | 接続先 Pleasanter の URL・API キー・版・タイムアウト | **読まれている** |
 | `Security.json` | **管理者のパスワードに求める条件**（Issue #157） | **読まれている** |
@@ -30,14 +40,14 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 > ⚠️ **`Service.json` の `Name` と `Description` はどこからも読んでいない。**
 > 表示名を出す画面が無いため。消してはいないが、変えても何も変わらない。
 
-### ファイルのキーと環境変数の対応
+### 従来のキーとの互換性
 
 **`Pleasanter.json` と `Service.json` は、キーの名前が環境変数と違う**
 （Pleasanter 本体に合わせた短い名前を使っているため）。
 **読み込み時に下表のとおり写している**ので、どちらで書いても効く。
 
 | ファイルのキー | 環境変数 |
-|---|---|
+| --- | --- |
 | `Service.json` の `TimeZoneDefault` | `QUESTIONNAIRE_TIMEZONE_DEFAULT` |
 | `Pleasanter.json` の `BaseUrl` | `QUESTIONNAIRE_PLEASANTER_BASEURL` |
 | `Pleasanter.json` の `ApiKey` | `QUESTIONNAIRE_PLEASANTER_APIKEY` |
@@ -45,12 +55,33 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | `Pleasanter.json` の `TimeoutSeconds` | `QUESTIONNAIRE_PLEASANTER_TIMEOUTSECONDS` |
 | `Pleasanter.json` の `ApiKeyUserTimeZoneId` | `QUESTIONNAIRE_PLEASANTER_TIMEZONE` |
 
-`Security.json` と `Analytics.json` は環境変数と同じ名前なので、写していない。
+`Security.json` の Password 系と `Analytics.json` の Analytics 系は従来どおり環境変数と同名です。
+追加した短いキーの対応は[設定ファイル対応一覧](../../_documents/設定ファイル対応一覧.md)を参照してください。
 
 > ⚠️ **値が `null` や空のキーは無視する。** `Pleasanter.json` の `ApiKey` は既定で `null`
 > （ここへ書かせないため）なので、写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
 
 ## 環境変数
+
+### 秘密ファイル
+
+`QUESTIONNAIRE_*` の全ての設定は、`{名前}_FILE` に**絶対パス**を指定すると、そのファイルの
+内容を `{名前}` の値として使える。例えば、Docker secrets が置く
+`/run/secrets/questionnaire_db_connectionstring` を DB 接続文字列に使う場合は次のとおり。
+
+```text
+QUESTIONNAIRE_DB_CONNECTIONSTRING_FILE=/run/secrets/questionnaire_db_connectionstring
+```
+
+末尾の改行（LF または CRLF）は 1 つだけ取り除く。それ以外の空白は変更しない。
+`{名前}` と `{名前}_FILE` を同時に指定すると、意図しない優先順位で起動しないよう、起動を
+中止する。ファイルが無い、読めない、空、または 64 KiB を超える場合も起動しない。
+
+秘密の内容はログ・例外メッセージ・画面へ出さない。ファイルのパスを含む実行設定も秘密情報と
+同じアクセス制御で扱う。Docker Compose の設定例は
+[`導入-更新運用手順書.md`](../../_documents/導入-更新運用手順書.md#533-docker--compose-で本番運用する)、
+Kubernetes でのファイルマウントは
+[`AKS-導入更新運用手順書.md`](../../_documents/AKS-導入更新運用手順書.md) を参照する。
 
 主なものだけを並べる。**全件と既定値・読む場所は
 [`_documents/設定パラメータ一覧.md`](../../_documents/設定パラメータ一覧.md)。**
@@ -59,7 +90,7 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 [`_documents/Pleasanter-SSO-運用手順書.md`](../../_documents/Pleasanter-SSO-運用手順書.md) を参照。
 
 | 変数 | 内容 |
-|---|---|
+| --- | --- |
 | `QUESTIONNAIRE_DB_PROVIDER` | `SqlServer` / `PostgreSql` / `MySql` / `Sqlite`。`Sqlite` は簡易セットアップ・デバッグ専用 |
 | `QUESTIONNAIRE_DB_CONNECTIONSTRING` | 本アプリの DB への接続文字列。`Sqlite` だけは省略でき、`App_Data/questionnaire.db` を使う |
 | `QUESTIONNAIRE_PLEASANTER_BASEURL` | 接続先 Pleasanter の URL |
@@ -71,14 +102,14 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 | `QUESTIONNAIRE_SECRET_KEY` | 管理者の 2 要素の共有鍵を守る鍵（Base64・32 バイト）。**送信チケットの署名鍵もここから派生させる** |
 | `QUESTIONNAIRE_DATA_PROTECTION_KEYS_PATH` | 複数インスタンスで管理画面の Cookie を共有する鍵束ディレクトリ。AKS では ReadWriteMany の永続ボリュームを指定する |
 | `QUESTIONNAIRE_ADMIN_SESSION_STORE` | 管理者セッションの保存先。`Database`（既定）/ `Redis`。⚠️ Redis 停止時は全管理者をログアウト扱いにする |
-| `QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING` | 管理者セッションまたは共有状態で `Redis` を選んだときの接続文字列。両方で同じ接続を使う。資格情報を含むため環境変数か Key Vault だけで与える |
+| `QUESTIONNAIRE_ADMIN_SESSION_REDIS_CONNECTIONSTRING` | 管理者セッションまたは共有状態で `Redis` を選んだときの接続文字列。両方で同じ接続を使う。資格情報を含むためGit 管理外の .local.json、環境変数か Key Vault で与える |
 | `QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX` | Redis キーの接頭辞。既定 `questionnaire:admin-session:`。同じ Redis を複数環境で共用するときに分ける |
 | `QUESTIONNAIRE_SHARED_STATE_STORE` | レート制限と滞留の見張りの保存先。`Process`（既定）/ `Redis`。⚠️ 未設定時はプロセスごとに数える |
 | `QUESTIONNAIRE_SHARED_STATE_REDIS_PREFIX` | 共有状態の Redis キー接頭辞。既定 `questionnaire:shared-state:`。同じ Redis を複数環境で共用するときに分ける |
 | `QUESTIONNAIRE_ASSET_STORE` | 資産の保存先。`Database`（既定）/ `Path` / `AzureBlob` / `S3` |
 | `QUESTIONNAIRE_ASSET_PATH` | `Path` の保存ディレクトリ。複数インスタンスでは全インスタンスが同じ共有領域を参照する |
 | `QUESTIONNAIRE_ASSET_AZURE_CONTAINERURI` | `AzureBlob` のコンテナー URI。マネージド ID を使う既定の指定方法 |
-| `QUESTIONNAIRE_ASSET_AZURE_CONNECTIONSTRING` | `AzureBlob` の接続文字列。鍵を保管するため非推奨。環境変数か Key Vault だけで与える |
+| `QUESTIONNAIRE_ASSET_AZURE_CONNECTIONSTRING` | `AzureBlob` の接続文字列。鍵を保管するため非推奨。Git 管理外の .local.json、環境変数か Key Vault で与える |
 | `QUESTIONNAIRE_ASSET_AZURE_CONTAINERNAME` | 接続文字列を使う場合のコンテナー名 |
 | `QUESTIONNAIRE_ASSET_S3_BUCKET` | `S3` のバケット名 |
 | `QUESTIONNAIRE_ASSET_S3_SERVICEURL` | S3 互換サービスの入口 URL。AWS S3 では省略できる |
@@ -104,7 +135,7 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 | `AnalyticsShowNotice` | 回答者へ告知を出すか（既定 `true`） |
 | `CaptchaProvider` | 課す課題。`Altcha`（既定・自前設置）/ `Recaptcha` / `Turnstile` / `Hcaptcha`。**知らない値は既定へ落とす** |
 | `CaptchaSiteKey` | 外部の CAPTCHA のサイトキー（画面へ渡る） |
-| `CaptchaSecretKey` | 外部の CAPTCHA の秘密鍵。**このフォルダのファイルへ書かないこと。** 環境変数か Key Vault から |
+| `CaptchaSecretKey` | 外部の CAPTCHA の秘密鍵。**実値は Git 管理外の Security.local.json に書くこと。** 環境変数か Key Vault から |
 | `QUESTIONNAIRE_SAML_ENABLED` | `true` で SAML のログインを使う。**既定は無効** |
 | `QUESTIONNAIRE_SAML_ENTITYID` | 本アプリ（SP）の EntityID。IdP へ登録する値と同じにする |
 | `QUESTIONNAIRE_SAML_IDPENTITYID` | IdP の EntityID。**これ以外が発行した応答は受け取らない** |
@@ -171,7 +202,8 @@ Redis で共有する場合は `QUESTIONNAIRE_SHARED_STATE_STORE=Redis` と
 dotnet run --project src/VehicleVision.PleasanterTools.Questionnaire.Web -- --generate-secret-key
 ```
 
-または任意の手段で 32 バイトの乱数を Base64 にする。
+ファイルへ直接保存するときは `--generate-secret-key --output App_Data/Parameters/Security.local.json` を使います。
+既存ファイルは上書きしません。詳細は[設定ファイル対応一覧](../../_documents/設定ファイル対応一覧.md#秘密鍵の生成)を参照してください。
 
 **この鍵と ASP.NET Core Data Protection の鍵束は役割が異なる。**
 `QUESTIONNAIRE_SECRET_KEY` は 2 要素の共有鍵と送信チケットに使い、運用者が保管する。
@@ -184,7 +216,7 @@ Pod 間で鍵束を共有する。
 
 ### 管理者セッションストア
 
-既定の `Database` は本アプリの DB に `AdminSessions` を作る。追加のサービスは要らない。
+既定の `Database` は本アプリの DB の `Core_AdminSessions`（Core.Data の共有表）を使う。追加のサービスは要らない。
 大規模構成では `Redis` を選べる。
 
 Redis はセッション専用の領域を使い、`maxmemory-policy` は `noeviction` にする。

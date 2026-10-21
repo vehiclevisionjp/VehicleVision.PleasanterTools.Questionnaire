@@ -1,6 +1,7 @@
 import type {
   AnswerState,
   ConditionRule,
+  VisibilityCondition,
   Page,
   Question,
   SurveyDefinition,
@@ -67,16 +68,35 @@ function isVisible(
   answers: Record<string, AnswerState>,
   visibleSoFar: Set<string>,
 ): boolean {
-  const rules = question.visibleWhen?.rules ?? [];
+  return conditionSatisfied(question.visibleWhen, answers, visibleSoFar);
+}
+
+/** 設問とページ下部の釦で共有する条件評価。未指定または空なら成立する。 */
+export function conditionSatisfied(
+  condition: VisibilityCondition | null | undefined,
+  answers: Record<string, AnswerState>,
+  visibleSoFar: Set<string>,
+): boolean {
+  const rules = condition?.rules ?? [];
   if (rules.length === 0) {
     return true;
   }
 
   const results = rules.map((rule) => matches(rule, answers, visibleSoFar));
 
-  return question.visibleWhen?.match === 'Any'
+  return condition?.match === 'Any'
     ? results.some((matched) => matched)
     : results.every((matched) => matched);
+}
+
+/** 任意リンクとして画面へ出してよい絶対 URL か。 */
+export function isAllowedButtonUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' || url.protocol === 'mailto:';
+  } catch {
+    return false;
+  }
 }
 
 function matches(
@@ -86,11 +106,16 @@ function matches(
 ): boolean {
   // **通らなかったページ・出していない設問は「未回答」。**
   // 答えが残っていても、見せていない以上は無かったことにする
-  const values = visibleSoFar.has(rule.questionId)
-    ? (answers[rule.questionId]?.values ?? []).filter((value) => value.trim() !== '')
+  const answer = visibleSoFar.has(rule.questionId) ? answers[rule.questionId] : undefined;
+  const values = answer
+    ? answer.values.filter((value) => value.trim() !== '')
     : [];
 
-  const answered = values.length > 0;
+  const rowValues = Object.values(answer?.rows ?? {}).flat();
+  const answered =
+    values.length > 0 ||
+    rowValues.some((value) => value.trim() !== '') ||
+    (answer?.files?.length ?? 0) > 0;
 
   switch (rule.operator) {
     case 'Answered':

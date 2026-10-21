@@ -238,9 +238,8 @@ public static class AdminSamlEndpoints
                     // **単一ログアウトに要る手掛かりだけを預ける**（Issue #191）
                     await AdminAuthEndpoints.SignInSessionAsync(
                         context,
-                        result.User!,
-                        ReadSessionKeys(response.ClaimsIdentity),
-                        method: AdminLoginMethod.Saml)
+                        result.User!.Id,
+                        SsoOf(response.ClaimsIdentity))
                         .ConfigureAwait(false);
                     return Results.Redirect(relay.ReturnUrl);
 
@@ -249,8 +248,9 @@ public static class AdminSamlEndpoints
                     AuditNotes.Add(context, "result", "second-factor");
                     // **2 要素を登録済みなら通し、必須なら登録させる**（Issue #154）。
                     // どちらも「途中状態」で管理画面へ戻し、画面が続きを出す
+                    // **IdP へログアウトを頼むのに要る値は、ログイン後のセッションへ引き継ぐ**（Issue #191）
                     await AdminAuthEndpoints.SignInPendingAsync(
-                        context, result.User!, secret: null, method: AdminLoginMethod.Saml)
+                        context, result.User!.Id, SsoOf(response.ClaimsIdentity))
                         .ConfigureAwait(false);
                     return Results.Redirect(relay.ReturnUrl);
 
@@ -661,6 +661,10 @@ public static class AdminSamlEndpoints
 
         return new SamlSessionKeys(nameId, sessionIndex);
     }
+
+    /// <summary>SAML で入ったときに、セッションへ預ける値（単一ログアウトの手掛かり）。無ければ <c>null</c>。</summary>
+    private static SessionSso? SsoOf(ClaimsIdentity? identity) =>
+        ReadSessionKeys(identity) is { } keys ? new SessionSso(Saml: keys) : null;
 
     /// <summary>管理画面の入口を、配置先のサブパス込みで返す（Issue #465）。</summary>
     /// <remarks>

@@ -43,6 +43,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'form.next': '下一步',
   'form.submit': '提交',
   'form.submitting': '正在提交…',
+  'form.buttonDisabled': '尚未满足条件，无法按此按钮',
   'form.languageLabel': '语言',
   'form.trapLabel': '请不要填写此栏',
   'readability.group': '可读性',
@@ -145,5 +146,6 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'serverValidation.PatternMismatch': '请按指定格式输入',
   'serverValidation.TooLarge': '提交内容过大',
   'serverValidation.ScannerUnavailable': '无法检查附件，因此当前无法受理',
+  'serverValidation.SubmitButtonConditionNotMet': '尚未满足提交条件',
   'serverValidation.unknown': '请确认输入内容',
 };

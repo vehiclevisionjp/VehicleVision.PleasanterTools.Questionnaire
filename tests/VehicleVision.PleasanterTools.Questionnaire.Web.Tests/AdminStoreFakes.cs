@@ -1,241 +1,464 @@
+using System.Security.Cryptography;
+using System.Text;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
-/// <summary>記憶の上だけで動く <see cref="IAdminUserStore"/>。</summary>
+/// <summary>
+/// 記憶の上だけで動く、Core.Data の <see cref="IAdminUserStore"/> と、本アプリの <see cref="IAdminUserSettingsStore"/>。
+/// </summary>
 /// <remarks>
 /// <para>
-/// **DB を立てずに、締め出し事故を防ぐ決まりだけを確かめるため。**
-/// 3 RDBMS で同じ SQL が動くことは結合テストの受け持ち。
+/// **DB を立てずに、本アプリの呼び出し側の決まり（締め出し事故を防ぐなど）だけを確かめるため。**
+/// 本物（Core の <c>AdminUserStore</c>）が 4 RDBMS で動くことは、Core の試験と本アプリの結合試験の受け持ち。
 /// </para>
 /// <para>
-/// **<see cref="TryDisableAsync"/> と <see cref="TrySetRoleAsync"/> は
-/// 本物の SQL と同じ条件を書く。** ここが緩いと、試験が通っても本物が守らない。
+/// **<see cref="SetDisabledAsync"/> と <see cref="SetRoleAsync"/> は、本物の SQL と同じ条件を書く。**
+/// ここが緩いと、試験が通っても本物が守らない。
 /// </para>
 /// </remarks>
-internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUserStore
+internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUserStore, IAdminUserSettingsStore
 {
-    private readonly Dictionary<Guid, AdminUser> users = [];
-    private readonly Dictionary<Guid, List<RecoveryCode>> recoveryCodes = [];
+    private sealed class Entry
+    {
+        public required Guid Id { get; init; }
 
-    private sealed record RecoveryCode(Guid RecoveryCodeId, string CodeHash, DateTime? UsedAt);
+        public required string LoginId { get; init; }
 
-    private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
+        public required string PasswordHash { get; set; }
 
-    public Task<AdminUser?> FindByLoginIdAsync(string loginId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(users.Values.FirstOrDefault(
-            user => string.Equals(user.LoginId, loginId, StringComparison.Ordinal)));
+        public required string Role { get; set; }
 
-    public Task<AdminUser?> FindByIdAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(users.TryGetValue(adminUserId, out var user) ? user : null);
+        public bool IsDisabled { get; set; }
+
+        public int FailedLoginCount { get; set; }
+
+        public DateTimeOffset? LockedUntil { get; set; }
+
+        public DateTimeOffset? LastLoginAt { get; set; }
+
+        public DateTimeOffset CreatedAt { get; init; }
+
+        public string? TotpSecret { get; set; }
+
+        public string? TotpPending { get; set; }
+
+        public long? TotpLastTimeStep { get; set; }
+
+        public string Language { get; set; } = "";
+
+        public bool ResponseNotificationEnabled { get; set; }
+
+        public List<(string Hash, bool Used)> Codes { get; } = [];
+
+        public AdminUser ToUser() => new(
+            Id,
+            LoginId,
+            Role,
+            IsDisabled,
+            FailedLoginCount,
+            LockedUntil,
+            LastLoginAt,
+            CreatedAt,
+            !string.IsNullOrEmpty(TotpSecret),
+            Language);
+    }
+
+    private readonly Dictionary<Guid, Entry> users = [];
+
+    private DateTimeOffset Now => timeProvider.GetUtcNow();
+
+    private static string KeyOf(string loginId) => loginId.Trim().ToLowerInvariant();
+
+    // ---- IAdminUserStore（Core.Data） ----------------------------------------------
+
+    public Task<int> CountAsync(CancellationToken cancellationToken = default) => Task.FromResult(users.Count);
+
+    public Task<AdminUser?> CreateFirstAsync(
+        string loginId, string passwordHash, string language, CancellationToken cancellationToken = default)
+    {
+        // **印は 1 回だけ。** 本物は印の表の主キーで排他する
+        if (users.Count > 0)
+        {
+            return Task.FromResult<AdminUser?>(null);
+        }
+
+        return Task.FromResult<AdminUser?>(
+            Add(loginId, passwordHash, AdminRoleNames.Administrator, language).ToUser());
+    }
+
+    public Task<(AdminUser User, string PasswordHash)?> FindForLoginAsync(
+        string loginId, CancellationToken cancellationToken = default)
+    {
+        var entry = users.Values.FirstOrDefault(user => KeyOf(user.LoginId) == KeyOf(loginId));
+        return Task.FromResult<(AdminUser User, string PasswordHash)?>(
+            entry is null ? null : (entry.ToUser(), entry.PasswordHash));
+    }
+
+    public Task<AdminUser?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(users.TryGetValue(id, out var entry) ? entry.ToUser() : null);
 
     public Task<IReadOnlyList<AdminUser>> ListAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<AdminUser>>(
-            users.Values.OrderBy(user => user.LoginId, StringComparer.Ordinal).ToList());
+            users.Values.OrderBy(user => user.CreatedAt).ThenBy(user => user.Id).Select(user => user.ToUser()).ToList());
 
-    public Task<bool> IsEmptyAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(users.Count == 0);
-
-    public Task CreateAsync(AdminUser user, CancellationToken cancellationToken = default)
+    public Task<AdminUser?> CreateAsync(
+        string loginId, string passwordHash, string role, string language, CancellationToken cancellationToken = default)
     {
-        // **ログイン ID は一意。** 本物は索引で守っている
-        if (users.Values.Any(other => string.Equals(other.LoginId, user.LoginId, StringComparison.Ordinal)))
+        // **ログイン ID は、大文字小文字を区別せず一意。** 本物は LoginIdKey の一意索引で守っている
+        if (users.Values.Any(user => KeyOf(user.LoginId) == KeyOf(loginId)))
         {
-            throw new InvalidOperationException($"ログイン ID が重複している: {user.LoginId}");
+            return Task.FromResult<AdminUser?>(null);
         }
 
-        users[user.AdminUserId] = user with { CreatedAt = Now, UpdatedAt = Now };
+        return Task.FromResult<AdminUser?>(Add(loginId, passwordHash, role, language).ToUser());
+    }
+
+    public Task<AdminChangeResult> SetDisabledAsync(
+        Guid id, bool disabled, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Change(id, leavesAdministrator: disabled, entry => entry.IsDisabled = disabled));
+
+    public Task<AdminChangeResult> SetRoleAsync(Guid id, string role, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Change(
+            id,
+            leavesAdministrator: role != AdminRoleNames.Administrator,
+            entry => entry.Role = role));
+
+    public Task<AdminFailure> RecordFailureAsync(
+        Guid id, int threshold, TimeSpan lockout, CancellationToken cancellationToken = default)
+    {
+        var entry = users[id];
+        entry.FailedLoginCount++;
+        if (entry.FailedLoginCount < threshold)
+        {
+            return Task.FromResult(new AdminFailure(entry.FailedLoginCount, null));
+        }
+
+        // 本物と同じ: 締め出したら回数は戻す
+        entry.FailedLoginCount = 0;
+        entry.LockedUntil = Now + lockout;
+        return Task.FromResult(new AdminFailure(0, entry.LockedUntil));
+    }
+
+    public Task RecordSuccessAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        if (users.TryGetValue(id, out var entry))
+        {
+            entry.LastLoginAt = Now;
+            entry.FailedLoginCount = 0;
+            entry.LockedUntil = null;
+        }
+
         return Task.CompletedTask;
     }
 
-    public Task UpdatePasswordHashAsync(
-        Guid adminUserId,
-        string passwordHash,
-        CancellationToken cancellationToken = default) =>
-        UpdateAsync(adminUserId, user => user with { PasswordHash = passwordHash });
+    public Task SetPasswordHashAsync(Guid id, string passwordHash, CancellationToken cancellationToken = default)
+    {
+        if (users.TryGetValue(id, out var entry))
+        {
+            entry.PasswordHash = passwordHash;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<string?> GetTotpSecretAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(users.TryGetValue(id, out var entry) ? entry.TotpSecret : null);
+
+    public Task SetTotpPendingAsync(Guid id, string secret, CancellationToken cancellationToken = default)
+    {
+        users[id].TotpPending = secret;
+        return Task.CompletedTask;
+    }
+
+    public Task<string?> GetTotpPendingAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(users.TryGetValue(id, out var entry) ? entry.TotpPending : null);
 
     public Task EnableTotpAsync(
-        Guid adminUserId,
-        string secretEncrypted,
-        CancellationToken cancellationToken = default) =>
-        UpdateAsync(adminUserId, user => user with
+        Guid id,
+        string secret,
+        long timeStep,
+        IReadOnlyList<string> recoveryCodeHashes,
+        CancellationToken cancellationToken = default)
+    {
+        var entry = users[id];
+        entry.TotpSecret = secret;
+        entry.TotpPending = null;
+        entry.TotpLastTimeStep = timeStep;
+        entry.Codes.Clear();
+        entry.Codes.AddRange(recoveryCodeHashes.Select(hash => (hash, false)));
+        return Task.CompletedTask;
+    }
+
+    public Task DisableTotpAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var entry = users[id];
+        entry.TotpSecret = null;
+        entry.TotpPending = null;
+        entry.TotpLastTimeStep = null;
+        entry.Codes.Clear();
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> TryUseTotpStepAsync(Guid id, long timeStep, CancellationToken cancellationToken = default)
+    {
+        if (!users.TryGetValue(id, out var entry) || (entry.TotpLastTimeStep is { } last && last >= timeStep))
         {
-            TotpSecretEncrypted = secretEncrypted,
-            TotpEnabledAt = Now,
-        });
+            return Task.FromResult(false);
+        }
 
-    public Task DisableTotpAsync(
-        Guid adminUserId,
-        CancellationToken cancellationToken = default) =>
-        UpdateAsync(adminUserId, user => user with
+        entry.TotpLastTimeStep = timeStep;
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> TryUseRecoveryCodeAsync(Guid id, string codeHash, CancellationToken cancellationToken = default)
+    {
+        if (!users.TryGetValue(id, out var entry))
         {
-            TotpSecretEncrypted = null,
-            TotpEnabledAt = null,
-        });
+            return Task.FromResult(false);
+        }
 
-    public Task SetDisabledAsync(
-        Guid adminUserId,
-        bool isDisabled,
-        CancellationToken cancellationToken = default) =>
-        UpdateAsync(adminUserId, user => user with { IsDisabled = isDisabled });
+        var index = entry.Codes.FindIndex(code => code.Hash == codeHash && !code.Used);
+        if (index < 0)
+        {
+            return Task.FromResult(false);
+        }
 
-    public Task SetLanguageAsync(
-        Guid adminUserId,
-        string? language,
-        CancellationToken cancellationToken = default) =>
-        UpdateAsync(adminUserId, user => user with { Language = language });
+        entry.Codes[index] = (codeHash, true);
+        return Task.FromResult(true);
+    }
+
+    public Task<int> CountRecoveryCodesAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(users.TryGetValue(id, out var entry) ? entry.Codes.Count(code => !code.Used) : 0);
+
+    // ---- IAdminUserSettingsStore（本アプリ） ---------------------------------------
+
+    public Task<bool> GetResponseNotificationEnabledAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(users.TryGetValue(adminUserId, out var entry) && entry.ResponseNotificationEnabled);
 
     public Task SetResponseNotificationEnabledAsync(
         Guid adminUserId,
         bool enabled,
-        CancellationToken cancellationToken = default) =>
-        UpdateAsync(adminUserId, user => user with { ResponseNotificationEnabled = enabled });
+        CancellationToken cancellationToken = default)
+    {
+        users[adminUserId].ResponseNotificationEnabled = enabled;
+        return Task.CompletedTask;
+    }
 
-    public Task<IReadOnlyList<ResponseNotificationRecipient>>
-        ListResponseNotificationRecipientsAsync(CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyList<ResponseNotificationRecipient>> ListResponseNotificationRecipientsAsync(
+        CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ResponseNotificationRecipient>>(
             users.Values
                 .Where(user => user.ResponseNotificationEnabled && !user.IsDisabled)
-                .OrderBy(user => user.AdminUserId)
+                .OrderBy(user => user.Id)
                 .Select(user => new ResponseNotificationRecipient(
-                    user.AdminUserId, user.LoginId, user.Language))
+                    user.Id, user.LoginId, string.IsNullOrEmpty(user.Language) ? null : user.Language))
                 .ToList());
 
-    public Task<bool> TryDisableAsync(Guid adminUserId, CancellationToken cancellationToken = default)
+    public Task SetLanguageAsync(Guid adminUserId, string? language, CancellationToken cancellationToken = default)
     {
-        if (!users.TryGetValue(adminUserId, out var user))
-        {
-            return Task.FromResult(false);
-        }
-
-        if (user.Role is AdminRole.Administrator && !user.IsDisabled && !OtherAdministratorExists(adminUserId))
-        {
-            return Task.FromResult(false);
-        }
-
-        users[adminUserId] = user with { IsDisabled = true, UpdatedAt = Now };
-        return Task.FromResult(true);
-    }
-
-    public Task<bool> TrySetRoleAsync(
-        Guid adminUserId,
-        AdminRole role,
-        CancellationToken cancellationToken = default)
-    {
-        if (!users.TryGetValue(adminUserId, out var user))
-        {
-            return Task.FromResult(false);
-        }
-
-        var demoting = role is not AdminRole.Administrator
-            && user.Role is AdminRole.Administrator
-            && !user.IsDisabled;
-
-        if (demoting && !OtherAdministratorExists(adminUserId))
-        {
-            return Task.FromResult(false);
-        }
-
-        users[adminUserId] = user with { Role = role, UpdatedAt = Now };
-        return Task.FromResult(true);
-    }
-
-    public Task RecordSuccessAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
-        UpdateAsync(adminUserId, user => user with
-        {
-            LastLoginAt = Now,
-            FailedLoginCount = 0,
-            LockedUntil = null,
-        });
-
-    public async Task<int> RecordFailureAsync(Guid adminUserId, CancellationToken cancellationToken = default)
-    {
-        await UpdateAsync(adminUserId, user => user with { FailedLoginCount = user.FailedLoginCount + 1 });
-        return users[adminUserId].FailedLoginCount;
-    }
-
-    public Task LockAsync(
-        Guid adminUserId,
-        DateTime lockedUntilUtc,
-        CancellationToken cancellationToken = default) =>
-        UpdateAsync(adminUserId, user => user with { LockedUntil = lockedUntilUtc });
-
-    public Task ReplaceRecoveryCodesAsync(
-        Guid adminUserId,
-        IReadOnlyList<string> codeHashes,
-        CancellationToken cancellationToken = default)
-    {
-        recoveryCodes[adminUserId] = codeHashes
-            .Select(hash => new RecoveryCode(Guid.NewGuid(), hash, null)).ToList();
+        users[adminUserId].Language = language ?? string.Empty;
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<RecoveryCodeRow>> ListUnusedRecoveryCodesAsync(
+    public Task<IReadOnlyList<string>> ListUnusedRecoveryCodeHashesAsync(
         Guid adminUserId,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<RecoveryCodeRow>>(
-            recoveryCodes.TryGetValue(adminUserId, out var codes)
-                ? codes.Where(code => code.UsedAt is null)
-                    .Select(code => new RecoveryCodeRow
-                    {
-                        RecoveryCodeId = code.RecoveryCodeId,
-                        CodeHash = code.CodeHash,
-                    }).ToList()
+        Task.FromResult<IReadOnlyList<string>>(
+            users.TryGetValue(adminUserId, out var entry)
+                ? entry.Codes.Where(code => !code.Used).Select(code => code.Hash).ToList()
                 : []);
 
-    public Task<bool> TryConsumeRecoveryCodeAsync(
-        Guid recoveryCodeId,
-        CancellationToken cancellationToken = default)
+    // ---- 試験が使う口 ------------------------------------------------------------------
+
+    /// <summary>指定の ID の管理者を作る（ID を決めたい試験用）。</summary>
+    public AdminUser Seed(
+        Guid id,
+        string loginId = "admin",
+        string role = AdminRoleNames.Administrator,
+        bool isDisabled = false,
+        string language = "")
     {
-        foreach (var (adminUserId, codes) in recoveryCodes)
-        {
-            var index = codes.FindIndex(code => code.RecoveryCodeId == recoveryCodeId);
-            if (index < 0 || codes[index].UsedAt is not null)
-            {
-                continue;
-            }
-
-            recoveryCodes[adminUserId][index] = codes[index] with { UsedAt = Now };
-            return Task.FromResult(true);
-        }
-
-        return Task.FromResult(false);
+        var entry = Add(loginId, "hash", role, language, id);
+        entry.IsDisabled = isDisabled;
+        return entry.ToUser();
     }
 
-    public Task<bool> TryConsumeTotpTimeStepAsync(
-        Guid adminUserId,
-        long timeStep,
-        CancellationToken cancellationToken = default)
-    {
-        if (!users.TryGetValue(adminUserId, out var user)
-            || (user.TotpLastTimeStep is { } last && last >= timeStep))
-        {
-            return Task.FromResult(false);
-        }
+    /// <summary>平文のまま持っている共有鍵を読む（本物は暗号化して持つ）。</summary>
+    public string? TotpSecretOf(Guid id) => users[id].TotpSecret;
 
-        users[adminUserId] = user with { TotpLastTimeStep = timeStep };
-        return Task.FromResult(true);
+    /// <summary>締め出しの解除の時刻を直接置く。</summary>
+    public void SetLockedUntil(Guid id, DateTimeOffset? lockedUntil) => users[id].LockedUntil = lockedUntil;
+
+    private Entry Add(string loginId, string passwordHash, string role, string language, Guid? id = null)
+    {
+        var entry = new Entry
+        {
+            Id = id ?? Guid.NewGuid(),
+            LoginId = loginId.Trim(),
+            PasswordHash = passwordHash,
+            Role = role,
+            Language = language,
+            CreatedAt = Now,
+        };
+        users[entry.Id] = entry;
+        return entry;
     }
 
-    /// <summary>他に**実際に入れる**管理者が居るか。</summary>
-    /// <remarks>
-    /// **一度もログインしていない管理者は当てにしない。**
+    /// <summary>
+    /// 本物と同じ条件で変える。<paramref name="leavesAdministrator"/> のときは、
+    /// **ほかに有効（無効でなく、一度でもログインした）な Administrator が居る場合だけ**通す。
+    /// </summary>
+    private AdminChangeResult Change(Guid id, bool leavesAdministrator, Action<Entry> change)
+    {
+        if (!users.TryGetValue(id, out var entry))
+        {
+            return AdminChangeResult.NotFound;
+        }
+
+        var counted = entry.Role == AdminRoleNames.Administrator && !entry.IsDisabled && entry.LastLoginAt is not null;
+        if (leavesAdministrator && counted && !OtherAdministratorExists(id))
+        {
+            return AdminChangeResult.LastAdministrator;
+        }
+
+        change(entry);
+        return AdminChangeResult.Updated;
+    }
+
+    /// <summary>
+    /// 他に**実際に入れる**管理者が居るか。**一度もログインしていない管理者は当てにしない。**
     /// 招待しただけの相手を頭数に入れると、それを頼りに最後の 1 人を止められてしまう。
-    /// </remarks>
+    /// </summary>
     private bool OtherAdministratorExists(Guid exceptId) => users.Values.Any(
-        other => other.AdminUserId != exceptId
-            && other.Role is AdminRole.Administrator
+        other => other.Id != exceptId
+            && other.Role == AdminRoleNames.Administrator
             && !other.IsDisabled
             && other.LastLoginAt is not null);
+}
 
-    private Task UpdateAsync(Guid adminUserId, Func<AdminUser, AdminUser> change)
+/// <summary>記憶の上だけで動く、Core.Data の <see cref="IAdminSessionStore"/>。</summary>
+/// <remarks>**ID を作り、SHA-256 を識別子にする作りは本物と同じ。**</remarks>
+internal sealed class FakeAdminSessionStore(TimeProvider timeProvider) : IAdminSessionStore
+{
+    private sealed record Row(
+        string Handle,
+        Guid UserId,
+        string Kind,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset ExpiresAt,
+        string? IpAddress,
+        string? UserAgent,
+        SessionSso? Sso);
+
+    private readonly List<Row> rows = [];
+
+    private DateTimeOffset Now => timeProvider.GetUtcNow();
+
+    /// <summary>いま残っている行の数（期限切れも含む）。</summary>
+    public int Count => rows.Count;
+
+    public string HandleOf(string sessionId) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(sessionId)));
+
+    public Task<string> CreateAsync(
+        Guid userId,
+        string kind,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken = default,
+        string? ipAddress = null,
+        string? userAgent = null,
+        SessionSso? sso = null)
     {
-        if (users.TryGetValue(adminUserId, out var user))
+        var sessionId = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        rows.Add(new Row(HandleOf(sessionId), userId, kind, Now, Now + lifetime, ipAddress, userAgent, sso));
+        return Task.FromResult(sessionId);
+    }
+
+    public Task<AdminSession?> FindAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        var handle = HandleOf(sessionId);
+        var row = rows.FirstOrDefault(candidate => candidate.Handle == handle && candidate.ExpiresAt > Now);
+        return Task.FromResult(
+            row is null ? null : new AdminSession(row.UserId, row.Kind, row.ExpiresAt, row.Sso?.Pleasanter));
+    }
+
+    public Task<SessionSso?> GetSsoAsync(string sessionId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(RowOf(sessionId)?.Sso);
+
+    public Task TouchPleasanterVerifiedAsync(
+        string sessionId,
+        DateTimeOffset verifiedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var row = RowOf(sessionId);
+        if (row?.Sso?.Pleasanter is { } keys)
         {
-            users[adminUserId] = change(user) with { UpdatedAt = Now };
+            rows[rows.IndexOf(row)] = row with
+            {
+                Sso = row.Sso with { Pleasanter = keys with { VerifiedAt = verifiedAt } },
+            };
         }
 
         return Task.CompletedTask;
+    }
+
+    public Task<SamlSessionKeys?> GetSamlKeysAsync(string sessionId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(RowOf(sessionId)?.Sso?.Saml);
+
+    public Task<int> DeleteBySamlKeysAsync(
+        string nameId,
+        string? sessionIndex,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(rows.RemoveAll(row =>
+            row.Sso?.Saml is { } saml
+            && saml.NameId == nameId
+            && (string.IsNullOrEmpty(sessionIndex) || saml.SessionIndex == sessionIndex)));
+
+    public Task<IReadOnlyList<AdminSessionInfo>> ListForUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<AdminSessionInfo>>(
+            rows.Where(row => row.UserId == userId && row.Kind == AdminSessionKinds.Session && row.ExpiresAt > Now)
+                .OrderByDescending(row => row.CreatedAt)
+                .Select(row => new AdminSessionInfo(
+                    row.Handle,
+                    row.CreatedAt,
+                    row.ExpiresAt,
+                    row.IpAddress,
+                    row.UserAgent,
+                    row.Sso?.Saml is not null ? SessionVia.Saml
+                    : row.Sso?.Pleasanter is not null ? SessionVia.Pleasanter
+                    : SessionVia.Password))
+                .ToList());
+
+    public Task<bool> DeleteByHandleAsync(Guid userId, string handle, CancellationToken cancellationToken = default) =>
+        Task.FromResult(rows.RemoveAll(row => row.Handle == handle && row.UserId == userId) > 0);
+
+    public Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        var handle = HandleOf(sessionId);
+        rows.RemoveAll(row => row.Handle == handle);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteForUserAsync(
+        Guid userId,
+        string? exceptSessionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var except = exceptSessionId is null ? null : HandleOf(exceptSessionId);
+        rows.RemoveAll(row => row.UserId == userId && row.Handle != except);
+        return Task.CompletedTask;
+    }
+
+    public Task<int> DeleteExpiredAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(rows.RemoveAll(row => row.ExpiresAt <= Now));
+
+    private Row? RowOf(string sessionId)
+    {
+        var handle = HandleOf(sessionId);
+        return rows.FirstOrDefault(row => row.Handle == handle);
     }
 }
 
@@ -244,7 +467,7 @@ internal sealed class FakeAdminInvitationStore(TimeProvider timeProvider) : IAdm
 {
     private readonly List<AdminInvitation> invitations = [];
 
-    private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
+    private DateTimeOffset Now => timeProvider.GetUtcNow();
 
     public Task ReplaceAsync(AdminInvitation invitation, CancellationToken cancellationToken = default)
     {
@@ -274,10 +497,9 @@ internal sealed class FakeAdminInvitationStore(TimeProvider timeProvider) : IAdm
     }
 
     public Task<IReadOnlyList<Guid>> ListPendingAdminUserIdsAsync(
-        DateTime nowUtc,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Guid>>(invitations
-            .Where(invitation => invitation.UsedAt is null && invitation.ExpiresAt > nowUtc)
+            .Where(invitation => invitation.UsedAt is null && invitation.ExpiresAt > Now)
             .Select(invitation => invitation.AdminUserId).ToList());
 
     public Task RevokeUnusedAsync(Guid adminUserId, CancellationToken cancellationToken = default)

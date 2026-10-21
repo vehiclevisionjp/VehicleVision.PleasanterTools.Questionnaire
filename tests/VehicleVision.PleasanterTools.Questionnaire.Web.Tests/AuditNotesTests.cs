@@ -21,13 +21,13 @@ public class AuditNotesTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<AuditLogView>> ListAsync(
+        public Task<IReadOnlyList<AuditEntry>> ListAsync(
             AuditLogQuery query,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AuditLogView>>([]);
+            Task.FromResult<IReadOnlyList<AuditEntry>>([]);
 
         public Task<int> DeleteOlderThanAsync(
-            DateTime threshold,
+            DateTimeOffset threshold,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
     }

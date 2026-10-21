@@ -24,6 +24,9 @@
     type MappingDefinition,
     type MappingProblem,
     type Page,
+    type PageButtonCondition,
+    type PageButtons,
+    type PageLinkButton,
     type Question,
     type QuestionImportResult,
     type SurveyDefinition,
@@ -47,6 +50,7 @@
   import { formatDateTime, language, t } from '../lib/i18n/state.svelte';
   import MappingEditor from './MappingEditor.svelte';
   import QuestionEditor from './QuestionEditor.svelte';
+  import ConditionEditor from './ConditionEditor.svelte';
   import AutoReplyEditor from './AutoReplyEditor.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
   import PublishPanel from './PublishPanel.svelte';
@@ -55,6 +59,20 @@
   import { assetMarkup as markupForAsset } from '../lib/asset';
   import { requiredPortCount } from '../lib/columnBudget';
   import { confirmAction } from '../lib/confirmation.svelte';
+  import {
+    movePageTo,
+    moveQuestionTo,
+    type QuestionDestination,
+  } from '../lib/reorder';
+  import { hasUnsavedQuestion } from '../lib/questionUnsaved';
+
+  const standardButtonKinds = ['previous', 'next', 'submit'] as const;
+
+  function standardButtonTitle(kind: (typeof standardButtonKinds)[number]): string {
+    if (kind === 'previous') return t('pageButtons.previous');
+    if (kind === 'next') return t('pageButtons.next');
+    return t('pageButtons.submit');
+  }
 
   interface Props {
     surveyId: string;
@@ -100,11 +118,18 @@
   let previewing = $state(false);
   /** 分岐の全体図を開いているか。**保存前の下書きを読み取り専用で見る。** */
   let flowcharting = $state(false);
+  type ReorderRequest =
+    | { kind: 'question'; questionId: string }
+    | { kind: 'page'; pageId: string };
+  type ReorderDestination = QuestionDestination & { label: string };
+
+  let reorder = $state<ReorderRequest | null>(null);
+  let reorderReturnFocus = $state<HTMLElement | null>(null);
 
   $effect(() => {
     // **開いている間は下敷きを巻き取らせない。**
     // 重ねて出しているのに背後が動くと、どちらを操作しているのか分からなくなる
-    if (!previewing && !flowcharting) {
+    if (!previewing && !flowcharting && !reorder) {
       return;
     }
 
@@ -116,6 +141,7 @@
       if (event.key === 'Escape') {
         previewing = false;
         flowcharting = false;
+        closeReorder();
       }
     };
 
@@ -200,6 +226,14 @@
   let publishFlow = $state<FlowProblem[]>([]);
 
   const allQuestions = $derived(definition?.pages.flatMap((page) => page.questions) ?? []);
+  const savedQuestionsById = $derived(
+    new Map(
+      (savedDefinition?.pages.flatMap((page) => page.questions) ?? []).map((question) => [
+        question.questionId,
+        question,
+      ]),
+    ),
+  );
   const hasUnsavedChanges = $derived(
     definition !== undefined &&
       (JSON.stringify(definition) !== JSON.stringify(savedDefinition) ||
@@ -409,6 +443,43 @@
     };
   }
 
+  function updatePageButtons(index: number, patch: Partial<PageButtons>) {
+    const page = definition?.pages[index];
+    if (!page) return;
+    updatePage(index, { buttons: { ...(page.buttons ?? {}), ...patch } });
+  }
+
+  function updateStandardButton(
+    pageIndex: number,
+    kind: 'submit' | 'next' | 'previous',
+    patch: Partial<PageButtonCondition>,
+  ) {
+    const current = definition?.pages[pageIndex]?.buttons?.[kind] ?? {};
+    updatePageButtons(pageIndex, { [kind]: { ...current, ...patch } });
+  }
+
+  function updateLinkButton(pageIndex: number, linkIndex: number, patch: Partial<PageLinkButton>) {
+    const links = definition?.pages[pageIndex]?.buttons?.links ?? [];
+    updatePageButtons(pageIndex, {
+      links: links.map((link, index) => index === linkIndex ? { ...link, ...patch } : link),
+    });
+  }
+
+  function addLinkButton(pageIndex: number) {
+    const links = definition?.pages[pageIndex]?.buttons?.links ?? [];
+    updatePageButtons(pageIndex, {
+      links: [
+        ...links,
+        {
+          buttonId: newId('button'),
+          label: withText(undefined, t('pageButtons.defaultLinkLabel'), editing),
+          url: 'https://',
+          sortOrder: links.length,
+        },
+      ],
+    });
+  }
+
   function addPage() {
     if (!definition) return;
     const pageId = newId('page');
@@ -533,6 +604,123 @@
     questions[questionIndex] = swapped;
     questions[target] = moved;
     updatePage(pageIndex, { questions });
+  }
+
+  function openQuestionReorder(questionId: string) {
+    reorderReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    reorder = { kind: 'question', questionId };
+    void tick().then(() => document.getElementById('reorder-first-destination')?.focus());
+  }
+
+  function openPageReorder(pageId: string) {
+    reorderReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    reorder = { kind: 'page', pageId };
+    void tick().then(() => document.getElementById('reorder-first-destination')?.focus());
+  }
+
+  function closeReorder() {
+    if (reorder === null) return;
+    reorder = null;
+    void tick().then(() => reorderReturnFocus?.focus());
+  }
+
+  function questionDestinations(questionId: string): ReorderDestination[] {
+    if (!definition) return [];
+
+    return definition.pages.flatMap((page, pageIndex) => {
+      const questions = page.questions.filter((question) => question.questionId !== questionId);
+      return Array.from({ length: questions.length + 1 }, (_, questionIndex) => ({
+        pageId: page.pageId,
+        questionIndex,
+        label:
+          questionIndex === 0
+            ? `${pageLabel(pageIndex)}: ${t('reorder.atStart')}`
+            : questionIndex === questions.length
+              ? `${pageLabel(pageIndex)}: ${t('reorder.atEnd')}`
+              : `${pageLabel(pageIndex)}: ${t('reorder.before', {
+                  item: questionLabel(questions[questionIndex]?.questionId ?? ''),
+                })}`,
+      }));
+    });
+  }
+
+  function pageDestinations(pageId: string): { pageIndex: number; label: string }[] {
+    if (!definition) return [];
+
+    const currentDefinition = definition;
+    const pages = currentDefinition.pages.filter((page) => page.pageId !== pageId);
+    return Array.from({ length: pages.length + 1 }, (_, pageIndex) => ({
+      pageIndex,
+      label:
+        pageIndex === 0
+          ? t('reorder.atStart')
+          : pageIndex === pages.length
+            ? t('reorder.atEnd')
+            : t('reorder.before', {
+                item: pageLabel(currentDefinition.pages.indexOf(pages[pageIndex]!)),
+              }),
+    }));
+  }
+
+  function reorderWarnings(next: SurveyDefinition): FlowProblem[] {
+    return validateFlow(next).filter(
+      (problem) =>
+        problem.code === 'BackwardTransition' ||
+        problem.code === 'SelfTransition' ||
+        problem.code === 'ForwardConditionReference',
+    );
+  }
+
+  function questionWarnings(questionId: string, destination: QuestionDestination): FlowProblem[] {
+    return definition
+      ? reorderWarnings(moveQuestionTo(definition, questionId, destination))
+      : [];
+  }
+
+  function pageWarnings(pageId: string, pageIndex: number): FlowProblem[] {
+    return definition ? reorderWarnings(movePageTo(definition, pageId, pageIndex)) : [];
+  }
+
+  function moveQuestionToDestination(questionId: string, destination: QuestionDestination) {
+    if (!definition) return;
+    definition = moveQuestionTo(definition, questionId, destination);
+    activePageId = destination.pageId;
+    notice = t('reorder.done');
+    closeReorder();
+  }
+
+  function movePageToDestination(pageId: string, pageIndex: number) {
+    if (!definition) return;
+    definition = movePageTo(definition, pageId, pageIndex);
+    activePageId = pageId;
+    notice = t('reorder.done');
+    closeReorder();
+  }
+
+  function handleReorderKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeReorder();
+      return;
+    }
+
+    if (event.key !== 'Tab') return;
+
+    const dialog = event.currentTarget as HTMLElement;
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input, select, textarea'),
+    );
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   /**
@@ -1253,12 +1441,16 @@
         >
           ×
         </button>
+        <button type="button" class="secondary small" onclick={() => openPageReorder(page.pageId)}>
+          {t('editor.move')}
+        </button>
       </div>
 
       {#each page.questions as question, questionIndex (question.questionId)}
         <QuestionEditor
           {question}
           {editing}
+          unsaved={hasUnsavedQuestion(question, savedQuestionsById.get(question.questionId))}
           selected={selectedQuestionId === question.questionId}
           mappedColumns={columnsFor(question.questionId)}
           canMoveUp={questionIndex > 0}
@@ -1272,6 +1464,7 @@
           onchange={(next) => updateQuestion(pageIndex, questionIndex, next)}
           onremove={() => removeQuestion(pageIndex, questionIndex)}
           onmove={(direction) => moveQuestion(pageIndex, questionIndex, direction)}
+          onreorder={() => openQuestionReorder(question.questionId)}
         />
       {/each}
 
@@ -1336,6 +1529,96 @@
           {hasVisibility ? t('editor.shuffleBlockedByVisibility') : t('editor.shuffleQuestionsHint')}
         </span>
       </div>
+
+      <details class="page-buttons">
+        <summary>{t('pageButtons.title')}</summary>
+        <p class="hint">{t('pageButtons.hint')}</p>
+
+        {#each standardButtonKinds as kind (kind)}
+          {@const button = page.buttons?.[kind]}
+          <section class="button-settings">
+            <h3>{standardButtonTitle(kind)}</h3>
+            <ConditionEditor
+              title={t('pageButtons.visibleWhen')}
+              condition={button?.visibleWhen}
+              priorQuestions={priorQuestions(pageIndex, page.questions.length)}
+              {editing}
+              onchange={(visibleWhen) =>
+                updateStandardButton(pageIndex, kind, { visibleWhen })}
+            />
+            <ConditionEditor
+              title={t('pageButtons.enabledWhen')}
+              condition={button?.enabledWhen}
+              priorQuestions={priorQuestions(pageIndex, page.questions.length)}
+              {editing}
+              onchange={(enabledWhen) =>
+                updateStandardButton(pageIndex, kind, { enabledWhen })}
+            />
+          </section>
+        {/each}
+
+        <h3>{t('pageButtons.links')}</h3>
+        <p class="hint">{t('pageButtons.linksHint')}</p>
+        {#each page.buttons?.links ?? [] as link, linkIndex (link.buttonId)}
+          <section class="button-settings link-settings">
+            <label>
+              {t('pageButtons.linkLabel')}
+              <input
+                type="text"
+                value={text(link.label, editing)}
+                oninput={(event) =>
+                  updateLinkButton(pageIndex, linkIndex, {
+                    label: withText(link.label, event.currentTarget.value, editing),
+                  })}
+              />
+            </label>
+            <label>
+              {t('pageButtons.linkUrl')}
+              <input
+                type="url"
+                value={link.url}
+                oninput={(event) => updateLinkButton(pageIndex, linkIndex, { url: event.currentTarget.value })}
+              />
+            </label>
+            <label class="inline">
+              <input
+                type="checkbox"
+                checked={link.openInNewTab ?? false}
+                onchange={(event) =>
+                  updateLinkButton(pageIndex, linkIndex, { openInNewTab: event.currentTarget.checked })}
+              />
+              {t('pageButtons.openInNewTab')}
+            </label>
+            <ConditionEditor
+              title={t('pageButtons.visibleWhen')}
+              condition={link.visibleWhen}
+              priorQuestions={priorQuestions(pageIndex, page.questions.length)}
+              {editing}
+              onchange={(visibleWhen) => updateLinkButton(pageIndex, linkIndex, { visibleWhen })}
+            />
+            <ConditionEditor
+              title={t('pageButtons.enabledWhen')}
+              condition={link.enabledWhen}
+              priorQuestions={priorQuestions(pageIndex, page.questions.length)}
+              {editing}
+              onchange={(enabledWhen) => updateLinkButton(pageIndex, linkIndex, { enabledWhen })}
+            />
+            <button
+              type="button"
+              class="secondary small danger"
+              onclick={() =>
+                updatePageButtons(pageIndex, {
+                  links: (page.buttons?.links ?? []).filter((_, index) => index !== linkIndex),
+                })}
+            >
+              {t('pageButtons.removeLink')}
+            </button>
+          </section>
+        {/each}
+        <button type="button" class="secondary small" onclick={() => addLinkButton(pageIndex)}>
+          {t('pageButtons.addLink')}
+        </button>
+      </details>
     </section>
     {/if}
   {/each}
@@ -1431,6 +1714,73 @@
         onclose={() => (flowcharting = false)}
         onpage={editPageFromFlowchart}
       />
+    </div>
+  </div>
+{/if}
+
+{#if reorder && definition}
+  <div class="reorder-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && closeReorder()}>
+    <div
+      class="reorder-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reorder-dialog-title"
+      aria-describedby="reorder-dialog-description"
+      tabindex="-1"
+      onkeydown={handleReorderKeydown}
+    >
+      <h2 id="reorder-dialog-title">
+        {reorder.kind === 'question' ? t('reorder.questionTitle') : t('reorder.pageTitle')}
+      </h2>
+      <p id="reorder-dialog-description">{t('reorder.chooseDestination')}</p>
+      <div class="reorder-destinations">
+        {#if reorder.kind === 'question'}
+          {@const questionId = reorder.questionId}
+          {#each questionDestinations(questionId) as destination, index (`${destination.pageId}-${destination.questionIndex}`)}
+            {@const warnings = questionWarnings(questionId, destination)}
+            <div class="reorder-destination">
+              <button
+                type="button"
+                class="secondary"
+                id={index === 0 ? 'reorder-first-destination' : undefined}
+                onclick={() => moveQuestionToDestination(questionId, destination)}
+              >
+                {destination.label}
+              </button>
+              {#if warnings.length > 0}
+                <p class="reorder-warning" role="status">
+                  {t('reorder.warning')} {warnings.map(describeFlow).join(' / ')}
+                </p>
+              {/if}
+            </div>
+          {/each}
+        {:else}
+          {@const pageId = reorder.pageId}
+          {#each pageDestinations(pageId) as destination, index (destination.pageIndex)}
+            {@const warnings = pageWarnings(pageId, destination.pageIndex)}
+            <div class="reorder-destination">
+              <button
+                type="button"
+                class="secondary"
+                id={index === 0 ? 'reorder-first-destination' : undefined}
+                onclick={() => movePageToDestination(pageId, destination.pageIndex)}
+              >
+                {destination.label}
+              </button>
+              {#if warnings.length > 0}
+                <p class="reorder-warning" role="status">
+                  {t('reorder.warning')} {warnings.map(describeFlow).join(' / ')}
+                </p>
+              {/if}
+            </div>
+          {/each}
+        {/if}
+      </div>
+      <div class="reorder-actions">
+        <button type="button" class="secondary" onclick={closeReorder}>
+          {t('list.cancel')}
+        </button>
+      </div>
     </div>
   </div>
 {/if}
@@ -1752,6 +2102,35 @@
     }
   }
 
+  .page-buttons {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+    }
+  }
+
+  .button-settings {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+
+    h3 {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+  }
+
+  .link-settings {
+    display: grid;
+    gap: 0.5rem;
+  }
+
   .problems {
     margin: 0 0 1rem;
     padding: 0.75rem 1rem 0.75rem 2rem;
@@ -1833,5 +2212,59 @@
   .small {
     font-size: 0.85rem;
     padding: 0.35rem 0.75rem;
+  }
+
+  .reorder-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(16 24 40 / 55%);
+  }
+
+  .reorder-dialog {
+    width: min(42rem, 100%);
+    max-height: min(42rem, 100%);
+    overflow-y: auto;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 1rem 2.5rem rgb(16 24 40 / 25%);
+
+    h2 {
+      margin: 0;
+      font-size: 1.15rem;
+    }
+
+    > p {
+      margin: 0.75rem 0 0;
+    }
+  }
+
+  .reorder-destinations {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+
+  .reorder-destination {
+    padding: 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  .reorder-warning {
+    margin: 0.5rem 0 0;
+    color: var(--warning-text);
+    font-size: 0.85rem;
+  }
+
+  .reorder-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
   }
 </style>

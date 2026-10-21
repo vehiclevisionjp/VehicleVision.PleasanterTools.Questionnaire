@@ -119,10 +119,10 @@ public class ConnectionSecurityTests
         var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         try
         {
-            var resolved = DatabaseConnectionString.Resolve(DatabaseProvider.Sqlite, null, root);
+            var resolved = QuestionnaireDatabase.Instance.ResolveConnectionString(DatabaseProvider.Sqlite, null, root);
 
             Assert.Equal(
-                Path.Combine(root, "App_Data", DatabaseConnectionString.DefaultSqliteFileName),
+                Path.Combine(root, "App_Data", QuestionnaireDatabase.Instance.DefaultSqliteFileName),
                 Setting(resolved, "DataSource"));
         }
         finally
@@ -135,7 +135,7 @@ public class ConnectionSecurityTests
     public void SQLite以外は接続文字列を必須にする()
     {
         Assert.Throws<InvalidOperationException>(() =>
-            DatabaseConnectionString.Resolve(DatabaseProvider.PostgreSql, null, AppContext.BaseDirectory));
+            QuestionnaireDatabase.Instance.ResolveConnectionString(DatabaseProvider.PostgreSql, null, AppContext.BaseDirectory));
     }
 
     // ---- 起動時の扱い -------------------------------------------------------
@@ -144,7 +144,7 @@ public class ConnectionSecurityTests
     public void 不備があれば起動を止める()
     {
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ConnectionSecurity.EnsureSecure(
+            QuestionnaireDatabase.Instance.EnsureSecure(
                 DatabaseProvider.SqlServer,
                 "Server=db;Database=Q;UID=sa;PWD=x;Encrypt=False",
                 allowInsecure: false));
@@ -157,7 +157,7 @@ public class ConnectionSecurityTests
     public void 明示して緩めたときだけ通す()
     {
         // 検証環境は自己署名の証明書を使う。**明示したときだけ**
-        ConnectionSecurity.EnsureSecure(
+        QuestionnaireDatabase.Instance.EnsureSecure(
             DatabaseProvider.SqlServer,
             "Server=db;Database=Q;UID=sa;PWD=x;TrustServerCertificate=True",
             allowInsecure: true);

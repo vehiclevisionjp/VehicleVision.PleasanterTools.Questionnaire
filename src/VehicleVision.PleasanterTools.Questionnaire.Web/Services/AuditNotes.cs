@@ -111,11 +111,21 @@ public static class AuditNotes
         string targetType,
         IEnumerable<Guid> targetIds)
     {
+        ArgumentNullException.ThrowIfNull(targetIds);
+        SetTargets(context, targetType, targetIds.Select(id => id.ToString()));
+    }
+
+    /// <summary>1 回の操作で失効させた複数の対象を、1 対象 1 監査行として預ける。</summary>
+    public static void SetTargets(
+        HttpContext context,
+        string targetType,
+        IEnumerable<string> targetIds)
+    {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetType);
         ArgumentNullException.ThrowIfNull(targetIds);
         context.Items[TargetsKey] = targetIds
-            .Select(id => (LogSafe.Text(targetType), (string?)id.ToString()))
+            .Select(id => (LogSafe.Text(targetType), (string?)LogSafe.Text(id)))
             .ToList();
     }
 

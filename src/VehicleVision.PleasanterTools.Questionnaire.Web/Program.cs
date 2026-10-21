@@ -1,4 +1,4 @@
-﻿using System.Threading.RateLimiting;
+using System.Threading.RateLimiting;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
@@ -25,7 +25,13 @@ using VehicleVision.PleasanterTools.Questionnaire.Worker;
 // **設定に書く鍵を作るための道。** 手で乱数を用意させると、短い値や使い回しが混ざる
 if (args.Contains("--generate-secret-key"))
 {
-    Console.WriteLine(SecretProtector.GenerateKey());
+    Environment.ExitCode = SecretKeyCommand.Run(args, Console.Out, Console.Error);
+    return;
+}
+
+if (args.Contains("--generate-token"))
+{
+    Console.WriteLine(SecretProtector.GenerateToken());
     return;
 }
 
@@ -93,14 +99,14 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 }
 
 // ---- 設定 ------------------------------------------------------------------
-// **資格情報の実値は設定ファイルへ書かない。** 環境変数か Key Vault から読む
+// **資格情報の実値はコミットしない。** .local.json・環境変数・Key Vault から読む
 // （App_Data/Parameters/README.md）
 var provider = Enum.Parse<DatabaseProvider>(
     builder.Configuration["QUESTIONNAIRE_DB_PROVIDER"] ?? nameof(DatabaseProvider.SqlServer));
 var usesSqlite = provider is DatabaseProvider.Sqlite;
 var databaseStartupState = new DatabaseStartupState();
 builder.Services.AddSingleton(databaseStartupState);
-var connectionString = DatabaseConnectionString.Resolve(
+var connectionString = QuestionnaireDatabase.Instance.ResolveConnectionString(
     provider,
     builder.Configuration["QUESTIONNAIRE_DB_CONNECTIONSTRING"],
     builder.Environment.ContentRootPath);
@@ -138,7 +144,7 @@ if (sharedStateOptions.UseRedis)
 // 接続文字列は運用者が与えるのでコードからは中身が見えず、
 // 暗号化を切った設定のまま本番へ出ても気付けない（CodeQL の cs/insecure-sql-connection）。
 // **既定は厳しい側。** 検証環境は自己署名の証明書を使うので明示して緩める
-ConnectionSecurity.EnsureSecure(
+QuestionnaireDatabase.Instance.EnsureSecure(
     provider,
     connectionString,
     allowInsecure: string.Equals(
@@ -209,7 +215,7 @@ builder.Services.AddSingleton(serviceProvider =>
 // ⚠️ **ここで DB を読まない**（Issue #404）。
 // `app.StartAsync()` は**マイグレーションより前**に走る（起動中も `/healthz` を応答させる設計）。
 // その時点で `AppSettingsMonitor` がリスナーを 1 度呼び、ここが解決されるため、
-// `PleasanterOptions` を経由すると**まだ存在しない `AppSettings` を読んで落ちる。**
+// `PleasanterOptions` を経由すると**まだ存在しない `Core_AppSettings` を読んで落ちる。**
 // **空の DB へ初めて起動する経路が丸ごと死ぬ**（#382 で自動適用を既定にしたので、これが既定の道）。
 //
 // **初期値は設定だけから採れば足りる。** 直後にリスナーが `SetTimeZone` で上書きする。
@@ -342,20 +348,30 @@ var secretKey = builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
     ?? throw new InvalidOperationException(
         "QUESTIONNAIRE_SECRET_KEY が設定されていない（Base64 の 32 バイト）");
 
-builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
+// **管理者・復旧コード・セッションは Core.Data の共有ストア**（Core_AdminUsers ほか）。
+// TOTP の共有鍵の暗号化は、本アプリの SecretProtector を ISecretCipher に合わせたアダプタで渡す
+// （文脈は Core が <appId>:totp:<管理者 ID> で組む）。アンケート固有の設定は AdminUserSettingsStore
+builder.Services.AddSingleton<ISecretCipher, SecretCipherAdapter>();
+builder.Services.AddSingleton<IAdminUserStore>(serviceProvider => new AdminUserStore(
+    serviceProvider.GetRequiredService<IDbConnectionFactory>(),
+    serviceProvider.GetRequiredService<ISecretCipher>(),
+    serviceProvider.GetRequiredService<TimeProvider>(),
+    QuestionnaireDatabase.Instance.AppId));
+builder.Services.AddSingleton<IAdminUserSettingsStore, AdminUserSettingsStore>();
 builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
 
 // **既定は DB。** 追加の基盤なしで、個別失効と端末一覧を使えるようにする。
 // 大規模構成では Redis を選べるが、停止時に cookie だけで通すことはしない。
 if (string.Equals(sessionStoreKind, "Database", StringComparison.OrdinalIgnoreCase))
 {
-    builder.Services.AddSingleton<IAdminSessionStore, DatabaseAdminSessionStore>();
+    builder.Services.AddSingleton<IAdminSessionStore, AdminSessionStore>();
 }
 else if (string.Equals(sessionStoreKind, "Redis", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<IAdminSessionStore>(serviceProvider =>
         new RedisAdminSessionStore(
             serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
+            serviceProvider.GetRequiredService<TimeProvider>(),
             builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX"]
                 ?? "questionnaire:admin-session:"));
 }
@@ -1091,7 +1107,7 @@ app.MapGet("/ready", async (CancellationToken cancellationToken) =>
         return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
 
-    var failure = await DatabaseMigrator.WaitForDatabaseAsync(
+    var failure = await QuestionnaireDatabase.Instance.Migrator.WaitForDatabaseAsync(
         provider,
         connectionString,
         TimeSpan.Zero,

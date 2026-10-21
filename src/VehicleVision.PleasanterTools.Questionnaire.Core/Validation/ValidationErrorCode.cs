@@ -63,4 +63,7 @@ public enum ValidationErrorCode
 
     /// <summary>真偽値として解釈できない。</summary>
     NotABoolean,
+
+    /// <summary>送信釦の表示条件または有効条件を満たしていない（Issue #624）。</summary>
+    SubmitButtonConditionNotMet,
 }

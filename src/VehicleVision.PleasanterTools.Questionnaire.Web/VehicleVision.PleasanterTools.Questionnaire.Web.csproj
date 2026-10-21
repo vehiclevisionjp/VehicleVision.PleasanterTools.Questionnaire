@@ -9,11 +9,11 @@
     <!-- 管理画面の SAML 2.0 ログイン（Issue #166）。BSD-3-Clause -->
     <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.21.0" />
     <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.21.0" />
-    <PackageReference Include="AWSSDK.S3" Version="4.0.104.2" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.104.4" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.30.1" />
     <PackageReference Include="nClam" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
     <PackageReference Include="Otp.NET" Version="1.4.1" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.17.14" />
   </ItemGroup>
@@ -36,6 +36,16 @@
   <ItemGroup>
     <InternalsVisibleTo Include="VehicleVision.PleasanterTools.Questionnaire.Web.Tests" />
     <InternalsVisibleTo Include="VehicleVision.PleasanterTools.Questionnaire.Integration.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- メール送信の部品は Core.Mail（NuGet）へ集約した。名前空間を暗黙に使えるようにする -->
+    <Using Include="VehicleVision.PleasanterTools.Core.Mail" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DB の基盤は Core.Data（NuGet）へ集約した。名前空間を暗黙に使えるようにする -->
+    <Using Include="VehicleVision.PleasanterTools.Core.Data" />
   </ItemGroup>
 
 </Project>

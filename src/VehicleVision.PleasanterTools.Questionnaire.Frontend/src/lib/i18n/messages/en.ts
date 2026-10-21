@@ -40,6 +40,7 @@ export const en: Record<MessageKey, string> = {
   'form.next': 'Next',
   'form.submit': 'Submit',
   'form.submitting': 'Submitting…',
+  'form.buttonDisabled': 'This button is unavailable until its conditions are met',
   'form.languageLabel': 'Language',
   'form.trapLabel': 'Leave this field empty',
   'readability.group': 'Readability',
@@ -144,5 +145,6 @@ export const en: Record<MessageKey, string> = {
   'serverValidation.PatternMismatch': 'Enter the value in the requested format',
   'serverValidation.ScannerUnavailable':
     'Attachments cannot be checked right now, so we cannot accept this yet',
+  'serverValidation.SubmitButtonConditionNotMet': 'The conditions for submitting have not been met',
   'serverValidation.unknown': 'Please check what you entered',
 };

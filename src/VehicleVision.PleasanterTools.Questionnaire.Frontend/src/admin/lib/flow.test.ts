@@ -246,6 +246,36 @@ describe('validateFlow の表示条件', () => {
 
     expect(codes(survey)).toContain('UnknownChoiceValue');
   });
+
+  it('釦条件は同じページの設問を参照できる', () => {
+    const survey = definition(
+      page('p1', {
+        questions: [question('q1')],
+        buttons: {
+          submit: {
+            enabledWhen: {
+              match: 'All',
+              rules: [{ questionId: 'q1', operator: 'Answered' }],
+            },
+          },
+        },
+      }),
+    );
+
+    expect(codes(survey)).toEqual([]);
+  });
+
+  it('危険な任意リンク URL を挙げる', () => {
+    const survey = definition(
+      page('p1', {
+        buttons: {
+          links: [{ buttonId: 'link-1', label: { ja: '危険' }, url: 'javascript:alert(1)' }],
+        },
+      }),
+    );
+
+    expect(codes(survey)).toContain('InvalidButtonUrl');
+  });
 });
 
 describe('isUnknownChoiceValue', () => {

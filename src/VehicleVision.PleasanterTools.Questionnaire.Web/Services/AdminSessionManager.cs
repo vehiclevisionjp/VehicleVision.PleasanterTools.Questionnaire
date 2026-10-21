@@ -1,75 +1,70 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.DataProtection;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
-/// <summary>管理者セッションの内容を保護し、cookie には識別子だけを渡す。</summary>
-public sealed class AdminSessionManager
+/// <summary>ストアから復元した管理者セッション。</summary>
+/// <param name="SessionId">cookie に載せている ID（<b>秘密</b>。ログへ出さない）。</param>
+/// <param name="Handle">端末を指す識別子（ID の SHA-256。ログ・一覧・監査へ出してよい）。</param>
+/// <param name="Session">ストアの中身。</param>
+/// <param name="User">持ち主。<b>居なければ <c>null</c></b>（呼び出し側が落とす）。</param>
+/// <param name="Principal">復元した principal（利用者・方式・外部ログインの鍵から組み立て直したもの）。</param>
+public sealed record RestoredAdminSession(
+    string SessionId,
+    string Handle,
+    AdminSession Session,
+    AdminUser? User,
+    ClaimsPrincipal Principal);
+
+/// <summary>管理者セッションをサーバ側（Core.Data のストア）に持ち、cookie には ID だけを渡す。</summary>
+/// <remarks>
+/// <para>
+/// cookie の中身（暗号化したチケット）に載るのは<b>セッション ID だけ</b>。ストアには ID の SHA-256 だけが入る。
+/// <b>利用者・役割・ログインの方式は、要求のたびにストアと利用者の表から組み立て直す</b>
+/// （Core のセッションは、セッションごとの内容の保管を持たない）。
+/// </para>
+/// <para>
+/// 役割は<b>いまの値</b>が入る。役割を変えたときに古い役割のセッションを残さないよう、
+/// 変える側が持ち主のセッションを失効させる（<see cref="AdminUserService.SetRoleAsync"/>）。
+/// </para>
+/// </remarks>
+public sealed class AdminSessionManager(
+    IAdminSessionStore store,
+    IAdminUserStore users,
+    ILogger<AdminSessionManager> logger)
 {
     /// <summary>cookie と復元後の principal に載せるセッション ID。</summary>
     public const string SessionIdClaim = "questionnaire:admin_session_id";
 
-    private const string ProtectionPurpose = "Questionnaire.AdminSession.v1";
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly IAdminSessionStore _store;
-    private readonly IDataProtector _protector;
-    private readonly TimeProvider _time;
-    private readonly ILogger<AdminSessionManager> _logger;
-
-    public AdminSessionManager(
-        IAdminSessionStore store,
-        IDataProtectionProvider protectionProvider,
-        TimeProvider time,
-        ILogger<AdminSessionManager> logger)
-    {
-        _store = store;
-        _protector = protectionProvider.CreateProtector(ProtectionPurpose);
-        _time = time;
-        _logger = logger;
-    }
-
     /// <summary>同じ方式の古い状態を捨てて、新しいセッションを発行する。</summary>
-    public async Task<Guid> SignInAsync(
+    /// <param name="sso">
+    /// SAML・Pleasanter のログインで入ったときの鍵（単一ログアウト・再検証に要る）。
+    /// <b>2 要素の途中からログイン後へは、そのまま引き継ぐ。</b>
+    /// </param>
+    /// <returns>cookie に載せたセッション ID。</returns>
+    public async Task<string> SignInAsync(
         HttpContext context,
         string scheme,
-        AdminSessionKind kind,
-        ClaimsPrincipal principal,
-        TimeSpan lifetime)
+        string kind,
+        Guid userId,
+        TimeSpan lifetime,
+        SessionSso? sso = null)
     {
         await RevokeCurrentAsync(context, scheme).ConfigureAwait(false);
 
-        var sessionId = Guid.NewGuid();
-        var now = _time.GetUtcNow().UtcDateTime;
-        var payload = new SessionPayload(
-            principal.Claims.Select(claim => new StoredClaim(claim.Type, claim.Value)).ToArray(),
-            principal.Identity?.AuthenticationType ?? scheme);
-
-        await _store.CreateAsync(
-            new AdminSessionEntry
-            {
-                AdminSessionId = sessionId,
-                AdminUserId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!),
-                Kind = kind,
-                ProtectedPayload = _protector.Protect(JsonSerializer.Serialize(payload, JsonOptions)),
-                CreatedAt = now,
-                ExpiresAt = now.Add(lifetime),
-                IpAddress = IpAddressOf(context),
-                UserAgent = Trim(context.Request.Headers.UserAgent.ToString(), 512),
-                LoginMethod = Enum.TryParse<AdminLoginMethod>(
-                        principal.FindFirstValue(AdminAuthSchemes.LoginMethodClaim), out var method)
-                    && Enum.IsDefined(method)
-                        ? method
-                        : null,
-            },
-            context.RequestAborted).ConfigureAwait(false);
+        var sessionId = await store.CreateAsync(
+            userId,
+            kind,
+            lifetime,
+            context.RequestAborted,
+            IpAddressOf(context),
+            Trim(context.Request.Headers.UserAgent.ToString(), 512),
+            sso).ConfigureAwait(false);
 
         var cookieIdentity = new ClaimsIdentity(
-            [new Claim(SessionIdClaim, sessionId.ToString())],
+            [new Claim(SessionIdClaim, sessionId)],
             scheme);
         await context.SignInAsync(
             scheme,
@@ -79,62 +74,83 @@ public sealed class AdminSessionManager
     }
 
     /// <summary>ストアに残っている内容から principal を復元する。</summary>
-    public async Task<(AdminSessionEntry Entry, ClaimsPrincipal Principal)?> FindAsync(
+    /// <param name="authenticationType">principal の認証の種別（認証方式の名前）。</param>
+    public async Task<RestoredAdminSession?> FindAsync(
         ClaimsPrincipal? cookiePrincipal,
-        AdminSessionKind expectedKind,
+        string expectedKind,
+        string authenticationType,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(cookiePrincipal?.FindFirstValue(SessionIdClaim), out var sessionId))
+        var sessionId = cookiePrincipal?.FindFirstValue(SessionIdClaim);
+        if (string.IsNullOrEmpty(sessionId))
         {
             return null;
         }
 
-        var entry = await _store.FindAsync(sessionId, cancellationToken).ConfigureAwait(false);
-        var now = _time.GetUtcNow().UtcDateTime;
-        if (entry is null || entry.Kind != expectedKind)
+        // 期限切れは、ストアが「無い」として返す
+        var session = await store.FindAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (session is null || session.Kind != expectedKind)
         {
             return null;
         }
 
-        if (AsUtc(entry.ExpiresAt) <= now)
+        var user = await users.FindByIdAsync(session.UserId, cancellationToken).ConfigureAwait(false);
+        var sso = await store.GetSsoAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        var handle = store.HandleOf(sessionId);
+
+        if (user is null)
         {
-            await _store.DeleteAsync(sessionId, cancellationToken).ConfigureAwait(false);
-            return null;
+            logger.LogWarning("管理者セッション {Handle} の持ち主が居ない（AdminUserId={AdminUserId}）", handle, session.UserId);
+            return new RestoredAdminSession(sessionId, handle, session, null, new ClaimsPrincipal());
         }
 
-        try
-        {
-            var json = _protector.Unprotect(entry.ProtectedPayload);
-            var payload = JsonSerializer.Deserialize<SessionPayload>(json, JsonOptions)
-                ?? throw new JsonException("セッションの内容が空だった。");
-            var claims = payload.Claims
-                .Select(claim => new Claim(claim.Type, claim.Value))
-                .Append(new Claim(SessionIdClaim, sessionId.ToString()));
-            var identity = new ClaimsIdentity(claims, payload.AuthenticationType);
-            return (entry, new ClaimsPrincipal(identity));
-        }
-        catch (Exception exception) when (exception is CryptographicException or JsonException)
-        {
-            _logger.LogError(exception, "管理者セッション {SessionId} の内容を復元できなかった", sessionId);
-            await _store.DeleteAsync(sessionId, cancellationToken).ConfigureAwait(false);
-            return null;
-        }
+        return new RestoredAdminSession(
+            sessionId,
+            handle,
+            session,
+            user,
+            new ClaimsPrincipal(new ClaimsIdentity(ClaimsOf(user, sso, sessionId), authenticationType)));
     }
 
     /// <summary>指定した認証方式の現在のセッションをストアと cookie の両方から消す。</summary>
     public async Task RevokeCurrentAsync(HttpContext context, string scheme)
     {
         var result = await context.AuthenticateAsync(scheme).ConfigureAwait(false);
-        if (Guid.TryParse(result.Principal?.FindFirstValue(SessionIdClaim), out var sessionId))
+        if (result.Principal?.FindFirstValue(SessionIdClaim) is { Length: > 0 } sessionId)
         {
-            await _store.DeleteAsync(sessionId, context.RequestAborted).ConfigureAwait(false);
+            await store.DeleteAsync(sessionId, context.RequestAborted).ConfigureAwait(false);
         }
 
         await context.SignOutAsync(scheme).ConfigureAwait(false);
     }
 
-    private static DateTime AsUtc(DateTime value) =>
-        value.Kind is DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+    private static List<Claim> ClaimsOf(AdminUser user, SessionSso? sso, string sessionId)
+    {
+        List<Claim> claims =
+        [
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.LoginId),
+            new(ClaimTypes.Role, user.Role),
+            new(SessionIdClaim, sessionId),
+        ];
+
+        // **IdP へログアウトを頼むのに要る値だけ**（Issue #191）
+        if (sso?.Saml is { } saml)
+        {
+            claims.Add(new Claim(AdminAuthSchemes.SamlNameIdClaim, saml.NameId));
+            if (!string.IsNullOrEmpty(saml.SessionIndex))
+            {
+                claims.Add(new Claim(AdminAuthSchemes.SamlSessionIndexClaim, saml.SessionIndex));
+            }
+        }
+
+        if (sso?.Pleasanter is { } pleasanter)
+        {
+            claims.AddRange(PleasanterSsoClaims.Create(pleasanter));
+        }
+
+        return claims;
+    }
 
     private static string? IpAddressOf(HttpContext context)
     {
@@ -148,10 +164,4 @@ public sealed class AdminSessionManager
         string.IsNullOrWhiteSpace(value)
             ? null
             : value.Length <= length ? value : value[..length];
-
-    private sealed record StoredClaim(string Type, string Value);
-
-    private sealed record SessionPayload(
-        IReadOnlyList<StoredClaim> Claims,
-        string AuthenticationType);
 }

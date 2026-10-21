@@ -24,6 +24,12 @@ public sealed class SecretProtector
     /// <summary>書式の版。**変えるときは <see cref="Unprotect"/> の分岐を足す。**</summary>
     private const string Version = "v1";
 
+    /// <summary>
+    /// 文脈に束縛した書式の版（<see cref="Protect(string, string)"/>）。
+    /// 文脈（利用者 ID など）を AES-GCM の追加認証データ（AAD）に入れる。**別の文脈では復号できない。**
+    /// </summary>
+    private const string ContextVersion = "v2";
+
     private const int NonceBytes = 12;
     private const int TagBytes = 16;
     private const int KeyBytes = 32;
@@ -66,8 +72,30 @@ public sealed class SecretProtector
     /// <summary>新しい鍵を作る。**設定に書く値を作るためのもの。**</summary>
     public static string GenerateKey() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(KeyBytes));
 
+    /// <summary>新しいトークンを作る。**URL や環境変数へ安全に書ける形にする。**</summary>
+    public static string GenerateToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(KeyBytes))
+        .TrimEnd('=')
+        .Replace('+', '-')
+        .Replace('/', '_');
+
     /// <summary>暗号化して、保存する形の文字列にする。</summary>
-    public string Protect(string plaintext)
+    public string Protect(string plaintext) => Protect(plaintext, Version, associatedData: null);
+
+    /// <summary>
+    /// <paramref name="context"/> に束縛して暗号化する（管理者の TOTP の共有鍵。Core.Data の <c>ISecretCipher</c> 経由）。
+    /// </summary>
+    /// <remarks>
+    /// **別の文脈では復号できない。** 暗号文を別の管理者の行へ貼り替えても、その管理者の共有鍵としては読めない。
+    /// 文脈を持たない形（<see cref="Protect(string)"/>）で暗号化した値は、<see cref="Unprotect(string, string)"/> が
+    /// 文脈を問わずに復号する（文脈を持たなかった旧の暗号文を、そのまま読むため）。
+    /// </remarks>
+    public string Protect(string plaintext, string context)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(context);
+        return Protect(plaintext, ContextVersion, Encoding.UTF8.GetBytes(context));
+    }
+
+    private string Protect(string plaintext, string version, byte[]? associatedData)
     {
         ArgumentNullException.ThrowIfNull(plaintext);
 
@@ -78,16 +106,22 @@ public sealed class SecretProtector
         var tag = new byte[TagBytes];
 
         using var aes = new AesGcm(key, TagBytes);
-        aes.Encrypt(nonce, bytes, cipher, tag);
+        aes.Encrypt(nonce, bytes, cipher, tag, associatedData);
 
         return string.Join(
-            '$', Version, Convert.ToBase64String(nonce), Convert.ToBase64String(tag),
+            '$', version, Convert.ToBase64String(nonce), Convert.ToBase64String(tag),
             Convert.ToBase64String(cipher));
     }
 
     /// <summary>復号する。壊れていたり鍵が違えば <c>null</c>。</summary>
     /// <remarks>**改竄されていれば復号は失敗する**（AES-GCM が検知する）。</remarks>
-    public string? Unprotect(string protectedValue)
+    public string? Unprotect(string protectedValue) => Unprotect(protectedValue, context: null);
+
+    /// <summary>
+    /// 復号する。<see cref="Protect(string, string)"/> で暗号化した値は、<b>同じ文脈でだけ</b>復号できる。
+    /// 文脈を持たない形で暗号化した値（旧の暗号文）は、文脈を問わず復号する。壊れていたり鍵・文脈が違えば <c>null</c>。
+    /// </summary>
+    public string? Unprotect(string protectedValue, string? context)
     {
         if (string.IsNullOrEmpty(protectedValue))
         {
@@ -95,9 +129,21 @@ public sealed class SecretProtector
         }
 
         var parts = protectedValue.Split('$');
-        if (parts.Length != 4 || parts[0] != Version)
+        if (parts.Length != 4 || (parts[0] != Version && parts[0] != ContextVersion))
         {
             return null;
+        }
+
+        byte[]? associatedData = null;
+        if (parts[0] == ContextVersion)
+        {
+            // **文脈に束縛した値は、文脈が分からなければ読まない**
+            if (string.IsNullOrEmpty(context))
+            {
+                return null;
+            }
+
+            associatedData = Encoding.UTF8.GetBytes(context);
         }
 
         try
@@ -108,7 +154,7 @@ public sealed class SecretProtector
             var plain = new byte[cipher.Length];
 
             using var aes = new AesGcm(key, TagBytes);
-            aes.Decrypt(nonce, cipher, tag, plain);
+            aes.Decrypt(nonce, cipher, tag, plain, associatedData);
 
             return Encoding.UTF8.GetString(plain);
         }

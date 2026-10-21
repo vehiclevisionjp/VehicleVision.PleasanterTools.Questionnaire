@@ -6,8 +6,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 /// <summary>Pleasanter のログインで入ったことを表す claim（Issue #464）。</summary>
 /// <remarks>
-/// **本アプリのセッション（サーバ側に保存する中身）に載せる。** cookie には載らない
-/// （<see cref="AdminSessionManager"/> は cookie へセッション ID だけを渡す）。
+/// **サーバ側のセッション（Core.Data のストア。<c>PleasanterTenantId</c> などの列）が持つ値から、要求のたびに組み立てる。**
+/// cookie には載らない（<see cref="AdminSessionManager"/> は cookie へセッション ID だけを渡す）。
 /// </remarks>
 public static class PleasanterSsoClaims
 {
@@ -20,29 +20,34 @@ public static class PleasanterSsoClaims
     /// <summary>Pleasanter に本人を確かめた時刻（UNIX 秒）。</summary>
     public const string VerifiedAt = "q.pleasanter.verifiedat";
 
-    /// <summary>この接頭辞の claim は、2 要素の途中状態からログイン後へ引き継ぐ。</summary>
-    public const string Prefix = "q.pleasanter.";
-
-    /// <summary>確かめた本人から claim を作る。</summary>
-    public static IReadOnlyList<Claim> Create(PleasanterIdentity identity, DateTimeOffset verifiedAt)
+    /// <summary>確かめた本人から、セッションへ保管する値を作る。</summary>
+    public static PleasanterSsoKeys Keys(PleasanterIdentity identity, DateTimeOffset verifiedAt)
     {
         ArgumentNullException.ThrowIfNull(identity);
 
+        return new PleasanterSsoKeys(identity.TenantId, identity.UserId, verifiedAt);
+    }
+
+    /// <summary>セッションの値から claim を作る（要求のたびに、ストアの値から組み立て直す）。</summary>
+    public static IReadOnlyList<Claim> Create(PleasanterSsoKeys keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+
         return
         [
-            new Claim(TenantId, identity.TenantId.ToString(CultureInfo.InvariantCulture)),
-            new Claim(UserId, identity.UserId.ToString(CultureInfo.InvariantCulture)),
-            new Claim(VerifiedAt, verifiedAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)),
+            new Claim(TenantId, keys.TenantId.ToString(CultureInfo.InvariantCulture)),
+            new Claim(UserId, keys.UserId.ToString(CultureInfo.InvariantCulture)),
+            new Claim(VerifiedAt, keys.VerifiedAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)),
         ];
     }
 
-    /// <summary>途中状態から引き継ぐ claim を取り出す。</summary>
-    public static IReadOnlyList<Claim> Carry(ClaimsPrincipal? principal) =>
-        principal?.Claims
-            .Where(claim => claim.Type.StartsWith(Prefix, StringComparison.Ordinal))
-            .Select(claim => new Claim(claim.Type, claim.Value))
-            .ToList()
-        ?? [];
+    /// <summary>
+    /// 途中状態から引き継ぐ値を取り出す。Pleasanter のログインで入ったのでなければ <c>null</c>。
+    /// </summary>
+    public static PleasanterSsoKeys? KeysOf(ClaimsPrincipal? principal) =>
+        TryRead(principal, out var tenantId, out var userId, out var verifiedAt)
+            ? new PleasanterSsoKeys(tenantId, userId, verifiedAt)
+            : null;
 
     /// <summary>Pleasanter のログインで入ったセッションか。入ったなら中身を読む。</summary>
     public static bool TryRead(
@@ -121,13 +126,13 @@ public sealed class PleasanterSsoSessionRevalidator(
     /// <summary>覚えておく件数の目安。**超えたら古いものを捨てる。**</summary>
     private const int PruneThreshold = 10_000;
 
-    private readonly ConcurrentDictionary<Guid, DateTimeOffset> lastVerified = new();
+    private readonly ConcurrentDictionary<string, DateTimeOffset> lastVerified = new();
 
     /// <summary>要求のセッションを必要なら確かめ直す。</summary>
     public async Task<PleasanterSsoRevalidation> RevalidateAsync(
         HttpContext context,
         ClaimsPrincipal principal,
-        Guid adminSessionId,
+        string sessionHandle,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -143,14 +148,14 @@ public sealed class PleasanterSsoSessionRevalidator(
         {
             // **確かめる手段が無いセッションは残さない。** 機能を止めたら、それで入った人も落とす
             logger.LogInformation(
-                "Pleasanter のシングルサインオンが無効になったため、それで入ったセッション {SessionId} を終了します。",
-                adminSessionId);
-            Forget(adminSessionId);
+                "Pleasanter のシングルサインオンが無効になったため、それで入ったセッション {Handle} を終了します。",
+                sessionHandle);
+            Forget(sessionHandle);
             return PleasanterSsoRevalidation.Rejected;
         }
 
         var now = timeProvider.GetUtcNow();
-        if (lastVerified.TryGetValue(adminSessionId, out var remembered) && remembered > verifiedAt)
+        if (lastVerified.TryGetValue(sessionHandle, out var remembered) && remembered > verifiedAt)
         {
             verifiedAt = remembered;
         }
@@ -169,42 +174,42 @@ public sealed class PleasanterSsoSessionRevalidator(
                 when result.Identity is { } identity
                     && identity.TenantId == tenantId
                     && identity.UserId == userId:
-                Remember(adminSessionId, now);
+                Remember(sessionHandle, now);
                 return PleasanterSsoRevalidation.Valid;
 
             case PleasanterSessionStatus.Authenticated:
                 // **別人に入れ替わっている。** Pleasanter で別の人がログインし直した
                 logger.LogWarning(
-                    "Pleasanter のログインが別の利用者に替わったため、セッション {SessionId} を終了します。",
-                    adminSessionId);
-                Forget(adminSessionId);
+                    "Pleasanter のログインが別の利用者に替わったため、セッション {Handle} を終了します。",
+                    sessionHandle);
+                Forget(sessionHandle);
                 return PleasanterSsoRevalidation.Rejected;
 
             case PleasanterSessionStatus.NotAllowed:
             case PleasanterSessionStatus.Unauthenticated:
                 logger.LogInformation(
-                    "Pleasanter でのログインまたは所属が許可されないため、セッション {SessionId} を終了します（{Reason}）。",
-                    adminSessionId,
+                    "Pleasanter でのログインまたは所属が許可されないため、セッション {Handle} を終了します（{Reason}）。",
+                    sessionHandle,
                     result.Reason);
-                Forget(adminSessionId);
+                Forget(sessionHandle);
                 return PleasanterSsoRevalidation.Rejected;
 
             default:
                 logger.LogWarning(
-                    "Pleasanter に確かめ直せなかったため、セッション {SessionId} を終了します（{Reason}）。",
-                    adminSessionId,
+                    "Pleasanter に確かめ直せなかったため、セッション {Handle} を終了します（{Reason}）。",
+                    sessionHandle,
                     result.Reason);
-                Forget(adminSessionId);
+                Forget(sessionHandle);
                 return PleasanterSsoRevalidation.UpstreamError;
         }
     }
 
     /// <summary>覚えた時刻を捨てる。</summary>
-    public void Forget(Guid adminSessionId) => lastVerified.TryRemove(adminSessionId, out _);
+    public void Forget(string sessionHandle) => lastVerified.TryRemove(sessionHandle, out _);
 
-    private void Remember(Guid adminSessionId, DateTimeOffset now)
+    private void Remember(string sessionHandle, DateTimeOffset now)
     {
-        lastVerified[adminSessionId] = now;
+        lastVerified[sessionHandle] = now;
 
         if (lastVerified.Count <= PruneThreshold)
         {

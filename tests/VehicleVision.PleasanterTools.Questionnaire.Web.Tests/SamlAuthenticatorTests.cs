@@ -69,17 +69,8 @@ public class SamlAuthenticatorTests
         AdminRole role = AdminRole.Editor,
         bool isDisabled = false)
     {
-        var user = new AdminUser
-        {
-            AdminUserId = Guid.NewGuid(),
-            LoginId = LoginId,
-            PasswordHash = harness.Hasher.Hash("long-enough-password"),
-            Role = role,
-            IsDisabled = isDisabled,
-        };
-
-        await harness.Store.CreateAsync(user);
-        return user;
+        await Task.CompletedTask;
+        return harness.Store.Seed(Guid.NewGuid(), LoginId, AdminRoleMap.ToName(role), isDisabled);
     }
 
     [Fact]
@@ -105,11 +96,11 @@ public class SamlAuthenticatorTests
         var result = await harness.Authenticator.SignInAsync(LoginId);
 
         Assert.Equal(SamlSignInOutcome.SignedIn, result.Outcome);
-        Assert.Equal(user.AdminUserId, result.User!.AdminUserId);
+        Assert.Equal(user.Id, result.User!.Id);
         Assert.False(result.Registered);
 
         // **最終ログイン日時が入る。** 止め忘れを見つける手掛かり
-        var stored = await harness.Store.FindByIdAsync(user.AdminUserId);
+        var stored = await harness.Store.FindByIdAsync(user.Id);
         Assert.NotNull(stored!.LastLoginAt);
     }
 
@@ -133,7 +124,7 @@ public class SamlAuthenticatorTests
 
         Assert.Equal(SamlSignInOutcome.SignedIn, result.Outcome);
         Assert.True(result.Registered);
-        Assert.Equal(AdminRole.Editor, result.User!.Role);
+        Assert.Equal(nameof(AdminRole.Editor), result.User!.Role);
 
         var stored = Assert.Single(await harness.Store.ListAsync());
         Assert.Equal(LoginId, stored.LoginId);
@@ -146,7 +137,7 @@ public class SamlAuthenticatorTests
 
         var result = await harness.Authenticator.SignInAsync(LoginId);
 
-        Assert.Equal(AdminRole.Administrator, result.User!.Role);
+        Assert.Equal(nameof(AdminRole.Administrator), result.User!.Role);
     }
 
     [Fact]
@@ -156,11 +147,11 @@ public class SamlAuthenticatorTests
         var harness = Create(Options(SamlUnknownUserPolicy.Register));
         await harness.Authenticator.SignInAsync(LoginId);
 
-        var stored = Assert.Single(await harness.Store.ListAsync());
+        var (_, passwordHash) = (await harness.Store.FindForLoginAsync(LoginId))!.Value;
 
-        Assert.NotEmpty(stored.PasswordHash);
-        Assert.False(harness.Hasher.Verify(string.Empty, stored.PasswordHash).Verified);
-        Assert.False(harness.Hasher.Verify(LoginId, stored.PasswordHash).Verified);
+        Assert.NotEmpty(passwordHash);
+        Assert.False(harness.Hasher.Verify(string.Empty, passwordHash).Verified);
+        Assert.False(harness.Hasher.Verify(LoginId, passwordHash).Verified);
     }
 
     [Fact]
@@ -173,7 +164,7 @@ public class SamlAuthenticatorTests
 
         Assert.True(first.Registered);
         Assert.False(second.Registered);
-        Assert.Equal(first.User!.AdminUserId, second.User!.AdminUserId);
+        Assert.Equal(first.User!.Id, second.User!.Id);
         Assert.Single(await harness.Store.ListAsync());
     }
 
@@ -200,7 +191,7 @@ public class SamlAuthenticatorTests
         Assert.Equal(SamlSignInOutcome.NeedsTotpEnrollment, result.Outcome);
 
         // **まだ通していないので、ログインは記録しない**
-        var stored = await harness.Store.FindByIdAsync(user.AdminUserId);
+        var stored = await harness.Store.FindByIdAsync(user.Id);
         Assert.Null(stored!.LastLoginAt);
     }
 
@@ -210,7 +201,7 @@ public class SamlAuthenticatorTests
         // **設定 1 つで既存の保護が消えるのは危ない**（Issue #154 の但し書き）
         var harness = Create(Options(), TwoFactorPolicy.Disabled);
         var user = await AddAsync(harness);
-        await harness.Store.EnableTotpAsync(user.AdminUserId, "encrypted-secret");
+        await harness.Store.EnableTotpAsync(user.Id, "SECRET", timeStep: 1, []);
 
         var result = await harness.Authenticator.SignInAsync(LoginId);
 
@@ -224,14 +215,14 @@ public class SamlAuthenticatorTests
         // 登録済みの相手が IdP 経由なら 1 要素で入れる、という穴を作らない
         var harness = Create(Options());
         var user = await AddAsync(harness);
-        await harness.Store.EnableTotpAsync(user.AdminUserId, "encrypted-secret");
+        await harness.Store.EnableTotpAsync(user.Id, "SECRET", timeStep: 1, []);
 
         var result = await harness.Authenticator.SignInAsync(LoginId);
 
         Assert.Equal(SamlSignInOutcome.NeedsSecondFactor, result.Outcome);
 
         // **まだ通していないので、ログインは記録しない**
-        var stored = await harness.Store.FindByIdAsync(user.AdminUserId);
+        var stored = await harness.Store.FindByIdAsync(user.Id);
         Assert.Null(stored!.LastLoginAt);
     }
 }

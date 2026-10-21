@@ -17,6 +17,7 @@ public class AdminUserServiceTests
 
     private sealed record Harness(
         FakeAdminUserStore Users,
+        FakeAdminSessionStore Sessions,
         FakeAdminInvitationStore Invitations,
         AdminUserService Service,
         AdminAuthenticator Authenticator,
@@ -27,21 +28,23 @@ public class AdminUserServiceTests
     {
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-08-19T00:00:00Z"));
         var users = new FakeAdminUserStore(time);
+        var sessions = new FakeAdminSessionStore(time);
         var invitations = new FakeAdminInvitationStore(time);
         var hasher = new PasswordHasher();
         var options = new AdminAuthOptions();
 
         var authenticator = new AdminAuthenticator(
             users,
+            users,
             hasher,
             new TotpService(),
-            new SecretProtector(SecretProtector.GenerateKey()),
             options,
             time,
             NullLogger<AdminAuthenticator>.Instance);
 
         var service = new AdminUserService(
             users,
+            sessions,
             invitations,
             authenticator,
             hasher,
@@ -50,7 +53,7 @@ public class AdminUserServiceTests
             time,
             NullLogger<AdminUserService>.Instance);
 
-        return new Harness(users, invitations, service, authenticator, options, time);
+        return new Harness(users, sessions, invitations, service, authenticator, options, time);
     }
 
     /// <summary>最初の管理者を作り、**一度ログインしたことにする。**</summary>
@@ -61,7 +64,7 @@ public class AdminUserServiceTests
     private static async Task<AdminUser> FirstAdministratorAsync(Harness harness, string loginId = "admin")
     {
         var user = (await harness.Authenticator.TryCreateFirstAdministratorAsync(loginId, Password))!;
-        await harness.Users.RecordSuccessAsync(user.AdminUserId);
+        await harness.Users.RecordSuccessAsync(user.Id);
         return user;
     }
 
@@ -98,7 +101,7 @@ public class AdminUserServiceTests
         var admin = await FirstAdministratorAsync(harness);
 
         var (outcome, invitation) = await harness.Service
-            .InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
+            .InviteAsync(admin.Id, "editor", AdminRole.Editor);
 
         Assert.Equal(AdminUserOutcome.Succeeded, outcome);
         Assert.NotNull(invitation);
@@ -117,7 +120,7 @@ public class AdminUserServiceTests
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
-        await InviteAndAcceptAsync(harness, admin.AdminUserId, "editor", AdminRole.Editor, AnotherPassword);
+        await InviteAndAcceptAsync(harness, admin.Id, "editor", AdminRole.Editor, AnotherPassword);
 
         var result = await harness.Authenticator.CheckPasswordAsync("editor", AnotherPassword);
 
@@ -131,7 +134,7 @@ public class AdminUserServiceTests
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
         var (_, invitation) = await harness.Service
-            .InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
+            .InviteAsync(admin.Id, "editor", AdminRole.Editor);
 
         Assert.Equal(
             AdminUserOutcome.Succeeded,
@@ -149,7 +152,7 @@ public class AdminUserServiceTests
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
         var (_, invitation) = await harness.Service
-            .InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
+            .InviteAsync(admin.Id, "editor", AdminRole.Editor);
 
         harness.Time.Advance(harness.Options.InvitationLifetime + TimeSpan.FromMinutes(1));
 
@@ -164,10 +167,10 @@ public class AdminUserServiceTests
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
         var (_, first) = await harness.Service
-            .InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
+            .InviteAsync(admin.Id, "editor", AdminRole.Editor);
 
         var (outcome, second) = await harness.Service
-            .ReissueInvitationAsync(admin.AdminUserId, first!.AdminUserId);
+            .ReissueInvitationAsync(admin.Id, first!.AdminUserId);
         Assert.Equal(AdminUserOutcome.Succeeded, outcome);
 
         // **前の紙を残さない。** 残すと、出し直した意味が無い
@@ -186,12 +189,12 @@ public class AdminUserServiceTests
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
         var (_, invitation) = await harness.Service
-            .InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
+            .InviteAsync(admin.Id, "editor", AdminRole.Editor);
 
         Assert.Equal(
             AdminUserOutcome.Succeeded,
             await harness.Service.SetDisabledAsync(
-                admin.AdminUserId, invitation!.AdminUserId, isDisabled: true));
+                admin.Id, invitation!.AdminUserId, isDisabled: true));
 
         // **止めたのにパスワードを決められては困る**
         Assert.Equal(
@@ -205,7 +208,7 @@ public class AdminUserServiceTests
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
         var (_, invitation) = await harness.Service
-            .InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
+            .InviteAsync(admin.Id, "editor", AdminRole.Editor);
 
         Assert.Equal(
             AdminUserOutcome.WeakPassword,
@@ -217,13 +220,25 @@ public class AdminUserServiceTests
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
-        await harness.Service.InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
+        await harness.Service.InviteAsync(admin.Id, "editor", AdminRole.Editor);
 
         var (outcome, invitation) = await harness.Service
-            .InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
+            .InviteAsync(admin.Id, "editor", AdminRole.Editor);
 
         Assert.Equal(AdminUserOutcome.DuplicateLoginId, outcome);
         Assert.Null(invitation);
+    }
+
+    [Fact]
+    public async Task 同じログインIDは大文字小文字が違っても二度使えない()
+    {
+        var harness = Create();
+        var admin = await FirstAdministratorAsync(harness);
+        await harness.Service.InviteAsync(admin.Id, "Editor@Example.test", AdminRole.Editor);
+
+        var (outcome, _) = await harness.Service.InviteAsync(admin.Id, "editor@example.TEST", AdminRole.Editor);
+
+        Assert.Equal(AdminUserOutcome.DuplicateLoginId, outcome);
     }
 
     // ---- 締め出し事故を防ぐ ------------------------------------------------
@@ -233,13 +248,13 @@ public class AdminUserServiceTests
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
-        var editorId = await InviteAndAcceptAsync(harness, admin.AdminUserId, "editor", AdminRole.Editor);
+        var editorId = await InviteAndAcceptAsync(harness, admin.Id, "editor", AdminRole.Editor);
 
         // **Editor が何人居ても、管理者が居なくなれば誰も足せない**
-        var outcome = await harness.Service.SetDisabledAsync(editorId, admin.AdminUserId, isDisabled: true);
+        var outcome = await harness.Service.SetDisabledAsync(editorId, admin.Id, isDisabled: true);
 
         Assert.Equal(AdminUserOutcome.LastAdministrator, outcome);
-        Assert.False((await harness.Users.FindByIdAsync(admin.AdminUserId))!.IsDisabled);
+        Assert.False((await harness.Users.FindByIdAsync(admin.Id))!.IsDisabled);
     }
 
     [Fact]
@@ -247,12 +262,12 @@ public class AdminUserServiceTests
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
-        var editorId = await InviteAndAcceptAsync(harness, admin.AdminUserId, "editor", AdminRole.Editor);
+        var editorId = await InviteAndAcceptAsync(harness, admin.Id, "editor", AdminRole.Editor);
 
-        var outcome = await harness.Service.SetRoleAsync(editorId, admin.AdminUserId, AdminRole.Editor);
+        var outcome = await harness.Service.SetRoleAsync(editorId, admin.Id, AdminRole.Editor);
 
         Assert.Equal(AdminUserOutcome.LastAdministrator, outcome);
-        Assert.Equal(AdminRole.Administrator, (await harness.Users.FindByIdAsync(admin.AdminUserId))!.Role);
+        Assert.Equal(nameof(AdminRole.Administrator), (await harness.Users.FindByIdAsync(admin.Id))!.Role);
     }
 
     [Fact]
@@ -261,17 +276,17 @@ public class AdminUserServiceTests
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
         var secondId = await InviteAndAcceptAsync(
-            harness, admin.AdminUserId, "admin2", AdminRole.Administrator);
+            harness, admin.Id, "admin2", AdminRole.Administrator);
 
         // 2 人目を止める。**まだ 1 人目が居るので通る**
         Assert.Equal(
             AdminUserOutcome.Succeeded,
-            await harness.Service.SetDisabledAsync(admin.AdminUserId, secondId, isDisabled: true));
+            await harness.Service.SetDisabledAsync(admin.Id, secondId, isDisabled: true));
 
         // **止まっている 2 人目は当てにならない。** 1 人目は止められない
         Assert.Equal(
             AdminUserOutcome.LastAdministrator,
-            await harness.Service.SetDisabledAsync(secondId, admin.AdminUserId, isDisabled: true));
+            await harness.Service.SetDisabledAsync(secondId, admin.Id, isDisabled: true));
     }
 
     [Fact]
@@ -282,18 +297,18 @@ public class AdminUserServiceTests
 
         // 招待を受け取っただけで、まだ一度も入っていない管理者
         var secondId = await InviteAndAcceptAsync(
-            harness, admin.AdminUserId, "admin2", AdminRole.Administrator, signedIn: false);
+            harness, admin.Id, "admin2", AdminRole.Administrator, signedIn: false);
 
         // **当てにしない。** 本当に入れるかが分からないうちに最後の 1 人を止めさせない
         Assert.Equal(
             AdminUserOutcome.LastAdministrator,
-            await harness.Service.SetDisabledAsync(secondId, admin.AdminUserId, isDisabled: true));
+            await harness.Service.SetDisabledAsync(secondId, admin.Id, isDisabled: true));
 
         // 一度でも入れたなら、頼りにしてよい
         await harness.Users.RecordSuccessAsync(secondId);
         Assert.Equal(
             AdminUserOutcome.Succeeded,
-            await harness.Service.SetDisabledAsync(secondId, admin.AdminUserId, isDisabled: true));
+            await harness.Service.SetDisabledAsync(secondId, admin.Id, isDisabled: true));
     }
 
     [Fact]
@@ -302,18 +317,18 @@ public class AdminUserServiceTests
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
         var secondId = await InviteAndAcceptAsync(
-            harness, admin.AdminUserId, "admin2", AdminRole.Administrator);
+            harness, admin.Id, "admin2", AdminRole.Administrator);
 
-        var outcome = await harness.Service.SetDisabledAsync(secondId, admin.AdminUserId, isDisabled: true);
+        var outcome = await harness.Service.SetDisabledAsync(secondId, admin.Id, isDisabled: true);
 
         Assert.Equal(AdminUserOutcome.Succeeded, outcome);
-        Assert.True((await harness.Users.FindByIdAsync(admin.AdminUserId))!.IsDisabled);
+        Assert.True((await harness.Users.FindByIdAsync(admin.Id))!.IsDisabled);
 
         // **有効へ戻せる**
         Assert.Equal(
             AdminUserOutcome.Succeeded,
-            await harness.Service.SetDisabledAsync(secondId, admin.AdminUserId, isDisabled: false));
-        Assert.False((await harness.Users.FindByIdAsync(admin.AdminUserId))!.IsDisabled);
+            await harness.Service.SetDisabledAsync(secondId, admin.Id, isDisabled: false));
+        Assert.False((await harness.Users.FindByIdAsync(admin.Id))!.IsDisabled);
     }
 
     [Fact]
@@ -321,11 +336,11 @@ public class AdminUserServiceTests
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
-        await InviteAndAcceptAsync(harness, admin.AdminUserId, "admin2", AdminRole.Administrator);
+        await InviteAndAcceptAsync(harness, admin.Id, "admin2", AdminRole.Administrator);
 
         // 他に管理者が居ても、**自分は止めさせない**（自分では戻せない）
         var outcome = await harness.Service
-            .SetDisabledAsync(admin.AdminUserId, admin.AdminUserId, isDisabled: true);
+            .SetDisabledAsync(admin.Id, admin.Id, isDisabled: true);
 
         Assert.Equal(AdminUserOutcome.SelfNotAllowed, outcome);
     }
@@ -335,12 +350,47 @@ public class AdminUserServiceTests
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
-        await InviteAndAcceptAsync(harness, admin.AdminUserId, "admin2", AdminRole.Administrator);
+        await InviteAndAcceptAsync(harness, admin.Id, "admin2", AdminRole.Administrator);
 
         var outcome = await harness.Service
-            .SetRoleAsync(admin.AdminUserId, admin.AdminUserId, AdminRole.Editor);
+            .SetRoleAsync(admin.Id, admin.Id, AdminRole.Editor);
 
         Assert.Equal(AdminUserOutcome.SelfNotAllowed, outcome);
+    }
+
+    [Fact]
+    public async Task 役割を変えると相手のセッションはすべて失効し他人のものは残る()
+    {
+        var harness = Create();
+        var admin = await FirstAdministratorAsync(harness);
+        var secondId = await InviteAndAcceptAsync(
+            harness, admin.Id, "admin2", AdminRole.Administrator);
+        await harness.Sessions.CreateAsync(secondId, AdminSessionKinds.Session, TimeSpan.FromHours(8));
+        await harness.Sessions.CreateAsync(secondId, AdminSessionKinds.Pending, TimeSpan.FromMinutes(5));
+        var adminSession = await harness.Sessions.CreateAsync(admin.Id, AdminSessionKinds.Session, TimeSpan.FromHours(8));
+
+        var outcome = await harness.Service.SetRoleAsync(admin.Id, secondId, AdminRole.Editor);
+
+        // **降格した相手が、古い役割のまま操作を続けられない**（cookie はセッション ID だけで、役割を持たない）
+        Assert.Equal(AdminUserOutcome.Succeeded, outcome);
+        Assert.Empty(await harness.Sessions.ListForUserAsync(secondId));
+        Assert.Equal(1, harness.Sessions.Count);
+        Assert.NotNull(await harness.Sessions.FindAsync(adminSession));
+    }
+
+    [Fact]
+    public async Task 役割を変えられなかったときはセッションを失効させない()
+    {
+        var harness = Create();
+        var admin = await FirstAdministratorAsync(harness);
+        var editorId = await InviteAndAcceptAsync(harness, admin.Id, "editor", AdminRole.Editor);
+        var adminSession = await harness.Sessions.CreateAsync(admin.Id, AdminSessionKinds.Session, TimeSpan.FromHours(8));
+
+        // 最後の Administrator は降格できない
+        Assert.Equal(
+            AdminUserOutcome.LastAdministrator,
+            await harness.Service.SetRoleAsync(editorId, admin.Id, AdminRole.Editor));
+        Assert.NotNull(await harness.Sessions.FindAsync(adminSession));
     }
 
     [Fact]
@@ -348,13 +398,13 @@ public class AdminUserServiceTests
     {
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
-        var editorId = await InviteAndAcceptAsync(harness, admin.AdminUserId, "editor", AdminRole.Editor);
+        var editorId = await InviteAndAcceptAsync(harness, admin.Id, "editor", AdminRole.Editor);
 
         var outcome = await harness.Service
-            .SetRoleAsync(admin.AdminUserId, editorId, AdminRole.Administrator);
+            .SetRoleAsync(admin.Id, editorId, AdminRole.Administrator);
 
         Assert.Equal(AdminUserOutcome.Succeeded, outcome);
-        Assert.Equal(AdminRole.Administrator, (await harness.Users.FindByIdAsync(editorId))!.Role);
+        Assert.Equal(nameof(AdminRole.Administrator), (await harness.Users.FindByIdAsync(editorId))!.Role);
     }
 
     // ---- 一覧 --------------------------------------------------------------
@@ -365,7 +415,7 @@ public class AdminUserServiceTests
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
         var (_, invitation) = await harness.Service
-            .InviteAsync(admin.AdminUserId, "editor", AdminRole.Editor);
+            .InviteAsync(admin.Id, "editor", AdminRole.Editor);
 
         var invited = (await harness.Service.ListAsync())
             .Single(user => user.AdminUserId == invitation!.AdminUserId);
@@ -394,7 +444,7 @@ public class AdminUserServiceTests
         var admin = await FirstAdministratorAsync(harness);
 
         var outcome = await harness.Service
-            .ChangeOwnPasswordAsync(admin.AdminUserId, Password, AnotherPassword);
+            .ChangeOwnPasswordAsync(admin.Id, Password, AnotherPassword);
 
         Assert.Equal(AdminUserOutcome.Succeeded, outcome);
         Assert.Equal(
@@ -412,7 +462,7 @@ public class AdminUserServiceTests
         var admin = await FirstAdministratorAsync(harness);
 
         var outcome = await harness.Service
-            .ChangeOwnPasswordAsync(admin.AdminUserId, "wrong-password", AnotherPassword);
+            .ChangeOwnPasswordAsync(admin.Id, "wrong-password", AnotherPassword);
 
         Assert.Equal(AdminUserOutcome.PasswordRejected, outcome);
         Assert.Equal(
@@ -428,7 +478,7 @@ public class AdminUserServiceTests
 
         Assert.Equal(
             AdminUserOutcome.WeakPassword,
-            await harness.Service.ChangeOwnPasswordAsync(admin.AdminUserId, Password, "short"));
+            await harness.Service.ChangeOwnPasswordAsync(admin.Id, Password, "short"));
     }
 
     [Fact]
@@ -439,7 +489,7 @@ public class AdminUserServiceTests
 
         Assert.Equal(
             AdminUserOutcome.InvalidInput,
-            await harness.Service.ChangeOwnPasswordAsync(admin.AdminUserId, Password, Password));
+            await harness.Service.ChangeOwnPasswordAsync(admin.Id, Password, Password));
     }
 
     [Fact]
@@ -454,12 +504,12 @@ public class AdminUserServiceTests
             Assert.Equal(
                 AdminUserOutcome.PasswordRejected,
                 await harness.Service.ChangeOwnPasswordAsync(
-                    admin.AdminUserId, "wrong-password", AnotherPassword));
+                    admin.Id, "wrong-password", AnotherPassword));
         }
 
         Assert.Equal(
             AdminUserOutcome.LockedOut,
-            await harness.Service.ChangeOwnPasswordAsync(admin.AdminUserId, Password, AnotherPassword));
+            await harness.Service.ChangeOwnPasswordAsync(admin.Id, Password, AnotherPassword));
     }
 
     [Fact]
@@ -471,10 +521,10 @@ public class AdminUserServiceTests
         // **画面を奪われただけで 2 要素を差し替えられないようにする関門**
         Assert.Equal(
             AdminUserOutcome.PasswordRejected,
-            await harness.Service.ConfirmOwnPasswordAsync(admin.AdminUserId, "wrong-password"));
+            await harness.Service.ConfirmOwnPasswordAsync(admin.Id, "wrong-password"));
 
         Assert.Equal(
             AdminUserOutcome.Succeeded,
-            await harness.Service.ConfirmOwnPasswordAsync(admin.AdminUserId, Password));
+            await harness.Service.ConfirmOwnPasswordAsync(admin.Id, Password));
     }
 }

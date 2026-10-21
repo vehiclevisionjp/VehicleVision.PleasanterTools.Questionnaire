@@ -32,6 +32,15 @@ public enum FlowProblemCode
 
     /// <summary>表示条件が、その設問に無い選択肢の値を見ている。**永久に成立しない。**</summary>
     UnknownChoiceValue,
+
+    /// <summary>任意リンクの URL が許可された方式ではない。</summary>
+    InvalidButtonUrl,
+
+    /// <summary>任意リンクの識別子が同じページで重複している。</summary>
+    DuplicateButtonId,
+
+    /// <summary>同じ条件で全釦が隠れ、操作できなくなる回答がある。</summary>
+    AllButtonsMayBeHidden,
 }
 
 /// <summary>分岐の不備 1 件。</summary>
@@ -171,6 +180,7 @@ public static class SurveyFlowValidator
             .Select((question, index) => (question.QuestionId, index))
             .ToDictionary(entry => entry.QuestionId, entry => entry.index, StringComparer.Ordinal);
 
+        var questionsBeforePage = 0;
         foreach (var page in definition.Pages)
         {
             foreach (var question in page.Questions)
@@ -182,16 +192,32 @@ public static class SurveyFlowValidator
 
                 foreach (var rule in condition.Rules)
                 {
-                    ValidateRule(rule, question, page, byId, position, problems);
+                    ValidateRule(
+                        rule,
+                        page,
+                        question.QuestionId,
+                        position[question.QuestionId],
+                        byId,
+                        position,
+                        problems);
                 }
             }
+
+            ValidateButtonConditions(
+                page,
+                questionsBeforePage + page.Questions.Length,
+                byId,
+                position,
+                problems);
+            questionsBeforePage += page.Questions.Length;
         }
     }
 
     private static void ValidateRule(
         ConditionRule rule,
-        Question question,
         Page page,
+        string ownerId,
+        int ownerPosition,
         IReadOnlyDictionary<string, Question> byId,
         IReadOnlyDictionary<string, int> position,
         ImmutableArray<FlowProblem>.Builder problems)
@@ -201,18 +227,18 @@ public static class SurveyFlowValidator
             problems.Add(new FlowProblem(
                 FlowProblemCode.UnknownConditionQuestion,
                 page.PageId,
-                question.QuestionId,
+                ownerId,
                 rule.QuestionId));
             return;
         }
 
         // **後ろを見る条件は成立しようがない。** その時点でまだ答えていない
-        if (position[rule.QuestionId] >= position[question.QuestionId])
+        if (position[rule.QuestionId] >= ownerPosition)
         {
             problems.Add(new FlowProblem(
                 FlowProblemCode.ForwardConditionReference,
                 page.PageId,
-                question.QuestionId,
+                ownerId,
                 rule.QuestionId));
             return;
         }
@@ -228,10 +254,93 @@ public static class SurveyFlowValidator
             problems.Add(new FlowProblem(
                 FlowProblemCode.UnknownChoiceValue,
                 page.PageId,
-                question.QuestionId,
+                ownerId,
                 value));
         }
     }
+
+    private static void ValidateButtonConditions(
+        Page page,
+        int ownerPosition,
+        IReadOnlyDictionary<string, Question> byId,
+        IReadOnlyDictionary<string, int> position,
+        ImmutableArray<FlowProblem>.Builder problems)
+    {
+        if (page.Buttons is not { } buttons)
+        {
+            return;
+        }
+
+        var conditions = new List<(string Owner, VisibilityCondition? Condition)>
+        {
+            ("button:submit:visible", buttons.Submit?.VisibleWhen),
+            ("button:submit:enabled", buttons.Submit?.EnabledWhen),
+            ("button:next:visible", buttons.Next?.VisibleWhen),
+            ("button:next:enabled", buttons.Next?.EnabledWhen),
+            ("button:previous:visible", buttons.Previous?.VisibleWhen),
+            ("button:previous:enabled", buttons.Previous?.EnabledWhen),
+        };
+
+        conditions.AddRange(buttons.Links.SelectMany(link => new[]
+        {
+            ($"button:{link.ButtonId}:visible", link.VisibleWhen),
+            ($"button:{link.ButtonId}:enabled", link.EnabledWhen),
+        }));
+
+        foreach (var (owner, condition) in conditions)
+        {
+            foreach (var rule in condition?.Rules ?? [])
+            {
+                ValidateRule(
+                    rule, page, owner, ownerPosition, byId, position, problems);
+            }
+        }
+
+        foreach (var link in buttons.Links.Where(link => !link.HasAllowedUrl))
+        {
+            problems.Add(new FlowProblem(
+                FlowProblemCode.InvalidButtonUrl,
+                page.PageId,
+                $"button:{link.ButtonId}",
+                link.Url));
+        }
+
+        foreach (var duplicate in buttons.Links
+                     .GroupBy(link => link.ButtonId, StringComparer.Ordinal)
+                     .Where(group => group.Count() > 1))
+        {
+            problems.Add(new FlowProblem(
+                FlowProblemCode.DuplicateButtonId,
+                page.PageId,
+                Detail: duplicate.Key));
+        }
+
+        var visibleConditions = new[]
+            {
+                buttons.Submit?.VisibleWhen,
+                buttons.Next?.VisibleWhen,
+                buttons.Previous?.VisibleWhen,
+            }
+            .Concat(buttons.Links.Select(link => link.VisibleWhen))
+            .ToList();
+
+        if (visibleConditions.Count > 0
+            && visibleConditions.All(condition => condition is { IsEmpty: false })
+            && visibleConditions.Skip(1).All(
+                condition => SameCondition(visibleConditions[0]!, condition!)))
+        {
+            problems.Add(new FlowProblem(
+                FlowProblemCode.AllButtonsMayBeHidden,
+                page.PageId));
+        }
+
+    }
+
+    private static bool SameCondition(
+        VisibilityCondition left,
+        VisibilityCondition right) =>
+        left.Match == right.Match
+        && left.Rules.SequenceEqual(right.Rules);
 
     // ---- 到達できるか -------------------------------------------------------
 

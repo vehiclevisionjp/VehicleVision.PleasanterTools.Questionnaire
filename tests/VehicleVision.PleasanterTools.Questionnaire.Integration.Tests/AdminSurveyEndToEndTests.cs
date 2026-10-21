@@ -46,8 +46,7 @@ public class AdminSurveyEndToEndTests
         await using (var connection = E2EDatabase.AppFactory().Create())
         {
             await connection.OpenAsync();
-            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"));
-            await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"));
+            await AdminTestSupport.ClearAdministratorsAsync(connection, E2EDatabase.Provider);
         }
 
         var http = CreateClient();
@@ -305,7 +304,7 @@ public class AdminSurveyEndToEndTests
         // **見たいのは消えたときの 1 行**なので、値を載せている行を選ぶ
         var details = (await connection.QueryAsync<string>(
             E2EDatabase.Sql(
-                "SELECT [DetailJson] FROM [AuditLogs] "
+                "SELECT [DetailJson] FROM [Core_AuditLogs] "
                 + "WHERE [Action] = @Action AND [TargetId] = @TargetId"),
             new
             {

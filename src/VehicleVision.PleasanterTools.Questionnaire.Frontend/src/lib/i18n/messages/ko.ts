@@ -43,6 +43,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'form.next': '다음',
   'form.submit': '제출',
   'form.submitting': '제출하는 중…',
+  'form.buttonDisabled': '조건을 충족하지 않아 누를 수 없습니다',
   'form.languageLabel': '언어',
   'form.trapLabel': '이 칸에는 입력하지 마세요',
   'readability.group': '가독성',
@@ -146,5 +147,6 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'serverValidation.PatternMismatch': '지정된 형식으로 입력하세요',
   'serverValidation.TooLarge': '제출 내용이 너무 큽니다',
   'serverValidation.ScannerUnavailable': '첨부 파일을 검사할 수 없어 지금은 접수할 수 없습니다',
+  'serverValidation.SubmitButtonConditionNotMet': '제출 조건을 충족하지 않았습니다',
   'serverValidation.unknown': '입력 내용을 확인하세요',
 };
