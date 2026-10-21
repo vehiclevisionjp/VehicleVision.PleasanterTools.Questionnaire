@@ -68,7 +68,7 @@ public static class AdminPleasanterSsoEndpoints
 
             // **最初の管理者を Pleasanter から作らせない。** 誰でも全権を取れてしまう
             // （SAML の釦を最初の管理者を作る画面に出さないのと同じ理由）
-            if (await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false))
+            if (await store.CountAsync(cancellationToken).ConfigureAwait(false) == 0)
             {
                 AuditNotes.Add(context, "result", "setup-required");
                 return Results.Conflict(new { code = "setup-required" });
@@ -113,32 +113,26 @@ public static class AdminPleasanterSsoEndpoints
                 AuditNotes.Add(context, "pleasanterSsoRegistered", "true");
             }
 
-            var claims = PleasanterSsoClaims.Create(identity, timeProvider.GetUtcNow());
+            var sso = new SessionSso(Pleasanter: PleasanterSsoClaims.Keys(identity, timeProvider.GetUtcNow()));
 
             switch (result.Outcome)
             {
                 case PleasanterSsoSignInOutcome.SignedIn:
                     AuditNotes.Add(context, "result", "signed-in");
-                    await AdminAuthEndpoints.SignInSessionAsync(
-                        context,
-                        result.User!,
-                        extraClaims: claims,
-                        method: AdminLoginMethod.PleasanterSso)
+                    await AdminAuthEndpoints.SignInSessionAsync(context, result.User!.Id, sso)
                         .ConfigureAwait(false);
                     return Results.Ok(new { status = "signedIn", next = "done" });
 
                 case PleasanterSsoSignInOutcome.NeedsSecondFactor:
                     // **本アプリで 2 要素を登録済みなら通す**（SAML と同じ）
                     AuditNotes.Add(context, "result", "second-factor");
-                    await AdminAuthEndpoints.SignInPendingAsync(
-                        context, result.User!, secret: null, claims, AdminLoginMethod.PleasanterSso)
+                    await AdminAuthEndpoints.SignInPendingAsync(context, result.User!.Id, sso)
                         .ConfigureAwait(false);
                     return Results.Ok(new { status = "signedIn", next = "totp" });
 
                 case PleasanterSsoSignInOutcome.NeedsTotpEnrollment:
                     AuditNotes.Add(context, "result", "enroll");
-                    await AdminAuthEndpoints.SignInPendingAsync(
-                        context, result.User!, secret: null, claims, AdminLoginMethod.PleasanterSso)
+                    await AdminAuthEndpoints.SignInPendingAsync(context, result.User!.Id, sso)
                         .ConfigureAwait(false);
                     return Results.Ok(new { status = "signedIn", next = "enroll" });
 
@@ -242,8 +236,8 @@ public static class AdminPleasanterSsoEndpoints
                 });
             }
 
-            var matched = await store.FindByLoginIdAsync(identity.LoginId, cancellationToken)
-                .ConfigureAwait(false);
+            var matched = (await store.FindForLoginAsync(identity.LoginId, cancellationToken)
+                .ConfigureAwait(false))?.User;
             return Results.Ok(new
             {
                 status = verification.Status.ToString(),

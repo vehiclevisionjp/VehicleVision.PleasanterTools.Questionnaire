@@ -239,7 +239,7 @@ public sealed class AuditLogRetentionService(
                 if (adminSessions is not null)
                 {
                     var expiredSessions = await adminSessions
-                        .DeleteExpiredAsync(_time.GetUtcNow().UtcDateTime, stoppingToken)
+                        .DeleteExpiredAsync(stoppingToken)
                         .ConfigureAwait(false);
                     if (expiredSessions > 0)
                     {

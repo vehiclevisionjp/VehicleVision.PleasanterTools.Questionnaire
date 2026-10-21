@@ -1,5 +1,4 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using StackExchange.Redis;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
@@ -15,8 +14,10 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// 「止め忘れを見つけて止める」ことに意味を持たせるには、止めた瞬間に効く必要がある。
 /// </para>
 /// <para>
-/// **役割の食い違いでも追い出す。** 降格した相手が、
-/// 古い cookie に載った <see cref="AdminRole.Administrator"/> のまま操作を続けられては困る。
+/// **役割の変更でも追い出す。** 降格した相手が、
+/// 古い <see cref="AdminRole.Administrator"/> のまま操作を続けられては困る。
+/// 役割は要求のたびに利用者の表から読み直し（<see cref="AdminSessionManager"/>）、
+/// 役割を変えたときは持ち主のセッションを失効させる（<see cref="AdminUserService.SetRoleAsync"/>）。
 /// </para>
 /// <para>
 /// 要求ごとに 1 回だけ DB を引く（認証の結果は要求の中で使い回される）。
@@ -26,24 +27,24 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 public static class AdminSessionGuard
 {
     public static async Task ValidateAsync(CookieValidatePrincipalContext context)
-        => await ValidateAsync(context, AdminSessionKind.Session).ConfigureAwait(false);
+        => await ValidateAsync(context, AdminSessionKinds.Session).ConfigureAwait(false);
 
     public static async Task ValidatePendingAsync(CookieValidatePrincipalContext context)
-        => await ValidateAsync(context, AdminSessionKind.Pending).ConfigureAwait(false);
+        => await ValidateAsync(context, AdminSessionKinds.Pending).ConfigureAwait(false);
 
     public static async Task ValidateReenrollAsync(CookieValidatePrincipalContext context)
-        => await ValidateAsync(context, AdminSessionKind.Reenroll).ConfigureAwait(false);
+        => await ValidateAsync(context, QuestionnaireSessionKinds.Reenroll).ConfigureAwait(false);
 
     private static async Task ValidateAsync(
         CookieValidatePrincipalContext context,
-        AdminSessionKind kind)
+        string kind)
     {
         var manager = context.HttpContext.RequestServices.GetRequiredService<AdminSessionManager>();
-        (AdminSessionEntry Entry, ClaimsPrincipal Principal)? restored;
+        RestoredAdminSession? restored;
         try
         {
             restored = await manager
-                .FindAsync(context.Principal, kind, context.HttpContext.RequestAborted)
+                .FindAsync(context.Principal, kind, context.Scheme.Name, context.HttpContext.RequestAborted)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -76,35 +77,23 @@ public static class AdminSessionGuard
             return;
         }
 
-        var principal = restored.Value.Principal;
-        if (!Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var adminUserId)
-            || adminUserId != restored.Value.Entry.AdminUserId)
-        {
-            await RejectAsync(context).ConfigureAwait(false);
-            return;
-        }
+        var sessions = context.HttpContext.RequestServices.GetRequiredService<IAdminSessionStore>();
+        var user = restored.User;
 
-        var store = context.HttpContext.RequestServices.GetRequiredService<IAdminUserStore>();
-        var user = await store.FindByIdAsync(adminUserId, context.HttpContext.RequestAborted)
-            .ConfigureAwait(false);
-
-        if (user is null
-            || user.IsDisabled
-            || !string.Equals(
-                principal!.FindFirstValue(ClaimTypes.Role),
-                user.Role.ToString(),
-                StringComparison.Ordinal))
+        // **止めた人は、その場で追い出す。** 持ち主が居ない場合も同じ
+        if (user is null || user.IsDisabled)
         {
-            await context.HttpContext.RequestServices.GetRequiredService<IAdminSessionStore>()
-                .DeleteAsync(restored.Value.Entry.AdminSessionId, context.HttpContext.RequestAborted)
+            await sessions.DeleteAsync(restored.SessionId, context.HttpContext.RequestAborted)
                 .ConfigureAwait(false);
             await RejectAsync(context).ConfigureAwait(false);
             return;
         }
 
+        var principal = restored.Principal;
+
         // **Pleasanter のログインで入った人は、一定間隔で Pleasanter に確かめ直す**（Issue #464）。
         // Pleasanter でログアウト・無効化された人を、本アプリに残さない
-        if (kind == AdminSessionKind.Session
+        if (kind == AdminSessionKinds.Session
             && context.HttpContext.RequestServices.GetService<PleasanterSsoSessionRevalidator>()
                 is { } revalidator)
         {
@@ -112,7 +101,7 @@ public static class AdminSessionGuard
                 .RevalidateAsync(
                     context.HttpContext,
                     principal,
-                    restored.Value.Entry.AdminSessionId,
+                    restored.Handle,
                     context.HttpContext.RequestAborted)
                 .ConfigureAwait(false);
 
@@ -125,8 +114,7 @@ public static class AdminSessionGuard
                     context.HttpContext.Items[PleasanterSsoSessionRevalidator.UpstreamErrorItemKey] = true;
                 }
 
-                await context.HttpContext.RequestServices.GetRequiredService<IAdminSessionStore>()
-                    .DeleteAsync(restored.Value.Entry.AdminSessionId, context.HttpContext.RequestAborted)
+                await sessions.DeleteAsync(restored.SessionId, context.HttpContext.RequestAborted)
                     .ConfigureAwait(false);
                 await RejectAsync(context).ConfigureAwait(false);
                 return;

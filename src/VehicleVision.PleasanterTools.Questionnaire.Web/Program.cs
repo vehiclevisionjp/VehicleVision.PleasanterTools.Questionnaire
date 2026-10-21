@@ -348,20 +348,30 @@ var secretKey = builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
     ?? throw new InvalidOperationException(
         "QUESTIONNAIRE_SECRET_KEY が設定されていない（Base64 の 32 バイト）");
 
-builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
+// **管理者・復旧コード・セッションは Core.Data の共有ストア**（Core_AdminUsers ほか）。
+// TOTP の共有鍵の暗号化は、本アプリの SecretProtector を ISecretCipher に合わせたアダプタで渡す
+// （文脈は Core が <appId>:totp:<管理者 ID> で組む）。アンケート固有の設定は AdminUserSettingsStore
+builder.Services.AddSingleton<ISecretCipher, SecretCipherAdapter>();
+builder.Services.AddSingleton<IAdminUserStore>(serviceProvider => new AdminUserStore(
+    serviceProvider.GetRequiredService<IDbConnectionFactory>(),
+    serviceProvider.GetRequiredService<ISecretCipher>(),
+    serviceProvider.GetRequiredService<TimeProvider>(),
+    QuestionnaireDatabase.Instance.AppId));
+builder.Services.AddSingleton<IAdminUserSettingsStore, AdminUserSettingsStore>();
 builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
 
 // **既定は DB。** 追加の基盤なしで、個別失効と端末一覧を使えるようにする。
 // 大規模構成では Redis を選べるが、停止時に cookie だけで通すことはしない。
 if (string.Equals(sessionStoreKind, "Database", StringComparison.OrdinalIgnoreCase))
 {
-    builder.Services.AddSingleton<IAdminSessionStore, DatabaseAdminSessionStore>();
+    builder.Services.AddSingleton<IAdminSessionStore, AdminSessionStore>();
 }
 else if (string.Equals(sessionStoreKind, "Redis", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<IAdminSessionStore>(serviceProvider =>
         new RedisAdminSessionStore(
             serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
+            serviceProvider.GetRequiredService<TimeProvider>(),
             builder.Configuration["QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX"]
                 ?? "questionnaire:admin-session:"));
 }

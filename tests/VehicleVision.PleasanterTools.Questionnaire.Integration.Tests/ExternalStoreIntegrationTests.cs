@@ -94,7 +94,7 @@ public class ExternalStoreIntegrationTests
     }
 
     [Fact]
-    public async Task Valkeyのセッションは削除すると再取得できない()
+    public async Task Valkeyのセッションは作成から失効まで通る()
     {
         var connectionString =
             Environment.GetEnvironmentVariable("QUESTIONNAIRE_VALKEY_CONNECTIONSTRING");
@@ -105,37 +105,81 @@ public class ExternalStoreIntegrationTests
 
         await using var connection = await ConnectionMultiplexer.ConnectAsync(connectionString);
         var prefix = $"questionnaire:test:{Guid.NewGuid():N}:";
-        var store = new RedisAdminSessionStore(connection, prefix);
-        var entry = new AdminSessionEntry
-        {
-            AdminSessionId = Guid.NewGuid(),
-            AdminUserId = Guid.NewGuid(),
-            Kind = AdminSessionKind.Session,
-            ProtectedPayload = "protected",
-            CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
-            IpAddress = "192.0.2.1",
-            UserAgent = "integration-test",
-            LoginMethod = AdminLoginMethod.PleasanterSso,
-        };
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(DateTimeOffset.UtcNow);
+        var store = new RedisAdminSessionStore(connection, time, prefix);
+        var userId = Guid.NewGuid();
+        var sso = new SessionSso(
+            new SamlSessionKeys("name-id", "index-1"),
+            new PleasanterSsoKeys(1, 7, time.GetUtcNow().AddMinutes(-1)));
 
         try
         {
-            await store.CreateAsync(entry);
-            Assert.Equal(entry, await store.FindAsync(entry.AdminSessionId));
+            var id = await store.CreateAsync(
+                userId, AdminSessionKinds.Session, TimeSpan.FromMinutes(5),
+                ipAddress: "192.0.2.1", userAgent: "integration-test", sso: sso);
+            var pendingId = await store.CreateAsync(userId, AdminSessionKinds.Pending, TimeSpan.FromMinutes(5));
 
-            Assert.True(await store.DeleteAsync(entry.AdminSessionId));
-            Assert.Null(await store.FindAsync(entry.AdminSessionId));
-            Assert.Empty(await store.ListAsync(entry.AdminUserId));
+            // ID の現物ではなく SHA-256 が識別子
+            Assert.NotEqual(id, store.HandleOf(id));
+            Assert.Equal(64, store.HandleOf(id).Length);
+
+            var found = await store.FindAsync(id);
+            Assert.Equal(userId, found!.UserId);
+            Assert.Equal(AdminSessionKinds.Session, found.Kind);
+            Assert.Equal(7, found.Pleasanter!.UserId);
+            Assert.Equal(AdminSessionKinds.Pending, (await store.FindAsync(pendingId))!.Kind);
+
+            var keys = await store.GetSamlKeysAsync(id);
+            Assert.Equal(new SamlSessionKeys("name-id", "index-1"), keys);
+
+            // 一覧は Session だけ（途中状態は出ない）
+            var listed = Assert.Single(await store.ListForUserAsync(userId));
+            Assert.Equal(store.HandleOf(id), listed.Handle);
+            Assert.Equal(SessionVia.Saml, listed.Via);
+            Assert.Equal("192.0.2.1", listed.IpAddress);
+
+            // Pleasanter の確認時刻の更新は、寿命を変えない
+            var verified = time.GetUtcNow();
+            await store.TouchPleasanterVerifiedAsync(id, verified);
+            Assert.Equal(verified.ToUnixTimeSeconds(), (await store.FindAsync(id))!.Pleasanter!.VerifiedAt.ToUnixTimeSeconds());
+            var ttl = await connection.GetDatabase().KeyTimeToLiveAsync($"{prefix}entry:{store.HandleOf(id)}");
+            Assert.InRange(ttl!.Value.TotalSeconds, 200, 300);
+
+            // 他人の識別子では消えない。持ち主の組なら消える
+            Assert.False(await store.DeleteByHandleAsync(Guid.NewGuid(), store.HandleOf(id)));
+            Assert.NotNull(await store.FindAsync(id));
+            Assert.True(await store.DeleteByHandleAsync(userId, store.HandleOf(id)));
+            Assert.Null(await store.FindAsync(id));
+            Assert.Empty(await store.ListForUserAsync(userId));
+
+            // SAML の鍵での失効
+            var second = await store.CreateAsync(
+                userId, AdminSessionKinds.Session, TimeSpan.FromMinutes(5),
+                sso: new SessionSso(Saml: new SamlSessionKeys("name-id", "index-2")));
+            Assert.Equal(0, await store.DeleteBySamlKeysAsync("name-id", "no-such-index"));
+            Assert.Equal(1, await store.DeleteBySamlKeysAsync("name-id", "index-2"));
+            Assert.Null(await store.FindAsync(second));
+
+            // 一括失効（いまの 1 つだけ残す）
+            var keep = await store.CreateAsync(userId, AdminSessionKinds.Session, TimeSpan.FromMinutes(5));
+            var other = await store.CreateAsync(userId, AdminSessionKinds.Session, TimeSpan.FromMinutes(5));
+            await store.DeleteForUserAsync(userId, keep);
+            Assert.NotNull(await store.FindAsync(keep));
+            Assert.Null(await store.FindAsync(other));
+            Assert.Null(await store.FindAsync(pendingId));
+
+            // 期限を過ぎたものは見つからない
+            time.Advance(TimeSpan.FromMinutes(6));
+            Assert.Null(await store.FindAsync(keep));
+            Assert.Empty(await store.ListForUserAsync(userId));
         }
         finally
         {
             var database = connection.GetDatabase();
-            await database.KeyDeleteAsync(
-            [
-                $"{prefix}{entry.AdminSessionId:N}",
-                $"{prefix}user:{entry.AdminUserId:N}",
-            ]);
+            foreach (var key in connection.GetServer(connection.GetEndPoints()[0]).Keys(pattern: prefix + "*"))
+            {
+                await database.KeyDeleteAsync(key);
+            }
         }
     }
 

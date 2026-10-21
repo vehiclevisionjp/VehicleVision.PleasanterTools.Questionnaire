@@ -25,9 +25,6 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// </remarks>
 public static class AdminAuthEndpoints
 {
-    /// <summary>途中状態に入れておく共有鍵の claim。</summary>
-    private const string EnrollmentSecretClaim = "questionnaire:totp_enrollment_secret";
-
     /// <summary>段階を問わず同じ文言を返す。</summary>
     private static string InvalidMessage(HttpContext context) =>
         ServerMessages.Get(ServerMessageKeys.InvalidCredentials, RequestLanguage.Of(context));
@@ -45,6 +42,7 @@ public static class AdminAuthEndpoints
         group.MapGet("/session", async (
             HttpContext context,
             IAdminUserStore store,
+            IAdminUserSettingsStore userSettings,
             ISamlOptionsProvider samlProvider,
             IPleasanterSsoOptionsProvider pleasanterSsoProvider,
             AdminPasswordSignInPolicy passwordSignIn,
@@ -53,7 +51,7 @@ public static class AdminAuthEndpoints
             IMailSettingsProvider mailSettings,
             CancellationToken cancellationToken) =>
         {
-            var setupRequired = await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false);
+            var setupRequired = await store.CountAsync(cancellationToken).ConfigureAwait(false) == 0;
             var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
             var pleasanterSso = (await pleasanterSsoProvider.GetAsync(cancellationToken).ConfigureAwait(false))
                 .Options;
@@ -89,8 +87,10 @@ public static class AdminAuthEndpoints
                     var user = await store.FindByIdAsync(sessionUserId, cancellationToken)
                         .ConfigureAwait(false);
                     language = SupportedLanguages.Normalize(user?.Language);
-                    hasTotp = user?.HasTotp ?? false;
-                    responseNotificationEnabled = user?.ResponseNotificationEnabled ?? false;
+                    hasTotp = user?.TotpEnabled ?? false;
+                    responseNotificationEnabled = await userSettings
+                        .GetResponseNotificationEnabledAsync(sessionUserId, cancellationToken)
+                        .ConfigureAwait(false);
                 }
 
                 var role = session.Principal?.FindFirstValue(ClaimTypes.Role);
@@ -170,7 +170,7 @@ public static class AdminAuthEndpoints
             {
                 var user = await store.FindByIdAsync(pendingUserId, cancellationToken)
                     .ConfigureAwait(false);
-                needsEnrollment = user is not null && !user.HasTotp;
+                needsEnrollment = user is not null && !user.TotpEnabled;
             }
 
             return Results.Ok(new
@@ -252,13 +252,13 @@ public static class AdminAuthEndpoints
             if (options.TwoFactor is not TwoFactorPolicy.Required)
             {
                 await authenticator
-                    .RecordSignInAsync(created.AdminUserId, cancellationToken)
+                    .RecordSignInAsync(created.Id, cancellationToken)
                     .ConfigureAwait(false);
-                await SignInSessionAsync(context, created).ConfigureAwait(false);
+                await SignInSessionAsync(context, created.Id).ConfigureAwait(false);
                 return Results.Ok(new { next = "done" });
             }
 
-            await SignInPendingAsync(context, created, secret: null).ConfigureAwait(false);
+            await SignInPendingAsync(context, created.Id).ConfigureAwait(false);
             return Results.Ok(new { next = "enroll" });
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
@@ -301,19 +301,19 @@ public static class AdminAuthEndpoints
             switch (result.Outcome)
             {
                 case PasswordOutcome.NeedsSecondFactor:
-                    await SignInPendingAsync(context, result.User!, secret: null).ConfigureAwait(false);
+                    await SignInPendingAsync(context, result.User!.Id).ConfigureAwait(false);
                     return Results.Ok(new { next = "totp" });
 
                 case PasswordOutcome.NeedsTotpEnrollment:
-                    await SignInPendingAsync(context, result.User!, secret: null).ConfigureAwait(false);
+                    await SignInPendingAsync(context, result.User!.Id).ConfigureAwait(false);
                     return Results.Ok(new { next = "enroll" });
 
                 case PasswordOutcome.SignedIn:
                     // **2 要素を求めない設定で、未登録の相手。** そのまま入れる（Issue #154）
                     await authenticator
-                        .RecordSignInAsync(result.User!.AdminUserId, cancellationToken)
+                        .RecordSignInAsync(result.User!.Id, cancellationToken)
                         .ConfigureAwait(false);
-                    await SignInSessionAsync(context, result.User!).ConfigureAwait(false);
+                    await SignInSessionAsync(context, result.User!.Id).ConfigureAwait(false);
                     return Results.Ok(new { next = "done" });
 
                 case PasswordOutcome.LockedOut:
@@ -340,10 +340,13 @@ public static class AdminAuthEndpoints
         group.MapPost("/enroll/begin", async (
             HttpContext context,
             AdminAuthenticator authenticator,
-            AdminAuthOptions options) =>
+            AdminAuthOptions options,
+            CancellationToken cancellationToken) =>
         {
             var pending = await context.AuthenticateAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
-            if (!pending.Succeeded || pending.Principal?.Identity?.Name is not { } loginId)
+            if (!pending.Succeeded
+                || pending.Principal?.Identity?.Name is not { } loginId
+                || !Guid.TryParse(pending.Principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             {
                 return Results.Unauthorized();
             }
@@ -358,16 +361,15 @@ public static class AdminAuthEndpoints
                 });
             }
 
-            var enrollment = authenticator.BeginTotpEnrollment(loginId);
-
-            // **共有鍵は途中状態の側に持たせる。** 画面から送り返させると差し替えられる
-            // **Pleasanter のログインで来た印も引き継ぐ**（Issue #464）。落とすと再検証から外れる
-            await SignInPendingAsync(
-                    context,
-                    ReadPending(pending.Principal),
-                    enrollment.SecretBase32,
-                    PleasanterSsoClaims.Carry(pending.Principal))
+            // **共有鍵はサーバ側に持たせる**（「登録の途中の鍵」として、暗号化して DB に置く）。
+            // 画面から送り返させると差し替えられる
+            var enrollment = await authenticator
+                .BeginTotpEnrollmentAsync(userId, loginId, cancellationToken)
                 .ConfigureAwait(false);
+
+            // **途中状態を張り直す**（登録の手順を終えるまでの時間を、ここから数え直す）。
+            // **Pleasanter・SAML のログインで来た印も引き継ぐ**（Issue #464）。落とすと再検証から外れる
+            await SignInPendingAsync(context, userId, SsoOf(pending.Principal)).ConfigureAwait(false);
 
             return Results.Ok(new { secret = enrollment.SecretBase32, uri = enrollment.OtpAuthUri });
         });
@@ -385,7 +387,12 @@ public static class AdminAuthEndpoints
                 return Results.Unauthorized();
             }
 
-            var secret = pending.Principal.FindFirstValue(EnrollmentSecretClaim);
+            var user = ReadPending(pending.Principal);
+
+            // **登録の途中の鍵はサーバ側にある。** 無ければ（始めていない・壊れている）、やり直させる
+            var secret = await authenticator
+                .GetPendingEnrollmentSecretAsync(user.UserId, cancellationToken)
+                .ConfigureAwait(false);
             if (string.IsNullOrEmpty(secret))
             {
                 return Results.BadRequest(new
@@ -404,9 +411,8 @@ public static class AdminAuthEndpoints
                 });
             }
 
-            var user = ReadPending(pending.Principal);
             var codes = await authenticator
-                .CompleteTotpEnrollmentAsync(user.AdminUserId, secret, request.Code ?? string.Empty, cancellationToken)
+                .CompleteTotpEnrollmentAsync(user.UserId, secret, request.Code ?? string.Empty, cancellationToken)
                 .ConfigureAwait(false);
 
             if (codes is null)
@@ -420,12 +426,7 @@ public static class AdminAuthEndpoints
                     statusCode: StatusCodes.Status401Unauthorized);
             }
 
-            await SignInSessionAsync(
-                    context,
-                    user,
-                    extraClaims: PleasanterSsoClaims.Carry(pending.Principal),
-                    method: LoginMethodOf(pending.Principal))
-                .ConfigureAwait(false);
+            await SignInSessionAsync(context, user.UserId, SsoOf(pending.Principal)).ConfigureAwait(false);
 
             // **復旧コードを返せるのはここだけ。** 保存しているのはハッシュのみ
             return Results.Ok(new { recoveryCodes = codes });
@@ -440,7 +441,7 @@ public static class AdminAuthEndpoints
             CompleteSecondFactorAsync(
                 context,
                 cancellationToken,
-                (user, token) => authenticator.VerifyTotpAsync(user.AdminUserId, request.Code ?? string.Empty, token)))
+                (user, token) => authenticator.VerifyTotpAsync(user.UserId, request.Code ?? string.Empty, token)))
             .RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
         group.MapPost("/login/recovery", (
@@ -452,7 +453,7 @@ public static class AdminAuthEndpoints
                 context,
                 cancellationToken,
                 (user, token) => authenticator.VerifyRecoveryCodeAsync(
-                    user.AdminUserId, request.Code ?? string.Empty, token)))
+                    user.UserId, request.Code ?? string.Empty, token)))
             .RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
         // ---- ログアウト ------------------------------------------------------
@@ -475,7 +476,7 @@ public static class AdminAuthEndpoints
     private static async Task<IResult> CompleteSecondFactorAsync(
         HttpContext context,
         CancellationToken cancellationToken,
-        Func<AdminUser, CancellationToken, Task<SecondFactorOutcome>> verify)
+        Func<PendingUser, CancellationToken, Task<SecondFactorOutcome>> verify)
     {
         var pending = await context.AuthenticateAsync(AdminAuthSchemes.Pending).ConfigureAwait(false);
         if (!pending.Succeeded || pending.Principal is null)
@@ -489,13 +490,8 @@ public static class AdminAuthEndpoints
         switch (outcome)
         {
             case SecondFactorOutcome.Succeeded:
-                // **Pleasanter のログインで来た印を引き継ぐ**（Issue #464）
-                await SignInSessionAsync(
-                        context,
-                        user,
-                        extraClaims: PleasanterSsoClaims.Carry(pending.Principal),
-                    method: LoginMethodOf(pending.Principal))
-                    .ConfigureAwait(false);
+                // **Pleasanter・SAML のログインで来た印を引き継ぐ**（Issue #464）
+                await SignInSessionAsync(context, user.UserId, SsoOf(pending.Principal)).ConfigureAwait(false);
                 return Results.Ok(new { authenticated = true });
 
             case SecondFactorOutcome.LockedOut:
@@ -519,127 +515,67 @@ public static class AdminAuthEndpoints
         }
     }
 
-    /// <summary>途中状態へ載せたログイン方式。**無ければパスワード**（この claim を足す前の途中状態）。</summary>
-    internal static AdminLoginMethod LoginMethodOf(ClaimsPrincipal? principal) =>
-        Enum.TryParse<AdminLoginMethod>(
-            principal?.FindFirstValue(AdminAuthSchemes.LoginMethodClaim), out var method)
-        && Enum.IsDefined(method)
-            ? method
-            : AdminLoginMethod.Password;
+    /// <summary>途中状態の持ち主。**照合に要る値だけ**（パスワードのハッシュなどは持たない）。</summary>
+    private readonly record struct PendingUser(Guid UserId);
 
-    /// <summary>途中状態の claim から利用者を組み立てる。</summary>
-    /// <remarks>
-    /// **照合に要る値だけを持つ。** パスワードのハッシュなどは cookie に入れない。
-    /// </remarks>
-    private static AdminUser ReadPending(ClaimsPrincipal principal) => new()
+    /// <summary>途中状態の claim から持ち主を読む。</summary>
+    private static PendingUser ReadPending(ClaimsPrincipal principal) =>
+        new(Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!));
+
+    /// <summary>
+    /// 要求の principal（ストアの値から組み立てたもの）から、SAML・Pleasanter のログインで来た印を取り出す。
+    /// 2 要素の途中状態からログイン後へ<b>そのまま引き継ぐ</b>ために使う。無ければ <c>null</c>。
+    /// </summary>
+    internal static SessionSso? SsoOf(ClaimsPrincipal? principal)
     {
-        AdminUserId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!),
-        LoginId = principal.Identity?.Name ?? string.Empty,
-        PasswordHash = string.Empty,
-        Role = Enum.TryParse<AdminRole>(principal.FindFirstValue(ClaimTypes.Role), out var role)
-            ? role
-            : AdminRole.Editor,
-    };
+        var nameId = principal?.FindFirstValue(AdminAuthSchemes.SamlNameIdClaim);
+        var saml = string.IsNullOrEmpty(nameId)
+            ? null
+            : new SamlSessionKeys(nameId, principal!.FindFirstValue(AdminAuthSchemes.SamlSessionIndexClaim));
+        var pleasanter = PleasanterSsoClaims.KeysOf(principal);
+
+        return saml is null && pleasanter is null ? null : new SessionSso(saml, pleasanter);
+    }
 
     /// <summary>パスワードまで通った状態にする。**ここでは何も操作させない。**</summary>
-    /// <param name="extraClaims">
-    /// ログイン後へ引き継ぐ claim（Pleasanter のログインで来た印など。Issue #464）。
+    /// <param name="sso">
+    /// ログイン後へ引き継ぐ、SAML・Pleasanter のログインで来た印（Issue #464・#191）。
+    /// **ログインに使った方式は、この印から決まる**（端末の一覧に出す。Issue #602）。無ければパスワード。
     /// </param>
-    /// <param name="method">
-    /// ログインに使った方式（Issue #602）。**ログイン後のセッションへ引き継ぎ、端末の一覧に出す。**
-    /// </param>
-    internal static async Task SignInPendingAsync(
-        HttpContext context,
-        AdminUser user,
-        string? secret,
-        IEnumerable<Claim>? extraClaims = null,
-        AdminLoginMethod method = AdminLoginMethod.Password)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.AdminUserId.ToString()),
-            new(ClaimTypes.Name, user.LoginId),
-            new(ClaimTypes.Role, user.Role.ToString()),
-            new(AdminAuthSchemes.LoginMethodClaim, method.ToString()),
-        };
-
-        if (secret is not null)
-        {
-            claims.Add(new Claim(EnrollmentSecretClaim, secret));
-        }
-
-        if (extraClaims is not null)
-        {
-            claims.AddRange(extraClaims);
-        }
-
-        var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Pending);
-        await context.RequestServices.GetRequiredService<AdminSessionManager>().SignInAsync(
+    internal static Task SignInPendingAsync(HttpContext context, Guid userId, SessionSso? sso = null) =>
+        context.RequestServices.GetRequiredService<AdminSessionManager>().SignInAsync(
             context,
             AdminAuthSchemes.Pending,
-            AdminSessionKind.Pending,
-            new ClaimsPrincipal(identity),
-            AdminAuthSchemes.PendingLifetime).ConfigureAwait(false);
-    }
+            AdminSessionKinds.Pending,
+            userId,
+            AdminAuthSchemes.PendingLifetime,
+            sso);
 
     /// <summary>2 要素まで通った状態にする。</summary>
     /// <remarks>
     /// **招待の受け取り**（<c>AdminUserEndpoints</c>。Issue #169）と
     /// **SAML の受け口**（<c>AdminSamlEndpoints</c>。Issue #166）からも同じ形で入る。
     /// </remarks>
-    /// <param name="samlSession">
-    /// SAML で入ったときの <c>NameID</c> と <c>SessionIndex</c>（Issue #191）。
-    /// **単一ログアウトの要求に載せるのに要る。** それ以外の入り方では <c>null</c>。
+    /// <param name="sso">
+    /// SAML で入ったときの <c>NameID</c> と <c>SessionIndex</c>（Issue #191。**単一ログアウトの要求に載せるのに要る**）、
+    /// Pleasanter のログインで入ったときの本人と確かめた時刻（Issue #464。再検証に使う）。
+    /// それ以外の入り方では <c>null</c>。
+    /// ⚠️ **SAML のアサーション全体は残さない。** 要らないものを持たない。
     /// </param>
-    /// <param name="method">ログインに使った方式（Issue #602）。2 要素の途中状態から来るときは引き継ぐ。</param>
-    /// <param name="extraClaims">
-    /// セッションへ足す claim。**Pleasanter のログインで入ったときの本人と確かめた時刻**
-    /// （<see cref="PleasanterSsoClaims"/>。Issue #464）。再検証に使う。
-    /// </param>
-    internal static async Task SignInSessionAsync(
-        HttpContext context,
-        AdminUser user,
-        SamlSessionKeys? samlSession = null,
-        IEnumerable<Claim>? extraClaims = null,
-        AdminLoginMethod method = AdminLoginMethod.Password)
+    internal static async Task SignInSessionAsync(HttpContext context, Guid userId, SessionSso? sso = null)
     {
-        // **途中状態は必ず消す。** ストアにも共有鍵を残さない
-        await context.RequestServices.GetRequiredService<AdminSessionManager>()
-            .RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
+        var sessions = context.RequestServices.GetRequiredService<AdminSessionManager>();
 
-        List<Claim> claims =
-        [
-            new Claim(ClaimTypes.NameIdentifier, user.AdminUserId.ToString()),
-            new Claim(ClaimTypes.Name, user.LoginId),
-            new Claim(ClaimTypes.Role, user.Role.ToString()),
-            new Claim(AdminAuthSchemes.LoginMethodClaim, method.ToString()),
-        ];
+        // **途中状態は必ず消す。** ストアにも途中の状態を残さない
+        await sessions.RevokeCurrentAsync(context, AdminAuthSchemes.Pending).ConfigureAwait(false);
 
-        // **IdP へログアウトを頼むのに要る値だけを持つ**（Issue #191）。
-        // ⚠️ **アサーション全体は残さない。** 要らないものを cookie へ入れない
-        if (samlSession is not null)
-        {
-            claims.Add(new Claim(AdminAuthSchemes.SamlNameIdClaim, samlSession.NameId));
-
-            if (!string.IsNullOrEmpty(samlSession.SessionIndex))
-            {
-                claims.Add(new Claim(AdminAuthSchemes.SamlSessionIndexClaim, samlSession.SessionIndex));
-            }
-        }
-
-        if (extraClaims is not null)
-        {
-            claims.AddRange(extraClaims);
-        }
-
-        var identity = new ClaimsIdentity(claims, AdminAuthSchemes.Session);
-
-        await context.RequestServices.GetRequiredService<AdminSessionManager>().SignInAsync(
+        await sessions.SignInAsync(
             context,
             AdminAuthSchemes.Session,
-            AdminSessionKind.Session,
-            new ClaimsPrincipal(identity),
-            AdminAuthSchemes.SessionLifetime).ConfigureAwait(false);
+            AdminSessionKinds.Session,
+            userId,
+            AdminAuthSchemes.SessionLifetime,
+            sso).ConfigureAwait(false);
     }
 
     /// <summary>ログイン ID とパスワード。</summary>
@@ -677,9 +613,6 @@ public static class AdminAuthSchemes
     /// ⚠️ **ログイン ID と同じとは限らない**（属性から取る設定があるため）。
     /// </remarks>
     public const string SamlNameIdClaim = "q.saml.nameid";
-
-    /// <summary>ログインに使った方式（<see cref="AdminLoginMethod"/> の名前。Issue #602）。</summary>
-    public const string LoginMethodClaim = "q.signin.method";
 
     /// <summary>SAML で入ったときの <c>SessionIndex</c>（Issue #191）。</summary>
     /// <remarks>

@@ -21,13 +21,12 @@ public class AdminTwoFactorPolicyTests
     {
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-09-08T00:00:00Z"));
         var users = new FakeAdminUserStore(time);
-        var protector = new SecretProtector(SecretProtector.GenerateKey());
 
         var authenticator = new AdminAuthenticator(
             users,
+            users,
             new PasswordHasher(),
             new TotpService(),
-            protector,
             new AdminAuthOptions { TwoFactor = policy },
             time,
             NullLogger<AdminAuthenticator>.Instance);
@@ -41,8 +40,7 @@ public class AdminTwoFactorPolicyTests
         var user = (await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", Password))!;
 
         // **共有鍵の中身はここでは問わない。** 「登録されている」状態を作るだけ
-        await harness.Users.EnableTotpAsync(user.AdminUserId, "protected-secret");
-        await harness.Users.ReplaceRecoveryCodesAsync(user.AdminUserId, ["hash-1", "hash-2"]);
+        await harness.Users.EnableTotpAsync(user.Id, "SECRET", timeStep: 1, ["hash-1", "hash-2"]);
         return user;
     }
 
@@ -95,25 +93,33 @@ public class AdminTwoFactorPolicyTests
     }
 
     [Fact]
-    public void 無効なら登録の口を開かない()
+    public async Task 無効なら登録の口を開かない()
     {
         var harness = Create(TwoFactorPolicy.Disabled);
+        var user = (await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", Password))!;
 
         // **画面から隠すだけでは足りない。** API を直接叩かれても通さない
-        Assert.Throws<InvalidOperationException>(() => harness.Authenticator.BeginTotpEnrollment("admin"));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Authenticator.BeginTotpEnrollmentAsync(user.Id, "admin"));
+        Assert.Null(await harness.Users.GetTotpPendingAsync(user.Id));
     }
 
     [Theory]
     [InlineData(TwoFactorPolicy.Required)]
     [InlineData(TwoFactorPolicy.Optional)]
-    public void 必須と任意では登録の口が開く(TwoFactorPolicy policy)
+    public async Task 必須と任意では登録の口が開く(TwoFactorPolicy policy)
     {
         var harness = Create(policy);
+        var user = (await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", Password))!;
 
-        var enrollment = harness.Authenticator.BeginTotpEnrollment("admin");
+        var enrollment = await harness.Authenticator.BeginTotpEnrollmentAsync(user.Id, "admin");
 
         Assert.NotEmpty(enrollment.SecretBase32);
         Assert.Contains("otpauth://", enrollment.OtpAuthUri, StringComparison.Ordinal);
+
+        // **共有鍵はサーバ側に「登録の途中の鍵」として預かる。** まだ有効にはならない
+        Assert.Equal(enrollment.SecretBase32, await harness.Authenticator.GetPendingEnrollmentSecretAsync(user.Id));
+        Assert.False((await harness.Users.FindByIdAsync(user.Id))!.TotpEnabled);
     }
 
     [Fact]
@@ -122,15 +128,15 @@ public class AdminTwoFactorPolicyTests
         var harness = Create(TwoFactorPolicy.Optional);
         var user = await EnrolledAdministratorAsync(harness);
 
-        await harness.Authenticator.DisableTotpAsync(user.AdminUserId);
+        await harness.Authenticator.DisableTotpAsync(user.Id);
 
-        var after = await harness.Users.FindByIdAsync(user.AdminUserId);
+        var after = await harness.Users.FindByIdAsync(user.Id);
         Assert.NotNull(after);
-        Assert.False(after!.HasTotp);
-        Assert.Null(after.TotpSecretEncrypted);
+        Assert.False(after!.TotpEnabled);
+        Assert.Null(harness.Users.TotpSecretOf(user.Id));
 
         // **復旧コードだけ残っても意味が無い**
-        Assert.Empty(await harness.Users.ListUnusedRecoveryCodesAsync(user.AdminUserId));
+        Assert.Equal(0, await harness.Users.CountRecoveryCodesAsync(user.Id));
     }
 
     /// <summary>必須の設定で解除された人は、**次回ログイン時に登録へ回る。**</summary>
@@ -140,7 +146,7 @@ public class AdminTwoFactorPolicyTests
         var harness = Create(TwoFactorPolicy.Required);
         var user = await EnrolledAdministratorAsync(harness);
 
-        await harness.Authenticator.DisableTotpAsync(user.AdminUserId);
+        await harness.Authenticator.DisableTotpAsync(user.Id);
         var result = await harness.Authenticator.CheckPasswordAsync("admin", Password);
 
         Assert.Equal(PasswordOutcome.NeedsTotpEnrollment, result.Outcome);
@@ -161,11 +167,11 @@ public class AdminTwoFactorPolicyTests
 
         await harness.Authenticator.CheckPasswordAsync("admin", Password);
 
-        var after = await harness.Users.FindByIdAsync(user.AdminUserId);
+        var after = await harness.Users.FindByIdAsync(user.Id);
         Assert.Null(after!.LastLoginAt);
 
         // **記録するのはセッションを張る側**
-        await harness.Authenticator.RecordSignInAsync(user.AdminUserId);
-        Assert.NotNull((await harness.Users.FindByIdAsync(user.AdminUserId))!.LastLoginAt);
+        await harness.Authenticator.RecordSignInAsync(user.Id);
+        Assert.NotNull((await harness.Users.FindByIdAsync(user.Id))!.LastLoginAt);
     }
 }

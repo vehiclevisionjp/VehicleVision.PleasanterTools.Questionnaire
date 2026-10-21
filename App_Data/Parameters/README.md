@@ -216,7 +216,7 @@ Pod 間で鍵束を共有する。
 
 ### 管理者セッションストア
 
-既定の `Database` は本アプリの DB に `AdminSessions` を作る。追加のサービスは要らない。
+既定の `Database` は本アプリの DB の `Core_AdminSessions`（Core.Data の共有表）を使う。追加のサービスは要らない。
 大規模構成では `Redis` を選べる。
 
 Redis はセッション専用の領域を使い、`maxmemory-policy` は `noeviction` にする。

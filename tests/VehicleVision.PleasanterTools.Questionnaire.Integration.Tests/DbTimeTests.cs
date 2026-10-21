@@ -37,33 +37,30 @@ public class DbTimeTests
 
         QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
-        var store = new AdminUserStore(factory);
+        var now = new DateTimeOffset(2026, 8, 18, 0, 0, 0, TimeSpan.Zero);
+        var store = AdminTestSupport.CreateUserStore(
+            factory,
+            new Microsoft.Extensions.Time.Testing.FakeTimeProvider(now),
+            new VehicleVision.PleasanterTools.Questionnaire.Web.Services.SecretProtector(
+                VehicleVision.PleasanterTools.Questionnaire.Web.Services.SecretProtector.GenerateKey()));
 
-        await using (var cleanup = factory.Create())
-        {
-            await cleanup.OpenAsync();
-            await cleanup.ExecuteAsync(
-                $"DELETE FROM {SqlDialect.Quote(provider, "AdminRecoveryCodes")}");
-            await cleanup.ExecuteAsync($"DELETE FROM {SqlDialect.Quote(provider, "AdminUsers")}");
-        }
+        await AdminTestSupport.ClearAdministratorsAsync(factory);
 
-        var user = new AdminUser
-        {
-            AdminUserId = Guid.NewGuid(),
-            LoginId = $"tz-{Guid.NewGuid():N}",
-            PasswordHash = "not-used",
-            Role = AdminRole.Editor,
-        };
-        await store.CreateAsync(user);
+        var user = await store.CreateAsync(
+            $"tz-{Guid.NewGuid():N}", "not-used", nameof(AdminRole.Editor), string.Empty);
+        Assert.NotNull(user);
 
-        // **UTC の種別を持った時刻を渡す。** ここが変換されるかどうかを見ている
-        var lockedUntil = new DateTime(2026, 8, 18, 0, 15, 0, DateTimeKind.Utc);
-        await store.LockAsync(user.AdminUserId, lockedUntil);
+        // **UTC の時刻を渡し、サーバの時間帯に左右されずにそのまま戻ること**を見ている
+        // （失敗の 1 回目で締め出す。解除の時刻は、時計から 15 分後）
+        var failure = await store.RecordFailureAsync(user.Id, threshold: 1, TimeSpan.FromMinutes(15));
+        var lockedUntil = now.AddMinutes(15);
+        Assert.Equal(lockedUntil, failure.LockedUntil);
 
-        var stored = await store.FindByIdAsync(user.AdminUserId);
+        var stored = await store.FindByIdAsync(user.Id);
 
         Assert.NotNull(stored?.LockedUntil);
-        Assert.Equal(lockedUntil.Ticks, stored.LockedUntil.Value.Ticks);
+        Assert.Equal(lockedUntil.UtcTicks, stored.LockedUntil.Value.UtcTicks);
+        Assert.Equal(TimeSpan.Zero, stored.LockedUntil.Value.Offset);
     }
 
     [Theory]

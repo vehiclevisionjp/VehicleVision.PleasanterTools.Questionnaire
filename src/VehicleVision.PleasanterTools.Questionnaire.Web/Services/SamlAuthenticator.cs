@@ -79,7 +79,7 @@ public sealed class SamlAuthenticator(
         ArgumentNullException.ThrowIfNull(options);
 
         var trimmed = loginId.Trim();
-        var user = await store.FindByLoginIdAsync(trimmed, cancellationToken).ConfigureAwait(false);
+        var user = (await store.FindForLoginAsync(trimmed, cancellationToken).ConfigureAwait(false))?.User;
         var registered = false;
 
         if (user is null)
@@ -108,7 +108,7 @@ public sealed class SamlAuthenticator(
             return new SamlSignInResult(SamlSignInOutcome.Disabled, user);
         }
 
-        if (user.HasTotp)
+        if (user.TotpEnabled)
         {
             // **登録済みの 2 要素は、IdP 経由でも省かせない。**
             // ⚠️ 方針が Disabled でも省かない（設定 1 つで保護が消えるのは危ない）
@@ -121,7 +121,7 @@ public sealed class SamlAuthenticator(
             return new SamlSignInResult(SamlSignInOutcome.NeedsTotpEnrollment, user, registered);
         }
 
-        await store.RecordSuccessAsync(user.AdminUserId, cancellationToken).ConfigureAwait(false);
+        await store.RecordSuccessAsync(user.Id, cancellationToken).ConfigureAwait(false);
         return new SamlSignInResult(SamlSignInOutcome.SignedIn, user, registered);
     }
 
@@ -136,20 +136,17 @@ public sealed class SamlAuthenticator(
         AdminRole registerRole,
         CancellationToken cancellationToken)
     {
-        var user = new AdminUser
-        {
-            AdminUserId = Guid.NewGuid(),
-            LoginId = loginId,
+        // **推測できない値。** 誰にも渡さないので、パスワードでは入れない
+        var passwordHash = hasher.Hash(Convert.ToBase64String(Guid.NewGuid().ToByteArray())
+            + Convert.ToBase64String(Guid.NewGuid().ToByteArray()));
 
-            // **推測できない値。** 誰にも渡さないので、パスワードでは入れない
-            PasswordHash = hasher.Hash(Convert.ToBase64String(Guid.NewGuid().ToByteArray())
-                + Convert.ToBase64String(Guid.NewGuid().ToByteArray())),
-            Role = registerRole,
-        };
+        var created = await store
+            .CreateAsync(loginId, passwordHash, AdminRoleMap.ToName(registerRole), language: string.Empty, cancellationToken)
+            .ConfigureAwait(false);
 
-        await store.CreateAsync(user, cancellationToken).ConfigureAwait(false);
-
-        // **作った直後の姿を DB から読み直す。** 既定値（作成日時など）を持った形で返す
-        return await store.FindByLoginIdAsync(loginId, cancellationToken).ConfigureAwait(false) ?? user;
+        // **同時に同じログイン ID の管理者が作られていたら、その管理者を使う**（役割は上書きしない）
+        return created
+            ?? (await store.FindForLoginAsync(loginId, cancellationToken).ConfigureAwait(false))?.User
+            ?? throw new InvalidOperationException("管理者を作れず、既存の管理者も見つからなかった。");
     }
 }

@@ -26,6 +26,8 @@ public class AdminAuthenticationTests
 
     private sealed record Harness(
         IAdminUserStore Store,
+        IAdminUserSettingsStore Settings,
+        DbConnectionFactory Factory,
         AdminAuthenticator Authenticator,
         PasswordHasher Hasher,
         TotpService Totp,
@@ -40,34 +42,26 @@ public class AdminAuthenticationTests
         QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         var factory = new DbConnectionFactory(provider, connectionString);
 
-        // **検証用の DB なので、毎回まっさらにしてから始める**
-        using (var connection = factory.Create())
-        {
-            connection.Open();
-            foreach (var table in new[] { "AdminRecoveryCodes", "AdminUsers" })
-            {
-                using var command = connection.CreateCommand();
-                command.CommandText = $"DELETE FROM {SqlDialect.Quote(provider, table)}";
-                command.ExecuteNonQuery();
-            }
-        }
+        // **検証用の DB なので、毎回まっさらにしてから始める**（初期設定の印も消す）
+        AdminTestSupport.ClearAdministratorsAsync(factory).GetAwaiter().GetResult();
 
-        var store = new AdminUserStore(factory);
         var hasher = new PasswordHasher();
         var totp = new TotpService();
         var protector = new SecretProtector(SecretProtector.GenerateKey());
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-08-18T00:00:00Z"));
+        var store = AdminTestSupport.CreateUserStore(factory, time, protector);
+        var settings = new AdminUserSettingsStore(factory);
 
         var authenticator = new AdminAuthenticator(
             store,
+            settings,
             hasher,
             totp,
-            protector,
             new AdminAuthOptions { TwoFactor = twoFactor },
             time,
             NullLogger<AdminAuthenticator>.Instance);
 
-        return new Harness(store, authenticator, hasher, totp, protector, time);
+        return new Harness(store, settings, factory, authenticator, hasher, totp, protector, time);
     }
 
     private static string Code(string secret) => new Totp(Base32Encoding.ToBytes(secret)).ComputeTotp();
@@ -79,7 +73,19 @@ public class AdminAuthenticationTests
     /// ログイン側だけを見たいときは、この道で有効にする。
     /// </remarks>
     private static async Task EnrollDirectlyAsync(Harness harness, Guid adminUserId, string secret) =>
-        await harness.Store.EnableTotpAsync(adminUserId, harness.Protector.Protect(secret));
+        await harness.Store.EnableTotpAsync(adminUserId, secret, timeStep: 0, []);
+
+    /// <summary>この管理者の共有鍵の暗号文（DB の列そのまま）。</summary>
+    private static async Task<string?> ReadCipherAsync(Harness harness, Guid adminUserId)
+    {
+        await using var connection = harness.Factory.Create();
+        await connection.OpenAsync();
+        return await Dapper.SqlMapper.ExecuteScalarAsync<string?>(
+            connection,
+            SqlDialect.Format(
+                harness.Factory.Provider, "SELECT [TotpSecretCipher] FROM [Core_AdminUsers] WHERE [Id] = @Id"),
+            new { Id = adminUserId });
+    }
 
     [Theory]
     [MemberData(nameof(Providers))]
@@ -97,15 +103,23 @@ public class AdminAuthenticationTests
             .TryCreateFirstAdministratorAsync("admin@example.test", "long-enough-password");
 
         Assert.NotNull(user);
-        Assert.False(user.ResponseNotificationEnabled);
-        Assert.Empty(await harness.Store.ListResponseNotificationRecipientsAsync());
+        Assert.False(await harness.Settings.GetResponseNotificationEnabledAsync(user.Id));
+        Assert.Empty(await harness.Settings.ListResponseNotificationRecipientsAsync());
 
-        await harness.Store.SetResponseNotificationEnabledAsync(user.AdminUserId, true);
+        await harness.Settings.SetResponseNotificationEnabledAsync(user.Id, true);
 
+        Assert.True(await harness.Settings.GetResponseNotificationEnabledAsync(user.Id));
         var recipient = Assert.Single(
-            await harness.Store.ListResponseNotificationRecipientsAsync());
-        Assert.Equal(user.AdminUserId, recipient.AdminUserId);
+            await harness.Settings.ListResponseNotificationRecipientsAsync());
+        Assert.Equal(user.Id, recipient.AdminUserId);
         Assert.Equal("admin@example.test", recipient.LoginId);
+
+        // 設定し直しても行は 1 つ（無効へ戻せる）。止めた管理者へは送らない
+        await harness.Settings.SetResponseNotificationEnabledAsync(user.Id, false);
+        Assert.Empty(await harness.Settings.ListResponseNotificationRecipientsAsync());
+        await harness.Settings.SetResponseNotificationEnabledAsync(user.Id, true);
+        await harness.Store.SetDisabledAsync(user.Id, true);
+        Assert.Empty(await harness.Settings.ListResponseNotificationRecipientsAsync());
     }
 
     [Theory]
@@ -121,11 +135,19 @@ public class AdminAuthenticationTests
 
         var first = await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
         Assert.NotNull(first);
-        Assert.Equal(AdminRole.Administrator, first.Role);
+        Assert.Equal(nameof(AdminRole.Administrator), first.Role);
 
         // **既に居るなら通さない。** ここが二度使えると誰でも管理者になれる
         var second = await harness.Authenticator.TryCreateFirstAdministratorAsync("attacker", "long-enough-password");
         Assert.Null(second);
+
+        // **初期設定の印が立つ。** 印は管理者が居なくなっても消えない（Core の窓口が主キーで排他する）
+        await using var connection = harness.Factory.Create();
+        await connection.OpenAsync();
+        Assert.Equal(
+            1,
+            await Dapper.SqlMapper.ExecuteScalarAsync<int>(
+                connection, SqlDialect.Format(provider, "SELECT COUNT(*) FROM [Core_AdminSetup]")));
     }
 
     [Theory]
@@ -179,21 +201,35 @@ public class AdminAuthenticationTests
 
         var harness = Create(provider, connectionString);
         var user = await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
-        var enrollment = harness.Authenticator.BeginTotpEnrollment("admin");
+        var enrollment = await harness.Authenticator.BeginTotpEnrollmentAsync(user!.Id, "admin");
+
+        // **登録の途中の鍵も、暗号化して置く。** まだ有効にはならない
+        Assert.False((await harness.Store.FindByIdAsync(user.Id))!.TotpEnabled);
+        Assert.Equal(enrollment.SecretBase32, await harness.Authenticator.GetPendingEnrollmentSecretAsync(user.Id));
 
         var codes = await harness.Authenticator.CompleteTotpEnrollmentAsync(
-            user!.AdminUserId, enrollment.SecretBase32, Code(enrollment.SecretBase32));
+            user.Id, enrollment.SecretBase32, Code(enrollment.SecretBase32));
 
         Assert.NotNull(codes);
         Assert.Equal(RecoveryCode.Count, codes.Count);
 
-        var stored = await harness.Store.FindByIdAsync(user.AdminUserId);
+        var stored = await harness.Store.FindByIdAsync(user.Id);
         Assert.NotNull(stored);
-        Assert.True(stored.HasTotp);
+        Assert.True(stored.TotpEnabled);
 
-        // **平文で置かない**
-        Assert.NotEqual(enrollment.SecretBase32, stored.TotpSecretEncrypted);
-        Assert.Equal(enrollment.SecretBase32, harness.Protector.Unprotect(stored.TotpSecretEncrypted!));
+        // 確定したら、途中の鍵は残らない
+        Assert.Null(await harness.Authenticator.GetPendingEnrollmentSecretAsync(user.Id));
+
+        // **平文で置かない。** 置いてあるのは、この管理者の文脈に束縛した暗号文
+        var cipher = await ReadCipherAsync(harness, user.Id);
+        Assert.NotEqual(enrollment.SecretBase32, cipher);
+        Assert.Equal(
+            enrollment.SecretBase32,
+            harness.Protector.Unprotect(cipher!, $"{QuestionnaireDatabase.Instance.AppId}:totp:{user.Id:D}"));
+
+        // 別の管理者の文脈では復号できない（暗号文を貼り替えても、その人の共有鍵としては読めない）
+        Assert.Null(harness.Protector.Unprotect(cipher!, $"{QuestionnaireDatabase.Instance.AppId}:totp:{Guid.NewGuid():D}"));
+        Assert.Equal(enrollment.SecretBase32, await harness.Store.GetTotpSecretAsync(user.Id));
 
         // 次のログインでは 2 要素を求める
         var result = await harness.Authenticator.CheckPasswordAsync("admin", "long-enough-password");
@@ -212,17 +248,17 @@ public class AdminAuthenticationTests
         var harness = Create(provider, connectionString);
         var user = await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
         var secret = harness.Totp.GenerateSecret();
-        await EnrollDirectlyAsync(harness, user!.AdminUserId, secret);
+        await EnrollDirectlyAsync(harness, user!.Id, secret);
 
         var code = Code(secret);
         Assert.Equal(
             SecondFactorOutcome.Succeeded,
-            await harness.Authenticator.VerifyTotpAsync(user.AdminUserId, code));
+            await harness.Authenticator.VerifyTotpAsync(user.Id, code));
 
         // **盗み見られた数字の二度目を弾く。** 30 秒の間は同じ数字が有効なため
         Assert.Equal(
             SecondFactorOutcome.Invalid,
-            await harness.Authenticator.VerifyTotpAsync(user.AdminUserId, code));
+            await harness.Authenticator.VerifyTotpAsync(user.Id, code));
     }
 
     [Theory]
@@ -237,11 +273,11 @@ public class AdminAuthenticationTests
         var harness = Create(provider, connectionString);
         var user = await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
         var secret = harness.Totp.GenerateSecret();
-        await EnrollDirectlyAsync(harness, user!.AdminUserId, secret);
+        await EnrollDirectlyAsync(harness, user!.Id, secret);
 
-        await harness.Authenticator.VerifyTotpAsync(user.AdminUserId, Code(secret));
+        await harness.Authenticator.VerifyTotpAsync(user.Id, Code(secret));
 
-        var stored = await harness.Store.FindByIdAsync(user.AdminUserId);
+        var stored = await harness.Store.FindByIdAsync(user.Id);
         // **止め忘れた管理者を見つける唯一の手掛かり**
         Assert.NotNull(stored!.LastLoginAt);
     }
@@ -257,24 +293,24 @@ public class AdminAuthenticationTests
 
         var harness = Create(provider, connectionString);
         var user = await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
-        var enrollment = harness.Authenticator.BeginTotpEnrollment("admin");
+        var enrollment = await harness.Authenticator.BeginTotpEnrollmentAsync(user!.Id, "admin");
         var codes = await harness.Authenticator.CompleteTotpEnrollmentAsync(
-            user!.AdminUserId, enrollment.SecretBase32, Code(enrollment.SecretBase32));
+            user.Id, enrollment.SecretBase32, Code(enrollment.SecretBase32));
 
         var code = codes![0];
 
         Assert.Equal(
             SecondFactorOutcome.Succeeded,
-            await harness.Authenticator.VerifyRecoveryCodeAsync(user.AdminUserId, code));
+            await harness.Authenticator.VerifyRecoveryCodeAsync(user.Id, code));
 
         Assert.Equal(
             SecondFactorOutcome.Invalid,
-            await harness.Authenticator.VerifyRecoveryCodeAsync(user.AdminUserId, code));
+            await harness.Authenticator.VerifyRecoveryCodeAsync(user.Id, code));
 
         // 残りは使える
         Assert.Equal(
             SecondFactorOutcome.Succeeded,
-            await harness.Authenticator.VerifyRecoveryCodeAsync(user.AdminUserId, codes[1]));
+            await harness.Authenticator.VerifyRecoveryCodeAsync(user.Id, codes[1]));
     }
 
     [Theory]
@@ -288,16 +324,16 @@ public class AdminAuthenticationTests
 
         var harness = Create(provider, connectionString);
         var user = await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
-        var enrollment = harness.Authenticator.BeginTotpEnrollment("admin");
+        var enrollment = await harness.Authenticator.BeginTotpEnrollmentAsync(user!.Id, "admin");
         var codes = await harness.Authenticator.CompleteTotpEnrollmentAsync(
-            user!.AdminUserId, enrollment.SecretBase32, Code(enrollment.SecretBase32));
+            user.Id, enrollment.SecretBase32, Code(enrollment.SecretBase32));
 
         // 区切りを外し、小文字で打ち直した形
         var typed = codes![0].Replace("-", " ", StringComparison.Ordinal).ToLowerInvariant();
 
         Assert.Equal(
             SecondFactorOutcome.Succeeded,
-            await harness.Authenticator.VerifyRecoveryCodeAsync(user.AdminUserId, typed));
+            await harness.Authenticator.VerifyRecoveryCodeAsync(user.Id, typed));
     }
 
     [Theory]
@@ -311,18 +347,19 @@ public class AdminAuthenticationTests
 
         var harness = Create(provider, connectionString);
         var user = await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
-        var enrollment = harness.Authenticator.BeginTotpEnrollment("admin");
+        var enrollment = await harness.Authenticator.BeginTotpEnrollmentAsync(user!.Id, "admin");
         var codes = await harness.Authenticator.CompleteTotpEnrollmentAsync(
-            user!.AdminUserId, enrollment.SecretBase32, Code(enrollment.SecretBase32));
+            user.Id, enrollment.SecretBase32, Code(enrollment.SecretBase32));
 
-        var rows = await harness.Store.ListUnusedRecoveryCodesAsync(user.AdminUserId);
+        var hashes = await harness.Settings.ListUnusedRecoveryCodeHashesAsync(user.Id);
+        Assert.Equal(RecoveryCode.Count, hashes.Count);
 
-        foreach (var row in rows)
+        foreach (var hash in hashes)
         {
             foreach (var code in codes!)
             {
                 // **ハッシュのみを持つ**
-                Assert.DoesNotContain(RecoveryCode.Normalize(code), row.CodeHash, StringComparison.Ordinal);
+                Assert.DoesNotContain(RecoveryCode.Normalize(code), hash, StringComparison.Ordinal);
             }
         }
     }
@@ -368,7 +405,7 @@ public class AdminAuthenticationTests
         var harness = Create(provider, connectionString);
         var user = await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
 
-        await harness.Store.SetDisabledAsync(user!.AdminUserId, true);
+        await harness.Store.SetDisabledAsync(user!.Id, true);
 
         var result = await harness.Authenticator.CheckPasswordAsync("admin", "long-enough-password");
         Assert.Equal(PasswordOutcome.Disabled, result.Outcome);
@@ -410,21 +447,21 @@ public class AdminAuthenticationTests
         var harness = Create(provider, connectionString);
         var user = await harness.Authenticator.TryCreateFirstAdministratorAsync("admin", "long-enough-password");
 
-        var first = harness.Authenticator.BeginTotpEnrollment("admin");
+        var first = await harness.Authenticator.BeginTotpEnrollmentAsync(user!.Id, "admin");
         var oldCodes = await harness.Authenticator.CompleteTotpEnrollmentAsync(
-            user!.AdminUserId, first.SecretBase32, Code(first.SecretBase32));
+            user.Id, first.SecretBase32, Code(first.SecretBase32));
 
         // 端末を替えて登録し直す
         harness.Time.Advance(TimeSpan.FromMinutes(1));
-        var second = harness.Authenticator.BeginTotpEnrollment("admin");
+        var second = await harness.Authenticator.BeginTotpEnrollmentAsync(user.Id, "admin");
         var newCodes = await harness.Authenticator.CompleteTotpEnrollmentAsync(
-            user.AdminUserId, second.SecretBase32, Code(second.SecretBase32));
+            user.Id, second.SecretBase32, Code(second.SecretBase32));
 
         Assert.NotNull(newCodes);
 
         // **古いコードは残さない。** 残すと、配り直した意味が無くなる
         Assert.Equal(
             SecondFactorOutcome.Invalid,
-            await harness.Authenticator.VerifyRecoveryCodeAsync(user.AdminUserId, oldCodes![0]));
+            await harness.Authenticator.VerifyRecoveryCodeAsync(user.Id, oldCodes![0]));
     }
 }

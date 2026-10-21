@@ -286,7 +286,7 @@ public class AuditLogEndToEndTests
         await using var connection = Connect();
         await connection.OpenAsync().ConfigureAwait(false);
         var adminUserId = await connection.QuerySingleAsync<Guid>(
-            E2EDatabase.Sql("SELECT [AdminUserId] FROM [AdminUsers]")).ConfigureAwait(false);
+            E2EDatabase.Sql("SELECT [Id] FROM [Core_AdminUsers]")).ConfigureAwait(false);
 
         return (http, adminUserId);
     }
@@ -305,12 +305,7 @@ public class AuditLogEndToEndTests
     {
         await using var connection = Connect();
         await connection.OpenAsync().ConfigureAwait(false);
-        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [Core_AdminInvitations]"))
-            .ConfigureAwait(false);
-        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminRecoveryCodes]"))
-            .ConfigureAwait(false);
-        await connection.ExecuteAsync(E2EDatabase.Sql("DELETE FROM [AdminUsers]"))
-            .ConfigureAwait(false);
+        await AdminTestSupport.ClearAdministratorsAsync(connection, E2EDatabase.Provider).ConfigureAwait(false);
     }
 
     private static async Task<IReadOnlyList<LogRow>> ReadLogsAsync()

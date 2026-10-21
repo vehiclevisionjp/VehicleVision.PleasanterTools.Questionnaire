@@ -45,16 +45,8 @@ public class PleasanterSsoAuthenticatorTests
 
     private static async Task<AdminUser> AddAsync(Harness harness, bool isDisabled = false)
     {
-        var user = new AdminUser
-        {
-            AdminUserId = Guid.NewGuid(),
-            LoginId = LoginId,
-            PasswordHash = harness.Hasher.Hash("long-enough-password"),
-            Role = AdminRole.Editor,
-            IsDisabled = isDisabled,
-        };
-        await harness.Store.CreateAsync(user);
-        return user;
+        await Task.CompletedTask;
+        return harness.Store.Seed(Guid.NewGuid(), LoginId, nameof(AdminRole.Editor), isDisabled);
     }
 
     [Fact]
@@ -77,8 +69,8 @@ public class PleasanterSsoAuthenticatorTests
         var result = await harness.Authenticator.SignInAsync($" {LoginId} ", Options());
 
         Assert.Equal(PleasanterSsoSignInOutcome.SignedIn, result.Outcome);
-        Assert.Equal(user.AdminUserId, result.User!.AdminUserId);
-        Assert.NotNull((await harness.Store.FindByIdAsync(user.AdminUserId))!.LastLoginAt);
+        Assert.Equal(user.Id, result.User!.Id);
+        Assert.NotNull((await harness.Store.FindByIdAsync(user.Id))!.LastLoginAt);
     }
 
     [Fact]
@@ -93,9 +85,10 @@ public class PleasanterSsoAuthenticatorTests
         Assert.Equal(PleasanterSsoSignInOutcome.SignedIn, result.Outcome);
         Assert.True(result.Registered);
         var stored = Assert.Single(await harness.Store.ListAsync());
-        Assert.Equal(AdminRole.SurveyAdministrator, stored.Role);
-        Assert.False(harness.Hasher.Verify(string.Empty, stored.PasswordHash).Verified);
-        Assert.False(harness.Hasher.Verify(LoginId, stored.PasswordHash).Verified);
+        Assert.Equal(nameof(AdminRole.SurveyAdministrator), stored.Role);
+        var (_, passwordHash) = (await harness.Store.FindForLoginAsync(LoginId))!.Value;
+        Assert.False(harness.Hasher.Verify(string.Empty, passwordHash).Verified);
+        Assert.False(harness.Hasher.Verify(LoginId, passwordHash).Verified);
     }
 
     [Theory]
@@ -135,12 +128,12 @@ public class PleasanterSsoAuthenticatorTests
         // ⚠️ **Pleasanter 側の 2 要素に任せきりにしない**（SAML と同じ）
         var harness = Create(TwoFactorPolicy.Disabled);
         var user = await AddAsync(harness);
-        await harness.Store.EnableTotpAsync(user.AdminUserId, "encrypted-secret");
+        await harness.Store.EnableTotpAsync(user.Id, "SECRET", timeStep: 1, []);
 
         var result = await harness.Authenticator.SignInAsync(LoginId, Options());
 
         Assert.Equal(PleasanterSsoSignInOutcome.NeedsSecondFactor, result.Outcome);
-        Assert.Null((await harness.Store.FindByIdAsync(user.AdminUserId))!.LastLoginAt);
+        Assert.Null((await harness.Store.FindByIdAsync(user.Id))!.LastLoginAt);
     }
 
     [Fact]
@@ -159,7 +152,7 @@ public class PleasanterSsoAuthenticatorTests
 public class PleasanterSsoSessionRevalidatorTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-09-24T12:00:00Z");
-    private static readonly Guid SessionId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private const string SessionId = "session-handle-1";
 
     private static PleasanterSsoOptions Options(bool enabled = true) => new()
     {
@@ -171,7 +164,7 @@ public class PleasanterSsoSessionRevalidatorTests
 
     private static System.Security.Claims.ClaimsPrincipal Principal(DateTimeOffset verifiedAt, int userId = 7) =>
         new(new System.Security.Claims.ClaimsIdentity(
-            PleasanterSsoClaims.Create(new PleasanterIdentity(1, userId, "admin", null), verifiedAt),
+            PleasanterSsoClaims.Create(PleasanterSsoClaims.Keys(new PleasanterIdentity(1, userId, "admin", null), verifiedAt)),
             "test"));
 
     private static (PleasanterSsoSessionRevalidator Revalidator, FakePleasanterSessionVerifier Verifier, FakeTimeProvider Time)

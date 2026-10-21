@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
@@ -110,12 +111,16 @@ public sealed record TotpEnrollment(string SecretBase32, string OtpAuthUri);
 /// **どの段階で外れたかを外へ伝えない。** 「その利用者は居ない」と
 /// 「パスワードが違う」を区別して返すと、利用者名の総当たりに使える。
 /// </para>
+/// <para>
+/// 管理者・復旧コードの保管は Core.Data の <see cref="IAdminUserStore"/>。
+/// 共有鍵の暗号化は、その中で <see cref="ISecretCipher"/>（<see cref="SecretCipherAdapter"/>）が行う。
+/// </para>
 /// </remarks>
 public sealed class AdminAuthenticator(
     IAdminUserStore store,
+    IAdminUserSettingsStore settings,
     PasswordHasher hasher,
     TotpService totp,
-    SecretProtector protector,
     AdminAuthOptions options,
     TimeProvider timeProvider,
     ILogger<AdminAuthenticator> logger)
@@ -132,9 +137,9 @@ public sealed class AdminAuthenticator(
         string password,
         CancellationToken cancellationToken = default)
     {
-        var user = await store.FindByLoginIdAsync(loginId, cancellationToken).ConfigureAwait(false);
+        var found = await store.FindForLoginAsync(loginId, cancellationToken).ConfigureAwait(false);
 
-        if (user is null)
+        if (found is not var (user, passwordHash))
         {
             // **見つからなくても照合する。** すぐ返すと、応答の速さで居ないことが分かる
             hasher.Verify(password, decoyHash);
@@ -146,23 +151,23 @@ public sealed class AdminAuthenticator(
             return new PasswordResult(PasswordOutcome.Disabled);
         }
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        if (user.LockedUntil is { } lockedUntil && lockedUntil > now)
+        var now = timeProvider.GetUtcNow();
+        if (user.IsLocked(now))
         {
-            return new PasswordResult(PasswordOutcome.LockedOut, LockedUntil: lockedUntil);
+            return new PasswordResult(PasswordOutcome.LockedOut, LockedUntil: user.LockedUntil!.Value.UtcDateTime);
         }
 
-        var (verified, needsRehash) = hasher.Verify(password, user.PasswordHash);
+        var (verified, needsRehash) = hasher.Verify(password, passwordHash);
         if (!verified)
         {
-            await CountFailureAsync(user, cancellationToken).ConfigureAwait(false);
+            await CountFailureAsync(user.Id, cancellationToken).ConfigureAwait(false);
             return new PasswordResult(PasswordOutcome.Invalid);
         }
 
         if (needsRehash)
         {
             // **通ったこの瞬間だけ、新しい書式で作り直せる。** 平文はここにしか無い
-            await store.UpdatePasswordHashAsync(user.AdminUserId, hasher.Hash(password), cancellationToken)
+            await store.SetPasswordHashAsync(user.Id, hasher.Hash(password), cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -176,7 +181,7 @@ public sealed class AdminAuthenticator(
         // 「パスワードの再確認」（2 要素の登録し直しなど）にも使われるので、
         // 記録するとログインしていないのにログイン扱いになる。
         // **記録はセッションを張る側で行う**（<see cref="RecordSignInAsync"/>）。
-        var outcome = user.HasTotp
+        var outcome = user.TotpEnabled
             ? PasswordOutcome.NeedsSecondFactor
             : options.TwoFactor is TwoFactorPolicy.Required
                 ? PasswordOutcome.NeedsTotpEnrollment
@@ -202,42 +207,49 @@ public sealed class AdminAuthenticator(
             return SecondFactorOutcome.Disabled;
         }
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        if (user.LockedUntil is { } lockedUntil && lockedUntil > now)
+        if (user.IsLocked(timeProvider.GetUtcNow()))
         {
             return SecondFactorOutcome.LockedOut;
         }
 
-        if (!user.HasTotp || user.TotpSecretEncrypted is null)
+        if (!user.TotpEnabled)
         {
             return SecondFactorOutcome.NotEnrolled;
         }
 
-        var secret = protector.Unprotect(user.TotpSecretEncrypted);
-        if (secret is null)
+        string? secret;
+        try
+        {
+            secret = await store.GetTotpSecretAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        }
+        catch (CryptographicException)
         {
             // **鍵を失うとここに来る。** 復旧コードで入って登録し直してもらう
             logger.LogError(
-                "共有鍵を復号できない（AdminUserId={AdminUserId}）。鍵の設定を確認する", user.AdminUserId);
+                "共有鍵を復号できない（AdminUserId={AdminUserId}）。鍵の設定を確認する", user.Id);
             return SecondFactorOutcome.Invalid;
+        }
+
+        if (secret is null)
+        {
+            return SecondFactorOutcome.NotEnrolled;
         }
 
         var (verified, timeStep) = totp.Verify(secret, code);
         if (!verified)
         {
-            await CountFailureAsync(user, cancellationToken).ConfigureAwait(false);
+            await CountFailureAsync(user.Id, cancellationToken).ConfigureAwait(false);
             return SecondFactorOutcome.Invalid;
         }
 
         // **同じ時間枠は一度しか通さない。** 30 秒の間は同じ数字が有効なため
-        if (!await store.TryConsumeTotpTimeStepAsync(user.AdminUserId, timeStep, cancellationToken)
-                .ConfigureAwait(false))
+        if (!await store.TryUseTotpStepAsync(user.Id, timeStep, cancellationToken).ConfigureAwait(false))
         {
-            await CountFailureAsync(user, cancellationToken).ConfigureAwait(false);
+            await CountFailureAsync(user.Id, cancellationToken).ConfigureAwait(false);
             return SecondFactorOutcome.Invalid;
         }
 
-        await store.RecordSuccessAsync(user.AdminUserId, cancellationToken).ConfigureAwait(false);
+        await store.RecordSuccessAsync(user.Id, cancellationToken).ConfigureAwait(false);
         return SecondFactorOutcome.Succeeded;
     }
 
@@ -258,8 +270,7 @@ public sealed class AdminAuthenticator(
             return SecondFactorOutcome.Disabled;
         }
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        if (user.LockedUntil is { } lockedUntil && lockedUntil > now)
+        if (user.IsLocked(timeProvider.GetUtcNow()))
         {
             return SecondFactorOutcome.LockedOut;
         }
@@ -270,50 +281,72 @@ public sealed class AdminAuthenticator(
             return SecondFactorOutcome.Invalid;
         }
 
-        var candidates = await store.ListUnusedRecoveryCodesAsync(adminUserId, cancellationToken)
+        var candidates = await settings.ListUnusedRecoveryCodeHashesAsync(adminUserId, cancellationToken)
             .ConfigureAwait(false);
 
         // **どれと一致したかは総当たりで探すしかない。** 復旧コードは推測しにくい値なので
-        // 回数は 10 本で頭打ちになり、かつ使う場面はまれ
+        // 回数は 10 本で頭打ちになり、かつ使う場面はまれ。
+        // 保存しているのは塩つきのハッシュなので、入力から同じハッシュは作れない（Core の窓口は完全一致で使用済みにする）
         foreach (var candidate in candidates)
         {
-            var (verified, _) = hasher.Verify(normalized, candidate.CodeHash);
+            var (verified, _) = hasher.Verify(normalized, candidate);
             if (!verified)
             {
                 continue;
             }
 
-            if (!await store.TryConsumeRecoveryCodeAsync(candidate.RecoveryCodeId, cancellationToken)
+            if (!await store.TryUseRecoveryCodeAsync(adminUserId, candidate, cancellationToken)
                     .ConfigureAwait(false))
             {
                 // 同時に使われた。**二度は通さない**
                 break;
             }
 
-            await store.RecordSuccessAsync(user.AdminUserId, cancellationToken).ConfigureAwait(false);
+            await store.RecordSuccessAsync(user.Id, cancellationToken).ConfigureAwait(false);
             logger.LogWarning(
                 "復旧コードでログインした（AdminUserId={AdminUserId}）。2 要素の登録し直しを促す",
-                user.AdminUserId);
+                user.Id);
             return SecondFactorOutcome.Succeeded;
         }
 
-        await CountFailureAsync(user, cancellationToken).ConfigureAwait(false);
+        await CountFailureAsync(user.Id, cancellationToken).ConfigureAwait(false);
         return SecondFactorOutcome.Invalid;
     }
 
-    /// <summary>2 要素の登録を始める。**まだ保存しない。**</summary>
+    /// <summary>2 要素の登録を始める。**共有鍵は確定させず、「登録の途中の鍵」として預ける。**</summary>
     /// <remarks>
     /// 認証アプリに読み込ませただけで有効にすると、
     /// **読み込みに失敗していた場合に本人が入れなくなる。**
     /// 一度打ってもらってから <see cref="CompleteTotpEnrollmentAsync"/> で確定する。
+    /// 預けた鍵は暗号化して DB に置く（<see cref="IAdminUserStore.SetTotpPendingAsync"/>）。
+    /// **画面から送り返させない**（差し替えられる）。
     /// </remarks>
     /// <exception cref="InvalidOperationException">2 要素を無効にしている場合。</exception>
-    public TotpEnrollment BeginTotpEnrollment(string loginId)
+    public async Task<TotpEnrollment> BeginTotpEnrollmentAsync(
+        Guid adminUserId,
+        string loginId,
+        CancellationToken cancellationToken = default)
     {
         EnsureEnrollmentAllowed();
 
         var secret = totp.GenerateSecret();
+        await store.SetTotpPendingAsync(adminUserId, secret, cancellationToken).ConfigureAwait(false);
         return new TotpEnrollment(secret, TotpService.BuildUri(options.Issuer, loginId, secret));
+    }
+
+    /// <summary>登録の途中の共有鍵を返す。**無い・復号できないときは <c>null</c>**（登録のやり直しを求める）。</summary>
+    public async Task<string?> GetPendingEnrollmentSecretAsync(
+        Guid adminUserId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await store.GetTotpPendingAsync(adminUserId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
     }
 
     /// <summary>2 要素の登録を確定する。</summary>
@@ -335,23 +368,20 @@ public sealed class AdminAuthenticator(
             return null;
         }
 
-        await store.EnableTotpAsync(adminUserId, protector.Protect(secretBase32), cancellationToken)
-            .ConfigureAwait(false);
-
-        // **登録に使った時間枠はもう使えない。** そのままログインへ流用させない
-        await store.TryConsumeTotpTimeStepAsync(adminUserId, timeStep, cancellationToken)
-            .ConfigureAwait(false);
+        // **共有鍵の確定・登録に使った時間枠・前の復旧コードの置き換えを、1 つの取引で行う。**
+        // 登録に使った時間枠はもう使えない（そのままログインへ流用させない）
+        var codes = RecoveryCode.Generate();
+        await store.EnableTotpAsync(
+            adminUserId,
+            secretBase32,
+            timeStep,
+            codes.Select(value => hasher.Hash(RecoveryCode.Normalize(value))).ToList(),
+            cancellationToken).ConfigureAwait(false);
 
         // **ここまで来たらログインが 1 回通ったのと同じ。**
         // パスワードと使い捨てパスワードの両方が揃っており、この後 `Admin.Session` になる。
         // 記録しないと、**入れているのに「一度も入っていない」ように見える**
         await store.RecordSuccessAsync(adminUserId, cancellationToken).ConfigureAwait(false);
-
-        var codes = RecoveryCode.Generate();
-        await store.ReplaceRecoveryCodesAsync(
-            adminUserId,
-            codes.Select(value => hasher.Hash(RecoveryCode.Normalize(value))).ToList(),
-            cancellationToken).ConfigureAwait(false);
 
         return codes;
     }
@@ -384,59 +414,54 @@ public sealed class AdminAuthenticator(
     /// 端末を失った人の救済に使う。**誰が誰の登録を解除したかは監査ログへ残すこと**
     /// （呼び出し側の責任）。
     /// </remarks>
-    public async Task DisableTotpAsync(Guid adminUserId, CancellationToken cancellationToken = default)
-    {
-        await store.DisableTotpAsync(adminUserId, cancellationToken).ConfigureAwait(false);
-
-        // **復旧コードだけ残っても意味が無い。** 2 要素を外したら一緒に消す
-        await store.ReplaceRecoveryCodesAsync(adminUserId, [], cancellationToken).ConfigureAwait(false);
-    }
+    public Task DisableTotpAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
+        // **復旧コードだけ残っても意味が無い。** 2 要素を外したら一緒に消える（Core の窓口が同じ取引で消す）
+        store.DisableTotpAsync(adminUserId, cancellationToken);
 
     /// <summary>最初の管理者を作る。**まだ 1 人も居ないときだけ通す。**</summary>
     /// <remarks>
     /// 既定のパスワードを仕込むより、**空の状態から利用者に作らせる**方が安全。
     /// 変え忘れた既定値が残らない。
+    /// 排他は Core の窓口（<see cref="IAdminUserStore.CreateFirstAsync"/>。印の表の主キー）が持つ。
     /// </remarks>
     public async Task<AdminUser?> TryCreateFirstAdministratorAsync(
         string loginId,
         string password,
         CancellationToken cancellationToken = default)
     {
-        if (!await store.IsEmptyAsync(cancellationToken).ConfigureAwait(false))
+        // **居るときはハッシュを作らない**（無駄な計算をさせない）。最終的な排他は CreateFirstAsync が行う
+        if (await store.CountAsync(cancellationToken).ConfigureAwait(false) != 0)
         {
             return null;
         }
 
-        var user = new AdminUser
+        var user = await store
+            .CreateFirstAsync(loginId, hasher.Hash(password), language: string.Empty, cancellationToken)
+            .ConfigureAwait(false);
+        if (user is null)
         {
-            AdminUserId = Guid.NewGuid(),
-            LoginId = loginId,
-            PasswordHash = hasher.Hash(password),
-            Role = AdminRole.Administrator,
-        };
+            return null;
+        }
 
-        await store.CreateAsync(user, cancellationToken).ConfigureAwait(false);
         // **利用者が書いた文字列をそのままログへ出さない。**
         // 改行を含めれば、ログの行を偽装できる（CodeQL の cs/log-forging）
         logger.LogInformation("最初の管理者を作った（LoginId={LoginId}）", LogSafe.Text(loginId));
         return user;
     }
 
-    private async Task CountFailureAsync(AdminUser user, CancellationToken cancellationToken)
+    private async Task CountFailureAsync(Guid adminUserId, CancellationToken cancellationToken)
     {
-        var failures = await store.RecordFailureAsync(user.AdminUserId, cancellationToken)
+        // **数えるのも締め出すのも DB 側の 1 つの口で行う。** 並行した失敗を数え落とさない
+        var failure = await store
+            .RecordFailureAsync(adminUserId, options.MaxFailedAttempts, options.LockoutDuration, cancellationToken)
             .ConfigureAwait(false);
 
-        if (failures < options.MaxFailedAttempts)
+        if (failure.LockedUntil is { } lockedUntil)
         {
-            return;
+            logger.LogWarning(
+                "失敗が続いたので締め出した（AdminUserId={AdminUserId}、{LockedUntil} まで）",
+                adminUserId,
+                lockedUntil);
         }
-
-        var lockedUntil = timeProvider.GetUtcNow().UtcDateTime + options.LockoutDuration;
-        await store.LockAsync(user.AdminUserId, lockedUntil, cancellationToken).ConfigureAwait(false);
-        logger.LogWarning(
-            "失敗が続いたので締め出した（AdminUserId={AdminUserId}、{LockedUntil} まで）",
-            user.AdminUserId,
-            lockedUntil);
     }
 }
