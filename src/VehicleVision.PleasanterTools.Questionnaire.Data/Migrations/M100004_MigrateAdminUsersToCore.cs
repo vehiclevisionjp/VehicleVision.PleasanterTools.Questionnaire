@@ -117,9 +117,9 @@ public sealed class M100004_MigrateAdminUsersToCore : Migration
             transaction,
             provider,
             "SELECT u.[AdminUserId], u.[LoginId] FROM [AdminUsers] u "
-            + $"WHERE {LowerOf(provider, "u.[LoginId]")} IN "
-            + $"(SELECT {LowerOf(provider, "d.[LoginId]")} FROM [AdminUsers] d "
-            + $"GROUP BY {LowerOf(provider, "d.[LoginId]")} HAVING COUNT(*) > 1) "
+            + "WHERE EXISTS (SELECT 1 FROM [AdminUsers] d "
+            + $"WHERE {LowerOf(provider, "d.[LoginId]")} = {LowerOf(provider, "u.[LoginId]")} "
+            + "AND d.[AdminUserId] <> u.[AdminUserId]) "
             + $"ORDER BY {LowerOf(provider, "u.[LoginId]")}, u.[LoginId]");
         if (duplicates.Count > 0)
         {
