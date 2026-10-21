@@ -313,7 +313,8 @@ public class AdminAuthEndToEndTests
             login.EnsureSuccessStatusCode();
         }
 
-        using (var totp = await PostAsync(owner, "/api/admin/login/totp", new { code = Code(secret) }))
+        // 登録に使った時間枠は使えないので、次の枠のコードで入る
+        using (var totp = await PostAsync(owner, "/api/admin/login/totp", new { code = NextCode(secret) }))
         {
             totp.EnsureSuccessStatusCode();
         }
