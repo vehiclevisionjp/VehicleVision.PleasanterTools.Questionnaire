@@ -30,6 +30,7 @@ public static class ServerMessages
         [ServerMessageKeys.AdministratorAlreadyExists] = "관리자가 이미 등록되어 있습니다.",
         [ServerMessageKeys.LoginTemporarilyLocked] = "시도가 계속되어 잠시 로그인할 수 없습니다. 잠시 후 다시 시도하세요.",
         [ServerMessageKeys.EnrollmentRestartRequired] = "등록을 처음부터 다시 하세요.",
+        [ServerMessageKeys.TotpAlreadyEnrolled] = "이미 2단계 인증이 등록되어 있습니다. 변경하려면 로그인한 뒤 계정 설정에서 다시 등록하세요.",
         [ServerMessageKeys.TotpCodeMismatch] = "코드가 일치하지 않습니다. 인증 앱에 표시된 번호를 확인하세요.",
         [ServerMessageKeys.TwoFactorDisabled] = "2단계 인증이 비활성화되어 있습니다. 등록하려면 관리자에게 설정 변경을 요청하세요.",
         [ServerMessageKeys.TwoFactorRequired] = "2단계 인증이 필수로 설정되어 있어 해제할 수 없습니다.",
@@ -182,6 +183,7 @@ public static class ServerMessages
             [ServerMessageKeys.AdministratorAlreadyExists] = "管理员已注册。",
             [ServerMessageKeys.LoginTemporarilyLocked] = "尝试次数过多，暂时无法登录。请稍后再试。",
             [ServerMessageKeys.EnrollmentRestartRequired] = "请重新开始注册。",
+            [ServerMessageKeys.TotpAlreadyEnrolled] = "已注册两步验证。如需更改，请先登录，再到账户设置中重新注册。",
             [ServerMessageKeys.TotpCodeMismatch] = "代码不匹配。请确认身份验证器应用显示的号码。",
             [ServerMessageKeys.TwoFactorDisabled] = "双重身份验证已被禁用。若要注册，请请求管理员更改设置。",
             [ServerMessageKeys.TwoFactorRequired] = "双重身份验证为必需设置，因此无法解除。",
@@ -297,6 +299,7 @@ public static class ServerMessages
             [ServerMessageKeys.AdministratorAlreadyExists] = "Ya se ha registrado un administrador.",
             [ServerMessageKeys.LoginTemporarilyLocked] = "Demasiados intentos. El inicio de sesión no está disponible durante un tiempo; inténtelo de nuevo más tarde.",
             [ServerMessageKeys.EnrollmentRestartRequired] = "Vuelva a iniciar el registro.",
+            [ServerMessageKeys.TotpAlreadyEnrolled] = "La verificación en dos pasos ya está registrada. Para cambiarla, inicie sesión y vuelva a registrarla en la configuración de la cuenta.",
             [ServerMessageKeys.TotpCodeMismatch] = "El código no coincide. Compruebe el número mostrado en su aplicación de autenticación.",
             [ServerMessageKeys.TwoFactorDisabled] = "La autenticación de dos factores está desactivada. Pida a su administrador que cambie la configuración para registrarla.",
             [ServerMessageKeys.TwoFactorRequired] = "La autenticación de dos factores es obligatoria, por lo que no se puede eliminar.",
@@ -417,6 +420,7 @@ public static class ServerMessages
             [ServerMessageKeys.AdministratorAlreadyExists] = "Ein Administrator wurde bereits registriert.",
             [ServerMessageKeys.LoginTemporarilyLocked] = "Zu viele Versuche. Die Anmeldung ist für eine Weile nicht verfügbar; versuchen Sie es später erneut.",
             [ServerMessageKeys.EnrollmentRestartRequired] = "Starten Sie die Registrierung erneut.",
+            [ServerMessageKeys.TotpAlreadyEnrolled] = "Die Zwei-Faktor-Authentifizierung ist bereits registriert. Zum Ändern melden Sie sich an und registrieren sie in den Kontoeinstellungen neu.",
             [ServerMessageKeys.TotpCodeMismatch] = "Dieser Code stimmt nicht überein. Prüfen Sie die Nummer in Ihrer Authenticator-App.",
             [ServerMessageKeys.TwoFactorDisabled] = "Die Zwei-Faktor-Authentifizierung ist deaktiviert. Bitten Sie Ihren Administrator, die Einstellung zu ändern.",
             [ServerMessageKeys.TwoFactorRequired] = "Die Zwei-Faktor-Authentifizierung ist erforderlich und kann daher nicht entfernt werden.",
@@ -588,6 +592,12 @@ public static class ServerMessages
             "登録をやり直してください。",
             "Start the registration over.",
             "Vui lòng thực hiện lại việc đăng ký.");
+
+        Add(
+            ServerMessageKeys.TotpAlreadyEnrolled,
+            "2 要素認証はすでに登録されています。変更するには、ログインしてからアカウント設定で登録し直してください。",
+            "Two-factor authentication is already set up. To change it, sign in and register again from your account settings.",
+            "Xác thực hai yếu tố đã được đăng ký. Để thay đổi, hãy đăng nhập rồi đăng ký lại trong phần cài đặt tài khoản.");
 
         Add(
             ServerMessageKeys.TotpCodeMismatch,
