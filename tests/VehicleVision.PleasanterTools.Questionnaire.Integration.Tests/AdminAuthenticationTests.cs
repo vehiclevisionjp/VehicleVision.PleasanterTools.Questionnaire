@@ -50,7 +50,7 @@ public class AdminAuthenticationTests
         var protector = new SecretProtector(SecretProtector.GenerateKey());
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-08-18T00:00:00Z"));
         var store = AdminTestSupport.CreateUserStore(factory, time, protector);
-        var settings = new AdminUserSettingsStore(factory);
+        var settings = new AdminUserSettingsStore(factory, store);
 
         var authenticator = new AdminAuthenticator(
             store,
