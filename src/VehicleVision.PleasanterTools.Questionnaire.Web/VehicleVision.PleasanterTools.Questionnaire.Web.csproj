@@ -50,4 +50,9 @@
     <Using Include="VehicleVision.PleasanterTools.Core.Data" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Pleasanter のログインの本人確認は Core.Web（NuGet）へ集約した（Issue #706）。名前空間を暗黙に使えるようにする -->
+    <Using Include="VehicleVision.PleasanterTools.Core.Web" />
+  </ItemGroup>
+
 </Project>

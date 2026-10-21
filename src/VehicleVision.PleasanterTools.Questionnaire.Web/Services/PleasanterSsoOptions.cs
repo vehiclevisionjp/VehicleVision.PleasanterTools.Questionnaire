@@ -32,8 +32,12 @@ public enum PleasanterSsoUnknownUserPolicy
 /// ⚠️ **本アプリと Pleasanter を同じホスト名で動かすことが前提。**
 /// cookie はホスト単位でしか届かない（<c>_documents/Pleasanter-SSO-運用手順書.md</c>）。
 /// </para>
+/// <para>
+/// 本人確認（Core.Web の <c>PleasanterSessionVerifier</c>）へは <see cref="IPleasanterSsoVerificationOptions"/> として渡す（Issue #706）。
+/// **設定の読み取りは本アプリに残す。**
+/// </para>
 /// </remarks>
-public sealed class PleasanterSsoOptions
+public sealed class PleasanterSsoOptions : IPleasanterSsoVerificationOptions
 {
     public const string AllowedDeptIdsKey = "QUESTIONNAIRE_PLEASANTERSSO_ALLOWEDDEPTIDS";
     public const string AllowedGroupIdsKey = "QUESTIONNAIRE_PLEASANTERSSO_ALLOWEDGROUPIDS";
