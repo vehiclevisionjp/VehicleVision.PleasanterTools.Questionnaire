@@ -11,7 +11,7 @@
   `Services/PleasanterSsoAuthenticator.cs`、`Services/PleasanterSsoSessionRevalidator.cs`、
   `Endpoints/AdminPleasanterSsoEndpoints.cs`
 - 本人確認の問い合わせ（検証サービス）: Core.Web（NuGet `VehicleVision.PleasanterTools.Core.Web`）の
-  [`PleasanterSessionVerifier.cs`](https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/v0.1.0-preview.10/src/VehicleVision.PleasanterTools.Core.Web/PleasanterSessionVerifier.cs)。
+  [`PleasanterSessionVerifier.cs`](https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/v0.1.0-preview.11/src/VehicleVision.PleasanterTools.Core.Web/PleasanterSessionVerifier.cs)。
   本アプリの実装を基準に Core へ移した（Issue #706）。本アプリは鍵・設定名・ログのカテゴリと接続設定を渡す
 - 保存先: `src/VehicleVision.PleasanterTools.Questionnaire.Data/PleasanterSsoSettingStore.cs`、
   `Migrations/M0032_PleasanterSsoSettings.cs`
@@ -521,4 +521,4 @@ Core.Web へ移した後も同じ名前で出す）と操作の記録（`POST /a
 
 [user-api-model]: https://github.com/Implem/Implem.Pleasanter/blob/Pleasanter_1.5.8.1/Implem.Pleasanter/Models/Users/UserApiModel.cs
 [group-utilities]: https://github.com/Implem/Implem.Pleasanter/blob/Pleasanter_1.5.8.1/Implem.Pleasanter/Models/Groups/GroupUtilities.cs
-[core-web-membership]: https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/v0.1.0-preview.10/src/VehicleVision.PleasanterTools.Core.Web/PleasanterSessionVerifier.Membership.cs
+[core-web-membership]: https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/v0.1.0-preview.11/src/VehicleVision.PleasanterTools.Core.Web/PleasanterSessionVerifier.Membership.cs
