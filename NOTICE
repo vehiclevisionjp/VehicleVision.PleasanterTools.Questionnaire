@@ -137,6 +137,9 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.Configuration 10.0.13 / MIT
     （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
   Microsoft.Extensions.TimeProvider.Testing 10.10.0 / MIT
+  Microsoft.AspNetCore.Mvc.Testing 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.Mvc.Testing/10.0.13
+    （本体の起動コード・HTTP パイプラインを通す管理画面の契約テストに使用。
+      https://github.com/dotnet/aspnetcore/blob/v10.0.13/LICENSE.txt、参照日 2026-10-22）
 
 **依存を追加したら、ここへ追記してからコミットすること。**
 
