@@ -156,7 +156,9 @@ QuestionnaireDatabase.Instance.EnsureSecure(
 // **当てる道具を別に作らない。** 接続文字列の読み方が二重になり、片方だけ直す事故が起きる
 if (MigrationCommand.IsRequested(args))
 {
-    Environment.ExitCode = await MigrationCommand.RunAsync(provider, connectionString, args);
+    Environment.ExitCode = await MigrationCommand.RunAsync(
+        QuestionnaireDatabase.Instance.Migrator, provider, connectionString, args,
+        lockTimeout: TimeSpan.FromSeconds(DatabaseStartupMigration.DefaultLockTimeoutSeconds));
     return;
 }
 
