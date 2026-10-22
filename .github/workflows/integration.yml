@@ -11,6 +11,8 @@
 #     → **`.github/workflows/e2e.yml` が回す**（根幹ブランチへの push と日次。Issue #111）
 #   - scripts/smoke.sh（起動しているアプリへ HTTP で当てるもの）
 #     → 手元の `docker compose --profile postgres up -d --wait` で確認する。
+#   - AdminContractTests（専用 SQLite の C1〜C5）
+#     → 外部サービス不要のため `.github/workflows/ci.yml` の build-test で回す。
 #
 # **接続先は tests 側にハードコードされている**（localhost の 11433 / 15432 / 13306、
 # パスワードは検証用の固定値）。ここでのポート公開はその値に合わせてある。変えると通らない。
@@ -189,10 +191,11 @@ jobs:
           # 失敗時にどの方言かを判別できる
         # Pleasanter 本体・本アプリのコンテナが要るものは除く。
         # AdminAuthEndToEndTests も名前に EndToEndTests を含むため、この 2 条件で外れる
+        # AdminContractTests は ci.yml で実行するため重複させない
         run: >-
           dotnet test tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests
           -c Release
-          --filter "FullyQualifiedName!~EndToEndTests&FullyQualifiedName!~PleasanterApiClientTests"
+          --filter "FullyQualifiedName!~EndToEndTests&FullyQualifiedName!~PleasanterApiClientTests&FullyQualifiedName!~AdminContractTests"
           --logger "trx;LogFileName=integration.trx"
           --results-directory "$GITHUB_WORKSPACE/TestResults"
 
