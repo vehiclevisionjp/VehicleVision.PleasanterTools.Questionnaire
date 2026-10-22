@@ -1,4 +1,4 @@
-# ビルド・単体テスト・フロントエンド・ライセンス検査。
+# ビルド・単体テスト・SQLite 契約テスト・フロントエンド・ライセンス検査。
 #
 # **ここで定義したジョブ名は必須ステータスチェックへ登録する。以後変えないこと**
 # （_documents/ブランチ運用方針.md「ブランチ保護」）。名前を変えると、必須チェックが
@@ -71,10 +71,10 @@ jobs:
           --no-restore -c Release
 
       - name: 単体テストを実行する
-        # **結合テスト（Integration.Tests）はここで回さない。**
+        # **Integration.Tests 全体はここで回さない。**
         # QUESTIONNAIRE_INTEGRATION を設定しないと何も検証せずに緑になるため、
-        # ここに混ぜると「通った」と誤読する。DB を用意した別ワークフローで回す
-        # （.github/workflows/integration.yml）
+        # DB を用意した別ワークフローで回す（.github/workflows/integration.yml）。
+        # 環境変数も外部 DB も不要な SQLite 契約テストだけは、次の専用ステップで回す
         run: |
           set -euo pipefail
           for proj in tests/*/*.csproj; do
@@ -89,6 +89,16 @@ jobs:
                   --logger "trx;LogFileName=$(basename "$proj" .csproj).trx" \
                   --results-directory "$GITHUB_WORKSPACE/TestResults"
           done
+
+      - name: 管理画面の契約テスト C1〜C5 を SQLite で実行する
+        # QUESTIONNAIRE_INTEGRATION は不要。本体の HTTP パイプラインを専用 SQLite で試す。
+        # SQL Server・Pleasanter の起動失敗に左右されず、通常の push / PR で検証する
+        run: >-
+          dotnet test tests/VehicleVision.PleasanterTools.Questionnaire.Integration.Tests
+          --no-build -c Release
+          --filter "FullyQualifiedName~AdminContractTests"
+          --logger "trx;LogFileName=admin-contracts.trx"
+          --results-directory "$GITHUB_WORKSPACE/TestResults"
 
       - name: テスト結果を残す
         if: always()

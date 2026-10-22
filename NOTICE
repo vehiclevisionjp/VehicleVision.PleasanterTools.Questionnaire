@@ -118,6 +118,10 @@ Copyright (C) PMC Co.,Ltd.
 
 テスト時のみ使用するもの
 
+  VehicleVision.PleasanterTools.Core.Web.Testing 0.1.0-preview.11 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://www.nuget.org/packages/VehicleVision.PleasanterTools.Core.Web.Testing/0.1.0-preview.11
+    （管理画面の共有契約テスト C1〜C5。xunit 2.9.3 のみを推移的に伴い、Core.Web には依存しない。
+      https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/57eceb486b465856a541b9cc0d3cb4101bfc2cdc/LICENSING.md、
+      公開パッケージの nuspec とライセンスを確認。参照日 2026-10-22）
   xunit 2.9.3 / Apache-2.0
   xunit.runner.visualstudio 4.0.1 / Apache-2.0
   Microsoft.NET.Test.Sdk 18.11.0 / MIT
@@ -137,6 +141,9 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.Configuration 10.0.13 / MIT
     （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
   Microsoft.Extensions.TimeProvider.Testing 10.10.0 / MIT
+  Microsoft.AspNetCore.Mvc.Testing 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.Mvc.Testing/10.0.13
+    （本体の起動コード・HTTP パイプラインを通す管理画面の契約テストに使用。
+      https://github.com/dotnet/aspnetcore/blob/v10.0.13/LICENSE.txt、参照日 2026-10-22）
 
 **依存を追加したら、ここへ追記してからコミットすること。**
 
