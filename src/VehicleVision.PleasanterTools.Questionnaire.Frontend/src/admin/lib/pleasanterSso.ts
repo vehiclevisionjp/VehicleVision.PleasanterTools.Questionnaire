@@ -25,7 +25,7 @@ export type PleasanterSsoFailure =
 export type PleasanterSsoCheckOutcome =
   | { kind: 'signedIn'; next: 'done' | 'totp' | 'enroll' }
   | { kind: 'waiting' }
-  | { kind: 'failed'; reason: PleasanterSsoFailure };
+  | { kind: 'failed'; reason: PleasanterSsoFailure; message?: string };
 
 /** `api.ts` の `Result` と同じ形（依存を増やさないため、ここで必要な分だけ書く）。 */
 type CheckResult =
@@ -61,6 +61,14 @@ export function classifyCheck(result: CheckResult): PleasanterSsoCheckOutcome {
     }
 
     return { kind: 'failed', reason: 'error' };
+  }
+
+  if (
+    (result.status === 401 || result.status === 423) &&
+    typeof result.body === 'object' && result.body !== null &&
+    'message' in result.body && typeof result.body.message === 'string'
+  ) {
+    return { kind: 'failed', reason: 'error', message: result.body.message };
   }
 
   const code =

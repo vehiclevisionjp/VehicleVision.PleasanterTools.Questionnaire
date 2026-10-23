@@ -147,6 +147,7 @@ public static class AdminSamlEndpoints
             HttpContext context,
             ISamlOptionsProvider optionsProvider,
             SamlAuthenticator authenticator,
+            IAdminUserStore store,
             IDataProtectionProvider protectionProvider,
             ILogger<SamlAuthenticator> logger,
             CancellationToken cancellationToken) =>
@@ -159,6 +160,12 @@ public static class AdminSamlEndpoints
 
             var relay = ReadRelay(context, protectionProvider, AdminEntry(context, adminPath.Path));
             ClearRelay(context);
+
+            if (await store.CountAsync(cancellationToken).ConfigureAwait(false) == 0)
+            {
+                return FailedAudited(context, AdminEntry(context, adminPath.Path),
+                    SamlFailure.Invalid, "setup-required", StatusCodes.Status409Conflict);
+            }
 
             if (relay is null)
             {
@@ -255,10 +262,20 @@ public static class AdminSamlEndpoints
                     return Results.Redirect(relay.ReturnUrl);
 
                 case SamlSignInOutcome.Disabled:
-                    return FailedAudited(context, AdminEntry(context, adminPath.Path), SamlFailure.Disabled);
+                    return FailedAudited(context, AdminEntry(context, adminPath.Path),
+                        SamlFailure.Invalid, "disabled");
+
+                case SamlSignInOutcome.LockedOut:
+                    return FailedAudited(context, AdminEntry(context, adminPath.Path),
+                        SamlFailure.Invalid, "locked-out", StatusCodes.Status423Locked);
+
+                case SamlSignInOutcome.NotAllowed:
+                    return FailedAudited(context, AdminEntry(context, adminPath.Path),
+                        SamlFailure.Invalid, "register-role-not-allowed");
 
                 default:
-                    return FailedAudited(context, AdminEntry(context, adminPath.Path), SamlFailure.UnknownUser);
+                    return FailedAudited(context, AdminEntry(context, adminPath.Path),
+                        SamlFailure.Invalid, "unknown-user");
             }
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
@@ -688,7 +705,8 @@ public static class AdminSamlEndpoints
         HttpContext context,
         string adminPath,
         string failure,
-        string? reason = null)
+        string? reason = null,
+        int statusCode = StatusCodes.Status401Unauthorized)
     {
         AuditNotes.Add(context, "result", failure);
         if (reason is not null)
@@ -696,11 +714,7 @@ public static class AdminSamlEndpoints
             AuditNotes.Add(context, "reason", reason);
         }
 
-        AuditNotes.SetStatus(
-            context,
-            failure == SamlFailure.Invalid
-                ? StatusCodes.Status401Unauthorized
-                : StatusCodes.Status403Forbidden);
+        AuditNotes.SetStatus(context, statusCode);
         return Failed(adminPath, failure);
     }
 
@@ -713,12 +727,6 @@ public static class AdminSamlEndpoints
     {
         /// <summary>応答が受け取れなかった（署名・宛先・期限・対応する要求が無い）。</summary>
         public const string Invalid = "invalid";
-
-        /// <summary>本アプリに居ない利用者だった。</summary>
-        public const string UnknownUser = "unknown-user";
-
-        /// <summary>止められている利用者だった。</summary>
-        public const string Disabled = "disabled";
     }
 
     /// <summary>この要求の配信元から受け口の URL を作る。</summary>

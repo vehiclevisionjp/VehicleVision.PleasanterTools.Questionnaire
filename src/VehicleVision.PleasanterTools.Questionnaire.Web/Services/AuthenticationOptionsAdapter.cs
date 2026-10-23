@@ -6,8 +6,12 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// <summary>Questionnaire 固有の役割の解釈と、既存の例外型を維持する。</summary>
 internal static class AuthenticationOptionsAdapter
 {
-    internal static readonly string[] RegisterRoles = Enum.GetNames<AdminRole>();
+    internal static readonly string[] RegisterRoles = Enum.GetValues<AdminRole>()
+        .Where(IsRegisterRoleAllowed).Select(role => role.ToString()).ToArray();
     internal const string DefaultRegisterRole = nameof(AdminRole.Editor);
+
+    internal static bool IsRegisterRoleAllowed(AdminRole role) =>
+        Enum.IsDefined(role) && role != AdminRole.Administrator;
 
     internal static string? ReadRegisterRole(string? value, string key, bool rejectNumeric)
     {
@@ -19,7 +23,7 @@ internal static class AuthenticationOptionsAdapter
 
         // SSO は数値を拒否し、SAML は受理する。複合表記は両方で従来どおり解釈する。
         if (!Enum.TryParse<AdminRole>(trimmed, ignoreCase: true, out var parsed)
-            || !Enum.IsDefined(parsed)
+            || !IsRegisterRoleAllowed(parsed)
             || (rejectNumeric && int.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)))
         {
             throw new InvalidOperationException(

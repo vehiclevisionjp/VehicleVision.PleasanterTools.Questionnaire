@@ -1,4 +1,6 @@
+using VehicleVision.PleasanterTools.Questionnaire.Core.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -138,16 +140,22 @@ public static class AdminPleasanterSsoEndpoints
 
                 case PleasanterSsoSignInOutcome.NotAllowed:
                     AuditNotes.Add(context, "result", "not-allowed");
-                    AuditNotes.Add(context, "reason", "membership-not-configured");
+                    AuditNotes.Add(context, "reason",
+                        AuthenticationOptionsAdapter.IsRegisterRoleAllowed(options.RegisterRole)
+                            ? "membership-not-configured" : "register-role-not-allowed");
                     return Results.Json(new { code = "not-allowed" }, statusCode: StatusCodes.Status403Forbidden);
 
                 case PleasanterSsoSignInOutcome.Disabled:
                     AuditNotes.Add(context, "result", "disabled");
-                    return Results.Json(new { code = "disabled" }, statusCode: StatusCodes.Status403Forbidden);
+                    return LoginFailure(context, ServerMessageKeys.InvalidCredentials, StatusCodes.Status401Unauthorized);
+
+                case PleasanterSsoSignInOutcome.LockedOut:
+                    AuditNotes.Add(context, "result", "locked-out");
+                    return LoginFailure(context, ServerMessageKeys.LoginTemporarilyLocked, StatusCodes.Status423Locked);
 
                 default:
                     AuditNotes.Add(context, "result", "unknown-user");
-                    return Results.Json(new { code = "unknown-user" }, statusCode: StatusCodes.Status403Forbidden);
+                    return LoginFailure(context, ServerMessageKeys.InvalidCredentials, StatusCodes.Status401Unauthorized);
             }
         }).RequireRateLimiting(CheckRateLimitPolicy);
 
@@ -155,6 +163,11 @@ public static class AdminPleasanterSsoEndpoints
 
         return builder;
     }
+
+    private static IResult LoginFailure(HttpContext context, string messageKey, int statusCode) =>
+        Results.Json(
+            new { message = ServerMessages.Get(messageKey, RequestLanguage.Of(context)) },
+            statusCode: statusCode);
 
     /// <summary>特権管理者だけが使える設定の入口。</summary>
     private static void MapSettings(RouteGroupBuilder group)

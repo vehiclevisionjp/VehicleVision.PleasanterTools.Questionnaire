@@ -218,11 +218,41 @@ public class PleasanterSsoEndToEndTests
             await browser.LoginToPleasanterAsync(StrangerUser, StrangerPassword));
 
         using var response = await browser.App.PostAsJsonAsync("/api/admin/pleasanter-sso/check", new { });
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
         var body = JsonNode.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal("unknown-user", body!["code"]!.GetValue<string>());
+        Assert.False(string.IsNullOrEmpty(body!["message"]!.GetValue<string>()));
+        Assert.Null(body["code"]);
         Assert.False((await browser.SessionAsync())!["authenticated"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task 締め出し中はPleasanterで本人確認できても本アプリのcookieを発行しない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        _ = await ResetAdminAsync(PlainUser);
+        await using var connection = E2EDatabase.AppFactory().Create();
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(E2EDatabase.Sql(
+            "UPDATE [Core_AdminUsers] SET [LockedUntil] = @until, [FailedLoginCount] = 2 WHERE [LoginId] = @loginId"),
+            new { until = DateTime.UtcNow.AddMinutes(15), loginId = PlainUser });
+        using var browser = new SharedHostBrowser();
+        AssertPleasanterSignedIn(await browser.LoginToPleasanterAsync(PlainUser, PlainPassword));
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var response = await browser.App.PostAsJsonAsync("/api/admin/pleasanter-sso/check", new { });
+            Assert.Equal(HttpStatusCode.Locked, response.StatusCode);
+            Assert.DoesNotContain(browser.AppCookies(), cookie => cookie.Name is "q.admin" or "q.admin.pending");
+            Assert.False((await browser.SessionAsync())!["authenticated"]!.GetValue<bool>());
+            using var probe = await browser.App.GetAsync("/api/admin/users");
+            Assert.Equal(HttpStatusCode.Unauthorized, probe.StatusCode);
+        }
+        Assert.Equal(2, await connection.ExecuteScalarAsync<int>(E2EDatabase.Sql(
+            "SELECT [FailedLoginCount] FROM [Core_AdminUsers] WHERE [LoginId] = @loginId"), new { loginId = PlainUser }));
     }
 
     [Fact]

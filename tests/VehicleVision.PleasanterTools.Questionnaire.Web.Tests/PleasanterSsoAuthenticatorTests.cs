@@ -14,6 +14,7 @@ public class PleasanterSsoAuthenticatorTests
     private sealed record Harness(
         FakeAdminUserStore Store,
         PasswordHasher Hasher,
+        FakeTimeProvider Time,
         PleasanterSsoAuthenticator Authenticator);
 
     private static Harness Create(TwoFactorPolicy twoFactor = TwoFactorPolicy.Optional)
@@ -24,10 +25,12 @@ public class PleasanterSsoAuthenticatorTests
         return new Harness(
             store,
             hasher,
+            time,
             new PleasanterSsoAuthenticator(
                 store,
                 hasher,
                 new AdminAuthOptions { TwoFactor = twoFactor },
+                time,
                 NullLogger<PleasanterSsoAuthenticator>.Instance));
     }
 
@@ -71,6 +74,53 @@ public class PleasanterSsoAuthenticatorTests
         Assert.Equal(PleasanterSsoSignInOutcome.SignedIn, result.Outcome);
         Assert.Equal(user.Id, result.User!.Id);
         Assert.NotNull((await harness.Store.FindByIdAsync(user.Id))!.LastLoginAt);
+    }
+
+    [Theory]
+    [InlineData(AdminRole.Administrator)]
+    [InlineData((AdminRole)999)]
+    public async Task 設定の解析を迂回しても禁止された役割では自動登録しない(AdminRole role)
+    {
+        var harness = Create();
+        var result = await harness.Authenticator.SignInAsync(LoginId,
+            Options(PleasanterSsoUnknownUserPolicy.Register, role));
+        Assert.Equal(PleasanterSsoSignInOutcome.NotAllowed, result.Outcome);
+        Assert.False(result.Registered);
+        Assert.Empty(await harness.Store.ListAsync());
+    }
+
+    [Theory]
+    [InlineData(TwoFactorPolicy.Optional, false)]
+    [InlineData(TwoFactorPolicy.Optional, true)]
+    [InlineData(TwoFactorPolicy.Required, false)]
+    [InlineData(TwoFactorPolicy.Required, true)]
+    [InlineData(TwoFactorPolicy.Disabled, false)]
+    [InlineData(TwoFactorPolicy.Disabled, true)]
+    public async Task 締め出し中は成功記録も二要素の開始もせず満了時に通す(TwoFactorPolicy policy, bool withTotp)
+    {
+        var harness = Create(policy);
+        var user = await AddAsync(harness);
+        if (withTotp)
+        {
+            await harness.Store.EnableTotpAsync(user.Id, "SECRET", 1, []);
+        }
+        await harness.Store.RecordFailureAsync(user.Id, 1, TimeSpan.FromMinutes(15));
+        await harness.Store.RecordFailureAsync(user.Id, 5, TimeSpan.FromMinutes(15));
+        var before = await harness.Store.FindByIdAsync(user.Id);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            Assert.Equal(PleasanterSsoSignInOutcome.LockedOut,
+                (await harness.Authenticator.SignInAsync(LoginId, Options())).Outcome);
+            Assert.Equal(before, await harness.Store.FindByIdAsync(user.Id));
+        }
+        harness.Time.Advance(TimeSpan.FromMinutes(15) - TimeSpan.FromTicks(1));
+        Assert.Equal(PleasanterSsoSignInOutcome.LockedOut,
+            (await harness.Authenticator.SignInAsync(LoginId, Options())).Outcome);
+        harness.Time.Advance(TimeSpan.FromTicks(1));
+        var expected = withTotp ? PleasanterSsoSignInOutcome.NeedsSecondFactor
+            : policy == TwoFactorPolicy.Required
+                ? PleasanterSsoSignInOutcome.NeedsTotpEnrollment : PleasanterSsoSignInOutcome.SignedIn;
+        Assert.Equal(expected, (await harness.Authenticator.SignInAsync(LoginId, Options())).Outcome);
     }
 
     [Fact]
