@@ -25,6 +25,14 @@ DB は `Rds.local.json`、メールは `Mail.local.json`、認証は `Authentica
 秘密情報も `.local.json` に指定できます。実値はコミットせず、読み取り権限を制限してください。
 設定変更後はアプリの再起動が必要です。
 
+**外部ログインの JIT には `Administrator` を指定できません**（共通仕様 U8・2026-10-23）。
+`QUESTIONNAIRE_SAML_REGISTERROLE`・`QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE` は、
+無効時も起動時に検証します。既存のファイル・環境変数・DB に `Administrator` を保存している場合は、
+更新前に通常の役割へ変更してください。通常の役割・既定の `Editor` は移行不要です。
+設定名・既定値・既存利用者の役割は変更しません。
+許可値・移行手順・実装根拠は [設定パラメータ一覧](../../_documents/設定パラメータ一覧.md) の
+「外部ログインの JIT 役割の制限」を参照してください。
+
 ## 既存ファイル
 
 | ファイル | 内容 | 読まれているか |
@@ -142,7 +150,8 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 | `QUESTIONNAIRE_SAML_SINGLESIGNONURL` | IdP のログインの窓口（`AuthnRequest` の宛先） |
 | `QUESTIONNAIRE_SAML_IDPCERTIFICATE` | IdP の署名証明書（PEM か、DER の base64）。**入れ替えの最中は改行かカンマで 2 枚並べられる** |
 | `QUESTIONNAIRE_SAML_UNKNOWNUSER` | 本アプリに居ない利用者の扱い。`Reject`（既定・通さない）/ `Register`（その場で作る） |
-| `QUESTIONNAIRE_SAML_REGISTERROLE` | `Register` で作る利用者の役割。`Editor`（既定）/ `Administrator`。**⚠️ Administrator にすると IdP に居る全員が全権を持つ** |
+| `QUESTIONNAIRE_SAML_REGISTERROLE` | JIT の役割。`Editor`（既定）/ `SurveyAdministrator` / `UserAdministrator` / `Auditor`。`Administrator` は不可 |
+| `QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE` | Pleasanter SSO の JIT 役割。許可値・既定値は SAML と同じ |
 | `QUESTIONNAIRE_SAML_LOGINIDSOURCE` | ログイン ID の取り出し先。`NameId`（既定）/ `Claim` |
 | `QUESTIONNAIRE_SAML_LOGINIDCLAIM` | `LOGINIDSOURCE=Claim` のときに読む属性名 |
 | `QUESTIONNAIRE_SAML_BUTTONLABEL` | ログイン画面の釦に出す文字（省略時は「シングルサインオンでログイン」） |

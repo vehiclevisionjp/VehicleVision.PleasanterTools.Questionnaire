@@ -88,6 +88,8 @@ sequenceDiagram
 - **失敗の理由は画面へ返さない。** 決まった文言を出し、詳しい理由はサーバのログと
   操作の記録（`Core_AuditLogs`）に残す
 - **最初の管理者を作る画面には SAML の釦を出さない。**
+  サーバも管理者 0 人の ACS を失敗転送で拒み、JIT を行わない（共通仕様 U8）。
+  締め出し中の利用者も Pending / Session の発行前に拒否し、失敗回数を成功扱いで戻さない
   IdP から来た人を最初の管理者にすると、誰でも全権を取れる
 - **ログイン ID とパスワードの入口は既定では残す。**
   `QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false` を外部設定へ明示した場合だけ、
@@ -225,7 +227,11 @@ URL はブラウザ履歴やリバースプロキシのアクセスログへ残�
 
 ⚠️ **`Register` を選ぶときは、IdP 側で本アプリへの割り当てを絞ること。**
 組織全員へ配ったままにすると、**全社員が管理画面へ入れる。**
-`QUESTIONNAIRE_SAML_REGISTERROLE` を `Administrator` にすると、その全員が全権を持つ。
+`QUESTIONNAIRE_SAML_REGISTERROLE` は通常の 4 役割だけを許可する（既定 `Editor`）。
+`Administrator` は起動時・設定の保存・JIT 実行時で拒否する。画面の選択肢にも出さない。
+既存の設定で指定している場合は、更新前に通常の役割へ変更する。
+設定名・既定値・既存利用者の役割は変えない。
+移行手順は [設定パラメータ一覧](設定パラメータ一覧.md) の「外部ログインの JIT 役割の制限」を参照。
 
 ### ログイン ID をどこから取るか
 
@@ -323,14 +329,13 @@ ACS URL が正しく組み立たない（[`サブパス配置-運用手順書.md
 
 | 印 | 画面の文言 | 見るところ |
 |---|---|---|
-| `unknown-user` | 管理画面に登録されていません | `UNKNOWNUSER` の設定。ログイン ID が IdP の値と一致しているか |
-| `disabled` | 利用を停止されています | 本アプリ側でその利用者を止めていないか |
-| `invalid` | 完了できませんでした | **サーバのログを見る**（下記） |
+| `invalid` | 完了できませんでした | **操作の記録とサーバのログを見る**（下記）。利用者の状態を URL で区別しない |
 
 **管理者の「操作の記録」にも理由が残る**（Issue #602。`POST /api/admin/saml/acs`）。
 画面へは返さない詳しい理由を、`detail` の `result` と `reason` で読める
-（`relay-missing`・`idp-refused`・`response-invalid`・`in-response-to-mismatch`・`login-id-missing`）。
-HTTP の応答は画面へ戻す 302 のままだが、記録は失敗（401 / 403）として残るので
+（`relay-missing`・`idp-refused`・`response-invalid`・`in-response-to-mismatch`・`login-id-missing`・
+`unknown-user`・`disabled`・`locked-out`・`setup-required`・`register-role-not-allowed`）。
+HTTP の応答は画面へ戻す 302 のままだが、記録は失敗（通常 401、締め出し 423、初期設定待ち 409）として残るので
 「失敗した操作のみ」でも絞れる。
 
 `invalid` のときにログへ出る主な理由。
@@ -359,7 +364,7 @@ python tools/saml-idp/roundtrip.py admin@example.jp idp-test-password
 | 試したこと | 結果 |
 |---|---|
 | 本アプリに居る利用者 | 入れる（`role` と `permissions` が返る） |
-| 本アプリに居ない利用者（`Reject`） | 入れない（`/admin?samlError=unknown-user`） |
+| 本アプリに居ない利用者（`Reject`） | 入れない（`/admin?samlError=invalid`。詳しい理由は監査だけに記録） |
 | 本アプリに居ない利用者（`Register`） | `Editor` として作られて入れる |
 | 2 要素が `required` | **入れない。** 途中状態になり登録を求められる |
 | 送り付けられた応答（IdP 起動） | 断る（`samlError=invalid`） |
