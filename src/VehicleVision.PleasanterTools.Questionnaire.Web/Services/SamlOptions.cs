@@ -49,9 +49,11 @@ public sealed class SamlOptions
     public static SamlOptions FromValues(Func<string, string?> valueOf)
     {
         ArgumentNullException.ThrowIfNull(valueOf);
+        var registerRole = AuthenticationOptionsAdapter.ReadRegisterRole(
+            valueOf(RegisterRoleKey), RegisterRoleKey, rejectNumeric: false);
         var options = AuthenticationOptionsAdapter.Read(() => CoreOptions.FromValues(
             key => key == RegisterRoleKey
-                ? AuthenticationOptionsAdapter.ReadRegisterRole(valueOf(key), key, rejectNumeric: false)
+                ? registerRole
                 : valueOf(key),
             Keys, AuthenticationOptionsAdapter.RegisterRoles, AuthenticationOptionsAdapter.DefaultRegisterRole));
 

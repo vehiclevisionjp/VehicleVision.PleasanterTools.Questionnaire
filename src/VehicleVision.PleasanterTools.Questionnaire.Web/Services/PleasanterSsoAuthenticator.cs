@@ -21,7 +21,10 @@ public enum PleasanterSsoSignInOutcome
     /// <summary>止められている利用者。</summary>
     Disabled,
 
-    /// <summary>許可する所属を設定していないため自動登録しない。</summary>
+    /// <summary>締め出し中。</summary>
+    LockedOut,
+
+    /// <summary>許可する所属が未設定、または役割が許可されないため自動登録しない。</summary>
     NotAllowed,
 }
 
@@ -50,6 +53,7 @@ public sealed class PleasanterSsoAuthenticator(
     IAdminUserStore store,
     PasswordHasher hasher,
     AdminAuthOptions authOptions,
+    TimeProvider timeProvider,
     ILogger<PleasanterSsoAuthenticator> logger)
 {
     /// <summary>ログイン ID から管理者を決める。居なければ設定に従って作るか断る。</summary>
@@ -75,6 +79,12 @@ public sealed class PleasanterSsoAuthenticator(
                 return new PleasanterSsoSignInResult(PleasanterSsoSignInOutcome.Unknown);
             }
 
+            if (!AuthenticationOptionsAdapter.IsRegisterRoleAllowed(options.RegisterRole))
+            {
+                logger.LogWarning("Pleasanter SSO の自動登録に許可されない役割のため登録を拒否しました。");
+                return new PleasanterSsoSignInResult(PleasanterSsoSignInOutcome.NotAllowed);
+            }
+
             if (!options.HasMembershipRestriction)
             {
                 logger.LogWarning("Pleasanter SSO の許可する所属が未設定のため自動登録を拒否しました。");
@@ -94,6 +104,11 @@ public sealed class PleasanterSsoAuthenticator(
         if (user.IsDisabled)
         {
             return new PleasanterSsoSignInResult(PleasanterSsoSignInOutcome.Disabled, user);
+        }
+
+        if (user.IsLocked(timeProvider.GetUtcNow()))
+        {
+            return new PleasanterSsoSignInResult(PleasanterSsoSignInOutcome.LockedOut, user);
         }
 
         if (user.TotpEnabled)

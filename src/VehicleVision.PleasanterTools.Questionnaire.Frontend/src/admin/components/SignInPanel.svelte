@@ -162,7 +162,7 @@
     stopPleasanterWaiting();
     // **黙って確かめたときは失敗を出さない。** 合言葉で入りたい人の邪魔をしない
     if (!silent) {
-      pleasanterError = pleasanterFailureMessage(outcome.reason);
+      pleasanterError = outcome.message ?? pleasanterFailureMessage(outcome.reason);
     }
     return false;
   }

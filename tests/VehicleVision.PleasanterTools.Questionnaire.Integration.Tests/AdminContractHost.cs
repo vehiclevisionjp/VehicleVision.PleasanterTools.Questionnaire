@@ -20,11 +20,13 @@ internal sealed class AdminContractHost : IAdminContractHost
     private readonly Dictionary<string, string> secrets = new(StringComparer.Ordinal);
     private readonly ContractApplication factory;
 
-    private AdminContractHost()
+    private AdminContractHost(Action<IServiceCollection>? configureServices)
     {
         Directory.CreateDirectory(Path.Combine(directory, "wwwroot"));
-        factory = new ContractApplication(directory);
+        factory = new ContractApplication(directory, configureServices);
     }
+
+    internal IServiceProvider Services => factory.Services;
 
     public AdminContractCapabilities Capabilities { get; } =
         new(Enum.GetValues<AdminContractOperation>().ToHashSet());
@@ -56,9 +58,9 @@ internal sealed class AdminContractHost : IAdminContractHost
         },
     };
 
-    public static async Task<AdminContractHost> StartAsync()
+    public static async Task<AdminContractHost> StartAsync(Action<IServiceCollection>? configureServices = null)
     {
-        var host = new AdminContractHost();
+        var host = new AdminContractHost(configureServices);
         try
         {
             QuestionnaireDatabase.Instance.Migrator.MigrateUp(DatabaseProvider.Sqlite, host.factory.ConnectionString);
@@ -144,11 +146,13 @@ internal sealed class AdminContractHost : IAdminContractHost
     private sealed class ContractApplication : WebApplicationFactory<Program>
     {
         private readonly string directory;
+        private readonly Action<IServiceCollection>? configureServices;
         public string ConnectionString { get; }
 
-        public ContractApplication(string directory)
+        public ContractApplication(string directory, Action<IServiceCollection>? configureServices)
         {
             this.directory = directory;
+            this.configureServices = configureServices;
             ConnectionString = new SqliteConnectionStringBuilder
             {
                 DataSource = Path.Combine(directory, "contracts.db"),
@@ -196,6 +200,7 @@ internal sealed class AdminContractHost : IAdminContractHost
                 {
                     services.Remove(service);
                 }
+                configureServices?.Invoke(services);
             });
         }
     }
