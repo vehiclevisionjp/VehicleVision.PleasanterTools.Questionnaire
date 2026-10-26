@@ -338,6 +338,60 @@ public partial class SamlEndToEndTests
     }
 
     [Fact]
+    public async Task 締め出し中は署名が正しいSAML応答でも認証cookieを発行しない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        _ = await ResetAdminAsync(KnownUser);
+        await using var connection = E2EDatabase.AppFactory().Create();
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(E2EDatabase.Sql(
+            "UPDATE [Core_AdminUsers] SET [LockedUntil] = @until, [FailedLoginCount] = 2 WHERE [LoginId] = @loginId"),
+            new { until = DateTime.UtcNow.AddMinutes(15), loginId = KnownUser });
+        var beforeFailures = await CountLockoutAuditsAsync(connection);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var (location, cookies) = await RoundTripAsync(KnownUser, IdpPassword);
+            Assert.EndsWith("?samlError=invalid", location);
+            Assert.DoesNotContain(cookies.GetAllCookies().Cast<Cookie>(),
+                cookie => cookie.Name is "q.admin" or "q.admin.pending");
+            Assert.False((await SessionAsync(cookies))!["authenticated"]!.GetValue<bool>());
+            using var client = CreateClient(cookies, followRedirects: false);
+            using var probe = await client.GetAsync("/api/admin/users");
+            Assert.Equal(HttpStatusCode.Unauthorized, probe.StatusCode);
+        }
+        Assert.Equal(2, await connection.ExecuteScalarAsync<int>(E2EDatabase.Sql(
+            "SELECT [FailedLoginCount] FROM [Core_AdminUsers] WHERE [LoginId] = @loginId"), new { loginId = KnownUser }));
+        Assert.Equal(beforeFailures + 2, await CountLockoutAuditsAsync(connection));
+    }
+
+    private static Task<int> CountLockoutAuditsAsync(System.Data.Common.DbConnection connection) =>
+        connection.ExecuteScalarAsync<int>(E2EDatabase.Sql(
+            "SELECT COUNT(*) FROM [Core_AuditLogs] WHERE [Action] = @action AND [Succeeded] = @succeeded "
+            + "AND [StatusCode] = 423"), new { action = "POST /api/admin/saml/acs", succeeded = false });
+
+    [Fact]
+    public async Task 管理者がゼロならSAMLの往復を終えても最初の管理者を作らない()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        _ = await ResetAdminAsync(null);
+        var (location, cookies) = await RoundTripAsync(KnownUser, IdpPassword);
+        Assert.EndsWith("?samlError=invalid", location);
+        Assert.DoesNotContain(cookies.GetAllCookies().Cast<Cookie>(),
+            cookie => cookie.Name is "q.admin" or "q.admin.pending");
+        await using var connection = E2EDatabase.AppFactory().Create();
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
+            E2EDatabase.Sql("SELECT COUNT(*) FROM [Core_AdminUsers]")));
+    }
+
+    [Fact]
     public async Task 単一ログアウトでIdP側も落とす()
     {
         if (!Enabled)

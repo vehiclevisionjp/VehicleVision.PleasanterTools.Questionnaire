@@ -287,6 +287,10 @@ Pleasanter の 2 要素を終えた人しか通さない**（2.2 の表。`users
   Pleasanter 側の 2 要素に任せきりにしない。**`disabled` でも省かない**
 - **`required` なら、Pleasanter から来た人にも登録させる**
 - 2 要素の途中状態から入り終えた後も、Pleasanter の本人の印は引き継がれ、再検証の対象になる
+- **締め出し中は 2 要素の登録有無・方針によらず 423 で拒む**（共通仕様 U8）。
+  Pending / Session は発行せず、成功扱いで失敗回数や締め出し期限を戻さない。
+  応答はパスワードと同じ `{ message }`。未登録と無効も理由を区別しない `401 { message }` にする。
+  詳細な理由は操作の記録だけに残す。管理者 0 人の `409 { code: "setup-required" }` は従来どおり
 
 ### 6.3 合言葉のログイン
 
@@ -327,7 +331,10 @@ SAML と同じ。**外部設定（環境変数・`App_Data/Parameters` など）
   Pleasanter の cookie 名を変えている場合だけ書き換える
 - **`users/get` で 403 が返ったときは、本アプリの Pleasanter 接続設定（`QUESTIONNAIRE_PLEASANTER_BASEURL`・
   `QUESTIONNAIRE_PLEASANTER_APIKEY`）を使う**（2.3）。新しい鍵は無い
-- ⚠️ **`REGISTERROLE` を `Administrator` にすると、許可した組織・グループの利用者が全権を持つ**
+- **`REGISTERROLE` は通常の 4 役割だけ。** `Administrator` は起動時・設定の保存・実行時で拒否し、
+  画面の選択肢にも出さない。既存設定にある場合は更新前に通常の役割へ変更する。
+  設定名・既定値・既存の管理者の役割は変更しない。
+  移行手順は [設定パラメータ一覧](設定パラメータ一覧.md) の「外部ログインの JIT 役割の制限」を参照
 - **外部設定の書き間違いは起動時に落とす**（英語のメッセージを出して起動しない）。
   DB の値は保存時に検証するので、読めない値は保存されない
 
@@ -470,8 +477,9 @@ Core.Web へ移した後も同じ名前で出す）と操作の記録（`POST /a
 | --- | --- | --- |
 | 釦が出ない | — | 無効、または管理者が 0 人（最初の管理者を先に作る）、またはログイン画面の URL が未設定 |
 | 別窓でログインしても入れず待ち続ける | 記録なし（未ログイン扱い） | **ホスト名が違う**ため Pleasanter の cookie が本アプリへ届いていない（4.1）。Pleasanter の cookie のパスが本アプリの下に届かない配置（Pleasanter をサブパス）も同じ |
-| 「管理者として登録されていません」 | `result=unknown-user` | 本アプリにそのログイン ID の管理者が居ない。先に作るか、許可する所属を設定して `UNKNOWNUSER=Register` にする |
-| 「利用を停止されています」 | `result=disabled` | 本アプリ側で止められている |
+| 認証失敗（401・理由は共通） | `result=unknown-user` | 本アプリに利用者が居ない。先に招待するか、所属を絞って JIT を設定する |
+| 同上 | `result=disabled` | 本アプリ側で止められている |
+| 一時的な締め出し（423） | `result=locked-out` | 本アプリの締め出し期限まで待つ。外部ログインでも解除されない |
 | 「Pleasanter に問い合わせできませんでした」 | `redirect` | 内部 URL が Pleasanter 以外（ログイン画面など）を指している |
 | 同上 | `http-403` | 利用者の API 利用が禁止されていて、本アプリに API キーが無い（2.3）。API キーを設定する。IP 制限（4.3）・`TokenCheck: true`（4.2）でも起きる |
 | 同上 | `http-400` / `http-404` | IP 制限で拒否（4.3）、`TokenCheck: true`（4.2）、内部 URL のパス違い |
@@ -497,7 +505,7 @@ Core.Web へ移した後も同じ名前で出す）と操作の記録（`POST /a
 | 再検証（間隔・別人・ログアウト・接続不可・機能の無効化）と `AdminSessionGuard` への組み込み | 単体テスト（`PleasanterSsoSessionRevalidatorTests`、`AdminSessionGuardTests`） |
 | SQL Server の Pleasanter 実機との往復・再検証・本アプリの 2 要素 | 2026-09-24 に手元で確認（2.2。当時の本人確認は拡張 SQL）。`users/get` での往復は下の自動試験で確かめている |
 | `users/get` と代わりの経路（一般利用者・管理者・未ログイン・`DisableApi` で API キーあり／なし／違うキー） | 2026-09-25 に実機で確認（2.2） |
-| `users/get` での往復: 一般の利用者で入れる・本アプリに居ない人は `unknown-user`・外部設定の項目は画面から変えられない | **自動試験**（`PleasanterSsoEndToEndTests`。`e2e.yml` の SQL Server の job で毎回。検証環境の Pleasanter 1.5.8.1、本アプリは `compose.pleasanter-sso.yaml` で外部設定から有効） |
+| `users/get` での往復: 一般の利用者で入れる・本アプリに居ない人は 401・外部設定の項目は画面から変えられない | **自動試験**（`PleasanterSsoEndToEndTests`。`e2e.yml` の SQL Server の job で毎回。検証環境の Pleasanter 1.5.8.1、本アプリは `compose.pleasanter-sso.yaml` で外部設定から有効） |
 | Pleasanter でログアウトした後、再検証で締め出される | **自動試験**（同上。間隔は最短の 1 分。本アプリの cookie を持ったままでも入れず、管理 API は 401） |
 | Pleasanter の TOTP・メールのワンタイムパスワード | TOTP は 2026-09-25 に `users/get` で実機確認（2.2）。**メールのワンタイムパスワードは自動試験**（同上。パスワードだけ・違うコードでは入れず、正しいコードの後に入れる。コードは Pleasanter の DB から読み、メールの配送そのものは見ていない） |
 | 利用者ごとの API 禁止（`DisableApi` 以外の禁止） | **未検証**（`UserSettings.AllowApi` の同じ判定に入る） |
@@ -517,7 +525,7 @@ Core.Web へ移した後も同じ名前で出す）と操作の記録（`POST /a
 | `POST /questionnaire/api/admin/pleasanter-sso/check` | 200（`signedIn`）。管理 API も 200 |
 | Pleasanter でログアウトした直後 | 本アプリの cookie（Path `/questionnaire`）は消えずに残る（4.4 の巻き添えは起きない） |
 | 再検証の間隔（1 分）の後 | 管理 API が 401 で締め出される |
-| 本アプリに未登録の Pleasanter 利用者 | 403（`unknown-user`） |
+| 本アプリに未登録の Pleasanter 利用者 | 401（`{ message }`。無効の利用者と同じ） |
 
 [user-api-model]: https://github.com/Implem/Implem.Pleasanter/blob/Pleasanter_1.5.8.1/Implem.Pleasanter/Models/Users/UserApiModel.cs
 [group-utilities]: https://github.com/Implem/Implem.Pleasanter/blob/Pleasanter_1.5.8.1/Implem.Pleasanter/Models/Groups/GroupUtilities.cs

@@ -31,10 +31,9 @@ public class AuthenticationOptionsAdapterTests
     {
         { "editor", AdminRole.Editor },
         { "SurveyAdministrator", AdminRole.SurveyAdministrator },
-        { "Administrator", AdminRole.Administrator },
         { "UserAdministrator", AdminRole.UserAdministrator },
         { "Auditor", AdminRole.Auditor },
-        { "Editor, Administrator", AdminRole.Administrator },
+        { "Editor, SurveyAdministrator", AdminRole.SurveyAdministrator },
     };
 
     [Theory]
@@ -48,11 +47,9 @@ public class AuthenticationOptionsAdapterTests
 
     [Theory]
     [InlineData("0")]
-    [InlineData("1")]
     [InlineData("2")]
     [InlineData("3")]
     [InlineData("4")]
-    [InlineData("+1")]
     [InlineData("-0")]
     public void 数値の役割はSSOで拒否しSAMLで受け付ける(string raw)
     {
@@ -60,7 +57,7 @@ public class AuthenticationOptionsAdapterTests
             key => key == PleasanterSsoOptions.RegisterRoleKey ? raw : null));
         Assert.Equal(
             $"{PleasanterSsoOptions.RegisterRoleKey} に知らない値が入っています: {raw}"
-            + "（使えるのは Editor / Administrator / SurveyAdministrator / UserAdministrator / Auditor）",
+            + "（使えるのは Editor / SurveyAdministrator / UserAdministrator / Auditor）",
             exception.Message);
         Assert.Equal(Enum.Parse<AdminRole>(raw),
             SamlOptions.FromValues(SamlValues(SamlOptions.RegisterRoleKey, raw)).RegisterRole);
@@ -70,32 +67,53 @@ public class AuthenticationOptionsAdapterTests
     [InlineData("Root")]
     [InlineData("5")]
     [InlineData("-1")]
+    [InlineData("Administrator")]
+    [InlineData(" administrator ")]
+    [InlineData("Editor, Administrator")]
+    [InlineData("1")]
+    [InlineData("+1")]
     public void SAMLの不正な役割は既存の例外と文言で拒否する(string raw)
     {
         var exception = Assert.Throws<InvalidOperationException>(() =>
             SamlOptions.FromValues(SamlValues(SamlOptions.RegisterRoleKey, raw)));
         Assert.Equal(
-            $"{SamlOptions.RegisterRoleKey} に知らない値が入っています: {raw}"
-            + "（使えるのは Editor / Administrator / SurveyAdministrator / UserAdministrator / Auditor）",
+            $"{SamlOptions.RegisterRoleKey} に知らない値が入っています: {raw.Trim()}"
+            + "（使えるのは Editor / SurveyAdministrator / UserAdministrator / Auditor）",
             exception.Message);
+        var sso = Assert.Throws<InvalidOperationException>(() => PleasanterSsoOptions.FromValues(
+            key => key == PleasanterSsoOptions.RegisterRoleKey ? raw : null));
+        Assert.Contains("使えるのは Editor / SurveyAdministrator / UserAdministrator / Auditor", sso.Message);
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("false")]
     [InlineData("yes")]
-    public void SAML無効時は役割を含め他の設定を読まない(string? enabled)
+    public void SAML無効時も役割を検証するが他の設定を読まない(string? enabled)
     {
         var options = SamlOptions.FromValues(key =>
         {
-            Assert.Equal(SamlOptions.EnabledKey, key);
-            return enabled;
+            Assert.True(key is SamlOptions.EnabledKey or SamlOptions.RegisterRoleKey);
+            return key == SamlOptions.EnabledKey ? enabled : null;
         });
         Assert.False(options.Enabled);
         Assert.Equal(AdminRole.Editor, options.RegisterRole);
         Assert.Equal(AdminRole.Editor, new SamlOptions().RegisterRole);
         Assert.Equal(SamlLoginIdSource.NameId, options.LoginIdSource);
         Assert.Equal(SamlUnknownUserPolicy.Reject, options.UnknownUser);
+    }
+
+    [Theory]
+    [InlineData("Administrator")]
+    [InlineData("administrator")]
+    [InlineData("Editor, Administrator")]
+    [InlineData("1")]
+    public void 無効時もAdministratorの設定は起動時に拒否する(string raw)
+    {
+        Assert.Throws<InvalidOperationException>(() => SamlOptions.FromValues(
+            key => key == SamlOptions.RegisterRoleKey ? raw : null));
+        Assert.Throws<InvalidOperationException>(() => PleasanterSsoOptions.FromValues(
+            key => key == PleasanterSsoOptions.RegisterRoleKey ? raw : null));
     }
 
     public static TheoryData<string, string, string> SsoErrors => new()

@@ -219,7 +219,7 @@ public static class AdminUserEndpoints
 
             // **必須の設定なら、この人は次回ログイン時に登録へ回る**（未登録になるため）
             return Results.Ok(new { reset = true });
-        });
+        }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersResetTwoFactor));
 
         // ---- 役割の変更 ------------------------------------------------------
         users.MapPost("/{adminUserId:guid}/role", async (
