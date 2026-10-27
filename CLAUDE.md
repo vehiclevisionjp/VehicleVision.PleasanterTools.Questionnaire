@@ -15,8 +15,9 @@ Claude Code は `applyTo` を自動で解釈しないため、自分で開く必
 
 ## このリポジトリ固有の注意
 
-- **`_reference/Implem.Pleasanter` は Pleasanter 本体（AGPL v3）のサブモジュールです。**
-  事実確認のための参照専用で、コードの取り込みは禁止です。
+- **Pleasanter 本体（AGPL v3）は事実確認のための参照専用・Git 管理外のソースです。**
+  読む前の同期・取得先・根拠の記録は共通指示の「参照情報の扱い」に従ってください。
+  コードの取り込みは禁止です。
   詳細は [`_reference/README.md`](_reference/README.md) を参照してください。
 - **Pleasanter の API キーは、リクエストボディに載せる方式です**
   （`_reference/Implem.Pleasanter/Implem.Pleasanter/Libraries/Requests/Context.cs`）。

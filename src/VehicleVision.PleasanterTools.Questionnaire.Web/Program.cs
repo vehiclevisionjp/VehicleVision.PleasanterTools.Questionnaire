@@ -156,7 +156,9 @@ QuestionnaireDatabase.Instance.EnsureSecure(
 // **当てる道具を別に作らない。** 接続文字列の読み方が二重になり、片方だけ直す事故が起きる
 if (MigrationCommand.IsRequested(args))
 {
-    Environment.ExitCode = await MigrationCommand.RunAsync(provider, connectionString, args);
+    Environment.ExitCode = await MigrationCommand.RunAsync(
+        QuestionnaireDatabase.Instance.Migrator, provider, connectionString, args,
+        lockTimeout: TimeSpan.FromSeconds(DatabaseStartupMigration.DefaultLockTimeoutSeconds));
     return;
 }
 
@@ -458,21 +460,12 @@ if (builder.Configuration[PleasanterSsoOptions.EnabledKey] is { Length: > 0 } pl
     throw new InvalidOperationException($"{PleasanterSsoOptions.EnabledKey} must be true or false.");
 }
 builder.Services.AddSingleton<IPleasanterSsoOptionsProvider, PleasanterSsoOptionsProvider>();
-builder.Services.AddSingleton<IPleasanterSessionVerifier, PleasanterSessionVerifier>();
+// **本人確認は Core.Web の検証器を使う**（Issue #706）。HttpClient（cookie を覚えない・転送を追わない・
+// 時間切れは無限で、要求ごとに設定の値で掛ける）も Core.Web が一緒に登録する。
+// ⚠️ **本アプリの値（鍵・ログのカテゴリ）は置き換える前のものをそのまま渡す**（PleasanterSessionVerification）
+builder.Services.AddQuestionnairePleasanterSessionVerifier();
 builder.Services.AddSingleton<PleasanterSsoAuthenticator>();
 builder.Services.AddSingleton<PleasanterSsoSessionRevalidator>();
-builder.Services
-    // **時間切れは要求ごとに設定の値で掛ける**（PleasanterSessionVerifier）。ここでは無限にしておく
-    .AddHttpClient(PleasanterSessionVerifier.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
-    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-    {
-        // ⚠️ **cookie を覚えさせない。** 覚えると、ある管理者の cookie が別の管理者の問い合わせへ混ざる。
-        // cookie は要求ごとに Cookie ヘッダで付ける
-        UseCookies = false,
-
-        // ⚠️ **転送を追わない。** ログイン画面への転送などを成功と取り違えない
-        AllowAutoRedirect = false,
-    });
 builder.Services.AddSingleton<AdminUserService>();
 
 // ---- bot 対策 --------------------------------------------------------------

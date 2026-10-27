@@ -49,7 +49,7 @@
 
   async function save(event: SubmitEvent) {
     event.preventDefault();
-    if (!settings) return;
+    if (!settings) {return;}
 
     error = '';
     done = '';
@@ -67,7 +67,7 @@
   }
 
   async function test() {
-    if (!settings) return;
+    if (!settings) {return;}
 
     testError = '';
     testMessage = '';
@@ -178,7 +178,6 @@
             <option value="SurveyAdministrator">{t('users.role.SurveyAdministrator')}</option>
             <option value="UserAdministrator">{t('users.role.UserAdministrator')}</option>
             <option value="Auditor">{t('users.role.Auditor')}</option>
-            <option value="Administrator">{t('users.role.Administrator')}</option>
           </select>
         </label>
       </div>

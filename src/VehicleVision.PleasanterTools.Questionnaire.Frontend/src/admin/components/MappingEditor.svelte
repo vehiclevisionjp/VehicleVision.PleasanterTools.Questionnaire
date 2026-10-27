@@ -98,7 +98,7 @@
    * 一覧の名前が無ければ Pleasanter は編集画面の名前を使うので、片方だけなら単に添える
    */
   function describeLabel(entry: ColumnDetail | undefined): string {
-    if (!entry) return '';
+    if (!entry) {return '';}
     const { label, gridLabel } = entry;
     if (label && gridLabel && label !== gridLabel) {
       return `${t('mapping.labelEditor')}: ${label} / ${t('mapping.labelGrid')}: ${gridLabel}`;
@@ -110,7 +110,7 @@
   /** 選択肢を 1 行に畳む。**値=表示** の並び。多いときは先頭だけ出して件数を添える。 */
   const SHOWN_CHOICES = 8;
   function describeChoices(entry: ColumnDetail | undefined): string {
-    if (!entry || entry.choiceCount === 0) return '';
+    if (!entry || entry.choiceCount === 0) {return '';}
     const shown = entry.choices
       .slice(0, SHOWN_CHOICES)
       .map((choice) => (choice.value === choice.text ? choice.value : `${choice.value}=${choice.text}`))
@@ -121,7 +121,7 @@
 
   /** リンク項目か、参照先があるか。**参照先のレコードは列挙できない**ので、参照先だけを出す。 */
   function describeLink(entry: ColumnDetail | undefined): string {
-    if (!entry || (!entry.isLink && entry.references.length === 0)) return '';
+    if (!entry || (!entry.isLink && entry.references.length === 0)) {return '';}
     const kind = entry.linkFormat === 'Json' ? t('mapping.columnLinkJson') : t('mapping.columnLink');
     return entry.references.length > 0
       ? `${kind}（${t('mapping.columnReferences', { targets: entry.references.join(', ') })}）`
@@ -160,7 +160,7 @@
    */
   function addAttachment() {
     const question = fileQuestions[0];
-    if (!question) return;
+    if (!question) {return;}
 
     update([
       ...mapping.assignments,
@@ -207,7 +207,7 @@
   function addSource(index: number) {
     const assignment = mapping.assignments[index];
     const firstSystem = systemSources[0];
-    if (!assignment || (!answerable[0] && !firstSystem)) return;
+    if (!assignment || (!answerable[0] && !firstSystem)) {return;}
 
     patch(index, {
       sources: [
@@ -223,7 +223,7 @@
 
   function removeSource(index: number, sourceIndex: number) {
     const assignment = mapping.assignments[index];
-    if (!assignment) return;
+    if (!assignment) {return;}
     patch(index, { sources: assignment.sources.filter((_, i) => i !== sourceIndex) });
   }
 

@@ -28,7 +28,7 @@ export function validateQuestion(
   language: Language,
   fallbackLanguage: Language = DEFAULT_LANGUAGE,
 ): string | null {
-  if (isDisplayOnly(question)) return null;
+  if (isDisplayOnly(question)) {return null;}
 
   // **添付の設問は値ではなくファイルの有無で見る。** サーバ側と同じ見方にする
   if (question.type === 'File') {
@@ -59,10 +59,10 @@ export function validateQuestion(
   }
 
   if (question.type === 'Confirm') {
-    if (values.length > 1) return t('validation.singleValueOnly');
+    if (values.length > 1) {return t('validation.singleValueOnly');}
 
     const value = values[0]?.toLowerCase();
-    if (value !== 'true' && value !== 'false') return t('validation.boolean');
+    if (value !== 'true' && value !== 'false') {return t('validation.boolean');}
     return question.isRequired && value !== 'true' ? t('validation.required') : null;
   }
 
@@ -78,11 +78,11 @@ export function validateQuestion(
   }
 
   const selectionError = validateSelectionCount(question, values.length, t);
-  if (selectionError) return selectionError;
+  if (selectionError) {return selectionError;}
 
   for (const value of values) {
     const error = validateValue(question, value, t, language, fallbackLanguage);
-    if (error) return error;
+    if (error) {return error;}
   }
 
   return null;
@@ -104,7 +104,7 @@ function validateGrid(
     const values = rowValues(answer, row.rowId).filter((value) => value.trim() !== '');
 
     if (values.length === 0) {
-      if (question.isRequired) return t('validation.rowRequired');
+      if (question.isRequired) {return t('validation.rowRequired');}
       continue;
     }
 
@@ -114,7 +114,7 @@ function validateGrid(
 
     // **行ごとに数える**（Issue #101）。1 行が 1 つの入力
     const selectionError = validateSelectionCount(question, values.length, t);
-    if (selectionError) return selectionError;
+    if (selectionError) {return selectionError;}
   }
 
   return null;
@@ -131,7 +131,7 @@ function validateSelectionCount(
   count: number,
   t: Translate,
 ): string | null {
-  if (!hasSelectionRange(question)) return null;
+  if (!hasSelectionRange(question)) {return null;}
 
   const { minSelections, maxSelections } = question.settings;
 
@@ -177,7 +177,7 @@ function validateValue(
     case 'Scale':
     case 'Rating': {
       const number = Number(value);
-      if (!Number.isFinite(number)) return t('validation.notANumber');
+      if (!Number.isFinite(number)) {return t('validation.notANumber');}
       if (settings.scaleMinimum !== undefined && number < settings.scaleMinimum) {
         return t('validation.minimum', { minimum: settings.scaleMinimum });
       }
@@ -260,7 +260,7 @@ export function validatePage(
       language,
       fallbackLanguage,
     );
-    if (error) errors[question.questionId] = error;
+    if (error) {errors[question.questionId] = error;}
   }
   return errors;
 }

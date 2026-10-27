@@ -69,8 +69,8 @@
   const standardButtonKinds = ['previous', 'next', 'submit'] as const;
 
   function standardButtonTitle(kind: (typeof standardButtonKinds)[number]): string {
-    if (kind === 'previous') return t('pageButtons.previous');
-    if (kind === 'next') return t('pageButtons.next');
+    if (kind === 'previous') {return t('pageButtons.previous');}
+    if (kind === 'next') {return t('pageButtons.next');}
     return t('pageButtons.submit');
   }
 
@@ -307,7 +307,7 @@
 
   async function toggleVersions() {
     versionsOpen = !versionsOpen;
-    if (!versionsOpen) return;
+    if (!versionsOpen) {return;}
 
     versionsLoading = true;
     const result = await listVersions(surveyId);
@@ -331,7 +331,7 @@
    * 過去の版の番号を持ち込むと、固める版が重なる
    */
   async function restoreVersion(version: number) {
-    if (!definition) return;
+    if (!definition) {return;}
 
     const confirmed = await confirmAction({
       title: t('editor.versionLoad'),
@@ -339,7 +339,7 @@
       confirmLabel: t('editor.versionLoad'),
       danger: hasUnsavedChanges,
     });
-    if (!confirmed) return;
+    if (!confirmed) {return;}
 
     error = '';
     notice = '';
@@ -400,7 +400,7 @@
   }
 
   async function uploadAsset(file: File | undefined) {
-    if (!file || assetUploading) return;
+    if (!file || assetUploading) {return;}
 
     assetUploading = true;
     assetError = '';
@@ -436,7 +436,7 @@
   }
 
   function updatePage(index: number, patch: Partial<Page>) {
-    if (!definition) return;
+    if (!definition) {return;}
     definition = {
       ...definition,
       pages: definition.pages.map((page, i) => (i === index ? { ...page, ...patch } : page)),
@@ -445,7 +445,7 @@
 
   function updatePageButtons(index: number, patch: Partial<PageButtons>) {
     const page = definition?.pages[index];
-    if (!page) return;
+    if (!page) {return;}
     updatePage(index, { buttons: { ...(page.buttons ?? {}), ...patch } });
   }
 
@@ -481,7 +481,7 @@
   }
 
   function addPage() {
-    if (!definition) return;
+    if (!definition) {return;}
     const pageId = newId('page');
     definition = {
       ...definition,
@@ -492,7 +492,7 @@
   }
 
   function removePage(index: number) {
-    if (!definition) return;
+    if (!definition) {return;}
     const remaining = definition.pages.filter((_, i) => i !== index);
     // **消したページの隣を開く。** 先頭へ飛ばすと、続きの作業の位置を見失う
     activePageId = (remaining[index] ?? remaining[index - 1] ?? remaining[0])?.pageId ?? null;
@@ -501,7 +501,7 @@
 
   function addQuestion(pageIndex: number) {
     const page = definition?.pages[pageIndex];
-    if (!page) return;
+    if (!page) {return;}
 
     const question: Question = {
       questionId: newId('q'),
@@ -518,7 +518,7 @@
 
   function addImportedQuestions(pageIndex: number, result: QuestionImportResult) {
     const page = definition?.pages[pageIndex];
-    if (!page || !definition) return;
+    if (!page || !definition) {return;}
 
     const nextDefinition = {
       ...definition,
@@ -555,7 +555,7 @@
 
   function updateQuestion(pageIndex: number, questionIndex: number, next: Question) {
     const page = definition?.pages[pageIndex];
-    if (!page) return;
+    if (!page) {return;}
     updatePage(pageIndex, {
       questions: page.questions.map((q, i) => (i === questionIndex ? next : q)),
     });
@@ -563,7 +563,7 @@
 
   function removeQuestion(pageIndex: number, questionIndex: number) {
     const page = definition?.pages[pageIndex];
-    if (!page) return;
+    if (!page) {return;}
     if (page.questions[questionIndex]?.questionId === selectedQuestionId) {
       selectedQuestionId = null;
     }
@@ -591,15 +591,15 @@
 
   function moveQuestion(pageIndex: number, questionIndex: number, direction: -1 | 1) {
     const page = definition?.pages[pageIndex];
-    if (!page) return;
+    if (!page) {return;}
 
     const target = questionIndex + direction;
-    if (target < 0 || target >= page.questions.length) return;
+    if (target < 0 || target >= page.questions.length) {return;}
 
     const questions = [...page.questions];
     const moved = questions[questionIndex];
     const swapped = questions[target];
-    if (!moved || !swapped) return;
+    if (!moved || !swapped) {return;}
 
     questions[questionIndex] = swapped;
     questions[target] = moved;
@@ -619,13 +619,13 @@
   }
 
   function closeReorder() {
-    if (reorder === null) return;
+    if (reorder === null) {return;}
     reorder = null;
     void tick().then(() => reorderReturnFocus?.focus());
   }
 
   function questionDestinations(questionId: string): ReorderDestination[] {
-    if (!definition) return [];
+    if (!definition) {return [];}
 
     return definition.pages.flatMap((page, pageIndex) => {
       const questions = page.questions.filter((question) => question.questionId !== questionId);
@@ -645,7 +645,7 @@
   }
 
   function pageDestinations(pageId: string): { pageIndex: number; label: string }[] {
-    if (!definition) return [];
+    if (!definition) {return [];}
 
     const currentDefinition = definition;
     const pages = currentDefinition.pages.filter((page) => page.pageId !== pageId);
@@ -682,7 +682,7 @@
   }
 
   function moveQuestionToDestination(questionId: string, destination: QuestionDestination) {
-    if (!definition) return;
+    if (!definition) {return;}
     definition = moveQuestionTo(definition, questionId, destination);
     activePageId = destination.pageId;
     notice = t('reorder.done');
@@ -690,7 +690,7 @@
   }
 
   function movePageToDestination(pageId: string, pageIndex: number) {
-    if (!definition) return;
+    if (!definition) {return;}
     definition = movePageTo(definition, pageId, pageIndex);
     activePageId = pageId;
     notice = t('reorder.done');
@@ -704,7 +704,7 @@
       return;
     }
 
-    if (event.key !== 'Tab') return;
+    if (event.key !== 'Tab') {return;}
 
     const dialog = event.currentTarget as HTMLElement;
     const focusable = Array.from(
@@ -712,7 +712,7 @@
     );
     const first = focusable[0];
     const last = focusable.at(-1);
-    if (!first || !last) return;
+    if (!first || !last) {return;}
 
     if (event.shiftKey && document.activeElement === first) {
       event.preventDefault();
@@ -735,7 +735,7 @@
 
   /** 下書きを保存する。**保存できたかを返す。** */
   async function save(): Promise<boolean> {
-    if (!definition) return false;
+    if (!definition) {return false;}
 
     saving = true;
     error = '';
@@ -827,7 +827,7 @@
    * 編集を失う。
    */
   async function republish() {
-    if (hasUnsavedChanges && !(await save())) return;
+    if (hasUnsavedChanges && !(await save())) {return;}
 
     saving = true;
     error = '';
@@ -862,9 +862,9 @@
       confirmLabel: t('list.revertToDraft'),
       danger: true,
     });
-    if (!confirmed) return;
+    if (!confirmed) {return;}
 
-    if (hasUnsavedChanges && !(await save())) return;
+    if (hasUnsavedChanges && !(await save())) {return;}
 
     saving = true;
     error = '';
@@ -954,8 +954,8 @@
     const page = pageIndex >= 0 ? pageLabel(pageIndex) : (problem.pageId ?? '');
     const question = problem.questionId ? questionLabel(problem.questionId) : '';
 
-    if (page === '') return question;
-    if (question === '') return page;
+    if (page === '') {return question;}
+    if (question === '') {return page;}
     return t('flow.where', { page, question });
   }
 

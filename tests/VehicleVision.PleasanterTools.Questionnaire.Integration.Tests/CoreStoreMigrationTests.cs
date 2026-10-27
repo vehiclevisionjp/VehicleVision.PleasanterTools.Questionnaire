@@ -656,7 +656,7 @@ public class CoreStoreMigrationTests
 
         // 復旧コード: 未使用は 2 本。塩つきのハッシュを読んで照合し、完全一致で使い切れる
         Assert.Equal(2, await store.CountRecoveryCodesAsync(AdminA));
-        var settings = new AdminUserSettingsStore(factory);
+        var settings = new AdminUserSettingsStore(factory, store);
         var hashes = await settings.ListUnusedRecoveryCodeHashesAsync(AdminA);
         var matched = Assert.Single(hashes, hash => Hasher.Verify(RecoveryCode.Normalize("AAAA-1111"), hash).Verified);
         Assert.True(await store.TryUseRecoveryCodeAsync(AdminA, matched));

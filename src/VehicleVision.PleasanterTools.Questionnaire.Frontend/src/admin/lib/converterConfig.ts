@@ -55,7 +55,7 @@ export function converterForOperation(
   operation: string,
   current: MappingConverter | null | undefined,
 ): MappingConverter | null {
-  if (operation === '') return null;
+  if (operation === '') {return null;}
 
   const config = current?.config ?? {};
   return {

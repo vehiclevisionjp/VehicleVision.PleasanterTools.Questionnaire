@@ -25,7 +25,7 @@ export type PleasanterSsoFailure =
 export type PleasanterSsoCheckOutcome =
   | { kind: 'signedIn'; next: 'done' | 'totp' | 'enroll' }
   | { kind: 'waiting' }
-  | { kind: 'failed'; reason: PleasanterSsoFailure };
+  | { kind: 'failed'; reason: PleasanterSsoFailure; message?: string };
 
 /** `api.ts` の `Result` と同じ形（依存を増やさないため、ここで必要な分だけ書く）。 */
 type CheckResult =
@@ -63,6 +63,14 @@ export function classifyCheck(result: CheckResult): PleasanterSsoCheckOutcome {
     return { kind: 'failed', reason: 'error' };
   }
 
+  if (
+    (result.status === 401 || result.status === 423) &&
+    typeof result.body === 'object' && result.body !== null &&
+    'message' in result.body && typeof result.body.message === 'string'
+  ) {
+    return { kind: 'failed', reason: 'error', message: result.body.message };
+  }
+
   const code =
     typeof result.body === 'object' && result.body !== null && 'code' in result.body
       ? String((result.body as { code: unknown }).code)
@@ -77,9 +85,9 @@ export function classifyCheck(result: CheckResult): PleasanterSsoCheckOutcome {
       return { kind: 'failed', reason: code };
   }
 
-  if (result.status === 404) return { kind: 'failed', reason: 'unavailable' };
-  if (result.status === 429) return { kind: 'failed', reason: 'rate-limited' };
-  if (result.status === 503) return { kind: 'failed', reason: 'upstream-error' };
+  if (result.status === 404) {return { kind: 'failed', reason: 'unavailable' };}
+  if (result.status === 429) {return { kind: 'failed', reason: 'rate-limited' };}
+  if (result.status === 503) {return { kind: 'failed', reason: 'upstream-error' };}
   return { kind: 'failed', reason: 'error' };
 }
 
@@ -135,7 +143,7 @@ export function writeSuppressed(
  * 同じホストの相対パス（`/` 始まり、`//` は除く）か http(s) の絶対 URL だけ。
  */
 export function isSafeBrowserUrl(url: string | null | undefined): url is string {
-  if (!url) return false;
+  if (!url) {return false;}
   if (url.startsWith('/')) {
     return !url.startsWith('//') && !url.startsWith('/\\');
   }

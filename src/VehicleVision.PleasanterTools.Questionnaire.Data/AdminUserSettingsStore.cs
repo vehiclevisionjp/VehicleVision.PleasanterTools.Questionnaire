@@ -37,13 +37,10 @@ public interface IAdminUserSettingsStore
     /// <summary>
     /// 管理画面を出す言語を決める。<c>null</c> で「選んでいない」に戻す。
     /// </summary>
-    /// <remarks>
-    /// <b>Core の窓口に言語を変える口が無い</b>ので、<c>Core_AdminUsers.Language</c> を直接書く
-    /// （「選んでいない」は空文字。列は NULL を許さない）。
-    /// </remarks>
+    /// <remarks>Core の窓口へ渡す。「選んでいない」は空文字（列は NULL を許さない）。</remarks>
     Task SetLanguageAsync(Guid adminUserId, string? language, CancellationToken cancellationToken = default);
 
-    /// <summary>まだ使っていない復旧コードのハッシュを返す（<c>Core_AdminRecoveryCodes</c> の読み取り）。</summary>
+    /// <summary>まだ使っていない復旧コードのハッシュを返す（Core の窓口へ渡す）。</summary>
     /// <remarks>
     /// 復旧コードのハッシュは<b>塩つき（PBKDF2）で、入力から同じハッシュを作れない</b>。
     /// Core の窓口は<b>ハッシュの完全一致</b>でしか使用済みにできないので、
@@ -55,7 +52,7 @@ public interface IAdminUserSettingsStore
 }
 
 /// <summary>Dapper を使った実装。表は <c>AdminUserSettings</c>（M0038）。</summary>
-public sealed class AdminUserSettingsStore(IDbConnectionFactory connectionFactory) : IAdminUserSettingsStore
+public sealed class AdminUserSettingsStore(IDbConnectionFactory connectionFactory, IAdminUserStore users) : IAdminUserSettingsStore
 {
     private DatabaseProvider Provider => connectionFactory.Provider;
 
@@ -126,26 +123,13 @@ public sealed class AdminUserSettingsStore(IDbConnectionFactory connectionFactor
     public async Task SetLanguageAsync(
         Guid adminUserId,
         string? language,
-        CancellationToken cancellationToken = default)
-    {
-        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await connection.ExecuteAsync(Sql(
-            "UPDATE [Core_AdminUsers] SET [Language] = @Language WHERE [Id] = @AdminUserId",
-            new { AdminUserId = adminUserId, Language = language ?? string.Empty },
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
-    }
+        CancellationToken cancellationToken = default) =>
+        await users.SetLanguageAsync(adminUserId, language ?? string.Empty, cancellationToken).ConfigureAwait(false);
 
-    public async Task<IReadOnlyList<string>> ListUnusedRecoveryCodeHashesAsync(
+    public Task<IReadOnlyList<string>> ListUnusedRecoveryCodeHashesAsync(
         Guid adminUserId,
-        CancellationToken cancellationToken = default)
-    {
-        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await connection.QueryAsync<string>(Sql(
-            "SELECT [CodeHash] FROM [Core_AdminRecoveryCodes] WHERE [UserId] = @AdminUserId AND [UsedAt] IS NULL",
-            new { AdminUserId = adminUserId },
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
-        return rows.ToList();
-    }
+        CancellationToken cancellationToken = default) =>
+        users.ListUnusedRecoveryCodeHashesAsync(adminUserId, cancellationToken);
 
     private async Task<bool> UpdateAsync(
         DbConnection connection,

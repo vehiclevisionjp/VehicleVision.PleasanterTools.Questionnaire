@@ -61,6 +61,20 @@ describe('classifyCheck', () => {
     expect(classifyCheck({ ok: false, status: 0 })).toEqual({ kind: 'failed', reason: 'error' });
   });
 
+  it('認証失敗と締め出しはパスワードと同じサーバの文言を表示して待つのをやめる', () => {
+    for (const status of [401, 423]) {
+      expect(classifyCheck({ ok: false, status, body: { message: '認証を完了できません。' } })).toEqual({
+        kind: 'failed',
+        reason: 'error',
+        message: '認証を完了できません。',
+      });
+      expect(classifyCheck({ ok: false, status, body: { message: 123 } })).toEqual({
+        kind: 'failed',
+        reason: 'error',
+      });
+    }
+  });
+
   it('知らない本文を成功と取り違えない', () => {
     expect(
       classifyCheck({ ok: true, value: { status: 'other' } as unknown as { status: 'unauthenticated' } }),

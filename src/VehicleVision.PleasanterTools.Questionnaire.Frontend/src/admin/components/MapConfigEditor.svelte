@@ -19,7 +19,7 @@
 
   function update(index: number, next: Partial<MapConfigRow>) {
     const current = rows[index];
-    if (!current) return;
+    if (!current) {return;}
     rows[index] = {
       source: next.source ?? current.source,
       target: next.target ?? current.target,

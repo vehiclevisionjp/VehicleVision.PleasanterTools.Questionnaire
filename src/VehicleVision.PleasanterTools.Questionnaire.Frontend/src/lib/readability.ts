@@ -155,7 +155,7 @@ export function applyReadability(
   preferences: ReadabilityPreferences,
   system: SystemReadabilityPreferences,
 ): void {
-  if (!target) return;
+  if (!target) {return;}
 
   for (const [name, value] of Object.entries(readabilityCssProperties(preferences, system))) {
     if (value === null) {
@@ -192,7 +192,7 @@ export function readReadabilityPreferences(): StoredReadabilityPreferences | nul
     const colorMode = COLOR_MODES.includes(candidate.colorMode as ColorMode)
       ? (candidate.colorMode as ColorMode)
       : undefined;
-    if (fontSize === undefined && colorMode === undefined) return null;
+    if (fontSize === undefined && colorMode === undefined) {return null;}
 
     return {
       fontSize,

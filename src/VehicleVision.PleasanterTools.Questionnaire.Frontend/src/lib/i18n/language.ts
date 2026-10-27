@@ -50,7 +50,7 @@ const LOCALES: Record<Language, string> = {
  * **地域まで見ない。** `en-US` も `en-GB` も `en` として扱う。
  */
 export function normalizeLanguage(languageTag: string | null | undefined): Language | null {
-  if (!languageTag) return null;
+  if (!languageTag) {return null;}
 
   const primary = languageTag.trim().split(/[-_]/)[0]?.toLowerCase() ?? '';
   return SUPPORTED_LANGUAGES.find((language) => language === primary) ?? null;
@@ -71,11 +71,11 @@ export function negotiateLanguage(
   browserLanguages: readonly string[] = [],
 ): Language {
   const explicit = normalizeLanguage(requested);
-  if (explicit) return explicit;
+  if (explicit) {return explicit;}
 
   for (const candidate of browserLanguages) {
     const language = normalizeLanguage(candidate);
-    if (language) return language;
+    if (language) {return language;}
   }
 
   return DEFAULT_LANGUAGE;
@@ -88,7 +88,7 @@ export function negotiateLanguage(
  * サーバへ言語を送らずに済むので、回答画面はこちらを見る。
  */
 export function browserLanguages(): readonly string[] {
-  if (typeof navigator === 'undefined') return [];
+  if (typeof navigator === 'undefined') {return [];}
   return navigator.languages ?? (navigator.language ? [navigator.language] : []);
 }
 
@@ -163,11 +163,11 @@ export function interpolate(
   parameters: Record<string, string | number> | undefined,
   language: Language,
 ): string {
-  if (!parameters) return template;
+  if (!parameters) {return template;}
 
   return template.replace(/\{(\w+)\}/g, (match, name: string) => {
     const value = parameters[name];
-    if (value === undefined) return match;
+    if (value === undefined) {return match;}
     return typeof value === 'number' ? formatNumber(value, language) : value;
   });
 }

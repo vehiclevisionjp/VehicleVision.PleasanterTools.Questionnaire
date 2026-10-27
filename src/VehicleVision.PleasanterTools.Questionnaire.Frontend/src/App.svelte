@@ -507,12 +507,12 @@
     // 回答の変化を見張る対象から外れて 2 度と走らない
     const snapshot = $state.snapshot(answers) as Record<string, AnswerState>;
 
-    if (!allowsDraft || screen !== 'answering') return;
+    if (!allowsDraft || screen !== 'answering') {return;}
 
     // ⚠️ **戻すかどうかを聞いている間は書かない。**
     // 読み込み直後の回答は空なので、書くと「全部消した」と見なして
     // **置いてある下書きを、戻す前に消してしまう**
-    if (draftFound) return;
+    if (draftFound) {return;}
 
     saveDraft(publicId, snapshot);
   });
@@ -529,7 +529,7 @@
 
     for (const [questionId, answer] of Object.entries(draft)) {
       // **今の定義に無い設問は戻さない。** 公開し直しで設問が消えていることがある
-      if (answers[questionId] === undefined) continue;
+      if (answers[questionId] === undefined) {continue;}
 
       answers[questionId] = { ...answer };
     }
@@ -551,7 +551,7 @@
    * 答えようのない設問で止まる。
    */
   function checkCurrentStep(): boolean {
-    if (!currentStep) return true;
+    if (!currentStep) {return true;}
     errors = validatePage(
       currentStep.questions,
       answers,
@@ -563,7 +563,7 @@
   }
 
   function goNext() {
-    if (!checkCurrentStep()) return;
+    if (!checkCurrentStep()) {return;}
     stepIndex = Math.min(stepIndex + 1, Math.max(steps.length - 1, 0));
     errors = {};
     window.scrollTo({ top: 0 });
@@ -609,7 +609,7 @@
   function compactRows(
     rows: Record<string, string[]> | undefined,
   ): Record<string, string[]> | undefined {
-    if (rows === undefined) return undefined;
+    if (rows === undefined) {return undefined;}
 
     const kept = Object.entries(rows).filter(([, values]) =>
       values.some((value) => value.trim() !== ''),
@@ -644,7 +644,7 @@
   }
 
   async function submit() {
-    if (!checkCurrentStep()) return;
+    if (!checkCurrentStep()) {return;}
 
     submitting = true;
     submitError = '';
