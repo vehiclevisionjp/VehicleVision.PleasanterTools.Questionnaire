@@ -19,7 +19,7 @@ Pleasanter 本体は**公式イメージを起動するだけ**で、ソース�
 |---|---|---|
 | `db` | `mcr.microsoft.com/mssql/server:2025-CU8-ubuntu-24.04` | SQL Server 2025 |
 | `codedefiner` | `implem/pleasanter:codedefiner` | スキーマ作成 ＋ 90 日トライアル登録 |
-| `pleasanter` | `implem/pleasanter:1.5.8.1` | 本体。サブモジュールの固定版に合わせる |
+| `pleasanter` | `implem/pleasanter:1.5.8.1` | 本体。AI 用の参照取得とは独立して試験用の版を固定 |
 | `verify` | `python:3.13-slim` | 検証の実行役。**ホストに python も curl も要求しない** |
 
 ## 使い方

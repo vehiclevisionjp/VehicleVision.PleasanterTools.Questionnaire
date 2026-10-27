@@ -79,8 +79,10 @@ GitHub Release には、Azure App Service（Windows Web App）とオンプレミ
 ```bash
 git clone https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Questionnaire.git
 cd VehicleVision.PleasanterTools.Questionnaire
-git submodule update --init --recursive
 ```
+
+Pleasanter 本体の参照ソースは開発・CI に不要です。
+仕様を調べる場合だけ、[参照ソースの取得手順](_reference/README.md)に従って取得します。
 
 ### 開発環境は Docker で完結する
 
