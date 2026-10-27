@@ -172,3 +172,9 @@ jobs:
         # **AGENTS.md は .github/copilot-instructions.md からの生成物。**
         # 参照元だけ直して生成し忘れると、Codex CLI などへ古い規約が届く（Issue #480）
         run: bash ./scripts/sync-agents.sh --check
+
+      - name: 参照取得スクリプトをネットワークなしで検証する
+        run: bash ./scripts/test-sync-reference.sh
+
+      - name: 既定先と共有先の参照ソースの隔離を検査する
+        run: bash ./scripts/reference-isolation-check.sh
