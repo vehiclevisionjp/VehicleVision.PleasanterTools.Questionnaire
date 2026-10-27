@@ -55,7 +55,7 @@ public class AdminUserManagementTests
 
         var authenticator = new AdminAuthenticator(
             users,
-            new AdminUserSettingsStore(factory),
+            new AdminUserSettingsStore(factory, users),
             hasher,
             new TotpService(),
             options,

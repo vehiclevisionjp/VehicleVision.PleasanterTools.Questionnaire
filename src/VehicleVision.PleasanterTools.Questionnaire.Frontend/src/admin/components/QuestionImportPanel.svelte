@@ -81,7 +81,7 @@
 
     while (true) {
       const result = await listSurveys(offset, 200, '', null);
-      if (!result.ok) return result;
+      if (!result.ok) {return result;}
 
       surveys.push(...result.value.items);
       if (!result.value.hasMore) {
@@ -97,7 +97,7 @@
     source = null;
     selectedIds = [];
     error = '';
-    if (sourceId === '') return;
+    if (sourceId === '') {return;}
 
     loading = true;
     const result = await loadQuestionImportSource(surveyId, sourceId);
@@ -117,7 +117,7 @@
   }
 
   async function submit() {
-    if (sourceId === '' || selectedIds.length === 0 || importing) return;
+    if (sourceId === '' || selectedIds.length === 0 || importing) {return;}
 
     importing = true;
     error = '';

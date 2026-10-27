@@ -79,8 +79,10 @@ GitHub Release には、Azure App Service（Windows Web App）とオンプレミ
 ```bash
 git clone https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Questionnaire.git
 cd VehicleVision.PleasanterTools.Questionnaire
-git submodule update --init --recursive
 ```
+
+Pleasanter 本体の参照ソースは開発・CI に不要です。
+仕様を調べる場合だけ、[参照ソースの取得手順](_reference/README.md)に従って取得します。
 
 ### 開発環境は Docker で完結する
 
@@ -193,7 +195,7 @@ Claude Code は [`CLAUDE.md`](CLAUDE.md)、その他のエージェントは [`A
 | | ライセンス | 想定する利用 |
 | --- | --- | --- |
 | A | [GNU AGPL v3 以降](LICENSE) | オープンソースとして利用・改変・再配布する場合 |
-| B | [PMC 商用ライセンス](LICENSE-COMMERCIAL.md) | AGPL の義務を負わずに利用したい場合（個別契約） |
+| B | [株式会社ピー・エム・シー ITソリューション事業部の商用ライセンス](LICENSE-COMMERCIAL.md) | AGPL の義務を負わずに利用したい場合（個別契約） |
 
 SPDX 表記: `AGPL-3.0-or-later OR LicenseRef-PMC-Commercial`
 
@@ -201,4 +203,4 @@ SPDX 表記: `AGPL-3.0-or-later OR LicenseRef-PMC-Commercial`
 取り込むと商用ライセンスでの提供ができなくなります。依存 OSS も寛容ライセンス
 （MIT / BSD 系 / Apache-2.0）に限定します（[`NOTICE`](NOTICE)）。
 
-Copyright (C) PMC Co.,Ltd.
+Copyright (C) PMC Co., Ltd. IT Solution Div.

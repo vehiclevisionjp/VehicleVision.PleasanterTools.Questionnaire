@@ -32,7 +32,7 @@ export function autoReplyKey(code: string): MessageKey | null {
  */
 export function validateAutoReply(definition: SurveyDefinition): AutoReplyProblem[] {
   const settings = definition.autoReply;
-  if (!settings?.enabled) return [];
+  if (!settings?.enabled) {return [];}
 
   const problems: AutoReplyProblem[] = [];
   const questions = definition.pages.flatMap((page) => page.questions);
@@ -48,8 +48,8 @@ export function validateAutoReply(definition: SurveyDefinition): AutoReplyProble
     }
   }
 
-  if (isBlank(settings.subject)) problems.push({ code: 'SubjectMissing' });
-  if (isBlank(settings.body)) problems.push({ code: 'BodyMissing' });
+  if (isBlank(settings.subject)) {problems.push({ code: 'SubjectMissing' });}
+  if (isBlank(settings.body)) {problems.push({ code: 'BodyMissing' });}
   if (localizedContainsNewLine(settings.fromName)) {
     problems.push({ code: 'FromNameInvalid' });
   }
@@ -121,7 +121,7 @@ function hasTicketedAssets(definition: SurveyDefinition): boolean {
  * **英語だけ書いてあるのは翻訳漏れであって不備ではない**（既定の言語へ落ちる）。
  */
 function isBlank(value: Record<string, string> | undefined): boolean {
-  if (!value) return true;
+  if (!value) {return true;}
   return Object.values(value).every((text) => text.trim() === '');
 }
 
@@ -130,9 +130,9 @@ function localizedContainsNewLine(value: Record<string, string> | undefined): bo
 }
 
 function isOptionalEmail(value: string | null | undefined): boolean {
-  if (!value?.trim()) return true;
+  if (!value?.trim()) {return true;}
   const normalized = value.trim();
-  if (/[\r\n ]/.test(normalized)) return false;
+  if (/[\r\n ]/.test(normalized)) {return false;}
   const at = normalized.indexOf('@');
   return at > 0 && at < normalized.length - 1;
 }

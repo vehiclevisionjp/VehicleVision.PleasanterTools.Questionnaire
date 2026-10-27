@@ -142,7 +142,7 @@
         language: Language;
       };
       const result = await previewAutoReply(request.definition, request.language);
-      if (source !== previewSource) return;
+      if (source !== previewSource) {return;}
 
       if (result.ok) {
         preview = result.value;

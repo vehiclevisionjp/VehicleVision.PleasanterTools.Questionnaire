@@ -114,7 +114,7 @@ export async function redeemEditLink(publicId: string): Promise<boolean> {
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }
 
-  if (!editToken) return false;
+  if (!editToken) {return false;}
 
   const response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}/edit-link`), {
     method: 'POST',
@@ -123,10 +123,10 @@ export async function redeemEditLink(publicId: string): Promise<boolean> {
   });
 
   // ⚠️ **理由は返ってこない。** 期限切れ・失効済み・無いトークンを区別しない
-  if (!response.ok) return false;
+  if (!response.ok) {return false;}
 
   const redeemed = (await response.json()) as { responseToken?: string };
-  if (!redeemed.responseToken) return false;
+  if (!redeemed.responseToken) {return false;}
 
   writeStorage(TOKEN_STORAGE_PREFIX + publicId, redeemed.responseToken);
   return true;
@@ -144,7 +144,7 @@ export async function redeemAssetTicket(publicId: string): Promise<FormResponse 
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }
 
-  if (!assetTicket) return null;
+  if (!assetTicket) {return null;}
 
   const response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}/asset-ticket`), {
     method: 'POST',
@@ -160,7 +160,7 @@ export async function activateAssetTicket(
   publicId: string,
   assetTicket: string | undefined,
 ): Promise<boolean> {
-  if (!assetTicket) return false;
+  if (!assetTicket) {return false;}
   window.location.hash = `d=${encodeURIComponent(assetTicket)}`;
   return (await redeemAssetTicket(publicId)) !== null;
 }
@@ -172,7 +172,7 @@ export async function requestTicket(publicId: string): Promise<Ticket | null> {
     body: JSON.stringify({ responseToken: readResponseToken(publicId) }),
   });
 
-  if (!response.ok) return null;
+  if (!response.ok) {return null;}
 
   const ticket = (await response.json()) as Ticket;
   writeStorage(TOKEN_STORAGE_PREFIX + publicId, ticket.responseToken);
@@ -385,7 +385,7 @@ export async function loadPendingAnswers(
     { headers: { accept: 'application/json' } },
   );
 
-  if (!response.ok) return null;
+  if (!response.ok) {return null;}
   const body = (await response.json()) as { answers?: PayloadAnswer[] };
   return body.answers ?? null;
 }

@@ -58,7 +58,7 @@ function storage(): Storage | null {
  */
 export function saveDraft(publicId: string, answers: Record<string, AnswerState>): void {
   const store = storage();
-  if (store === null) return;
+  if (store === null) {return;}
 
   const kept: StoredDraft['answers'] = {};
 
@@ -100,7 +100,7 @@ export function readDraft(
   maxAgeDays: number = DRAFT_MAX_AGE_DAYS,
 ): Record<string, AnswerState> | null {
   const store = storage();
-  if (store === null) return null;
+  if (store === null) {return null;}
 
   let raw: string | null = null;
   try {
@@ -109,7 +109,7 @@ export function readDraft(
     return null;
   }
 
-  if (raw === null) return null;
+  if (raw === null) {return null;}
 
   let draft: StoredDraft;
   try {
@@ -166,7 +166,7 @@ function isText(value: unknown): value is string {
 function compactRows(
   rows: Record<string, string[]> | undefined,
 ): Record<string, string[]> | undefined {
-  if (rows === undefined) return undefined;
+  if (rows === undefined) {return undefined;}
 
   const kept = Object.entries(rows).filter(([, values]) =>
     values.some((value) => value.trim() !== ''),
@@ -177,7 +177,7 @@ function compactRows(
 
 /** 端末から読んだ行を、形を確かめて戻す。 */
 function readRows(rows: unknown): Record<string, string[]> | undefined {
-  if (rows === null || typeof rows !== 'object') return undefined;
+  if (rows === null || typeof rows !== 'object') {return undefined;}
 
   const kept: Record<string, string[]> = {};
   for (const [rowId, values] of Object.entries(rows as Record<string, unknown>)) {

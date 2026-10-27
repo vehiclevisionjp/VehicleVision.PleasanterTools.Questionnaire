@@ -29,7 +29,7 @@ export type ColumnAvailability = Readonly<Record<string, number>>;
  */
 export function prefixOf(columnName: string): string {
   const trimmed = columnName.trim();
-  if (trimmed === '') return '';
+  if (trimmed === '') {return '';}
 
   // 項目拡張で増えた列（Class001 など）
   const withoutDigits = trimmed.replace(/[0-9]+$/, '');
@@ -67,8 +67,8 @@ export function measure(
 
   for (const assignment of mapping.assignments) {
     const column = assignment.targetColumn?.trim() ?? '';
-    if (column === '') continue;
-    if (!/[A-Z0-9]$/.test(column)) continue;
+    if (column === '') {continue;}
+    if (!/[A-Z0-9]$/.test(column)) {continue;}
 
     const prefix = prefixOf(column);
     const columns = byPrefix.get(prefix) ?? new Set<string>();
@@ -89,7 +89,7 @@ export function measure(
 }
 
 function availableFor(prefix: string, available: number | ColumnAvailability): number {
-  if (typeof available === 'number') return available;
+  if (typeof available === 'number') {return available;}
 
   return available[prefix] ?? STANDARD_COLUMNS_PER_TYPE;
 }
@@ -108,7 +108,7 @@ export function requiredPortCount(definition: SurveyDefinition): number {
 }
 
 function portsOf(question: Question): number {
-  if (!hasRowPorts(question.type)) return 1;
+  if (!hasRowPorts(question.type)) {return 1;}
 
   // **行が 0 本でも 1 とみなす。** これから足すものとして数える
   return Math.max(rowPorts(question).length, 1);

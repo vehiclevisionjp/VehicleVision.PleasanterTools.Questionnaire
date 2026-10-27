@@ -25,7 +25,7 @@ export function noteBlocks(
   language: Language,
   fallbackLanguage: Language = DEFAULT_LANGUAGE,
 ): NoteBlock[] {
-  if (!byLanguage) return [];
+  if (!byLanguage) {return [];}
   return byLanguage[language] ?? byLanguage[fallbackLanguage] ?? [];
 }
 
@@ -37,7 +37,7 @@ export function noteBlocks(
  * **「消して残りを出す」ではなく「知っているものだけ出す」。**
  */
 export function renderableBlocks(blocks: NoteBlock[] | undefined): NoteBlock[] {
-  if (!blocks) return [];
+  if (!blocks) {return [];}
   return blocks.filter((block) => RENDERABLE_KINDS.includes(block.kind));
 }
 
@@ -48,7 +48,7 @@ export function renderableBlocks(blocks: NoteBlock[] | undefined): NoteBlock[] {
  * 説明文がそこへ並ぶと読み上げの見出し構造が壊れる。
  */
 export function headingLevel(level: number): number {
-  if (!Number.isFinite(level)) return MIN_HEADING_LEVEL;
+  if (!Number.isFinite(level)) {return MIN_HEADING_LEVEL;}
   return Math.min(Math.max(Math.trunc(level), MIN_HEADING_LEVEL), MAX_HEADING_LEVEL);
 }
 
@@ -60,7 +60,7 @@ export function headingLevel(level: number): number {
  * 通すのは絶対 URL の `https:` だけ。
  */
 export function isSafeHref(href: string | null | undefined): href is string {
-  if (!href) return false;
+  if (!href) {return false;}
   try {
     return new URL(href).protocol === 'https:';
   } catch {
@@ -75,7 +75,7 @@ export function isSafeHref(href: string | null | undefined): href is string {
  * 消してしまうと、書いた人が誤りに気付けない。
  */
 export function renderableInlines(inlines: NoteInline[] | undefined): NoteInline[] {
-  if (!inlines) return [];
+  if (!inlines) {return [];}
   return inlines
     .filter((inline) => inline.text !== '')
     .map((inline) => {

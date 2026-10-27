@@ -261,6 +261,19 @@ internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUser
         return Task.CompletedTask;
     }
 
+    /// <summary>Core の窓口（<see cref="IAdminUserStore"/>）側。設定の窓口と、引数が同じで戻り値だけが違うので、明示的に実装する。</summary>
+    Task<AdminChangeResult> IAdminUserStore.SetLanguageAsync(
+        Guid id, string language, CancellationToken cancellationToken)
+    {
+        if (!users.TryGetValue(id, out var entry))
+        {
+            return Task.FromResult(AdminChangeResult.NotFound);
+        }
+
+        entry.Language = language;
+        return Task.FromResult(AdminChangeResult.Updated);
+    }
+
     public Task<IReadOnlyList<string>> ListUnusedRecoveryCodeHashesAsync(
         Guid adminUserId,
         CancellationToken cancellationToken = default) =>

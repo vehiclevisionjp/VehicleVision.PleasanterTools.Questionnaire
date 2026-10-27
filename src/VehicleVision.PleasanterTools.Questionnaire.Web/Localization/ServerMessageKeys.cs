@@ -29,6 +29,8 @@ public static class ServerMessageKeys
 
     public const string EnrollmentRestartRequired = "auth.enrollmentRestartRequired";
 
+    public const string TotpAlreadyEnrolled = "auth.totpAlreadyEnrolled";
+
     public const string TotpCodeMismatch = "auth.totpCodeMismatch";
 
     /// <summary>2 要素認証を無効にしているため、登録できない。</summary>

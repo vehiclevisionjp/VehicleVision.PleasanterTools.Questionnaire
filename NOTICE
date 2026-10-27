@@ -1,5 +1,5 @@
 VehicleVision.PleasanterTools.Questionnaire
-Copyright (C) PMC Co.,Ltd.
+Copyright (C) PMC Co., Ltd. IT Solution Div.
 
 本ソフトウェアはデュアルライセンス（AGPL-3.0-or-later OR LicenseRef-PMC-Commercial）で
 提供されます。詳細は LICENSING.md を参照してください。
@@ -57,11 +57,14 @@ Copyright (C) PMC Co.,Ltd.
     （Microsoft.IdentityModel.* と Newtonsoft.Json を推移的に伴う。いずれも MIT）
   Azure.Storage.Blobs 12.30.1 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
-  VehicleVision.PleasanterTools.Core.Data 0.1.0-preview.7 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
-    （DB の基盤。接続・暗号化検査・DbTime・マイグレーションと排他・SqlDialect の汎用部分。Dapper・FluentMigrator・DB ドライバは、これが推移的に伴う）
-  VehicleVision.PleasanterTools.Core.Mail 0.1.0-preview.4 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+  VehicleVision.PleasanterTools.Core.Data 0.1.0-preview.12 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+    （DB の基盤。接続・暗号化検査・DbTime・マイグレーションと排他・手動コマンド・SqlDialect の汎用部分。Dapper・FluentMigrator・DB ドライバは、これが推移的に伴う）
+  VehicleVision.PleasanterTools.Core.Mail 0.1.0-preview.12 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
     （メール送信の部品。以下の AWSSDK.SimpleEmailV2・Azure.Communication.Email・Azure.Identity・MailKit・MimeKit・
       System.Security.Cryptography.Pkcs は、これが推移的に伴う。Issue #670）
+  VehicleVision.PleasanterTools.Core.Web 0.1.0-preview.12 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+    （Web 層の部品。Pleasanter の本人確認と SSO・SAML の設定読み取り・検証。
+      ASP.NET Core の共有フレームワークだけを使い、NuGet の依存を推移的に伴わない。Issue #706）
   AWSSDK.SimpleEmailV2 4.0.106.4 / Apache-2.0 / https://github.com/aws/aws-sdk-net
     （Amazon SES の送信経路。**IAM ロールで通るので、保管する秘密が 0 になる**。Issue #198）
   AWSSDK.S3 4.0.104.4 / Apache-2.0 / https://github.com/aws/aws-sdk-net
@@ -93,6 +96,9 @@ Copyright (C) PMC Co.,Ltd.
   vitest 5.0.5 / MIT / https://www.npmjs.com/package/vitest
   sass 1.105.2 / MIT
   typescript 6.0.3 / Apache-2.0
+  eslint 10.13.0 / MIT / https://www.npmjs.com/package/eslint
+  typescript-eslint 8.72.0 / MIT / https://www.npmjs.com/package/typescript-eslint
+  eslint-plugin-svelte 3.23.1 / MIT / https://www.npmjs.com/package/eslint-plugin-svelte
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
   @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://github.com/DefinitelyTyped/DefinitelyTyped
 
@@ -112,6 +118,10 @@ Copyright (C) PMC Co.,Ltd.
 
 テスト時のみ使用するもの
 
+  VehicleVision.PleasanterTools.Core.Web.Testing 0.1.0-preview.12 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://www.nuget.org/packages/VehicleVision.PleasanterTools.Core.Web.Testing/0.1.0-preview.12
+    （管理画面の共有契約テスト C1〜C5。xunit 2.9.3 のみを推移的に伴い、Core.Web には依存しない。
+      https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/57eceb486b465856a541b9cc0d3cb4101bfc2cdc/LICENSING.md、
+      公開パッケージの nuspec とライセンスを確認。参照日 2026-10-22）
   xunit 2.9.3 / Apache-2.0
   xunit.runner.visualstudio 4.0.1 / Apache-2.0
   Microsoft.NET.Test.Sdk 18.11.0 / MIT
@@ -131,6 +141,9 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.Configuration 10.0.14 / MIT
     （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
   Microsoft.Extensions.TimeProvider.Testing 10.10.0 / MIT
+  Microsoft.AspNetCore.Mvc.Testing 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.Mvc.Testing/10.0.13
+    （本体の起動コード・HTTP パイプラインを通す管理画面の契約テストに使用。
+      https://github.com/dotnet/aspnetcore/blob/v10.0.13/LICENSE.txt、参照日 2026-10-22）
 
 **依存を追加したら、ここへ追記してからコミットすること。**
 

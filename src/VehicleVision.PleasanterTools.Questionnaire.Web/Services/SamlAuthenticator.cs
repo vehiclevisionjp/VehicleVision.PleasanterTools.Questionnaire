@@ -22,6 +22,12 @@ public enum SamlSignInOutcome
 
     /// <summary>止められている利用者。</summary>
     Disabled,
+
+    /// <summary>締め出し中。</summary>
+    LockedOut,
+
+    /// <summary>自動登録に許可されない役割。</summary>
+    NotAllowed,
 }
 
 /// <summary>IdP から来た利用者の扱いの結果。</summary>
@@ -58,6 +64,7 @@ public sealed class SamlAuthenticator(
     PasswordHasher hasher,
     ISamlOptionsProvider optionsProvider,
     AdminAuthOptions authOptions,
+    TimeProvider timeProvider,
     ILogger<SamlAuthenticator> logger)
 {
     /// <summary>ログイン ID から管理者を決める。居なければ設定に従って作るか断る。</summary>
@@ -93,6 +100,12 @@ public sealed class SamlAuthenticator(
                 return new SamlSignInResult(SamlSignInOutcome.Unknown);
             }
 
+            if (!AuthenticationOptionsAdapter.IsRegisterRoleAllowed(options.RegisterRole))
+            {
+                logger.LogWarning("SAML の自動登録に許可されない役割のため登録を拒否しました。");
+                return new SamlSignInResult(SamlSignInOutcome.NotAllowed);
+            }
+
             user = await RegisterAsync(trimmed, options.RegisterRole, cancellationToken)
                 .ConfigureAwait(false);
             registered = true;
@@ -106,6 +119,11 @@ public sealed class SamlAuthenticator(
         if (user.IsDisabled)
         {
             return new SamlSignInResult(SamlSignInOutcome.Disabled, user);
+        }
+
+        if (user.IsLocked(timeProvider.GetUtcNow()))
+        {
+            return new SamlSignInResult(SamlSignInOutcome.LockedOut, user);
         }
 
         if (user.TotpEnabled)
