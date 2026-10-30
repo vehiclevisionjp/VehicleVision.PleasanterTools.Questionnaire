@@ -57,12 +57,12 @@ Copyright (C) PMC Co., Ltd. IT Solution Div.
     （Microsoft.IdentityModel.* と Newtonsoft.Json を推移的に伴う。いずれも MIT）
   Azure.Storage.Blobs 12.30.1 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure.Core などを推移的に伴う。いずれも同リポジトリの MIT）
-  VehicleVision.PleasanterTools.Core.Data 0.1.0-preview.12 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+  VehicleVision.PleasanterTools.Core.Data 0.1.0 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
     （DB の基盤。接続・暗号化検査・DbTime・マイグレーションと排他・手動コマンド・SqlDialect の汎用部分。Dapper・FluentMigrator・DB ドライバは、これが推移的に伴う）
-  VehicleVision.PleasanterTools.Core.Mail 0.1.0-preview.12 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+  VehicleVision.PleasanterTools.Core.Mail 0.1.0 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
     （メール送信の部品。以下の AWSSDK.SimpleEmailV2・Azure.Communication.Email・Azure.Identity・MailKit・MimeKit・
       System.Security.Cryptography.Pkcs は、これが推移的に伴う。Issue #670）
-  VehicleVision.PleasanterTools.Core.Web 0.1.0-preview.12 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+  VehicleVision.PleasanterTools.Core.Web 0.1.0 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
     （Web 層の部品。Pleasanter の本人確認と SSO・SAML の設定読み取り・検証。
       ASP.NET Core の共有フレームワークだけを使い、NuGet の依存を推移的に伴わない。Issue #706）
   AWSSDK.SimpleEmailV2 4.0.106.4 / Apache-2.0 / https://github.com/aws/aws-sdk-net
@@ -118,7 +118,7 @@ Copyright (C) PMC Co., Ltd. IT Solution Div.
 
 テスト時のみ使用するもの
 
-  VehicleVision.PleasanterTools.Core.Web.Testing 0.1.0-preview.12 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://www.nuget.org/packages/VehicleVision.PleasanterTools.Core.Web.Testing/0.1.0-preview.12
+  VehicleVision.PleasanterTools.Core.Web.Testing 0.1.0 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://www.nuget.org/packages/VehicleVision.PleasanterTools.Core.Web.Testing/0.1.0
     （管理画面の共有契約テスト C1〜C5。xunit 2.9.3 のみを推移的に伴い、Core.Web には依存しない。
       https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/57eceb486b465856a541b9cc0d3cb4101bfc2cdc/LICENSING.md、
       公開パッケージの nuspec とライセンスを確認。参照日 2026-10-22）
