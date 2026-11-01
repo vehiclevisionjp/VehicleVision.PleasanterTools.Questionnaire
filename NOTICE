@@ -38,14 +38,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
       上の条件は、LICENSING.md（例外の節）と LICENSE-COMMERCIAL.md（頒布先に守っていただく条件）へ反映した）
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
-  StackExchange.Redis 3.4.20 / MIT / https://www.nuget.org/packages/StackExchange.Redis/3.4.0
+  StackExchange.Redis 3.4.29 / MIT / https://www.nuget.org/packages/StackExchange.Redis/3.4.0
     （大規模構成で選択できる管理者セッションストア。既定は本アプリの DB）
   Microsoft.Extensions.DependencyInjection 10.0.13 / MIT
   Microsoft.Extensions.Configuration.Abstractions 10.0.14 / MIT
   Microsoft.Extensions.Hosting.Abstractions 10.0.14 / MIT
   Microsoft.Extensions.Logging.Abstractions 10.0.14 / MIT
   Microsoft.AspNetCore.OpenApi 10.0.14 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.OpenApi
-  Scalar.AspNetCore 2.18.5 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.18.5
+  Scalar.AspNetCore 2.18.7 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.18.7
     （OpenAPI 文書を読む画面。画面本体は埋め込みアセットで同梱し、CDN の既定フォントと
       利用状況テレメトリーは無効化する）
   Jint 4.17.0 / BSD-2-Clause / https://github.com/sebastienros/jint
@@ -68,7 +68,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
       ASP.NET Core の共有フレームワークだけを使い、NuGet の依存を推移的に伴わない。Issue #706）
   AWSSDK.SimpleEmailV2 4.0.106.4 / Apache-2.0 / https://github.com/aws/aws-sdk-net
     （Amazon SES の送信経路。**IAM ロールで通るので、保管する秘密が 0 になる**。Issue #198）
-  AWSSDK.S3 4.0.104.4 / Apache-2.0 / https://github.com/aws/aws-sdk-net
+  AWSSDK.S3 4.0.104.8 / Apache-2.0 / https://github.com/aws/aws-sdk-net
     （アンケート資産の S3 互換保存。既定の資格情報探索で IAM ロールを利用できる。Issue #271）
   Azure.Communication.Email 1.1.0 / MIT / https://github.com/Azure/azure-sdk-for-net
     （Azure Communication Services の送信経路。**マネージド ID で通る**。Issue #198）
@@ -95,10 +95,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   @sveltejs/vite-plugin-svelte 7.3.1 / MIT
   svelte-check 4.7.7 / MIT
   vitest 5.0.5 / MIT / https://www.npmjs.com/package/vitest
-  sass 1.105.2 / MIT
+  sass 1.107.1 / MIT
   typescript 6.0.3 / Apache-2.0
-  eslint 10.13.0 / MIT / https://www.npmjs.com/package/eslint
-  typescript-eslint 8.72.0 / MIT / https://www.npmjs.com/package/typescript-eslint
+  eslint 10.14.0 / MIT / https://www.npmjs.com/package/eslint
+  typescript-eslint 8.72.1 / MIT / https://www.npmjs.com/package/typescript-eslint
   eslint-plugin-svelte 3.23.1 / MIT / https://www.npmjs.com/package/eslint-plugin-svelte
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
   @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://github.com/DefinitelyTyped/DefinitelyTyped
@@ -147,7 +147,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   Microsoft.Extensions.Configuration 10.0.14 / MIT
     （設定の読み取りを試すのに使う。アプリ側は Abstractions だけを参照する）
   Microsoft.Extensions.TimeProvider.Testing 10.11.0 / MIT
-  Microsoft.AspNetCore.Mvc.Testing 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.Mvc.Testing/10.0.13
+  Microsoft.AspNetCore.Mvc.Testing 10.0.14 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.Mvc.Testing/10.0.14
     （本体の起動コード・HTTP パイプラインを通す管理画面の契約テストに使用。
       https://github.com/dotnet/aspnetcore/blob/v10.0.13/LICENSE.txt、参照日 2026-10-22）
 
