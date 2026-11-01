@@ -117,17 +117,21 @@ textarea {
 /*
  * チェック・ラジオ（DesignReference の .vv-check と同じ形）。枠は --border-strong（面に対し 3:1 以上）、
  * 選んだ状態は --accent の塗り。ダークや作成者のテーマの地でも見えるよう、色は意味名から引く。
- * `:where()` で詳細度を 0 にして、各画面の指定（寸法・余白）が勝つようにしている
+ * ⚠️ **寸法と枠の太さは `!important`。** 各画面に `width: auto; border: 0` のような指定が残っていて、
+ * `appearance: none` と組み合わさると大きさ 0 の釦になり、見えず押せなくなる（CI の写しの試験で見つかった）。
+ * 色と余白は各画面が変えられる
  */
 :where(input[type='checkbox'], input[type='radio']) {
   appearance: none;
   flex: none;
   position: relative;
   box-sizing: border-box;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.25rem !important;
+  min-width: 1.25rem !important;
+  height: 1.25rem !important;
+  padding: 0 !important;
   background: var(--surface);
-  border: 2px solid var(--border-strong);
+  border: 2px solid var(--border-strong) !important;
   border-radius: var(--radius-sm);
   cursor: pointer;
   accent-color: var(--accent);
@@ -139,7 +143,7 @@ textarea {
 
 :where(input[type='checkbox'], input[type='radio']):checked {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent) !important;
 }
 
 :where(input[type='checkbox']):checked::after {
@@ -159,7 +163,7 @@ textarea {
 }
 
 :where(input[type='checkbox'], input[type='radio']):disabled {
-  border-color: var(--border);
+  border-color: var(--border) !important;
   cursor: not-allowed;
 }
 
