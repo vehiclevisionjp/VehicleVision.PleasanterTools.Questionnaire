@@ -7,6 +7,9 @@
 import '@fontsource-variable/noto-sans-jp';
 import '@fontsource-variable/m-plus-1-code';
 import '@fontsource/material-icons';
+// **色・余白・角丸などは DesignReference のトークン**（Issue #776）。先に色、次に基本
+import '../styles/tokens.css';
+import '../styles/base.css';
 import { mount } from 'svelte';
 import AdminApp from './AdminApp.svelte';
 

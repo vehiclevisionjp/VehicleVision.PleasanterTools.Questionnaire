@@ -11,6 +11,9 @@ import '@fontsource/m-plus-rounded-1c/japanese-700.css';
 import '@fontsource/m-plus-rounded-1c/latin-400.css';
 import '@fontsource/m-plus-rounded-1c/latin-700.css';
 import '@fontsource-variable/m-plus-1-code';
+// **色・余白・角丸などは DesignReference のトークン**（Issue #776）。先に色、次に基本
+import './styles/tokens.css';
+import './styles/base.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
 
