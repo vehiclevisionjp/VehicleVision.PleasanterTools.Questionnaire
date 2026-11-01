@@ -1149,7 +1149,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'theme.chooseImage': '이미지 선택',
   'theme.uploading': '업로드 중…',
   'theme.removeImage': '이미지 삭제',
-  'themeFont.System': '기기 기본값',
+  'themeFont.System': '기본값(Zen Kaku Gothic New)',
   'themeFont.Sans': '고딕체',
   'themeFont.Serif': '명나라 몸',
   'themeFont.Rounded': '둥근 고딕체',

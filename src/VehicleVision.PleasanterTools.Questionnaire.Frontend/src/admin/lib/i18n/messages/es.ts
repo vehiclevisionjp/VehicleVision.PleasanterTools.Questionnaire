@@ -1215,7 +1215,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "theme.chooseImage": "Elegir una imagen",
   "theme.uploading": "Subiendo…",
   "theme.removeImage": "Quitar la imagen",
-  "themeFont.System": "Valor predeterminado del dispositivo",
+  "themeFont.System": "Predeterminada (Zen Kaku Gothic New)",
   "themeFont.Sans": "Palo seco",
   "themeFont.Serif": "Serif",
   "themeFont.Rounded": "Redondeada",

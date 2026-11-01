@@ -1269,7 +1269,7 @@ export const ja = {
   'theme.chooseImage': '画像を選択',
   'theme.uploading': 'アップロードしています…',
   'theme.removeImage': '画像を削除',
-  'themeFont.System': '端末の既定',
+  'themeFont.System': '既定（Zen Kaku Gothic New）',
   'themeFont.Sans': 'ゴシック体',
   'themeFont.Serif': '明朝体',
   'themeFont.Rounded': '丸ゴシック体',

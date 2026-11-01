@@ -156,7 +156,8 @@ export function safeColor(value: string | null | undefined): string | null {
  * **後ろに端末の書体も並べたままにする。** 配信に失敗しても文字が出なくならないため。
  */
 const FONT_STACKS: Record<ThemeFont, string | null> = {
-  // **既定は指定しない。** `:root` に書いてある今までの指定がそのまま効く
+  // **既定は指定しない。** `:root` の `--font`（styles/base.css。同梱の Zen Kaku Gothic New）がそのまま効く。
+  // ⚠️ **「端末の書体」ではない**（Issue #791。以前は `--font` が未定義で、回答者の端末の書体になっていた）
   System: null,
   // **同梱した Zen Kaku Gothic New を先頭に置く**（DesignReference 第 2.3 版の本文書体。管理画面と共用。無い環境でも端末の書体へ落ちる）
   Sans: '"Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif',
