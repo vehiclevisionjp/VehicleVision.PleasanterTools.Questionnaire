@@ -163,8 +163,10 @@ const FONT_STACKS: Record<ThemeFont, string | null> = {
   Serif: '"Noto Serif JP Variable", "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif',
   Rounded:
     '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Quicksand", "Hiragino Sans", sans-serif',
-  // **日本語も等幅**にしたいので M PLUS 1 Code を同梱している
-  Monospace: '"M PLUS 1 Code Variable", ui-monospace, SFMono-Regular, Consolas, monospace',
+  // **DesignReference の `--font-mono`（Noto Sans Mono CJK JP）。管理画面と共用**。
+  // 同梱しているのは ASCII だけなので、**日本語は同梱の Noto Sans CJK JP に落ちる**（日本語は等幅にならない）
+  Monospace:
+    '"Noto Sans Mono CJK JP", "Noto Sans CJK JP", ui-monospace, SFMono-Regular, Consolas, monospace',
 };
 
 /**

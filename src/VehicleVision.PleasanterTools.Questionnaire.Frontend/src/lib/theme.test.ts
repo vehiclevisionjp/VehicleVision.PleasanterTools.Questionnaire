@@ -4,6 +4,7 @@ import {
   DEFAULT_COLORS,
   THEME_PRESETS,
   THEME_PRESET_COLORS,
+  applyTheme,
   contrastRatio,
   resolveTheme,
   safeColor,
@@ -114,4 +115,24 @@ describe('配色として用意した組み合わせ', () => {
       );
     },
   );
+});
+
+describe('等幅の書体', () => {
+  it('Noto Sans Mono CJK JP を先頭に置き、日本語は Noto Sans CJK JP へ落とす（Issue #778）', () => {
+    const target = { style: new Map<string, string>() };
+    const el = {
+      style: {
+        setProperty: (name: string, value: string) => target.style.set(name, value),
+        removeProperty: (name: string) => target.style.delete(name),
+      },
+    } as unknown as HTMLElement;
+
+    applyTheme(el, { font: 'Monospace' });
+
+    const font = target.style.get('--font') ?? '';
+    expect(font.startsWith('"Noto Sans Mono CJK JP", "Noto Sans CJK JP", ')).toBe(true);
+    expect(font).toContain('monospace');
+    // **同梱をやめた M PLUS 1 Code は、もう並べない**
+    expect(font).not.toContain('M PLUS 1 Code');
+  });
 });

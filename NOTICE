@@ -105,7 +105,7 @@ Copyright (C) PMC Co., Ltd. IT Solution Div.
 同梱する書体とアイコン（**成果物に含まれる。** 自前配信なので外部へ要求は出ない）
 
   Noto Sans CJK JP 2.004（Regular・Bold）・Noto Sans Mono CJK JP 2.004（Regular。ASCII のみ） / SIL Open Font License 1.1 / https://github.com/notofonts/noto-cjk
-    （管理画面と回答画面の既定・テーマの「ゴシック体」。DesignReference 第 2.2 版（73943fd）の同梱書体を `sync-app-fonts.mjs` で複写したもの。
+    （管理画面と回答画面の既定・テーマの「ゴシック体」「等幅」（等幅は ASCII のみで、日本語はゴシック体へ落ちる）。DesignReference 第 2.2 版（73943fd）の同梱書体を `sync-app-fonts.mjs` で複写したもの。
       JIS X 0208 + NEC・IBM 拡張に絞った woff2 を unicode-range で区画に分けている。出どころ・SHA は
       `src/VehicleVision.PleasanterTools.Questionnaire.Frontend/src/fonts/app/SOURCE.json` と `manifest.json`。
       ライセンス全文は成果物の `fonts-licenses/NotoCJK-OFL.txt`。
@@ -115,8 +115,6 @@ Copyright (C) PMC Co., Ltd. IT Solution Div.
     （Noto Serif JP Variable。テーマの「明朝体」）
   @fontsource/m-plus-rounded-1c 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/m-plus-rounded-1c
     （M PLUS Rounded 1c。テーマの「丸ゴシック体」。**可変フォントが無いので 400 と 700 だけ持つ**）
-  @fontsource-variable/m-plus-1-code 5.3.1 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/m-plus-1-code
-    （M PLUS 1 Code Variable。日本語も等幅になる）
   @fontsource/material-icons 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/material-icons
     （Material Icons。**上流（google/material-design-icons）は Apache-2.0** だが、
       npm パッケージは OFL-1.1 を宣言している）

@@ -7,9 +7,7 @@
 //
 // **明朝体と丸ゴシック体は読まない。** 回答画面のテーマ用なので、
 // プレビューでは端末の書体になる（そこだけ本番と差が出る点に注意）。
-// 等幅（M PLUS 1 Code）は、プレビューを本番に合わせるためだけに読む（管理画面の UI では使わない）。
 import '../styles/app-fonts.css';
-import '@fontsource-variable/m-plus-1-code';
 import '@fontsource/material-icons';
 // **色・余白・角丸などは DesignReference のトークン**（Issue #776）。先に色、次に基本
 import '../styles/tokens.css';
