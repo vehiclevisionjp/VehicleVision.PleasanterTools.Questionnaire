@@ -2,7 +2,7 @@
  * アプリ（回答画面・管理画面）の基本スタイル。VehicleVision DesignReference の css/app-base.css を土台にする。
  *
  * 出どころ: vehiclevisionjp/VehicleVision.DesignReference の css/app-base.css
- *           （第 2.1 版、コミット 7c60bae、2026-11-01 参照。書体の並びだけ第 2.3 版・080f9b3）。先に tokens.css を読み込む。
+ *           （第 2.1 版、コミット 7c60bae、2026-11-01 参照。書体の並びは第 2.3 版・080f9b3 から変わらない。書体の実体は第 2.4 版・0730ea9）。先に tokens.css を読み込む。
  *           書体の実体は app-fonts.css（`scripts/fonts/sync-app-fonts.mjs` で複写。出どころは fonts/app/SOURCE.json）。
  *
  * DesignReference と違う点（理由つき）:
@@ -18,7 +18,7 @@
  */
 :root,
 [data-theme] {
-  /* 書体の並び（DesignReference 第 2.3 版と同じ）。書体そのものは app-fonts.css（同梱。同梱の範囲の外の字は、次の端末の書体） */
+  /* 書体の並び（DesignReference 第 2.3 版以降と同じ）。書体そのものは app-fonts.css（同梱。同梱の範囲の外の字は、次の端末の書体） */
   --font-sans: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
   --font-heading: "Zen Maru Gothic", var(--font-sans);
   --font-accent: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -91,6 +91,16 @@
   --info-surface: var(--color-primary-subtle);
   --info-text: var(--color-text);
   --motion-duration: 0.15s;
+}
+
+/*
+ * **回答画面の既定の書体（`--font`）。** テーマで書体を選ばなかった（`System`）アンケートも、同梱の Zen Kaku Gothic New にする
+ * （Issue #791。以前は未定義で、回答者の端末の書体になっていた）。作成者がテーマで選んだ書体は、lib/theme.ts の applyTheme が
+ * `<html>` の style へ `--font` を直に入れて上書きする（`System` は消して、ここへ落とす）。
+ * 管理画面の下見（SurveyPreview）は自分で同じ指定を持つ。**`:root` だけ**に置く（`[data-theme]` の入れ子で作成者の選択を戻さないため）
+ */
+:root {
+  --font: var(--font-sans);
 }
 
 /*

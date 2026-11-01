@@ -1153,7 +1153,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "theme.chooseImage": "Chọn một hình ảnh",
   "theme.uploading": "Đang tải lên…",
   "theme.removeImage": "Xóa hình ảnh",
-  "themeFont.System": "Mặc định của thiết bị",
+  "themeFont.System": "Mặc định (Zen Kaku Gothic New)",
   "themeFont.Sans": "Sans serif",
   "themeFont.Serif": "Serif",
   "themeFont.Rounded": "làm tròn",

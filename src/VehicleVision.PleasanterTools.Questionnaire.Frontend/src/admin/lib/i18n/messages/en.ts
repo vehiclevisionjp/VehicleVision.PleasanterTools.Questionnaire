@@ -1315,7 +1315,7 @@ export const en: Record<MessageKey, string> = {
   'theme.chooseImage': 'Choose an image',
   'theme.uploading': 'Uploading…',
   'theme.removeImage': 'Remove the image',
-  'themeFont.System': 'Device default',
+  'themeFont.System': 'Default (Zen Kaku Gothic New)',
   'themeFont.Sans': 'Sans serif',
   'themeFont.Serif': 'Serif',
   'themeFont.Rounded': 'Rounded',

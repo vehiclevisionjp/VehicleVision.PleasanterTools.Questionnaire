@@ -1271,7 +1271,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'theme.chooseImage': '选择图片',
   'theme.uploading': '正在上传…',
   'theme.removeImage': '删除图片',
-  'themeFont.System': '设备默认字体',
+  'themeFont.System': '默认（Zen Kaku Gothic New）',
   'themeFont.Sans': '无衬线体',
   'themeFont.Serif': '衬线体',
   'themeFont.Rounded': '圆体',

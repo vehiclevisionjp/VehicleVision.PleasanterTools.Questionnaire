@@ -1153,7 +1153,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "theme.chooseImage": "Wählen Sie ein Bild",
   "theme.uploading": "Hochladen...",
   "theme.removeImage": "Entfernen Sie das Bild",
-  "themeFont.System": "Gerätestandard",
+  "themeFont.System": "Standard (Zen Kaku Gothic New)",
   "themeFont.Sans": "Sans serif",
   "themeFont.Serif": "Serif",
   "themeFont.Rounded": "abgerundet",
