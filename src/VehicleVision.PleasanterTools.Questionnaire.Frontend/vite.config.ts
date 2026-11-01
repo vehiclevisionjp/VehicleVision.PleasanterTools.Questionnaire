@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 // **`vite` ではなく `vitest/config` から取る。** `test` の設定を書けるのはこちら
@@ -30,9 +31,33 @@ function forbidInlineFonts(): Plugin {
   };
 }
 
+// **同梱した書体のライセンス（OFL など）と出どころを、成果物（wwwroot/fonts-licenses/）へ入れる。**
+// 書体を配る（Docker・publish・NuGet など）ときは、ライセンスを付けて渡す必要がある（Issue #776）。
+// 元は src/fonts/app/（DesignReference の sync-app-fonts.mjs が複写したもの。手で直さない）
+function emitFontLicenses(): Plugin {
+  const dir = resolve(import.meta.dirname, 'src/fonts/app');
+  return {
+    name: 'questionnaire:emit-font-licenses',
+    apply: 'build',
+    generateBundle() {
+      const files = [
+        ...readdirSync(resolve(dir, 'licenses')).map((name) => `licenses/${name}`),
+        'SOURCE.json',
+      ];
+      for (const file of files) {
+        this.emitFile({
+          type: 'asset',
+          fileName: `fonts-licenses/${file.replace('licenses/', '')}`,
+          source: readFileSync(resolve(dir, file)),
+        });
+      }
+    },
+  };
+}
+
 // ビルド成果物は .Web の wwwroot へ出す。**単一のアプリとして配信するため**
 export default defineConfig({
-  plugins: [svelte(), forbidInlineFonts()],
+  plugins: [svelte(), forbidInlineFonts(), emitFontLicenses()],
   // **配置先のサブパスを組み立て時に焼き込まない**（Issue #465）。
   //   - JS と CSS からの参照は**自分の位置からの相対**にする（`./`）。
   //     サブパスがどこでも、資産同士は同じ `assets/` の中で見つかる

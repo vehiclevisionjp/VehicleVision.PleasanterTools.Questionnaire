@@ -158,8 +158,8 @@ export function safeColor(value: string | null | undefined): string | null {
 const FONT_STACKS: Record<ThemeFont, string | null> = {
   // **既定は指定しない。** `:root` に書いてある今までの指定がそのまま効く
   System: null,
-  // **同梱した可変フォントを先頭に置く**（無い環境でも端末の書体へ落ちる）
-  Sans: '"Noto Sans JP Variable", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif',
+  // **同梱した Noto Sans CJK JP を先頭に置く**（DesignReference の書体。管理画面と共用。無い環境でも端末の書体へ落ちる）
+  Sans: '"Noto Sans CJK JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif',
   Serif: '"Noto Serif JP Variable", "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif',
   Rounded:
     '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Quicksand", "Hiragino Sans", sans-serif',

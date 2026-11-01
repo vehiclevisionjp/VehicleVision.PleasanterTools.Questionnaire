@@ -104,8 +104,13 @@ Copyright (C) PMC Co., Ltd. IT Solution Div.
 
 同梱する書体とアイコン（**成果物に含まれる。** 自前配信なので外部へ要求は出ない）
 
-  @fontsource-variable/noto-sans-jp 5.3.1 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-sans-jp
-    （Noto Sans JP Variable。unicode-range で分割された woff2）
+  Noto Sans CJK JP 2.004（Regular・Bold）・Noto Sans Mono CJK JP 2.004（Regular。ASCII のみ） / SIL Open Font License 1.1 / https://github.com/notofonts/noto-cjk
+    （管理画面と回答画面の既定・テーマの「ゴシック体」。DesignReference 第 2.2 版（73943fd）の同梱書体を `sync-app-fonts.mjs` で複写したもの。
+      JIS X 0208 + NEC・IBM 拡張に絞った woff2 を unicode-range で区画に分けている。出どころ・SHA は
+      `src/VehicleVision.PleasanterTools.Questionnaire.Frontend/src/fonts/app/SOURCE.json` と `manifest.json`。
+      ライセンス全文は成果物の `fonts-licenses/NotoCJK-OFL.txt`。
+      コード用の Myrica M は、この製品がコード書体を使う画面を持たないので同梱しない（`--without-code`。
+      `fonts-licenses/` には複写の道具が付けた Myrica のライセンスも入る））
   @fontsource-variable/noto-serif-jp 5.3.1 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-serif-jp
     （Noto Serif JP Variable。テーマの「明朝体」）
   @fontsource/m-plus-rounded-1c 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/m-plus-rounded-1c

@@ -2,13 +2,13 @@
  * アプリ（回答画面・管理画面）の基本スタイル。VehicleVision DesignReference の css/app-base.css を土台にする。
  *
  * 出どころ: vehiclevisionjp/VehicleVision.DesignReference の css/app-base.css
- *           （第 2.1 版、コミット 7c60bae、2026-11-01 参照）。先に tokens.css を読み込む。
+ *           （第 2.1 版、コミット 7c60bae、2026-11-01 参照。書体の並びだけ第 2.2 版・73943fd）。先に tokens.css を読み込む。
+ *           書体の実体は app-fonts.css（`scripts/fonts/sync-app-fonts.mjs` で複写。出どころは fonts/app/SOURCE.json）。
  *
  * DesignReference と違う点（理由つき）:
  *   - **文字サイズと余白は px ではなく rem で持つ**（16px 基準で同じ値）。
  *     読みやすさ設定（文字の大きさ）は `<html>` の font-size を変えて効かせているので、px だと余白と文字が連動しない。
- *   - **書体は同梱している**（Issue #152。外部へ要求を出さない・イントラでも同じ見た目）。
- *     同梱の書体を先頭に置き、その後ろに DesignReference のフォールバック（端末の書体）を並べる。
+ *   - **書体の並びは DesignReference と同じ**（同梱は Issue #152 から。外部へ要求を出さない・イントラでも同じ見た目）。
  *     回答画面の書体はアンケートの作成者が選べる（lib/theme.ts の FONT_STACKS）。ここは「選ばなかったとき」の既定。
  *   - ボックスモデル・見出し・本文の指定は持たない（各画面の指定を変えないため）。
  *
@@ -18,12 +18,12 @@
  */
 :root,
 [data-theme] {
-  /* 書体: 同梱の Noto Sans JP → Noto Sans CJK JP → (Google 版の名前) → macOS → Windows → OS 標準 */
-  --font-sans: 'Noto Sans JP Variable', 'Noto Sans CJK JP', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
+  /* 書体の並び（DesignReference 第 2.2 版と同じ）。書体そのものは app-fonts.css（同梱。同梱の範囲の外の字は、次の端末の書体） */
+  --font-sans: "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
   --font-heading: var(--font-sans);
-  /* コード・ID・ログ。同梱の M PLUS 1 Code（日本語も等幅）→ Myrica M → … */
-  --font-code: 'M PLUS 1 Code Variable', 'Myrica M', 'MyricaM M', 'Noto Sans Mono CJK JP', 'Cascadia Mono', Consolas, 'BIZ UDGothic', 'MS Gothic', monospace;
-  --font-mono: var(--font-code);
+  --font-accent: "Noto Serif CJK JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-mono: "Noto Sans Mono CJK JP", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;
+  --font-code: "Myrica M", "MyricaM M", "Noto Sans Mono CJK JP", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;
 
   /* 文字サイズ（DesignReference の 12 / 14 / 16 / 20 / 28 / 36px を rem で） */
   --fs-xs: 0.75rem;
