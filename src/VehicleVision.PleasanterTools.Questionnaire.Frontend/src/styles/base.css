@@ -2,7 +2,7 @@
  * アプリ（回答画面・管理画面）の基本スタイル。VehicleVision DesignReference の css/app-base.css を土台にする。
  *
  * 出どころ: vehiclevisionjp/VehicleVision.DesignReference の css/app-base.css
- *           （第 2.1 版、コミット 7c60bae、2026-11-01 参照。書体の並びだけ第 2.2 版・73943fd）。先に tokens.css を読み込む。
+ *           （第 2.1 版、コミット 7c60bae、2026-11-01 参照。書体の並びだけ第 2.3 版・080f9b3）。先に tokens.css を読み込む。
  *           書体の実体は app-fonts.css（`scripts/fonts/sync-app-fonts.mjs` で複写。出どころは fonts/app/SOURCE.json）。
  *
  * DesignReference と違う点（理由つき）:
@@ -18,12 +18,12 @@
  */
 :root,
 [data-theme] {
-  /* 書体の並び（DesignReference 第 2.2 版と同じ）。書体そのものは app-fonts.css（同梱。同梱の範囲の外の字は、次の端末の書体） */
-  --font-sans: "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
-  --font-heading: var(--font-sans);
-  --font-accent: "Noto Serif CJK JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  --font-mono: "Noto Sans Mono CJK JP", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;
-  --font-code: "Myrica M", "MyricaM M", "Noto Sans Mono CJK JP", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;
+  /* 書体の並び（DesignReference 第 2.3 版と同じ）。書体そのものは app-fonts.css（同梱。同梱の範囲の外の字は、次の端末の書体） */
+  --font-sans: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
+  --font-heading: "Zen Maru Gothic", var(--font-sans);
+  --font-accent: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-mono: "Myrica M", "MyricaM M", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;
+  --font-code: var(--font-mono);
 
   /* 文字サイズ（DesignReference の 12 / 14 / 16 / 20 / 28 / 36px を rem で） */
   --fs-xs: 0.75rem;

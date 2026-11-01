@@ -723,10 +723,18 @@
     line-height: 1.7;
   }
 
+  /* **見出しと釦は Zen Maru Gothic（Bold）**（DesignReference 第 2.3 版。--font-heading。Issue #789） */
+  :global(h1),
+  :global(h2),
+  :global(h3) {
+    font-family: var(--font-heading);
+  }
+
   :global(button) {
     box-sizing: border-box;
     min-height: var(--control-h);
     font: inherit;
+    font-family: var(--font-heading);
     font-size: var(--fs-sm);
     font-weight: 700;
     padding: 0 var(--space-4);

@@ -118,7 +118,7 @@ describe('配色として用意した組み合わせ', () => {
 });
 
 describe('等幅の書体', () => {
-  it('Noto Sans Mono CJK JP を先頭に置き、日本語は Noto Sans CJK JP へ落とす（Issue #778）', () => {
+  it('Myrica M を先頭に置き、範囲の外は Zen Kaku Gothic New へ落とす（Issue #778・#789）', () => {
     const target = { style: new Map<string, string>() };
     const el = {
       style: {
@@ -130,9 +130,27 @@ describe('等幅の書体', () => {
     applyTheme(el, { font: 'Monospace' });
 
     const font = target.style.get('--font') ?? '';
-    expect(font.startsWith('"Noto Sans Mono CJK JP", "Noto Sans CJK JP", ')).toBe(true);
+    expect(font.startsWith('"Myrica M", "Zen Kaku Gothic New", ')).toBe(true);
     expect(font).toContain('monospace');
     // **同梱をやめた M PLUS 1 Code は、もう並べない**
     expect(font).not.toContain('M PLUS 1 Code');
+    // **廃止された Noto CJK 系は、もう並べない**（DesignReference 第 2.3 版）
+    expect(font).not.toContain('Noto');
+  });
+
+  it('ゴシック体は Zen Kaku Gothic New を先頭に置く（Issue #789）', () => {
+    const target = { style: new Map<string, string>() };
+    const el = {
+      style: {
+        setProperty: (name: string, value: string) => target.style.set(name, value),
+        removeProperty: (name: string) => target.style.delete(name),
+      },
+    } as unknown as HTMLElement;
+
+    applyTheme(el, { font: 'Sans' });
+
+    const font = target.style.get('--font') ?? '';
+    expect(font.startsWith('"Zen Kaku Gothic New", ')).toBe(true);
+    expect(font).not.toContain('Noto');
   });
 });
