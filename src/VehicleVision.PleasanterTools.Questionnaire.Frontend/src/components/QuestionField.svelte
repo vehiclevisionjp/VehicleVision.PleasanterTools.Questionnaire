@@ -552,10 +552,9 @@
 <style lang="scss">
   .field {
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    margin: 0 0 1rem;
-
+    border-radius: var(--radius-md);
+    padding: var(--space-4) 1.25rem;
+    margin: 0 0 var(--space-4);
     &.has-error {
       border-color: var(--error);
     }
@@ -563,17 +562,17 @@
 
   legend {
     font-weight: 600;
-    padding: 0 0.25rem;
+    padding: 0 var(--space-1);
   }
 
   .required {
     color: var(--error);
-    margin-left: 0.25rem;
+    margin-left: var(--space-1);
   }
 
   .description {
     color: var(--muted);
-    margin: 0.25rem 0 0.75rem;
+    margin: var(--space-1) 0 var(--space-3);
     font-size: 0.9rem;
     white-space: pre-line;
   }
@@ -581,7 +580,7 @@
   .choice {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     padding: 0.35rem 0;
     cursor: pointer;
   }
@@ -599,7 +598,7 @@
 
   .dropdown-remark {
     display: block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
   }
 
   input[type='text'],
@@ -608,9 +607,10 @@
   textarea,
   select {
     width: 100%;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    padding: var(--space-2);
+    /* **部品の枠は --border-strong**（面に対し 3:1 以上。DesignReference） */
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
     font: inherit;
     box-sizing: border-box;
     /* **入力欄の地と文字もテーマに追随させる**（Issue #109）。
@@ -620,7 +620,7 @@
   }
 
   .other {
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
   }
 
   /* ---- グリッド（Issue #74）------------------------------------------------ */
@@ -639,7 +639,7 @@
   .grid th,
   .grid td {
     border-bottom: 1px solid var(--border);
-    padding: 0.5rem;
+    padding: var(--space-2);
     text-align: center;
   }
 
@@ -689,16 +689,16 @@
 
     .grid tr {
       border: 1px solid var(--border);
-      border-radius: 6px;
-      margin-bottom: 0.75rem;
-      padding: 0.5rem;
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+      padding: var(--space-2);
     }
 
     .grid tbody th {
       display: block;
       border-bottom: none;
       font-weight: 600;
-      padding: 0.25rem 0.5rem 0.5rem;
+      padding: var(--space-1) var(--space-2) var(--space-2);
     }
 
     .grid td {
@@ -710,7 +710,7 @@
     .cell {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--space-2);
     }
 
     .cell-label {
@@ -729,11 +729,11 @@
   .rank-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
-    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-2);
+    padding: var(--space-1) var(--space-2);
   }
 
   /* **色だけに頼らない。** 左端の太い線と、順位そのものの文字で分かる */
@@ -744,11 +744,11 @@
   .rank-toggle {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     flex: 1;
     background: none;
     border: none;
-    padding: 0.5rem;
+    padding: var(--space-2);
     font: inherit;
     text-align: left;
     cursor: pointer;
@@ -768,15 +768,15 @@
 
   .rank-actions {
     display: flex;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
 
   /* **指で押せる大きさにする。** 並べ替えは押し間違えると順位が崩れる */
   .rank-move {
     min-width: 2.5rem;
     min-height: 2.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     background: none;
     font: inherit;
     cursor: pointer;
@@ -798,7 +798,7 @@
   }
 
   .files {
-    margin: 0.5rem 0 0;
+    margin: var(--space-2) 0 0;
     padding-left: 1.25rem;
     color: var(--muted);
     font-size: 0.9rem;
@@ -807,7 +807,7 @@
   .scale {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     flex-wrap: wrap;
   }
 
@@ -825,7 +825,7 @@
 
   .rating {
     display: flex;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
 
   .star {
@@ -833,7 +833,7 @@
     border: none;
     font-size: 1.75rem;
     line-height: 1;
-    color: var(--border);
+    color: var(--border-strong);
     cursor: pointer;
 
     &.filled {
@@ -842,16 +842,15 @@
   }
 
   .note {
-    margin: 0 0 1rem;
-
+    margin: 0 0 var(--space-4);
     h3 {
-      margin: 0 0 0.25rem;
+      margin: 0 0 var(--space-1);
     }
   }
 
   .error {
     color: var(--error);
-    margin: 0.5rem 0 0;
+    margin: var(--space-2) 0 0;
     font-size: 0.9rem;
   }
 

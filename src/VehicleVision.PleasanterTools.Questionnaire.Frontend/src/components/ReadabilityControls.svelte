@@ -151,7 +151,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.25rem 0.75rem;
+    gap: var(--space-1) var(--space-3);
   }
 
   .choices {
@@ -168,7 +168,7 @@
     height: 2.25rem;
     padding: 0;
     border: 1px solid transparent;
-    border-radius: 0.35rem;
+    border-radius: var(--radius-md);
     background: transparent;
     color: var(--muted);
     cursor: pointer;
@@ -194,7 +194,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     min-width: 0;
     margin: 0;
     padding: 0;
@@ -215,15 +215,15 @@
   label {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
     min-width: 0;
   }
 
   select {
     max-width: 100%;
-    padding: 0.25rem 0.4rem;
+    padding: var(--space-1) 0.4rem;
     border: 1px solid var(--border);
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
     font: inherit;

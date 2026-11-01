@@ -72,16 +72,16 @@
 
 <style>
   .embed {
-    margin: 0 0 1.5rem;
+    margin: 0 0 var(--space-6);
   }
 
   h3 {
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
     font-size: 1.05rem;
   }
 
   .description {
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
   }
 

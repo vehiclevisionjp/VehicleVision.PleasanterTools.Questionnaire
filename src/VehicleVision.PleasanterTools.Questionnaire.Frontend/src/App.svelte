@@ -1047,59 +1047,44 @@
 </main>
 
 <style lang="scss">
-  /* **テーマで差し替わるのはここに書いた既定値**（Issue #56）。
-     何も指定されなければ、この値のまま＝今までの見た目 */
-  :global(:root) {
-    --border: #d0d5dd;
-    --muted: #667085;
-    --error: #b42318;
-    --accent: #175cd3;
-    --bg: #f9fafb;
-    --text: #101828;
-    /* **釦の文字色と入力欄の地**（Issue #109）。
-       今までは #fff を直に書いていた。既定値は変えていないので見た目は同じ */
-    --accent-text: #fff;
-    --surface: #fff;
-    --motion-duration: 0.2s;
-    /* **同梱した書体を既定にする**（Issue #152）。テーマで変えられる */
-    --font: 'Noto Sans JP Variable', system-ui, sans-serif;
-    --font-mono: 'M PLUS 1 Code Variable', ui-monospace, Consolas, monospace;
-  }
+  /* **テーマで差し替わる名前（--accent など）の既定値は styles/base.css に移した**（Issue #776）。
+     値は DesignReference のトークン（styles/tokens.css）から引く。
+     何も指定されなければその値＝既定の見た目。アンケートの作成者のテーマは lib/theme.ts が上書きする */
 
   :global(body) {
     margin: 0;
     background: var(--bg);
     font-family: var(--font);
     color: var(--text);
-    line-height: 1.6;
+    line-height: 1.7;
   }
 
   main {
     max-width: 46rem;
     margin: 0 auto;
-    padding: 2rem 1rem 4rem;
+    padding: var(--space-8) var(--space-4) 4rem;
   }
 
   h1 {
     font-size: 1.5rem;
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
   }
 
   h2 {
     font-size: 1.15rem;
-    margin: 1.5rem 0 0.5rem;
+    margin: var(--space-6) 0 var(--space-2);
   }
 
   .lead {
     color: var(--muted);
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
   }
 
   /* ---- 埋め込みの知らせ（Issue #107）--------------------------------------- */
 
   .embed-notice {
-    margin: 0 0 1rem;
-    padding: 0.5rem 0.75rem;
+    margin: 0 0 var(--space-4);
+    padding: var(--space-2) var(--space-3);
     border-left: 3px solid var(--muted);
     color: var(--muted);
     font-size: 0.9rem;
@@ -1111,13 +1096,13 @@
     border: 1px solid var(--border);
     /* **色だけに頼らない。** 左端の太い線でも「いつもと違う」が分かる */
     border-left: 4px solid var(--accent);
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    margin: 0 0 1rem;
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin: 0 0 var(--space-4);
   }
 
   .draft p {
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
   }
 
   .draft-note {
@@ -1128,14 +1113,14 @@
   .draft-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
   }
 
   .draft-notice {
     color: var(--muted);
     font-size: 0.9rem;
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
   }
 
   .status {
@@ -1145,9 +1130,9 @@
   .progress {
     height: 6px;
     background: var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
-    margin: 1rem 0 0.25rem;
+    margin: var(--space-4) 0 var(--space-1);
   }
 
   .bar {
@@ -1159,14 +1144,14 @@
   .progress-text {
     color: var(--muted);
     font-size: 0.85rem;
-    margin: 0 0 1.5rem;
+    margin: 0 0 var(--space-6);
   }
 
   .actions {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-3);
     justify-content: flex-end;
-    margin-top: 1.5rem;
+    margin-top: var(--space-6);
   }
 
   .action-item {
@@ -1183,10 +1168,15 @@
   }
 
   .button-link {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: var(--control-h);
     font: inherit;
-    padding: 0.6rem 1.25rem;
-    border-radius: 6px;
+    font-weight: 700;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-md);
     border: 1px solid var(--accent);
     text-decoration: none;
     text-align: center;
@@ -1197,8 +1187,11 @@
     color: var(--accent);
   }
 
+  /* **無効は、色を落として枠だけにする**（透過にしない。DesignReference の部品の決まり） */
   .button-link.disabled {
-    opacity: 0.6;
+    background: var(--bg);
+    color: var(--muted);
+    border-color: var(--border);
     cursor: not-allowed;
   }
 
@@ -1208,8 +1201,8 @@
     width: 100%;
     max-height: 14rem;
     object-fit: cover;
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
   }
 
   .display-settings {
@@ -1217,8 +1210,8 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.75rem 1rem;
-    margin-bottom: 1rem;
+    gap: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-4);
     font-size: 0.85rem;
     color: var(--muted);
   }
@@ -1228,9 +1221,9 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.5rem 1rem;
-    margin-top: 2rem;
-    padding-top: 1rem;
+    gap: var(--space-2) var(--space-4);
+    margin-top: var(--space-8);
+    padding-top: var(--space-4);
     border-top: 1px solid var(--border);
     font-size: 0.85rem;
 
@@ -1246,22 +1239,33 @@
   }
 
   button {
+    box-sizing: border-box;
+    min-height: var(--control-h);
     font: inherit;
-    padding: 0.6rem 1.25rem;
-    border-radius: 6px;
+    font-weight: 700;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-md);
     border: 1px solid var(--accent);
     background: var(--accent);
     color: var(--accent-text);
     cursor: pointer;
 
+    /* **無効は、色を落として枠だけにする**（透過にしない） */
     &:disabled {
-      opacity: 0.6;
+      background: var(--bg);
+      color: var(--muted);
+      border-color: var(--border);
       cursor: not-allowed;
     }
 
     &.secondary {
       background: var(--surface);
       color: var(--accent);
+    }
+
+    &.secondary:disabled {
+      background: var(--bg);
+      color: var(--muted);
     }
   }
 
@@ -1272,23 +1276,23 @@
   .note {
     color: var(--muted);
     font-size: 0.85rem;
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
   }
 
   /* **CAPTCHA は送信の直前に置く**（Issue #164） */
   .captcha {
-    margin: 1.5rem 0 0;
+    margin: var(--space-6) 0 0;
   }
 
   .captcha-notice {
-    margin: 0.5rem 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--muted);
     font-size: 0.8rem;
   }
 
   /* **告知は小さく、でも読める大きさで**（Issue #162） */
   .analytics-notice {
-    margin: 2rem 0 0;
+    margin: var(--space-8) 0 0;
     color: var(--muted);
     font-size: 0.8rem;
   }
