@@ -376,20 +376,20 @@
         onclick={() => onmove(-1)}
         aria-label={t('question.moveUp')}
       >
-        ↑
+        <span class="material-icons" aria-hidden="true">arrow_upward</span>
       </button>
       <button
         type="button"
         class="icon"
         disabled={!canMoveDown}
         onclick={() => onmove(1)}
-        aria-label={t('question.moveDown')}>↓</button
+        aria-label={t('question.moveDown')}><span class="material-icons" aria-hidden="true">arrow_downward</span></button
       >
       <button type="button" class="secondary small" onclick={onreorder}>
         {t('editor.move')}
       </button>
       <button type="button" class="icon danger" onclick={onremove} aria-label={t('question.remove')}>
-        ×
+        <span class="material-icons" aria-hidden="true">close</span>
       </button>
     </div>
   </div>
@@ -587,20 +587,20 @@
             class="icon"
             disabled={index === 0}
             onclick={() => moveRow(index, -1)}
-            aria-label={t('question.moveRowUp')}>↑</button
+            aria-label={t('question.moveRowUp')}><span class="material-icons" aria-hidden="true">arrow_upward</span></button
           >
           <button
             type="button"
             class="icon"
             disabled={index === rows.length - 1}
             onclick={() => moveRow(index, 1)}
-            aria-label={t('question.moveRowDown')}>↓</button
+            aria-label={t('question.moveRowDown')}><span class="material-icons" aria-hidden="true">arrow_downward</span></button
           >
           <button
             type="button"
             class="icon danger"
             onclick={() => removeRow(index)}
-            aria-label={t('question.removeRow')}>×</button
+            aria-label={t('question.removeRow')}><span class="material-icons" aria-hidden="true">close</span></button
           >
         </div>
       {/each}
@@ -1017,11 +1017,11 @@
 
 <style lang="scss">
   .question {
-    padding: 1rem;
+    padding: var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 0.75rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-3);
   }
 
   .question.selected {
@@ -1037,7 +1037,7 @@
   .head {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
     align-items: center;
   }
 
@@ -1059,16 +1059,16 @@
   input[type='number'],
   textarea,
   select {
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    padding: 0.4rem var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     box-sizing: border-box;
   }
 
   .description {
     width: 100%;
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
     color: var(--muted);
     resize: vertical;
     line-height: 1.6;
@@ -1078,13 +1078,13 @@
   .description-format {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
     font-size: 0.85rem;
   }
 
   .markup-hint {
-    margin: 0.25rem 0 0;
+    margin: var(--space-1) 0 0;
     font-size: 0.78rem;
     color: var(--muted);
     line-height: 1.6;
@@ -1094,8 +1094,8 @@
   .meta {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-top: 0.5rem;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
     font-size: 0.82rem;
     flex-wrap: wrap;
   }
@@ -1104,7 +1104,7 @@
     color: var(--muted);
     background: var(--bg);
     padding: 0.1rem 0.35rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
   }
 
   .inline {
@@ -1115,7 +1115,7 @@
 
   /* **未割り当ては目立たせる。** 気付かずに公開すると回答が Pleasanter に残らない */
   .unmapped {
-    padding: 0.1rem 0.5rem;
+    padding: 0.1rem var(--space-2);
     color: var(--warning-text);
     background: var(--warning-surface);
     border: 1px solid var(--warning-border);
@@ -1124,7 +1124,7 @@
   }
 
   .unsaved-indicator {
-    padding: 0.1rem 0.5rem;
+    padding: 0.1rem var(--space-2);
     color: var(--warning-text);
     background: var(--surface);
     border: 1px solid var(--warning-border);
@@ -1152,26 +1152,26 @@
   }
 
   .choices {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
     border-top: 1px dashed var(--border);
   }
 
   .rows {
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
   }
 
   /* ---- 埋め込み（Issue #104 / #107）---------------------------------------- */
 
   .embed {
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
     display: grid;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .embed label {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-1);
     font-size: 0.9rem;
   }
 
@@ -1197,7 +1197,7 @@
   .row-line {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     margin-bottom: 0.35rem;
   }
 
@@ -1217,7 +1217,7 @@
 
   .choice {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
     align-items: center;
   }
 
@@ -1225,7 +1225,7 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    margin: 0.25rem 0 0 1rem;
+    margin: var(--space-1) 0 0 var(--space-4);
     font-size: 0.8rem;
     color: var(--muted);
 
@@ -1238,14 +1238,14 @@
 
   .choice-remark {
     width: calc(100% - 1rem);
-    margin: 0.25rem 0 0 1rem;
+    margin: var(--space-1) 0 0 var(--space-4);
     box-sizing: border-box;
   }
 
   .warn {
     color: var(--warning-text);
     font-size: 0.8rem;
-    margin: 0.25rem 0 0.5rem;
+    margin: var(--space-1) 0 var(--space-2);
   }
 
   .choice-label {
@@ -1267,9 +1267,8 @@
 
   .range {
     display: flex;
-    gap: 1rem;
-    margin-top: 0.75rem;
-
+    gap: var(--space-4);
+    margin-top: var(--space-3);
     label {
       font-size: 0.85rem;
     }
@@ -1284,36 +1283,38 @@
   .normalization {
     display: grid;
     gap: 0.35rem;
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
   }
 
   .hint {
     color: var(--muted);
     font-size: 0.8rem;
-    margin: 0.5rem 0 0;
+    margin: var(--space-2) 0 0;
   }
 
   .actions {
     display: flex;
     flex-shrink: 0;
-    gap: 0.25rem;
+    gap: var(--space-1);
     margin-left: auto;
   }
 
   .icon {
-    width: 1.9rem;
-    height: 1.9rem;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
     padding: 0;
     line-height: 1;
     background: var(--surface);
     color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
     cursor: pointer;
 
     &:disabled {
-      opacity: 0.35;
-      cursor: default;
+      background: var(--disabled-surface);
+      color: var(--disabled-text);
+      border-color: var(--border);
+      cursor: not-allowed;
     }
 
     &.danger {
@@ -1322,7 +1323,7 @@
   }
 
   .small {
-    font-size: 0.85rem;
-    padding: 0.35rem 0.75rem;
+    font-size: var(--fs-xs);
+    padding: 0 var(--space-3);
   }
 </style>

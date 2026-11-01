@@ -711,42 +711,26 @@
 <ConfirmationDialog />
 
 <style lang="scss">
-  :global(:root) {
-    --border: #d0d5dd;
-    --muted: #667085;
-    --error: #b42318;
-    --accent: #175cd3;
-    --bg: #f9fafb;
-    --text: #101828;
-    --surface: #fff;
-    --accent-text: #fff;
-    --success: #067647;
-    --success-surface: #ecfdf3;
-    --warning-text: #7a4b00;
-    --warning-surface: #fff4e5;
-    --warning-border: #f79009;
-    --error-surface: #fef3f2;
-    --disabled-surface: #f2f4f7;
-    --disabled-text: #475467;
-    --info-surface: #eef4ff;
-    --info-text: #1f2a44;
-    /* **書体は同梱している**（Issue #152）。等幅は日本語も等幅になる */
-    --font-mono: 'M PLUS 1 Code Variable', ui-monospace, Consolas, monospace;
-  }
+  /* **色・書体・余白・角丸は DesignReference のトークン**（Issue #776）。
+     --accent などの意味名と --font-mono は styles/base.css が持つ（値はトークンから引く） */
 
   :global(body) {
     margin: 0;
     background: var(--bg);
-    /* **同梱した書体を使う**（Issue #152）。端末の書体に依存させない */
-    font-family: 'Noto Sans JP Variable', system-ui, sans-serif;
+    /* **同梱した書体を使う**（Issue #152）。端末の書体に依存させない。後ろは DesignReference のフォールバック */
+    font-family: var(--font-sans);
     color: var(--text);
-    line-height: 1.6;
+    line-height: 1.7;
   }
 
   :global(button) {
+    box-sizing: border-box;
+    min-height: var(--control-h);
     font: inherit;
-    padding: 0.45rem 1rem;
-    border-radius: 6px;
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-md);
     border: 1px solid var(--accent);
     background: var(--accent);
     color: var(--accent-text);
@@ -794,9 +778,21 @@
     text-align: center;
   }
 
+  /* **表の中・小さい釦は 32px**（DesignReference の「小」。一覧の行ごとに釦が並ぶので 40px だと行が伸びる） */
+  :global(table button),
+  :global(button.small),
+  :global(button.icon) {
+    min-height: var(--control-h-sm);
+    padding: 0 var(--space-3);
+    font-size: var(--fs-xs);
+  }
+
+  /* **無効は、色を落として枠だけにする**（透過にしない。DesignReference の部品の決まり） */
   :global(button:disabled) {
-    opacity: 0.55;
-    cursor: default;
+    background: var(--disabled-surface);
+    color: var(--disabled-text);
+    border-color: var(--border);
+    cursor: not-allowed;
   }
 
   :global(button.secondary) {
@@ -804,18 +800,23 @@
     color: var(--accent);
   }
 
+  :global(button.secondary:disabled) {
+    background: var(--disabled-surface);
+    color: var(--disabled-text);
+  }
+
   .top {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 1.5rem;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-6);
     background: var(--surface);
     border-bottom: 1px solid var(--border);
   }
 
   .breadcrumbs {
-    padding: 0.5rem 1.5rem;
+    padding: var(--space-2) var(--space-6);
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     color: var(--muted);
@@ -825,7 +826,7 @@
   .breadcrumbs ol {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
     max-width: var(--page-max-width);
     padding: 0;
     margin: 0 auto;
@@ -835,22 +836,22 @@
   .breadcrumbs li {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     min-width: 0;
   }
 
   .insecure-warning {
     display: flex;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: var(--space-2);
     max-width: var(--page-max-width);
 
     /* ⚠️ **枠と余白を幅の内側へ入れる。** 入れないと帯だけ外へ膨らみ、本体と端がずれる */
     box-sizing: border-box;
-    margin: 1rem auto 0;
-    padding: 0.75rem 1rem;
+    margin: var(--space-4) auto 0;
+    padding: var(--space-3) var(--space-4);
     border: 1px solid var(--warning-border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--warning-surface);
     color: var(--warning-text);
   }
@@ -882,8 +883,8 @@
     font: inherit;
     font-size: 0.85rem;
     padding: 0.2rem 0.35rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
     background: var(--surface);
     color: var(--text);
   }
@@ -919,11 +920,12 @@
     display: inline-block;
     min-width: 1.25rem;
     padding: 0 0.35rem;
-    margin-left: 0.25rem;
+    margin-left: var(--space-1);
     border-radius: 999px;
-    background: var(--error);
-    color: var(--accent-text);
-    font-size: 0.75rem;
+    background: var(--color-danger);
+    color: var(--color-on-fill);
+    font-size: var(--fs-xs);
+    font-weight: 700;
     text-align: center;
   }
 
@@ -944,7 +946,7 @@
   main {
     max-width: var(--page-max-width);
     margin: 0 auto;
-    padding: 2rem 1.5rem 4rem;
+    padding: var(--space-8) var(--space-6) 4rem;
   }
 
   .status {
@@ -954,7 +956,7 @@
   }
 
   .version {
-    padding: 0 1.5rem 1.5rem;
+    padding: 0 var(--space-6) var(--space-6);
     color: var(--muted);
     font-family: var(--font-mono);
     font-size: 0.75rem;

@@ -329,8 +329,8 @@
   .head {
     display: flex;
     align-items: baseline;
-    gap: 1rem;
-    margin-bottom: 0.25rem;
+    gap: var(--space-4);
+    margin-bottom: var(--space-1);
   }
 
   h1 {
@@ -340,7 +340,7 @@
 
   h2 {
     font-size: 1rem;
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
   }
 
   .who {
@@ -360,7 +360,7 @@
     padding: 1.25rem;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     margin-bottom: 1.25rem;
   }
 
@@ -371,17 +371,17 @@
 
   label {
     display: block;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
     font-size: 0.9rem;
   }
 
   input {
     display: block;
     width: 100%;
-    margin-top: 0.25rem;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    margin-top: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     box-sizing: border-box;
   }
@@ -389,7 +389,7 @@
   .check {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .check input {
@@ -404,31 +404,31 @@
   .row {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .state {
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
     font-size: 0.9rem;
   }
 
   .policy {
     color: var(--muted);
     font-size: 0.8rem;
-    margin-left: 0.5rem;
+    margin-left: var(--space-2);
   }
 
   .hint {
     color: var(--muted);
     font-size: 0.85rem;
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
   }
 
   .secret code {
     display: inline-block;
     padding: 0.4rem 0.6rem;
     background: var(--disabled-surface);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     /* **写し間違いを減らす。** 桁が揃う書体で出す */
     font-family: var(--font-mono, monospace);
     letter-spacing: 0.08em;
@@ -438,7 +438,7 @@
   .codes {
     list-style: none;
     padding: 0;
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
     gap: 0.35rem;
@@ -449,9 +449,9 @@
   }
 
   button[type='submit'] {
-    padding: 0.5rem 1.25rem;
+    padding: var(--space-2) 1.25rem;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: var(--accent);
     color: var(--accent-text);
     font: inherit;

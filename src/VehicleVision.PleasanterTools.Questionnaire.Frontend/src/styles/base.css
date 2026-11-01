@@ -1,0 +1,199 @@
+/*
+ * アプリ（回答画面・管理画面）の基本スタイル。VehicleVision DesignReference の css/app-base.css を土台にする。
+ *
+ * 出どころ: vehiclevisionjp/VehicleVision.DesignReference の css/app-base.css
+ *           （第 2.1 版、コミット 7c60bae、2026-11-01 参照。書体の並びだけ第 2.2 版・73943fd）。先に tokens.css を読み込む。
+ *           書体の実体は app-fonts.css（`scripts/fonts/sync-app-fonts.mjs` で複写。出どころは fonts/app/SOURCE.json）。
+ *
+ * DesignReference と違う点（理由つき）:
+ *   - **文字サイズと余白は px ではなく rem で持つ**（16px 基準で同じ値）。
+ *     読みやすさ設定（文字の大きさ）は `<html>` の font-size を変えて効かせているので、px だと余白と文字が連動しない。
+ *   - **書体の並びは DesignReference と同じ**（同梱は Issue #152 から。外部へ要求を出さない・イントラでも同じ見た目）。
+ *     回答画面の書体はアンケートの作成者が選べる（lib/theme.ts の FONT_STACKS）。ここは「選ばなかったとき」の既定。
+ *   - ボックスモデル・見出し・本文の指定は持たない（各画面の指定を変えないため）。
+ *
+ * **回答画面の見た目は、アンケートの作成者が決める。** 下の「回答画面・管理画面で共通の意味名」は、
+ * 既定の値を DesignReference のトークンから引くだけで、`lib/theme.ts` の applyTheme が上書きする名前（--accent など）は
+ * 変えていない。何も指定されていないアンケートだけが、ここの既定値で表示される。
+ */
+:root,
+[data-theme] {
+  /* 書体の並び（DesignReference 第 2.2 版と同じ）。書体そのものは app-fonts.css（同梱。同梱の範囲の外の字は、次の端末の書体） */
+  --font-sans: "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --font-accent: "Noto Serif CJK JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-mono: "Noto Sans Mono CJK JP", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;
+  --font-code: "Myrica M", "MyricaM M", "Noto Sans Mono CJK JP", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;
+
+  /* 文字サイズ（DesignReference の 12 / 14 / 16 / 20 / 28 / 36px を rem で） */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.25rem;
+  --fs-xl: 1.75rem;
+  --fs-2xl: 2.25rem;
+
+  /* 余白（4px 基準を rem で） */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  /* 角丸・影 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 12%);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 28%);
+
+  /* アプリ用 */
+  --control-h: 2.5rem;
+  --control-h-sm: 2rem;
+  --focus-outline: 3px solid var(--color-primary-text);
+  --overlay-bg: color-mix(in srgb, var(--color-on-accent) 60%, transparent);
+
+  /*
+   * 回答画面・管理画面で共通の意味名。**値は DesignReference のトークンから引く。**
+   * 回答画面ではこの名前をアンケートの作成者のテーマが上書きする（lib/theme.ts）。
+   * 読みやすさ設定（ダーク・高コントラスト）も同じ名前を上書きする（lib/readability.ts）。
+   *
+   *   --accent          釦の面・リンク・選択     ← 鉄紺（ダークは文字用の淡い鉄紺）
+   *   --accent-text     --accent の上の文字      ← 白（ダークは鉄紺）
+   *   --bg / --surface  ページの地 / 枠・入力欄の地
+   *   --text / --muted  本文 / 補助の文字
+   *   --border          罫線・区切り
+   *   --border-strong   入力欄・チェックなど部品の枠（面に対し 3:1 以上）
+   *
+   * ⚠️ **`[data-theme]` にも同じ定義を置く。** 管理画面の下見（SurveyPreview）が `data-theme="light"` を付けて、
+   * 管理画面がダークでも「回答画面の既定の見た目」を保つため（意味名はその要素の中で引き直す）
+   */
+  --accent: var(--color-primary-text);
+  --accent-text: var(--color-on-fill);
+  --bg: var(--color-bg);
+  --surface: var(--color-surface);
+  --text: var(--color-text);
+  --muted: var(--color-text-muted);
+  --border: var(--color-border);
+  --border-strong: var(--color-border-strong);
+  --error: var(--color-danger-text);
+  --error-surface: var(--color-danger-subtle);
+  --success: var(--color-success-text);
+  --success-surface: var(--color-success-subtle);
+  --warning-text: var(--color-warning-text);
+  --warning-surface: var(--color-warning-subtle);
+  --warning-border: var(--color-warning-text);
+  --disabled-surface: var(--color-bg);
+  --disabled-text: var(--color-text-muted);
+  --info-surface: var(--color-primary-subtle);
+  --info-text: var(--color-text);
+  --motion-duration: 0.15s;
+}
+
+/*
+ * ダークは `data-theme="dark"` のときだけ。--accent は「面にも文字にも使う」ので、
+ * 淡い鉄紺（文字用）を面にし、その上の文字は鉄紺にする（DesignReference の主要ボタンは鉄紺の面 + 白文字だが、
+ * ダークの地の上では面の枠が見えにくいため、このアプリは面と文字を入れ替える。コントラストは tokens.test.ts で検査）。
+ */
+[data-theme='dark'] {
+  --accent-text: var(--color-primary);
+}
+
+a {
+  color: var(--accent);
+}
+
+/* 入力欄の地と文字も、トークン（ダークでも読める組み合わせ）に揃える。回答画面ではテーマが --surface / --text を上書きする */
+input:not([type='checkbox'], [type='radio'], [type='color'], [type='range'], [type='file'], [type='button'], [type='submit']),
+select,
+textarea {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/*
+ * チェック・ラジオ（DesignReference の .vv-check と同じ形）。枠は --border-strong（面に対し 3:1 以上）、
+ * 選んだ状態は --accent の塗り。ダークや作成者のテーマの地でも見えるよう、色は意味名から引く。
+ * ⚠️ **寸法と枠の太さは `!important`。** 各画面に `width: auto; border: 0` のような指定が残っていて、
+ * `appearance: none` と組み合わさると大きさ 0 の釦になり、見えず押せなくなる（CI の写しの試験で見つかった）。
+ * 色と余白は各画面が変えられる
+ */
+:where(input[type='checkbox'], input[type='radio']) {
+  appearance: none;
+  flex: none;
+  position: relative;
+  box-sizing: border-box;
+  width: 1.25rem !important;
+  min-width: 1.25rem !important;
+  height: 1.25rem !important;
+  padding: 0 !important;
+  background: var(--surface);
+  border: 2px solid var(--border-strong) !important;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+:where(input[type='radio']) {
+  border-radius: 50%;
+}
+
+:where(input[type='checkbox'], input[type='radio']):checked {
+  background: var(--accent);
+  border-color: var(--accent) !important;
+}
+
+:where(input[type='checkbox']):checked::after {
+  content: '';
+  position: absolute;
+  left: 0.3125rem;
+  top: 0.0625rem;
+  width: 0.3125rem;
+  height: 0.625rem;
+  border: solid var(--accent-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+:where(input[type='radio']):checked {
+  box-shadow: inset 0 0 0 3px var(--surface);
+}
+
+:where(input[type='checkbox'], input[type='radio']):disabled {
+  border-color: var(--border) !important;
+  cursor: not-allowed;
+}
+
+@media (forced-colors: active) {
+  :where(input[type='checkbox'], input[type='radio']) {
+    appearance: auto;
+  }
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* フォーカス: キーボードで操作したときだけ、はっきりしたリングを出す（消さない）。
+   回答画面ではアンケートの作成者が選んだアクセント色になる */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 動きを減らす設定（OS の「視覚効果を減らす」）のとき、アニメーション・トランジションを止める */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

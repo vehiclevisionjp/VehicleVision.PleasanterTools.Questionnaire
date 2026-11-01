@@ -358,8 +358,8 @@
   .head {
     display: flex;
     align-items: baseline;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
+    gap: var(--space-4);
+    margin-bottom: var(--space-2);
   }
 
   h1 {
@@ -377,12 +377,12 @@
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 0.75rem;
-    padding: 1rem;
+    gap: var(--space-3);
+    padding: var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
   }
 
   label {
@@ -394,20 +394,20 @@
   input,
   select {
     display: block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
     padding: 0.4rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     color: initial;
   }
 
   .issued {
-    padding: 0.75rem 1rem;
+    padding: var(--space-3) var(--space-4);
     border: 1px solid var(--accent);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--info-surface);
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
   }
 
   .issued p {
@@ -440,16 +440,19 @@
   th,
   td {
     border-bottom: 1px solid var(--border);
-    padding: 0.5rem 0.6rem;
+    padding: var(--space-2) 0.6rem;
     text-align: left;
     vertical-align: middle;
   }
 
   th {
-    color: var(--muted);
-    font-weight: 600;
     font-size: 0.8rem;
     white-space: nowrap;
+    /* **見出し行は鉄紺・白文字**（DesignReference の表の決まり） */
+    background: var(--color-primary);
+    color: var(--color-on-fill);
+    font-weight: 700;
+    border-bottom: 1px solid var(--color-primary-edge);
   }
 
   tr.disabled {
@@ -464,7 +467,7 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .self {
@@ -496,9 +499,9 @@
   }
 
   button[type='submit'] {
-    padding: 0.45rem 1rem;
+    padding: 0.45rem var(--space-4);
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: var(--accent);
     color: var(--accent-text);
     font: inherit;

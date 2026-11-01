@@ -250,7 +250,7 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   h1 {
@@ -267,12 +267,12 @@
     display: flex;
     flex-wrap: wrap;
     align-items: end;
-    gap: 0.75rem 1rem;
-    padding: 1rem;
-    margin-bottom: 1rem;
+    gap: var(--space-3) var(--space-4);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   .filters label {
@@ -292,14 +292,14 @@
   .filters input,
   .filters select {
     font: inherit;
-    padding: 0.35rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    padding: 0.35rem var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
   }
 
   .actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
     margin-left: auto;
   }
 
@@ -307,7 +307,7 @@
     overflow-x: auto;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   table {
@@ -325,15 +325,18 @@
   th,
   td {
     text-align: left;
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
 
   th {
-    color: var(--muted);
-    font-weight: 600;
     white-space: nowrap;
+    /* **見出し行は鉄紺・白文字**（DesignReference の表の決まり） */
+    background: var(--color-primary);
+    color: var(--color-on-fill);
+    font-weight: 700;
+    border-bottom: 1px solid var(--color-primary-edge);
   }
 
   .nowrap {
@@ -364,7 +367,7 @@
 
   .sign-in-note {
     display: block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
     font-family: inherit;
     color: var(--muted);
   }
@@ -376,8 +379,8 @@
   .pager {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
   }
 
   .range {

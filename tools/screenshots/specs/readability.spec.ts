@@ -26,10 +26,11 @@ const highContrast = {
   text: '#000000',
 };
 
+// DesignReference のダーク（Frontend/src/styles/tokens.css。Issue #776）
 const dark = {
-  accent: '#8ab4f8',
-  background: '#121212',
-  text: '#f5f5f5',
+  accent: '#d0d3ff',
+  background: '#30334f',
+  text: '#f4f4f8',
 };
 
 async function cssVariable(page: Page, name: string): Promise<string> {

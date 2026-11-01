@@ -173,7 +173,7 @@
       >
         <defs>
           <marker id="flowchart-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <path d="M 0 0 L 8 4 L 0 8 z" fill="#475467"></path>
+            <path class="arrow" d="M 0 0 L 8 4 L 0 8 z"></path>
           </marker>
         </defs>
 
@@ -323,7 +323,7 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   h1 {
@@ -336,9 +336,13 @@
     color: var(--muted);
   }
 
+  .arrow {
+    fill: var(--muted);
+  }
+
   .healthy {
-    margin: 0 0 1rem;
-    color: #067647;
+    margin: 0 0 var(--space-4);
+    color: var(--success);
     font-weight: 700;
   }
 
@@ -346,8 +350,8 @@
     max-height: 70vh;
     overflow: auto;
     border: 1px solid var(--border);
-    border-radius: 8px;
-    background: #f8fafc;
+    border-radius: var(--radius-md);
+    background: var(--bg);
   }
 
   .diagram {
@@ -362,36 +366,36 @@
   }
 
   .default-edge {
-    stroke: #475467;
+    stroke: var(--muted);
   }
 
   .page-edge {
-    stroke: #175cd3;
+    stroke: var(--accent);
   }
 
   .choice-edge {
-    stroke: #067647;
+    stroke: var(--success);
   }
 
   .missing-edge {
-    stroke: #b42318;
+    stroke: var(--error);
     stroke-dasharray: 7 4;
   }
 
   .edge-label {
-    fill: #344054;
+    fill: var(--text);
     font-size: 12px;
   }
 
   .missing-label {
-    fill: #b42318;
+    fill: var(--error);
     font-size: 12px;
     font-weight: 700;
   }
 
   .node rect {
-    fill: #fff;
-    stroke: #98a2b3;
+    fill: var(--surface);
+    stroke: var(--border-strong);
     stroke-width: 2;
   }
 
@@ -406,12 +410,12 @@
   }
 
   .submit-node rect {
-    fill: #ecfdf3;
-    stroke: #067647;
+    fill: var(--success-surface);
+    stroke: var(--success);
   }
 
   .problem-node rect {
-    stroke: #b42318;
+    stroke: var(--error);
   }
 
   .unreachable-node rect {
@@ -419,17 +423,17 @@
   }
 
   .legend {
-    margin-top: 1rem;
+    margin-top: var(--space-4);
   }
 
   .legend h2 {
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
     font-size: 1rem;
   }
 
   .legend ul {
     display: flex;
-    gap: 0.75rem 1.25rem;
+    gap: var(--space-3) 1.25rem;
     flex-wrap: wrap;
     margin: 0;
     padding: 0;
@@ -449,25 +453,25 @@
   }
 
   .legend-unreachable {
-    fill: #fff;
-    stroke: #b42318;
+    fill: var(--surface);
+    stroke: var(--error);
     stroke-width: 2;
     stroke-dasharray: 7 4;
   }
 
   .node-title {
-    fill: #101828;
+    fill: var(--text);
     font-size: 16px;
     font-weight: 700;
   }
 
   .node-detail {
-    fill: #475467;
+    fill: var(--muted);
     font-size: 13px;
   }
 
   .problem-mark {
-    fill: #b42318;
+    fill: var(--error);
     font-size: 13px;
     font-weight: 700;
   }
@@ -477,13 +481,13 @@
   }
 
   .destinations h2 {
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
     font-size: 1rem;
   }
 
   .destinations ul {
     margin: 0;
-    padding-left: 1.5rem;
+    padding-left: var(--space-6);
   }
 
   .destinations li + li {
@@ -492,7 +496,7 @@
 
   .problem-text {
     margin: 0.35rem 0 0;
-    color: #b42318;
+    color: var(--error);
     font-weight: 600;
   }
 </style>

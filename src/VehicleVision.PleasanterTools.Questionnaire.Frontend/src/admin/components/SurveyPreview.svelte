@@ -362,7 +362,7 @@
     </nav>
   {/if}
 
-  <div class="paper {previewWidth}" bind:this={paper}>
+  <div class="paper {previewWidth}" data-theme="light" bind:this={paper}>
     {#if previewMode !== 'design' || designTarget !== 'completed'}
       <!-- **飾り。** 回答画面と同じく `alt` は空にする -->
       {#if headerImageUrl}
@@ -480,7 +480,7 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   h1 {
@@ -496,16 +496,16 @@
     font: inherit;
     font-size: 0.85rem;
     padding: 0.2rem 0.35rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
   }
 
   /* **本物と見分けが付くようにする** */
   .notice {
-    margin: 0.75rem 0 1rem;
-    padding: 0.5rem 0.75rem;
+    margin: var(--space-3) 0 var(--space-4);
+    padding: var(--space-2) var(--space-3);
     border-left: 3px solid var(--accent);
     background: var(--info-surface);
     color: var(--info-text);
@@ -513,24 +513,20 @@
   }
 
   .paper {
-    /* **回答画面の既定値をここへ置き直す**（Issue #56）。
+    /* **回答画面の既定値は `data-theme="light"` で引き直す**（Issue #56・#776）。
+       意味名（--bg・--accent など）は styles/base.css が DesignReference のライトのトークンから引く。
        テーマがあれば `applyTheme` が同じ名前をこの要素の style へ入れて上書きする
        （要素に直接書いた値が、この規則より強い）。
-       **管理画面の `:root` の値をそのまま使わない。** 地の色が別物になる */
-    --bg: #fff;
-    --text: #101828;
-    /* **釦の文字色と入力欄の地**（Issue #109）。回答画面の `:root` と同じ値 */
-    --accent-text: #fff;
-    --surface: #fff;
-    --font: system-ui, sans-serif;
+       **管理画面の値（ダークのときを含む）をそのまま使わない。** 回答画面の既定とは別物になる */
+    --font: var(--font-sans);
 
     max-width: 40rem;
-    padding: 1.5rem;
+    padding: var(--space-6);
     background: var(--bg);
     color: var(--text);
     font-family: var(--font);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   .paper.tablet {
@@ -544,13 +540,13 @@
   .preview-options {
     display: flex;
     align-items: end;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
   }
 
   .preview-options fieldset {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-3);
     margin: 0;
     padding: 0;
     border: 0;
@@ -565,8 +561,8 @@
   .design-pages {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
   }
 
   .design-pages button.active {
@@ -579,8 +575,8 @@
     width: 100%;
     max-height: 10rem;
     object-fit: cover;
-    border-radius: 6px;
-    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
   }
 
   h2 {
@@ -589,7 +585,7 @@
   }
 
   h3 {
-    margin-top: 1.5rem;
+    margin-top: var(--space-6);
     font-size: 1.1rem;
   }
 
@@ -599,7 +595,7 @@
 
   .progress {
     height: 6px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     background: var(--border);
     overflow: hidden;
   }
@@ -618,8 +614,8 @@
   .actions {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-top: 1.5rem;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
   }
 
   .end {
