@@ -73,7 +73,11 @@ test('許した別生成元の枠内から回答し、Cookie 付きで配布資�
   await expect(form.getByRole('heading', { name: '埋め込み回答の見本' })).toBeVisible();
   await form.getByLabel('お名前').fill('埋め込み 検証');
   await form.getByRole('button', { name: '次へ' }).click();
+  // 次の頁が描かれる前に 2 回目を押すと、前の頁のボタンを押してしまい、確認頁へ進めず
+  // 「送信する」が出ない（Issue #782）。頁ごとに見出しを待ってから押す
+  await expect(form.getByRole('heading', { name: '長い説明ページ' })).toBeVisible();
   await form.getByRole('button', { name: '次へ' }).click();
+  await expect(form.getByRole('heading', { name: '短い確認ページ' })).toBeVisible();
   await page.waitForTimeout(submissionMinimumElapsedMilliseconds);
   await form.getByRole('button', { name: '送信する' }).click();
 
