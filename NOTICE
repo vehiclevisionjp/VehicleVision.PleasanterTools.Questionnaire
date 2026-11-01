@@ -107,8 +107,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
 
   Zen Kaku Gothic New 1.002（Regular・Bold）・Zen Maru Gothic 1.001（Bold） / SIL Open Font License 1.1 / https://github.com/googlefonts/zen-kakugothic / https://github.com/googlefonts/zen-marugothic
     （管理画面と回答画面の既定・テーマの「ゴシック体」（Zen Kaku Gothic New）。管理画面の見出し・釦（Zen Maru Gothic）。
-      DesignReference 第 2.3 版（080f9b3）の同梱書体を `sync-app-fonts.mjs` で複写したもの。
-      JIS X 0208 + NEC・IBM 拡張に絞った woff2 を unicode-range で区画に分けている。出どころ・SHA は
+      DesignReference 第 2.4 版（0730ea9）の同梱書体を `sync-app-fonts.mjs` で複写したもの。
+      JIS X 0208 + NEC・IBM 拡張に絞った woff2 を unicode-range で区画に分けている（第 1 水準は使用頻度の順に jis1a・jis1b・jis1c の 3 つ）。出どころ・SHA は
       `src/VehicleVision.PleasanterTools.Questionnaire.Frontend/src/fonts/app/SOURCE.json` と `manifest.json`。
       ライセンス全文は成果物の `fonts-licenses/ZenKakuGothicNew-OFL.txt`・`ZenMaruGothic-OFL.txt`）
   Myrica M 2.012.20180119 / SIL Open Font License 1.1 + M+ FONTS LICENSE / http://myrica.estable.jp/
