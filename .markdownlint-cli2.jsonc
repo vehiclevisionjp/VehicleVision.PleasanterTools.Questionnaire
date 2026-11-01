@@ -3,8 +3,11 @@
     "MD007": {
       "indent": 4,
     },
-    // 行の長さは検査しない（ライセンス文書の正本に、リンクで 120 字を超える行がある。Template ほかと同じ）
-    "MD013": false,
+    "MD013": {
+      "line_length": 120,
+      "tables": false,
+      "code_blocks": false,
+    },
     "MD024": {
       "siblings_only": true,
     },
