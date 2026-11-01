@@ -529,6 +529,15 @@
     border-radius: var(--radius-md);
   }
 
+  /* **回答画面の見出し・釦は、作成者が選んだ書体（--font）にする。** 管理画面の全体に当てた
+     Zen Maru Gothic（--font-heading。AdminApp.svelte）を、下見の中へは持ち込まない（Issue #789） */
+  .paper :global(h1),
+  .paper :global(h2),
+  .paper :global(h3),
+  .paper :global(button) {
+    font-family: inherit;
+  }
+
   .paper.tablet {
     max-width: 32rem;
   }

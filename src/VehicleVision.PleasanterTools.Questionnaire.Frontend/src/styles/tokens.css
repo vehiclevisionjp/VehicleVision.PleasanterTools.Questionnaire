@@ -2,7 +2,7 @@
  * 色のトークン（VehicleVision DesignReference）。**手で直さない。**
  *
  * 出どころ: vehiclevisionjp/VehicleVision.DesignReference の css/colors-explicit.css
- *           （第 2.1 版、コミット 7c60bae、2026-11-01 参照）。
+ *           （第 2.1 版、コミット 7c60bae、2026-11-01 参照。第 2.3 版・080f9b3 でも色の定義は変わっていない）。
  * 値を変えるときは DesignReference の tokens/colors.json を直し、生成し直したものをここへ写す。
  *
  * **明示型**（アプリ向け）。既定はライトで、OS の prefers-color-scheme には従わない。

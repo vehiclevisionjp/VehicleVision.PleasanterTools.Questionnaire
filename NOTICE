@@ -105,13 +105,15 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
 
 同梱する書体とアイコン（**成果物に含まれる。** 自前配信なので外部へ要求は出ない）
 
-  Noto Sans CJK JP 2.004（Regular・Bold）・Noto Sans Mono CJK JP 2.004（Regular。ASCII のみ） / SIL Open Font License 1.1 / https://github.com/notofonts/noto-cjk
-    （管理画面と回答画面の既定・テーマの「ゴシック体」「等幅」（等幅は ASCII のみで、日本語はゴシック体へ落ちる）。DesignReference 第 2.2 版（73943fd）の同梱書体を `sync-app-fonts.mjs` で複写したもの。
+  Zen Kaku Gothic New 1.002（Regular・Bold）・Zen Maru Gothic 1.001（Bold） / SIL Open Font License 1.1 / https://github.com/googlefonts/zen-kakugothic / https://github.com/googlefonts/zen-marugothic
+    （管理画面と回答画面の既定・テーマの「ゴシック体」（Zen Kaku Gothic New）。管理画面の見出し・釦（Zen Maru Gothic）。
+      DesignReference 第 2.3 版（080f9b3）の同梱書体を `sync-app-fonts.mjs` で複写したもの。
       JIS X 0208 + NEC・IBM 拡張に絞った woff2 を unicode-range で区画に分けている。出どころ・SHA は
       `src/VehicleVision.PleasanterTools.Questionnaire.Frontend/src/fonts/app/SOURCE.json` と `manifest.json`。
-      ライセンス全文は成果物の `fonts-licenses/NotoCJK-OFL.txt`。
-      コード用の Myrica M は、この製品がコード書体を使う画面を持たないので同梱しない（`--without-code`。
-      `fonts-licenses/` には複写の道具が付けた Myrica のライセンスも入る））
+      ライセンス全文は成果物の `fonts-licenses/ZenKakuGothicNew-OFL.txt`・`ZenMaruGothic-OFL.txt`）
+  Myrica M 2.012.20180119 / SIL Open Font License 1.1 + M+ FONTS LICENSE / http://myrica.estable.jp/
+    （管理画面のコード・数値・ログの表示と、テーマの「等幅」。半角:全角 = 1:2 で日本語も等幅になる。
+      同じ複写で入る。ライセンス全文は成果物の `fonts-licenses/Myrica-LICENSE_OFL.txt`・`Myrica-LICENSE_M+.txt`）
   @fontsource-variable/noto-serif-jp 5.3.1 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-serif-jp
     （Noto Serif JP Variable。テーマの「明朝体」）
   @fontsource/m-plus-rounded-1c 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/m-plus-rounded-1c
@@ -130,7 +132,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   xunit.runner.visualstudio 4.0.1 / Apache-2.0
   Microsoft.NET.Test.Sdk 18.11.0 / MIT
   @playwright/test 1.62.1 / Apache-2.0 / https://github.com/microsoft/playwright
-  Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。成果物へ入るのは上記の書体）
+  Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。端末の書体の代わりに使うだけで、成果物へは入らない）
   Keycloak 26.7.3 / Apache-2.0 / https://github.com/keycloak/keycloak
     （SAML の検証用 IdP。**別のコンテナとして立てるだけで、成果物には含まれない**）
   Mailpit 1.31.1 / MIT / https://github.com/axllent/mailpit

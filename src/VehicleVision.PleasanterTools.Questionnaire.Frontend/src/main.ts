@@ -4,8 +4,8 @@
 // **インターネットへ出られないイントラでも同じ見た目で動かすため。**
 // unicode-range で分割された woff2 なので、受け取るのは使った範囲だけ。
 // テーマで選べる 4 書体すべてを持つ（ゴシック体・明朝体・丸ゴシック体・等幅）。
-// **ゴシック体は DesignReference の Noto Sans CJK JP**（管理画面と同じ woff2 を共用する。Issue #776）。
-// **等幅は DesignReference の Noto Sans Mono CJK JP**（ASCII のみ。日本語はゴシック体へ落ちる。Issue #778）。
+// **ゴシック体は DesignReference の Zen Kaku Gothic New**（管理画面と同じ woff2 を共用する。Issue #776・#789）。
+// **等幅は DesignReference の Myrica M**（半角:全角 = 1:2。日本語も等幅になる。Issue #778・#789）。
 // 明朝体・丸ゴシック体は、作成者が選べるテーマのために維持する
 import './styles/app-fonts.css';
 import '@fontsource-variable/noto-serif-jp';

@@ -158,15 +158,15 @@ export function safeColor(value: string | null | undefined): string | null {
 const FONT_STACKS: Record<ThemeFont, string | null> = {
   // **既定は指定しない。** `:root` に書いてある今までの指定がそのまま効く
   System: null,
-  // **同梱した Noto Sans CJK JP を先頭に置く**（DesignReference の書体。管理画面と共用。無い環境でも端末の書体へ落ちる）
-  Sans: '"Noto Sans CJK JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif',
+  // **同梱した Zen Kaku Gothic New を先頭に置く**（DesignReference 第 2.3 版の本文書体。管理画面と共用。無い環境でも端末の書体へ落ちる）
+  Sans: '"Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif',
   Serif: '"Noto Serif JP Variable", "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif',
   Rounded:
     '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Quicksand", "Hiragino Sans", sans-serif',
-  // **DesignReference の `--font-mono`（Noto Sans Mono CJK JP）。管理画面と共用**。
-  // 同梱しているのは ASCII だけなので、**日本語は同梱の Noto Sans CJK JP に落ちる**（日本語は等幅にならない）
+  // **DesignReference の `--font-mono`（Myrica M）。管理画面と共用**。
+  // 半角:全角 = 1:2 で、**日本語も等幅になる**。同梱の範囲の外の字は、同梱の Zen Kaku Gothic New に落ちる
   Monospace:
-    '"Noto Sans Mono CJK JP", "Noto Sans CJK JP", ui-monospace, SFMono-Regular, Consolas, monospace',
+    '"Myrica M", "Zen Kaku Gothic New", ui-monospace, SFMono-Regular, Consolas, monospace',
 };
 
 /**

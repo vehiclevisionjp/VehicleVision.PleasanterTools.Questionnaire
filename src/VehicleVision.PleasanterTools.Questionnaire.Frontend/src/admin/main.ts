@@ -2,7 +2,7 @@
 //
 // **アイコンは管理画面だけに読み込む。** 回答者へ配るものは軽くしておきたい。
 //
-// **管理画面の書体は DesignReference の同梱書体**（Noto Sans CJK JP・Noto Sans Mono CJK JP。Issue #776）。
+// **管理画面の書体は DesignReference の同梱書体**（Zen Kaku Gothic New・Zen Maru Gothic・Myrica M。Issue #776・#789）。
 // 回答画面と同じ woff2 を共用する。
 //
 // **明朝体と丸ゴシック体は読まない。** 回答画面のテーマ用なので、
