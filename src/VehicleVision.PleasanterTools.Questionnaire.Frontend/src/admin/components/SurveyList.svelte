@@ -813,8 +813,8 @@
   .bar {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-6);
   }
 
   /* **絞り込みは 1 行に収める。** 狭い画面では折り返す */
@@ -822,8 +822,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
   }
 
   .filter-title {
@@ -836,17 +836,17 @@
 
   .filter select {
     display: block;
-    margin-top: 0.25rem;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    margin-top: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
   }
 
   .pager {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
   }
 
   .range {
@@ -863,12 +863,12 @@
 
   .create {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-3);
     padding: 1.25rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-6);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   .create h2 {
@@ -888,7 +888,7 @@
 
   .danger-panel dl div {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .danger-panel dt {
@@ -906,7 +906,7 @@
 
   .actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   /*
@@ -933,7 +933,7 @@
     枠からはみ出して切れる。**折り返せば、はみ出しようがない**
   */
   .row-actions-inner button {
-    padding: 0.25rem 0.4rem;
+    padding: var(--space-1) 0.4rem;
     font-size: 0.78rem;
     line-height: 1.3;
     /* **文字数が違っても同じ大きさに見えるようにする** */
@@ -953,10 +953,10 @@
   input {
     display: block;
     width: 100%;
-    margin-top: 0.25rem;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    margin-top: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     box-sizing: border-box;
   }
@@ -979,7 +979,7 @@
 
   .hint {
     display: block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
     color: var(--muted);
     font-size: 0.8rem;
   }
@@ -989,7 +989,7 @@
     border-collapse: collapse;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     overflow: hidden;
   }
 
@@ -1001,14 +1001,17 @@
   th,
   td {
     text-align: left;
-    padding: 0.6rem 0.75rem;
+    padding: 0.6rem var(--space-3);
     border-bottom: 1px solid var(--border);
     font-size: 0.9rem;
   }
 
   th {
-    background: var(--bg);
-    font-weight: 600;
+    /* **見出し行は鉄紺・白文字**（DesignReference の表の決まり） */
+    background: var(--color-primary);
+    color: var(--color-on-fill);
+    font-weight: 700;
+    border-bottom: 1px solid var(--color-primary-edge);
   }
 
   .compact-column {
@@ -1093,7 +1096,7 @@
   }
 
   .test-response-note {
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
   }
 
   .status-0 {

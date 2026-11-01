@@ -150,13 +150,13 @@
 
 <style lang="scss">
   .sessions {
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
   }
   .title-row {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 1rem;
+    gap: var(--space-4);
   }
   h3 {
     margin: 0;
@@ -165,7 +165,7 @@
   .hint {
     color: var(--muted);
     font-size: 0.8rem;
-    margin: 0.25rem 0 0.75rem;
+    margin: var(--space-1) 0 var(--space-3);
   }
   .scroll {
     overflow-x: auto;
@@ -178,14 +178,18 @@
   }
   th,
   td {
-    padding: 0.4rem 0.5rem;
+    padding: 0.4rem var(--space-2);
     border-bottom: 1px solid var(--border);
     text-align: left;
     vertical-align: top;
   }
   th {
-    color: var(--muted);
     white-space: nowrap;
+    /* **見出し行は鉄紺・白文字**（DesignReference の表の決まり） */
+    background: var(--color-primary);
+    color: var(--color-on-fill);
+    font-weight: 700;
+    border-bottom: 1px solid var(--color-primary-edge);
   }
   .device {
     max-width: 28rem;

@@ -193,14 +193,14 @@
 <style lang="scss">
   .panel {
     padding: 1.25rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-6);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   h2 {
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
     font-size: 1.05rem;
   }
 
@@ -211,23 +211,23 @@
 
   .hint {
     display: block;
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
     color: var(--muted);
     font-size: 0.8rem;
   }
 
   .use {
     display: grid;
-    gap: 0.75rem;
-    padding: 1rem;
-    margin-bottom: 1rem;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
     background: var(--bg);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
   }
 
   .actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   label {
@@ -238,10 +238,10 @@
   input {
     display: block;
     width: 100%;
-    margin-top: 0.25rem;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    margin-top: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     box-sizing: border-box;
   }
@@ -254,7 +254,7 @@
   th,
   td {
     text-align: left;
-    padding: 0.5rem 0.6rem;
+    padding: var(--space-2) 0.6rem;
     border-bottom: 1px solid var(--border);
     font-size: 0.9rem;
   }

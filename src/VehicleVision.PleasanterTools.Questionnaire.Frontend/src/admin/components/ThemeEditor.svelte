@@ -339,38 +339,38 @@
     padding: 1.25rem;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
   }
 
   h2 {
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
     font-size: 1rem;
   }
 
   .hint {
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
     color: var(--muted);
     font-size: 0.82rem;
   }
 
   .colors {
     display: flex;
-    gap: 1.5rem;
+    gap: var(--space-6);
     flex-wrap: wrap;
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
   }
 
   /* ---- 名前の付いた配色（Issue #109）---------------------------------------- */
 
   .presets {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
   }
 
   .preset-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .preset {
@@ -379,7 +379,7 @@
     gap: 0.4rem;
     padding: 0.35rem 0.6rem;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-size: 0.85rem;
     color: inherit;
     cursor: pointer;
@@ -406,7 +406,7 @@
     width: 1.5rem;
     height: 1.1rem;
     border: 1px solid;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
   }
 
@@ -417,16 +417,16 @@
   }
 
   .contrast {
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.75rem;
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
     border: 1px solid var(--border);
     /* **色だけに頼らない。** 左端の太い線でも「いつもと違う」が分かる */
     border-left: 4px solid var(--error);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-size: 0.82rem;
 
     p {
-      margin: 0 0 0.25rem;
+      margin: 0 0 var(--space-1);
     }
 
     ul {
@@ -437,14 +437,13 @@
   }
 
   .toggle {
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
   }
 
   .color {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-
+    gap: var(--space-1);
     .hint {
       margin: 0;
     }
@@ -462,8 +461,8 @@
     height: 2rem;
     margin-top: 0.2rem;
     padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     cursor: pointer;
   }
@@ -472,8 +471,8 @@
     display: block;
     margin-top: 0.2rem;
     padding: 0.3rem 0.4rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     background: var(--surface);
     color: var(--text);
@@ -483,8 +482,8 @@
     display: block;
     margin-top: 0.2rem;
     padding: 0.3rem 0.4rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     background: var(--surface);
     color: var(--text);
@@ -503,22 +502,22 @@
     max-height: 10rem;
     object-fit: cover;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-2);
   }
 
   .image-actions {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   /* **入力欄そのものは出さず、ラベルを釦に見せる** */
   .file {
     display: inline-block;
-    padding: 0.35rem 0.75rem;
+    padding: 0.35rem var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--surface);
     color: var(--accent);
     cursor: pointer;
@@ -539,7 +538,7 @@
   }
 
   .error {
-    margin: 0.5rem 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--error);
     font-size: 0.85rem;
   }

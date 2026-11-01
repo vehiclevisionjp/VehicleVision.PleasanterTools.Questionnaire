@@ -95,15 +95,15 @@
   .panel {
     max-width: 24rem;
     margin: 4rem auto;
-    padding: 2rem;
+    padding: var(--space-8);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   h1 {
     font-size: 1.25rem;
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
   }
 
   .lead,
@@ -117,29 +117,29 @@
   }
 
   .hint {
-    margin: -0.5rem 0 0.75rem;
+    margin: -0.5rem 0 var(--space-3);
   }
 
   label {
     display: block;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
     font-size: 0.9rem;
   }
 
   input {
     display: block;
     width: 100%;
-    margin-top: 0.25rem;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    margin-top: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     box-sizing: border-box;
   }
 
   button {
     width: 100%;
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
   }
 
   .error {

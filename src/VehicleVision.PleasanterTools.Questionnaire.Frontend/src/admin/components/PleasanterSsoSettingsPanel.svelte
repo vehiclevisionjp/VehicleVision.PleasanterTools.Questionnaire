@@ -256,16 +256,16 @@
   .test {
     max-width: 52rem;
     display: grid;
-    gap: 1rem;
+    gap: var(--space-4);
     padding: 1.25rem;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--surface);
   }
   .head {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
   .lead,
   .hint {
@@ -276,7 +276,7 @@
     font-size: 0.85rem;
   }
   .test {
-    margin-top: 1.5rem;
+    margin-top: var(--space-6);
   }
   label {
     display: grid;
@@ -286,7 +286,7 @@
   .check {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .check input[type='checkbox'] {
     flex: none;
@@ -300,8 +300,8 @@
     box-sizing: border-box;
     width: 100%;
     padding: 0.55rem;
-    border: 1px solid var(--border);
-    border-radius: 5px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
     font: inherit;
   }
   input:disabled,
@@ -312,7 +312,7 @@
   .row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
+    gap: var(--space-4);
   }
   .fixed {
     color: var(--warning-text);
@@ -321,12 +321,12 @@
   }
   .warning {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-1);
     max-width: 52rem;
-    margin-bottom: 1rem;
-    padding: 0.9rem 1rem;
+    margin-bottom: var(--space-4);
+    padding: 0.9rem var(--space-4);
     border: 1px solid var(--warning-border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--warning-surface);
     color: var(--warning-text);
   }

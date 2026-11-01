@@ -192,7 +192,7 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   h1 {
@@ -201,7 +201,7 @@
   }
 
   .badge {
-    padding: 0.15rem 0.5rem;
+    padding: 0.15rem var(--space-2);
     border-radius: 999px;
     background: var(--error);
     color: var(--accent-text);
@@ -217,7 +217,7 @@
     overflow-x: auto;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   table {
@@ -230,15 +230,18 @@
   th,
   td {
     text-align: left;
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
 
   th {
-    color: var(--muted);
-    font-weight: 600;
     white-space: nowrap;
+    /* **見出し行は鉄紺・白文字**（DesignReference の表の決まり） */
+    background: var(--color-primary);
+    color: var(--color-on-fill);
+    font-weight: 700;
+    border-bottom: 1px solid var(--color-primary-edge);
   }
 
   .nowrap {
@@ -257,8 +260,8 @@
   .pager {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
   }
 
   .range {
