@@ -56,29 +56,21 @@ public sealed class LookupSearchClientTests
             MaxResults = maxResults,
             Keys =
             [
-                new LookupKey { QuestionId = "k1", SourceColumn = "ClassA", MatchMode = mode, AllowPrefix = allowPrefix },
-                new LookupKey { QuestionId = "k2", SourceColumn = "NumA" },
+                new LookupKey { QuestionId = "k1", SourceColumn = "ClassA", SourceColumnKind = LookupColumnKind.Text, MatchMode = mode, AllowPrefix = allowPrefix },
+                new LookupKey { QuestionId = "k2", SourceColumn = "NumA", SourceColumnKind = LookupColumnKind.Number },
             ],
             AllowedColumns = ["ClassB", "NumB"],
             DisplayColumns = ["ClassB"],
             Targets = [new LookupTarget { QuestionId = "t1", SourceColumn = "ClassB" }],
         };
 
-    private static readonly IReadOnlyDictionary<string, LookupColumnKind> Kinds =
-        new Dictionary<string, LookupColumnKind>
-        {
-            ["ClassA"] = LookupColumnKind.Text,
-            ["NumA"] = LookupColumnKind.Number,
-        };
-
     private static LookupSearchRequest Request(
         LookupDefinition? lookup = null,
         string? k1 = "00123",
-        string? k2 = "7",
-        IReadOnlyDictionary<string, LookupColumnKind>? kinds = null)
+        string? k2 = "7")
     {
         var values = new Dictionary<string, string?> { ["k1"] = k1, ["k2"] = k2 };
-        return new LookupSearchRequest(lookup ?? Definition(), values, kinds ?? Kinds);
+        return new LookupSearchRequest(lookup ?? Definition(), values);
     }
 
     private static LookupSourceConnection Connection(string url = BaseUrl) => new(url, SecretKey);
@@ -164,7 +156,7 @@ public sealed class LookupSearchClientTests
         var values = new Dictionary<string, string?> { ["k1"] = "a", ["k2"] = "1", ["extra"] = "x" };
 
         var result = await Client(handler).SearchAsync(
-            Connection(), new LookupSearchRequest(Definition(), values, Kinds));
+            Connection(), new LookupSearchRequest(Definition(), values));
 
         Assert.Equal(LookupSearchStatus.InvalidKeys, result.Status);
         Assert.Contains("extra", result.InvalidKeyQuestionIds);
@@ -175,9 +167,12 @@ public sealed class LookupSearchClientTests
     public async Task 列の種類が分からないキーは検索しない()
     {
         var handler = new FakeHandler((_, _) => Json(Page(0, 11, [])));
-        var kinds = new Dictionary<string, LookupColumnKind> { ["ClassA"] = LookupColumnKind.Text };
+        var lookup = Definition() with
+        {
+            Keys = [.. Definition().Keys.Select(key => key with { SourceColumnKind = null })],
+        };
 
-        var result = await Client(handler).SearchAsync(Connection(), Request(kinds: kinds));
+        var result = await Client(handler).SearchAsync(Connection(), Request(lookup));
 
         Assert.Equal(LookupSearchStatus.SourceInvalid, result.Status);
         Assert.Equal(LookupSearchFailure.InvalidDefinition, result.Failure);

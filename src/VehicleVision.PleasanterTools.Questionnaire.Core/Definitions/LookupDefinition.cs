@@ -50,6 +50,12 @@ public sealed record LookupKey
     /// <summary>参照元のキー列の名前。</summary>
     public required string SourceColumn { get; init; }
 
+    /// <summary>
+    /// 参照元のキー列の種類（<c>Text</c> か <c>Number</c>）。**公開時に版へ固定する。**
+    /// 検索時に参照元へ問い合わせず、これで値の検証を型別にする。<c>null</c> は未指定で、公開前の検証で拒否する。
+    /// </summary>
+    public Validation.LookupColumnKind? SourceColumnKind { get; init; }
+
     public LookupMatchMode MatchMode { get; init; } = LookupMatchMode.Exact;
 
     /// <summary>前方一致を許すか。既定は許さない。</summary>

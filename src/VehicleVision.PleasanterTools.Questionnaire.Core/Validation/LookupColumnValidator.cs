@@ -47,6 +47,9 @@ public enum LookupColumnProblemCode
     /// </summary>
     KeyColumnTypeUnsupported,
 
+    /// <summary>定義に固定したキー列の種類が、参照元の実際の列の種類と違う。</summary>
+    KeyColumnKindMismatch,
+
     /// <summary>前方一致を許したキーが文字列列ではない。</summary>
     PrefixColumnNotText,
 
@@ -97,6 +100,12 @@ public static class LookupColumnValidator
             {
                 problems.Add(Problem(
                     lookup, LookupColumnProblemCode.KeyColumnTypeUnsupported, key.SourceColumn));
+            }
+
+            if (key.SourceColumnKind is { } declared && declared != column.Kind)
+            {
+                problems.Add(Problem(
+                    lookup, LookupColumnProblemCode.KeyColumnKindMismatch, key.SourceColumn));
             }
 
             if (key.MatchMode == LookupMatchMode.Prefix && column.Kind != LookupColumnKind.Text)

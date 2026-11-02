@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
-using VehicleVision.PleasanterTools.Questionnaire.Core.Validation;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
@@ -46,14 +45,13 @@ public sealed class LookupSearchOptions
 /// <summary>検索の要求。回答者の入力はキー値だけ。</summary>
 /// <param name="Lookup">公開版で固定された定義。</param>
 /// <param name="KeyValues">キー項目（設問 ID）ごとの入力値。</param>
-/// <param name="KeyColumnKinds">
-/// 参照元のキー列（<see cref="LookupKey.SourceColumn"/>）ごとの列の種類。
-/// **種類が分からないキーは検索しない**（整数以外を数値列へ送ると条件が捨てられて全件が返る）。
-/// </param>
+/// <remarks>
+/// キー列の種類は定義（<see cref="LookupKey.SourceColumnKind"/>。公開時に版へ固定）から読む。
+/// **種類が固定されていないキーは検索しない**（整数以外を数値列へ送ると条件が捨てられて全件が返る）。
+/// </remarks>
 public sealed record LookupSearchRequest(
     LookupDefinition Lookup,
-    IReadOnlyDictionary<string, string?> KeyValues,
-    IReadOnlyDictionary<string, LookupColumnKind> KeyColumnKinds);
+    IReadOnlyDictionary<string, string?> KeyValues);
 
 /// <summary>検索の結果の区分（仕様書 4.3 節の HTTP・コードへ写す前の分類）。</summary>
 public enum LookupSearchStatus
@@ -84,6 +82,15 @@ public enum LookupSearchFailure
 
     /// <summary>定義・接続先の不備（サイト ID・許可列・件数・列の種類・接続先 URL など）。</summary>
     InvalidDefinition,
+
+    /// <summary>専用資格情報が無い（削除された・別のアンケートのもの）。</summary>
+    CredentialMissing,
+
+    /// <summary>専用資格情報が停止・失効している。**公開し直さずに効く。**</summary>
+    CredentialDisabled,
+
+    /// <summary>専用資格情報を復号できない（鍵・文脈の不一致、破損）。</summary>
+    CredentialUndecryptable,
 
     /// <summary>HTTPS ではない接続先。</summary>
     InsecureTransport,

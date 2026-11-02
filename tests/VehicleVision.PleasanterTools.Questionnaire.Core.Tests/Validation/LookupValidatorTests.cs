@@ -42,7 +42,7 @@ public class LookupValidatorTests
         AnchorQuestionId = "btn",
         SourceSiteId = 10,
         CredentialId = "c1",
-        Keys = [new LookupKey { QuestionId = "k1", SourceColumn = "ClassA" }],
+        Keys = [new LookupKey { QuestionId = "k1", SourceColumn = "ClassA", SourceColumnKind = LookupColumnKind.Text }],
         Targets = [new LookupTarget { SourceColumn = "ClassB", QuestionId = "t1" }],
         AllowedColumns = ["ClassB"],
     };
@@ -110,7 +110,7 @@ public class LookupValidatorTests
     public void キーの数はNが1から5(int count, bool ok)
     {
         var keys = Enumerable.Range(0, count)
-            .Select(i => new LookupKey { QuestionId = $"n{i}", SourceColumn = $"Class{i}" })
+            .Select(i => new LookupKey { QuestionId = $"n{i}", SourceColumn = $"Class{i}", SourceColumnKind = LookupColumnKind.Text })
             .ToImmutableArray();
         var survey = Survey([.. Enumerable.Range(0, 7).Select(i => Q($"n{i}"))]);
 
@@ -141,6 +141,21 @@ public class LookupValidatorTests
                 new LookupKey { QuestionId = "k2", SourceColumn = "A" })));
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(LookupColumnKind.Date)]
+    [InlineData(LookupColumnKind.Check)]
+    [InlineData(LookupColumnKind.Other)]
+    public void キー列の種類は固定された文字列か数値だけ(LookupColumnKind? kind)
+    {
+        var lookup = Valid() with
+        {
+            Keys = [new LookupKey { QuestionId = "k1", SourceColumn = "ClassA", SourceColumnKind = kind }],
+        };
+
+        Assert.Contains(LookupProblemCode.KeyColumnKindInvalid, Codes(lookup));
+    }
+
     [Fact]
     public void 前方一致は許可したキーだけ()
     {
@@ -151,6 +166,7 @@ public class LookupValidatorTests
                 new LookupKey
                 {
                     QuestionId = "k1", SourceColumn = "A", MatchMode = LookupMatchMode.Prefix,
+                    SourceColumnKind = LookupColumnKind.Text,
                 },
             ],
         };
@@ -162,6 +178,7 @@ public class LookupValidatorTests
                 {
                     QuestionId = "k1",
                     SourceColumn = "A",
+                    SourceColumnKind = LookupColumnKind.Text,
                     MatchMode = LookupMatchMode.Prefix,
                     AllowPrefix = true,
                 },
