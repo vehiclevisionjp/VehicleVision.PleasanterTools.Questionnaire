@@ -240,6 +240,21 @@ builder.Services.AddTransient(serviceProvider => new PleasanterApiClient(
     serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter"),
     serviceProvider.GetRequiredService<IPleasanterOptionsProvider>()));
 
+// **ルックアップ専用の検索クライアント**（Issue #829）。回答保存用とは別の HttpClient。
+// **リダイレクトを追わない**（専用の API キーを別のホストへ送らない）。時間切れはクライアント側で 5 秒に絞る。
+// 平文の HTTP（ループバックだけ）は開発用の `Lookup:AllowLoopbackHttp` を明示したときだけ
+builder.Services.AddHttpClient("pleasanter-lookup", client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton(new LookupSearchOptions
+{
+    AllowLoopbackHttp = builder.Configuration.GetValue<bool>("Lookup:AllowLoopbackHttp"),
+});
+builder.Services.AddSingleton<ILookupCredentialStore, LookupCredentialStore>();
+builder.Services.AddTransient(serviceProvider => new LookupSearchClient(
+    serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter-lookup"),
+    serviceProvider.GetRequiredService<LookupSearchOptions>()));
+builder.Services.AddTransient<LookupSearchService>();
+
 // **溜まりすぎたら受付を止める**（Issue #72、_documents/非機能設計.md 2 章）。
 // **WAF が無い導入先を想定した最後の壁。** 分散した相手にはレート制限が効かない。
 // 攻撃が無くても、Pleasanter が長く落ちれば同じように溜まる
