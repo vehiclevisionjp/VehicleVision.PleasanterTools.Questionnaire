@@ -178,6 +178,7 @@ public sealed class SurveyDeletionStore(
             "Responses",
             "ResponseTokens",
             "SurveyVersions",
+            "SurveyLookups",
         })
         {
             await DeleteAsync(
