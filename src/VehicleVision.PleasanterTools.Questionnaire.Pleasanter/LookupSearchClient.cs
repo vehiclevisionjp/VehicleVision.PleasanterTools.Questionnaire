@@ -132,7 +132,7 @@ public sealed class LookupSearchClient(HttpClient httpClient, LookupSearchOption
             request.KeyValues.TryGetValue(key.QuestionId, out var raw);
 
             // 種類が分からない列へは送らない。**黙って全件が返り得る**
-            if (!request.KeyColumnKinds.TryGetValue(key.SourceColumn, out var kind))
+            if (key.SourceColumnKind is not { } kind)
             {
                 return new FilterResult([], LookupSearchFailure.InvalidDefinition, hash, searchTypes);
             }

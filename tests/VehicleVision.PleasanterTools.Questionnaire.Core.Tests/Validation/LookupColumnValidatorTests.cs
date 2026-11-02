@@ -161,4 +161,17 @@ public class LookupColumnValidatorTests
 
         Assert.Equal(ok, !codes.Contains(LookupColumnProblemCode.TargetColumnTypeIncompatible));
     }
+
+    [Fact]
+    public void 固定したキー列の種類が実際の列と違えば弾く()
+    {
+        var lookup = Lookup() with
+        {
+            Keys = [new LookupKey { QuestionId = "k1", SourceColumn = "ClassA", SourceColumnKind = LookupColumnKind.Number }],
+        };
+
+        Assert.Contains(
+            LookupColumnProblemCode.KeyColumnKindMismatch,
+            Codes(lookup, Text("ClassA"), Text("ClassB")));
+    }
 }

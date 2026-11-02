@@ -69,6 +69,9 @@ public enum LookupProblemCode
 
     /// <summary>最大候補数が 1〜システム上限の範囲外。</summary>
     MaxResultsInvalid,
+
+    /// <summary>キー列の種類が未指定、または文字列・数値以外。</summary>
+    KeyColumnKindInvalid,
 }
 
 /// <summary>ルックアップ定義の不備 1 件。</summary>
@@ -219,6 +222,12 @@ public static class LookupValidator
                     problems.Add(new LookupProblem(
                         lookup.LookupId, LookupProblemCode.KeyPageMismatch, key.QuestionId));
                 }
+            }
+
+            if (key.SourceColumnKind is not (LookupColumnKind.Text or LookupColumnKind.Number))
+            {
+                problems.Add(new LookupProblem(
+                    lookup.LookupId, LookupProblemCode.KeyColumnKindInvalid, key.QuestionId));
             }
 
             if (key.MatchMode == LookupMatchMode.Prefix && !key.AllowPrefix)
