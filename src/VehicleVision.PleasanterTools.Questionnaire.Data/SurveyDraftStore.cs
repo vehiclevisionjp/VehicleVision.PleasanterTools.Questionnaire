@@ -596,6 +596,18 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                         source.QuestionId, (QuestionPort)source.Port, source.RowId))
                     .ToImmutableArray());
 
+        // **壊れた行は読み飛ばす**（1 件の壊れで下書きがまるごと開けなくなるのを避ける。`Read` と同じ方針）
+        var lookupJsons = (await connection.QueryAsync<string>(Sql(
+            "SELECT [DefinitionJson] FROM [SurveyLookups] "
+            + "WHERE [SurveyId] = @SurveyId ORDER BY [SortOrder]",
+            new { SurveyId = surveyId },
+            transaction,
+            cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
+        var lookups = lookupJsons
+            .Select(json => Read<LookupDefinition>(json))
+            .OfType<LookupDefinition>()
+            .ToImmutableArray();
+
         var definition = new SurveyDefinition
         {
             SurveyId = surveyId.ToString(),
@@ -615,6 +627,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             // （端から端まで通す試験で見つかった。Issue #189）
             AutoReply = ReadAutoReply(survey.AutoReplyJson),
             AssetDelivery = ReadAssetDelivery(survey.AssetDeliveryJson),
+            // **無いときは `null`**（公開済みの版の JSON を変えない。Issue #813）
+            Lookups = lookups.IsEmpty ? null : lookups,
             Pages = pages
                 .Select(page => new Page
                 {
@@ -1015,6 +1029,12 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             new { SurveyId = surveyId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        await connection.ExecuteAsync(Sql(
+            "DELETE FROM [SurveyLookups] WHERE [SurveyId] = @SurveyId",
+            new { SurveyId = surveyId },
+            transaction,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     private async Task InsertDraftAsync(
@@ -1100,6 +1120,26 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                         cancellationToken: cancellationToken)).ConfigureAwait(false);
                 }
             }
+        }
+
+        // ルックアップ定義（Issue #820）。**無ければ 1 行も入れない**（読むと `null` に戻る）
+        var lookups = definition.GetLookups();
+        for (var lookupIndex = 0; lookupIndex < lookups.Length; lookupIndex++)
+        {
+            var lookup = lookups[lookupIndex];
+
+            await connection.ExecuteAsync(Sql(
+                "INSERT INTO [SurveyLookups] ([SurveyId], [LookupId], [SortOrder], [DefinitionJson]) "
+                + "VALUES (@SurveyId, @LookupId, @SortOrder, @DefinitionJson)",
+                new
+                {
+                    SurveyId = surveyId,
+                    lookup.LookupId,
+                    SortOrder = lookupIndex,
+                    DefinitionJson = SurveyJson.Serialize(lookup),
+                },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
 
         for (var index = 0; index < mapping.Assignments.Length; index++)
