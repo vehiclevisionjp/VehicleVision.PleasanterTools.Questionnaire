@@ -41,6 +41,12 @@
     <Using Include="VehicleVision.PleasanterTools.Core.Web" />
     <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.PleasanterSsoOptions" Alias="PleasanterSsoOptions" />
     <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.SamlOptions" Alias="SamlOptions" />
+    <!-- Core.Web 0.1.0 が同名の型を持つため、本アプリの型を別名で明示する（暗黙の using との曖昧さを避ける） -->
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.PasswordHasher" Alias="PasswordHasher" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.SecretProtector" Alias="SecretProtector" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.TotpService" Alias="TotpService" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.InvitationToken" Alias="InvitationToken" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.RecoveryCode" Alias="RecoveryCode" />
   </ItemGroup>
 
 </Project>
