@@ -1,16 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <!--
-      暫定: Core.Data 0.1.0 の推移依存で、IBM Db2・Firebird のドライバ（独自許諾・IDPL 1.0）が配布物へ入る。
-      本アプリは使わないので、アセットを全て除外して publish の出力から外す。バージョンは推移依存の解決版に合わせる。
-      Core 側が依存を絞った版（vehiclevisionjp/VehicleVision.PleasanterTools.Core#151）を取り込んだら、この 2 行を外す。
-    -->
-    <PackageReference Include="Net.IBM.Data.Db2" Version="9.0.0.300" ExcludeAssets="all" />
-    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.3" ExcludeAssets="all" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- パスワードのハッシュ（PBKDF2）は ASP.NET Core の共有フレームワークに含まれるため
          PackageReference は要らない（NU1510） -->
     <!-- TOTP（RFC 6238）。MIT。**自前で書かない** -->
@@ -27,7 +17,7 @@
     <PackageReference Include="Otp.NET" Version="1.4.1" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.18.7" />
     <!-- Pleasanter のログインの本人確認（PleasanterSessionVerifier）は Core.Web（NuGet）へ集約した（Issue #706） -->
-    <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.1.0" />
+    <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.1.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -71,6 +61,12 @@
     <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.TotpService" Alias="TotpService" />
     <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.InvitationToken" Alias="InvitationToken" />
     <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.Services.RecoveryCode" Alias="RecoveryCode" />
+    <!-- Core.Web 0.1.1 が同名の型を追加したため、本アプリの型を別名で明示する（暗黙の using との曖昧さを避ける） -->
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.EndpointNetworkRestrictions" Alias="EndpointNetworkRestrictions" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.ForwardedProxyNetworks" Alias="ForwardedProxyNetworks" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.PathBaseOptions" Alias="PathBaseOptions" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.StaticCachePolicy" Alias="StaticCachePolicy" />
+    <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.TransportSecurityOptions" Alias="TransportSecurityOptions" />
   </ItemGroup>
 
 </Project>
