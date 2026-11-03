@@ -4,6 +4,16 @@ using VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
+/// <summary>検索を実行する口。公開 API（Issue #832）が使い、試験では偽物へ差し替える。</summary>
+public interface ILookupSearchService
+{
+    Task<LookupSearchResult> SearchAsync(
+        Guid surveyId,
+        LookupDefinition lookup,
+        IReadOnlyDictionary<string, string?> keyValues,
+        CancellationToken cancellationToken = default);
+}
+
 /// <summary>
 /// ルックアップの検索を、専用資格情報と結線して実行する（Issue #829・仕様書 3.3・6.1 節）。
 /// </summary>
@@ -25,7 +35,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 public sealed class LookupSearchService(
     ILookupCredentialStore credentials,
     IPleasanterOptionsProvider pleasanterOptions,
-    LookupSearchClient client)
+    LookupSearchClient client) : ILookupSearchService
 {
     public async Task<LookupSearchResult> SearchAsync(
         Guid surveyId,

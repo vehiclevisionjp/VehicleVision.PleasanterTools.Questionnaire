@@ -254,6 +254,17 @@ builder.Services.AddTransient(serviceProvider => new LookupSearchClient(
     serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter-lookup"),
     serviceProvider.GetRequiredService<LookupSearchOptions>()));
 builder.Services.AddTransient<LookupSearchService>();
+builder.Services.AddTransient<ILookupSearchService>(
+    serviceProvider => serviceProvider.GetRequiredService<LookupSearchService>());
+
+// **ルックアップの公開 API**（Issue #832）。署名つきの短命トークン・3 つの枠・同時実行数。
+// 枠は既存の共有レート制限ストアを再利用し、**ストア障害時は拒否する**（プロセス内へ退避しない）。
+// 上限は既定値だけで、環境変数・設定ファイルからは読まない
+builder.Services.AddSingleton(new LookupPublicOptions());
+builder.Services.AddSingleton<ILookupRateGate>(serviceProvider => new LookupRateGate(
+    serviceProvider.GetService<ISharedRateLimitStore>(),
+    serviceProvider.GetRequiredService<ILogger<LookupRateGate>>()));
+builder.Services.AddSingleton<LookupConcurrencyGate>();
 
 // **溜まりすぎたら受付を止める**（Issue #72、_documents/非機能設計.md 2 章）。
 // **WAF が無い導入先を想定した最後の壁。** 分散した相手にはレート制限が効かない。
@@ -503,6 +514,12 @@ var submissionGuardOptions = new SubmissionGuardOptions
 };
 
 builder.Services.AddSingleton(submissionGuardOptions);
+
+// 検索用トークンは送信チケットと鍵の派生も版も別（検索に送信権限を持たせない）
+builder.Services.AddSingleton(serviceProvider => new LookupSessionTokens(
+    secretKey,
+    serviceProvider.GetRequiredService<LookupPublicOptions>(),
+    serviceProvider.GetRequiredService<TimeProvider>()));
 builder.Services.AddSingleton(serviceProvider => new SubmissionGuard(
     secretKey, submissionGuardOptions, serviceProvider.GetRequiredService<TimeProvider>()));
 
@@ -991,6 +1008,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.MapFormEndpoints();
+app.MapLookupEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminSessionEndpoints();

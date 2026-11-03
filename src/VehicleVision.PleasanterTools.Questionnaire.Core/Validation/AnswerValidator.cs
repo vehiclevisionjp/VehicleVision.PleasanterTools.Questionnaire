@@ -32,6 +32,27 @@ public static class AnswerValidator
         IReadOnlyCollection<Answer> answers)
         => Validate(definition, answers, pageId);
 
+    /// <summary>ルックアップの取得値 1 つが、入力先の設問に入れられるかを検証する（Issue #832）。</summary>
+    /// <remarks>
+    /// <para>
+    /// 通常の回答と同じ規則（文字数・選択肢・数値・範囲・形式）を使い、規則を二重に書かない。
+    /// **必須は見ない**（取得値が空なら呼ぶ側が反映しない）。誤りの値そのものは返さない。
+    /// </para>
+    /// </remarks>
+    /// <returns>誤りが無ければ空。</returns>
+    public static ImmutableArray<ValidationError> ValidateLookupValue(Question question, string value)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        ArgumentNullException.ThrowIfNull(value);
+
+        var errors = ImmutableArray.CreateBuilder<ValidationError>();
+        ValidateQuestion(
+            question with { IsRequired = false },
+            new Answer(question.QuestionId, [value]),
+            errors);
+        return errors.ToImmutable();
+    }
+
     private static ImmutableArray<ValidationError> Validate(
         SurveyDefinition definition,
         IReadOnlyCollection<Answer> answers,
