@@ -400,6 +400,98 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task 参照元の不備の502は管理者の通知へ立て_連続しても一件で_値や秘密は出ない()
+    {
+        search.Behave = () => Task.FromResult(new LookupSearchResult
+        {
+            Status = LookupSearchStatus.SourceInvalid,
+            Failure = LookupSearchFailure.Unauthorized,
+        });
+        using var client = Client();
+        var session = await NewSessionAsync(client, publicId);
+
+        for (var i = 0; i < 5; i++)
+        {
+            using var response = await SearchAsync(client, publicId, "l1", Body(session));
+            Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+            Assert.Equal("LookupSourceInvalid", await CodeOf(response));
+        }
+
+        var store = factory.Services.GetRequiredService<IAdminNotificationStore>();
+        var rows = await store.ListAsync(new AdminNotificationQuery { UnreadOnly = true });
+        var row = Assert.Single(rows, item => item.Kind == (int)Core.Notifications.AdminNotificationKind.LookupSourceAccessDenied);
+        Assert.Equal(surveyId, row.SurveyId);
+
+        // 窓の内側では DB へ足さないので、件数は 1 のまま
+        Assert.Equal(1, row.Count);
+        lock (logs.Lines)
+        {
+            Assert.DoesNotContain(logs.Lines, line => line.Contains(KeyValue, StringComparison.Ordinal));
+            Assert.DoesNotContain(logs.Lines, line => line.Contains(session, StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public async Task 想定外の例外の502も知らせるが_502以外の失敗では知らせない()
+    {
+        using var client = Client();
+        var session = await NewSessionAsync(client, publicId);
+        var store = factory.Services.GetRequiredService<IAdminNotificationStore>();
+
+        foreach (var status in new[]
+        {
+            LookupSearchStatus.TemporarilyUnavailable,
+            LookupSearchStatus.Timeout,
+            LookupSearchStatus.TooManyResults,
+            LookupSearchStatus.InvalidKeys,
+        })
+        {
+            search.Behave = () => Task.FromResult(new LookupSearchResult
+            {
+                Status = status,
+                Failure = LookupSearchFailure.Unauthorized,
+            });
+            using var response = await SearchAsync(client, publicId, "l1", Body(session));
+            Assert.NotEqual(HttpStatusCode.BadGateway, response.StatusCode);
+        }
+
+        Assert.Empty(await store.ListAsync(new AdminNotificationQuery()));
+
+        search.Behave = () => throw new InvalidOperationException("DETAIL-" + KeyValue);
+        using var failed = await SearchAsync(client, publicId, "l1", Body(session));
+        Assert.Equal(HttpStatusCode.BadGateway, failed.StatusCode);
+        var row = Assert.Single(await store.ListAsync(new AdminNotificationQuery()));
+        Assert.Equal((int)Core.Notifications.AdminNotificationKind.LookupSourceBadResponse, row.Kind);
+    }
+
+    [Fact]
+    public async Task 通知を書けなくても応答は同じ502()
+    {
+        search.Behave = () => Task.FromResult(new LookupSearchResult
+        {
+            Status = LookupSearchStatus.SourceInvalid,
+            Failure = LookupSearchFailure.CredentialDisabled,
+        });
+        using var client = Client();
+        var session = await NewSessionAsync(client, publicId);
+
+        // 通知の表を壊して、書き込みが失敗する状況を作る
+        await using (var connection = new SqliteConnection(factory.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DROP TABLE AdminNotifications";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        using var response = await SearchAsync(client, publicId, "l1", Body(session));
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal("LookupSourceInvalid", await CodeOf(response));
+        Assert.DoesNotContain("CredentialDisabled", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task 回答者の枠を超えたら429でRetryAfterを付け_外部検索しない()
     {
         await StartAsync(new LookupPublicOptions { RespondentLimit = 2 });

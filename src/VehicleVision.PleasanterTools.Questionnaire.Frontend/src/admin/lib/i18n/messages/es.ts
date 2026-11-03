@@ -902,6 +902,10 @@ export const es: Partial<Record<MessageKey, string>> = {
   "notifications.kind.ResponseReceived": "Se recibieron respuestas nuevas",
   "notifications.kind.ClamAvUnavailable": "El análisis de ClamAV no está disponible",
   "notifications.kind.ClamAvRecovered": "El análisis de ClamAV se ha restablecido",
+  "notifications.kind.LookupCredentialUnavailable": "Las credenciales de la búsqueda no están disponibles",
+  "notifications.kind.LookupSourceAccessDenied": "El origen de la búsqueda denegó el acceso",
+  "notifications.kind.LookupSourceRejected": "El origen de la búsqueda rechazó la solicitud",
+  "notifications.kind.LookupSourceBadResponse": "El origen de la búsqueda devolvió una respuesta inutilizable",
   "notifications.kind.Unknown": "Notificación desconocida",
 
   // ---- 分岐（ジャンプ） ---------------------------------------------------

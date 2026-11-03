@@ -49,4 +49,17 @@ public enum AdminNotificationKind
 
     /// <summary>同じインスタンスで異常を検知した後、ClamAV の検査が復旧した。</summary>
     ClamAvRecovered = 9,
+
+    /// <summary>ルックアップの専用資格情報が使えない（無い・停止・失効・復号不可）。仕様書 4.3 節の 502。</summary>
+    /// <remarks>**公開し直さずに効く。** 管理画面で資格情報を確認する。回答者には内部情報なしの取得失敗を返している。</remarks>
+    LookupCredentialUnavailable = 10,
+
+    /// <summary>ルックアップの参照元で権限がない・サイトが見つからない（401・403・404）。仕様書 4.3 節の 502。</summary>
+    LookupSourceAccessDenied = 11,
+
+    /// <summary>ルックアップの参照元が要求を拒否した・定義や接続先の不備（その他の 4xx・リダイレクト・HTTPS でない・定義不正）。</summary>
+    LookupSourceRejected = 12,
+
+    /// <summary>ルックアップの参照元の応答が使えない（JSON でない・上限超過・件数の不整合・想定外の例外）。</summary>
+    LookupSourceBadResponse = 13,
 }

@@ -963,6 +963,10 @@ export const en: Record<MessageKey, string> = {
   'notifications.kind.ResponseReceived': 'New responses were received',
   "notifications.kind.ClamAvUnavailable": "ClamAV scanning is unavailable",
   "notifications.kind.ClamAvRecovered": "ClamAV scanning has recovered",
+  "notifications.kind.LookupCredentialUnavailable": "Lookup credential is unavailable",
+  "notifications.kind.LookupSourceAccessDenied": "Lookup source denied access",
+  "notifications.kind.LookupSourceRejected": "Lookup source rejected the request",
+  "notifications.kind.LookupSourceBadResponse": "Lookup source returned an unusable response",
   'notifications.kind.Unknown': 'Unknown notification',
 
   // ---- Branching (jumps) --------------------------------------------------
