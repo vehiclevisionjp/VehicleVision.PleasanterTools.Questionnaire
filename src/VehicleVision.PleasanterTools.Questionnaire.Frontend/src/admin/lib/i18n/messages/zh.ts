@@ -942,6 +942,10 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'notifications.kind.ResponseReceived': '收到新回答',
   "notifications.kind.ClamAvUnavailable": "ClamAV 扫描不可用",
   "notifications.kind.ClamAvRecovered": "ClamAV 扫描已恢复",
+  "notifications.kind.LookupCredentialUnavailable": "查询项的专用凭据不可用",
+  "notifications.kind.LookupSourceAccessDenied": "查询项的参考来源拒绝了访问",
+  "notifications.kind.LookupSourceRejected": "查询项的参考来源拒绝了请求",
+  "notifications.kind.LookupSourceBadResponse": "查询项的参考来源返回了无法使用的响应",
   'notifications.kind.Unknown': '未知通知',
 
   // ---- 分岐（ジャンプ） ---------------------------------------------------

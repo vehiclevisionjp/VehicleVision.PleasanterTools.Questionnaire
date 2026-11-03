@@ -940,6 +940,10 @@ export const ja = {
   'notifications.kind.ResponseReceived': '新しい回答が届きました',
   "notifications.kind.ClamAvUnavailable": "ClamAV の検査が利用できません",
   "notifications.kind.ClamAvRecovered": "ClamAV の検査が復旧しました",
+  "notifications.kind.LookupCredentialUnavailable": "ルックアップの専用資格情報が使えません",
+  "notifications.kind.LookupSourceAccessDenied": "ルックアップの参照元で権限がありません",
+  "notifications.kind.LookupSourceRejected": "ルックアップの参照元が要求を拒否しました",
+  "notifications.kind.LookupSourceBadResponse": "ルックアップの参照元の応答が使えません",
   'notifications.kind.Unknown': '不明なお知らせ',
 
   // ---- 分岐（ジャンプ） ---------------------------------------------------

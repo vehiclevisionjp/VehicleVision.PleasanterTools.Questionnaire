@@ -36,6 +36,12 @@ public sealed record LookupPublicOptions
     /// <summary>フォームの枠の窓。</summary>
     public TimeSpan FormWindow { get; init; } = TimeSpan.FromMinutes(1);
 
+    /// <summary>
+    /// 参照元の不備（502）を管理者へ知らせる重複抑止の窓（Issue #833）。
+    /// アンケート・検索・種類ごとに、この間は 2 回目以降を立てない。
+    /// </summary>
+    public TimeSpan AdminNotificationWindow { get; init; } = TimeSpan.FromMinutes(10);
+
     /// <summary>検索用トークンの有効期間。</summary>
     public TimeSpan SessionLifetime { get; init; } = TimeSpan.FromMinutes(30);
 }

@@ -26,6 +26,10 @@
     ResponseReceived: 'notifications.kind.ResponseReceived',
     ClamAvUnavailable: 'notifications.kind.ClamAvUnavailable',
     ClamAvRecovered: 'notifications.kind.ClamAvRecovered',
+    LookupCredentialUnavailable: 'notifications.kind.LookupCredentialUnavailable',
+    LookupSourceAccessDenied: 'notifications.kind.LookupSourceAccessDenied',
+    LookupSourceRejected: 'notifications.kind.LookupSourceRejected',
+    LookupSourceBadResponse: 'notifications.kind.LookupSourceBadResponse',
   };
 
   let items = $state<AdminNotification[]>([]);

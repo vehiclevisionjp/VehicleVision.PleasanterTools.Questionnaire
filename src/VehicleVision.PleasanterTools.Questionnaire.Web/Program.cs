@@ -265,6 +265,8 @@ builder.Services.AddSingleton<ILookupRateGate>(serviceProvider => new LookupRate
     serviceProvider.GetService<ISharedRateLimitStore>(),
     serviceProvider.GetRequiredService<ILogger<LookupRateGate>>()));
 builder.Services.AddSingleton<LookupConcurrencyGate>();
+// 参照元の不備（502）の管理者通知（Issue #833）。既存の管理者通知の表へ立てる。窓は LookupPublicOptions の既定値
+builder.Services.AddSingleton<ILookupFailureNotifier, LookupFailureNotifier>();
 
 // **溜まりすぎたら受付を止める**（Issue #72、_documents/非機能設計.md 2 章）。
 // **WAF が無い導入先を想定した最後の壁。** 分散した相手にはレート制限が効かない。

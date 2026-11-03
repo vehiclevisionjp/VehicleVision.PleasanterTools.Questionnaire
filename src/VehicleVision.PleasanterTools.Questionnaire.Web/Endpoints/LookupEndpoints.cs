@@ -97,6 +97,7 @@ public static class LookupEndpoints
             HttpContext context,
             ResponseIntake intake,
             ILookupSearchService search,
+            ILookupFailureNotifier failureNotifier,
             LookupSessionTokens sessions,
             ILookupRateGate rate,
             LookupConcurrencyGate concurrency,
@@ -196,11 +197,22 @@ public static class LookupEndpoints
                     exception.GetType().Name,
                     lookup.LookupId,
                     context.TraceIdentifier);
+                await failureNotifier.NotifyAsync(
+                    form.SurveyId, lookup.LookupId, LookupSearchFailure.None, context.TraceIdentifier)
+                    .ConfigureAwait(false);
                 return Error(StatusCodes.Status502BadGateway, SourceInvalid);
             }
 
             var elapsed = Stopwatch.GetElapsedTime(started);
             LogOutcome(logger, context, form.SurveyId, lookup.LookupId, result, elapsed);
+            if (result.Status == LookupSearchStatus.SourceInvalid)
+            {
+                // **502 のときだけ管理者へ知らせる。** 失敗しても応答は変えない（例外を投げない実装）
+                await failureNotifier.NotifyAsync(
+                    form.SurveyId, lookup.LookupId, result.Failure, context.TraceIdentifier)
+                    .ConfigureAwait(false);
+            }
+
             return ToResult(context, form, lookup, result);
         });
 
