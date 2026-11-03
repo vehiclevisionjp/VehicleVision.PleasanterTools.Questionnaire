@@ -58,6 +58,7 @@ public class EndpointGraphTests
             new DatabaseStartupState());
         app.MapAnalyticsEndpoints();
         app.MapFormEndpoints();
+        app.MapLookupEndpoints();
         app.MapMonitoringEndpoints(new MonitoringToken("test-monitoring-token"));
 
         // **ここで初めて RequestDelegateFactory が走る。**
