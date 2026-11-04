@@ -12,7 +12,7 @@ public interface ILookupFailureNotifier
 {
     /// <summary>失敗を知らせる。**例外を投げない。呼び出し側の応答を変えない。**</summary>
     /// <param name="failure">失敗の分類。<see cref="LookupSearchFailure.None"/> は想定外の例外として扱う。</param>
-    /// <param name="correlationId">相関 ID（要求の識別子）。ログへだけ出す。</param>
+    /// <param name="correlationId">相関 ID（要求の識別子）。ログと、通知の行（直近のもの）へ出す。</param>
     Task NotifyAsync(
         Guid surveyId,
         string lookupId,
@@ -25,8 +25,8 @@ public interface ILookupFailureNotifier
 /// </summary>
 /// <remarks>
 /// <para>
-/// **渡すのはアンケート ID・分類（種類）・時刻だけ。** キー値・取得値・資格情報・生の応答・トークンは
-/// この型へ渡る経路すらない。ログへは検索 ID・分類名・相関 ID を出す（値は出さない）。
+/// **渡すのはアンケート ID・分類（種類）・時刻・検索 ID・相関 ID だけ。** キー値・取得値・資格情報・生の応答・トークンは
+/// この型へ渡る経路すらない。検索 ID と相関 ID は通知の行にも残す（Issue #836。集約の単位は変えず直近の値で上書き）。
 /// </para>
 /// <para>
 /// **重複の抑止は 2 段。** (1) インスタンス内で、アンケート・検索・種類ごとに
@@ -91,6 +91,8 @@ public sealed class LookupFailureNotifier(
                     (int)kind,
                     surveyId,
                     now.UtcDateTime,
+                    // **識別子だけ。** 検索 ID と相関 ID を通知の行へ載せる（Issue #836）
+                    new AdminNotificationDetail(lookupId, correlationId),
                     timeout.Token)
                 .ConfigureAwait(false);
             logger.LogWarning(

@@ -177,7 +177,8 @@ public static partial class QuestionnaireSqlDialect
     /// </remarks>
     public static string ListAdminNotifications(DatabaseProvider provider, bool unreadOnly) =>
         "SELECT n.[AdminNotificationId], n.[Kind], n.[SurveyId], s.[Title] AS [SurveyTitle], "
-        + "       n.[Count], n.[FirstOccurredAt], n.[LastOccurredAt], n.[ReadAt] "
+        + "       n.[Count], n.[FirstOccurredAt], n.[LastOccurredAt], n.[ReadAt], "
+        + "       n.[LookupId], n.[LastCorrelationId] "
         + "FROM [AdminNotifications] n "
         + "LEFT JOIN [Surveys] s ON s.[SurveyId] = n.[SurveyId] "
         + (unreadOnly ? "WHERE n.[ReadAt] IS NULL " : string.Empty)

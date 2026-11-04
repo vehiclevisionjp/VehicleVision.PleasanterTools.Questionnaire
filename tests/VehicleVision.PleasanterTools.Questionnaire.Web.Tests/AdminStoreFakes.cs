@@ -532,7 +532,22 @@ internal sealed class FakeAdminNotificationStore : IAdminNotificationStore
 {
     public List<(int Kind, Guid SurveyId)> Raised { get; } = [];
 
+    /// <summary>識別子つきで立てた知らせの識別子（<see cref="Raised"/> と同じ順）。</summary>
+    public List<AdminNotificationDetail> Details { get; } = [];
+
     public bool Throws { get; set; }
+
+    public Task RaiseAsync(
+        int kind,
+        Guid surveyId,
+        DateTime occurredAt,
+        AdminNotificationDetail detail,
+        CancellationToken cancellationToken = default)
+    {
+        var task = RaiseAsync(kind, surveyId, occurredAt, cancellationToken);
+        Details.Add(detail);
+        return task;
+    }
 
     public Task RaiseAsync(
         int kind,

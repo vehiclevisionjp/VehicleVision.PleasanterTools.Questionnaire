@@ -17,7 +17,9 @@ public class AdminNotificationEndpointsTests
         Guid? surveyId = null,
         string? title = null,
         int count = 1,
-        DateTime? readAt = null) =>
+        DateTime? readAt = null,
+        string? lookupId = null,
+        string? correlationId = null) =>
         new(Guid.NewGuid(),
             kind,
             surveyId ?? Guid.NewGuid(),
@@ -25,7 +27,9 @@ public class AdminNotificationEndpointsTests
             count,
             Occurred,
             Occurred.AddMinutes(5),
-            readAt);
+            readAt,
+            lookupId,
+            correlationId);
 
     [Fact]
     public void 時刻に協定世界時の印を付ける()
@@ -36,6 +40,29 @@ public class AdminNotificationEndpointsTests
         Assert.Equal(DateTimeKind.Utc, response.FirstOccurredAt.Kind);
         Assert.Equal(DateTimeKind.Utc, response.LastOccurredAt.Kind);
         Assert.Equal(DateTimeKind.Utc, response.ReadAt!.Value.Kind);
+    }
+
+    [Fact]
+    public void 検索IDと相関IDを返し_無い知らせでは落として返す()
+    {
+        // Issue #836。サーバは null のプロパティを落として返す（画面側の型は省略可）
+        var with = AdminNotificationEndpoints.ToResponse(
+            View(kind: 12, lookupId: "l1", correlationId: "0HN:0001"));
+        Assert.Equal("l1", with.LookupId);
+        Assert.Equal("0HN:0001", with.CorrelationId);
+
+        var without = AdminNotificationEndpoints.ToResponse(View(kind: 1));
+        Assert.Null(without.LookupId);
+        Assert.Null(without.CorrelationId);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            without,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)
+            {
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+            });
+        Assert.DoesNotContain("lookupId", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("correlationId", json, StringComparison.Ordinal);
     }
 
     [Fact]

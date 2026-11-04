@@ -851,6 +851,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   "notifications.isUnread": "ungelesen",
   "notifications.isRead": "Lesen",
   "notifications.noSurvey": "(alle Erhebungen)",
+  "notifications.lookupId": "Lookup-ID",
+  "notifications.correlationId": "Letzte Korrelations-ID",
   "notifications.removedSurvey": "Gelöschte Umfrage ({id})",
   "notifications.previous": "Früher",
   "notifications.next": "Nächster Artikel",

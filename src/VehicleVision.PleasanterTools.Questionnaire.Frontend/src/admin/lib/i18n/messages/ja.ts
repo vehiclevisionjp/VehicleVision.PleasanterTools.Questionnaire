@@ -927,6 +927,8 @@ export const ja = {
   'notifications.isUnread': '未読',
   'notifications.isRead': '既読',
   'notifications.noSurvey': '（全体）',
+  'notifications.lookupId': '検索 ID',
+  'notifications.correlationId': '直近の相関 ID',
   'notifications.removedSurvey': '削除されたアンケート（{id}）',
   'notifications.previous': '前へ',
   'notifications.next': '次へ',
