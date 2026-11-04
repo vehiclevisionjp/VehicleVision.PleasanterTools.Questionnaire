@@ -14,7 +14,7 @@ public sealed class AssetHistorySender(
     IAssetHistoryOutbox outbox,
     IResponseTokenStore tokens,
     ISurveySnapshotStore snapshots,
-    PleasanterApiClient pleasanter,
+    PleasanterGateway pleasanter,
     PleasanterRecordBuilder recordBuilder,
     MappingEvaluator mappingEvaluator,
     ResponseSenderOptions options,
@@ -41,6 +41,18 @@ public sealed class AssetHistorySender(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (PleasanterConfigurationException)
+        {
+            // **サーバー側の設定の誤り（BaseUrl）。履歴の問題ではないので、デッドレターへ落とさず再送の対象のまま残す。**
+            // 管理者への通知は、同じ接続先を使う回答の送信（ResponseSender）が出す
+            logger.LogError("Pleasanter への接続先（BaseUrl）の設定が使えない。管理画面の設定を直す必要がある");
+            await outbox.RescheduleAsync(
+                claimed.EventId,
+                options.NextAttemptAt(_time.GetUtcNow().UtcDateTime, claimed.RetryCount),
+                "Pleasanter への接続先（BaseUrl）の設定が使えない",
+                cancellationToken).ConfigureAwait(false);
+            return SendOutcome.Rescheduled;
         }
         catch (Exception exception)
         {
@@ -116,7 +128,7 @@ public sealed class AssetHistorySender(
         {
             PleasanterErrorKind.None => await CompleteAsync(claimed, cancellationToken).ConfigureAwait(false),
             PleasanterErrorKind.Permanent => await DeadLetterAsync(
-                claimed, $"Pleasanter が履歴を受け付けない（{response.StatusCode}）", cancellationToken)
+                claimed, $"Pleasanter が履歴を受け付けない（{response.DisplayStatusCode()}）", cancellationToken)
                 .ConfigureAwait(false),
             PleasanterErrorKind.Unknown => await DeadLetterAsync(
                 claimed, "履歴の作成結果を確認できない。二重登録を避けるため人が確認する", cancellationToken)

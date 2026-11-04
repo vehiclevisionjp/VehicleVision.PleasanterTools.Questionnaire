@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="VehicleVision.PleasanterTools.DotNetClient.PleasanterErrorKind" Alias="PleasanterErrorKind" />
   </ItemGroup>
 
   <ItemGroup>

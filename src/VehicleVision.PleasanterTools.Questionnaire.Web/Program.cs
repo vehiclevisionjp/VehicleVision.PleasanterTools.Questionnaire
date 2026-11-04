@@ -234,9 +234,13 @@ builder.Services.AddSingleton<IScriptConverter>(serviceProvider =>
     new JintScriptConverter(serviceProvider.GetRequiredService<ScriptConverterOptions>()));
 builder.Services.AddSingleton(serviceProvider =>
     new MappingEvaluator(serviceProvider.GetRequiredService<IScriptConverter>()));
+// **リダイレクトを追わない**（API キーは本文に載り、307・308 は本文を転送先へ再送するため。Issue #844）。
+// 時間切れは `PleasanterGateway` 側（接続設定の Timeout）で切るので、HttpClient の既定は無制限にする
 builder.Services.AddHttpClient("pleasanter", client =>
-    client.Timeout = Timeout.InfiniteTimeSpan);
-builder.Services.AddTransient(serviceProvider => new PleasanterApiClient(
+        client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(
+        VehicleVision.PleasanterTools.DotNetClient.PleasanterHttp.CreateHandler);
+builder.Services.AddTransient(serviceProvider => new PleasanterGateway(
     serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter"),
     serviceProvider.GetRequiredService<IPleasanterOptionsProvider>()));
 

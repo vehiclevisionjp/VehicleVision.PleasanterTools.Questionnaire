@@ -62,4 +62,11 @@ public enum AdminNotificationKind
 
     /// <summary>ルックアップの参照元の応答が使えない（JSON でない・上限超過・件数の不整合・想定外の例外）。</summary>
     LookupSourceBadResponse = 13,
+
+    /// <summary>Pleasanter への接続先（BaseUrl）の設定が使えない（https でない・資格情報／クエリ／フラグメント付きなど）。</summary>
+    /// <remarks>
+    /// **認証の失敗（<see cref="PleasanterUnauthorized"/>）とは別。** サーバー側の設定の誤りで、人が直す必要がある。
+    /// 直るまで、未送信の回答は再送の対象のまま残る。通知にも URL・資格情報は載せない。
+    /// </remarks>
+    PleasanterConfigurationInvalid = 14,
 }

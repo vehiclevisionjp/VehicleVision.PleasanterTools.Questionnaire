@@ -28,4 +28,9 @@
     <Using Include="VehicleVision.PleasanterTools.Core.Data" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Pleasanter の応答の型は DotNetClient のもの（Issue #844）。名前空間ごとは取り込まない（PleasanterOptions などが本アプリのものと衝突する） -->
+    <Using Include="VehicleVision.PleasanterTools.DotNetClient.PleasanterErrorKind" Alias="PleasanterErrorKind" />
+    <Using Include="VehicleVision.PleasanterTools.DotNetClient.PleasanterResponse" Alias="PleasanterResponse" />
+  </ItemGroup>
 </Project>

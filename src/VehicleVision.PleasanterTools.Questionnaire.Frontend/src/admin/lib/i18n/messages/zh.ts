@@ -939,6 +939,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'notifications.kind.BacklogBlockedSurvey': '因发送积压，已停止接收此问卷的回答',
   'notifications.kind.BacklogBlockedTotal': '因发送积压，已停止接收所有问卷的回答',
   'notifications.kind.PleasanterUnauthorized': 'Pleasanter 身份验证失败',
+  'notifications.kind.PleasanterConfigurationInvalid': '无法使用 Pleasanter 连接目标（BaseUrl）的设置',
   'notifications.kind.ResponseLimitReached': '已达到回答数量上限，停止接收回答',
   'notifications.kind.MailDeadLettered': '电子邮件无法发送，已暂缓处理',
   'notifications.kind.ResponseReceived': '收到新回答',

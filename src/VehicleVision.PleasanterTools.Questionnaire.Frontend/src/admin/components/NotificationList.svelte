@@ -21,6 +21,7 @@
     BacklogBlockedSurvey: 'notifications.kind.BacklogBlockedSurvey',
     BacklogBlockedTotal: 'notifications.kind.BacklogBlockedTotal',
     PleasanterUnauthorized: 'notifications.kind.PleasanterUnauthorized',
+    PleasanterConfigurationInvalid: 'notifications.kind.PleasanterConfigurationInvalid',
     ResponseLimitReached: 'notifications.kind.ResponseLimitReached',
     MailDeadLettered: 'notifications.kind.MailDeadLettered',
     ResponseReceived: 'notifications.kind.ResponseReceived',

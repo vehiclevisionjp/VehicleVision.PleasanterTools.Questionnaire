@@ -80,11 +80,11 @@ public class AssetHistorySenderTests
     {
         var outbox = new FakeAssetHistoryOutbox();
         var tokens = new FakeTokenStore();
-        var client = new PleasanterApiClient(
+        var client = new PleasanterGateway(
             new HttpClient(handler),
             new PleasanterOptions
             {
-                BaseUrl = "http://pleasanter",
+                BaseUrl = "https://pleasanter.example.test",
                 ApiKey = "key",
                 ApiKeyUserTimeZoneId = "Asia/Tokyo",
             });

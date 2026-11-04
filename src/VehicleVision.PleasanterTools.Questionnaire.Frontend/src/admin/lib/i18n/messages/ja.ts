@@ -937,6 +937,7 @@ export const ja = {
   'notifications.kind.BacklogBlockedSurvey': '送信の滞留でこのアンケートの受付を止めました',
   'notifications.kind.BacklogBlockedTotal': '送信の滞留で全アンケートの受付を止めました',
   'notifications.kind.PleasanterUnauthorized': 'Pleasanter の認証に失敗しました',
+  'notifications.kind.PleasanterConfigurationInvalid': 'Pleasanter への接続先（BaseUrl）の設定が使えません',
   'notifications.kind.ResponseLimitReached': '回答数の上限に達したので受付を止めました',
   'notifications.kind.MailDeadLettered': 'メールを送れず保留にしました',
   'notifications.kind.ResponseReceived': '新しい回答が届きました',

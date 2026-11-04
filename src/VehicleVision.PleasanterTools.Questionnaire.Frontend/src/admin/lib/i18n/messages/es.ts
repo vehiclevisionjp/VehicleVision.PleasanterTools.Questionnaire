@@ -899,6 +899,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "notifications.kind.BacklogBlockedSurvey": "La acumulación detuvo la recepción de esta encuesta",
   "notifications.kind.BacklogBlockedTotal": "La acumulación detuvo la recepción de todas las encuestas",
   "notifications.kind.PleasanterUnauthorized": "Falló la autenticación con Pleasanter",
+  "notifications.kind.PleasanterConfigurationInvalid": "No se puede usar la configuración del destino de conexión de Pleasanter (BaseUrl)",
   "notifications.kind.ResponseLimitReached": "La recepción se detuvo porque se alcanzó el límite de respuestas",
   "notifications.kind.MailDeadLettered": "No se pudo entregar un correo y está retenido",
   "notifications.kind.ResponseReceived": "Se recibieron respuestas nuevas",

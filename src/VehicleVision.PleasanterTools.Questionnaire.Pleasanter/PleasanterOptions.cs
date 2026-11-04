@@ -28,6 +28,26 @@ public sealed class PleasanterOptions
     /// <summary>API のバージョン。リクエストボディの <c>ApiVersion</c> に載せる。</summary>
     public decimal ApiVersion { get; init; } = DefaultApiVersion;
 
+    /// <summary>環境変数の名前。DotNetClient の <c>PleasanterOptions.FromEnvironment()</c> と同じ名前にそろえている。</summary>
+    public const string AllowInsecureHttpEnvironmentVariable = "PLEASANTER_ALLOW_INSECURE_HTTP";
+
+    /// <summary>
+    /// ループバック以外の <c>http</c> も許す。<b>検証用の環境（コンテナ間の通信など）だけで有効にすること。</b>
+    /// 有効にすると、API キーを含むリクエストの本文が<b>平文</b>で流れる。既定は無効。
+    /// 資格情報・クエリ・フラグメント・http／https 以外のスキームは、有効にしても拒否される（DotNetClient 0.3.0）。
+    /// </summary>
+    /// <remarks>
+    /// <b>管理画面・設定ファイルからは設定できない</b>（本番で誤って有効にされないよう、設定の項目にしない）。
+    /// 既定値は、環境変数 <c>PLEASANTER_ALLOW_INSECURE_HTTP</c> が <c>true</c> のときだけ有効。
+    /// 本アプリは接続設定を自前で組み立てて DotNetClient へ渡すので、DotNetClient 側の環境変数の読み取り
+    /// （<c>FromEnvironment()</c>）は届かない。そのため、ここで読む。
+    /// </remarks>
+    public bool AllowInsecureHttp { get; init; } = ParseAllowInsecureHttp(Environment.GetEnvironmentVariable(AllowInsecureHttpEnvironmentVariable));
+
+    /// <summary>環境変数の値を読む。<c>true</c>（大文字小文字は問わない）のときだけ有効。</summary>
+    public static bool ParseAllowInsecureHttp(string? value)
+        => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>1 回の呼び出しの上限。</summary>
     public TimeSpan Timeout { get; set; } = DefaultTimeout;
 

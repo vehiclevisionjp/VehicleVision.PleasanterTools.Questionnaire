@@ -96,6 +96,7 @@ public static class ServerMessages
         [ServerMessageKeys.SettingsValuesRequired] = "설정 값을 지정하세요.",
         [ServerMessageKeys.PleasanterConnectionRequired] = "Pleasanter의 URL과 API 키를 지정하세요.",
         [ServerMessageKeys.PleasanterConnectionFailed] = "Pleasanter에 연결할 수 없습니다. URL, API 키, 연결 대상의 상태를 확인하세요.",
+        [ServerMessageKeys.PleasanterConfigurationInvalid] = "Pleasanter 접속 대상(BaseUrl) 설정을 사용할 수 없습니다. https(루프백만 http 허용)로 지정하고 자격 증명·쿼리·프래그먼트는 포함하지 마세요.",
         [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "로그인 ID가 이메일 주소가 아니므로 테스트 전송을 할 수 없습니다.",
         [ServerMessageKeys.MaintenanceMessageTooLong] = "메시지는 {0}자 이내로 입력하세요.",
         [ServerMessageKeys.SettingKeyNotManaged] = "관리 대상이 아닌 설정입니다: {0}",
@@ -255,6 +256,7 @@ public static class ServerMessages
             [ServerMessageKeys.SettingsValuesRequired] = "请指定设置值。",
             [ServerMessageKeys.PleasanterConnectionRequired] = "请指定 Pleasanter 的 URL 和 API 密钥。",
             [ServerMessageKeys.PleasanterConnectionFailed] = "无法连接到 Pleasanter。请检查 URL、API 密钥和连接目标的状态。",
+            [ServerMessageKeys.PleasanterConfigurationInvalid] = "无法使用 Pleasanter 连接目标（BaseUrl）的设置。请使用 https（仅回环地址允许 http），且不要包含凭据、查询或片段。",
             [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "登录 ID 不是电子邮件地址，因此无法试发。",
             [ServerMessageKeys.MaintenanceMessageTooLong] = "消息请在 {0} 个字符以内输入。",
             [ServerMessageKeys.SettingKeyNotManaged] = "这不是受管理的设置：{0}",
@@ -371,6 +373,7 @@ public static class ServerMessages
             [ServerMessageKeys.SettingsValuesRequired] = "Especifique los valores de configuración.",
             [ServerMessageKeys.PleasanterConnectionRequired] = "Especifique la URL y la clave de API de Pleasanter.",
             [ServerMessageKeys.PleasanterConnectionFailed] = "No se pudo conectar con Pleasanter. Compruebe la URL, la clave de API y el estado del destino.",
+            [ServerMessageKeys.PleasanterConfigurationInvalid] = "No se puede usar la configuración del destino de conexión de Pleasanter (BaseUrl). Especifique https (http solo para loopback) sin credenciales, consulta ni fragmento.",
             [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "El ID de inicio de sesión no es una dirección de correo, por lo que no se puede enviar una prueba.",
             [ServerMessageKeys.MaintenanceMessageTooLong] = "Introduzca un mensaje de {0} caracteres como máximo.",
             [ServerMessageKeys.SettingKeyNotManaged] = "Esta configuración no está administrada: {0}",
@@ -486,6 +489,7 @@ public static class ServerMessages
             [ServerMessageKeys.SettingsValuesRequired] = "Geben Sie die Einstellungswerte an.",
             [ServerMessageKeys.PleasanterConnectionRequired] = "Geben Sie die Pleasanter-URL und den API-Schlüssel an.",
             [ServerMessageKeys.PleasanterConnectionFailed] = "Die Verbindung zu Pleasanter ist fehlgeschlagen. Prüfen Sie URL, API-Schlüssel und den Zustand des Ziels.",
+            [ServerMessageKeys.PleasanterConfigurationInvalid] = "Die Einstellung für das Pleasanter-Verbindungsziel (BaseUrl) ist nicht verwendbar. Geben Sie https an (http nur für Loopback) – ohne Anmeldedaten, Abfrage oder Fragment.",
             [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "Die Anmelde-ID ist keine E-Mail-Adresse, daher kann keine Testnachricht gesendet werden.",
             [ServerMessageKeys.MaintenanceMessageTooLong] = "Geben Sie eine Nachricht mit höchstens {0} Zeichen ein.",
             [ServerMessageKeys.SettingKeyNotManaged] = "Diese Einstellung wird nicht verwaltet: {0}",
@@ -1007,6 +1011,12 @@ public static class ServerMessages
             "Pleasanter の URL と API キーを指定してください。",
             "Specify the Pleasanter URL and API key.",
             "Vui lòng chỉ định URL và khóa API của Pleasanter.");
+
+        Add(
+            ServerMessageKeys.PleasanterConfigurationInvalid,
+            "Pleasanter への接続先（BaseUrl）の設定が使えません。https（ループバックだけ http 可）で、資格情報・クエリ・フラグメントを含めずに指定してください。",
+            "The Pleasanter connection URL (BaseUrl) setting cannot be used. Specify an https URL (http is allowed only for loopback) without credentials, query or fragment.",
+            "Không thể sử dụng cấu hình URL kết nối Pleasanter (BaseUrl). Hãy chỉ định URL https (chỉ loopback mới được dùng http), không kèm thông tin xác thực, truy vấn hoặc đoạn.");
 
         Add(
             ServerMessageKeys.PleasanterConnectionFailed,
