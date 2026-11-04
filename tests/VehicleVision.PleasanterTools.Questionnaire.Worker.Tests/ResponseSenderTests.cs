@@ -120,11 +120,11 @@ public class ResponseSenderTests
             effective = effective with { Mapping = mapping };
         }
 
-        var client = new PleasanterApiClient(
+        var client = new PleasanterGateway(
             new HttpClient(handler),
             new PleasanterOptions
             {
-                BaseUrl = "http://pleasanter",
+                BaseUrl = "https://pleasanter.example.test",
                 ApiKey = "key",
                 ApiKeyUserTimeZoneId = "Asia/Tokyo",
             });

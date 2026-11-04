@@ -4,6 +4,14 @@
     <ProjectReference Include="..\VehicleVision.PleasanterTools.Questionnaire.Core\VehicleVision.PleasanterTools.Questionnaire.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Pleasanter の標準 Web API クライアントは DotNetClient（NuGet）へ集約した（Issue #844）。
+         応答の型を、本アプリの全体で同じ名前で使えるようにする -->
+    <PackageReference Include="VehicleVision.PleasanterTools.DotNetClient" Version="0.2.0" />
+    <Using Include="VehicleVision.PleasanterTools.DotNetClient.PleasanterErrorKind" Alias="PleasanterErrorKind" />
+    <Using Include="VehicleVision.PleasanterTools.DotNetClient.PleasanterResponse" Alias="PleasanterResponse" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -134,7 +134,7 @@ public static class AdminSurveyEndpoints
             HttpContext context,
             ISurveyRepository surveys,
             ISurveyDraftStore drafts,
-            PleasanterApiClient pleasanter,
+            PleasanterGateway pleasanter,
             CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.Title))
@@ -426,7 +426,7 @@ public static class AdminSurveyEndpoints
             Guid surveyId,
             HttpContext context,
             ISurveyRepository surveys,
-            PleasanterApiClient pleasanter,
+            PleasanterGateway pleasanter,
             CancellationToken cancellationToken) =>
         {
             var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
@@ -464,7 +464,7 @@ public static class AdminSurveyEndpoints
             HttpContext context,
             ISurveyRepository surveys,
             ISurveyDraftStore drafts,
-            PleasanterApiClient pleasanter,
+            PleasanterGateway pleasanter,
             CancellationToken cancellationToken) =>
         {
             var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
@@ -510,7 +510,7 @@ public static class AdminSurveyEndpoints
             HttpContext context,
             ISurveyRepository surveys,
             ISurveyDraftStore drafts,
-            PleasanterApiClient pleasanter,
+            PleasanterGateway pleasanter,
             CancellationToken cancellationToken) =>
         {
             var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)

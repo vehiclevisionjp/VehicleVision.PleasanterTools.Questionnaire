@@ -39,7 +39,7 @@ public sealed class ResponseSender(
     IResponseOutbox outbox,
     IResponseTokenStore tokens,
     ISurveySnapshotStore snapshots,
-    PleasanterApiClient pleasanter,
+    PleasanterGateway pleasanter,
     PleasanterRecordBuilder recordBuilder,
     MappingEvaluator mappingEvaluator,
     ResponseSenderOptions options,

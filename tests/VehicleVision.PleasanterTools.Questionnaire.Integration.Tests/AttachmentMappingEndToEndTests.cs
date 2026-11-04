@@ -155,7 +155,7 @@ public class AttachmentMappingEndToEndTests
         await surveys.PublishAsync(surveyId, 1, Definition(), Mapping(), null);
 
         var intake = new ResponseIntake(surveys, snapshots, outbox, tokens, Inspector());
-        var pleasanter = new PleasanterApiClient(http, new PleasanterOptions
+        var pleasanter = new PleasanterGateway(http, new PleasanterOptions
         {
             BaseUrl = PleasanterBaseUrl,
             ApiKey = ApiKey,
@@ -242,7 +242,7 @@ public class AttachmentMappingEndToEndTests
         await surveys.PublishAsync(surveyId, 1, Definition(), Mapping(), null);
 
         var intake = new ResponseIntake(surveys, snapshots, outbox, tokens, Inspector());
-        var pleasanter = new PleasanterApiClient(http, new PleasanterOptions
+        var pleasanter = new PleasanterGateway(http, new PleasanterOptions
         {
             BaseUrl = PleasanterBaseUrl,
             ApiKey = ApiKey,
@@ -311,7 +311,7 @@ public class AttachmentMappingEndToEndTests
         await surveys.PublishAsync(surveyId, 1, Definition(), Mapping(), null);
 
         var intake = new ResponseIntake(surveys, snapshots, outbox, tokens, Inspector());
-        var pleasanter = new PleasanterApiClient(http, new PleasanterOptions
+        var pleasanter = new PleasanterGateway(http, new PleasanterOptions
         {
             BaseUrl = PleasanterBaseUrl,
             ApiKey = ApiKey,

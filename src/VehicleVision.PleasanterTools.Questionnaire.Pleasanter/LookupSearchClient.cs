@@ -13,7 +13,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 /// </summary>
 /// <remarks>
 /// <para>
-/// **回答の書き込み用の <see cref="PleasanterApiClient"/> とは別。** 専用の資格情報で読み取りだけを行い、
+/// **回答の書き込み用の <see cref="PleasanterGateway"/> とは別。** 専用の資格情報で読み取りだけを行い、
 /// 再試行せず、リダイレクトを追わず、応答の大きさと時間に上限を持つ。
 /// </para>
 /// <para>

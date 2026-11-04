@@ -14,7 +14,7 @@ public sealed class AssetHistorySender(
     IAssetHistoryOutbox outbox,
     IResponseTokenStore tokens,
     ISurveySnapshotStore snapshots,
-    PleasanterApiClient pleasanter,
+    PleasanterGateway pleasanter,
     PleasanterRecordBuilder recordBuilder,
     MappingEvaluator mappingEvaluator,
     ResponseSenderOptions options,

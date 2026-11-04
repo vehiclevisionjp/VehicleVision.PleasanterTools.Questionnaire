@@ -119,7 +119,7 @@ public static class AdminSettingsEndpoints
                     });
                 }
 
-                var client = new PleasanterApiClient(
+                var client = new PleasanterGateway(
                     httpClientFactory.CreateClient("pleasanter"),
                     options);
                 var connected = await client.CheckConnectionAsync(cancellationToken)
