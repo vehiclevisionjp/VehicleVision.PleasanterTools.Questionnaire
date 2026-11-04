@@ -1642,7 +1642,7 @@ public static class AdminSurveyEndpoints
                         ServerMessageKeys.PleasanterSiteWriteFailed, RequestLanguage.Of(context))
                     : response.Message,
             },
-            statusCode: response.StatusCode ?? StatusCodes.Status502BadGateway);
+            statusCode: response.DisplayStatusCode() ?? StatusCodes.Status502BadGateway);
 
     /// <summary>停止と再開。**理由を必ず書き換える。**</summary>
     /// <remarks>

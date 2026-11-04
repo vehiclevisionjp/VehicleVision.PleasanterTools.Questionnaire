@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Dnc = VehicleVision.PleasanterTools.DotNetClient;
@@ -38,14 +37,15 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 /// <c>DetectServerVersion = false</c> も指定している。
 /// </para>
 /// <para>
-/// **DotNetClient 0.2.0 に無いものを、ここで補っている。** 該当の変更を含む版へ上げたら、不要になった分を消す。
+/// **HTTP が 200 でも本文の <c>StatusCode</c> が 200 以外なら、DotNetClient（0.3.0。#95）が失敗として分類する**
+/// （<see cref="PleasanterResponse.ApplicationStatusCode"/>）。このクラスは分類しない。
+/// <c>Retry-After</c> は読まない（DotNetClient 0.3.0 に無い。従来の自前クライアントも読まず、再送の間隔は送信ワーカーの
+/// 再送の予定（<c>ResponseSenderOptions.NextAttemptAt</c>）で決めているため）。429 は <see cref="PleasanterErrorKind.Transient"/>。
 /// </para>
-/// <list type="bullet">
-/// <item><description>HTTP が 200 でも、本文の <c>StatusCode</c> が 200 以外なら失敗として分類する
-/// （DotNetClient #95・PR #96 は develop にあるが 0.2.0 には無い。<b>DotNetClient #95 を含む版へ上げたら、この補いは消せる</b>）</description></item>
-/// <item><description><c>Retry-After</c> は読まない。従来の自前クライアントも読まず、再送の間隔は送信ワーカーの
-/// 再送の予定（<c>ResponseSenderOptions.NextAttemptAt</c>）で決めているため</description></item>
-/// </list>
+/// <para>
+/// <b>平文 http は既定で拒否する。</b> <see cref="PleasanterOptions.AllowInsecureHttp"/>（環境変数
+/// <c>PLEASANTER_ALLOW_INSECURE_HTTP=true</c> が既定値。検証用の環境だけ）で、ループバック以外の http も許す。
+/// </para>
 /// <para>**実機の Pleasanter では未検証**（フェイクの通信とループバックのみ）。</para>
 /// </remarks>
 public sealed class PleasanterGateway(
@@ -150,19 +150,6 @@ public sealed class PleasanterGateway(
             },
             cancellationToken);
 
-    /// <summary>本文の <c>StatusCode</c> を、HTTP のステータスと同じ表で分類する。</summary>
-    private static PleasanterErrorKind Classify(int statusCode) => statusCode switch
-    {
-        (int)HttpStatusCode.OK => PleasanterErrorKind.None,
-        (int)HttpStatusCode.Unauthorized => PleasanterErrorKind.Unauthorized,
-        (int)HttpStatusCode.BadRequest or (int)HttpStatusCode.Forbidden or (int)HttpStatusCode.NotFound
-            => PleasanterErrorKind.Permanent,
-        (int)HttpStatusCode.RequestTimeout or (int)HttpStatusCode.TooManyRequests
-            => PleasanterErrorKind.Transient,
-        >= 500 => PleasanterErrorKind.Transient,
-        _ => PleasanterErrorKind.Permanent,
-    };
-
     private async Task<PleasanterResponse> PostAsync(
         string path,
         IReadOnlyDictionary<string, object?> body,
@@ -173,21 +160,9 @@ public sealed class PleasanterGateway(
 
         var payload = JsonSerializer.SerializeToNode(body, SerializerOptions) as JsonObject ?? [];
 
-        // 呼び出し側の取り消しは伝わる。それ以外の通信の失敗（接続・タイムアウト）は、DotNetClient が応答なし（Unknown）で返す
-        var response = await client.PostJsonAsync(path, payload, cancellationToken).ConfigureAwait(false);
-
-        // 応答本文の StatusCode も見る（HTTP が 200 でも本文でエラーを返す場合に備える）。
-        // DotNetClient #95 を含む版へ上げたら消せる（DotNetClient 0.2.0 は HTTP のステータスだけで分類する）
-        if (response.IsSuccess
-            && response.Body is JsonObject node
-            && node["StatusCode"] is JsonValue statusNode
-            && statusNode.TryGetValue<int>(out var bodyStatus)
-            && bodyStatus != (int)HttpStatusCode.OK)
-        {
-            return response with { ErrorKind = Classify(bodyStatus), StatusCode = bodyStatus };
-        }
-
-        return response;
+        // 呼び出し側の取り消しは伝わる。それ以外の通信の失敗（接続・タイムアウト）は、DotNetClient が応答なし（Unknown）で返す。
+        // HTTP が 200 でも本文の StatusCode が 200 以外なら、DotNetClient（0.3.0。#95）が失敗として分類する
+        return await client.PostJsonAsync(path, payload, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>接続設定から DotNetClient を作る。<c>BaseUrl</c> が使えない形なら <see cref="PleasanterConfigurationException"/>（呼び出しごとに検査する）。</summary>
@@ -203,6 +178,7 @@ public sealed class PleasanterGateway(
             ApiVersion = options.ApiVersion,
             Timeout = options.Timeout,
             DetectServerVersion = false,
+            AllowInsecureHttp = options.AllowInsecureHttp,
         };
 
         try

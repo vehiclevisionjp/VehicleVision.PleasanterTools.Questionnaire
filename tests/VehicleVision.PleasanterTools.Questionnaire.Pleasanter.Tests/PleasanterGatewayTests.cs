@@ -34,7 +34,7 @@ public class PleasanterGatewayTests
     private static HttpResponseMessage Json(HttpStatusCode status, string json) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
-    private static PleasanterGateway Create(HttpMessageHandler handler, string baseUrl = "https://pleasanter.example.test") =>
+    private static PleasanterGateway Create(HttpMessageHandler handler, string baseUrl = "https://pleasanter.example.test", bool allowInsecureHttp = false) =>
         new(
             new HttpClient(handler),
             new PleasanterOptions
@@ -43,6 +43,7 @@ public class PleasanterGatewayTests
                 ApiKey = ApiKey,
                 ApiVersion = 1.1m,
                 ApiKeyUserTimeZoneId = "Asia/Tokyo",
+                AllowInsecureHttp = allowInsecureHttp,
             });
 
     private static Dictionary<string, object?> Record() => new() { ["ClassA"] = "値", ["NumA"] = 3 };
@@ -158,14 +159,80 @@ public class PleasanterGatewayTests
     [InlineData(409, PleasanterErrorKind.Permanent)]
     public async Task HTTPが200でも_本文のStatusCodeが200以外なら失敗にする(int bodyStatus, PleasanterErrorKind expected)
     {
-        // DotNetClient #95 を含む版へ上げたら、この補いと試験は消せる
+        // 分類は DotNetClient 0.3.0（#95）。0.2.0 までの自前の補いと同じ結果になること（従来の分類との差が無いこと）を確かめる
         var stub = new Stub(_ => Json(HttpStatusCode.OK, $$"""{ "StatusCode": {{bodyStatus}}, "Message": "detail" }"""));
 
         var response = await Create(stub).CreateAsync(1, Record());
 
         Assert.Equal(expected, response.ErrorKind);
-        Assert.Equal(bodyStatus, response.StatusCode);
+        Assert.Equal(bodyStatus, response.ApplicationStatusCode);
+        Assert.Equal(bodyStatus, response.DisplayStatusCode());
         Assert.False(response.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData("""{ "Message": "no status" }""")]
+    [InlineData("""{ "StatusCode": "x" }""")]
+    public async Task 本文のStatusCodeが無い_整数でないときは_失敗にしない(string json)
+    {
+        var response = await Create(new Stub(_ => Json(HttpStatusCode.OK, json))).CreateAsync(1, Record());
+
+        Assert.True(response.IsSuccess);
+        Assert.Equal(PleasanterErrorKind.None, response.ErrorKind);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable, 200, PleasanterErrorKind.Transient)]
+    [InlineData(HttpStatusCode.BadRequest, 200, PleasanterErrorKind.Permanent)]
+    public async Task HTTPが200以外なら_本文ではなくHTTPで分類する(HttpStatusCode status, int bodyStatus, PleasanterErrorKind expected)
+    {
+        var stub = new Stub(_ => Json(status, $$"""{ "StatusCode": {{bodyStatus}} }"""));
+
+        var response = await Create(stub).CreateAsync(1, Record());
+
+        Assert.Equal(expected, response.ErrorKind);
+        Assert.Equal((int)status, response.StatusCode);
+        Assert.Equal((int)status, response.DisplayStatusCode());
+    }
+
+    [Fact]
+    public void AllowInsecureHttpの既定は無効で_環境変数のtrueだけが有効()
+    {
+        Assert.False(PleasanterOptions.ParseAllowInsecureHttp(null));
+        Assert.False(PleasanterOptions.ParseAllowInsecureHttp(string.Empty));
+        Assert.False(PleasanterOptions.ParseAllowInsecureHttp("1"));
+        Assert.False(PleasanterOptions.ParseAllowInsecureHttp("false"));
+        Assert.True(PleasanterOptions.ParseAllowInsecureHttp("true"));
+        Assert.True(PleasanterOptions.ParseAllowInsecureHttp("TRUE"));
+        Assert.Equal("PLEASANTER_ALLOW_INSECURE_HTTP", PleasanterOptions.AllowInsecureHttpEnvironmentVariable);
+    }
+
+    [Theory]
+    [InlineData("http://pleasanter:8080")]
+    [InlineData("http://pleasanter.example.com")]
+    public async Task AllowInsecureHttpが有効なら_非ループバックのhttpも通信する(string baseUrl)
+    {
+        var stub = new Stub(_ => Json(HttpStatusCode.OK, OkBody));
+
+        var response = await Create(stub, baseUrl, allowInsecureHttp: true).CreateAsync(1, Record());
+
+        Assert.True(response.IsSuccess);
+        Assert.Single(stub.Requests);
+    }
+
+    [Theory]
+    [InlineData("ftp://pleasanter.example.com")]
+    [InlineData("http://user:pass@pleasanter.example.com")]
+    [InlineData("http://pleasanter.example.com?x=1")]
+    [InlineData("http://pleasanter.example.com#frag")]
+    public async Task AllowInsecureHttpが有効でも_資格情報_クエリ_フラグメント_httpとhttps以外は通信せず拒否する(string baseUrl)
+    {
+        var stub = new Stub(_ => Json(HttpStatusCode.OK, OkBody));
+
+        await Assert.ThrowsAsync<PleasanterConfigurationException>(
+            () => Create(stub, baseUrl, allowInsecureHttp: true).CreateAsync(1, Record()));
+
+        Assert.Empty(stub.Requests);
     }
 
     [Fact]

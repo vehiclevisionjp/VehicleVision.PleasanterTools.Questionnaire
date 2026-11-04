@@ -165,7 +165,7 @@ public sealed class ResponseSender(
             PleasanterErrorKind.Permanent =>
                 await DeadLetterAsync(
                     claimed,
-                    $"Pleasanter が受け付けない（{response.StatusCode}）: {response.Message}",
+                    $"Pleasanter が受け付けない（{response.DisplayStatusCode()}）: {response.Message}",
                     cancellationToken).ConfigureAwait(false),
 
             // 認証は人が直すまで通らないが、直れば同じ回答が送れる
@@ -174,7 +174,7 @@ public sealed class ResponseSender(
 
             _ => await RescheduleAsync(
                 claimed,
-                $"一時的な失敗（{response.StatusCode}）: {response.Message}",
+                $"一時的な失敗（{response.DisplayStatusCode()}）: {response.Message}",
                 cancellationToken).ConfigureAwait(false),
         };
     }

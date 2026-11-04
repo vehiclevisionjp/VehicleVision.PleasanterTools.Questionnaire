@@ -128,7 +128,7 @@ public sealed class AssetHistorySender(
         {
             PleasanterErrorKind.None => await CompleteAsync(claimed, cancellationToken).ConfigureAwait(false),
             PleasanterErrorKind.Permanent => await DeadLetterAsync(
-                claimed, $"Pleasanter が履歴を受け付けない（{response.StatusCode}）", cancellationToken)
+                claimed, $"Pleasanter が履歴を受け付けない（{response.DisplayStatusCode()}）", cancellationToken)
                 .ConfigureAwait(false),
             PleasanterErrorKind.Unknown => await DeadLetterAsync(
                 claimed, "履歴の作成結果を確認できない。二重登録を避けるため人が確認する", cancellationToken)
