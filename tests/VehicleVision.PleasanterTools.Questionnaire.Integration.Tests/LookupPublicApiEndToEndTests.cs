@@ -424,6 +424,13 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
 
         // 窓の内側では DB へ足さないので、件数は 1 のまま
         Assert.Equal(1, row.Count);
+
+        // Issue #836。検索 ID と相関 ID が通知の行に載る。秘密・値は載らない
+        Assert.Equal("l1", row.LookupId);
+        Assert.False(string.IsNullOrWhiteSpace(row.LastCorrelationId));
+        Assert.DoesNotContain(KeyValue, row.LookupId, StringComparison.Ordinal);
+        Assert.DoesNotContain(KeyValue, row.LastCorrelationId, StringComparison.Ordinal);
+        Assert.DoesNotContain(session, row.LastCorrelationId, StringComparison.Ordinal);
         lock (logs.Lines)
         {
             Assert.DoesNotContain(logs.Lines, line => line.Contains(KeyValue, StringComparison.Ordinal));

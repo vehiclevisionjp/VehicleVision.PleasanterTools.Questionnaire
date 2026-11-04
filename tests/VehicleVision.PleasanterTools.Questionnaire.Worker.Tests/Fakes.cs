@@ -246,6 +246,14 @@ public sealed class FakeAdminNotificationStore : IAdminNotificationStore
         int kind,
         Guid surveyId,
         DateTime occurredAt,
+        AdminNotificationDetail detail,
+        CancellationToken cancellationToken = default) =>
+        RaiseAsync(kind, surveyId, occurredAt, cancellationToken);
+
+    public Task RaiseAsync(
+        int kind,
+        Guid surveyId,
+        DateTime occurredAt,
         CancellationToken cancellationToken = default)
     {
         if (Throws)

@@ -28,7 +28,41 @@ public sealed record AdminNotificationView(
     int Count,
     DateTime FirstOccurredAt,
     DateTime LastOccurredAt,
-    DateTime? ReadAt);
+    DateTime? ReadAt,
+    string? LookupId = null,
+    string? LastCorrelationId = null);
+
+/// <summary>
+/// 知らせの行へ添える識別子（Issue #836）。**ルックアップの 502 だけが使う。**
+/// </summary>
+/// <remarks>
+/// ⚠️ **識別子だけ。** キー値・取得値・資格情報・生の応答・値のハッシュを渡す経路を作らない。
+/// 集約の単位は変えず、同じ行へ複数回起きたときは直近の値で上書きする。
+/// </remarks>
+/// <param name="LookupId">ルックアップ定義の識別子。</param>
+/// <param name="CorrelationId">要求の相関 ID（<c>TraceIdentifier</c>）。</param>
+public sealed record AdminNotificationDetail(string? LookupId, string? CorrelationId)
+{
+    /// <summary>列の長さ（<c>AdminNotifications.LookupId</c>・<c>LastCorrelationId</c>）。</summary>
+    public const int MaxLength = 64;
+
+    /// <summary>空・空白だけは <c>null</c>。制御文字を除き、<see cref="MaxLength"/> 文字で切る。</summary>
+    internal static string? Normalize(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var cleaned = new string([.. value.Where(c => !char.IsControl(c))]).Trim();
+        if (cleaned.Length > MaxLength)
+        {
+            cleaned = cleaned[..MaxLength];
+        }
+
+        return cleaned.Length == 0 ? null : cleaned;
+    }
+}
 
 /// <summary>回答通知メールへ積む対象。</summary>
 /// <remarks>⚠️ **回答本文を持たない。** 件数・時刻・アンケート名だけを渡す。</remarks>
@@ -80,6 +114,18 @@ public interface IAdminNotificationStore
         DateTime occurredAt,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// 識別子を添えて知らせを 1 件立てる（Issue #836）。集約の単位は変わらない
+    /// （<see cref="RaiseAsync(int, Guid, DateTime, CancellationToken)"/> と同じ）。
+    /// 同じ行へ足すときは、識別子を直近のもので上書きする。
+    /// </summary>
+    Task RaiseAsync(
+        int kind,
+        Guid surveyId,
+        DateTime occurredAt,
+        AdminNotificationDetail detail,
+        CancellationToken cancellationToken = default);
+
     /// <summary>新しい順に読む。</summary>
     Task<IReadOnlyList<AdminNotificationView>> ListAsync(
         AdminNotificationQuery query,
@@ -125,11 +171,38 @@ public sealed class AdminNotificationStore(IDbConnectionFactory connectionFactor
 {
     private DatabaseProvider Provider => connectionFactory.Provider;
 
-    public async Task RaiseAsync(
+    public Task RaiseAsync(
         int kind,
         Guid surveyId,
         DateTime occurredAt,
+        CancellationToken cancellationToken = default) =>
+        RaiseCoreAsync(kind, surveyId, occurredAt, null, null, cancellationToken);
+
+    public Task RaiseAsync(
+        int kind,
+        Guid surveyId,
+        DateTime occurredAt,
+        AdminNotificationDetail detail,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(detail);
+
+        return RaiseCoreAsync(
+            kind,
+            surveyId,
+            occurredAt,
+            AdminNotificationDetail.Normalize(detail.LookupId),
+            AdminNotificationDetail.Normalize(detail.CorrelationId),
+            cancellationToken);
+    }
+
+    private async Task RaiseCoreAsync(
+        int kind,
+        Guid surveyId,
+        DateTime occurredAt,
+        string? lookupId,
+        string? correlationId,
+        CancellationToken cancellationToken)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
@@ -138,14 +211,21 @@ public sealed class AdminNotificationStore(IDbConnectionFactory connectionFactor
             Kind = kind,
             SurveyId = surveyId,
             OccurredAt = DbTime.ForDb(occurredAt),
+            LookupId = lookupId,
+            CorrelationId = correlationId,
         };
+
+        // 識別子があるときだけ上書きする。**無いときは列に触れない**（既存の通知の更新を変えない）
+        var identifiers = lookupId is null && correlationId is null
+            ? string.Empty
+            : ", [LookupId] = @LookupId, [LastCorrelationId] = @CorrelationId";
 
         // **1 文の UPDATE で足し、0 行なら INSERT。**
         // 更新で必ず値が変わる（Count が増える）ので、
         // 「一致行数」を返す MySQL でも判定が割れない
         var updated = await connection.ExecuteAsync(Sql(
             "UPDATE [AdminNotifications] "
-            + "SET [Count] = [Count] + 1, [LastOccurredAt] = @OccurredAt "
+            + "SET [Count] = [Count] + 1, [LastOccurredAt] = @OccurredAt" + identifiers + " "
             + "WHERE [Kind] = @Kind AND [SurveyId] = @SurveyId AND [ReadAt] IS NULL",
             parameters,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -158,15 +238,17 @@ public sealed class AdminNotificationStore(IDbConnectionFactory connectionFactor
             await connection.ExecuteAsync(Sql(
                 "INSERT INTO [AdminNotifications] "
                 + "([AdminNotificationId], [Kind], [SurveyId], [Count], "
-                + " [FirstOccurredAt], [LastOccurredAt], [ReadAt]) "
+                + " [FirstOccurredAt], [LastOccurredAt], [ReadAt], [LookupId], [LastCorrelationId]) "
                 + "VALUES (@AdminNotificationId, @Kind, @SurveyId, 1, "
-                + "        @OccurredAt, @OccurredAt, NULL)",
+                + "        @OccurredAt, @OccurredAt, NULL, @LookupId, @CorrelationId)",
                 new
                 {
                     AdminNotificationId = Guid.NewGuid(),
                     parameters.Kind,
                     parameters.SurveyId,
                     parameters.OccurredAt,
+                    parameters.LookupId,
+                    parameters.CorrelationId,
                 },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
         }

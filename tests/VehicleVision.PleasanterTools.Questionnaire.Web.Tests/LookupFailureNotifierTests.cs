@@ -81,6 +81,26 @@ public sealed class LookupFailureNotifierTests
     }
 
     [Fact]
+    public async Task 検索IDと相関IDを通知の行へ添えて立てる_それ以外は渡さない()
+    {
+        // Issue #836。識別子だけを渡す。キー値・取得値・資格情報を渡す経路は型に無い
+        var f = new Fixture();
+        var surveyId = Guid.NewGuid();
+
+        await f.Notifier.NotifyAsync(surveyId, "l1", LookupSearchFailure.Unauthorized, "trace-1");
+
+        var detail = Assert.Single(f.Store.Details);
+        Assert.Equal(new AdminNotificationDetail("l1", "trace-1"), detail);
+        Assert.Equal(
+            ["LookupId", "CorrelationId"],
+            typeof(AdminNotificationDetail)
+                .GetProperties()
+                .Where(property => property.Name != "EqualityContract")
+                .Select(property => property.Name)
+                .ToArray());
+    }
+
+    [Fact]
     public async Task アンケート_検索_種類が違えば別々に立てる()
     {
         var f = new Fixture();
@@ -132,6 +152,11 @@ public sealed class LookupFailureNotifierTests
     /// <summary>書き込みで必ず例外を投げる通知先。例外の本文に秘密に見立てた値を入れられる。</summary>
     private sealed class ThrowingStore(Exception exception) : IAdminNotificationStore
     {
+        public Task RaiseAsync(
+            int kind, Guid surveyId, DateTime occurredAt, AdminNotificationDetail detail,
+            CancellationToken cancellationToken = default) =>
+            throw exception;
+
         public Task RaiseAsync(
             int kind, Guid surveyId, DateTime occurredAt, CancellationToken cancellationToken = default) =>
             throw exception;
