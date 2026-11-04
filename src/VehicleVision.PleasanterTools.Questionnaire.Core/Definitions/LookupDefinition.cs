@@ -39,6 +39,9 @@ public static class LookupLimits
 
     /// <summary>前方一致で必要な最短の文字数。</summary>
     public const int MinPrefixLength = 3;
+
+    /// <summary>表示 ID の最大長（Issue #835）。</summary>
+    public const int MaxDisplayIdLength = 32;
 }
 
 /// <summary>キー項目と、参照元のキー列の対応。</summary>
@@ -70,6 +73,26 @@ public sealed record LookupTarget
     public required string QuestionId { get; init; }
 }
 
+/// <summary>モーダルに出す列 1 つ。回答者へ見せる名前（表示 ID）と、参照元の列の対応（Issue #835）。</summary>
+/// <remarks>
+/// 応答の <c>display</c> の鍵は <see cref="DisplayId"/> で、<see cref="SourceColumn"/>（Pleasanter の列名）は
+/// 回答者へ返さない。
+/// </remarks>
+public sealed record LookupDisplayField
+{
+    /// <summary>
+    /// 表示 ID。ルックアップの中で一意。英字で始まる英数字・下線で
+    /// <see cref="LookupLimits.MaxDisplayIdLength"/> 文字まで。
+    /// </summary>
+    public required string DisplayId { get; init; }
+
+    /// <summary>参照元の列の名前。許可列に含まれていること。</summary>
+    public required string SourceColumn { get; init; }
+
+    /// <summary>モーダルの見出し。<c>null</c> なら画面カタログの標準の扱い（手順 5）。</summary>
+    public LocalizedText? Heading { get; init; }
+}
+
 /// <summary>ルックアップ定義 1 つ。1 つの検索ボタンに対応する（仕様書 3.2 節）。</summary>
 /// <remarks>
 /// 秘密（API キー）は含めない。<see cref="CredentialId"/> は資格情報への参照だけ。
@@ -98,7 +121,14 @@ public sealed record LookupDefinition
     /// <summary>回答者へ返せる列の許可リスト。</summary>
     public ImmutableArray<string> AllowedColumns { get; init; } = [];
 
-    /// <summary>モーダルに出す列。許可列の部分集合。</summary>
+    /// <summary>モーダルに出す列と、その表示 ID（Issue #835）。列は許可列の部分集合。</summary>
+    public ImmutableArray<LookupDisplayField> DisplayFields { get; init; } = [];
+
+    /// <summary>
+    /// **旧形式（表示 ID が無い列名だけの一覧）。新しい定義では使わない。**
+    /// 保存済みの古い定義を読み込んで検出するためだけに残している。
+    /// 空でなければ公開前の検証で拒否する（黙って捨てたり、列名を表示 ID にしたりしない）。
+    /// </summary>
     public ImmutableArray<string> DisplayColumns { get; init; } = [];
 
     /// <summary>1 回の最大候補数 K。</summary>

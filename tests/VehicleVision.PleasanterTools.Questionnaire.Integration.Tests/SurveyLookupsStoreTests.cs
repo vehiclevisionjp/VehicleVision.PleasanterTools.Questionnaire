@@ -56,7 +56,15 @@ public class SurveyLookupsStoreTests
         Keys = [new LookupKey { QuestionId = "k1", SourceColumn = "ClassA" }],
         Targets = [new LookupTarget { SourceColumn = "ClassB", QuestionId = "t1" }],
         AllowedColumns = ["ClassB", "ClassC"],
-        DisplayColumns = ["ClassB"],
+        DisplayFields =
+        [
+            new LookupDisplayField
+            {
+                DisplayId = "city",
+                SourceColumn = "ClassB",
+                Heading = LocalizedText.Japanese("市区町村"),
+            },
+        ],
         MaxResults = 7,
     };
 
@@ -105,6 +113,10 @@ public class SurveyLookupsStoreTests
         Assert.Equal("ClassA", Assert.Single(first.Keys).SourceColumn);
         Assert.Equal("ClassB", Assert.Single(first.Targets).SourceColumn);
         Assert.Equal(["ClassB", "ClassC"], first.AllowedColumns.ToArray());
+        var displayField = Assert.Single(first.DisplayFields);
+        Assert.Equal("city", displayField.DisplayId);
+        Assert.Equal("ClassB", displayField.SourceColumn);
+        Assert.Equal("市区町村", displayField.Heading!.Get("ja"));
         Assert.Equal(7, first.MaxResults);
     }
 

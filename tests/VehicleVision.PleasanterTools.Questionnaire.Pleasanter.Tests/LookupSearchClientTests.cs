@@ -60,7 +60,7 @@ public sealed class LookupSearchClientTests
                 new LookupKey { QuestionId = "k2", SourceColumn = "NumA", SourceColumnKind = LookupColumnKind.Number },
             ],
             AllowedColumns = ["ClassB", "NumB"],
-            DisplayColumns = ["ClassB"],
+            DisplayFields = [new LookupDisplayField { DisplayId = "city", SourceColumn = "ClassB" }],
             Targets = [new LookupTarget { QuestionId = "t1", SourceColumn = "ClassB" }],
         };
 

@@ -171,7 +171,11 @@ public sealed class LookupPublicApiUnitTests
                 new LookupTarget { QuestionId = "t4", SourceColumn = "ClassD" },
             ],
             AllowedColumns = ["ClassB", "NumA", "ClassC", "ClassD"],
-            DisplayColumns = ["ClassB", "Hidden"],
+            DisplayFields =
+            [
+                new LookupDisplayField { DisplayId = "city", SourceColumn = "ClassB" },
+                new LookupDisplayField { DisplayId = "hidden", SourceColumn = "Hidden" },
+            ],
         };
 
         static Question Q(string id, QuestionType type) => new()
@@ -234,7 +238,8 @@ public sealed class LookupPublicApiUnitTests
         var candidate = Assert.Single(response.Candidates);
         Assert.Equal("1", candidate.CandidateKey);
         var display = Assert.Single(candidate.Display);
-        Assert.Equal("ClassB", display.Key);
+        // 鍵は表示 ID。参照元の列名ではない（Issue #835）
+        Assert.Equal("city", display.Key);
         Assert.Equal("東京", display.Value);
         Assert.Equal("東京", candidate.Values["t1"]);
         Assert.False(candidate.Values.ContainsKey("t2"));

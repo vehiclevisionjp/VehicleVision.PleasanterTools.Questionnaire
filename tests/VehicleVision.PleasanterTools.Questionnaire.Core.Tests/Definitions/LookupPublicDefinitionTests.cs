@@ -19,7 +19,15 @@ public class LookupPublicDefinitionTests
         ],
         Targets = [new LookupTarget { SourceColumn = "ClassHiddenTarget", QuestionId = "t1" }],
         AllowedColumns = ["ClassHiddenTarget", "ClassHiddenOther"],
-        DisplayColumns = ["ClassHiddenOther"],
+        DisplayFields =
+        [
+            new LookupDisplayField
+            {
+                DisplayId = "city",
+                SourceColumn = "ClassHiddenOther",
+                Heading = LocalizedText.Japanese("市区町村"),
+            },
+        ],
         MaxResults = 17,
     };
 
@@ -33,6 +41,9 @@ public class LookupPublicDefinitionTests
         Assert.Equal("住所を検索", dto.ButtonLabel!.Get("ja"));
         Assert.Equal(["k1", "k2"], dto.KeyQuestionIds.ToArray());
         Assert.Equal(["t1"], dto.TargetQuestionIds.ToArray());
+        var field = Assert.Single(dto.DisplayFields);
+        Assert.Equal("city", field.DisplayId);
+        Assert.Equal("市区町村", field.Heading!.Get("ja"));
     }
 
     [Fact]
