@@ -2,10 +2,20 @@ using System.Collections.Immutable;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
+/// <summary>回答画面へ渡す、モーダルの表示列 1 つ（Issue #835）。**表示 ID と見出しだけ。参照元の列名は含めない。**</summary>
+public sealed record LookupPublicDisplayField
+{
+    /// <summary>応答の <c>display</c> の鍵。</summary>
+    public required string DisplayId { get; init; }
+
+    /// <summary>モーダルの見出し。<c>null</c> なら画面カタログの標準の扱い。</summary>
+    public LocalizedText? Heading { get; init; }
+}
+
 /// <summary>回答画面へ渡すルックアップ定義（Issue #822・仕様書 3.1 節）。</summary>
 /// <remarks>
 /// <para>
-/// **操作に必要な情報だけ。** 検索 ID・起点・キー項目 ID・入力先 ID・ボタン文言のみ。
+/// **操作に必要な情報だけ。** 検索 ID・起点・キー項目 ID・入力先 ID・ボタン文言・表示 ID と見出しのみ。
 /// **参照元の種類・サイト ID・資格情報の参照・参照元の列名・許可列・件数の上限・前方一致の可否を含めない。**
 /// 回答者に参照元の構造を教えないため。
 /// </para>
@@ -30,6 +40,9 @@ public sealed record LookupPublicDefinition
     /// <summary>結果を入れる入力先項目（設問 ID）。</summary>
     public ImmutableArray<string> TargetQuestionIds { get; init; } = [];
 
+    /// <summary>モーダルに出す列（表示 ID と見出し）。順序は定義のとおり。</summary>
+    public ImmutableArray<LookupPublicDisplayField> DisplayFields { get; init; } = [];
+
     /// <summary>サーバー用の定義から、回答画面用へ写す。</summary>
     public static LookupPublicDefinition From(LookupDefinition lookup)
     {
@@ -42,6 +55,13 @@ public sealed record LookupPublicDefinition
             ButtonLabel = lookup.ButtonLabel,
             KeyQuestionIds = [.. lookup.Keys.Select(key => key.QuestionId)],
             TargetQuestionIds = [.. lookup.Targets.Select(target => target.QuestionId)],
+            DisplayFields = lookup.DisplayFields.IsDefault
+                ? []
+                : [.. lookup.DisplayFields.Select(field => new LookupPublicDisplayField
+                {
+                    DisplayId = field.DisplayId,
+                    Heading = field.Heading,
+                })],
         };
     }
 

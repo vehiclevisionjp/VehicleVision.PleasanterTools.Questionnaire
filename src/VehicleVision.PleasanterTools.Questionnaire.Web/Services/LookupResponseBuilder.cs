@@ -6,7 +6,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 /// <summary>回答画面へ返す候補 1 件（仕様書 4.2 節）。</summary>
 /// <param name="CandidateKey">その応答内だけの識別子。Pleasanter の ID ではない。</param>
-/// <param name="Display">モーダルに出す列（鍵は <c>DisplayColumns</c> の列名）。</param>
+/// <param name="Display">モーダルに出す列（鍵は定義の表示 ID。参照元の列名ではない。Issue #835）。</param>
 /// <param name="Values">入力先の設問 ID → 値。**入れられる値だけ。**</param>
 public sealed record LookupCandidateResponse(
     string CandidateKey,
@@ -53,9 +53,9 @@ public static class LookupResponseBuilder
             var candidateKey = number.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
             var display = new Dictionary<string, string?>(StringComparer.Ordinal);
-            foreach (var column in lookup.DisplayColumns.Where(allowed.Contains))
+            foreach (var field in lookup.DisplayFields.Where(f => allowed.Contains(f.SourceColumn)))
             {
-                display[column] = row.Values.GetValueOrDefault(column);
+                display[field.DisplayId] = row.Values.GetValueOrDefault(field.SourceColumn);
             }
 
             var values = new Dictionary<string, string?>(StringComparer.Ordinal);

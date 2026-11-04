@@ -252,7 +252,94 @@ public class LookupValidatorTests
             Codes(Valid() with { AllowedColumns = ["ClassZ"] }));
         Assert.Contains(
             LookupProblemCode.DisplayColumnNotAllowed,
-            Codes(Valid() with { DisplayColumns = ["ClassQ"] }));
+            Codes(Valid() with { DisplayFields = [Field("city", "ClassQ")] }));
+    }
+
+    private static LookupDisplayField Field(string displayId, string column) =>
+        new() { DisplayId = displayId, SourceColumn = column };
+
+    [Fact]
+    public void 表示IDを持つ表示列は通る()
+    {
+        var lookup = Valid() with
+        {
+            AllowedColumns = ["ClassB", "ClassC"],
+            DisplayFields = [Field("city", "ClassB"), Field("town_2", "ClassC")],
+        };
+
+        Assert.Empty(Codes(lookup));
+    }
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData(" ", false)]
+    [InlineData("city", true)]
+    [InlineData("City_2", true)]
+    [InlineData("2city", false)]
+    [InlineData("_city", false)]
+    [InlineData("ci ty", false)]
+    [InlineData("ci-ty", false)]
+    [InlineData("市区町村", false)]
+    [InlineData("ClassB.x", false)]
+    public void 表示IDの形式を見る(string displayId, bool ok)
+    {
+        var codes = Codes(Valid() with { DisplayFields = [Field(displayId, "ClassB")] });
+
+        Assert.Equal(ok, !codes.Contains(LookupProblemCode.DisplayIdInvalid));
+    }
+
+    [Fact]
+    public void 表示IDは最大32文字()
+    {
+        var max = new string('a', LookupLimits.MaxDisplayIdLength);
+
+        Assert.DoesNotContain(
+            LookupProblemCode.DisplayIdInvalid,
+            Codes(Valid() with { DisplayFields = [Field(max, "ClassB")] }));
+        Assert.Contains(
+            LookupProblemCode.DisplayIdInvalid,
+            Codes(Valid() with { DisplayFields = [Field(max + "a", "ClassB")] }));
+    }
+
+    [Fact]
+    public void 表示IDの重複を弾く()
+    {
+        var lookup = Valid() with
+        {
+            DisplayFields = [Field("city", "ClassB"), Field("city", "ClassB")],
+        };
+
+        var problem = Assert.Single(
+            LookupValidator.Validate(Survey(), [lookup]),
+            p => p.Code == LookupProblemCode.DisplayIdDuplicated);
+
+        // 詳細に入れるのは表示 ID だけ。参照元の列名は入れない
+        Assert.Equal("city", problem.Detail);
+    }
+
+    [Fact]
+    public void 旧形式の表示列は拒否する()
+    {
+        Assert.Contains(
+            LookupProblemCode.DisplayColumnsLegacy,
+            Codes(Valid() with { DisplayColumns = ["ClassB"] }));
+    }
+
+    [Fact]
+    public void 保存済みの旧形式のJSONを読んでも表示列は黙って捨てず拒否する()
+    {
+        const string oldJson = """
+            {"lookupId":"l1","anchorQuestionId":"btn","sourceSiteId":10,"credentialId":"c1",
+             "keys":[{"questionId":"k1","sourceColumn":"ClassA","sourceColumnKind":"Text"}],
+             "targets":[{"sourceColumn":"ClassB","questionId":"t1"}],
+             "allowedColumns":["ClassB"],"displayColumns":["ClassB"]}
+            """;
+
+        var lookup = SurveyJson.Deserialize<LookupDefinition>(oldJson)!;
+
+        Assert.Equal(["ClassB"], lookup.DisplayColumns.ToArray());
+        Assert.Empty(lookup.DisplayFields);
+        Assert.Equal([LookupProblemCode.DisplayColumnsLegacy], Codes(lookup));
     }
 
     [Theory]

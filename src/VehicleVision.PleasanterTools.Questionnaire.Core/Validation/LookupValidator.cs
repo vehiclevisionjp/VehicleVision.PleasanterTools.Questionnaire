@@ -67,6 +67,15 @@ public enum LookupProblemCode
     /// <summary>表示列が許可列に含まれていない。</summary>
     DisplayColumnNotAllowed,
 
+    /// <summary>表示 ID が空・形式の不正（英字で始まる英数字・下線、最大 32 文字）。</summary>
+    DisplayIdInvalid,
+
+    /// <summary>表示 ID が、同じルックアップの中で重複している。</summary>
+    DisplayIdDuplicated,
+
+    /// <summary>旧形式の表示列（表示 ID が無い列名の一覧）が残っている。表示 ID の定義へ作り直す。</summary>
+    DisplayColumnsLegacy,
+
     /// <summary>最大候補数が 1〜システム上限の範囲外。</summary>
     MaxResultsInvalid,
 
@@ -307,13 +316,31 @@ public static class LookupValidator
             }
         }
 
-        var displayColumns = lookup.DisplayColumns.IsDefault ? [] : lookup.DisplayColumns;
-        foreach (var column in displayColumns)
+        if (!lookup.DisplayColumns.IsDefaultOrEmpty)
         {
-            if (!allowed.Contains(column))
+            // 旧形式は表示 ID が無い。列名を表示 ID へ読み替えず、作り直しを求める（Issue #835）
+            problems.Add(new LookupProblem(lookup.LookupId, LookupProblemCode.DisplayColumnsLegacy));
+        }
+
+        var displayFields = lookup.DisplayFields.IsDefault ? [] : lookup.DisplayFields;
+        var displayIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in displayFields)
+        {
+            if (!IsValidDisplayId(field.DisplayId))
+            {
+                problems.Add(new LookupProblem(lookup.LookupId, LookupProblemCode.DisplayIdInvalid));
+            }
+            else if (!displayIds.Add(field.DisplayId))
+            {
+                // 詳細に入れるのは表示 ID だけ（回答者へ見せる名前。参照元の列名は入れない）
+                problems.Add(new LookupProblem(
+                    lookup.LookupId, LookupProblemCode.DisplayIdDuplicated, field.DisplayId));
+            }
+
+            if (string.IsNullOrWhiteSpace(field.SourceColumn) || !allowed.Contains(field.SourceColumn))
             {
                 problems.Add(new LookupProblem(
-                    lookup.LookupId, LookupProblemCode.DisplayColumnNotAllowed, column));
+                    lookup.LookupId, LookupProblemCode.DisplayColumnNotAllowed, field.SourceColumn));
             }
         }
 
@@ -324,6 +351,13 @@ public static class LookupValidator
                 lookup.MaxResults.ToString(CultureInfo.InvariantCulture)));
         }
     }
+
+    /// <summary>表示 ID の形式。英字で始まる英数字・下線、最大 <see cref="LookupLimits.MaxDisplayIdLength"/> 文字。</summary>
+    private static bool IsValidDisplayId(string? id) =>
+        !string.IsNullOrEmpty(id)
+        && id.Length <= LookupLimits.MaxDisplayIdLength
+        && char.IsAsciiLetter(id[0])
+        && id.All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
 
     private static string? PageOf(SurveyDefinition definition, string questionId) =>
         definition.Pages

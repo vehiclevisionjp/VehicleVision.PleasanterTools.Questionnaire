@@ -176,7 +176,7 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
             }],
             Targets = [new LookupTarget { QuestionId = "t1", SourceColumn = "ClassB" }],
             AllowedColumns = ["ClassB"],
-            DisplayColumns = ["ClassB"],
+            DisplayFields = [new LookupDisplayField { DisplayId = "city", SourceColumn = "ClassB" }],
         };
         var definition = new SurveyDefinition
         {
@@ -243,7 +243,9 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
         Assert.Equal("single", json.GetProperty("outcome").GetString());
         var candidate = json.GetProperty("candidates")[0];
         Assert.Equal(FetchedValue, candidate.GetProperty("values").GetProperty("t1").GetString());
-        Assert.Equal(FetchedValue, candidate.GetProperty("display").GetProperty("ClassB").GetString());
+        Assert.Equal(FetchedValue, candidate.GetProperty("display").GetProperty("city").GetString());
+        // 回答者へ Pleasanter の列名を見せない（Issue #835）
+        Assert.DoesNotContain("ClassB", text, StringComparison.Ordinal);
         Assert.DoesNotContain("内部の題名", text, StringComparison.Ordinal);
         Assert.DoesNotContain(KeyValue, text, StringComparison.Ordinal);
 
