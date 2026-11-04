@@ -39,8 +39,8 @@ x-app-environment: &app-environment
     # **検証環境は自己署名の証明書を使うので、暗号化の検査を緩める。**
     # 本番では設定しないこと（設定すると平文のまま起動できてしまう）
     QUESTIONNAIRE_DB_ALLOW_INSECURE: "true"
-    # **注意（Issue #844）。** DotNetClient は、ループバック以外の http を使わない（API キーを本文で送るため）。
-    # この値（別コンテナへの http）では、回答の送信・管理画面の接続確認が通らない。解消の方法は未決（PR #844 の本文を参照）
+    # 別コンテナへの http。DotNetClient 0.3.0 は既定でこれを拒否するので、`app` サービスだけ
+    # `PLEASANTER_ALLOW_INSECURE_HTTP` を有効にしている（下の `app` を参照）
     QUESTIONNAIRE_PLEASANTER_BASEURL: http://pleasanter:8080
     # **実値をここへ書かない。** 検証環境用の固定値のみ
     QUESTIONNAIRE_PLEASANTER_APIKEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
@@ -464,6 +464,11 @@ services:
       # 実体は devcert が作ってボリュームへ置いたもの
       ASPNETCORE_Kestrel__Certificates__Default__Path: /https/aspnetapp.pfx
       ASPNETCORE_Kestrel__Certificates__Default__Password: *devcert-password
+      # **検証用の環境だけの設定（Issue #844）。** 別コンテナへの http は、DotNetClient 0.3.0 では既定で拒否される
+      # （API キーを本文で送るため）。この compose の中（コンテナ間）だけ、非ループバックの http を許す。
+      # **API キーが平文で流れる。本番へ持ち込まないこと**（Helm・AKS・本番の手順には入れない）。
+      # 資格情報・クエリ・フラグメント・http／https 以外のスキームは、許しても拒否される
+      PLEASANTER_ALLOW_INSECURE_HTTP: "true"
     depends_on:
       migrate:
         condition: service_completed_successfully
