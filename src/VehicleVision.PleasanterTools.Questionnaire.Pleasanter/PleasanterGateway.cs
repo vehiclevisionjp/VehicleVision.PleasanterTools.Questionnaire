@@ -26,8 +26,9 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 /// </para>
 /// <para>
 /// **<c>BaseUrl</c> は DotNetClient が通信の前に呼び出しごとに検査する**（https のみ・ループバックだけ http・資格情報／クエリ／フラグメント拒否）。
-/// 満たさないときは通信せず、<see cref="PleasanterErrorKind.Unauthorized"/> で返す（人が設定を直す必要があり、直れば同じ回答が送れるため。
-/// 送信ワーカーは再送しつつ管理者へ通知する。<b>Permanent にすると、設定ミスで未送信の回答が全部デッドレターへ落ちる</b>）。
+/// 満たさないときは通信せず、<see cref="PleasanterConfigurationException"/> を投げる。
+/// **認証の失敗でも恒久的な失敗でもなく、サーバー側の設定の誤り（内部エラー）**だからである。
+/// 送信ワーカーは、未送信の回答をデッドレターへ落とさず再送の対象のまま残し、管理者へ通知する。
 /// 文言は固定で、API キーも URL も含めない。
 /// </para>
 /// <para>
@@ -51,10 +52,6 @@ public sealed class PleasanterGateway(
     HttpClient httpClient,
     IPleasanterOptionsProvider optionsProvider)
 {
-    /// <summary>接続先の URL が使えないときの文言。**API キーも URL も含めない。**</summary>
-    public const string InvalidBaseUrlMessage =
-        "Pleasanter の URL が使えません。https（ループバックだけ http 可）で、資格情報・クエリ・フラグメントを含めずに指定してください。";
-
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
@@ -66,13 +63,11 @@ public sealed class PleasanterGateway(
     }
 
     /// <summary>接続先へ到達し、API キーが拒否されないことを確かめる。</summary>
-    /// <remarks><c>BaseUrl</c> が使えない形のときは、通信せずに <c>false</c>。</remarks>
+    /// <exception cref="PleasanterConfigurationException"><c>BaseUrl</c> が使えない形のとき（通信しない）。</exception>
     public async Task<bool> CheckConnectionAsync(CancellationToken cancellationToken = default)
     {
         var options = await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
-        var client = TryCreateClient(options);
-        return client is not null
-            && await client.CheckConnectionAsync(cancellationToken).ConfigureAwait(false);
+        return await CreateClient(options).CheckConnectionAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>レコードを作る。</summary>
@@ -174,12 +169,7 @@ public sealed class PleasanterGateway(
         CancellationToken cancellationToken)
     {
         var options = await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
-        var client = TryCreateClient(options);
-        if (client is null)
-        {
-            // 通信しない。**人が設定を直すまで通らない**（キーの失効と同じ扱い）
-            return new PleasanterResponse(PleasanterErrorKind.Unauthorized, Message: InvalidBaseUrlMessage);
-        }
+        var client = CreateClient(options);
 
         var payload = JsonSerializer.SerializeToNode(body, SerializerOptions) as JsonObject ?? [];
 
@@ -200,11 +190,11 @@ public sealed class PleasanterGateway(
         return response;
     }
 
-    /// <summary>接続設定から DotNetClient を作る。<c>BaseUrl</c> が使えない形なら <c>null</c>（呼び出しごとに検査する）。</summary>
+    /// <summary>接続設定から DotNetClient を作る。<c>BaseUrl</c> が使えない形なら <see cref="PleasanterConfigurationException"/>（呼び出しごとに検査する）。</summary>
     /// <remarks>
     /// **接続設定は管理画面で変えられる**ので、クライアントは呼び出しごとに作る（軽い。<see cref="HttpClient"/> は使い回す）。
     /// </remarks>
-    private Dnc.PleasanterApiClient? TryCreateClient(PleasanterOptions options)
+    private Dnc.PleasanterApiClient CreateClient(PleasanterOptions options)
     {
         var dncOptions = new Dnc.PleasanterOptions
         {
@@ -217,14 +207,26 @@ public sealed class PleasanterGateway(
 
         try
         {
-            // 例外の文言は理由だけで、URL も API キーも含まない。ここで握りつぶし、画面へ出す文言は固定にする
+            // DotNetClient の例外の文言は理由だけで、URL も API キーも含まない。それでも内側の例外にはしない（固定の文言だけを出す）
             dncOptions.Validate();
         }
         catch (ArgumentException)
         {
-            return null;
+            throw new PleasanterConfigurationException();
         }
 
         return new Dnc.PleasanterApiClient(httpClient, dncOptions);
     }
+}
+
+/// <summary>
+/// Pleasanter への接続先（<c>BaseUrl</c>）の設定が使えない。**サーバー側の設定の誤り（内部エラー）。**
+/// </summary>
+/// <remarks>
+/// 認証の失敗（<see cref="PleasanterErrorKind.Unauthorized"/>）でも、送ったデータの問題（<see cref="PleasanterErrorKind.Permanent"/>）でもない。
+/// **文言は固定で、URL・資格情報を含めない。** 呼び出し側は、回答をデッドレターへ落とさず、管理者へ通知する。
+/// </remarks>
+public sealed class PleasanterConfigurationException()
+    : InvalidOperationException("Pleasanter への接続先（BaseUrl）の設定が使えません。")
+{
 }

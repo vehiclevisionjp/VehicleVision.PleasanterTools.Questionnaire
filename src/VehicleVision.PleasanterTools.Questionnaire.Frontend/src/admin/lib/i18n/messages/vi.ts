@@ -861,6 +861,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "notifications.kind.BacklogBlockedSurvey": "Việc tiếp nhận khảo sát này đã bị dừng do tồn đọng",
   "notifications.kind.BacklogBlockedTotal": "Việc tiếp nhận tất cả các cuộc khảo sát đã bị dừng do tồn đọng",
   "notifications.kind.PleasanterUnauthorized": "Xác thực với Pleasanter không thành công",
+  "notifications.kind.PleasanterConfigurationInvalid": "Không thể sử dụng cấu hình URL kết nối Pleasanter (BaseUrl)",
   "notifications.kind.ResponseLimitReached": "Việc nạp đã dừng lại vì đã đạt đến giới hạn phản hồi",
   "notifications.kind.MailDeadLettered": "Một email không thể gửi được và đang bị treo",
   "notifications.kind.ResponseReceived": "Đã nhận được phản hồi mới",

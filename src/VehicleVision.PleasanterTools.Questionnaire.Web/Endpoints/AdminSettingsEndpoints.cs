@@ -132,6 +132,17 @@ public static class AdminSettingsEndpoints
                             ServerMessageKeys.PleasanterConnectionFailed, RequestLanguage.Of(context)),
                     });
             }
+            catch (PleasanterConfigurationException)
+            {
+                // サーバー側の設定の誤り（内部エラー）。固定の文言だけを返す
+                return Results.Json(
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.PleasanterConfigurationInvalid, RequestLanguage.Of(context)),
+                    },
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
             catch (AppSettingValidationException exception)
             {
                 return Results.BadRequest(new { message = exception.MessageFor(RequestLanguage.Of(context)) });

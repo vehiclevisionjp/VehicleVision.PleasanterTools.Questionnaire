@@ -42,6 +42,18 @@ public sealed class AssetHistorySender(
         {
             throw;
         }
+        catch (PleasanterConfigurationException)
+        {
+            // **サーバー側の設定の誤り（BaseUrl）。履歴の問題ではないので、デッドレターへ落とさず再送の対象のまま残す。**
+            // 管理者への通知は、同じ接続先を使う回答の送信（ResponseSender）が出す
+            logger.LogError("Pleasanter への接続先（BaseUrl）の設定が使えない。管理画面の設定を直す必要がある");
+            await outbox.RescheduleAsync(
+                claimed.EventId,
+                options.NextAttemptAt(_time.GetUtcNow().UtcDateTime, claimed.RetryCount),
+                "Pleasanter への接続先（BaseUrl）の設定が使えない",
+                cancellationToken).ConfigureAwait(false);
+            return SendOutcome.Rescheduled;
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "配布資料の受取履歴の送信で想定外の失敗が起きた");

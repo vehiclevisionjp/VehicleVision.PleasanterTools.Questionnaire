@@ -53,6 +53,27 @@ public static class AdminSurveyEndpoints
         // **管理操作を残す**（Issue #19）。読み取りは残さない
         group.AddEndpointFilter<AuditLogFilter>();
 
+        // **Pleasanter への接続先（BaseUrl）の設定が使えない。** 認証の失敗でも恒久的な失敗でもなく、サーバー側の設定の誤り（内部エラー）。
+        // 固定の文言だけを返す（URL・列名・API キーを含めない）
+        group.AddEndpointFilter(async (context, next) =>
+        {
+            try
+            {
+                return await next(context);
+            }
+            catch (PleasanterConfigurationException)
+            {
+                return Results.Json(
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.PleasanterConfigurationInvalid,
+                            RequestLanguage.Of(context.HttpContext)),
+                    },
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
+        });
+
         // **管理画面の応答を途中の経路に残さない**
         group.AddEndpointFilter(async (context, next) =>
         {

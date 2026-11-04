@@ -861,6 +861,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "notifications.kind.BacklogBlockedSurvey": "Intake für diese Umfrage wurde durch den Backlog gestoppt",
   "notifications.kind.BacklogBlockedTotal": "Intake für alle Umfragen wurde durch den Backlog gestoppt",
   "notifications.kind.PleasanterUnauthorized": "Authentifizierung mit Pleasanter fehlgeschlagen",
+  "notifications.kind.PleasanterConfigurationInvalid": "Die Einstellung für das Pleasanter-Verbindungsziel (BaseUrl) ist nicht verwendbar",
   "notifications.kind.ResponseLimitReached": "Aufnahme gestoppt, weil das Ansprechlimit erreicht wurde",
   "notifications.kind.MailDeadLettered": "Eine E-Mail konnte nicht zugestellt werden und ist auf Eis gelegt",
   "notifications.kind.ResponseReceived": "Neue Antworten gingen ein",

@@ -220,6 +220,9 @@ public static class ServerMessageKeys
     /// <summary>接続確認に要る Pleasanter の URL と API キーが無い。</summary>
     public const string PleasanterConnectionRequired = "settings.pleasanterConnectionRequired";
 
+    /// <summary>Pleasanter への接続先（BaseUrl）の設定が使えない。**サーバー側の設定の誤り（内部エラー）。URL は載せない。**</summary>
+    public const string PleasanterConfigurationInvalid = "settings.pleasanterConfigurationInvalid";
+
     /// <summary>Pleasanter へ接続できなかった。</summary>
     public const string PleasanterConnectionFailed = "settings.pleasanterConnectionFailed";
 

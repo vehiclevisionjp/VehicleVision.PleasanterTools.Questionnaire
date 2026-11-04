@@ -61,11 +61,12 @@ public class PleasanterGatewayTests
     }
 
     [Fact]
-    public async Task 接続試験は_使えないURLなら通信せずに失敗()
+    public async Task 接続試験は_使えないURLなら通信せず_設定の誤りとして例外()
     {
         var stub = new Stub(_ => Json(HttpStatusCode.OK, "{}"));
 
-        Assert.False(await Create(stub, "http://pleasanter:8080").CheckConnectionAsync());
+        await Assert.ThrowsAsync<PleasanterConfigurationException>(
+            () => Create(stub, "http://pleasanter:8080").CheckConnectionAsync());
         Assert.Empty(stub.Requests);
     }
 
@@ -199,19 +200,19 @@ public class PleasanterGatewayTests
     [InlineData("https://pleasanter.example.com#frag")]
     [InlineData("pleasanter.example.com")]
     [InlineData("")]
-    public async Task 使えないURLは_通信せずにUnauthorized_固定の文言でURLもAPIキーも出さない(string baseUrl)
+    public async Task 使えないURLは_通信せず_設定の誤りとして例外_固定の文言でURLもAPIキーも出さない(string baseUrl)
     {
         var stub = new Stub(_ => Json(HttpStatusCode.OK, OkBody));
 
-        var response = await Create(stub, baseUrl).CreateAsync(1, Record());
+        var exception = await Assert.ThrowsAsync<PleasanterConfigurationException>(
+            () => Create(stub, baseUrl).CreateAsync(1, Record()));
 
-        Assert.Equal(PleasanterErrorKind.Unauthorized, response.ErrorKind);
-        Assert.Null(response.StatusCode);
-        Assert.Equal(PleasanterGateway.InvalidBaseUrlMessage, response.Message);
+        Assert.Equal("Pleasanter への接続先（BaseUrl）の設定が使えません。", exception.Message);
+        Assert.Null(exception.InnerException);
         Assert.Empty(stub.Requests);
-        Assert.DoesNotContain("pass", response.Message);
-        Assert.DoesNotContain("example.com", response.Message);
-        Assert.DoesNotContain(ApiKey, response.Message);
+        Assert.DoesNotContain("pass", exception.Message);
+        Assert.DoesNotContain("example.com", exception.Message);
+        Assert.DoesNotContain(ApiKey, exception.Message);
     }
 
     [Theory]

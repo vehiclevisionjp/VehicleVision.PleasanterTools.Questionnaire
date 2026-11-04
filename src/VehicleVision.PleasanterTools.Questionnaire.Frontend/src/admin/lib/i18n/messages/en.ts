@@ -960,6 +960,7 @@ export const en: Record<MessageKey, string> = {
   'notifications.kind.BacklogBlockedSurvey': 'Intake for this survey was stopped by the backlog',
   'notifications.kind.BacklogBlockedTotal': 'Intake for all surveys was stopped by the backlog',
   'notifications.kind.PleasanterUnauthorized': 'Authentication with Pleasanter failed',
+  'notifications.kind.PleasanterConfigurationInvalid': 'The Pleasanter connection URL (BaseUrl) setting cannot be used',
   'notifications.kind.ResponseLimitReached': 'Intake stopped because the response limit was reached',
   'notifications.kind.MailDeadLettered': 'An email could not be delivered and is on hold',
   'notifications.kind.ResponseReceived': 'New responses were received',

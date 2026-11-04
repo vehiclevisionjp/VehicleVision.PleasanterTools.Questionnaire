@@ -70,6 +70,12 @@ public sealed class ResponseSender(
             // **確保したまま落ちても、期限切れで解放される。** 回答は失われない
             throw;
         }
+        catch (PleasanterConfigurationException)
+        {
+            // **サーバー側の設定の誤り（BaseUrl）。回答の問題ではないので、デッドレターへ落とさない。**
+            // 直るまで再送の対象のまま残し、管理者へ通知する（URL・資格情報は載せない）
+            return await HandleConfigurationErrorAsync(claimed, cancellationToken).ConfigureAwait(false);
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "回答の送信で想定外の失敗が起きた");
@@ -228,6 +234,24 @@ public sealed class ResponseSender(
                     $"同じトークンのレコードが {rows!.Count} 件ある。二重登録の可能性",
                     cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private async Task<SendOutcome> HandleConfigurationErrorAsync(
+        PendingResponse claimed,
+        CancellationToken cancellationToken)
+    {
+        logger.LogError("Pleasanter への接続先（BaseUrl）の設定が使えない。管理画面の設定を直す必要がある");
+        await NotifyAsync(
+            AdminNotificationKind.PleasanterConfigurationInvalid, Guid.Empty, cancellationToken)
+            .ConfigureAwait(false);
+
+        // **再送の上限を適用しない。** 設定が直れば同じ回答が送れる。待つ間隔は上限（RetryMaxDelay）で頭打ちになる。
+        // 送信の失敗ではないので、デッドレターにしない
+        var next = options.NextAttemptAt(_time.GetUtcNow().UtcDateTime, claimed.RetryCount);
+        await outbox
+            .RescheduleAsync(claimed.ResponseToken, next, "Pleasanter への接続先（BaseUrl）の設定が使えない", cancellationToken)
+            .ConfigureAwait(false);
+        return SendOutcome.Rescheduled;
     }
 
     private async Task<SendOutcome> HandleUnauthorizedAsync(
