@@ -283,7 +283,7 @@
   .detail {
     margin-top: var(--space-1);
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-xs);
     font-weight: 400;
     overflow-wrap: anywhere;
   }
