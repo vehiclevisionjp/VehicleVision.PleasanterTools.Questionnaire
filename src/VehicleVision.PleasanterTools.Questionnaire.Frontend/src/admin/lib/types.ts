@@ -1044,6 +1044,10 @@ export interface AdminNotification {
   lastOccurredAt: string;
   /** 既読にした日時。**未読では無い。** */
   readAt?: string | null;
+  /** ルックアップの検索 ID。**ルックアップ以外の知らせでは無い。**（直近のもの） */
+  lookupId?: string | null;
+  /** 直近に起きたときの相関 ID。ログと突き合わせる。**無い知らせもある。** */
+  correlationId?: string | null;
 }
 
 /** 知らせの 1 ページ。 */

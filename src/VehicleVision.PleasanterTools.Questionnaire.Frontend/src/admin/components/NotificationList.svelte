@@ -104,6 +104,28 @@
       : title;
   }
 
+  /**
+   * 検索 ID・相関 ID を 1 行にまとめる。無ければ空文字（行ごと出さない）。
+   *
+   * **識別子だけ。** 値・秘密は届かない（サーバが持たない）。
+   * 相関 ID は直近に起きたときのもので、ログと突き合わせる。
+   */
+  function identifiers(entry: AdminNotification): string {
+    const parts: string[] = [];
+    const lookupId = entry.lookupId ?? '';
+    const correlationId = entry.correlationId ?? '';
+
+    if (lookupId !== '') {
+      parts.push(`${t('notifications.lookupId')}: ${lookupId}`);
+    }
+
+    if (correlationId !== '') {
+      parts.push(`${t('notifications.correlationId')}: ${correlationId}`);
+    }
+
+    return parts.join(' / ');
+  }
+
   function unread(entry: AdminNotification): boolean {
     return (entry.readAt ?? '') === '';
   }
@@ -153,7 +175,12 @@
           {#each items as entry (entry.id)}
             <tr class:unread={unread(entry)}>
               <td class="nowrap">{formatDateTime(new Date(entry.lastOccurredAt))}</td>
-              <td>{kind(entry)}</td>
+              <td>
+                {kind(entry)}
+                {#if identifiers(entry) !== ''}
+                  <div class="detail">{identifiers(entry)}</div>
+                {/if}
+              </td>
               <td>{survey(entry)}</td>
               <td class="nowrap">{entry.count}</td>
               <td class="nowrap">{formatDateTime(new Date(entry.firstOccurredAt))}</td>
@@ -250,6 +277,15 @@
 
   .nowrap {
     white-space: nowrap;
+  }
+
+  /* 識別子は長くなりうるので折り返す。本文より控えめにする */
+  .detail {
+    margin-top: var(--space-1);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 400;
+    overflow-wrap: anywhere;
   }
 
   /* **未読は目で追えるようにする。** 色だけに頼らず、左端に印も付ける */

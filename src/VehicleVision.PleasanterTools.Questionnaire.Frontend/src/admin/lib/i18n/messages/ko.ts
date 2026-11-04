@@ -845,6 +845,8 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'notifications.isUnread': '읽지 않은',
   'notifications.isRead': '읽음',
   'notifications.noSurvey': '(전체)',
+  'notifications.lookupId': '조회 항목 ID',
+  'notifications.correlationId': '최근 상관 ID',
   'notifications.removedSurvey': '삭제된 설문조사({id})',
   'notifications.previous': '이전',
   'notifications.next': '다음',

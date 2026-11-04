@@ -851,6 +851,8 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "notifications.isUnread": "Chưa đọc",
   "notifications.isRead": "Đọc",
   "notifications.noSurvey": "(tất cả các cuộc khảo sát)",
+  "notifications.lookupId": "ID tra cứu",
+  "notifications.correlationId": "ID tương quan gần nhất",
   "notifications.removedSurvey": "Đã xóa khảo sát ({id})",
   "notifications.previous": "trước đó",
   "notifications.next": "Tiếp theo",

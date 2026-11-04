@@ -950,6 +950,8 @@ export const en: Record<MessageKey, string> = {
   'notifications.isUnread': 'Unread',
   'notifications.isRead': 'Read',
   'notifications.noSurvey': '(all surveys)',
+  'notifications.lookupId': 'Lookup ID',
+  'notifications.correlationId': 'Latest correlation ID',
   'notifications.removedSurvey': 'Deleted survey ({id})',
   'notifications.previous': 'Previous',
   'notifications.next': 'Next',

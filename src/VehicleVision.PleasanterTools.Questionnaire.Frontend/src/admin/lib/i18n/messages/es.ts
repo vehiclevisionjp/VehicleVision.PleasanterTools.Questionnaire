@@ -889,6 +889,8 @@ export const es: Partial<Record<MessageKey, string>> = {
   "notifications.isUnread": "Sin leer",
   "notifications.isRead": "Leída",
   "notifications.noSurvey": "(todas las encuestas)",
+  "notifications.lookupId": "ID de búsqueda",
+  "notifications.correlationId": "Último ID de correlación",
   "notifications.removedSurvey": "Encuesta eliminada ({id})",
   "notifications.previous": "Anterior",
   "notifications.next": "Siguiente",

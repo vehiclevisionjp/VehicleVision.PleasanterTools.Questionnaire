@@ -929,6 +929,8 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'notifications.isUnread': '未读',
   'notifications.isRead': '已读',
   'notifications.noSurvey': '（全部）',
+  'notifications.lookupId': '查询项 ID',
+  'notifications.correlationId': '最近的关联 ID',
   'notifications.removedSurvey': '已删除的问卷（{id}）',
   'notifications.previous': '上一页',
   'notifications.next': '下一页',
