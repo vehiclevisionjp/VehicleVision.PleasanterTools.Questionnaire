@@ -84,6 +84,13 @@ public sealed class ResponseSenderOptions
                 $"{MaxSendsPerMinuteKey} は 1 以上の整数で指定する（今の値: {raw}）");
     }
 
+    /// <summary>設定の誤りで送れなかったときに、次に送る時刻を決める。</summary>
+    /// <remarks>
+    /// **<c>RetryCount</c> を増やさない**ので、回数で間隔を伸ばせない（Issue #853）。
+    /// 一時的な失敗ではなく人が直す誤りなので、最初から再送間隔の上限で待つ。
+    /// </remarks>
+    public DateTime NextAttemptAtAfterConfigurationError(DateTime utcNow) => utcNow.Add(RetryMaxDelay);
+
     /// <summary>指数バックオフで次に送る時刻を決める。</summary>
     public DateTime NextAttemptAt(DateTime utcNow, int retryCount)
     {

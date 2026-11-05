@@ -47,9 +47,10 @@ public sealed class AssetHistorySender(
             // **サーバー側の設定の誤り（BaseUrl）。履歴の問題ではないので、デッドレターへ落とさず再送の対象のまま残す。**
             // 管理者への通知は、同じ接続先を使う回答の送信（ResponseSender）が出す
             logger.LogError("Pleasanter への接続先（BaseUrl）の設定が使えない。管理画面の設定を直す必要がある");
-            await outbox.RescheduleAsync(
+            // RetryCount は増やさない（直した直後の一時的な失敗でデッドレターへ回らないため。Issue #853）
+            await outbox.PostponeAsync(
                 claimed.EventId,
-                options.NextAttemptAt(_time.GetUtcNow().UtcDateTime, claimed.RetryCount),
+                options.NextAttemptAtAfterConfigurationError(_time.GetUtcNow().UtcDateTime),
                 "Pleasanter への接続先（BaseUrl）の設定が使えない",
                 cancellationToken).ConfigureAwait(false);
             return SendOutcome.Rescheduled;

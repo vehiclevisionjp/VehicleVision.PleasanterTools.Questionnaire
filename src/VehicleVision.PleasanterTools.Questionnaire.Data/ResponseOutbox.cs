@@ -140,6 +140,19 @@ public interface IResponseOutbox
         string? error,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// 送信側の設定の誤りで送れなかったので、<c>RetryCount</c> を増やさずに後で再送する。
+    /// </summary>
+    /// <remarks>
+    /// **設定の誤りは回答の失敗ではない。** 数えると、直した直後の一時的な失敗 1 回で
+    /// 再送の上限を超えてデッドレターへ回りうる（Issue #853）。
+    /// </remarks>
+    Task PostponeAsync(
+        string responseToken,
+        DateTime nextAttemptAtUtc,
+        string? error,
+        CancellationToken cancellationToken = default);
+
     /// <summary>再送しても通らないので分離する。**管理者へ通知すること。**</summary>
     Task DeadLetterAsync(
         string responseToken,
@@ -322,6 +335,33 @@ public sealed class ResponseOutbox(IDbConnectionFactory connectionFactory) : IRe
             "UPDATE [Responses] SET " +
             "  [Status] = @PendingStatus, " +
             "  [RetryCount] = [RetryCount] + 1, " +
+            "  [NextAttemptAt] = @NextAttemptAt, " +
+            "  [LastError] = @Error, " +
+            "  [LockedBy] = NULL, [LockedUntil] = NULL, " +
+            "  [UpdatedAt] = @Now " +
+            "WHERE [ResponseToken] = @ResponseToken",
+            new
+            {
+                ResponseToken = responseToken,
+                PendingStatus = (int)ResponseStatus.Pending,
+                NextAttemptAt = DbTime.ForDb(nextAttemptAtUtc),
+                Error = Truncate(error),
+                Now = DbTime.UtcNowTruncated(),
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    public async Task PostponeAsync(
+        string responseToken,
+        DateTime nextAttemptAtUtc,
+        string? error,
+        CancellationToken cancellationToken = default)
+    {
+        // **RetryCount を増やさない**（RescheduleAsync との違いはここだけ。Issue #853）
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await connection.ExecuteAsync(Sql(
+            "UPDATE [Responses] SET " +
+            "  [Status] = @PendingStatus, " +
             "  [NextAttemptAt] = @NextAttemptAt, " +
             "  [LastError] = @Error, " +
             "  [LockedBy] = NULL, [LockedUntil] = NULL, " +

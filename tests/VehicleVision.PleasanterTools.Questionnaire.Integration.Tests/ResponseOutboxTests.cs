@@ -165,6 +165,46 @@ public class ResponseOutboxTests
     }
 
     /// <summary>
+    /// 設定の誤りで送れなかったときは <c>RetryCount</c> を増やさず、一時的な失敗は増やすこと（Issue #853）。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 設定の誤りによる再送では再送回数を増やさない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (outbox, _) = Create(provider, connectionString);
+        var token = NewToken();
+        await outbox.SaveAsync(token, Guid.NewGuid(), 1, "{}");
+
+        // 設定の誤りが続く（確保 → 後で再送、を繰り返す）。時刻は過去にして、すぐ確保し直せるようにする
+        for (var i = 0; i < 3; i++)
+        {
+            var claimed = await ClaimUntilAsync(outbox, token, "worker-1");
+            Assert.NotNull(claimed);
+            Assert.Equal(0, claimed.RetryCount);
+            await outbox.PostponeAsync(token, DateTime.UtcNow.AddMinutes(-1), "設定の誤り");
+        }
+
+        // 一時的な失敗は 1 つ増える
+        var next = await ClaimUntilAsync(outbox, token, "worker-1");
+        Assert.NotNull(next);
+        Assert.Equal(0, next.RetryCount);
+        await outbox.RescheduleAsync(token, DateTime.UtcNow.AddMinutes(-1), "一時的な失敗");
+
+        var after = await ClaimUntilAsync(outbox, token, "worker-1");
+        Assert.NotNull(after);
+        Assert.Equal(1, after.RetryCount);
+
+        await outbox.CompleteAsync(token);
+    }
+
+    /// <summary>
     /// 期限を過ぎたデッドレターだけを消せること（Issue #85）。
     /// ⚠️ **送信待ちを巻き込むと、まだ届けられる回答を捨てることになる。**
     /// </summary>

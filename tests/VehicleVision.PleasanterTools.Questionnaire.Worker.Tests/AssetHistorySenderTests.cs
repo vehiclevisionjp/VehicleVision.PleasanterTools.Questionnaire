@@ -20,6 +20,9 @@ public class AssetHistorySenderTests
     {
         public List<string> RequestedBodies { get; } = [];
 
+        /// <summary>返す状態。既定は成功。</summary>
+        public HttpStatusCode Status { get; init; } = HttpStatusCode.OK;
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -29,7 +32,7 @@ public class AssetHistorySenderTests
                 RequestedBodies.Add(await request.Content.ReadAsStringAsync(cancellationToken));
             }
 
-            return new HttpResponseMessage(HttpStatusCode.OK)
+            return new HttpResponseMessage(Status)
             {
                 Content = new StringContent(
                     """{"Id":1,"StatusCode":200}""",
@@ -76,7 +79,7 @@ public class AssetHistorySenderTests
         });
 
     private static (AssetHistorySender Sender, FakeAssetHistoryOutbox Outbox, FakeTokenStore Tokens)
-        Build(RecordingHandler handler)
+        Build(RecordingHandler handler, string baseUrl = "https://pleasanter.example.test")
     {
         var outbox = new FakeAssetHistoryOutbox();
         var tokens = new FakeTokenStore();
@@ -84,7 +87,7 @@ public class AssetHistorySenderTests
             new HttpClient(handler),
             new PleasanterOptions
             {
-                BaseUrl = "https://pleasanter.example.test",
+                BaseUrl = baseUrl,
                 ApiKey = "key",
                 ApiKeyUserTimeZoneId = "Asia/Tokyo",
             });
@@ -149,5 +152,56 @@ public class AssetHistorySenderTests
         Assert.Empty(outbox.Waited);
         Assert.Empty(outbox.Rescheduled);
         Assert.Empty(outbox.DeadLettered);
+    }
+
+    [Fact]
+    public async Task BaseUrlが使えなければ_通信せず_再試行回数を増やさず再送の対象のまま残す()
+    {
+        // **設定の誤りは履歴の失敗ではない。** 数えると、直した直後の一時的な失敗でデッドレターへ回りうる（Issue #853）
+        var handler = new RecordingHandler();
+        var (sender, outbox, tokens) = Build(handler, baseUrl: "http://pleasanter:8080");
+        tokens.Map[ResponseToken] = 987654;
+        var options = new ResponseSenderOptions();
+        outbox.Enqueue(Pending(retryCount: options.MaxRetryCount));
+
+        Assert.Equal(SendOutcome.Rescheduled, await sender.SendOnceAsync());
+
+        Assert.Empty(handler.RequestedBodies);
+        Assert.Equal(EventId, Assert.Single(outbox.Postponed).EventId);
+        Assert.Empty(outbox.Rescheduled);
+        Assert.Empty(outbox.DeadLettered);
+    }
+
+    [Fact]
+    public async Task 設定の誤りが続いたあとの一時的な失敗_1_回では_デッドレターへ回さず再試行回数を数える()
+    {
+        // 設定の誤りの間は RetryCount が進まない（Postponed）ので、直したあとの最初の一時的な失敗は上限の手前に収まる
+        var options = new ResponseSenderOptions();
+        var retryCount = options.MaxRetryCount - 1;
+        var (broken, brokenOutbox, brokenTokens) = Build(new RecordingHandler(), baseUrl: "http://pleasanter:8080");
+        brokenTokens.Map[ResponseToken] = 987654;
+        brokenOutbox.Enqueue(Pending(retryCount));
+        Assert.Equal(SendOutcome.Rescheduled, await broken.SendOnceAsync());
+        Assert.Single(brokenOutbox.Postponed);
+
+        var (fixedSender, outbox, tokens) = Build(new RecordingHandler { Status = HttpStatusCode.InternalServerError });
+        tokens.Map[ResponseToken] = 987654;
+        outbox.Enqueue(Pending(retryCount));
+
+        Assert.Equal(SendOutcome.Rescheduled, await fixedSender.SendOnceAsync());
+        Assert.Single(outbox.Rescheduled);
+        Assert.Empty(outbox.DeadLettered);
+    }
+
+    [Fact]
+    public async Task 一時的な失敗は上限に達するとデッドレターへ回る()
+    {
+        var options = new ResponseSenderOptions();
+        var (sender, outbox, tokens) = Build(new RecordingHandler { Status = HttpStatusCode.InternalServerError });
+        tokens.Map[ResponseToken] = 987654;
+        outbox.Enqueue(Pending(options.MaxRetryCount));
+
+        Assert.Equal(SendOutcome.DeadLettered, await sender.SendOnceAsync());
+        Assert.Empty(outbox.Postponed);
     }
 }
