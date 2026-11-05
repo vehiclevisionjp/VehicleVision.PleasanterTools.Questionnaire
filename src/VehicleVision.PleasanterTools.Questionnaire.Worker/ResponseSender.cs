@@ -245,11 +245,12 @@ public sealed class ResponseSender(
             AdminNotificationKind.PleasanterConfigurationInvalid, Guid.Empty, cancellationToken)
             .ConfigureAwait(false);
 
-        // **再送の上限を適用しない。** 設定が直れば同じ回答が送れる。待つ間隔は上限（RetryMaxDelay）で頭打ちになる。
-        // 送信の失敗ではないので、デッドレターにしない
-        var next = options.NextAttemptAt(_time.GetUtcNow().UtcDateTime, claimed.RetryCount);
+        // **再送の上限を適用せず、RetryCount も増やさない。** 設定が直れば同じ回答が送れる。
+        // 数えると、直した直後の一時的な失敗 1 回で上限を超えてデッドレターへ回りうる（Issue #853）。
+        // 回数で間隔を伸ばせないので、最初から再送間隔の上限（RetryMaxDelay）で待つ。送信の失敗ではないので、デッドレターにしない
+        var next = options.NextAttemptAtAfterConfigurationError(_time.GetUtcNow().UtcDateTime);
         await outbox
-            .RescheduleAsync(claimed.ResponseToken, next, "Pleasanter への接続先（BaseUrl）の設定が使えない", cancellationToken)
+            .PostponeAsync(claimed.ResponseToken, next, "Pleasanter への接続先（BaseUrl）の設定が使えない", cancellationToken)
             .ConfigureAwait(false);
         return SendOutcome.Rescheduled;
     }
