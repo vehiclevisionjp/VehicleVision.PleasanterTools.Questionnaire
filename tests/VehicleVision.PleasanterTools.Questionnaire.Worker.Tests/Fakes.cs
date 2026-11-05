@@ -13,6 +13,9 @@ public sealed class FakeOutbox : IResponseOutbox
 
     public List<(string Token, DateTime NextAttemptAt, string? Error)> Rescheduled { get; } = [];
 
+    /// <summary><c>RetryCount</c> を増やさずに再送へ回したもの（Issue #853）。</summary>
+    public List<(string Token, DateTime NextAttemptAt, string? Error)> Postponed { get; } = [];
+
     public List<(string Token, string Error)> DeadLettered { get; } = [];
 
     public void Enqueue(PendingResponse response) => _pending.Enqueue(response);
@@ -34,6 +37,16 @@ public sealed class FakeOutbox : IResponseOutbox
         CancellationToken cancellationToken = default)
     {
         Rescheduled.Add((responseToken, nextAttemptAtUtc, error));
+        return Task.CompletedTask;
+    }
+
+    public Task PostponeAsync(
+        string responseToken,
+        DateTime nextAttemptAtUtc,
+        string? error,
+        CancellationToken cancellationToken = default)
+    {
+        Postponed.Add((responseToken, nextAttemptAtUtc, error));
         return Task.CompletedTask;
     }
 
@@ -110,6 +123,9 @@ public sealed class FakeAssetHistoryOutbox : IAssetHistoryOutbox
 
     public List<(Guid EventId, DateTime NextAttemptAt, string Error)> Rescheduled { get; } = [];
 
+    /// <summary><c>RetryCount</c> を増やさずに再送へ回したもの（Issue #853）。</summary>
+    public List<(Guid EventId, DateTime NextAttemptAt, string Error)> Postponed { get; } = [];
+
     public List<(Guid EventId, string Error)> DeadLettered { get; } = [];
 
     public void Enqueue(PendingAssetHistory history) => _pending.Enqueue(history);
@@ -165,6 +181,16 @@ public sealed class FakeAssetHistoryOutbox : IAssetHistoryOutbox
         CancellationToken cancellationToken = default)
     {
         Rescheduled.Add((eventId, nextAttemptAtUtc, error));
+        return Task.CompletedTask;
+    }
+
+    public Task PostponeAsync(
+        Guid eventId,
+        DateTime nextAttemptAtUtc,
+        string error,
+        CancellationToken cancellationToken = default)
+    {
+        Postponed.Add((eventId, nextAttemptAtUtc, error));
         return Task.CompletedTask;
     }
 

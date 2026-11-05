@@ -124,6 +124,12 @@ public class ResponseLimitTests
             string? error,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
 
+        public Task PostponeAsync(
+            string responseToken,
+            DateTime nextAttemptAtUtc,
+            string? error,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
         public Task DeadLetterAsync(
             string responseToken, string error, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;

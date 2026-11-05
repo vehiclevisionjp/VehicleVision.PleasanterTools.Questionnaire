@@ -186,6 +186,10 @@ public class AnswerDraftSettingTests
             string responseToken, DateTime nextAttemptAtUtc, string? error,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+        public Task PostponeAsync(
+            string responseToken, DateTime nextAttemptAtUtc, string? error,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task DeadLetterAsync(
             string responseToken, string error, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
