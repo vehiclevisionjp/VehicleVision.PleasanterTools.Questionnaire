@@ -292,6 +292,11 @@ export interface FormResponse {
   recordsAssetHistory?: boolean;
   /** テーマに指定が無い場合の運用側の配色固定。 */
   colorScheme?: ThemeColorScheme;
+  /**
+   * 回答画面用のルックアップ定義（Issue #871・#874）。**公開用の形だけが来る**（参照元の構造は来ない）。
+   * 無い・形が違えば使わない（`parsePublicLookups` を通す）。
+   */
+  lookups?: unknown;
 }
 
 /** 送信する回答 1 件。 */
