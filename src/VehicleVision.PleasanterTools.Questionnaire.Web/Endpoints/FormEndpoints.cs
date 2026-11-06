@@ -105,6 +105,12 @@ public sealed record FormResponse(
     /// （<c>_documents/ルックアップ項目の仕様書.md</c> 3.1 節）。ルックアップが無ければ <c>lookups</c> は省く。
     /// </para>
     /// <para>
+    /// <b>自動返信（<c>autoReply</c>：BCC・返信先・件名・本文・差出人名・再編集リンクの日数）と、
+    /// 資産の引換券の期限（<c>assetDelivery</c>）も <c>definition</c> から除く</b>（Issue #876）。
+    /// どちらもサーバだけが使う設定で、回答画面は参照しない。BCC の宛先は社内のアドレスで、
+    /// 認証の無い回答者へ渡す理由が無い。
+    /// </para>
+    /// <para>
     /// 回答画面へ <see cref="SurveyDefinition"/> を返す口は、必ずこれを通す。
     /// </para>
     /// </remarks>
@@ -122,7 +128,7 @@ public sealed record FormResponse(
         var lookups = LookupPublicDefinition.FromDefinition(definition);
         return new FormResponse(
             publicId,
-            definition with { Lookups = null },
+            definition with { Lookups = null, AutoReply = null, AssetDelivery = null },
             requiresProofOfWork,
             allowsDraft,
             isTest,

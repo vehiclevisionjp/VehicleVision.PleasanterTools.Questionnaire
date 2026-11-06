@@ -185,6 +185,16 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
             Title = LocalizedText.Japanese("検証用"),
             Pages = [new Page { PageId = "p1", Questions = [Q("a1"), Q("k1"), Q("t1")] }],
             Lookups = [lookup],
+            AutoReply = new AutoReplySettings
+            {
+                Enabled = true,
+                ToQuestionId = "k1",
+                Subject = LocalizedText.Japanese("SUBJECT-secret"),
+                Body = LocalizedText.Japanese("BODY-secret"),
+                ReplyToAddress = "reply-secret@example.com",
+                BccAddress = "bcc-secret@example.com",
+            },
+            AssetDelivery = new AssetDeliverySettings { Expiration = AssetTicketExpiration.CompletedOnly },
         };
         await drafts.SaveAsync(surveyId, definition, new MappingDefinition(), expectedRevision: 0);
         var draft = await drafts.LoadAsync(surveyId);
@@ -637,6 +647,9 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
         {
             "sourceSiteId", "credentialId", "cred-1", "sourceColumn", "sourceColumnKind",
             "allowedColumns", "maxResults", "allowPrefix", "ClassA", "ClassB",
+            // 自動返信と資産の引換券の設定（Issue #876）
+            "autoReply", "bccAddress", "replyToAddress", "assetDelivery",
+            "bcc-secret", "reply-secret", "SUBJECT-secret", "BODY-secret",
         })
         {
             Assert.DoesNotContain(leaked, text, StringComparison.Ordinal);
