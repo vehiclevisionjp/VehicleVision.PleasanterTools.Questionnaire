@@ -587,6 +587,9 @@
     border-radius: var(--radius-md);
     padding: var(--space-4) 1.25rem;
     margin: 0 0 var(--space-4);
+    /* **内容の最小幅で枠を押し広げない**（Issue #901）。fieldset の既定は min-content で、長い語が画面幅を超えさせる */
+    min-width: 0;
+    overflow-wrap: anywhere;
     &.has-error {
       border-color: var(--error);
     }
@@ -760,6 +763,8 @@
 
   .rank-item {
     display: flex;
+    /* **狭い幅では ↑↓ の釦を次の行へ回す**（Issue #901）。選択肢名の列が 1 文字幅まで潰れるのを防ぐ */
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
     border: 1px solid var(--border);
@@ -777,7 +782,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    flex: 1;
+    flex: 1 1 12rem;
+    min-width: 0;
     background: none;
     border: none;
     padding: var(--space-2);
@@ -788,7 +794,7 @@
 
   .rank-badge {
     flex: 0 0 auto;
-    min-width: 5rem;
+    min-width: 3.5rem;
     color: var(--muted);
     font-size: 0.85rem;
   }
