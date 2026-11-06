@@ -103,6 +103,8 @@ public sealed record FormResponse(
     /// <c>lookups</c> に載せ、<c>definition</c> からは生の <c>lookups</c> を除く。</b>
     /// 参照元のサイト ID・資格情報の参照・列名・許可列・件数の上限を回答者へ返さないため
     /// （<c>_documents/ルックアップ項目の仕様書.md</c> 3.1 節）。ルックアップが無ければ <c>lookups</c> は省く。
+    /// <b>サーバー全体のスイッチ（<see cref="LookupFeatureOptions"/>）が無効なら、既定の <paramref name="lookupsEnabled"/>
+    /// = <c>false</c> のまま <c>lookups</c> を載せない</b>（Issue #883）。
     /// </para>
     /// <para>
     /// <b>自動返信（<c>autoReply</c>：BCC・返信先・件名・本文・差出人名・再編集リンクの日数）と、
@@ -121,11 +123,15 @@ public sealed record FormResponse(
         bool allowsDraft = false,
         bool isTest = false,
         bool recordsAssetHistory = false,
-        ThemeColorScheme colorScheme = ThemeColorScheme.System)
+        ThemeColorScheme colorScheme = ThemeColorScheme.System,
+        bool lookupsEnabled = false)
     {
         ArgumentNullException.ThrowIfNull(definition);
 
-        var lookups = LookupPublicDefinition.FromDefinition(definition);
+        // **サーバー全体のスイッチが無効なら、公開用の定義も載せない**（ボタンが出ない。Issue #883）
+        var lookups = lookupsEnabled
+            ? LookupPublicDefinition.FromDefinition(definition)
+            : [];
         return new FormResponse(
             publicId,
             definition with { Lookups = null, AutoReply = null, AssetDelivery = null },
@@ -168,6 +174,7 @@ public static class FormEndpoints
             ResponseIntake intake,
             MaintenanceMode maintenance,
             IAppSettingsProvider appSettings,
+            LookupFeatureOptions lookupFeature,
             CancellationToken cancellationToken) =>
         {
             // **同じ URL でも枠内申告で応答が変わる。**
@@ -194,7 +201,8 @@ public static class FormEndpoints
                     form.AllowsDraft,
                     form.IsTest,
                     form.RecordsAssetHistory,
-                    colorScheme));
+                    colorScheme,
+                    lookupFeature.Enabled));
         });
 
         // **ヘッダ画像を配る**（Issue #56）。

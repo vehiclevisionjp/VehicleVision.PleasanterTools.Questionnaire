@@ -11,6 +11,7 @@ public static partial class ParameterFiles
         ("Service", "PathBase", "QUESTIONNAIRE_PATH_BASE"),
         ("Service", "AdminPath", "QUESTIONNAIRE_ADMIN_PATH"),
         ("Service", "ColorScheme", "QUESTIONNAIRE_COLOR_SCHEME"),
+        ("Service", "LookupEnabled", "QUESTIONNAIRE_LOOKUP_ENABLED"),
         ("Service", "MaintenanceMode", "QUESTIONNAIRE_MAINTENANCE_MODE"),
         ("Service", "MaintenanceMessageJa", "QUESTIONNAIRE_MAINTENANCE_MESSAGE_JA"),
         ("Service", "MaintenanceMessageEn", "QUESTIONNAIRE_MAINTENANCE_MESSAGE_EN"),

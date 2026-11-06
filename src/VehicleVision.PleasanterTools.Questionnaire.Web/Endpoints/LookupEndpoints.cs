@@ -31,6 +31,10 @@ public sealed record LookupErrorResponse(
 /// 例外は型名だけを記録する。
 /// </para>
 /// <para>
+/// 前提: サーバー全体のスイッチ（<see cref="LookupFeatureOptions"/>。既定は無効）。無効なら、どちらの経路も
+/// 最初に <c>404 LookupUnavailable</c> を返す（Issue #883）。
+/// </para>
+/// <para>
 /// 順序: 枠（IP・フォーム）→ 本文の上限と構文 → トークン → 回答者の枠 → 公開版の解決・受付状態 → 版の一致
 /// → 同時実行数 → 検索。**外部検索の前に、枠と構文の不備をすべて断る。**
 /// 認証の Cookie を使わないので CSRF の対象にならない（トークンは本文で渡す）。
@@ -72,9 +76,15 @@ public static class LookupEndpoints
             LookupSessionTokens sessions,
             ILookupRateGate rate,
             LookupPublicOptions options,
+            LookupFeatureOptions feature,
             CancellationToken cancellationToken) =>
         {
             context.Response.Headers.CacheControl = "no-store";
+            if (!feature.Enabled)
+            {
+                return Error(StatusCodes.Status404NotFound, Unavailable);
+            }
+
             if (publicId.Length > MaxRouteIdLength)
             {
                 return Error(StatusCodes.Status404NotFound, Unavailable);
@@ -102,11 +112,18 @@ public static class LookupEndpoints
             ILookupRateGate rate,
             LookupConcurrencyGate concurrency,
             LookupPublicOptions options,
+            LookupFeatureOptions feature,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
             var logger = loggerFactory.CreateLogger("Questionnaire.Lookup");
             context.Response.Headers.CacheControl = "no-store";
+            // **サーバー全体のスイッチが無効なら、枠・DB・参照元のどれにも触れずに「使えない」を返す**（Issue #883）
+            if (!feature.Enabled)
+            {
+                return Error(StatusCodes.Status404NotFound, Unavailable);
+            }
+
             if (publicId.Length > MaxRouteIdLength || lookupId.Length > MaxRouteIdLength)
             {
                 return Error(StatusCodes.Status404NotFound, Unavailable);

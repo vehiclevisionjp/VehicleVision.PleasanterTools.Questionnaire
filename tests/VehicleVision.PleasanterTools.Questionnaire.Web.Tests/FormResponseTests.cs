@@ -72,7 +72,7 @@ public sealed class FormResponseTests
     [Fact]
     public void 公開用のlookupsを最上位に載せ_definitionから生のlookupsを除く()
     {
-        var response = FormResponse.Create("pub", Definition(withLookup: true), requiresProofOfWork: false);
+        var response = FormResponse.Create("pub", Definition(withLookup: true), requiresProofOfWork: false, lookupsEnabled: true);
 
         var lookup = Assert.Single(response.Lookups!.Value);
         Assert.Equal("l1", lookup.LookupId);
@@ -91,6 +91,21 @@ public sealed class FormResponseTests
         using var json = JsonDocument.Parse(text);
         Assert.True(json.RootElement.TryGetProperty("lookups", out _));
         Assert.False(json.RootElement.GetProperty("definition").TryGetProperty("lookups", out _));
+    }
+
+    [Fact]
+    public void サーバー全体のスイッチが無効なら_ルックアップの定義があってもlookupsを載せない()
+    {
+        // 既定（引数を渡さない）も無効側
+        var response = FormResponse.Create("pub", Definition(withLookup: true), requiresProofOfWork: false);
+
+        Assert.Null(response.Lookups);
+        Assert.Null(response.Definition.Lookups);
+        var text = Serialize(response);
+        using var json = JsonDocument.Parse(text);
+        Assert.False(json.RootElement.TryGetProperty("lookups", out _));
+        Assert.False(json.RootElement.GetProperty("definition").TryGetProperty("lookups", out _));
+        Assert.DoesNotContain("sourceSiteId", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -137,7 +152,7 @@ public sealed class FormResponseTests
     {
         var source = Definition(withLookup: true, withServerSettings: true);
 
-        _ = FormResponse.Create("pub", source, requiresProofOfWork: false);
+        _ = FormResponse.Create("pub", source, requiresProofOfWork: false, lookupsEnabled: true);
 
         Assert.NotNull(source.AutoReply);
         Assert.NotNull(source.AssetDelivery);

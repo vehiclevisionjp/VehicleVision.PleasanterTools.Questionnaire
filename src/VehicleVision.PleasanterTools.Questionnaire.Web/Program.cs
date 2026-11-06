@@ -267,6 +267,9 @@ builder.Services.AddTransient<ILookupSearchService>(
 // 枠は既存の共有レート制限ストアを再利用し、**ストア障害時は拒否する**（プロセス内へ退避しない）。
 // 上限は既定値だけで、環境変数・設定ファイルからは読まない
 builder.Services.AddSingleton(new LookupPublicOptions());
+// **サーバー全体のスイッチ。既定は無効**（実機の総合判定がそろうまで有効にしない。Issue #883）。
+// 書き間違いは設定名つきで起動時に止める。無効でも管理側（定義の編集・保存・接続試験など）は使える
+builder.Services.AddSingleton(LookupFeatureOptions.FromConfiguration(builder.Configuration));
 builder.Services.AddSingleton<ILookupRateGate>(serviceProvider => new LookupRateGate(
     serviceProvider.GetService<ISharedRateLimitStore>(),
     serviceProvider.GetRequiredService<ILogger<LookupRateGate>>()));
