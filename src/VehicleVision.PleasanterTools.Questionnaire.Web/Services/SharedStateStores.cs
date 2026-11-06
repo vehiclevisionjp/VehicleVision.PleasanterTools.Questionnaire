@@ -43,6 +43,39 @@ public sealed record SharedStateOptions
     }
 }
 
+/// <summary>共有ストア（Redis・Valkey）への接続設定を作る（Issue #899）。</summary>
+public static class SharedStateConnection
+{
+    /// <summary>
+    /// 接続設定を作る。<b>停止中に長く待たせない</b>ための値をここで一か所に決める。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// StackExchange.Redis の既定は、接続・同期・非同期のどれも 5 秒で、切断中の命令は
+    /// 再接続を待つ列へ積まれて 5 秒後に失敗する。1 つの要求が共有ストアを何度か順に呼ぶため、
+    /// 停止中の拒否（503・<c>Retry-After: 5</c>）が約 17 秒後になっていた。
+    /// </para>
+    /// <para>
+    /// ① 3 つの待ち時間を <paramref name="timeoutMilliseconds"/> へ揃える。
+    /// ② <see cref="BacklogPolicy.FailFast"/> で、切断中の命令を列へ積まず**すぐ失敗**させる
+    /// （再接続は裏で続き、復旧すれば次の命令から通る）。
+    /// 接続文字列に書かれた同名の待ち時間は、この設定で上書きする。
+    /// </para>
+    /// </remarks>
+    public static ConfigurationOptions CreateOptions(string connectionString, int timeoutMilliseconds)
+    {
+        var options = ConfigurationOptions.Parse(connectionString);
+
+        // 一時的に到達できなくてもアプリ自体は起動する。
+        options.AbortOnConnectFail = false;
+        options.ConnectTimeout = timeoutMilliseconds;
+        options.SyncTimeout = timeoutMilliseconds;
+        options.AsyncTimeout = timeoutMilliseconds;
+        options.BacklogPolicy = BacklogPolicy.FailFast;
+        return options;
+    }
+}
+
 /// <summary>Redis 障害の警告を要求ごとに繰り返さないための抑止器。</summary>
 internal sealed class SharedStateWarning(ILogger logger, TimeProvider? timeProvider = null)
 {

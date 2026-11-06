@@ -123,11 +123,15 @@ if (sharedStateOptions.UseRedis || useRedisSessionStore)
     var redisConnectionString = StartupSettingValidation.RequireRedisConnectionString(
         builder.Configuration[SharedStateOptions.ConnectionStringKey],
         SharedStateOptions.ConnectionStringKey);
-    var redisConfiguration = ConfigurationOptions.Parse(redisConnectionString);
 
     // **一時的に到達できなくてもアプリ自体は起動する。**
     // 共有状態はプロセス内へ倒し、セッション照合はログアウト扱いにする。
-    redisConfiguration.AbortOnConnectFail = false;
+    // **待ち時間は短くする**（既定 1 秒・切断中はすぐ失敗。Issue #899）。
+    // 既定の 5 秒のままだと、ルックアップの拒否（503）が約 17 秒後になる
+    var redisConfiguration = SharedStateConnection.CreateOptions(
+        redisConnectionString,
+        StartupSettingValidation.ParseSharedStateTimeoutMilliseconds(
+            builder.Configuration[StartupSettingValidation.SharedStateTimeoutKey]));
     builder.Services.AddSingleton<IConnectionMultiplexer>(
         ConnectionMultiplexer.Connect(redisConfiguration));
 }
