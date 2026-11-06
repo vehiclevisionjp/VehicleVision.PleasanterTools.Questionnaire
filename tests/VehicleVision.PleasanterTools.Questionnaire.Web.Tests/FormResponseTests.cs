@@ -8,7 +8,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 /// <summary>回答画面へ返す応答の組み立て（Issue #874）。</summary>
 public sealed class FormResponseTests
 {
-    private static SurveyDefinition Definition(bool withLookup) => new()
+    private static SurveyDefinition Definition(bool withLookup, bool withServerSettings = false) => new()
     {
         SurveyId = "s1",
         Version = 1,
@@ -47,6 +47,23 @@ public sealed class FormResponseTests
                 },
             ]
             : null,
+        AutoReply = withServerSettings
+            ? new AutoReplySettings
+            {
+                Enabled = true,
+                ToQuestionId = "k1",
+                Subject = LocalizedText.Japanese("SUBJECT-secret"),
+                Body = LocalizedText.Japanese("BODY-secret"),
+                FromName = LocalizedText.Japanese("FROM-secret"),
+                ReplyToAddress = "reply-secret@example.com",
+                BccAddress = "bcc-secret@example.com",
+                EditLinkDays = 11,
+            }
+            : null,
+        AssetDelivery = withServerSettings
+            ? new AssetDeliverySettings { Expiration = AssetTicketExpiration.DaysAfterResponse, Days = 77 }
+            : null,
+        ConfirmationMessage = LocalizedText.Japanese("完了"),
     };
 
     private static string Serialize(FormResponse response) =>
@@ -85,5 +102,45 @@ public sealed class FormResponseTests
         using var json = JsonDocument.Parse(Serialize(response));
         Assert.False(json.RootElement.TryGetProperty("lookups", out _));
         Assert.True(json.RootElement.GetProperty("requiresProofOfWork").GetBoolean());
+    }
+
+    [Fact]
+    public void 自動返信と資産の引換券の設定を_definitionから除く()
+    {
+        var response = FormResponse.Create("pub", Definition(withLookup: false, withServerSettings: true), requiresProofOfWork: false);
+
+        Assert.Null(response.Definition.AutoReply);
+        Assert.Null(response.Definition.AssetDelivery);
+
+        var text = Serialize(response);
+        foreach (var leaked in new[]
+        {
+            "autoReply", "bccAddress", "replyToAddress", "toQuestionId", "editLinkDays", "fromName",
+            "assetDelivery", "expiration", "bcc-secret", "reply-secret", "SUBJECT-secret", "BODY-secret", "FROM-secret",
+        })
+        {
+            Assert.DoesNotContain(leaked, text, StringComparison.Ordinal);
+        }
+
+        // 回答画面が使う項目は残す
+        using var json = JsonDocument.Parse(text);
+        var definition = json.RootElement.GetProperty("definition");
+        Assert.Equal("題名", definition.GetProperty("title").GetProperty("ja").GetString());
+        Assert.Equal("完了", definition.GetProperty("confirmationMessage").GetProperty("ja").GetString());
+        Assert.Equal(2, definition.GetProperty("pages")[0].GetProperty("questions").GetArrayLength());
+        Assert.True(definition.TryGetProperty("allowEditingAfterSubmit", out _));
+        Assert.True(definition.TryGetProperty("showProgress", out _));
+    }
+
+    [Fact]
+    public void 公開版の定義そのものは変えない()
+    {
+        var source = Definition(withLookup: true, withServerSettings: true);
+
+        _ = FormResponse.Create("pub", source, requiresProofOfWork: false);
+
+        Assert.NotNull(source.AutoReply);
+        Assert.NotNull(source.AssetDelivery);
+        Assert.NotNull(source.Lookups);
     }
 }
