@@ -224,7 +224,12 @@
 {:else if question.type === 'Embed'}
   <EmbedBlock {question} {language} {fallbackLanguage} />
 {:else}
-  <fieldset class="field" class:has-error={error !== undefined}>
+  <!-- **群全体の誤りも読み上げへ届ける**（Issue #865）。個々の入力に aria-invalid を付けられない群（選択肢・グリッド）向け -->
+  <fieldset
+    class="field"
+    class:has-error={error !== undefined}
+    aria-describedby={error ? errorId : undefined}
+  >
     {#if question.type !== 'Confirm'}
       <legend id={labelId}>
         {text(question.title, language)}
@@ -355,7 +360,12 @@
         </small>
       {/if}
     {:else if question.type === 'Scale'}
-      <div class="scale" role="radiogroup" aria-labelledby={labelId}>
+      <div
+        class="scale"
+        role="radiogroup"
+        aria-labelledby={labelId}
+        aria-invalid={error !== undefined}
+      >
         {#if question.settings.scaleMinimumLabel}
           <span class="scale-label">{text(question.settings.scaleMinimumLabel, language)}</span>
         {/if}
@@ -376,7 +386,12 @@
         {/if}
       </div>
     {:else if question.type === 'Rating'}
-      <div class="rating" role="radiogroup" aria-labelledby={labelId}>
+      <div
+        class="rating"
+        role="radiogroup"
+        aria-labelledby={labelId}
+        aria-invalid={error !== undefined}
+      >
         {#each scaleValues as value (value)}
           <button
             type="button"
