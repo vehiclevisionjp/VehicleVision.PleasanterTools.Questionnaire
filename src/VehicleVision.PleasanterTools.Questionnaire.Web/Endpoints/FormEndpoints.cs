@@ -443,16 +443,25 @@ public static class FormEndpoints
         }).RequireRateLimiting(SubmitRateLimitPolicy);
 
         forms.MapGet("/{publicId}/responses/{responseToken}", async (
+            HttpContext context,
             string publicId,
             string responseToken,
-            ResponseIntake intake,
+            ResponseReader reader,
             CancellationToken cancellationToken) =>
         {
-            // **送信待ちを先に見る。** 未送信の回答は Pleasanter にまだ無い
-            var pending = await intake.FindPendingAsync(responseToken, cancellationToken);
-            return pending is null
-                ? Results.NotFound()
-                : Results.Ok(new { answers = pending.Answers });
+            // **回答本文を返す口。** 共有キャッシュ・ブラウザの履歴に残さない
+            context.Response.Headers.CacheControl = "private, no-store";
+
+            // **送信待ちを先に見て、無ければ Pleasanter から読む**（Issue #908。
+            // _documents/アーキテクチャ方針.md 10 章「読み出しも 2 段構え」）。
+            // 「無い」(404) と「今は読めない」(503) を区別する。どちらも本文は持たない
+            var result = await reader.ReadAsync(publicId, responseToken, cancellationToken);
+            return result.Status switch
+            {
+                ResponseReadStatus.Found => Results.Ok(new { answers = result.Answers }),
+                ResponseReadStatus.Unavailable => Results.StatusCode(StatusCodes.Status503ServiceUnavailable),
+                _ => Results.NotFound(),
+            };
         });
 
         // **添付は回答と同じ要求で受け取る**（`multipart/form-data`）。

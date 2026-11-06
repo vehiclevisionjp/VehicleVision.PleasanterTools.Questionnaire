@@ -285,6 +285,7 @@ builder.Services.AddSingleton(backlogGuardOptions);
 builder.Services.AddSingleton<ResponseBacklogGuard>();
 
 builder.Services.AddSingleton<ResponseIntake>();
+builder.Services.AddTransient<ResponseReader>();
 
 // **HTTP でやり取りする JSON も定義と同じ設定にする。**
 // 既定のままだと LocalizedText が言語コードのオブジェクトにならず、
