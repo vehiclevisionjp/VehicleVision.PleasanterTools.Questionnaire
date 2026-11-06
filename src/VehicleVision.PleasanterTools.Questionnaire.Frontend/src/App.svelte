@@ -549,6 +549,8 @@
         answers[answer.questionId] = {
           values: answer.values ?? [],
           otherText: answer.otherText ?? '',
+          // **グリッドの回答は rows にしか入っていない**（Issue #908）。落とすと再編集で空に戻る
+          ...(answer.rows ? { rows: answer.rows } : {}),
         };
       }
     }
