@@ -104,6 +104,17 @@
 }
 
 /*
+ * ベトナム語（Issue #905）。同梱の Zen Kaku Gothic New はベトナム語の字（U+1EA0〜U+1EF9）を持たず、
+ * 次の候補の Yu Gothic UI（Windows）には合成済みの字が無いため、声調記号が文字から離れて出る
+ * （「Tốc」が「Tô´c」になる）。ベトナム語のときだけ、その字を持つ書体を日本語の書体より前に入れる。
+ * 日本語・他の言語の並びは変えない
+ */
+:root:lang(vi),
+[data-theme]:lang(vi) {
+  --font-sans: "Zen Kaku Gothic New", "Segoe UI", "Helvetica Neue", Roboto, Arial, "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
+}
+
+/*
  * ダークは `data-theme="dark"` のときだけ。--accent は「面にも文字にも使う」ので、
  * 淡い鉄紺（文字用）を面にし、その上の文字は鉄紺にする（DesignReference の主要ボタンは鉄紺の面 + 白文字だが、
  * ダークの地の上では面の枠が見えにくいため、このアプリは面と文字を入れ替える。コントラストは tokens.test.ts で検査）。
