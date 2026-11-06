@@ -1242,6 +1242,15 @@ export const de: Partial<Record<MessageKey, string>> = {
   "lookupAdmin.credentialDeleted": "Aufgehoben.",
   "lookupAdmin.credentialDeleteConfirm":
     "Der dedizierte API-Schlüssel wird aufgehoben. Die Suche in veröffentlichten Umfragen funktioniert dann nicht mehr. Möchten Sie fortfahren?",
+  "lookupAdmin.unusedTitle": "Nicht verwendete Zugangsdaten",
+  "lookupAdmin.unusedHint": "Dedizierte API-Schlüssel, die registriert, aber von keiner Suchschaltfläche verwendet werden (Schlüssel, die ein gespeicherter Entwurf oder eine veröffentlichte Version referenziert, werden nicht aufgeführt). Wiederverwenden oder bei Nichtbedarf entfernen. Werte können nicht angezeigt werden.",
+  "lookupAdmin.unusedItem": "ID {id} ({state})",
+  "lookupAdmin.unusedDelete": "Entfernen",
+  "lookupAdmin.unusedDeleteConfirm": "Diesen nicht verwendeten dedizierten API-Schlüssel entfernen? Das kann nicht rückgängig gemacht werden. Fortfahren?",
+  "lookupAdmin.credentialReuse": "Nicht verwendete Zugangsdaten wiederverwenden",
+  "lookupAdmin.credentialReusePick": "Bitte auswählen",
+  "lookupAdmin.credentialReuseButton": "Diese Zugangsdaten verwenden",
+  "lookupAdmin.credentialReused": "Wiederverwendet. Speichern Sie den Entwurf, um es zu übernehmen.",
   "lookupAdmin.inspectNeedsKeyAndSite":
     "Der API-Schlüssel muss registriert und die ID der Quell-Site eingegeben sein.",
   "lookupAdmin.test": "Verbindung testen",

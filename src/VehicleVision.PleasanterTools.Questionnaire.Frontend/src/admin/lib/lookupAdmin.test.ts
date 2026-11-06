@@ -14,8 +14,9 @@ import {
   problemMessageKey,
   targetQuestionOptions,
   toPreviewDefinition,
+  unusedCredentials,
 } from './lookupAdmin';
-import type { LookupDefinition, LookupInspectColumn, Question, SurveyDefinition } from './types';
+import type { LookupCredentialStatus, LookupDefinition, LookupInspectColumn, Question, SurveyDefinition } from './types';
 
 function q(questionId: string, type: Question['type']): Question {
   return { questionId, type, title: { ja: questionId }, isRequired: false, choices: [], settings: {} };
@@ -148,5 +149,30 @@ describe('管理プレビューの公開 DTO（回答画面のものとは別に
     expect(previewDefinitions(survey([{ ...lookup, keys: [] }]))).toHaveLength(0);
     expect(previewDefinitions(survey([{ ...lookup, targets: [{ sourceColumn: 'B', questionId: 'gone' }] }]))).toHaveLength(0);
     expect(previewDefinitions(survey())).toEqual([]);
+  });
+});
+
+describe('未使用の資格情報（#892）', () => {
+  const cred = (credentialId: string, isReferenced: boolean): LookupCredentialStatus => ({
+    credentialId,
+    sourceKind: 'Pleasanter',
+    isEnabled: true,
+    updatedAt: '2026-11-06T00:00:00Z',
+    isReferenced,
+  });
+
+  it('保存済みの定義が参照していないものだけが未使用になる', () => {
+    const list = [cred('a', true), cred('b', false)];
+    expect(unusedCredentials(list, []).map((item) => item.credentialId)).toEqual(['b']);
+  });
+
+  it('編集中の定義が参照しているものは、未保存でも使用中として除く', () => {
+    const list = [cred('b', false), cred('c', false)];
+    const editing = [{ ...newLookup('a'), credentialId: 'b' }];
+    expect(unusedCredentials(list, editing).map((item) => item.credentialId)).toEqual(['c']);
+  });
+
+  it('参照を外した（保存前の）ものは、サーバーが参照中と言う間は未使用にしない', () => {
+    expect(unusedCredentials([cred('a', true)], [])).toEqual([]);
   });
 });
