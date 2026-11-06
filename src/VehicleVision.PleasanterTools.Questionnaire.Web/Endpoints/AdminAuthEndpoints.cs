@@ -49,13 +49,17 @@ public static class AdminAuthEndpoints
             AdminAuthOptions options,
             BotMitigationOptionsProvider botOptionsProvider,
             IMailSettingsProvider mailSettings,
+            ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
             var setupRequired = await store.CountAsync(cancellationToken).ConfigureAwait(false) == 0;
             var saml = (await samlProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
             var pleasanterSso = (await pleasanterSsoProvider.GetAsync(cancellationToken).ConfigureAwait(false))
                 .Options;
-            var mail = await mailSettings.GetAsync(cancellationToken).ConfigureAwait(false);
+            var mailReady = await MailReadiness.IsReadyAsync(
+                mailSettings,
+                loggerFactory.CreateLogger("VehicleVision.PleasanterTools.Questionnaire.Web.AdminSession"),
+                cancellationToken).ConfigureAwait(false);
             var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
 
             // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。
@@ -148,7 +152,7 @@ public static class AdminAuthEndpoints
                     // 自動返信を設定しただけで「送っているつもり」にさせない。
                     // ⚠️ **接続先も資格情報も返さない**（送れるか否かだけ）。
                     // **認証済みの相手にだけ返す**（構成の情報を未認証へ出さない）
-                    mailEnabled = mail.IsReady,
+                    mailEnabled = mailReady,
                     responseNotificationEnabled,
 
                     // **試し送信の宛先は自分のログイン ID に固定する**（Issue #319）。
