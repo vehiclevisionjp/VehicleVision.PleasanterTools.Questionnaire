@@ -60,6 +60,7 @@
   import { assetMarkup as markupForAsset } from '../lib/asset';
   import { requiredPortCount } from '../lib/columnBudget';
   import { confirmAction } from '../lib/confirmation.svelte';
+  import { shouldGoBackOnEscape } from '../lib/escapeKey';
   import {
     movePageTo,
     moveQuestionTo,
@@ -783,7 +784,8 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape' && !previewing && !flowcharting) {
+    // **入力中・変換中・別の処理が受け持った Esc では戻らない**（Issue #903）
+    if (shouldGoBackOnEscape(event) && !previewing && !flowcharting) {
       back();
     }
   }
