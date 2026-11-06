@@ -119,7 +119,7 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
     }
 
     /// <summary>上限を差し替えて起動し直す。</summary>
-    private async Task StartAsync(LookupPublicOptions publicOptions)
+    private async Task StartAsync(LookupPublicOptions publicOptions, bool lookupEnabled = true)
     {
         options = publicOptions;
         if (factory is not null)
@@ -127,7 +127,7 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
             await factory.DisposeAsync();
         }
 
-        factory = new ApiFactory(directory, search, logs, options);
+        factory = new ApiFactory(directory, search, logs, options, lookupEnabled);
         QuestionnaireDatabase.Instance.Migrator.MigrateUp(DatabaseProvider.Sqlite, factory.ConnectionString);
         using var client = factory.CreateClient();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -656,6 +656,43 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task サーバー全体のスイッチが無効なら_トークン発行も検索も使えず_参照元を呼ばない()
+    {
+        await StartAsync(new LookupPublicOptions(), lookupEnabled: false);
+        using var client = Client();
+
+        using var session = await client.PostAsync($"/api/forms/{publicId}/lookups/session", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, session.StatusCode);
+        Assert.Equal("no-store", session.Headers.CacheControl?.ToString());
+        Assert.Equal("LookupUnavailable", await CodeOf(session));
+
+        // 有効だった間に発行した形のトークンでも、検索は使えない
+        using var search404 = await SearchAsync(client, publicId, "l1", Body("dummy-token"));
+        Assert.Equal(HttpStatusCode.NotFound, search404.StatusCode);
+        Assert.Equal("LookupUnavailable", await CodeOf(search404));
+        Assert.Empty(search.Calls);
+    }
+
+    [Fact]
+    public async Task サーバー全体のスイッチが無効なら_回答画面の取得応答にlookupsを載せない()
+    {
+        await StartAsync(new LookupPublicOptions(), lookupEnabled: false);
+        using var client = Client();
+
+        using var response = await client.GetAsync($"/api/forms/{publicId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var text = await response.Content.ReadAsStringAsync();
+        var json = JsonDocument.Parse(text).RootElement;
+        Assert.False(json.TryGetProperty("lookups", out _));
+        Assert.False(json.GetProperty("definition").TryGetProperty("lookups", out _));
+        // フォーム自体は通常どおり返る
+        Assert.Equal(3, json.GetProperty("definition").GetProperty("pages")[0].GetProperty("questions").GetArrayLength());
+        Assert.DoesNotContain("sourceSiteId", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("cred-1", text, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var current = new DirectoryInfo(AppContext.BaseDirectory); current is not null; current = current.Parent)
@@ -680,7 +717,8 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
             string directory,
             FakeSearch search,
             CapturingLoggerProvider logs,
-            LookupPublicOptions publicOptions)
+            LookupPublicOptions publicOptions,
+            bool lookupEnabled)
         {
             this.directory = directory;
             this.search = search;
@@ -706,6 +744,7 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
                     ["QUESTIONNAIRE_ADMIN_SESSION_STORE"] = "Database",
                     ["QUESTIONNAIRE_SAML_ENABLED"] = "false",
                     ["QUESTIONNAIRE_PLEASANTERSSO_ENABLED"] = "false",
+                    ["QUESTIONNAIRE_LOOKUP_ENABLED"] = lookupEnabled ? "true" : "false",
                     ["QUESTIONNAIRE_REQUESTS_PER_MIN"] = "100000",
                     ["QUESTIONNAIRE_FORM_REQUESTS_PER_MIN"] = "100000",
                     ["QUESTIONNAIRE_ASSET_PATH"] = Path.Combine(directory, "assets"),
