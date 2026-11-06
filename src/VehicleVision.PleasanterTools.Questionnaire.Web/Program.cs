@@ -995,6 +995,11 @@ if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
 // 埋め込み先だけは 30 秒 TTL の設定スナップショットから要求ごとに差し替える。
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
+// **管理 API の状態を変える要求を、同一オリジンの画面からのものに限る**（Issue #907）。
+// `SameSite=Strict` は同一サイト（登録可能なドメインが同じ別オリジン）を止められない。
+// PathBase を剥がし、経路を照合した後・認証の前に置く（例外の経路は剥がした後の Path で見る）
+app.UseMiddleware<AdminCsrfMiddleware>();
+
 app.UseRateLimiter();
 
 app.UseAuthentication();
