@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { tick } from 'svelte';
+  import { focusFirstError } from './lib/focusError';
   import { appRoute, appUrl } from './lib/basePath';
   import QuestionField from './components/QuestionField.svelte';
   import NoteContent from './components/NoteContent.svelte';
@@ -562,8 +564,17 @@
     return Object.keys(errors).length === 0;
   }
 
+  /** 描き直しを待ってから、最初の誤りへフォーカスを移す。 */
+  async function focusErrors() {
+    await tick();
+    focusFirstError();
+  }
+
   function goNext() {
-    if (!checkCurrentStep()) {return;}
+    if (!checkCurrentStep()) {
+      void focusErrors();
+      return;
+    }
     stepIndex = Math.min(stepIndex + 1, Math.max(steps.length - 1, 0));
     errors = {};
     window.scrollTo({ top: 0 });
@@ -644,7 +655,10 @@
   }
 
   async function submit() {
-    if (!checkCurrentStep()) {return;}
+    if (!checkCurrentStep()) {
+      void focusErrors();
+      return;
+    }
 
     submitting = true;
     submitError = '';
@@ -721,6 +735,7 @@
           mapped[questionId] = codes.map(serverValidationMessage).join(' / ');
         }
         errors = mapped;
+        void focusErrors();
       }
     } catch {
       submitError = t('submit.failed');
