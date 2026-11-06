@@ -80,6 +80,10 @@ public sealed record TicketResponse(
 /// 回答の下書きを端末へ残してよいか（Issue #59）。
 /// **下書きはサーバへ送らない**ので、伝えるのは可否だけ。
 /// </param>
+/// <param name="Lookups">
+/// 回答画面用のルックアップ定義（Issue #874）。<b>公開用の形だけ</b>（<see cref="LookupPublicDefinition"/>）。
+/// <c>Definition</c> の <c>lookups</c> には参照元の構造が入るので、回答者へは返さない。無ければ省く。
+/// </param>
 public sealed record FormResponse(
     string PublicId,
     SurveyDefinition Definition,
@@ -87,7 +91,46 @@ public sealed record FormResponse(
     bool AllowsDraft = false,
     bool IsTest = false,
     bool RecordsAssetHistory = false,
-    ThemeColorScheme ColorScheme = ThemeColorScheme.System);
+    ThemeColorScheme ColorScheme = ThemeColorScheme.System,
+    ImmutableArray<LookupPublicDefinition>? Lookups = null)
+{
+    /// <summary>
+    /// 公開版の定義から、回答画面へ返す応答を作る（Issue #874）。<b><see cref="FormResponse"/> はここで作る。</b>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>ルックアップの定義は公開用の形（<see cref="LookupPublicDefinition"/>）へ写して最上位の
+    /// <c>lookups</c> に載せ、<c>definition</c> からは生の <c>lookups</c> を除く。</b>
+    /// 参照元のサイト ID・資格情報の参照・列名・許可列・件数の上限を回答者へ返さないため
+    /// （<c>_documents/ルックアップ項目の仕様書.md</c> 3.1 節）。ルックアップが無ければ <c>lookups</c> は省く。
+    /// </para>
+    /// <para>
+    /// 回答画面へ <see cref="SurveyDefinition"/> を返す口は、必ずこれを通す。
+    /// </para>
+    /// </remarks>
+    public static FormResponse Create(
+        string publicId,
+        SurveyDefinition definition,
+        bool requiresProofOfWork,
+        bool allowsDraft = false,
+        bool isTest = false,
+        bool recordsAssetHistory = false,
+        ThemeColorScheme colorScheme = ThemeColorScheme.System)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+
+        var lookups = LookupPublicDefinition.FromDefinition(definition);
+        return new FormResponse(
+            publicId,
+            definition with { Lookups = null },
+            requiresProofOfWork,
+            allowsDraft,
+            isTest,
+            recordsAssetHistory,
+            colorScheme,
+            lookups.IsEmpty ? null : lookups);
+    }
+}
 
 /// <summary>回答画面向けの口。**認証は無い。**</summary>
 public static class FormEndpoints
@@ -138,7 +181,7 @@ public static class FormEndpoints
             var settings = await appSettings.GetAsync(cancellationToken).ConfigureAwait(false);
             var colorScheme = form.Definition.Theme?.ColorScheme
                 ?? ColorSchemeOptions.FromSnapshot(settings).ColorScheme;
-            return Results.Ok(new FormResponse(
+            return Results.Ok(FormResponse.Create(
                     publicId,
                     form.Definition,
                     form.RequiresProofOfWork,
@@ -378,11 +421,11 @@ public static class FormEndpoints
                         grant.ExpiresAtUtc, DateTimeKind.Utc)),
                     context.Request.PathBase));
 
-            return Results.Ok(new FormResponse(
+            return Results.Ok(FormResponse.Create(
                 publicId,
                 form.Definition,
-                RequiresProofOfWork: false,
-                RecordsAssetHistory: form.RecordsAssetHistory));
+                requiresProofOfWork: false,
+                recordsAssetHistory: form.RecordsAssetHistory));
         }).RequireRateLimiting(SubmitRateLimitPolicy);
 
         forms.MapGet("/{publicId}/responses/{responseToken}", async (
