@@ -39,6 +39,7 @@ public sealed class LookupFailureNotifierTests
     [InlineData(LookupSearchFailure.Redirected, AdminNotificationKind.LookupSourceRejected)]
     [InlineData(LookupSearchFailure.InvalidDefinition, AdminNotificationKind.LookupSourceRejected)]
     [InlineData(LookupSearchFailure.InsecureTransport, AdminNotificationKind.LookupSourceRejected)]
+    [InlineData(LookupSearchFailure.CertificateInvalid, AdminNotificationKind.LookupSourceRejected)]
     [InlineData(LookupSearchFailure.InvalidResponse, AdminNotificationKind.LookupSourceBadResponse)]
     [InlineData(LookupSearchFailure.ResponseTooLarge, AdminNotificationKind.LookupSourceBadResponse)]
     [InlineData(LookupSearchFailure.Inconsistent, AdminNotificationKind.LookupSourceBadResponse)]

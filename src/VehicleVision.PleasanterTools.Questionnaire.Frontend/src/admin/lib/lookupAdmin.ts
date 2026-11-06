@@ -236,6 +236,7 @@ export function inspectFailureKey(failure: string | null | undefined): MessageKe
     case 'CredentialUndecryptable':
       return 'lookupAdmin.failure.credential';
     case 'InsecureTransport':
+    case 'CertificateInvalid':
     case 'InvalidDefinition':
       return 'lookupAdmin.failure.config';
     case 'ConnectionFailed':

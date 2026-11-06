@@ -251,7 +251,9 @@ builder.Services.AddTransient(serviceProvider => new PleasanterGateway(
 // **リダイレクトを追わない**（専用の API キーを別のホストへ送らない）。時間切れはクライアント側で 5 秒に絞る。
 // 平文の HTTP（ループバックだけ）は開発用の `Lookup:AllowLoopbackHttp` を明示したときだけ
 builder.Services.AddHttpClient("pleasanter-lookup", client => client.Timeout = Timeout.InfiniteTimeSpan)
-    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+    // 標準のログ（要求の URL・例外の文言を出す）は外す。接続先・証明書の詳細をログへ出さない（Issue #898）
+    .RemoveAllLoggers()
+    .ConfigurePrimaryHttpMessageHandler(LookupCertificateValidation.CreateHandler);
 builder.Services.AddSingleton(new LookupSearchOptions
 {
     AllowLoopbackHttp = builder.Configuration.GetValue<bool>("Lookup:AllowLoopbackHttp"),
