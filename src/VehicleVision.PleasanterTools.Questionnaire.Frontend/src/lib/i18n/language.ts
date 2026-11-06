@@ -157,6 +157,9 @@ export function formatElapsed(from: Date, language: Language, now: Date = new Da
  * 差し込みのある文言を組み立てる。
  *
  * `{name}` の形で書いた所を置き換える。**数値は言語に合わせて整形する。**
+ *
+ * `{name|単数形|複数形}` は、数値の引数 `name` が 1 のとき単数形、それ以外は複数形を選ぶ
+ * （英語・ドイツ語・スペイン語の「1 files」を避ける。Issue #906）。日本語など活用の無い言語では使わない。
  */
 export function interpolate(
   template: string,
@@ -165,7 +168,16 @@ export function interpolate(
 ): string {
   if (!parameters) {return template;}
 
-  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+  const selected = template.replace(
+    /\{(\w+)\|([^|}]*)\|([^}]*)\}/g,
+    (match, name: string, singular: string, plural: string) => {
+      const value = parameters[name];
+      if (typeof value !== 'number') {return match;}
+      return value === 1 ? singular : plural;
+    },
+  );
+
+  return selected.replace(/\{(\w+)\}/g, (match, name: string) => {
     const value = parameters[name];
     if (value === undefined) {return match;}
     return typeof value === 'number' ? formatNumber(value, language) : value;
