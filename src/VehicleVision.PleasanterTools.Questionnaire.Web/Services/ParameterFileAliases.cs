@@ -83,6 +83,7 @@ public static partial class ParameterFiles
         ("Session", "RedisPrefix", "QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX"),
         ("Session", "SharedStateStore", "QUESTIONNAIRE_SHARED_STATE_STORE"),
         ("Session", "SharedStateRedisPrefix", "QUESTIONNAIRE_SHARED_STATE_REDIS_PREFIX"),
+        ("Session", "SharedStateTimeoutMs", "QUESTIONNAIRE_SHARED_STATE_TIMEOUT_MS"),
         ("BinaryStorage", "Store", "QUESTIONNAIRE_ASSET_STORE"),
         ("BinaryStorage", "Path", "QUESTIONNAIRE_ASSET_PATH"),
         ("BinaryStorage", "AzureContainerUri", "QUESTIONNAIRE_ASSET_AZURE_CONTAINERURI"),
