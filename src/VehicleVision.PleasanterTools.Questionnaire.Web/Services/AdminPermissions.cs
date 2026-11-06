@@ -36,6 +36,10 @@ public static class AdminPermissions
     /// </remarks>
     public const string SurveysDelete = "surveys.delete";
 
+    /// <summary>ルックアップの設定・専用 API キー・接続試験（仕様書 U7。Issue #879）。</summary>
+    /// <remarks>**アンケート管理者だけ。** 編集者は設定を見られるが、変えられない。</remarks>
+    public const string LookupsManage = "lookups.manage";
+
     /// <summary>テンプレートの利用。</summary>
     public const string TemplatesRead = "templates.read";
 
@@ -93,6 +97,7 @@ public static class AdminPermissions
         SurveysWrite,
         SurveysPublish,
         SurveysDelete,
+        LookupsManage,
         TemplatesRead,
         TemplatesWrite,
         OutboxRead,
@@ -125,6 +130,7 @@ public static class AdminPermissions
                 SurveysRead,
                 SurveysWrite,
                 SurveysPublish,
+                LookupsManage,
                 TemplatesRead,
                 TemplatesWrite,
                 OutboxRead,

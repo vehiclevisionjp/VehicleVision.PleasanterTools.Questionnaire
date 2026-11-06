@@ -132,6 +132,15 @@ public static class ServerMessageKeys
     /// <summary>自動返信の設定が送れる形になっていなくて公開できない（Issue #189）。</summary>
     public const string PublishBlockedByAutoReply = "surveys.publishBlockedByAutoReply";
 
+    /// <summary>ルックアップの設定に不備があって公開できない（Issue #879）。</summary>
+    public const string PublishBlockedByLookup = "surveys.publishBlockedByLookup";
+
+    /// <summary>ルックアップの専用 API キーが空・長すぎる・制御文字を含む（Issue #879）。</summary>
+    public const string LookupCredentialInvalid = "lookups.credentialInvalid";
+
+    /// <summary>ルックアップの設定を変える権限が無い（Issue #879）。</summary>
+    public const string LookupSettingsForbidden = "lookups.settingsForbidden";
+
     public const string NotPublishedYet = "surveys.notPublishedYet";
 
     /// <summary>その版は既にある。**同時に 2 人が公開を押した場合など。**</summary>

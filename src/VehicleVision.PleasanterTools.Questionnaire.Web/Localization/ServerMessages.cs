@@ -849,6 +849,24 @@ public static class ServerMessages
             "Không thể công bố. Cài đặt trả lời tự động không thể gửi email.");
 
         Add(
+            ServerMessageKeys.PublishBlockedByLookup,
+            "公開できません。ルックアップの設定に不備があります。",
+            "Cannot publish. The lookup settings have problems.",
+            "Không thể công bố. Cài đặt tra cứu có vấn đề.");
+
+        Add(
+            ServerMessageKeys.LookupCredentialInvalid,
+            "API キーを入力してください（空・512 文字超・制御文字は使えません）。",
+            "Enter an API key (empty values, more than 512 characters and control characters are not allowed).",
+            "Hãy nhập khóa API (không được để trống, quá 512 ký tự hoặc chứa ký tự điều khiển).");
+
+        Add(
+            ServerMessageKeys.LookupSettingsForbidden,
+            "ルックアップの設定を変更できるのは、アンケート管理者だけです。",
+            "Only a survey administrator can change the lookup settings.",
+            "Chỉ quản trị viên khảo sát mới có thể thay đổi cài đặt tra cứu.");
+
+        Add(
             ServerMessageKeys.NoAnswerableQuestion,
             "回答できる設問がありません。",
             "There is no question that can be answered.",
