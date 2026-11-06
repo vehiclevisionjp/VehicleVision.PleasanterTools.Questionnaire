@@ -101,8 +101,8 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 // ---- 設定 ------------------------------------------------------------------
 // **資格情報の実値はコミットしない。** .local.json・環境変数・Key Vault から読む
 // （App_Data/Parameters/README.md）
-var provider = Enum.Parse<DatabaseProvider>(
-    builder.Configuration["QUESTIONNAIRE_DB_PROVIDER"] ?? nameof(DatabaseProvider.SqlServer));
+var provider = StartupSettingValidation.ParseDatabaseProvider(
+    builder.Configuration[StartupSettingValidation.DatabaseProviderKey]);
 var usesSqlite = provider is DatabaseProvider.Sqlite;
 var databaseStartupState = new DatabaseStartupState();
 builder.Services.AddSingleton(databaseStartupState);
@@ -120,10 +120,9 @@ var useRedisSessionStore =
 // 別々に持つと、片方だけ接続先や資格情報を更新する事故が起きる。
 if (sharedStateOptions.UseRedis || useRedisSessionStore)
 {
-    var redisConnectionString =
-        builder.Configuration[SharedStateOptions.ConnectionStringKey]
-        ?? throw new InvalidOperationException(
-            $"{SharedStateOptions.ConnectionStringKey} is required when Redis is used.");
+    var redisConnectionString = StartupSettingValidation.RequireRedisConnectionString(
+        builder.Configuration[SharedStateOptions.ConnectionStringKey],
+        SharedStateOptions.ConnectionStringKey);
     var redisConfiguration = ConfigurationOptions.Parse(redisConnectionString);
 
     // **一時的に到達できなくてもアプリ自体は起動する。**
@@ -378,9 +377,8 @@ builder.Services.AddSingleton<CaptchaVerifier>();
 // ---- 管理者の認証 ----------------------------------------------------------
 // **共有鍵を復号するための鍵。** 失うと登録済みの 2 要素が全て使えなくなるので、
 // **App Service の設定か Key Vault に置き、控えを取っておくこと**
-var secretKey = builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
-    ?? throw new InvalidOperationException(
-        "QUESTIONNAIRE_SECRET_KEY が設定されていない（Base64 の 32 バイト）");
+var secretKey = StartupSettingValidation.RequireSecretKey(
+    builder.Configuration[StartupSettingValidation.SecretKeyKey]);
 
 // **管理者・復旧コード・セッションは Core.Data の共有ストア**（Core_AdminUsers ほか）。
 // TOTP の共有鍵の暗号化は、本アプリの SecretProtector を ISecretCipher に合わせたアダプタで渡す
