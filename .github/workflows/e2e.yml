@@ -518,12 +518,19 @@ jobs:
   notify-failure:
     name: notify-failure
     needs:
+      - e2e-database
       - e2e
       - screenshots
+    # ⚠️ **同時実行で取り消された実行は、失敗として通知しない**（Issue #921）。
+    # develop へ push が続くと、`cancel-in-progress` で前の実行が取り消される。
+    # 集約の `e2e` は、`e2e-database` が `cancelled` でも失敗にするので（PR のチェックは
+    # 従来どおり失敗のまま）、そのまま通知すると、実際には失敗していないのに Issue が立つ
+    # （2026-11-06 の #919）。`screenshots` の失敗は、取り消しの影響を受けないのでそのまま通知する。
     if: >-
       always()
       && (github.event_name == 'push' || github.event_name == 'schedule')
-      && contains(needs.*.result, 'failure')
+      && (needs.screenshots.result == 'failure'
+          || (needs.e2e.result == 'failure' && needs.e2e-database.result != 'cancelled'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
