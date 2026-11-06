@@ -276,4 +276,134 @@ public sealed class LookupPublicApiUnitTests
         Assert.Equal("multiple", multiple.Outcome);
         Assert.Equal(["1", "2"], multiple.Candidates.Select(candidate => candidate.CandidateKey).ToArray());
     }
+
+    /// <summary>数値列（NumA）の値 1 つを、指定の型の設問 1 つへ反映した結果（Issue #891）。</summary>
+    private static (string? Value, bool Warned) ReflectNumber(QuestionType type, string? raw, string column = "NumA")
+    {
+        var lookup = new LookupDefinition
+        {
+            LookupId = "l1",
+            AnchorQuestionId = "a",
+            SourceSiteId = 5,
+            CredentialId = "c",
+            Keys = [new LookupKey { QuestionId = "k", SourceColumn = "ClassA" }],
+            Targets = [new LookupTarget { QuestionId = "t", SourceColumn = column }],
+            AllowedColumns = [column],
+        };
+        var question = new Question
+        {
+            QuestionId = "t",
+            Type = type,
+            Title = LocalizedText.Japanese("t"),
+            Settings = type is QuestionType.Scale or QuestionType.Rating
+                ? new QuestionSettings { ScaleMinimum = 0, ScaleMaximum = 10 }
+                : new QuestionSettings(),
+        };
+        var survey = new SurveyDefinition
+        {
+            SurveyId = Guid.NewGuid().ToString(),
+            Version = 1,
+            Title = LocalizedText.Japanese("s"),
+            Pages = [new Page { PageId = "p", Questions = [question] }],
+            Lookups = [lookup],
+        };
+        var result = new LookupSearchResult
+        {
+            Status = LookupSearchStatus.Success,
+            Candidates = [new LookupCandidateRow(new Dictionary<string, string?> { [column] = raw })],
+        };
+
+        var response = LookupResponseBuilder.Build(1, survey, lookup, result);
+        var candidate = Assert.Single(response.Candidates);
+        return (candidate.Values.GetValueOrDefault("t"), response.Warnings.Count > 0);
+    }
+
+    [Theory]
+    [InlineData("5.0000", "5")]
+    [InlineData("5", "5")]
+    [InlineData("0.0000", "0")]
+    [InlineData("10.00", "10")]
+    [InlineData("+5.0", "5")]
+    public void 数値列の整数値は_尺度と評価へ整数の表現で反映する(string raw, string expected)
+    {
+        foreach (var type in new[] { QuestionType.Scale, QuestionType.Rating })
+        {
+            var (value, warned) = ReflectNumber(type, raw);
+            Assert.Equal(expected, value);
+            Assert.False(warned);
+        }
+    }
+
+    [Theory]
+    [InlineData("5.5")]
+    [InlineData("5.0001")]
+    [InlineData("-1")]
+    [InlineData("-1.0000")]
+    [InlineData("11")]
+    [InlineData("10.0001")]
+    [InlineData("abc")]
+    [InlineData("5kg")]
+    [InlineData("1.00000000000000000000000000001")]
+    public void 数値列の整数でない値と範囲外と数値でない値は_尺度と評価で警告にする(string raw)
+    {
+        foreach (var type in new[] { QuestionType.Scale, QuestionType.Rating })
+        {
+            var (value, warned) = ReflectNumber(type, raw);
+            Assert.Null(value);
+            Assert.True(warned);
+        }
+    }
+
+    [Theory]
+    [InlineData("1.0000", "1")]
+    [InlineData("1.2500", "1.25")]
+    [InlineData("-0.5000", "-0.5")]
+    [InlineData("0.0000", "0")]
+    [InlineData("100.00", "100")]
+    [InlineData("100", "100")]
+    public void 数値列の値は_テキストと段落へ等しいまま末尾の0だけ落として反映する(string raw, string expected)
+    {
+        foreach (var type in new[] { QuestionType.Text, QuestionType.Paragraph })
+        {
+            var (value, warned) = ReflectNumber(type, raw);
+            Assert.Equal(expected, value);
+            Assert.False(warned);
+        }
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("1.0 kg")]
+    public void 数値列が数値として解釈できなければ_テキストでも警告にする(string raw)
+    {
+        var (value, warned) = ReflectNumber(QuestionType.Text, raw);
+        Assert.Null(value);
+        Assert.True(warned);
+    }
+
+    [Theory]
+    [InlineData(QuestionType.Scale)]
+    [InlineData(QuestionType.Rating)]
+    [InlineData(QuestionType.Text)]
+    [InlineData(QuestionType.Paragraph)]
+    public void 数値列の空は_どの型でも反映も警告もしない(QuestionType type)
+    {
+        foreach (var raw in new[] { null, string.Empty, "  " })
+        {
+            var (value, warned) = ReflectNumber(type, raw);
+            Assert.Null(value);
+            Assert.False(warned);
+        }
+    }
+
+    [Theory]
+    [InlineData("00123")]
+    [InlineData("1.0000")]
+    [InlineData("007.50")]
+    public void 文字列の列の値は整えずそのまま反映する(string raw)
+    {
+        var (value, warned) = ReflectNumber(QuestionType.Text, raw, column: "ClassB");
+        Assert.Equal(raw, value);
+        Assert.False(warned);
+    }
 }
