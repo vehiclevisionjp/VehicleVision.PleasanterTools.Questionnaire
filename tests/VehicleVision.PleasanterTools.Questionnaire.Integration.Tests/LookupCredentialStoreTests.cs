@@ -230,4 +230,30 @@ public class LookupCredentialStoreTests
             LookupSecretStatus.Undecryptable,
             (await otherKey.ResolveSecretAsync(surveyId, id)).Status);
     }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 一覧は自分のアンケートの状態だけを返し_秘密を含まない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (store, _) = Create(provider, connectionString);
+        var surveyId = Guid.NewGuid();
+        var first = await store.CreateAsync(surveyId, LookupSourceKind.Pleasanter, Secret, "admin-1");
+        var second = await store.CreateAsync(surveyId, LookupSourceKind.Pleasanter, Secret, "admin-2");
+        await store.CreateAsync(Guid.NewGuid(), LookupSourceKind.Pleasanter, Secret, "other");
+        await store.SetEnabledAsync(surveyId, second, enabled: false, "admin-2");
+
+        var list = await store.ListStatusAsync(surveyId);
+
+        Assert.Equal(2, list.Count);
+        Assert.Equal(new[] { first, second }.Order(StringComparer.Ordinal), list.Select(item => item.CredentialId).Order(StringComparer.Ordinal));
+        Assert.False(list.Single(item => item.CredentialId == second).IsEnabled);
+        Assert.Empty(await store.ListStatusAsync(Guid.NewGuid()));
+    }
 }

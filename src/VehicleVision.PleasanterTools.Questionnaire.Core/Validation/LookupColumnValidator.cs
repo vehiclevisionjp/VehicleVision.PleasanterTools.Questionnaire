@@ -28,12 +28,14 @@ public enum LookupColumnKind
 /// <param name="HasChoices">選択肢の設定があるか。</param>
 /// <param name="Nullable">数値列の <c>Nullable</c> 設定。0 を保存・返却できるのはこの設定の列だけ。</param>
 /// <param name="DecimalPlaces">数値列の小数の桁数。整数だけの列は 0。</param>
+/// <param name="Label">管理画面で見せる列の表示名（任意。検証には使わない）。</param>
 public sealed record LookupSourceColumn(
     string Name,
     LookupColumnKind Kind,
     bool HasChoices = false,
     bool Nullable = false,
-    int? DecimalPlaces = null);
+    int? DecimalPlaces = null,
+    string? Label = null);
 
 /// <summary>参照元の列の型の不備の種類（実測の判断 2・3 の決定。Issue #808）。</summary>
 public enum LookupColumnProblemCode

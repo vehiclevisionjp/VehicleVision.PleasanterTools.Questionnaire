@@ -162,3 +162,30 @@ public sealed record LookupSearchResult
             _ => "multiple",
         };
 }
+
+/// <summary>参照元サイトの点検結果（管理画面の接続試験・公開前検証。Issue #879）。</summary>
+/// <remarks>
+/// <para>**検索値・取得値・API キー・生の応答を持たない。** 持つのは分類・統合/継承の有無・列の名前と種類だけ。</para>
+/// <para>
+/// <c>GetSite</c> は設定を付けた列だけを返すので、設定のない標準の列（<c>ClassA</c>〜など）は
+/// **選択肢・<c>Nullable</c> のない既定の列として補う**（設定を付ければ <c>GetSite</c> に載る）。
+/// 数値列の小数の桁数は、設定が返ったものだけを知る（返らなければ <c>null</c>。整数キーには使えない）。
+/// </para>
+/// </remarks>
+public sealed record LookupSiteInspection
+{
+    public required LookupSearchStatus Status { get; init; }
+
+    public LookupSearchFailure Failure { get; init; }
+
+    /// <summary>サイトの列。成功したときだけ。</summary>
+    public ImmutableArray<Core.Validation.LookupSourceColumn> Columns { get; init; } = [];
+
+    /// <summary>サイト統合で他のサイトの範囲を読むか。**空でなければ拒否する**（実機検証結果 12.4）。</summary>
+    public bool IsIntegrated { get; init; }
+
+    /// <summary>権限を他のサイトから継承しているか（自サイトの ID と違う）。**継承していれば拒否する。**</summary>
+    public bool InheritsPermission { get; init; }
+
+    public bool IsSuccess => Status == LookupSearchStatus.Success;
+}

@@ -79,6 +79,11 @@ public interface ILookupCredentialStore
         string credentialId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>そのアンケートの資格情報の状態を、登録順に読む。**秘密は返さない。**</summary>
+    Task<IReadOnlyList<LookupCredentialStatus>> ListStatusAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>検索のために秘密を取り出す。**停止・失効していれば取り出さない。**</summary>
     Task<LookupSecretResolution> ResolveSecretAsync(
         Guid surveyId,
@@ -209,6 +214,29 @@ public sealed class LookupCredentialStore(
                 row.IsEnabled,
                 DateTime.SpecifyKind(row.UpdatedAt, DateTimeKind.Utc),
                 row.UpdatedBy);
+    }
+
+    public async Task<IReadOnlyList<LookupCredentialStatus>> ListStatusAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await connection.QueryAsync<StatusRow>(Sql(
+            "SELECT [CredentialId], [SourceKind], [IsEnabled], [UpdatedAt], [UpdatedBy] "
+            + "FROM [LookupCredentials] WHERE [SurveyId] = @SurveyId "
+            + "ORDER BY [UpdatedAt], [CredentialId]",
+            new { SurveyId = surveyId },
+            cancellationToken)).ConfigureAwait(false);
+
+        return
+        [
+            .. rows.Select(row => new LookupCredentialStatus(
+                row.CredentialId,
+                (LookupSourceKind)row.SourceKind,
+                row.IsEnabled,
+                DateTime.SpecifyKind(row.UpdatedAt, DateTimeKind.Utc),
+                row.UpdatedBy)),
+        ];
     }
 
     public async Task<LookupSecretResolution> ResolveSecretAsync(

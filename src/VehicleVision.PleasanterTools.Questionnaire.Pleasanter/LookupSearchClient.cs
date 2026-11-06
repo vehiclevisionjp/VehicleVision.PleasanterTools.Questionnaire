@@ -43,7 +43,7 @@ public sealed class LookupSearchClient(HttpClient httpClient, LookupSearchOption
             return Fail(LookupSearchStatus.SourceInvalid, LookupSearchFailure.InvalidDefinition);
         }
 
-        var endpoint = ResolveEndpoint(connection, lookup);
+        var endpoint = ResolveEndpoint(connection, lookup.SourceSiteId, "get");
         if (endpoint.Failure != LookupSearchFailure.None)
         {
             return Fail(LookupSearchStatus.SourceInvalid, endpoint.Failure);
@@ -75,6 +75,45 @@ public sealed class LookupSearchClient(HttpClient httpClient, LookupSearchOption
         return MapResponse(lookup, transfer.Json!);
     }
 
+    /// <summary>
+    /// 参照元サイトの定義を読む（<c>GetSite</c>）。**接続試験・列の取得・公開前の検証に使う。**
+    /// </summary>
+    /// <remarks>
+    /// 読み取りだけの専用資格情報で呼ぶ。**更新・削除は呼ばない。** 検索と同じく再試行せず、
+    /// リダイレクトを追わず、応答の大きさと時間に上限を持つ。
+    /// </remarks>
+    public async Task<LookupSiteInspection> InspectSiteAsync(
+        LookupSourceConnection connection,
+        long siteId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        if (siteId <= 0)
+        {
+            return LookupSiteInspector.Fail(LookupSearchStatus.SourceInvalid, LookupSearchFailure.InvalidDefinition);
+        }
+
+        var endpoint = ResolveEndpoint(connection, siteId, "getsite");
+        if (endpoint.Failure != LookupSearchFailure.None)
+        {
+            return LookupSiteInspector.Fail(LookupSearchStatus.SourceInvalid, endpoint.Failure);
+        }
+
+        var body = new JsonObject
+        {
+            ["ApiVersion"] = _options.ApiVersion,
+            ["ApiKey"] = connection.ApiKey,
+        };
+        var transfer = await SendAsync(endpoint.Uri!, body, cancellationToken).ConfigureAwait(false);
+        if (transfer.Result is not null)
+        {
+            return LookupSiteInspector.Fail(transfer.Result.Status, transfer.Result.Failure);
+        }
+
+        return LookupSiteInspector.Map(siteId, transfer.Json!);
+    }
+
     private static bool IsUsableDefinition(LookupDefinition lookup) =>
         lookup.SourceKind == LookupSourceKind.Pleasanter
         && lookup.SourceSiteId is > 0
@@ -89,7 +128,8 @@ public sealed class LookupSearchClient(HttpClient httpClient, LookupSearchOption
 
     private (Uri? Uri, LookupSearchFailure Failure) ResolveEndpoint(
         LookupSourceConnection connection,
-        LookupDefinition lookup)
+        long? siteId,
+        string action)
     {
         if (string.IsNullOrEmpty(connection.ApiKey)
             || !Uri.TryCreate(connection.BaseUrl?.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri)
@@ -109,7 +149,7 @@ public sealed class LookupSearchClient(HttpClient httpClient, LookupSearchOption
             return (null, LookupSearchFailure.InsecureTransport);
         }
 
-        return (new Uri(baseUri, $"api/items/{lookup.SourceSiteId}/get"), LookupSearchFailure.None);
+        return (new Uri(baseUri, $"api/items/{siteId}/{action}"), LookupSearchFailure.None);
     }
 
     /// <summary>キーごとの単一値の条件。**型付きで作り、値の連結で JSON を作らない。**</summary>

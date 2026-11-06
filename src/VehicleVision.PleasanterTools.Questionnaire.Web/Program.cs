@@ -257,6 +257,9 @@ builder.Services.AddTransient(serviceProvider => new LookupSearchClient(
     serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter-lookup"),
     serviceProvider.GetRequiredService<LookupSearchOptions>()));
 builder.Services.AddTransient<LookupSearchService>();
+// 管理画面の接続試験・列の取得・公開前検証（Issue #879）
+builder.Services.AddTransient<ILookupSiteInspectionService, LookupSiteInspectionService>();
+builder.Services.AddTransient<LookupPublishValidator>();
 builder.Services.AddTransient<ILookupSearchService>(
     serviceProvider => serviceProvider.GetRequiredService<LookupSearchService>());
 
@@ -1013,6 +1016,7 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.MapFormEndpoints();
 app.MapLookupEndpoints();
+app.MapAdminLookupEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminSessionEndpoints();

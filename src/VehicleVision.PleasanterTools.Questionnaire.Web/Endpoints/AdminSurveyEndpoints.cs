@@ -693,6 +693,26 @@ public static class AdminSurveyEndpoints
                 });
             }
 
+            // **ルックアップの設定を変えられるのはアンケート管理者だけ**（Issue #879・仕様書 U7）。
+            // 編集者の保存では、ルックアップの定義を今の下書きから変えさせない（見る・他の項目を直すのは妨げない）
+            if (!AdminPermissions.Has(
+                context.User.FindFirstValue(ClaimTypes.Role), AdminPermissions.LookupsManage))
+            {
+                var current = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
+                var before = SurveyJson.Serialize(current?.Definition.GetLookups() ?? []);
+                var after = SurveyJson.Serialize(request.Definition.GetLookups());
+                if (!string.Equals(before, after, StringComparison.Ordinal))
+                {
+                    return Results.Json(
+                        new
+                        {
+                            message = ServerMessages.Get(
+                                ServerMessageKeys.LookupSettingsForbidden, RequestLanguage.Of(context)),
+                        },
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
+            }
+
             // **不備があっても保存はさせる。** 直している途中で保存できないと作業にならない。
             // **拒否するのは公開のとき**
             try
@@ -972,6 +992,7 @@ public static class AdminSurveyEndpoints
             HttpContext context,
             ISurveyDraftStore drafts,
             ISurveyRepository surveys,
+            LookupPublishValidator lookupValidator,
             CancellationToken cancellationToken) =>
         {
             var draft = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
@@ -1133,6 +1154,27 @@ public static class AdminSurveyEndpoints
                     {
                         code = problem.Code.ToString(),
                         questionId = problem.QuestionId,
+                        detail = problem.Detail,
+                    }),
+                });
+            }
+
+            // **不備のあるルックアップのまま公開しない**（Issue #879・仕様書 3.2・8 章）。
+            // 構造・資格情報・参照元の列の型・統合/継承を見る。参照元の列定義を取得できなければ公開させない。
+            // ルックアップが無いアンケートでは外部を呼ばない
+            var lookupProblems = await lookupValidator
+                .ValidateAsync(surveyId, draft.Definition, cancellationToken).ConfigureAwait(false);
+            if (lookupProblems.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PublishBlockedByLookup, RequestLanguage.Of(context)),
+                    lookups = lookupProblems.Select(problem => new
+                    {
+                        lookupId = problem.LookupId,
+                        kind = problem.Kind,
+                        code = problem.Code,
                         detail = problem.Detail,
                     }),
                 });
