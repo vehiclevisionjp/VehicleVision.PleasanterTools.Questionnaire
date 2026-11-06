@@ -145,7 +145,8 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
         await SeedAsync();
     }
 
-    private async Task SeedAsync()
+    /// <param name="numeric">数値列（NumA）を尺度とテキストへ対応づけた定義も足す（Issue #891）。</param>
+    private async Task SeedAsync(bool numeric = false)
     {
         var repository = factory.Services.GetRequiredService<ISurveyRepository>();
         var drafts = factory.Services.GetRequiredService<ISurveyDraftStore>();
@@ -162,6 +163,14 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
             Title = LocalizedText.Japanese(id),
         };
 
+        static Question Scale(string id) => new()
+        {
+            QuestionId = id,
+            Type = QuestionType.Scale,
+            Title = LocalizedText.Japanese(id),
+            Settings = new QuestionSettings { ScaleMinimum = 0, ScaleMaximum = 10 },
+        };
+
         var lookup = new LookupDefinition
         {
             LookupId = "l1",
@@ -174,8 +183,15 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
                 SourceColumn = "ClassA",
                 SourceColumnKind = LookupColumnKind.Text,
             }],
-            Targets = [new LookupTarget { QuestionId = "t1", SourceColumn = "ClassB" }],
-            AllowedColumns = ["ClassB"],
+            Targets = numeric
+                ?
+                [
+                    new LookupTarget { QuestionId = "t1", SourceColumn = "ClassB" },
+                    new LookupTarget { QuestionId = "n1", SourceColumn = "NumA" },
+                    new LookupTarget { QuestionId = "n2", SourceColumn = "NumA" },
+                ]
+                : [new LookupTarget { QuestionId = "t1", SourceColumn = "ClassB" }],
+            AllowedColumns = numeric ? ["ClassB", "NumA"] : ["ClassB"],
             DisplayFields = [new LookupDisplayField { DisplayId = "city", SourceColumn = "ClassB" }],
         };
         var definition = new SurveyDefinition
@@ -183,7 +199,9 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
             SurveyId = surveyId.ToString(),
             Version = 1,
             Title = LocalizedText.Japanese("検証用"),
-            Pages = [new Page { PageId = "p1", Questions = [Q("a1"), Q("k1"), Q("t1")] }],
+            Pages = [new Page { PageId = "p1", Questions = numeric
+                ? [Q("a1"), Q("k1"), Q("t1"), Scale("n1"), Q("n2")]
+                : [Q("a1"), Q("k1"), Q("t1")] }],
             Lookups = [lookup],
             AutoReply = new AutoReplySettings
             {
@@ -274,6 +292,42 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
         Assert.DoesNotContain(lines, line => line.Contains(KeyValue, StringComparison.Ordinal));
         Assert.DoesNotContain(lines, line => line.Contains(FetchedValue, StringComparison.Ordinal));
         Assert.DoesNotContain(lines, line => line.Contains(session, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("5.0000", "5", "5", false)]
+    [InlineData("5", "5", "5", false)]
+    [InlineData("1.2500", null, "1.25", true)]
+    [InlineData("5.5", null, "5.5", true)]
+    [InlineData("-1", null, "-1", true)]
+    [InlineData("11", null, "11", true)]
+    [InlineData("abc", null, null, true)]
+    public async Task 数値列の値は入力先の型に合わせて整えて返す_Issue891(
+        string raw, string? scale, string? text, bool scaleWarned)
+    {
+        await SeedAsync(numeric: true);
+        search.Behave = () => Task.FromResult(new LookupSearchResult
+        {
+            Status = LookupSearchStatus.Success,
+            Candidates = [new LookupCandidateRow(new Dictionary<string, string?> { ["NumA"] = raw })],
+        });
+        using var client = Client();
+        var session = await NewSessionAsync(client, publicId);
+
+        using var response = await SearchAsync(client, publicId, "l1", Body(session));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        var candidate = json.GetProperty("candidates")[0];
+        var values = candidate.GetProperty("values");
+        var warnings = json.GetProperty("warnings").EnumerateArray()
+            .Select(warning => (Field: warning.GetProperty("fieldId").GetString(), Code: warning.GetProperty("code").GetString()))
+            .ToList();
+
+        Assert.Equal(scale, values.TryGetProperty("n1", out var n1) ? n1.GetString() : null);
+        Assert.Equal(text, values.TryGetProperty("n2", out var n2) ? n2.GetString() : null);
+        Assert.Equal(scaleWarned, warnings.Contains(("n1", "ValueIncompatible")));
+        Assert.Equal(text is null, warnings.Contains(("n2", "ValueIncompatible")));
     }
 
     [Fact]
