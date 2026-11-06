@@ -185,6 +185,14 @@
     color: var(--accent);
   }
 
+  /* 強制カラーでは枠色・文字色の違いが消える。選択中は太い枠で示す（Issue #902） */
+  @media (forced-colors: active) {
+    .icon[aria-pressed='true'] {
+      border-width: 3px;
+      border-color: Highlight;
+    }
+  }
+
   .icon svg {
     width: 1.5rem;
     height: 1.5rem;
