@@ -256,4 +256,60 @@ public class LookupCredentialStoreTests
         Assert.False(list.Single(item => item.CredentialId == second).IsEnabled);
         Assert.Empty(await store.ListStatusAsync(Guid.NewGuid()));
     }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 保存済みの下書きか公開した版が参照している資格情報だけを参照中として返す(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var (store, factory) = Create(provider, connectionString);
+        var surveyId = Guid.NewGuid();
+        var orphan = await store.CreateAsync(surveyId, LookupSourceKind.Pleasanter, Secret, "admin-1");
+        var inDraft = await store.CreateAsync(surveyId, LookupSourceKind.Pleasanter, Secret, "admin-1");
+        var inVersion = await store.CreateAsync(surveyId, LookupSourceKind.Pleasanter, Secret, "admin-1");
+        var otherSurvey = Guid.NewGuid();
+        var foreign = await store.CreateAsync(otherSurvey, LookupSourceKind.Pleasanter, Secret, "other");
+
+        // 孤立だけのあいだは、参照中は空
+        Assert.Empty(await store.ListReferencedAsync(surveyId));
+
+        await using var connection = factory.Create();
+        await connection.OpenAsync();
+        const string InsertLookup =
+            "INSERT INTO [SurveyLookups] ([SurveyId], [LookupId], [SortOrder], [DefinitionJson]) "
+            + "VALUES (@SurveyId, 'l1', 0, @Json)";
+        await connection.ExecuteAsync(
+            SqlDialect.Format(provider, InsertLookup),
+            new { SurveyId = surveyId, Json = $"{{\"lookupId\":\"l1\",\"credentialId\":\"{inDraft}\"}}" });
+        await connection.ExecuteAsync(
+            SqlDialect.Format(provider,
+                "INSERT INTO [SurveyVersions] ([SurveyId], [Version], [DefinitionJson], [MappingJson], [PublishedAt]) "
+                + "VALUES (@SurveyId, 1, @Json, '{}', @Now)"),
+            new
+            {
+                SurveyId = surveyId,
+                Json = $"{{\"lookups\":[{{\"credentialId\": \"{inVersion}\"}}]}}",
+                Now = DateTime.UtcNow,
+            });
+
+        // ほかのアンケートの定義が参照していても数えない
+        await connection.ExecuteAsync(
+            SqlDialect.Format(provider, InsertLookup),
+            new { SurveyId = otherSurvey, Json = $"{{\"credentialId\":\"{orphan}\"}}" });
+
+        var referenced = await store.ListReferencedAsync(surveyId);
+
+        Assert.Equal(
+            new[] { inDraft, inVersion }.Order(StringComparer.Ordinal),
+            referenced.Order(StringComparer.Ordinal));
+        Assert.DoesNotContain(orphan, referenced);
+        Assert.DoesNotContain(foreign, referenced);
+        Assert.Empty(await store.ListReferencedAsync(Guid.NewGuid()));
+    }
 }

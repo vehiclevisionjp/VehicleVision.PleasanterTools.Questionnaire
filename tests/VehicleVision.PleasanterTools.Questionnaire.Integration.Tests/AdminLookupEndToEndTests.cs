@@ -198,6 +198,113 @@ public sealed class AdminLookupEndToEndTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task 登録だけして保存しなかった資格情報は孤立として一覧され_再利用も解除もできる()
+    {
+        await SeedSurveyAsync(null);
+        using var client = await SignInAsync("SurveyAdministrator");
+        var credentials = host.Services.GetRequiredService<ILookupCredentialStore>();
+
+        // 1. 登録（定義へは入れない）。別のアンケートにも 1 件ある
+        using var created = await client.PostAsJsonAsync(Url("/credentials"), new { apiKey = ApiKey });
+        var createdJson = await JsonOf(created);
+        var orphanId = createdJson.GetProperty("credentialId").GetString()!;
+        Assert.False(createdJson.GetProperty("isReferenced").GetBoolean());
+        await credentials.CreateAsync(Guid.NewGuid(), LookupSourceKind.Pleasanter, "OTHER-SURVEY-KEY", "x");
+
+        // 2. 一覧に「参照されていない」として出る。秘密は出ない
+        using (var list = await client.GetAsync(Url("/credentials")))
+        {
+            var text = await list.Content.ReadAsStringAsync();
+            Assert.DoesNotContain(ApiKey, text, StringComparison.Ordinal);
+            Assert.DoesNotContain("OTHER-SURVEY-KEY", text, StringComparison.Ordinal);
+            var item = Assert.Single(JsonDocument.Parse(text).RootElement.EnumerateArray());
+            Assert.Equal(orphanId, item.GetProperty("credentialId").GetString());
+            Assert.False(item.GetProperty("isReferenced").GetBoolean());
+        }
+
+        // 3. 下書きから参照する（再利用して保存）と、参照中になり、秘密はそのまま使える
+        var drafts = host.Services.GetRequiredService<ISurveyDraftStore>();
+        var draft = (await drafts.LoadAsync(surveyId))!;
+        var reused = draft.Definition with
+        {
+            Lookups = [.. draft.Definition.GetLookups().Select(lookup => lookup with { CredentialId = orphanId })],
+        };
+        await drafts.SaveAsync(surveyId, reused, draft.Mapping, draft.Revision);
+
+        using (var list = await client.GetAsync(Url("/credentials")))
+        {
+            var item = Assert.Single((await JsonOf(list)).EnumerateArray());
+            Assert.True(item.GetProperty("isReferenced").GetBoolean());
+        }
+
+        Assert.Equal(ApiKey, (await credentials.ResolveSecretAsync(surveyId, orphanId)).Secret);
+
+        // 4. 参照を外して保存すると再び孤立になり、解除（削除）できる
+        draft = (await drafts.LoadAsync(surveyId))!;
+        await drafts.SaveAsync(surveyId, draft.Definition with { Lookups = null }, draft.Mapping, draft.Revision);
+        using (var list = await client.GetAsync(Url("/credentials")))
+        {
+            var item = Assert.Single((await JsonOf(list)).EnumerateArray());
+            Assert.False(item.GetProperty("isReferenced").GetBoolean());
+        }
+
+        using (var deleted = await client.DeleteAsync(Url($"/credentials/{orphanId}")))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        }
+
+        using (var list = await client.GetAsync(Url("/credentials")))
+        {
+            Assert.Equal(0, (await JsonOf(list)).GetArrayLength());
+        }
+    }
+
+    [Fact]
+    public async Task 別のアンケートの資格情報は一覧にも出ず_解除もできない()
+    {
+        await SeedSurveyAsync(null);
+        using var client = await SignInAsync("SurveyAdministrator");
+        var credentials = host.Services.GetRequiredService<ILookupCredentialStore>();
+        var otherSurvey = Guid.NewGuid();
+        var foreign = await credentials.CreateAsync(otherSurvey, LookupSourceKind.Pleasanter, ApiKey, "x");
+
+        using (var list = await client.GetAsync(Url("/credentials")))
+        {
+            Assert.Equal(0, (await JsonOf(list)).GetArrayLength());
+        }
+
+        using (var deleted = await client.DeleteAsync(Url($"/credentials/{foreign}")))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, deleted.StatusCode);
+        }
+
+        Assert.Equal(LookupSecretStatus.Available, (await credentials.ResolveSecretAsync(otherSurvey, foreign)).Status);
+    }
+
+    [Fact]
+    public async Task 孤立した資格情報の解除は管理権限が無ければ403で_残る()
+    {
+        await SeedSurveyAsync(null);
+        using var admin = await SignInAsync("SurveyAdministrator");
+        using var created = await admin.PostAsJsonAsync(Url("/credentials"), new { apiKey = ApiKey });
+        var id = (await JsonOf(created)).GetProperty("credentialId").GetString()!;
+
+        using var editor = await SignInAsync("Editor");
+        using (var deleted = await editor.DeleteAsync(Url($"/credentials/{id}")))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, deleted.StatusCode);
+        }
+
+        using (var enabled = await editor.PutAsJsonAsync(Url($"/credentials/{id}/enabled"), new { enabled = false }))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, enabled.StatusCode);
+        }
+
+        var credentials = host.Services.GetRequiredService<ILookupCredentialStore>();
+        Assert.Equal(LookupSecretStatus.Available, (await credentials.ResolveSecretAsync(surveyId, id)).Status);
+    }
+
+    [Fact]
     public async Task 不正なAPIキーは保存しない()
     {
         await SeedSurveyAsync(null);

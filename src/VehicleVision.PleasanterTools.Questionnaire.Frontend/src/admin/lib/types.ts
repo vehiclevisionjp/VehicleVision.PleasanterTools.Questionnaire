@@ -437,6 +437,11 @@ export interface LookupCredentialStatus {
   isEnabled: boolean;
   updatedAt: string;
   updatedBy?: string | null;
+  /**
+   * 保存済みの定義（下書き・公開した版）が参照しているか。`false` は、登録だけして保存しなかった孤立した資格情報
+   * （Issue #892）。画面で編集中の未保存の定義は含まない。
+   */
+  isReferenced: boolean;
 }
 
 /** 接続試験で取れた参照元の列。 */

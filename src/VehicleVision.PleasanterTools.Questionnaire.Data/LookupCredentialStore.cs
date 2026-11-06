@@ -84,6 +84,15 @@ public interface ILookupCredentialStore
         Guid surveyId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// そのアンケートの資格情報のうち、**保存済みの定義（下書き・公開した版）のどれかが参照しているもの**の ID を返す
+    /// （Issue #892）。参照されていないものは、登録だけして保存しなかった「孤立した資格情報」。
+    /// </summary>
+    /// <remarks>画面で編集中の未保存の定義は見えない。呼び出し側（管理画面）が足して判断する。</remarks>
+    Task<IReadOnlySet<string>> ListReferencedAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>検索のために秘密を取り出す。**停止・失効していれば取り出さない。**</summary>
     Task<LookupSecretResolution> ResolveSecretAsync(
         Guid surveyId,
@@ -237,6 +246,41 @@ public sealed class LookupCredentialStore(
                 DateTime.SpecifyKind(row.UpdatedAt, DateTimeKind.Utc),
                 row.UpdatedBy)),
         ];
+    }
+
+    public async Task<IReadOnlySet<string>> ListReferencedAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var ids = (await connection.QueryAsync<string>(Sql(
+            "SELECT [CredentialId] FROM [LookupCredentials] WHERE [SurveyId] = @SurveyId",
+            new { SurveyId = surveyId },
+            cancellationToken)).ConfigureAwait(false)).ToList();
+
+        var referenced = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var id in ids)
+        {
+            // 資格情報 ID は乱数の GUID（32 桁の 16 進）で、LIKE の特殊文字を含まない。
+            // 定義の JSON に現れる位置・体裁（空白）に依存しないよう、部分一致で見る
+            var pattern = $"%{id}%";
+            var count = 0;
+            foreach (var table in new[] { "SurveyLookups", "SurveyVersions" })
+            {
+                count += await connection.ExecuteScalarAsync<int>(Sql(
+                    $"SELECT COUNT(*) FROM [{table}] "
+                    + "WHERE [SurveyId] = @SurveyId AND [DefinitionJson] LIKE @Pattern",
+                    new { SurveyId = surveyId, Pattern = pattern },
+                    cancellationToken)).ConfigureAwait(false);
+            }
+
+            if (count > 0)
+            {
+                referenced.Add(id);
+            }
+        }
+
+        return referenced;
     }
 
     public async Task<LookupSecretResolution> ResolveSecretAsync(

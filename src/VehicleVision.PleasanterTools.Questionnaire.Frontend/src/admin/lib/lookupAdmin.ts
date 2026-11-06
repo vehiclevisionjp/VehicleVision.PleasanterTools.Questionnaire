@@ -2,6 +2,7 @@ import type { LookupPublicDefinition } from '../../lib/lookup';
 import type { MessageKey } from './i18n/messages';
 import type {
   LookupColumnKind,
+  LookupCredentialStatus,
   LookupDefinition,
   LookupInspectColumn,
   LookupPublishProblem,
@@ -86,6 +87,22 @@ export function newLookup(anchorQuestionId: string): LookupDefinition {
     displayFields: [],
     maxResults: DEFAULT_MAX_RESULTS,
   };
+}
+
+/**
+ * どの定義からも参照されていない資格情報（Issue #892）。
+ *
+ * サーバーが知るのは保存済みの定義（下書き・公開した版）だけなので、**画面で編集中の定義が参照しているもの
+ * も使用中として除く**（登録して割り当てたが、まだ保存していないものを「未使用」にして消さない）。
+ */
+export function unusedCredentials(
+  credentials: readonly LookupCredentialStatus[],
+  lookups: readonly LookupDefinition[],
+): LookupCredentialStatus[] {
+  const inEditing = new Set(
+    lookups.map((lookup) => lookup.credentialId).filter((id): id is string => !!id),
+  );
+  return credentials.filter((credential) => !credential.isReferenced && !inEditing.has(credential.credentialId));
 }
 
 /** 表示 ID の形（英字で始まる英数字・下線、最大 32 文字）。サーバの検証と同じ。 */

@@ -1369,6 +1369,7 @@
     {definition}
     {editing}
     canManage={canManageLookups}
+    savedRevision={revision}
     onchange={(next) => (definition = { ...definition!, lookups: next.length > 0 ? next : null })}
   />
   {/if}
