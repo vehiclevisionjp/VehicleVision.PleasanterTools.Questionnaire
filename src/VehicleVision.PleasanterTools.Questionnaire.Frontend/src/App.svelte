@@ -1246,6 +1246,19 @@
     transition: width var(--motion-duration) ease;
   }
 
+  /* 強制カラー（Windows のコントラストテーマ）では背景色が OS の色に置き換わり、進捗バーが消える（Issue #902）。
+     枠と、システムカラーの塗りで示す */
+  @media (forced-colors: active) {
+    .progress {
+      border: 1px solid CanvasText;
+    }
+
+    .bar {
+      forced-color-adjust: none;
+      background: Highlight;
+    }
+  }
+
   .progress-text {
     color: var(--muted);
     font-size: 0.85rem;

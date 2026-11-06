@@ -401,9 +401,8 @@
     {:else if question.type === 'Rating'}
       <div
         class="rating"
-        role="radiogroup"
+        role="group"
         aria-labelledby={labelId}
-        aria-invalid={error !== undefined}
       >
         {#each scaleValues as value (value)}
           <button
@@ -412,7 +411,8 @@
             class:filled={Number(current.values[0] ?? '0') >= value}
             aria-label={t('question.ratingLabel', { value, max: scaleValues.at(-1) ?? value })}
             aria-pressed={current.values.includes(String(value))}
-            onclick={() => setSingle(String(value))}>★</button
+            onclick={() => setSingle(String(value))}
+            >{Number(current.values[0] ?? '0') >= value ? '★' : '☆'}</button
           >
         {/each}
       </div>
