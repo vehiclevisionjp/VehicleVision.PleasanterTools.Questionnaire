@@ -63,6 +63,7 @@ public sealed class LookupFailureNotifier(
             or LookupSearchFailure.NotFound => AdminNotificationKind.LookupSourceAccessDenied,
         LookupSearchFailure.InvalidDefinition
             or LookupSearchFailure.InsecureTransport
+            or LookupSearchFailure.CertificateInvalid
             or LookupSearchFailure.ClientError
             or LookupSearchFailure.Redirected => AdminNotificationKind.LookupSourceRejected,
         _ => AdminNotificationKind.LookupSourceBadResponse,

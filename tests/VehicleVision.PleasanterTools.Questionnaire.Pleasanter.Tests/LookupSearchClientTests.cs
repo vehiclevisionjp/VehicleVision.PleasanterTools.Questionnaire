@@ -1,5 +1,8 @@
 using System.Collections.Immutable;
 using System.Net;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Text;
 using System.Text.Json.Nodes;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
@@ -396,6 +399,90 @@ public sealed class LookupSearchClientTests
         Assert.Equal(LookupSearchStatus.TemporarilyUnavailable, result.Status);
         Assert.Equal(LookupSearchFailure.ConnectionFailed, result.Failure);
         Assert.DoesNotContain(SecretKey, result.ToString());
+    }
+
+    // Issue #898。証明書の検証失敗は設定の誤り（502・通知）。名前が引けない・拒否・TLS を話さない等は一時障害のまま
+    [Theory]
+    [InlineData(SslPolicyErrors.RemoteCertificateChainErrors)]
+    [InlineData(SslPolicyErrors.RemoteCertificateNameMismatch)]
+    [InlineData(SslPolicyErrors.RemoteCertificateNotAvailable)]
+    [InlineData(SslPolicyErrors.RemoteCertificateChainErrors | SslPolicyErrors.RemoteCertificateNameMismatch)]
+    public async Task 証明書の検証失敗は設定の誤りとして分類し_詳細を結果へ含めない(SslPolicyErrors errors)
+    {
+        var handler = new FakeHandler((request, _) =>
+        {
+            // 接続の確立時に、検証の呼び出しが要求へ結果を残す（SocketsHttpHandler の挙動）
+            LookupCertificateValidation.Record(request.RequestUri!.Host, errors);
+            throw new HttpRequestException(
+                "ssl " + SecretKey + " pleasanter.example.test",
+                new AuthenticationException("The remote certificate is invalid: UntrustedRoot"));
+        });
+
+        var result = await Client(handler).SearchAsync(Connection(), Request());
+
+        Assert.Equal(LookupSearchStatus.SourceInvalid, result.Status);
+        Assert.Equal(LookupSearchFailure.CertificateInvalid, result.Failure);
+        Assert.DoesNotContain(SecretKey, result.ToString());
+        Assert.DoesNotContain("pleasanter.example.test", result.ToString());
+        Assert.DoesNotContain("UntrustedRoot", result.ToString());
+    }
+
+    [Fact]
+    public async Task 証明書の検証失敗は接続試験でも設定の誤りとして分類する()
+    {
+        var handler = new FakeHandler((request, _) =>
+        {
+            LookupCertificateValidation.Record(request.RequestUri!.Host, SslPolicyErrors.RemoteCertificateChainErrors);
+            throw new HttpRequestException("ssl", new AuthenticationException("x"));
+        });
+
+        var result = await Client(handler).InspectSiteAsync(Connection(), 123);
+
+        Assert.Equal(LookupSearchStatus.SourceInvalid, result.Status);
+        Assert.Equal(LookupSearchFailure.CertificateInvalid, result.Failure);
+    }
+
+    [Fact]
+    public void 検証の呼び出しはエラーなしだけを受け入れ_ホスト名ごとに記録する()
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Get, "https://record-test.example.test/");
+        var since = LookupCertificateValidation.Now();
+
+        Assert.True(LookupCertificateValidation.Validate(message, null, null, SslPolicyErrors.None));
+        Assert.False(LookupCertificateValidation.TryGetFailure("record-test.example.test", since, out _));
+
+        Assert.False(LookupCertificateValidation.Validate(
+            message, null, null, SslPolicyErrors.RemoteCertificateNameMismatch));
+        Assert.True(LookupCertificateValidation.TryGetFailure("RECORD-TEST.example.test", since, out var errors));
+        Assert.Equal(SslPolicyErrors.RemoteCertificateNameMismatch, errors);
+
+        // 開始より前の失敗は、今回の要求の失敗とは見なさない
+        Assert.False(LookupCertificateValidation.TryGetFailure(
+            "record-test.example.test", LookupCertificateValidation.Now() + 1, out _));
+
+        // 送信者が分からなくても、拒否は変えない（緩めない）
+        Assert.False(LookupCertificateValidation.Validate(
+            new object(), null, null, SslPolicyErrors.RemoteCertificateChainErrors));
+    }
+
+    [Theory]
+    [InlineData("name")]
+    [InlineData("tls")]
+    [InlineData("io")]
+    public async Task 検証の記録が無い失敗は一時障害のまま(string kind)
+    {
+        // 名前が引けない・TLS を話さない相手（AuthenticationException でも検証の記録が無い）・切断
+        var handler = new FakeHandler((_, _) => throw kind switch
+        {
+            "name" => new HttpRequestException("name", new SocketException(11001)),
+            "tls" => new HttpRequestException("tls", new AuthenticationException("frame size")),
+            _ => new IOException("closed"),
+        });
+
+        var result = await Client(handler).SearchAsync(Connection(), Request());
+
+        Assert.Equal(LookupSearchStatus.TemporarilyUnavailable, result.Status);
+        Assert.Equal(LookupSearchFailure.ConnectionFailed, result.Failure);
     }
 
     [Theory]

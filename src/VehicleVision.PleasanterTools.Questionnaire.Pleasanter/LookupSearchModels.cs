@@ -116,7 +116,13 @@ public enum LookupSearchFailure
     /// <summary>外部の 5xx。</summary>
     ServerError,
 
-    /// <summary>接続できなかった。</summary>
+    /// <summary>
+    /// HTTPS のサーバー証明書の検証に失敗した（信頼されない・名前の不一致・期限切れ・チェーンの不正）。
+    /// 設定の誤りで、再試行しても直らない（Issue #898）。
+    /// </summary>
+    CertificateInvalid,
+
+    /// <summary>接続できなかった（一時的な障害になりうるもの）。</summary>
     ConnectionFailed,
 
     /// <summary>応答が JSON でない・必須の構造が無い。</summary>

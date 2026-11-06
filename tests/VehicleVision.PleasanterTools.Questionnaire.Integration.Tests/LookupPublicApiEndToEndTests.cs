@@ -1,5 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
@@ -444,6 +452,137 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
                 ["k1"],
                 JsonDocument.Parse(text).RootElement.GetProperty("fieldIds")
                     .EnumerateArray().Select(item => item.GetString()!).ToArray());
+        }
+    }
+
+    /// <summary>テスト内で作る自己署名の証明書。**鍵・証明書をリポジトリへ置かない。**</summary>
+    private static X509Certificate2 NewCertificate(DateTimeOffset notBefore, DateTimeOffset notAfter)
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var names = new SubjectAlternativeNameBuilder();
+        names.AddDnsName("localhost");
+        request.CertificateExtensions.Add(names.Build());
+        using var created = request.CreateSelfSigned(notBefore, notAfter);
+        return X509CertificateLoader.LoadPkcs12(created.Export(X509ContentType.Pfx), null);
+    }
+
+    /// <summary>使い捨ての TLS サーバー（Kestrel）。受けた要求の数を数える。</summary>
+    private static async Task<(WebApplication App, Uri Url, Func<int> Hits)> StartTlsServerAsync(
+        X509Certificate2 certificate)
+    {
+        var hits = 0;
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.ConfigureKestrel(kestrel => kestrel.Listen(
+            IPAddress.Loopback, 0, listen => listen.UseHttps(certificate)));
+        var app = builder.Build();
+        app.Run(context =>
+        {
+            Interlocked.Increment(ref hits);
+            return context.Response.WriteAsync("{}");
+        });
+        await app.StartAsync();
+        var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!
+            .Addresses.First();
+        return (app, new Uri(address.Replace("127.0.0.1", "localhost")), () => Volatile.Read(ref hits));
+    }
+
+    /// <summary>実アプリの DI にある専用クライアント（Program.cs の設定そのまま）で、指定の接続先を検索する。</summary>
+    private void SearchWithRealClient(Uri baseUrl)
+    {
+        var client = new LookupSearchClient(
+            factory.Services.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter-lookup"));
+        search.Behave = () => client.SearchAsync(
+            new LookupSourceConnection(baseUrl.ToString(), "SECRET-API-KEY-0123456789"),
+            new LookupSearchRequest(
+                new LookupDefinition
+                {
+                    LookupId = "l1",
+                    AnchorQuestionId = "a1",
+                    SourceSiteId = 5,
+                    CredentialId = "cred-1",
+                    Keys = [new LookupKey
+                    {
+                        QuestionId = "k1",
+                        SourceColumn = "ClassA",
+                        SourceColumnKind = LookupColumnKind.Text,
+                    }],
+                    AllowedColumns = ["ClassB"],
+                },
+                new Dictionary<string, string?> { ["k1"] = KeyValue }));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task 信頼されない_期限切れの証明書は502で管理者へ通知し_要求は送らない_Issue898(bool expired)
+    {
+        var now = DateTimeOffset.UtcNow;
+        using var certificate = expired
+            ? NewCertificate(now.AddDays(-30), now.AddDays(-1))
+            : NewCertificate(now.AddDays(-1), now.AddDays(30));
+        var (app, url, hits) = await StartTlsServerAsync(certificate);
+        await using var _ = app;
+        SearchWithRealClient(url);
+        using var client = Client();
+        var session = await NewSessionAsync(client, publicId);
+
+        using var response = await SearchAsync(client, publicId, "l1", Body(session));
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal("LookupSourceInvalid", await CodeOf(response));
+        var text = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("localhost", text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(url.Port.ToString(), text, StringComparison.Ordinal);
+        Assert.Equal(0, hits());
+
+        var store = factory.Services.GetRequiredService<IAdminNotificationStore>();
+        var row = Assert.Single(await store.ListAsync(new AdminNotificationQuery { UnreadOnly = true }));
+        Assert.Equal((int)Core.Notifications.AdminNotificationKind.LookupSourceRejected, row.Kind);
+        Assert.Equal(surveyId, row.SurveyId);
+        Assert.False(string.IsNullOrWhiteSpace(row.LastCorrelationId));
+        lock (logs.Lines)
+        {
+            Assert.DoesNotContain(logs.Lines, line => line.Contains(url.Port.ToString(), StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("closed")]
+    [InlineData("plain")]
+    public async Task TLSを話さない_接続できない相手は従来どおり503で通知しない_Issue898(string kind)
+    {
+        // 閉じたポート、または TLS ではなく平文で応答する（すぐ切る）ポート
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        Task? accepting = null;
+        if (kind == "closed")
+        {
+            listener.Stop();
+        }
+        else
+        {
+            accepting = Task.Run(async () =>
+            {
+                using var peer = await listener.AcceptTcpClientAsync();
+                await peer.GetStream().WriteAsync("HTTP/1.1 400 Bad Request\r\n\r\n"u8.ToArray());
+            });
+        }
+
+        SearchWithRealClient(new Uri($"https://localhost:{port}/"));
+        using var client = Client();
+        var session = await NewSessionAsync(client, publicId);
+
+        using var response = await SearchAsync(client, publicId, "l1", Body(session));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("LookupTemporarilyUnavailable", await CodeOf(response));
+        var store = factory.Services.GetRequiredService<IAdminNotificationStore>();
+        Assert.Empty(await store.ListAsync(new AdminNotificationQuery()));
+        if (accepting is not null)
+        {
+            await accepting;
         }
     }
 

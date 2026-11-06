@@ -235,13 +235,15 @@ public sealed class LookupSearchClient(HttpClient httpClient, LookupSearchOption
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_options.Timeout);
+        var started = LookupCertificateValidation.Now();
+
+        using var message = new HttpRequestMessage(HttpMethod.Post, uri)
+        {
+            Content = JsonContent.Create(body, options: SerializerOptions),
+        };
 
         try
         {
-            using var message = new HttpRequestMessage(HttpMethod.Post, uri)
-            {
-                Content = JsonContent.Create(body, options: SerializerOptions),
-            };
             using var response = await httpClient
                 .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
                 .ConfigureAwait(false);
@@ -295,6 +297,15 @@ public sealed class LookupSearchClient(HttpClient httpClient, LookupSearchOption
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException)
         {
+            // 証明書の検証失敗は設定の誤り（再試行しても直らない）。検証の結果は、接続の確立時に
+            // LookupCertificateValidation がホスト名ごとに記録している。**記録が無ければ（名前が引けない・
+            // 拒否・TLS を話さない相手など）従来どおり一時的な障害**。要求を送る前に失敗するので外部呼び出しは 0 回
+            if (LookupCertificateValidation.TryGetFailure(uri.Host, started, out _))
+            {
+                return new Transfer(
+                    Fail(LookupSearchStatus.SourceInvalid, LookupSearchFailure.CertificateInvalid), null);
+            }
+
             return new Transfer(
                 Fail(LookupSearchStatus.TemporarilyUnavailable, LookupSearchFailure.ConnectionFailed), null);
         }
