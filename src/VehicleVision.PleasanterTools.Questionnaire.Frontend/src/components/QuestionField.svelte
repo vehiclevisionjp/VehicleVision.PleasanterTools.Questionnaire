@@ -29,6 +29,11 @@
     assetUrl?: (assetId: string) => string;
     /** 入力の後ろへ足す部品（ルックアップのボタンなど。Issue #871）。 */
     extra?: Snippet;
+    /**
+     * 入力へ関連付ける、ほかの要素の ID（ルックアップの警告など。Issue #884）。
+     * 誤りの案内と同じく `aria-describedby` へ足す。
+     */
+    describedBy?: readonly string[];
   }
 
   let {
@@ -39,6 +44,7 @@
     error,
     assetUrl,
     extra,
+    describedBy = [],
   }: Props = $props();
 
   const t = $derived(translator(language));
@@ -55,6 +61,12 @@
 
   const labelId = $derived(`label-${question.questionId}`);
   const errorId = $derived(`error-${question.questionId}`);
+
+  /** `aria-describedby` の値。空なら属性ごと省く。 */
+  function describedByOf(...ids: (string | false | undefined)[]): string | undefined {
+    return [...ids, ...describedBy].filter(Boolean).join(' ') || undefined;
+  }
+
   const otherChoice = $derived(question.choices.find((choice) => choice.isOther));
   const otherSelected = $derived(
     otherChoice !== undefined && current.values.includes(otherChoice.value),
@@ -232,7 +244,7 @@
   <fieldset
     class="field"
     class:has-error={error !== undefined}
-    aria-describedby={error ? errorId : undefined}
+    aria-describedby={describedByOf(error && errorId)}
   >
     {#if question.type !== 'Confirm'}
       <legend id={labelId}>
@@ -281,12 +293,10 @@
       <input
         type="text"
         aria-labelledby={labelId}
-        aria-describedby={[
-          normalizationNotice !== '' ? `normalization-${question.questionId}` : '',
-          error ? errorId : '',
-        ]
-          .filter(Boolean)
-          .join(' ') || undefined}
+        aria-describedby={describedByOf(
+          normalizationNotice !== '' && `normalization-${question.questionId}`,
+          error && errorId,
+        )}
         aria-invalid={error !== undefined}
         maxlength={question.settings.maxLength}
         placeholder={text(question.settings.placeholder, language)}
@@ -298,12 +308,10 @@
       <textarea
         rows="4"
         aria-labelledby={labelId}
-        aria-describedby={[
-          normalizationNotice !== '' ? `normalization-${question.questionId}` : '',
-          error ? errorId : '',
-        ]
-          .filter(Boolean)
-          .join(' ') || undefined}
+        aria-describedby={describedByOf(
+          normalizationNotice !== '' && `normalization-${question.questionId}`,
+          error && errorId,
+        )}
         aria-invalid={error !== undefined}
         maxlength={question.settings.maxLength}
         placeholder={text(question.settings.placeholder, language)}
@@ -349,6 +357,7 @@
     {:else if question.type === 'Dropdown'}
       <select
         aria-labelledby={labelId}
+        aria-describedby={describedByOf()}
         aria-invalid={error !== undefined}
         value={current.values[0] ?? ''}
         onchange={(event) => setSingle(event.currentTarget.value)}
@@ -411,6 +420,7 @@
       <input
         type="date"
         aria-labelledby={labelId}
+        aria-describedby={describedByOf()}
         aria-invalid={error !== undefined}
         value={current.values[0] ?? ''}
         oninput={(event) => setSingle(event.currentTarget.value)}

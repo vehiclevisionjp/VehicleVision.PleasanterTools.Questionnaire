@@ -163,3 +163,77 @@ describe('回答の自動変換', () => {
     expect(body).not.toContain('自動で変換します');
   });
 });
+
+describe('ルックアップの警告の関連付け（aria-describedby）', () => {
+  const warningId = 'lookup-warning-l1-city';
+
+  function textQuestion(type: 'Text' | 'Paragraph' | 'Dropdown' | 'Date' | 'Radio'): Question {
+    return {
+      questionId: 'city',
+      type,
+      title: { ja: '市区町村' },
+      isRequired: false,
+      choices:
+        type === 'Dropdown' || type === 'Radio'
+          ? [{ value: 'tokyo', label: { ja: '東京' }, isOther: false }]
+          : [],
+      settings: {},
+    };
+  }
+
+  it.each(['Text', 'Paragraph', 'Dropdown', 'Date'] as const)(
+    '%s の入力へ警告の要素を関連付ける',
+    (type) => {
+      const { body } = render(QuestionField, {
+        props: {
+          question: textQuestion(type),
+          language: 'ja',
+          answer: { values: [], otherText: '' },
+          describedBy: [warningId],
+        },
+      });
+
+      // 群（fieldset）と入力の両方
+      expect(body.match(new RegExp(`aria-describedby="${warningId}"`, 'g'))?.length).toBe(2);
+    },
+  );
+
+  it('選択肢の設問は群へ関連付ける', () => {
+    const { body } = render(QuestionField, {
+      props: {
+        question: textQuestion('Radio'),
+        language: 'ja',
+        answer: { values: [], otherText: '' },
+        describedBy: [warningId],
+      },
+    });
+
+    expect(body).toMatch(new RegExp(`<fieldset class="field[^"]*" aria-describedby="${warningId}"`));
+  });
+
+  it('誤りの案内と並べて関連付ける', () => {
+    const { body } = render(QuestionField, {
+      props: {
+        question: textQuestion('Text'),
+        language: 'ja',
+        answer: { values: [], otherText: '' },
+        error: '必須です',
+        describedBy: [warningId],
+      },
+    });
+
+    expect(body).toContain(`aria-describedby="error-city ${warningId}"`);
+  });
+
+  it('警告が無ければ属性を付けない', () => {
+    const { body } = render(QuestionField, {
+      props: {
+        question: textQuestion('Text'),
+        language: 'ja',
+        answer: { values: [], otherText: '' },
+      },
+    });
+
+    expect(body).not.toContain('aria-describedby');
+  });
+});

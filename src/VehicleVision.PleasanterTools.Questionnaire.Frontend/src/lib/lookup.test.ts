@@ -6,6 +6,7 @@ import {
   keyValues,
   LookupRequestTracker,
   LookupSessionHolder,
+  lookupWarningId,
   missingKeyQuestionIds,
   parsePublicLookups,
   planApply,
@@ -361,5 +362,13 @@ describe('検索の呼び出し', () => {
     vi.stubGlobal('window', { self: 1, top: 1 });
 
     expect(await searchLookup('p', 'l', 1, {}, 't')).toMatchObject({ ok: false, failure: 'network' });
+  });
+});
+
+describe('入力先への警告の要素 ID', () => {
+  it('定義と入力先の組ごとに別の ID になる', () => {
+    expect(lookupWarningId('l1', 't1')).toBe('lookup-warning-l1-t1');
+    expect(lookupWarningId('l1', 't2')).not.toBe(lookupWarningId('l1', 't1'));
+    expect(lookupWarningId('l2', 't1')).not.toBe(lookupWarningId('l1', 't1'));
   });
 });
