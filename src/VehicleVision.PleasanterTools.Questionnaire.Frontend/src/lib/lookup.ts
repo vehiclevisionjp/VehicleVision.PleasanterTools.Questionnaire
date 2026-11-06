@@ -416,7 +416,8 @@ export class LookupSessionHolder {
   }
 }
 
-function parseResponse(raw: unknown): LookupResponse | null {
+/** サーバの検索応答を読む。形が違う・件数と区分が食い違うものは `null`。管理プレビューも使う。 */
+export function parseLookupResponse(raw: unknown): LookupResponse | null {
   if (typeof raw !== 'object' || raw === null) {
     return null;
   }
@@ -512,7 +513,7 @@ export async function searchLookup(
   }
 
   if (response.ok) {
-    const parsed = parseResponse(await response.json().catch(() => null));
+    const parsed = parseLookupResponse(await response.json().catch(() => null));
     return parsed ? { ok: true, response: parsed } : failure('sourceInvalid');
   }
 

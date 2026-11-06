@@ -38,7 +38,13 @@
     answers: Record<string, AnswerState | undefined>;
     /** いま出している設問。**出ていない入力先へは入れない。** */
     visible: ReadonlySet<string>;
-    sessions: LookupSessionHolder;
+    /** 検索用トークンの入れ物。`search` を渡すときは使わない。 */
+    sessions?: LookupSessionHolder;
+    /**
+     * 検索の差し替え。**管理画面のプレビュー専用**（保存済みの下書きを引く別経路。Issue #880・仕様書 U9）。
+     * 無ければ公開 API（トークン付き）を使う。
+     */
+    search?: (keys: Record<string, string>) => Promise<LookupSearchResult>;
     /** 入力先へ値を書き込む。呼び出し側が通常の入力と同じ扱いにする。 */
     onapply: (changes: { questionId: string; value: string }[]) => void;
   }
@@ -53,6 +59,7 @@
     answers,
     visible,
     sessions,
+    search,
     onapply,
   }: Props = $props();
 
@@ -202,9 +209,10 @@
     await closeDialog(false);
 
     try {
-      const token = await sessions.get();
-      const result: LookupSearchResult =
-        token === null
+      const token = search ? '' : ((await sessions?.get()) ?? null);
+      const result: LookupSearchResult = search
+        ? await search(keys)
+        : token === null
           ? { ok: false, failure: 'network', fieldIds: [], retryAfterSeconds: null }
           : await searchLookup(publicId, lookup.lookupId, version, keys, token);
 
@@ -216,7 +224,7 @@
 
       if (!result.ok) {
         if (result.failure === 'sessionInvalid') {
-          sessions.discard();
+          sessions?.discard();
         }
         status = '';
         error = failureMessage(result);

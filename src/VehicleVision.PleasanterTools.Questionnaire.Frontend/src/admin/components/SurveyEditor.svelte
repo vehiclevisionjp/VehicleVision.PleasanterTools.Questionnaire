@@ -52,6 +52,7 @@
   import QuestionEditor from './QuestionEditor.svelte';
   import ConditionEditor from './ConditionEditor.svelte';
   import AutoReplyEditor from './AutoReplyEditor.svelte';
+  import LookupEditor from './LookupEditor.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
   import PublishPanel from './PublishPanel.svelte';
   import { adminAssetUrl } from '../lib/api';
@@ -84,6 +85,8 @@
     testRecipientAvailable: boolean;
     /** 公開設定を保存してよい相手か（`surveys.publish`）。「公開」タブを読み取り専用にするかを決める。 */
     canPublish: boolean;
+    /** ルックアップの設定・API キー・接続試験をしてよい相手か（`lookups.manage`）。無ければ読み取り専用。 */
+    canManageLookups: boolean;
     onback: () => void;
     onbreadcrumbchange: (title: string | null) => void;
     onnavigationguardchange: (guard: (() => Promise<boolean>) | null) => void;
@@ -95,6 +98,7 @@
     testRecipient,
     testRecipientAvailable,
     canPublish,
+    canManageLookups,
     onback,
     onbreadcrumbchange,
     onnavigationguardchange,
@@ -197,7 +201,7 @@
    * 開いているタブ（Issue #546）。**見せ方だけで、編集の内容・保存・公開は変わらない。**
    * 設問と割り当てを同じ画面に置き、基本設定と見た目・自動返信は別のタブへ分ける。
    */
-  let tab = $state<'settings' | 'questions' | 'mapping' | 'extras' | 'publish'>('questions');
+  let tab = $state<'settings' | 'questions' | 'mapping' | 'lookups' | 'extras' | 'publish'>('questions');
   /** 開いているページのタブ。**無い・消えた ID のときは先頭のページ。** */
   let activePageId = $state<string | null>(null);
   const currentPageId = $derived(
@@ -1167,7 +1171,7 @@
 
   <!-- **タブで分ける。** 1 枚に全部並べると縦に長く、設問と割り当てが離れる（Issue #546） -->
   <div class="tabs" role="tablist" aria-label={t('editor.tabs')}>
-    {#each [['questions', 'editor.tabQuestions'], ['mapping', 'editor.tabMapping'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras'], ['publish', 'editor.tabPublish']] as const as [key, label] (key)}
+    {#each [['questions', 'editor.tabQuestions'], ['mapping', 'editor.tabMapping'], ['lookups', 'editor.tabLookups'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras'], ['publish', 'editor.tabPublish']] as const as [key, label] (key)}
       <button
         type="button"
         role="tab"
@@ -1354,6 +1358,17 @@
       <span class="next-version">{t('editor.nextVersion', { version: definition.version })}</span>
     </div>
   </section>
+  {/if}
+
+  {#if tab === 'lookups'}
+  <!-- **ルックアップは定義の一部**（保存・競合検知は設問とまとめて）。専用 API キーだけは別にその場で送る -->
+  <LookupEditor
+    {surveyId}
+    {definition}
+    {editing}
+    canManage={canManageLookups}
+    onchange={(next) => (definition = { ...definition!, lookups: next.length > 0 ? next : null })}
+  />
   {/if}
 
   {#if tab === 'extras'}
@@ -1694,6 +1709,7 @@
            公開前の画像は回答画面の口からは出ない -->
       <SurveyPreview
         {definition}
+        {surveyId}
         assetUrl={(assetId) => adminAssetUrl(surveyId, assetId)}
         headerImageUrl={definition.theme?.headerImageId
           ? adminAssetUrl(surveyId, definition.theme.headerImageId)

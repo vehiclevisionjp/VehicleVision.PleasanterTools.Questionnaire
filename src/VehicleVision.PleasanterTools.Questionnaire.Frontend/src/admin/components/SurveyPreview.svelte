@@ -1,5 +1,7 @@
 <script lang="ts">
   import QuestionField from '../../components/QuestionField.svelte';
+  import LookupControl from '../../components/LookupControl.svelte';
+  import { answerWithValue } from '../../lib/lookup';
   import NoteContent from '../../components/NoteContent.svelte';
   import { toSteps, tracePath } from '../../lib/flow';
   import { applyShuffle, createShuffleSeed } from '../../lib/shuffle';
@@ -17,7 +19,8 @@
   import type { SurveyDefinition } from '../lib/types';
   import { language as adminLanguage, t } from '../lib/i18n/state.svelte';
   import { applyTheme } from '../../lib/theme';
-  import { previewNotes } from '../lib/api';
+  import { previewNotes, previewSearchLookup } from '../lib/api';
+  import { previewDefinitions } from '../lib/lookupAdmin';
   import { listDesignPreviewPages } from '../lib/preview';
 
   /** 1 度に読んでもらう記法の上限。**サーバ側の上限と揃える。** */
@@ -53,10 +56,31 @@
     headerImageUrl?: string | null;
     /** 本文用資産を管理画面の配信口へ変換する。 */
     assetUrl?: (assetId: string) => string;
+    /** 検索のプレビューに使う（保存済みの下書きを引く）。 */
+    surveyId?: string;
     onclose: () => void;
   }
 
-  let { definition, headerImageUrl = null, assetUrl, onclose }: Props = $props();
+  let { definition, headerImageUrl = null, assetUrl, surveyId = '', onclose }: Props = $props();
+
+  /**
+   * ルックアップのボタン（Issue #880）。**回答画面と同じ部品**で描くが、検索は管理プレビュー専用の別経路
+   * （`previewSearchLookup`。保存済みの下書きを引く）。公開用の定義は下書きから作る別のもの（U9）。
+   */
+  const lookupPreviews = $derived(previewDefinitions(definition));
+  const lookupQuestions = $derived(
+    new Map(
+      definition.pages.flatMap((page) =>
+        page.questions.map((question) => [question.questionId, question as unknown as AnswerQuestion] as const),
+      ),
+    ),
+  );
+
+  function applyLookup(changes: { questionId: string; value: string }[]) {
+    for (const { questionId, value } of changes) {
+      answers[questionId] = answerWithValue(value);
+    }
+  }
 
   /**
    * テーマを写す枠（Issue #56）。
@@ -458,8 +482,28 @@
             () => ensure(question.questionId), (value) => (answers[question.questionId] = value)
           }
           error={errors[question.questionId]}
-        />
+        >
+          {#snippet extra()}
+            {#each lookupPreviews.filter((item) => item.anchorQuestionId === question.questionId) as lookup (lookup.lookupId)}
+              <LookupControl
+                {lookup}
+                version={definition.version}
+                publicId=""
+                {language}
+                fallbackLanguage={definition.fallbackLanguage}
+                questions={lookupQuestions}
+                {answers}
+                visible={path.visible}
+                search={(keys) => previewSearchLookup(surveyId, lookup.lookupId, keys)}
+                onapply={applyLookup}
+              />
+            {/each}
+          {/snippet}
+        </QuestionField>
       {/each}
+      {#if lookupPreviews.length > 0}
+        <p class="lookup-note">{t('lookupAdmin.previewNote')}</p>
+      {/if}
 
       <nav class="actions">
         {#if stepIndex > 0}
@@ -477,6 +521,12 @@
 </section>
 
 <style lang="scss">
+  .lookup-note {
+    margin-block: var(--space-3);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
   .head {
     display: flex;
     align-items: center;

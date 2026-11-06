@@ -654,6 +654,7 @@
           testRecipient={session?.loginId ?? ''}
           testRecipientAvailable={session?.autoReplyTestRecipientAvailable ?? false}
           canPublish={can('surveys.publish')}
+          canManageLookups={can('lookups.manage')}
           onback={back}
           onbreadcrumbchange={(title) => (surveyBreadcrumbTitle = title)}
           onnavigationguardchange={(guard) => (navigationGuard = guard)}

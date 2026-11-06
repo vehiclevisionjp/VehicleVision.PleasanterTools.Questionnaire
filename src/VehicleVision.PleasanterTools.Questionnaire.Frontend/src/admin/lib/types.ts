@@ -380,6 +380,93 @@ export interface AssetDeliverySettings {
   days: number;
 }
 
+/** 参照元の列の種類（キーにできるのは `Text` と `Number` だけ）。 */
+export type LookupColumnKind = 'Text' | 'Number' | 'Date' | 'Check' | 'Other';
+
+/** キー項目と、参照元のキー列の対応（Issue #880）。 */
+export interface LookupKey {
+  questionId: string;
+  sourceColumn: string;
+  /** 公開時に版へ固定する。**未指定は公開前に拒否される。** */
+  sourceColumnKind?: LookupColumnKind | null;
+  matchMode?: 'Exact' | 'Prefix';
+  /** 前方一致を許すか。既定は許さない。 */
+  allowPrefix?: boolean;
+}
+
+/** 参照元の列と、結果を入れる入力先項目の対応。 */
+export interface LookupTarget {
+  sourceColumn: string;
+  questionId: string;
+}
+
+/**
+ * モーダルに出す列。
+ *
+ * **表示 ID は固定（画面から編集しない。自動採番）。** 回答者へ参照元の列名を見せないための名前。
+ */
+export interface LookupDisplayField {
+  displayId: string;
+  sourceColumn: string;
+  heading?: LocalizedText | null;
+}
+
+/**
+ * ルックアップ定義 1 つ（仕様書 3.2 節）。
+ *
+ * **資格情報の秘密は含まない**（`credentialId` は参照だけ）。
+ */
+export interface LookupDefinition {
+  lookupId: string;
+  anchorQuestionId: string;
+  buttonLabel?: LocalizedText | null;
+  sourceKind?: 'Pleasanter';
+  sourceSiteId?: number | null;
+  credentialId?: string | null;
+  keys: LookupKey[];
+  targets: LookupTarget[];
+  allowedColumns: string[];
+  displayFields?: LookupDisplayField[];
+  maxResults?: number;
+}
+
+/** 専用資格情報の状態。**秘密は含まない。** */
+export interface LookupCredentialStatus {
+  credentialId: string;
+  sourceKind: string;
+  isEnabled: boolean;
+  updatedAt: string;
+  updatedBy?: string | null;
+}
+
+/** 接続試験で取れた参照元の列。 */
+export interface LookupInspectColumn {
+  name: string;
+  kind: LookupColumnKind;
+  label?: string | null;
+  hasChoices: boolean;
+  nullable: boolean;
+  decimalPlaces?: number | null;
+}
+
+/** 接続試験の結果。**分類・統合/継承の有無・列の名前と種類だけ。** */
+export interface LookupInspectResult {
+  ok: boolean;
+  /** 失敗の分類（`Unauthorized` など）。成功のときは無い。 */
+  failure?: string | null;
+  isIntegrated: boolean;
+  inheritsPermission: boolean;
+  columns: LookupInspectColumn[];
+}
+
+/** 公開前に見つかったルックアップの不備。 */
+export interface LookupPublishProblem {
+  lookupId?: string | null;
+  kind: 'structure' | 'credential' | 'source' | 'column';
+  code: string;
+  detail?: string | null;
+}
+
 export interface SurveyDefinition {
   surveyId: string;
   version: number;
@@ -406,6 +493,8 @@ export interface SurveyDefinition {
   autoReply?: AutoReplySettings | null;
   /** 無ければ「アンケートの受付期間に合わせる」。 */
   assetDelivery?: AssetDeliverySettings | null;
+  /** ルックアップの定義（Issue #880）。**無ければ検索ボタンは出ない（既定）。** */
+  lookups?: LookupDefinition[] | null;
   pages: Page[];
 }
 
@@ -692,6 +781,7 @@ export type AdminPermission =
   | 'surveys.write'
   | 'surveys.publish'
   | 'surveys.delete'
+  | 'lookups.manage'
   | 'templates.read'
   | 'templates.write'
   | 'outbox.read'
