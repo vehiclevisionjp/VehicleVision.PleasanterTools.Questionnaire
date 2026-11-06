@@ -604,6 +604,45 @@ public sealed class LookupPublicApiEndToEndTests : IAsyncLifetime
         Assert.Empty(search.Calls);
     }
 
+    [Fact]
+    public async Task 回答画面の取得応答は公開用のlookupsを最上位に載せ_参照元の構造を返さない()
+    {
+        using var client = Client();
+
+        using var response = await client.GetAsync($"/api/forms/{publicId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var text = await response.Content.ReadAsStringAsync();
+        var json = JsonDocument.Parse(text).RootElement;
+
+        // 公開用の DTO が最上位に載る（Issue #874）
+        var lookup = Assert.Single(json.GetProperty("lookups").EnumerateArray());
+        Assert.Equal("l1", lookup.GetProperty("lookupId").GetString());
+        Assert.Equal("a1", lookup.GetProperty("anchorQuestionId").GetString());
+        Assert.Equal("k1", Assert.Single(lookup.GetProperty("keyQuestionIds").EnumerateArray()).GetString());
+        Assert.Equal("t1", Assert.Single(lookup.GetProperty("targetQuestionIds").EnumerateArray()).GetString());
+        Assert.Equal(
+            "city",
+            Assert.Single(lookup.GetProperty("displayFields").EnumerateArray())
+                .GetProperty("displayId").GetString());
+
+        // 定義の本体には生の lookups を残さない。他の項目は変えない
+        var definition = json.GetProperty("definition");
+        Assert.False(definition.TryGetProperty("lookups", out _));
+        Assert.Equal("検証用", definition.GetProperty("title").GetProperty("ja").GetString());
+        Assert.Equal(3, definition.GetProperty("pages")[0].GetProperty("questions").GetArrayLength());
+
+        // 参照元の構造・資格情報に関わる語を、応答のどこにも出さない
+        foreach (var leaked in new[]
+        {
+            "sourceSiteId", "credentialId", "cred-1", "sourceColumn", "sourceColumnKind",
+            "allowedColumns", "maxResults", "allowPrefix", "ClassA", "ClassB",
+        })
+        {
+            Assert.DoesNotContain(leaked, text, StringComparison.Ordinal);
+        }
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var current = new DirectoryInfo(AppContext.BaseDirectory); current is not null; current = current.Parent)
