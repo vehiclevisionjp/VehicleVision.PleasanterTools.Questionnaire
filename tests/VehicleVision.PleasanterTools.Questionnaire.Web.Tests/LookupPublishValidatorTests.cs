@@ -31,6 +31,9 @@ public sealed class LookupPublishValidatorTests
         public Task<IReadOnlyList<LookupCredentialStatus>> ListStatusAsync(Guid s, CancellationToken c = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlySet<string>> ListReferencedAsync(Guid s, CancellationToken c = default) =>
+            throw new NotSupportedException();
+
         public Task<LookupSecretResolution> ResolveSecretAsync(Guid s, string id, CancellationToken c = default) =>
             throw new NotSupportedException();
     }
