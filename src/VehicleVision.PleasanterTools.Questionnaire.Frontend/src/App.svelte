@@ -34,6 +34,7 @@
   import {
     answerWithValue,
     LookupSessionHolder,
+    lookupWarningId,
     parsePublicLookups,
     type LookupPublicDefinition,
   } from './lib/lookup';
@@ -174,6 +175,26 @@
       ),
     ),
   );
+
+  /**
+   * 警告が出ている入力先（定義の ID → 設問 ID）。入力先の `aria-describedby` へ警告を関連付ける（Issue #884）。
+   */
+  let lookupWarned = $state<Record<string, string[]>>({});
+
+  function setLookupWarnings(lookupId: string, questionIds: string[]) {
+    const current = lookupWarned[lookupId] ?? [];
+    if (current.length === questionIds.length && current.every((id, i) => id === questionIds[i])) {
+      return;
+    }
+    lookupWarned = { ...lookupWarned, [lookupId]: questionIds };
+  }
+
+  /** その設問へ関連付ける、ルックアップの警告の要素 ID。 */
+  function lookupWarningIdsFor(questionId: string): string[] {
+    return Object.entries(lookupWarned).flatMap(([lookupId, ids]) =>
+      ids.includes(questionId) ? [lookupWarningId(lookupId, questionId)] : [],
+    );
+  }
 
   function lookupsFor(questionId: string): LookupPublicDefinition[] {
     return lookups.filter((lookup) => lookup.anchorQuestionId === questionId);
@@ -979,6 +1000,7 @@
           assetUrl={contentAssetUrl}
           bind:answer={answers[question.questionId]}
           error={errors[question.questionId]}
+          describedBy={lookupWarningIdsFor(question.questionId)}
         >
           {#snippet extra()}
             {#each lookupsFor(question.questionId) as lookup (lookup.lookupId)}
@@ -994,6 +1016,7 @@
                   visible={path.visible}
                   sessions={lookupSessions}
                   onapply={applyLookup}
+                  onwarnings={setLookupWarnings}
                 />
               {/if}
             {/each}

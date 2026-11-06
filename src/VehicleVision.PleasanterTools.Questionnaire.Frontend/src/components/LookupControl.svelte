@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { DEFAULT_LANGUAGE, type Language } from '../lib/i18n/language';
   import { translator } from '../lib/i18n/messages';
   import {
     keySnapshot,
     keyValues,
     LOOKUP_FAILURE_MESSAGES,
+    lookupWarningId,
     LookupRequestTracker,
     missingKeyQuestionIds,
     planApply,
@@ -47,6 +48,11 @@
     search?: (keys: Record<string, string>) => Promise<LookupSearchResult>;
     /** 入力先へ値を書き込む。呼び出し側が通常の入力と同じ扱いにする。 */
     onapply: (changes: { questionId: string; value: string }[]) => void;
+    /**
+     * 警告が出ている入力先を知らせる（Issue #884）。空配列で解除。
+     * 呼び出し側は、その入力先の `aria-describedby` へ `lookupWarningId` の要素を足す。
+     */
+    onwarnings?: (lookupId: string, questionIds: string[]) => void;
   }
 
   let {
@@ -61,6 +67,7 @@
     sessions,
     search,
     onapply,
+    onwarnings,
   }: Props = $props();
 
   type DialogMode = 'choose' | 'confirm';
@@ -90,7 +97,7 @@
   /** 進行状況・件数・0 件・反映完了。`role="status"` で読み上げる。 */
   let status = $state('');
   let error = $state('');
-  let warnings = $state<string[]>([]);
+  let warnings = $state<{ questionId: string; message: string }[]>([]);
   let dialog = $state<DialogState | null>(null);
   let button = $state<HTMLButtonElement | null>(null);
   let dialogElement = $state<HTMLDialogElement | null>(null);
@@ -125,6 +132,20 @@
       void closeDialog(false);
       status = t('lookup.stale');
     }
+  });
+
+  $effect(() => {
+    // **警告のある入力先を呼び出し側へ知らせ、入力先の `aria-describedby` と関連付ける。**
+    // 通知先が持つ状態を、この効果の依存にしない（untrack）
+    const id = lookup.lookupId;
+    const questionIds = warnings.map((warning) => warning.questionId);
+    untrack(() => onwarnings?.(id, questionIds));
+  });
+
+  $effect(() => {
+    // この部品が外れたときは、関連付けを解除する
+    const id = untrack(() => lookup.lookupId);
+    return () => onwarnings?.(id, []);
   });
 
   $effect(() => {
@@ -165,12 +186,14 @@
     return planApply(lookup, candidate, response.warnings, answers, questions, visible);
   }
 
-  function describeWarnings(result: LookupApplyPlan): string[] {
-    return result.warnings.map((warning) =>
-      t(warning.reason === 'choiceUnavailable' ? 'lookup.choiceUnavailable' : 'lookup.valueInvalid', {
-        question: questionTitle(warning.questionId),
-      }),
-    );
+  function describeWarnings(result: LookupApplyPlan): { questionId: string; message: string }[] {
+    return result.warnings.map((warning) => ({
+      questionId: warning.questionId,
+      message: t(
+        warning.reason === 'choiceUnavailable' ? 'lookup.choiceUnavailable' : 'lookup.valueInvalid',
+        { question: questionTitle(warning.questionId) },
+      ),
+    }));
   }
 
   async function apply(result: LookupApplyPlan) {
@@ -335,8 +358,8 @@
 
   {#if warnings.length > 0}
     <ul class="warnings" role="alert">
-      {#each warnings as warning (warning)}
-        <li>{warning}</li>
+      {#each warnings as warning (warning.questionId)}
+        <li id={lookupWarningId(lookup.lookupId, warning.questionId)}>{warning.message}</li>
       {/each}
     </ul>
   {/if}

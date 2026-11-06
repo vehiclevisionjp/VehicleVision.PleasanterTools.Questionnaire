@@ -337,6 +337,15 @@ export function planApply(
   return plan;
 }
 
+/**
+ * 入力先への警告の要素 ID。**入力先の `aria-describedby` が指す先**（Issue #884）。
+ * 警告は `LookupControl` が描き、入力先の設問（`QuestionField`）がこの ID で関連付ける。
+ * 設問 ID・定義の ID は管理者が決める識別子で、回答者の入力や取得値は含まれない。
+ */
+export function lookupWarningId(lookupId: string, questionId: string): string {
+  return `lookup-warning-${lookupId}-${questionId}`;
+}
+
 /** 入力先 1 つへ値を入れた回答。**他の中身（「その他」の記述など）は持ち越さない。** */
 export function answerWithValue(value: string): AnswerState {
   return { values: [value], otherText: '' };
