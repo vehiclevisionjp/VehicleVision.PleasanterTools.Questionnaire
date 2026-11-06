@@ -1205,4 +1205,159 @@ export const de: Partial<Record<MessageKey, string>> = {
   "flow.InvalidButtonUrl": "Die URL des benutzerdefinierten Links ist nicht zulässig",
   "flow.DuplicateButtonId": "Kennungen benutzerdefinierter Links sind doppelt",
   "flow.AllButtonsMayBeHidden": "Bei einigen Antworten können alle Schaltflächen gleichzeitig ausgeblendet sein",
+
+  "lookupAdmin.title": "Lookup-Einstellungen",
+  "lookupAdmin.intro":
+    "Legen Sie eine Schaltfläche fest, die eine Pleasanter-Quell-Site durchsucht und die Werte des gewählten Datensatzes in die Zielfragen überträgt. Dies ist unabhängig von der „Zuordnung“ (wo Antworten gespeichert werden). Gespeichert wird wie bei den Fragen mit „Speichern“ (nur der API-Schlüssel wird bei der Eingabe sofort gesendet).",
+  "lookupAdmin.publicDataWarning":
+    "Erlauben Sie nur Daten, die jede Person abrufen darf, die den Schlüssel kennt.",
+  "lookupAdmin.realDataWarning":
+    "Auch bei reinem Lesezugriff greifen Vorschau und Testveröffentlichung auf die echten Daten der Quell-Site zu. Verwenden Sie eine eigene Site für die Veröffentlichung und ein dediziertes Konto, das nur diese Site lesen kann.",
+  "lookupAdmin.readOnly":
+    "Nur Umfrageadministratoren können die Lookup-Einstellungen ändern. Hier können Sie sie nur ansehen.",
+  "lookupAdmin.lookupHeading": "Suchschaltfläche: {question}",
+  "lookupAdmin.buttonLabel": "Beschriftung der Schaltfläche",
+  "lookupAdmin.buttonLabelHint":
+    "Wenn leer, wird die Standardbeschriftung („Suchen und ausfüllen“) angezeigt. Es wird nur der Text der Sprache geändert, die Sie gerade bearbeiten.",
+  "lookupAdmin.sourceSite": "Quell-Site (ID)",
+  "lookupAdmin.credential": "Dedizierter API-Schlüssel",
+  "lookupAdmin.credentialConfigured": "Eingerichtet",
+  "lookupAdmin.credentialRevokedState": "Gesperrt (Suche nicht möglich)",
+  "lookupAdmin.credentialUpdated": "Aktualisiert: {at}",
+  "lookupAdmin.credentialNone": "Nicht eingerichtet.",
+  "lookupAdmin.credentialInput": "API-Schlüssel eingeben",
+  "lookupAdmin.credentialReenter": "API-Schlüssel erneut eingeben (ersetzen)",
+  "lookupAdmin.credentialHint":
+    "Der Wert kann nach der Registrierung weder angezeigt noch kopiert werden. Das eingegebene Feld wird nach dem Senden geleert. Verwenden Sie für die Quelle den Schlüssel eines dedizierten Kontos mit reinem Lesezugriff.",
+  "lookupAdmin.credentialRegister": "Registrieren",
+  "lookupAdmin.credentialRotate": "Ersetzen",
+  "lookupAdmin.credentialRevoke": "Sperren",
+  "lookupAdmin.credentialResume": "Fortsetzen",
+  "lookupAdmin.credentialDelete": "Aufheben (löschen)",
+  "lookupAdmin.credentialDuplicateHint":
+    "Sperren und Aufheben wirken sofort auf die Suche aller veröffentlichten Versionen, ohne dass erneut veröffentlicht werden muss. Der Schlüssel wird nicht in eine duplizierte Umfrage übernommen und muss dort neu registriert werden.",
+  "lookupAdmin.credentialSaved": "Der API-Schlüssel wurde gespeichert.",
+  "lookupAdmin.credentialResumed": "Fortgesetzt.",
+  "lookupAdmin.credentialRevoked": "Gesperrt.",
+  "lookupAdmin.credentialDeleted": "Aufgehoben.",
+  "lookupAdmin.credentialDeleteConfirm":
+    "Der dedizierte API-Schlüssel wird aufgehoben. Die Suche in veröffentlichten Umfragen funktioniert dann nicht mehr. Möchten Sie fortfahren?",
+  "lookupAdmin.inspectNeedsKeyAndSite":
+    "Der API-Schlüssel muss registriert und die ID der Quell-Site eingegeben sein.",
+  "lookupAdmin.test": "Verbindung testen",
+  "lookupAdmin.testFailed": "Verbindung oder Leseberechtigung konnte nicht bestätigt werden.",
+  "lookupAdmin.testOk": "Verbindung hergestellt. {count} Spalten wurden abgerufen.",
+  "lookupAdmin.siteIntegrated":
+    "Die Quell-Site verwendet die Site-Integration. Dadurch wird der Bereich erweitert, daher kann nicht veröffentlicht werden.",
+  "lookupAdmin.siteInherits":
+    "Die Quell-Site erbt Berechtigungen von anderer Stelle. Dadurch wird der Bereich erweitert, daher kann nicht veröffentlicht werden.",
+  "lookupAdmin.keys": "Schlüsselfelder und Quellspalten",
+  "lookupAdmin.keyQuestion": "Schlüsselfeld (einzeiliger Text)",
+  "lookupAdmin.sourceColumn": "Schlüsselspalte der Quelle",
+  "lookupAdmin.columnKind": "Spaltentyp",
+  "lookupAdmin.kindText": "Text",
+  "lookupAdmin.kindNumber": "Zahl (ganzzahlig)",
+  "lookupAdmin.prefix": "Präfixsuche erlauben",
+  "lookupAdmin.prefixHint":
+    "Standard ist eine exakte Übereinstimmung. Die Präfixsuche gilt nur für Textspalten und erfordert mindestens 3 Zeichen.",
+  "lookupAdmin.remove": "Entfernen",
+  "lookupAdmin.addKey": "Schlüssel hinzufügen (max. {max})",
+  "lookupAdmin.choose": "Bitte auswählen",
+  "lookupAdmin.targets": "Quellspalten und Zielfelder",
+  "lookupAdmin.targetColumn": "Quellspalte",
+  "lookupAdmin.targetQuestion": "Zielfrage",
+  "lookupAdmin.targetIncompatible": "Der Typ dieser Spalte passt nicht zum Format der Zielfrage.",
+  "lookupAdmin.numberNotNullable":
+    "Bei einer Zahlenspalte muss „Nullable“ aktiviert sein, sonst wird 0 nicht übernommen.",
+  "lookupAdmin.addTarget": "Ziel hinzufügen (max. {max})",
+  "lookupAdmin.partialHint":
+    "Felder, deren abgerufener Wert leer ist, bleiben unverändert. Bei Werten, die nicht zum Ziel passen, wird gewarnt und nur die übrigen Felder werden übernommen.",
+  "lookupAdmin.displayFields": "Im Dialog angezeigte Spalten",
+  "lookupAdmin.displayColumn": "Anzuzeigende Spalte",
+  "lookupAdmin.displayId": "Anzeige-ID (fest)",
+  "lookupAdmin.heading": "Überschrift",
+  "lookupAdmin.addDisplay": "Anzeigespalte hinzufügen",
+  "lookupAdmin.displayHint":
+    "Die Anzeige-ID wird automatisch vergeben und kann nicht geändert werden. Ist die Überschrift leer, wird die Anzeige-ID verwendet.",
+  "lookupAdmin.allowedColumns": "Spalten, die zurückgegeben werden dürfen",
+  "lookupAdmin.allowedHint":
+    "Nur die Quellspalten und die Anzeigespalten werden automatisch erlaubt. Alle anderen Spalten werden nicht an die Befragten zurückgegeben.",
+  "lookupAdmin.maxResults": "Maximale Trefferzahl",
+  "lookupAdmin.maxResultsHint":
+    "Standard sind 10 Treffer, das Maximum ist {max}. Wird die Zahl überschritten, werden keine Treffer angezeigt und die Befragten werden gebeten, die Suche genauer zu formulieren.",
+  "lookupAdmin.removeLookup": "Diese Suchschaltfläche entfernen",
+  "lookupAdmin.anchor": "Frage, bei der die Schaltfläche steht",
+  "lookupAdmin.add": "Suchschaltfläche hinzufügen",
+  "lookupAdmin.checkProblems": "Vor der Veröffentlichung prüfen",
+  "lookupAdmin.checkProblemsHint":
+    "Prüft den gespeicherten Entwurf mit derselben Validierung wie die Testveröffentlichung (es wird auch eine Verbindung zur Quelle hergestellt).",
+  "lookupAdmin.noProblems": "Es wurden keine Mängel gefunden.",
+  "lookupAdmin.previewNote":
+    "Die Suche in der Vorschau durchsucht die Quelle mit den Einstellungen des gespeicherten Entwurfs.",
+  "lookupAdmin.problem.unknown": "Die Einstellungen sind fehlerhaft.",
+  "lookupAdmin.problem.LookupIdInvalid": "Die Such-ID ist leer oder doppelt vorhanden.",
+  "lookupAdmin.problem.SourceKindUnsupported": "Der Quelltyp wird nicht unterstützt.",
+  "lookupAdmin.problem.SourceSiteInvalid": "Die ID der Quell-Site ist ungültig.",
+  "lookupAdmin.problem.CredentialMissing": "Es ist kein dedizierter API-Schlüssel eingerichtet.",
+  "lookupAdmin.problem.AnchorNotFound":
+    "Die Frage, bei der die Schaltfläche stehen soll, existiert nicht.",
+  "lookupAdmin.problem.AnchorDuplicated": "Eine Frage hat mehrere Suchschaltflächen.",
+  "lookupAdmin.problem.KeyCountInvalid": "Verwenden Sie 1 bis 5 Schlüsselfelder.",
+  "lookupAdmin.problem.KeyQuestionNotFound": "Die Frage eines Schlüsselfelds existiert nicht.",
+  "lookupAdmin.problem.KeyQuestionTypeUnsupported":
+    "Schlüsselfelder müssen Fragen mit einzeiligem Text sein.",
+  "lookupAdmin.problem.KeyDuplicated":
+    "Ein Schlüsselfeld oder eine Quellspalte ist doppelt vorhanden oder leer.",
+  "lookupAdmin.problem.KeyPageMismatch":
+    "Ein Schlüsselfeld befindet sich auf einer anderen Seite als die Schaltfläche.",
+  "lookupAdmin.problem.PrefixNotAllowed": "Die Präfixsuche ist nicht erlaubt.",
+  "lookupAdmin.problem.TargetCountInvalid": "Verwenden Sie 1 bis 10 Ziele.",
+  "lookupAdmin.problem.TargetQuestionNotFound": "Eine Zielfrage existiert nicht.",
+  "lookupAdmin.problem.TargetQuestionTypeUnsupported":
+    "Der Typ einer Zielfrage wird nicht unterstützt.",
+  "lookupAdmin.problem.TargetConflict":
+    "Ein Ziel oder eine Quellspalte ist doppelt vorhanden oder leer.",
+  "lookupAdmin.problem.TargetPageMismatch":
+    "Ein Ziel befindet sich auf einer anderen Seite als die Schaltfläche.",
+  "lookupAdmin.problem.AllowedColumnsInvalid": "Es sind keine erlaubten Spalten angegeben.",
+  "lookupAdmin.problem.TargetColumnNotAllowed":
+    "Eine Quellspalte ist nicht in den erlaubten Spalten enthalten.",
+  "lookupAdmin.problem.DisplayColumnNotAllowed":
+    "Eine Anzeigespalte ist leer oder nicht in den erlaubten Spalten enthalten.",
+  "lookupAdmin.problem.DisplayIdInvalid": "Das Format einer Anzeige-ID ist ungültig.",
+  "lookupAdmin.problem.DisplayIdDuplicated": "Eine Anzeige-ID ist doppelt vorhanden.",
+  "lookupAdmin.problem.DisplayColumnsLegacy":
+    "Es sind noch Anzeigespalten im alten Format vorhanden. Erstellen Sie die Anzeigespalten neu.",
+  "lookupAdmin.problem.MaxResultsInvalid":
+    "Die maximale Trefferzahl muss zwischen 1 und 20 liegen.",
+  "lookupAdmin.problem.KeyColumnKindInvalid": "Der Typ der Schlüsselspalte ist nicht angegeben.",
+  "lookupAdmin.problem.CredentialNotFound":
+    "Der dedizierte API-Schlüssel wurde nicht gefunden. Registrieren Sie ihn erneut.",
+  "lookupAdmin.problem.CredentialDisabled": "Der dedizierte API-Schlüssel ist gesperrt.",
+  "lookupAdmin.problem.SourceUnavailable":
+    "Die Quelle ist nicht erreichbar oder die Site-Definition kann nicht gelesen werden.",
+  "lookupAdmin.problem.SourceSiteIntegrated": "Die Quell-Site verwendet die Site-Integration.",
+  "lookupAdmin.problem.SourceSiteInheritsPermission": "Die Quell-Site erbt Berechtigungen.",
+  "lookupAdmin.problem.ColumnNotFound": "Eine Spalte existiert in der Quelle nicht.",
+  "lookupAdmin.problem.KeyColumnTypeUnsupported":
+    "Dieser Spaltentyp kann nicht als Schlüssel dienen (nur Textspalten ohne Auswahlmöglichkeiten oder ganzzahlige Zahlenspalten).",
+  "lookupAdmin.problem.KeyColumnKindMismatch":
+    "Der Typ der Schlüsselspalte weicht von der Spalte der Quelle ab.",
+  "lookupAdmin.problem.PrefixColumnNotText": "Die Präfixsuche gilt nur für Textspalten.",
+  "lookupAdmin.problem.NumberColumnNotNullable":
+    "Bei einer Zahlenspalte ist „Nullable“ nicht aktiviert.",
+  "lookupAdmin.problem.TargetColumnTypeIncompatible":
+    "Der Spaltentyp passt nicht zum Format der Zielfrage.",
+  "lookupAdmin.failure.unauthorized":
+    "Der API-Schlüssel ist ungültig oder das dedizierte Konto ist deaktiviert.",
+  "lookupAdmin.failure.forbidden": "Das dedizierte Konto hat keine Leseberechtigung.",
+  "lookupAdmin.failure.notFound":
+    "Die Quell-Site wurde nicht gefunden oder kann nicht gelesen werden.",
+  "lookupAdmin.failure.credential":
+    "Der dedizierte API-Schlüssel kann nicht verwendet werden (nicht registriert, gesperrt oder nicht entschlüsselbar).",
+  "lookupAdmin.failure.config":
+    "Die Verbindungseinstellungen können nicht verwendet werden. Wenden Sie sich an einen Administrator.",
+  "lookupAdmin.failure.unreachable":
+    "Die Quelle ist nicht erreichbar. Bitte versuchen Sie es später erneut.",
+  "lookupAdmin.failure.other": "Verbindung oder Leseberechtigung konnte nicht bestätigt werden.",
 };

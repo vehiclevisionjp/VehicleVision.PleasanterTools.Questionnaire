@@ -1327,4 +1327,146 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'flow.InvalidButtonUrl': '自定义链接 URL 不被允许',
   'flow.DuplicateButtonId': '自定义链接标识符重复',
   'flow.AllButtonsMayBeHidden': '某些回答会同时隐藏所有按钮',
+
+  'lookupAdmin.title': '查找设置',
+  'lookupAdmin.intro':
+    '设置一个按钮，用于检索参照来源的 Pleasanter 站点，并将所选 1 条记录的值复制到填入目标的问题中。这与“分配”（回答的保存位置）是不同的设置。保存方式与问题等相同，使用“保存”（仅 API 密钥在输入时立即发送）。',
+  'lookupAdmin.publicDataWarning':
+    '请仅允许获取知道关键字的答题者可以取得的数据。',
+  'lookupAdmin.realDataWarning':
+    '即使是只读，预览和测试发布也会访问参照来源的真实数据。请使用专供公开的独立站点，以及只能读取该站点的专用账号。',
+  'lookupAdmin.readOnly':
+    '只有问卷管理员才能更改查找设置。此页面只能查看内容。',
+  'lookupAdmin.lookupHeading': '检索按钮：{question}',
+  'lookupAdmin.buttonLabel': '按钮文字',
+  'lookupAdmin.buttonLabelHint':
+    '未填写时显示默认文字（“检索并填入”）。只会改写当前输入语言的文字。',
+  'lookupAdmin.sourceSite': '参照来源站点（ID）',
+  'lookupAdmin.credential': '专用 API 密钥',
+  'lookupAdmin.credentialConfigured': '已设置',
+  'lookupAdmin.credentialRevokedState': '已失效（无法检索）',
+  'lookupAdmin.credentialUpdated': '更新：{at}',
+  'lookupAdmin.credentialNone': '尚未设置。',
+  'lookupAdmin.credentialInput': '输入 API 密钥',
+  'lookupAdmin.credentialReenter': '重新输入 API 密钥（替换）',
+  'lookupAdmin.credentialHint':
+    '注册后无法显示或复制该值。输入的值在发送后会被清除。参照来源请使用只读专用账号的密钥。',
+  'lookupAdmin.credentialRegister': '注册',
+  'lookupAdmin.credentialRotate': '替换',
+  'lookupAdmin.credentialRevoke': '使其失效',
+  'lookupAdmin.credentialResume': '恢复',
+  'lookupAdmin.credentialDelete': '解除（删除）',
+  'lookupAdmin.credentialDuplicateHint':
+    '失效和解除无需重新发布，会立即对所有已发布版本的检索生效。复制的问卷不会继承此设置，需要重新注册。',
+  'lookupAdmin.credentialSaved': '已保存 API 密钥。',
+  'lookupAdmin.credentialResumed': '已恢复。',
+  'lookupAdmin.credentialRevoked': '已使其失效。',
+  'lookupAdmin.credentialDeleted': '已解除。',
+  'lookupAdmin.credentialDeleteConfirm':
+    '将解除专用 API 密钥，已发布的检索将无法使用。确定吗？',
+  'lookupAdmin.inspectNeedsKeyAndSite':
+    '需要注册 API 密钥并填写参照来源站点 ID。',
+  'lookupAdmin.test': '确认连接',
+  'lookupAdmin.testFailed': '无法确认连接或读取权限。',
+  'lookupAdmin.testOk': '连接成功。已获取 {count} 个列。',
+  'lookupAdmin.siteIntegrated':
+    '参照来源站点使用了站点整合。由于范围会扩大，无法发布。',
+  'lookupAdmin.siteInherits':
+    '参照来源站点继承了其他站点的权限。由于范围会扩大，无法发布。',
+  'lookupAdmin.keys': '关键项目与参照来源列',
+  'lookupAdmin.keyQuestion': '关键项目（单行文本）',
+  'lookupAdmin.sourceColumn': '参照来源的关键列',
+  'lookupAdmin.columnKind': '列的类型',
+  'lookupAdmin.kindText': '字符串',
+  'lookupAdmin.kindNumber': '数值（整数）',
+  'lookupAdmin.prefix': '允许前缀匹配',
+  'lookupAdmin.prefixHint':
+    '基本为完全匹配。前缀匹配仅限字符串列，且需填写 3 个字符以上。',
+  'lookupAdmin.remove': '删除',
+  'lookupAdmin.addKey': '添加关键项目（最多 {max} 个）',
+  'lookupAdmin.choose': '请选择',
+  'lookupAdmin.targets': '填入来源列与填入目标项目',
+  'lookupAdmin.targetColumn': '填入来源的列',
+  'lookupAdmin.targetQuestion': '填入目标的问题',
+  'lookupAdmin.targetIncompatible': '此列的类型与填入目标问题的格式不匹配。',
+  'lookupAdmin.numberNotNullable':
+    '数值列必须启用“Nullable”，否则 0 不会被反映。',
+  'lookupAdmin.addTarget': '添加填入目标（最多 {max} 个）',
+  'lookupAdmin.partialHint':
+    '获取的值为空的项目不会更改。与填入目标不匹配的值会给出警告，仅反映其他项目。',
+  'lookupAdmin.displayFields': '在弹窗中显示的列',
+  'lookupAdmin.displayColumn': '显示的列',
+  'lookupAdmin.displayId': '显示 ID（固定）',
+  'lookupAdmin.heading': '标题',
+  'lookupAdmin.addDisplay': '添加显示列',
+  'lookupAdmin.displayHint':
+    '显示 ID 会自动生成，无法更改。标题为空时将使用显示 ID。',
+  'lookupAdmin.allowedColumns': '允许返回的列',
+  'lookupAdmin.allowedHint':
+    '仅自动允许填入来源的列和显示列。不在此处的列不会返回给答题者。',
+  'lookupAdmin.maxResults': '候选项最大数量',
+  'lookupAdmin.maxResultsHint':
+    '默认为 10 个，上限为 {max} 个。超出时不会显示候选项，而是提示答题者填写更详细的检索条件。',
+  'lookupAdmin.removeLookup': '删除此检索按钮',
+  'lookupAdmin.anchor': '放置按钮的问题',
+  'lookupAdmin.add': '添加检索按钮',
+  'lookupAdmin.checkProblems': '发布前检查',
+  'lookupAdmin.checkProblemsHint':
+    '使用与测试发布相同的验证来检查已保存的草稿（也会连接参照来源）。',
+  'lookupAdmin.noProblems': '未发现问题。',
+  'lookupAdmin.previewNote': '预览中的检索会按已保存草稿的设置检索参照来源。',
+  'lookupAdmin.problem.unknown': '设置存在问题。',
+  'lookupAdmin.problem.LookupIdInvalid': '检索 ID 为空或重复。',
+  'lookupAdmin.problem.SourceKindUnsupported': '不支持该参照来源的类型。',
+  'lookupAdmin.problem.SourceSiteInvalid': '参照来源站点 ID 不正确。',
+  'lookupAdmin.problem.CredentialMissing': '尚未设置专用 API 密钥。',
+  'lookupAdmin.problem.AnchorNotFound': '找不到作为按钮起点的问题。',
+  'lookupAdmin.problem.AnchorDuplicated': '1 个问题中有多个检索按钮。',
+  'lookupAdmin.problem.KeyCountInvalid': '关键项目请设置为 1～5 个。',
+  'lookupAdmin.problem.KeyQuestionNotFound': '找不到关键项目的问题。',
+  'lookupAdmin.problem.KeyQuestionTypeUnsupported':
+    '关键项目只能是单行文本问题。',
+  'lookupAdmin.problem.KeyDuplicated': '关键项目或参照来源的列重复或为空。',
+  'lookupAdmin.problem.KeyPageMismatch': '关键项目与按钮不在同一页面。',
+  'lookupAdmin.problem.PrefixNotAllowed': '不允许前缀匹配。',
+  'lookupAdmin.problem.TargetCountInvalid': '填入目标请设置为 1～10 个。',
+  'lookupAdmin.problem.TargetQuestionNotFound': '找不到填入目标的问题。',
+  'lookupAdmin.problem.TargetQuestionTypeUnsupported':
+    '该问题的格式不能用作填入目标。',
+  'lookupAdmin.problem.TargetConflict': '填入目标或填入来源的列重复或为空。',
+  'lookupAdmin.problem.TargetPageMismatch': '填入目标与按钮不在同一页面。',
+  'lookupAdmin.problem.AllowedColumnsInvalid': '允许的列为空。',
+  'lookupAdmin.problem.TargetColumnNotAllowed': '填入来源的列不在允许的列中。',
+  'lookupAdmin.problem.DisplayColumnNotAllowed':
+    '显示列为空，或不在允许的列中。',
+  'lookupAdmin.problem.DisplayIdInvalid': '显示 ID 的格式不正确。',
+  'lookupAdmin.problem.DisplayIdDuplicated': '显示 ID 重复。',
+  'lookupAdmin.problem.DisplayColumnsLegacy':
+    '仍保留着旧格式的显示列。请重新创建显示列。',
+  'lookupAdmin.problem.MaxResultsInvalid': '候选项最大数量请设置为 1～20。',
+  'lookupAdmin.problem.KeyColumnKindInvalid': '未指定关键列的类型。',
+  'lookupAdmin.problem.CredentialNotFound': '找不到专用 API 密钥。请重新注册。',
+  'lookupAdmin.problem.CredentialDisabled': '专用 API 密钥已失效。',
+  'lookupAdmin.problem.SourceUnavailable':
+    '无法连接参照来源，或无法读取站点的定义。',
+  'lookupAdmin.problem.SourceSiteIntegrated': '参照来源站点使用了站点整合。',
+  'lookupAdmin.problem.SourceSiteInheritsPermission':
+    '参照来源站点继承了权限。',
+  'lookupAdmin.problem.ColumnNotFound': '指向了参照来源中不存在的列。',
+  'lookupAdmin.problem.KeyColumnTypeUnsupported':
+    '该列的类型不能用作关键字（仅限没有选项的字符串列或整数的数值列）。',
+  'lookupAdmin.problem.KeyColumnKindMismatch':
+    '关键列的类型与参照来源的列不一致。',
+  'lookupAdmin.problem.PrefixColumnNotText': '前缀匹配仅限字符串列。',
+  'lookupAdmin.problem.NumberColumnNotNullable': '数值列的“Nullable”未启用。',
+  'lookupAdmin.problem.TargetColumnTypeIncompatible':
+    '列的类型与填入目标问题的格式不匹配。',
+  'lookupAdmin.failure.unauthorized': 'API 密钥不正确，或专用账号已失效。',
+  'lookupAdmin.failure.forbidden': '专用账号没有读取权限。',
+  'lookupAdmin.failure.notFound': '找不到参照来源站点，或没有读取权限。',
+  'lookupAdmin.failure.credential':
+    '无法使用专用 API 密钥（未注册、已失效或无法解密）。',
+  'lookupAdmin.failure.config': '无法使用连接目标的设置。请联系管理员。',
+  'lookupAdmin.failure.unreachable': '无法连接参照来源。请稍后再试。',
+  'lookupAdmin.failure.other': '无法确认连接或读取权限。',
 } as const;
