@@ -20,10 +20,12 @@ internal sealed class AdminContractHost : IAdminContractHost
     private readonly Dictionary<string, string> secrets = new(StringComparer.Ordinal);
     private readonly ContractApplication factory;
 
-    private AdminContractHost(Action<IServiceCollection>? configureServices)
+    private AdminContractHost(
+        Action<IServiceCollection>? configureServices,
+        IReadOnlyDictionary<string, string>? settings)
     {
         Directory.CreateDirectory(Path.Combine(directory, "wwwroot"));
-        factory = new ContractApplication(directory, configureServices);
+        factory = new ContractApplication(directory, configureServices, settings);
     }
 
     internal IServiceProvider Services => factory.Services;
@@ -58,9 +60,11 @@ internal sealed class AdminContractHost : IAdminContractHost
         },
     };
 
-    public static async Task<AdminContractHost> StartAsync(Action<IServiceCollection>? configureServices = null)
+    public static async Task<AdminContractHost> StartAsync(
+        Action<IServiceCollection>? configureServices = null,
+        IReadOnlyDictionary<string, string>? settings = null)
     {
-        var host = new AdminContractHost(configureServices);
+        var host = new AdminContractHost(configureServices, settings);
         try
         {
             QuestionnaireDatabase.Instance.Migrator.MigrateUp(DatabaseProvider.Sqlite, host.factory.ConnectionString);
@@ -149,7 +153,10 @@ internal sealed class AdminContractHost : IAdminContractHost
         private readonly Action<IServiceCollection>? configureServices;
         public string ConnectionString { get; }
 
-        public ContractApplication(string directory, Action<IServiceCollection>? configureServices)
+        public ContractApplication(
+            string directory,
+            Action<IServiceCollection>? configureServices,
+            IReadOnlyDictionary<string, string>? settings)
         {
             this.directory = directory;
             this.configureServices = configureServices;
@@ -162,7 +169,8 @@ internal sealed class AdminContractHost : IAdminContractHost
             Directory.CreateDirectory(parameters);
             // 環境変数より強い専用の設定ファイルで、開発者の DB・資格情報を使わせない。
             File.WriteAllText(Path.Combine(parameters, "General.local.json"),
-                JsonSerializer.Serialize(new Dictionary<string, string?>
+                JsonSerializer.Serialize(new Dictionary<string, string?>(settings?.ToDictionary(
+                    pair => pair.Key, pair => (string?)pair.Value) ?? [])
                 {
                     ["QUESTIONNAIRE_DB_PROVIDER"] = "Sqlite",
                     ["QUESTIONNAIRE_DB_CONNECTIONSTRING"] = ConnectionString,

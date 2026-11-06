@@ -123,11 +123,15 @@ if (sharedStateOptions.UseRedis || useRedisSessionStore)
     var redisConnectionString = StartupSettingValidation.RequireRedisConnectionString(
         builder.Configuration[SharedStateOptions.ConnectionStringKey],
         SharedStateOptions.ConnectionStringKey);
-    var redisConfiguration = ConfigurationOptions.Parse(redisConnectionString);
 
     // **一時的に到達できなくてもアプリ自体は起動する。**
     // 共有状態はプロセス内へ倒し、セッション照合はログアウト扱いにする。
-    redisConfiguration.AbortOnConnectFail = false;
+    // **待ち時間は短くする**（既定 1 秒・切断中はすぐ失敗。Issue #899）。
+    // 既定の 5 秒のままだと、ルックアップの拒否（503）が約 17 秒後になる
+    var redisConfiguration = SharedStateConnection.CreateOptions(
+        redisConnectionString,
+        StartupSettingValidation.ParseSharedStateTimeoutMilliseconds(
+            builder.Configuration[StartupSettingValidation.SharedStateTimeoutKey]));
     builder.Services.AddSingleton<IConnectionMultiplexer>(
         ConnectionMultiplexer.Connect(redisConfiguration));
 }
@@ -285,6 +289,7 @@ builder.Services.AddSingleton(backlogGuardOptions);
 builder.Services.AddSingleton<ResponseBacklogGuard>();
 
 builder.Services.AddSingleton<ResponseIntake>();
+builder.Services.AddTransient<ResponseReader>();
 
 // **HTTP でやり取りする JSON も定義と同じ設定にする。**
 // 既定のままだと LocalizedText が言語コードのオブジェクトにならず、
@@ -993,6 +998,11 @@ if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
 // **セキュリティヘッダを一式付ける**（_documents/非機能設計.md 1 章）。
 // 埋め込み先だけは 30 秒 TTL の設定スナップショットから要求ごとに差し替える。
 app.UseMiddleware<SecurityHeadersMiddleware>();
+
+// **管理 API の状態を変える要求を、同一オリジンの画面からのものに限る**（Issue #907）。
+// `SameSite=Strict` は同一サイト（登録可能なドメインが同じ別オリジン）を止められない。
+// PathBase を剥がし、経路を照合した後・認証の前に置く（例外の経路は剥がした後の Path で見る）
+app.UseMiddleware<AdminCsrfMiddleware>();
 
 app.UseRateLimiter();
 

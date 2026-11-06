@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { focusFirstError } from './lib/focusError';
+  import { focusFirstError, focusPageHeading, focusSubmitResult as focusSubmitResultIn } from './lib/focusError';
   import { appRoute, appUrl } from './lib/basePath';
   import QuestionField from './components/QuestionField.svelte';
   import NoteContent from './components/NoteContent.svelte';
@@ -549,6 +549,8 @@
         answers[answer.questionId] = {
           values: answer.values ?? [],
           otherText: answer.otherText ?? '',
+          // **グリッドの回答は rows にしか入っていない**（Issue #908）。落とすと再編集で空に戻る
+          ...(answer.rows ? { rows: answer.rows } : {}),
         };
       }
     }
@@ -606,6 +608,7 @@
     }
 
     draftNotice = t('draft.restored');
+    void focusPageTop();
   }
 
   /** 下書きを捨てる。**共有の端末で、前の人の回答を消せる口。** */
@@ -613,6 +616,7 @@
     clearDraft(publicId);
     draftFound = false;
     draftNotice = t('draft.discarded');
+    void focusPageTop();
   }
 
   /**
@@ -633,6 +637,18 @@
     return Object.keys(errors).length === 0;
   }
 
+  /** ページが変わったあと、描き直しを待ってから見出しへフォーカスを移す（Issue #900）。 */
+  async function focusPageTop() {
+    await tick();
+    focusPageHeading(document);
+  }
+
+  /** 送信のあと、フォーカスが落ちていたら戻す（Issue #900）。 */
+  async function focusSubmitResult() {
+    await tick();
+    focusSubmitResultIn(document);
+  }
+
   /** 描き直しを待ってから、最初の誤りへフォーカスを移す。 */
   async function focusErrors() {
     await tick();
@@ -647,12 +663,14 @@
     stepIndex = Math.min(stepIndex + 1, Math.max(steps.length - 1, 0));
     errors = {};
     window.scrollTo({ top: 0 });
+    void focusPageTop();
   }
 
   function goBack() {
     stepIndex = Math.max(stepIndex - 1, 0);
     errors = {};
     window.scrollTo({ top: 0 });
+    void focusPageTop();
   }
 
   /** 選ばれた添付を、設問と組にして取り出す。 */
@@ -810,6 +828,7 @@
       submitError = t('submit.failed');
     } finally {
       submitting = false;
+      void focusSubmitResult();
     }
   }
 
@@ -1244,6 +1263,19 @@
     height: 100%;
     background: var(--accent);
     transition: width var(--motion-duration) ease;
+  }
+
+  /* 強制カラー（Windows のコントラストテーマ）では背景色が OS の色に置き換わり、進捗バーが消える（Issue #902）。
+     枠と、システムカラーの塗りで示す */
+  @media (forced-colors: active) {
+    .progress {
+      border: 1px solid CanvasText;
+    }
+
+    .bar {
+      forced-color-adjust: none;
+      background: Highlight;
+    }
   }
 
   .progress-text {

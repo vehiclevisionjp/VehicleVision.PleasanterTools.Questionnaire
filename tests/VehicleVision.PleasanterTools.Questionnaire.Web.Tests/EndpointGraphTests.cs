@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
@@ -129,6 +131,29 @@ public class EndpointGraphTests
                 endpoint => endpoint.RoutePattern.RawText == route);
             Assert.NotNull(endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>());
         }
+
+        // **別オリジンからの状態変更を拒まない口は、許可リストの 2 本だけ**（Issue #907）。
+        // 口を足したとき、うっかり例外に入れたり、例外の経路が消えたまま残ったりしないように見る
+        var unsafeAdminRoutes = endpoints.OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith(
+                AdminCsrfGuard.ProtectedPrefix, StringComparison.OrdinalIgnoreCase) == true)
+            .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods
+                    ?? [])
+                .Where(method => !HttpMethods.IsGet(method) && !HttpMethods.IsHead(method)
+                    && !HttpMethods.IsOptions(method))
+                .Select(method => (Method: method, Path: endpoint.RoutePattern.RawText!)))
+            .ToList();
+        Assert.True(unsafeAdminRoutes.Count > 50);
+        Assert.Equal(
+            ["/api/admin/saml/acs", "/api/admin/saml/slo"],
+            unsafeAdminRoutes
+                .Where(route => AdminCsrfGuard.CrossSitePostPaths.Contains(
+                    route.Path, StringComparer.OrdinalIgnoreCase))
+                .Select(route => route.Path)
+                .Order(StringComparer.Ordinal));
+        Assert.All(
+            AdminCsrfGuard.CrossSitePostPaths,
+            path => Assert.Contains(unsafeAdminRoutes, route => route.Method == "POST" && route.Path == path));
     }
 
     /// <summary>口が受け取るサービスを、型だけ DI へ置く。</summary>

@@ -1364,6 +1364,15 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'lookupAdmin.credentialDeleted': '已解除。',
   'lookupAdmin.credentialDeleteConfirm':
     '将解除专用 API 密钥，已发布的检索将无法使用。确定吗？',
+  'lookupAdmin.unusedTitle': '未使用的凭据',
+  'lookupAdmin.unusedHint': '已注册但未被任何搜索按钮使用的专用 API 密钥（已保存的草稿或已发布版本引用的不会列出）。请重复使用，不需要时请解除。无法显示其值。',
+  'lookupAdmin.unusedItem': 'ID {id}（{state}）',
+  'lookupAdmin.unusedDelete': '解除（删除）',
+  'lookupAdmin.unusedDeleteConfirm': '将解除（删除）未使用的专用 API 密钥，且无法恢复。是否继续？',
+  'lookupAdmin.credentialReuse': '重复使用未使用的凭据',
+  'lookupAdmin.credentialReusePick': '请选择',
+  'lookupAdmin.credentialReuseButton': '使用此凭据',
+  'lookupAdmin.credentialReused': '已重复使用。保存草稿后生效。',
   'lookupAdmin.inspectNeedsKeyAndSite':
     '需要注册 API 密钥并填写参照来源站点 ID。',
   'lookupAdmin.test': '确认连接',

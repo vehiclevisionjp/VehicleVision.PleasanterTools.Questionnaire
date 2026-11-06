@@ -62,4 +62,38 @@ public class StartupSettingValidationTests
 
         Assert.Contains("QUESTIONNAIRE_X", exception.Message);
     }
+
+    [Theory]
+    [InlineData(null, 1000)]
+    [InlineData("", 1000)]
+    [InlineData("  ", 1000)]
+    [InlineData("100", 100)]
+    [InlineData("1500", 1500)]
+    [InlineData(" 2000 ", 2000)]
+    [InlineData("10000", 10000)]
+    public void 共有ストアの待ち時間は未設定なら1秒_指定があればその値になる(string? value, int expected)
+    {
+        Assert.Equal(expected, StartupSettingValidation.ParseSharedStateTimeoutMilliseconds(value));
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("99")]
+    [InlineData("10001")]
+    [InlineData("-1")]
+    [InlineData("1.5")]
+    [InlineData("abc")]
+    [InlineData("1,000")]
+    public void 共有ストアの待ち時間が範囲外や数でなければ設定名と範囲を示して止める(string value)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => StartupSettingValidation.ParseSharedStateTimeoutMilliseconds(value));
+
+        Assert.Contains("QUESTIONNAIRE_SHARED_STATE_TIMEOUT_MS", exception.Message);
+        Assert.Contains("100", exception.Message);
+        Assert.Contains("10000", exception.Message);
+
+        // 値そのものはメッセージへ出さない
+        Assert.DoesNotContain($"({value})", exception.Message);
+    }
 }

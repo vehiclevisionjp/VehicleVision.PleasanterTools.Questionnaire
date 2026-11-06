@@ -24,6 +24,7 @@
     problemMessageKey,
     SYSTEM_MAX_RESULTS,
     targetQuestionOptions,
+    unusedCredentials,
     withDerivedAllowedColumns,
   } from '../lib/lookupAdmin';
   import {
@@ -56,10 +57,12 @@
     editing: Language;
     /** 設定・API キー・接続試験をしてよい相手か（`lookups.manage`）。 */
     canManage: boolean;
+    /** 下書きの版。保存で変わったら、資格情報の「参照されているか」を読み直す。 */
+    savedRevision?: number;
     onchange: (next: LookupDefinition[]) => void;
   }
 
-  let { surveyId, definition, editing, canManage, onchange }: Props = $props();
+  let { surveyId, definition, editing, canManage, savedRevision, onchange }: Props = $props();
 
   const lookups = $derived(definition.lookups ?? []);
   const allQuestions = $derived(definition.pages.flatMap((page) => page.questions));
@@ -75,14 +78,67 @@
   let problemsChecked = $state(false);
   let problemsError = $state('');
 
-  onMount(async () => {
+  async function reloadCredentials() {
     const result = await loadLookupCredentials(surveyId);
     if (result.ok) {
       credentials = result.value;
+      loadError = '';
     } else {
       loadError = result.message;
     }
+  }
+
+  onMount(reloadCredentials);
+
+  // 下書きを保存すると、サーバー側の「参照されているか」が変わる（再読み込みで孤立したものを正しく出す）
+  let lastRevision: number | undefined;
+  let revisionSeen = false;
+  $effect(() => {
+    const current = savedRevision;
+    if (!revisionSeen) {
+      revisionSeen = true;
+      lastRevision = current;
+      return;
+    }
+    if (current !== lastRevision) {
+      lastRevision = current;
+      void reloadCredentials();
+    }
   });
+
+  /** 未使用の資格情報（Issue #892）。保存済みの定義にも、編集中の定義にも参照されていないもの。 */
+  const unused = $derived(unusedCredentials(credentials, lookups));
+  let reusePick = $state<Record<string, string>>({});
+  let unusedNotice = $state('');
+  let unusedBusy = $state(false);
+
+  function reuse(lookup: LookupDefinition) {
+    const id = reusePick[lookup.lookupId] ?? '';
+    if (id === '' || !unused.some((item) => item.credentialId === id)) {
+      return;
+    }
+    replace(lookup.lookupId, (item) => ({ ...item, credentialId: id }));
+    reusePick = { ...reusePick, [lookup.lookupId]: '' };
+    setNotice(lookup.lookupId, t('lookupAdmin.credentialReused'));
+  }
+
+  async function removeUnused(credential: LookupCredentialStatus) {
+    if (!window.confirm(t('lookupAdmin.unusedDeleteConfirm'))) {
+      return;
+    }
+
+    unusedBusy = true;
+    unusedNotice = '';
+    const result = await deleteLookupCredential(surveyId, credential.credentialId);
+    unusedBusy = false;
+    if (!result.ok) {
+      unusedNotice = result.message;
+      return;
+    }
+
+    credentials = credentials.filter((item) => item.credentialId !== credential.credentialId);
+    unusedNotice = t('lookupAdmin.credentialDeleted');
+  }
 
   function questionTitle(questionId: string): string {
     const question = allQuestions.find((item) => item.questionId === questionId);
@@ -350,6 +406,30 @@
             oninput={(event) => (apiKeys = { ...apiKeys, [lookup.lookupId]: event.currentTarget.value })}
           />
         </label>
+        {#if !status && unused.length > 0}
+          <label>
+            {t('lookupAdmin.credentialReuse')}
+            <select bind:value={reusePick[lookup.lookupId]} data-testid="credential-reuse-select">
+              <option value="">{t('lookupAdmin.credentialReusePick')}</option>
+              {#each unused as item (item.credentialId)}
+                <option value={item.credentialId}>
+                  {t('lookupAdmin.unusedItem', {
+                    id: item.credentialId.slice(0, 8),
+                    state: item.isEnabled ? t('lookupAdmin.credentialConfigured') : t('lookupAdmin.credentialRevokedState'),
+                  })} - {item.updatedAt}
+                </option>
+              {/each}
+            </select>
+          </label>
+          <button
+            type="button"
+            class="secondary"
+            disabled={busy[lookup.lookupId] || (reusePick[lookup.lookupId] ?? '') === ''}
+            onclick={() => reuse(lookup)}
+          >
+            {t('lookupAdmin.credentialReuseButton')}
+          </button>
+        {/if}
         <p class="hint">{t('lookupAdmin.credentialHint')}</p>
         <div class="row">
           <button
@@ -639,6 +719,32 @@
     </div>
   {/if}
 
+  {#if canManage && unused.length > 0}
+    <div class="unused" data-testid="unused-credentials">
+      <h3>{t('lookupAdmin.unusedTitle')}</h3>
+      <p class="hint">{t('lookupAdmin.unusedHint')}</p>
+      <ul>
+        {#each unused as item (item.credentialId)}
+          <li class="row">
+            <span>
+              {t('lookupAdmin.unusedItem', {
+                id: item.credentialId.slice(0, 8),
+                state: item.isEnabled ? t('lookupAdmin.credentialConfigured') : t('lookupAdmin.credentialRevokedState'),
+              })}
+              <span class="hint">{t('lookupAdmin.credentialUpdated', { at: item.updatedAt })}</span>
+            </span>
+            <button type="button" class="secondary" disabled={unusedBusy} onclick={() => removeUnused(item)}>
+              {t('lookupAdmin.unusedDelete')}
+            </button>
+          </li>
+        {/each}
+      </ul>
+      {#if unusedNotice}<p class="hint" role="status">{unusedNotice}</p>{/if}
+    </div>
+  {:else if unusedNotice}
+    <p class="hint" role="status">{unusedNotice}</p>
+  {/if}
+
   <div class="check">
     <button type="button" class="secondary" onclick={checkProblems}>{t('lookupAdmin.checkProblems')}</button>
     <p class="hint">{t('lookupAdmin.checkProblemsHint')}</p>
@@ -704,6 +810,11 @@
     display: block;
     width: 100%;
     margin-block-start: var(--space-1);
+    padding: 0.4rem var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font: inherit;
+    box-sizing: border-box;
   }
 
   .grid {
@@ -745,6 +856,7 @@
 
   .credential,
   .inspect,
+  .unused,
   .check {
     margin-block-start: var(--space-3);
   }

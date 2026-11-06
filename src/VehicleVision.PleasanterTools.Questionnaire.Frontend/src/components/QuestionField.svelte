@@ -61,6 +61,11 @@
 
   const labelId = $derived(`label-${question.questionId}`);
   const errorId = $derived(`error-${question.questionId}`);
+  /** 補足文の ID。群の `aria-describedby` へ結び付ける（Issue #900）。 */
+  const descriptionId = $derived(`description-${question.questionId}`);
+  const selectionLimitsId = $derived(`selection-limits-${question.questionId}`);
+  const fileLimitsId = $derived(`file-limits-${question.questionId}`);
+  const rankingLeadId = $derived(`ranking-lead-${question.questionId}`);
 
   /** `aria-describedby` の値。空なら属性ごと省く。 */
   function describedByOf(...ids: (string | false | undefined)[]): string | undefined {
@@ -219,6 +224,9 @@
       : [],
   );
 
+  /** 記法でない（プレーンな）設問の説明があるか。 */
+  const hasPlainDescription = $derived(descriptionBlocks.length === 0 && !!question.description);
+
   const normalizationNotice = $derived(
     hasAnswerNormalization(question.settings) ? t('question.normalizationNotice') : '',
   );
@@ -244,7 +252,13 @@
   <fieldset
     class="field"
     class:has-error={error !== undefined}
-    aria-describedby={describedByOf(error && errorId)}
+    aria-describedby={describedByOf(
+      error && errorId,
+      hasPlainDescription && descriptionId,
+      selectionLimits !== '' && selectionLimitsId,
+      question.type === 'File' && fileLimits !== '' && fileLimitsId,
+      question.type === 'Ranking' && rankingLeadId,
+    )}
   >
     {#if question.type !== 'Confirm'}
       <legend id={labelId}>
@@ -277,12 +291,12 @@
     {#if descriptionBlocks.length > 0}
       <div class="description"><NoteContent blocks={descriptionBlocks} {assetUrl} /></div>
     {:else if question.description}
-      <p class="description">{text(question.description, language)}</p>
+      <p class="description" id={descriptionId}>{text(question.description, language)}</p>
     {/if}
 
     <!-- **選べる数は設問の頭で伝える。** 選び終えてから弾かれると選び直しになる -->
     {#if selectionLimits !== ''}
-      <p class="description">{selectionLimits}</p>
+      <p class="description" id={selectionLimitsId}>{selectionLimits}</p>
     {/if}
 
     {#if normalizationNotice !== ''}
@@ -401,9 +415,8 @@
     {:else if question.type === 'Rating'}
       <div
         class="rating"
-        role="radiogroup"
+        role="group"
         aria-labelledby={labelId}
-        aria-invalid={error !== undefined}
       >
         {#each scaleValues as value (value)}
           <button
@@ -412,7 +425,8 @@
             class:filled={Number(current.values[0] ?? '0') >= value}
             aria-label={t('question.ratingLabel', { value, max: scaleValues.at(-1) ?? value })}
             aria-pressed={current.values.includes(String(value))}
-            onclick={() => setSingle(String(value))}>★</button
+            onclick={() => setSingle(String(value))}
+            >{Number(current.values[0] ?? '0') >= value ? '★' : '☆'}</button
           >
         {/each}
       </div>
@@ -436,7 +450,7 @@
         onchange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))}
       />
       {#if fileLimits !== ''}
-        <p class="description">{fileLimits}</p>
+        <p class="description" id={fileLimitsId}>{fileLimits}</p>
       {/if}
       {#if (current.files ?? []).length > 0}
         <ul class="files">
@@ -494,7 +508,7 @@
         </table>
       </div>
     {:else if question.type === 'Ranking'}
-      <p class="description">{t('question.rankingLead')}</p>
+      <p class="description" id={rankingLeadId}>{t('question.rankingLead')}</p>
 
       <ol class="ranking">
         {#each question.choices as choice (choice.value)}
@@ -587,6 +601,9 @@
     border-radius: var(--radius-md);
     padding: var(--space-4) 1.25rem;
     margin: 0 0 var(--space-4);
+    /* **内容の最小幅で枠を押し広げない**（Issue #901）。fieldset の既定は min-content で、長い語が画面幅を超えさせる */
+    min-width: 0;
+    overflow-wrap: anywhere;
     &.has-error {
       border-color: var(--error);
     }
@@ -760,6 +777,8 @@
 
   .rank-item {
     display: flex;
+    /* **狭い幅では ↑↓ の釦を次の行へ回す**（Issue #901）。選択肢名の列が 1 文字幅まで潰れるのを防ぐ */
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
     border: 1px solid var(--border);
@@ -777,7 +796,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    flex: 1;
+    flex: 1 1 12rem;
+    min-width: 0;
     background: none;
     border: none;
     padding: var(--space-2);
@@ -788,7 +808,7 @@
 
   .rank-badge {
     flex: 0 0 auto;
-    min-width: 5rem;
+    min-width: 3.5rem;
     color: var(--muted);
     font-size: 0.85rem;
   }

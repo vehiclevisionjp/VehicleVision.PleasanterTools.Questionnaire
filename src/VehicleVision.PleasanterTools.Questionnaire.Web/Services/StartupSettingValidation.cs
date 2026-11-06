@@ -12,6 +12,16 @@ public static class StartupSettingValidation
 {
     public const string DatabaseProviderKey = "QUESTIONNAIRE_DB_PROVIDER";
     public const string SecretKeyKey = "QUESTIONNAIRE_SECRET_KEY";
+    public const string SharedStateTimeoutKey = "QUESTIONNAIRE_SHARED_STATE_TIMEOUT_MS";
+
+    /// <summary>共有ストアの待ち時間（ミリ秒）の既定値。</summary>
+    public const int DefaultSharedStateTimeoutMilliseconds = 1000;
+
+    /// <summary>共有ストアの待ち時間の下限（ミリ秒）。</summary>
+    public const int MinimumSharedStateTimeoutMilliseconds = 100;
+
+    /// <summary>共有ストアの待ち時間の上限（ミリ秒）。</summary>
+    public const int MaximumSharedStateTimeoutMilliseconds = 10000;
 
     /// <summary>DB の種類を読む。未設定（null）は SQL Server。</summary>
     public static DatabaseProvider ParseDatabaseProvider(string? value)
@@ -53,5 +63,33 @@ public static class StartupSettingValidation
         }
 
         return value;
+    }
+
+    /// <summary>
+    /// 共有ストアの接続・操作の待ち時間（ミリ秒）を読む。未設定・空は既定の 1000。
+    /// 範囲外・数でない値は、設定名と使える範囲を添えて起動時に止める（値そのものは出さない）。
+    /// </summary>
+    public static int ParseSharedStateTimeoutMilliseconds(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return DefaultSharedStateTimeoutMilliseconds;
+        }
+
+        if (int.TryParse(
+                value.Trim(),
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var milliseconds)
+            && milliseconds is >= MinimumSharedStateTimeoutMilliseconds
+                and <= MaximumSharedStateTimeoutMilliseconds)
+        {
+            return milliseconds;
+        }
+
+        throw new InvalidOperationException(
+            $"{SharedStateTimeoutKey} には {MinimumSharedStateTimeoutMilliseconds} から "
+            + $"{MaximumSharedStateTimeoutMilliseconds} の整数（ミリ秒）を指定する"
+            + $"（未設定なら {DefaultSharedStateTimeoutMilliseconds}）");
     }
 }

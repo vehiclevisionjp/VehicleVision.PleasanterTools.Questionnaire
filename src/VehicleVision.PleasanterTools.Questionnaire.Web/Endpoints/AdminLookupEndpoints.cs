@@ -21,15 +21,26 @@ public sealed record LookupInspectRequest(string? CredentialId, long? SourceSite
 public sealed record LookupPreviewSearchRequest(Dictionary<string, string?>? Keys);
 
 /// <summary>資格情報の状態の応答。**秘密（平文も暗号文）は含めない。**</summary>
+/// <param name="IsReferenced">
+/// 保存済みの定義（下書き・公開した版）が参照しているか（Issue #892）。<c>false</c> は、登録だけして
+/// 保存しなかった「孤立した資格情報」。画面で編集中の未保存の定義は含まない。
+/// </param>
 public sealed record LookupCredentialStatusResponse(
     string CredentialId,
     string SourceKind,
     bool IsEnabled,
     DateTime UpdatedAt,
-    string? UpdatedBy)
+    string? UpdatedBy,
+    bool IsReferenced)
 {
-    public static LookupCredentialStatusResponse From(LookupCredentialStatus status) =>
-        new(status.CredentialId, status.SourceKind.ToString(), status.IsEnabled, status.UpdatedAt, status.UpdatedBy);
+    public static LookupCredentialStatusResponse From(LookupCredentialStatus status, bool isReferenced) =>
+        new(
+            status.CredentialId,
+            status.SourceKind.ToString(),
+            status.IsEnabled,
+            status.UpdatedAt,
+            status.UpdatedBy,
+            isReferenced);
 }
 
 /// <summary>参照元の列 1 本の応答（管理者向け。名前と種類だけ）。</summary>
@@ -96,7 +107,10 @@ public static class AdminLookupEndpoints
             }
 
             var list = await credentials.ListStatusAsync(surveyId, cancellationToken).ConfigureAwait(false);
-            return Results.Ok(list.Select(LookupCredentialStatusResponse.From));
+            var referenced = await credentials.ListReferencedAsync(surveyId, cancellationToken)
+                .ConfigureAwait(false);
+            return Results.Ok(list.Select(
+                status => LookupCredentialStatusResponse.From(status, referenced.Contains(status.CredentialId))));
         });
 
         group.MapPost("/credentials", async (
@@ -124,7 +138,9 @@ public static class AdminLookupEndpoints
             AuditNotes.SetTarget(context, "survey", surveyId.ToString());
             AuditNotes.Add(context, "credentialId", id);
             var status = await credentials.FindStatusAsync(surveyId, id, cancellationToken).ConfigureAwait(false);
-            return Results.Ok(LookupCredentialStatusResponse.From(status!));
+            return Results.Ok(LookupCredentialStatusResponse.From(
+                status!, await IsReferencedAsync(credentials, surveyId, status!.CredentialId, cancellationToken)
+                    .ConfigureAwait(false)));
         }).RequireAuthorization(manage);
 
         group.MapPut("/credentials/{credentialId}", async (
@@ -158,7 +174,9 @@ public static class AdminLookupEndpoints
             AuditNotes.Add(context, "credentialId", credentialId);
             var status = await credentials.FindStatusAsync(surveyId, credentialId, cancellationToken)
                 .ConfigureAwait(false);
-            return Results.Ok(LookupCredentialStatusResponse.From(status!));
+            return Results.Ok(LookupCredentialStatusResponse.From(
+                status!, await IsReferencedAsync(credentials, surveyId, status!.CredentialId, cancellationToken)
+                    .ConfigureAwait(false)));
         }).RequireAuthorization(manage);
 
         // 失効・再開。**公開し直さずに全公開版の実行時へ効く**
@@ -193,7 +211,9 @@ public static class AdminLookupEndpoints
             AuditNotes.Add(context, "enabled", enabled ? "true" : "false");
             var status = await credentials.FindStatusAsync(surveyId, credentialId, cancellationToken)
                 .ConfigureAwait(false);
-            return Results.Ok(LookupCredentialStatusResponse.From(status!));
+            return Results.Ok(LookupCredentialStatusResponse.From(
+                status!, await IsReferencedAsync(credentials, surveyId, status!.CredentialId, cancellationToken)
+                    .ConfigureAwait(false)));
         }).RequireAuthorization(manage);
 
         group.MapDelete("/credentials/{credentialId}", async (
@@ -359,6 +379,14 @@ public static class AdminLookupEndpoints
 
         return builder;
     }
+
+    private static async Task<bool> IsReferencedAsync(
+        ILookupCredentialStore credentials,
+        Guid surveyId,
+        string credentialId,
+        CancellationToken cancellationToken) =>
+        (await credentials.ListReferencedAsync(surveyId, cancellationToken).ConfigureAwait(false))
+        .Contains(credentialId);
 
     private static string? UserOf(HttpContext context) =>
         context.User.FindFirstValue(ClaimTypes.NameIdentifier);

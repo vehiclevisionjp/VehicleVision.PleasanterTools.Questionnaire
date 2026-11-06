@@ -44,6 +44,9 @@ public sealed class LookupSearchServiceTests
 
         public Task<IReadOnlyList<LookupCredentialStatus>> ListStatusAsync(Guid s, CancellationToken c = default) =>
             throw new NotSupportedException();
+
+        public Task<IReadOnlySet<string>> ListReferencedAsync(Guid s, CancellationToken c = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class FakeHandler : HttpMessageHandler
