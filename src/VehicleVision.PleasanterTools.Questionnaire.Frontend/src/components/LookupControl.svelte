@@ -268,6 +268,15 @@
       }
     } finally {
       searching = false;
+
+      // **0 件・失敗・古い応答のときは、モーダルを開かない。** 検索中は釦が無効になり、
+      // フォーカスが `<body>` へ落ちているので、起点の釦へ戻す（Issue #900）
+      if (dialog === null) {
+        await tick();
+        if (document.activeElement === document.body || document.activeElement === null) {
+          button?.focus();
+        }
+      }
     }
   }
 

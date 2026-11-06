@@ -61,6 +61,11 @@
 
   const labelId = $derived(`label-${question.questionId}`);
   const errorId = $derived(`error-${question.questionId}`);
+  /** 補足文の ID。群の `aria-describedby` へ結び付ける（Issue #900）。 */
+  const descriptionId = $derived(`description-${question.questionId}`);
+  const selectionLimitsId = $derived(`selection-limits-${question.questionId}`);
+  const fileLimitsId = $derived(`file-limits-${question.questionId}`);
+  const rankingLeadId = $derived(`ranking-lead-${question.questionId}`);
 
   /** `aria-describedby` の値。空なら属性ごと省く。 */
   function describedByOf(...ids: (string | false | undefined)[]): string | undefined {
@@ -219,6 +224,9 @@
       : [],
   );
 
+  /** 記法でない（プレーンな）設問の説明があるか。 */
+  const hasPlainDescription = $derived(descriptionBlocks.length === 0 && !!question.description);
+
   const normalizationNotice = $derived(
     hasAnswerNormalization(question.settings) ? t('question.normalizationNotice') : '',
   );
@@ -244,7 +252,13 @@
   <fieldset
     class="field"
     class:has-error={error !== undefined}
-    aria-describedby={describedByOf(error && errorId)}
+    aria-describedby={describedByOf(
+      error && errorId,
+      hasPlainDescription && descriptionId,
+      selectionLimits !== '' && selectionLimitsId,
+      question.type === 'File' && fileLimits !== '' && fileLimitsId,
+      question.type === 'Ranking' && rankingLeadId,
+    )}
   >
     {#if question.type !== 'Confirm'}
       <legend id={labelId}>
@@ -277,12 +291,12 @@
     {#if descriptionBlocks.length > 0}
       <div class="description"><NoteContent blocks={descriptionBlocks} {assetUrl} /></div>
     {:else if question.description}
-      <p class="description">{text(question.description, language)}</p>
+      <p class="description" id={descriptionId}>{text(question.description, language)}</p>
     {/if}
 
     <!-- **選べる数は設問の頭で伝える。** 選び終えてから弾かれると選び直しになる -->
     {#if selectionLimits !== ''}
-      <p class="description">{selectionLimits}</p>
+      <p class="description" id={selectionLimitsId}>{selectionLimits}</p>
     {/if}
 
     {#if normalizationNotice !== ''}
@@ -436,7 +450,7 @@
         onchange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))}
       />
       {#if fileLimits !== ''}
-        <p class="description">{fileLimits}</p>
+        <p class="description" id={fileLimitsId}>{fileLimits}</p>
       {/if}
       {#if (current.files ?? []).length > 0}
         <ul class="files">
@@ -494,7 +508,7 @@
         </table>
       </div>
     {:else if question.type === 'Ranking'}
-      <p class="description">{t('question.rankingLead')}</p>
+      <p class="description" id={rankingLeadId}>{t('question.rankingLead')}</p>
 
       <ol class="ranking">
         {#each question.choices as choice (choice.value)}
