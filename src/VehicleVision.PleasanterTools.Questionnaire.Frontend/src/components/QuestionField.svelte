@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { AnswerState, LocalizedText, Question } from '../lib/types';
   import {
     allowsMultiplePerRow,
@@ -26,6 +27,8 @@
     error?: string;
     /** 記法に含まれる自前資産を、本アプリの配信口へ変換する。 */
     assetUrl?: (assetId: string) => string;
+    /** 入力の後ろへ足す部品（ルックアップのボタンなど。Issue #871）。 */
+    extra?: Snippet;
   }
 
   let {
@@ -35,6 +38,7 @@
     answer = $bindable(),
     error,
     assetUrl,
+    extra,
   }: Props = $props();
 
   const t = $derived(translator(language));
@@ -557,6 +561,9 @@
       />
     {/if}
 
+    {#if extra}
+      {@render extra()}
+    {/if}
     {#if error}
       <!-- **読み上げに届く形でエラーを出す** -->
       <p class="error" id={errorId} role="alert">{error}</p>

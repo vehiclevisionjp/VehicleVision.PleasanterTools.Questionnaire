@@ -4,6 +4,7 @@
   import { appRoute, appUrl } from './lib/basePath';
   import QuestionField from './components/QuestionField.svelte';
   import NoteContent from './components/NoteContent.svelte';
+  import LookupControl from './components/LookupControl.svelte';
   import ReadabilityControls from './components/ReadabilityControls.svelte';
   import {
     forgetSubmission,
@@ -30,12 +31,19 @@
     type CaptchaChallenge,
     type CaptchaWidget,
   } from './lib/captcha';
+  import {
+    answerWithValue,
+    LookupSessionHolder,
+    parsePublicLookups,
+    type LookupPublicDefinition,
+  } from './lib/lookup';
   import { conditionSatisfied, isAllowedButtonUrl, toSteps, tracePath } from './lib/flow';
   import { applyShuffle, createShuffleSeed } from './lib/shuffle';
   import type {
     AnswerState,
     PageButtonCondition,
     PayloadAnswer,
+    Question,
     RejectionReason,
     SurveyDefinition,
   } from './lib/types';
@@ -151,6 +159,36 @@
   let colorScheme = $state<ThemeColorScheme>();
   let publicId = $state('');
   let responseToken = $state('');
+
+  /**
+   * 回答画面用のルックアップ定義（Issue #871）。**公開用の形だけを受け取る。**
+   * 無ければボタンは出ない（既定は無効のまま）。
+   */
+  let lookups = $state<LookupPublicDefinition[]>([]);
+  /** 検索用トークンの入れ物。**メモリだけ。長期保存しない。** */
+  let lookupSessions = $state<LookupSessionHolder>();
+  const lookupQuestions = $derived(
+    new Map<string, Question>(
+      (definition?.pages ?? []).flatMap((page) =>
+        page.questions.map((question) => [question.questionId, question] as const),
+      ),
+    ),
+  );
+
+  function lookupsFor(questionId: string): LookupPublicDefinition[] {
+    return lookups.filter((lookup) => lookup.anchorQuestionId === questionId);
+  }
+
+  /** 検索結果を、通常の入力と同じ回答の状態へ写す。**検証の誤り表示は、書いた設問だけ外す。** */
+  function applyLookup(changes: { questionId: string; value: string }[]) {
+    for (const { questionId, value } of changes) {
+      answers[questionId] = answerWithValue(value);
+      if (errors[questionId] !== undefined) {
+        const { [questionId]: _removed, ...rest } = errors;
+        errors = rest;
+      }
+    }
+  }
 
   $effect(() => {
     const queries = [
@@ -426,6 +464,16 @@
 
     definition = result.form.definition;
     colorScheme = result.form.colorScheme;
+
+    // **形が違うものは捨てる。** 起点・キー・入力先が定義に無いものも使わない
+    const known = new Set(definition.pages.flatMap((page) => page.questions.map((q) => q.questionId)));
+    lookups = parsePublicLookups(result.form.lookups).filter(
+      (lookup) =>
+        [lookup.anchorQuestionId, ...lookup.keyQuestionIds, ...lookup.targetQuestionIds].every((id) =>
+          known.has(id),
+        ),
+    );
+    lookupSessions = new LookupSessionHolder(publicId);
 
     // **サーバが null の項目を落として返す**ので、`?? true` で受ける。
     // **分からなければ解く側に倒す**（解かずに送って断られる方が重い）
@@ -931,7 +979,26 @@
           assetUrl={contentAssetUrl}
           bind:answer={answers[question.questionId]}
           error={errors[question.questionId]}
-        />
+        >
+          {#snippet extra()}
+            {#each lookupsFor(question.questionId) as lookup (lookup.lookupId)}
+              {#if lookupSessions && definition}
+                <LookupControl
+                  {lookup}
+                  version={definition.version}
+                  {publicId}
+                  {language}
+                  fallbackLanguage={definition.fallbackLanguage}
+                  questions={lookupQuestions}
+                  {answers}
+                  visible={path.visible}
+                  sessions={lookupSessions}
+                  onapply={applyLookup}
+                />
+              {/if}
+            {/each}
+          {/snippet}
+        </QuestionField>
       {/each}
 
       <!-- **ハニーポット。** 画面にも読み上げにも出さず、キーボードでも辿れない場所に置く。
