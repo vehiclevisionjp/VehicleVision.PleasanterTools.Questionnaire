@@ -158,4 +158,41 @@ export const de: Partial<Record<MessageKey, string>> = {
     'Anhänge können derzeit nicht geprüft werden, daher können wir dies noch nicht annehmen',
   'serverValidation.SubmitButtonConditionNotMet': 'Die Bedingungen zum Absenden sind nicht erfüllt',
   'serverValidation.unknown': 'Bitte überprüfen Sie Ihre Eingabe',
+
+  'lookup.search': 'Suchen und ausfüllen',
+  'lookup.keysMissing': 'Geben Sie zum Suchen {fields} ein.',
+  'lookup.searching': 'Es wird gesucht.',
+  'lookup.notFound': 'Es wurde nichts gefunden. Bitte prüfen Sie Ihre Eingabe.',
+  'lookup.chooseTitle': 'Wählen Sie einen Treffer zum Ausfüllen aus',
+  'lookup.candidateCount': 'Es gibt {count} Treffer.',
+  'lookup.candidateLabel': 'Treffer {number}',
+  'lookup.apply': 'Ausfüllen',
+  'lookup.cancel': 'Abbrechen',
+  'lookup.selectFirst': 'Wählen Sie einen Treffer aus, um ihn auszufüllen.',
+  'lookup.applied': 'Das Suchergebnis wurde eingetragen.',
+  'lookup.appliedNothing': 'Es gab keine Werte zum Ausfüllen. Ihre Eingaben wurden nicht geändert.',
+  'lookup.confirmTitle': 'Bereits eingegebene Werte überschreiben?',
+  'lookup.confirmOverwrite':
+    'Möchten Sie die bereits eingegebenen Werte mit dem Suchergebnis überschreiben?',
+  'lookup.confirmFields': 'Felder, die überschrieben werden: {fields}',
+  'lookup.confirmApply': 'Überschreiben und ausfüllen',
+  'lookup.choiceUnavailable':
+    'Der Wert ist keine Antwortoption von {question} und kann daher nicht eingetragen werden.',
+  'lookup.valueInvalid': 'Dieser Wert kann bei {question} nicht eingetragen werden.',
+  'lookup.tooMany': 'Es gibt zu viele Treffer. Bitte geben Sie genauere Suchwerte ein.',
+  'lookup.failed':
+    'Die Daten konnten nicht abgerufen werden. Bitte versuchen Sie es später erneut.',
+  'lookup.timeout': 'Die Suche dauert länger als erwartet. Bitte versuchen Sie es später erneut.',
+  'lookup.rateLimited':
+    'Das Limit für Suchen ist erreicht. Bitte versuchen Sie es in {seconds} Sekunden erneut.',
+  'lookup.rateLimitedLater':
+    'Das Limit für Suchen ist erreicht. Bitte versuchen Sie es später erneut.',
+  'lookup.versionChanged':
+    'Das Formular wurde aktualisiert. Laden Sie die Seite neu und prüfen Sie Ihre Eingaben.',
+  'lookup.sessionExpired': 'Die Suche ist abgelaufen. Bitte suchen Sie erneut.',
+  'lookup.closed': 'In diesem Formular ist die Suche derzeit nicht verfügbar.',
+  'lookup.invalidKeys': 'Bitte prüfen Sie die Suchwerte.',
+  'lookup.requestTooLarge': 'Die Eingabe ist zu lang. Bitte prüfen Sie die Suchwerte.',
+  'lookup.stale':
+    'Die Suchbedingungen haben sich geändert, daher wurde das vorherige Suchergebnis nicht verwendet. Bitte suchen Sie erneut.',
 };
