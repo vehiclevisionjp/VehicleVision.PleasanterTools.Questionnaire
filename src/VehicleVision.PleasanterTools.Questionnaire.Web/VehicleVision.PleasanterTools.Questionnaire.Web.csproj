@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
     <!-- パスワードのハッシュ（PBKDF2）は ASP.NET Core の共有フレームワークに含まれるため
@@ -17,7 +17,7 @@
     <PackageReference Include="Otp.NET" Version="1.4.1" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.18.7" />
     <!-- Pleasanter のログインの本人確認（PleasanterSessionVerifier）は Core.Web（NuGet）へ集約した（Issue #706） -->
-    <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.1.1" />
+    <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.2.0" />
   </ItemGroup>
 
   <ItemGroup>
