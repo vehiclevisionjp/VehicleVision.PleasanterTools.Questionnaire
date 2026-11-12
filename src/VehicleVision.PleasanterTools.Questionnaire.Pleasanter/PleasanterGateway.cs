@@ -44,7 +44,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 /// </para>
 /// <para>
 /// <b>平文 http は既定で拒否する。</b> <see cref="PleasanterOptions.AllowInsecureHttp"/>（環境変数
-/// <c>PLEASANTER_ALLOW_INSECURE_HTTP=true</c> が既定値。検証用の環境だけ）で、ループバック以外の http も許す。
+/// <c>VVPT_PLEASANTER_ALLOW_INSECURE_HTTP=true</c> が既定値。検証用の環境だけ）で、ループバック以外の http も許す。
 /// </para>
 /// <para>**実機の Pleasanter では未検証**（フェイクの通信とループバックのみ）。</para>
 /// </remarks>

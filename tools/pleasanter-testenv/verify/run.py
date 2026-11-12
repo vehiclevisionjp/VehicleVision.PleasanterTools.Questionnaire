@@ -10,7 +10,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(__file__))
-BASE = os.environ.get("PLEASANTER_BASE_URL", "http://pleasanter:8080").rstrip("/")
+BASE = os.environ.get("VVPT_PLEASANTER_BASE_URL", "http://pleasanter:8080").rstrip("/")
 
 RESULTS = []
 
