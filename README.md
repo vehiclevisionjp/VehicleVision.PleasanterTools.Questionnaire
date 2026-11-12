@@ -88,6 +88,18 @@ GitHub Release には、Azure App Service（Windows Web App）とオンプレミ
   [`_documents/Pleasanter-SSO-運用手順書.md`](_documents/Pleasanter-SSO-運用手順書.md)
 - 設定の一覧: [`_documents/設定パラメータ一覧.md`](_documents/設定パラメータ一覧.md)
 
+## 破壊的変更（0.13.x から更新する場合）
+
+- 検証用の環境変数 `PLEASANTER_ALLOW_INSECURE_HTTP` を `VVPT_PLEASANTER_ALLOW_INSECURE_HTTP` へ改名した。
+  **旧名は検出も受け付けもしない**（旧名だけの環境では新名が未設定として扱われる）。設定している環境は書き換える
+  （本番では有効にしない設定）。試験環境のスクリプトの `PLEASANTER_BASE_URL`・`PLEASANTER_API_KEY` も
+  `VVPT_PLEASANTER_BASE_URL`・`VVPT_PLEASANTER_API_KEY` へ改名した
+- `--migrate` / `--migrate-status`: DB の待機期限切れの終了コードが 2 から 1 になり、出力に `[OK]`・`[ERROR]` の接頭辞が付き、
+  進行表示は標準エラーへ移った。`--wait-for-db` は `N`・`=N`・`:N` の 3 書式を受ける
+
+対応表・直し方・影響は [`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md) の
+「3.4 破壊的変更（旧版から更新する場合）」を参照。
+
 ## 開発をはじめる
 
 **VS Code を使うなら [`_documents/開発環境.md`](_documents/開発環境.md) を見ること。**
