@@ -21,7 +21,7 @@ public class ConnectionSecurityTests
             "Server=db;Database=Q;UID=sa;PWD=x;Encrypt=False");
 
         // **できない指定を黙って読み替えない。**「切ったつもりで動いている」状態を作らない
-        Assert.Contains(problems, problem => problem.Reason.Contains("通らない", StringComparison.Ordinal));
+        Assert.Contains(problems, problem => problem.Reason.Contains("rejected", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class ConnectionSecurityTests
         // **暗号化はされるが、相手が本物かを確かめない**
         Assert.Contains(
             problems,
-            problem => problem.Reason.Contains("中間者", StringComparison.Ordinal));
+            problem => problem.Reason.Contains("man-in-the-middle", StringComparison.Ordinal));
     }
 
     [Fact]
