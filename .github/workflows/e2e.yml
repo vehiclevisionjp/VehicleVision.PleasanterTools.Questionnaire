@@ -23,7 +23,7 @@
 # **ドキュメントだけの PR では回さない**（下の paths）。
 #
 # **Pleasanter の版は固定する**（tools/pleasanter-testenv/docker-compose.yml が
-# implem/pleasanter:1.5.8.1 を指す）。最新に追随させると、壊れた原因が
+# implem/pleasanter:1.5.9.1 を指す）。最新に追随させると、壊れた原因が
 # 自分の変更か相手の更新かを切り分けられなくなる。
 name: E2E Tests
 

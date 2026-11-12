@@ -1,5 +1,5 @@
 {
-    "//": "Pleasanter 1.5.8.1 の公式イメージ（implem/pleasanter:1.5.8.1）の App_Data/Parameters/Security.json を写し、SecondaryAuthentication.Mode だけを None から DefaultDisable に変えたもの（Issue #470）。NotificationType は既定で Mail。Pleasanter はファイル全体を読むため、一部だけを置くことはできない。DefaultDisable では Users.EnableSecondaryAuthentication を有効にした利用者（seed/03_sso_users.sql の sso-e2e-mail）にだけ 2 要素が掛かり、ほかの利用者と API キーの試験には影響しない。版を上げるときは新しいイメージから取り直すこと（tools/pleasanter-testenv/README.md）。",
+    "//": "Pleasanter 1.5.9.1 の公式イメージ（implem/pleasanter:1.5.9.1）の App_Data/Parameters/Security.json を写し、SecondaryAuthentication.Mode だけを None から DefaultDisable に変えたもの（Issue #470）。NotificationType は既定で Mail。Pleasanter はファイル全体を読むため、一部だけを置くことはできない。DefaultDisable では Users.EnableSecondaryAuthentication を有効にした利用者（seed/03_sso_users.sql の sso-e2e-mail）にだけ 2 要素が掛かり、ほかの利用者と API キーの試験には影響しない。版を上げるときは新しいイメージから取り直すこと（tools/pleasanter-testenv/README.md）。",
     "AllowIpAddresses": null,
     "IpRestrictionExcludeMembers": null,
     "MimeTypeCheckOnApi": false,
