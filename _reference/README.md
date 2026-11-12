@@ -102,7 +102,7 @@ bash scripts/sync-reference.sh
 git ls-remote --tags https://github.com/Implem/Implem.Pleasanter.git 'refs/tags/Pleasanter_*^{}'
 ```
 
-検証環境の公式イメージ `implem/pleasanter:1.5.8.1` は取得先と独立して固定し、自動更新しない。
+検証環境の公式イメージ `implem/pleasanter:1.5.9.1` は取得先と独立して固定し、自動更新しない。
 ZIP は Web プロジェクトの発行結果、コンテナは Dockerfile の明示した対象だけを含める。
 既定先・共有先の本体と Git メタデータをビルド・配布物へ含めない。
 既存の `license-check.sh` と、取得先を検査する `reference-isolation-check.sh` を維持する。
