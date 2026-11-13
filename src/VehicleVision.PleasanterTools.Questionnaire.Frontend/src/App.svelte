@@ -25,6 +25,7 @@
     type AnalyticsSettings,
   } from './lib/analytics';
   import { solveAltcha } from './lib/altcha';
+  import { renewSubmitCredentials } from './lib/submitCredentials';
   import {
     renderCaptcha,
     usesExternalCaptcha,
@@ -741,6 +742,29 @@
       }));
   }
 
+  /**
+   * 次の送信のために、チケットと proof-of-work の解答（と外部の CAPTCHA）を取り直す。
+   *
+   * **送信が受け付けられなかったときは毎回呼ぶ**（Issue #959）。
+   * 取り直せなければ、いまの値を残す。
+   */
+  async function renewCredentials() {
+    const fresh = await renewSubmitCredentials(publicId, requiresProofOfWork);
+    if (!fresh) {
+      return;
+    }
+
+    responseToken = fresh.responseToken;
+    ticket = fresh.ticket;
+    altcha = fresh.altcha;
+
+    // **外部の CAPTCHA も描き直す**（Issue #164）。同じ解答は 2 度通らない
+    if (usesCaptcha) {
+      captchaToken = '';
+      captchaWidget?.reset();
+    }
+  }
+
   async function submit() {
     if (!checkCurrentStep()) {
       void focusErrors();
@@ -777,25 +801,7 @@
           result.rejection === 'tooManyRequests'
             ? t('submit.tooManyRequests')
             : t('submit.rejected');
-
-        // **チケットが切れていただけのことがある。** 取り直して次の操作で通るようにする
-        const reissued = await requestTicket(publicId);
-        if (reissued) {
-          responseToken = reissued.responseToken;
-          ticket = reissued.ticket;
-
-          // **課題も取り直す。** 使い終えた解答は 2 度通らない
-          altcha = '';
-          if (requiresProofOfWork && reissued.altcha) {
-            altcha = (await solveAltcha(reissued.altcha)) ?? '';
-          }
-
-          // **外部の CAPTCHA も描き直す**（Issue #164）。同じ解答は 2 度通らない
-          if (usesCaptcha) {
-            captchaToken = '';
-            captchaWidget?.reset();
-          }
-        }
+        await renewCredentials();
         return;
       }
 
@@ -824,8 +830,16 @@
         errors = mapped;
         void focusErrors();
       }
+
+      // **422・503 のあとも取り直す**（Issue #959）。サーバは解答を受付の前に使い切るので、
+      // 直して押し直したときに同じ解答では 403 になる
+      await renewCredentials();
     } catch {
       submitError = t('submit.failed');
+
+      // **通信が切れた場合も取り直す。** 要求がサーバへ届いていれば、解答は使い切られている。
+      // 取り直せなければ（まだ切れている）、いまの値を残す
+      await renewCredentials();
     } finally {
       submitting = false;
       void focusSubmitResult();
