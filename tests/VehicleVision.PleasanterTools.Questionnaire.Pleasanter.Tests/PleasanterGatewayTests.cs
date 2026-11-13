@@ -204,7 +204,7 @@ public class PleasanterGatewayTests
         Assert.False(PleasanterOptions.ParseAllowInsecureHttp("false"));
         Assert.True(PleasanterOptions.ParseAllowInsecureHttp("true"));
         Assert.True(PleasanterOptions.ParseAllowInsecureHttp("TRUE"));
-        Assert.Equal("PLEASANTER_ALLOW_INSECURE_HTTP", PleasanterOptions.AllowInsecureHttpEnvironmentVariable);
+        Assert.Equal("VVPT_PLEASANTER_ALLOW_INSECURE_HTTP", PleasanterOptions.AllowInsecureHttpEnvironmentVariable);
     }
 
     [Theory]

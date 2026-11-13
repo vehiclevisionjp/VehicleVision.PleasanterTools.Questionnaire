@@ -7,7 +7,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 public class MigrationCommandApplicationTests
 {
     [Fact]
-    public async Task 本体のコマンドが固有スキーマの状態と適用結果を従来どおり返す()
+    public async Task 本体のコマンドが固有スキーマの状態と適用結果を返す()
     {
         var directory = NewDirectory();
         try
@@ -32,14 +32,14 @@ public class MigrationCommandApplicationTests
             var apply = await RunAsync(directory, connectionString, "--migrate-status", "--migrate");
             Assert.Equal(0, apply.ExitCode);
             Assert.Empty(apply.Error);
-            Assert.Equal(expectedPending + $"Applied {pending.Count} migration(s).{Environment.NewLine}", apply.Output);
+            Assert.Equal(expectedPending + $"[OK] Applied {pending.Count} migration(s).{Environment.NewLine}", apply.Output);
 
             foreach (var argument in new[] { "--migrate-status", "--migrate" })
             {
                 var applied = await RunAsync(directory, connectionString, argument);
                 Assert.Equal(0, applied.ExitCode);
                 Assert.Empty(applied.Error);
-                Assert.Equal($"All migrations are applied (Sqlite).{Environment.NewLine}", applied.Output);
+                Assert.Equal($"[OK] All migrations are applied (Sqlite).{Environment.NewLine}", applied.Output);
             }
         }
         finally
@@ -48,17 +48,21 @@ public class MigrationCommandApplicationTests
         }
     }
 
-    [Fact]
-    public async Task 一時SQLiteを開けないときは待機の出力と終了コードを維持する()
+    [Theory]
+    [InlineData("--wait-for-db=1")]
+    [InlineData("--wait-for-db:1")]
+    public async Task 一時SQLiteを開けないときは待機を標準エラーへ出し終了コード1で終わる(string waitArgument)
     {
         var directory = NewDirectory();
         try
         {
             var connectionString = $"Data Source={Path.Combine(directory, "missing", "migration.db")};Pooling=False";
-            var result = await RunAsync(directory, connectionString, "--migrate", "--wait-for-db=1");
-            Assert.Equal(2, result.ExitCode);
-            Assert.Equal($"Waiting for the database (up to 1s)...{Environment.NewLine}", result.Output);
-            Assert.StartsWith("Database not reachable after 1s: ", result.Error);
+            var result = await RunAsync(directory, connectionString, "--migrate", waitArgument);
+            Assert.Equal(1, result.ExitCode);
+            Assert.Empty(result.Output);
+            Assert.StartsWith(
+                $"Waiting for the database (up to 1s)...{Environment.NewLine}[ERROR] Database not reachable after 1s (",
+                result.Error);
         }
         finally
         {

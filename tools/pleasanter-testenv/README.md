@@ -74,6 +74,11 @@ docker compose down -v               # 後片付け（DB ごと破棄）
 名前だと、**ホスト環境に同名の変数があったときに compose の既定値が黙って上書きされる**
 （実際に踏んで原因究明に時間を使った）。
 
+コンテナの中で検証スクリプトが読む変数は、共通の名前 `VVPT_PLEASANTER_BASE_URL`・`VVPT_PLEASANTER_API_KEY` に改名した
+（旧名 `PLEASANTER_BASE_URL`・`PLEASANTER_API_KEY` は読まない。Issue #940）。
+`VVPT_` 接頭辞が付いたので、素の名前でホストの変数と衝突する事故も起きない。
+ただし compose へ渡すホスト側の変数は、引き続き `TESTENV_*` である。
+
 | 変数 | 既定 |
 |---|---|
 | `TESTENV_SA_PASSWORD` | `Questionnaire#Test1` |
