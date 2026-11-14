@@ -1,44 +1,31 @@
 /**
- * サーバ側の都合で送信できなかったときに、回答者へ出す文言を決める（Issue #961）。
+ * メンテナンス中で送信できなかったときの案内（Issue #961）。
  *
- * **画面は切り替えず、入力を残したまま、この文言を送信ボタンの近くへ出す。**
+ * **画面は切り替えず、入力を残したまま、送信ボタンの近くへ出す。**
+ *
+ * **対応言語（7 言語）の固定文言をすべて並べる。** 画面の `?lang=` とサーバの `Accept-Language` が
+ * 食い違っても、読める言語が必ず含まれる。サーバが返す `message`（日本語・英語だけ）は使わない。
+ * 現在の画面の言語を先頭にし、残りは `SUPPORTED_LANGUAGES` の順に続ける。
  */
 
-import type { SubmitResult } from './api';
-import type { Language } from './i18n/language';
+import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from './i18n/language';
+import { translator } from './i18n/messages';
 
-/** サーバがメンテナンスの案内を用意している言語。**日本語と英語だけ**（`MaintenanceMode.MessageOf`）。 */
-const SERVER_MESSAGE_LANGUAGES: readonly Language[] = ['ja', 'en'];
-
-/**
- * メンテナンスの案内を選ぶ。
- *
- * **管理者が書いた案内（再開の見込みなど）があれば、それを優先する。**
- * ただしサーバの案内は日本語か英語しかない。**画面がそれ以外の言語なら、
- * 翻訳済みの固定文言を使う**（別の言語の文章を読ませない）。
- */
-export function maintenanceNotice(
-  serverMessage: string | undefined,
-  language: Language,
-  fixedMessage: string,
-): string {
-  const message = serverMessage?.trim() ?? '';
-  return message !== '' && SERVER_MESSAGE_LANGUAGES.includes(language) ? message : fixedMessage;
+/** 案内 1 行ぶん。 */
+export interface MaintenanceNotice {
+  language: Language;
+  /** その言語自身で書いた名前（言語切り替えと同じ表記）。 */
+  name: string;
+  text: string;
 }
 
-/**
- * 送信結果が「サーバ側の都合」なら、出す文言を返す。そうでなければ `null`。
- *
- * @param messages 翻訳済みの固定文言（`submit.maintenance` と `submit.unavailable`）
- */
-export function unavailableNotice(
-  result: Pick<SubmitResult, 'unavailable' | 'maintenanceMessage'>,
-  language: Language,
-  messages: { maintenance: string; unavailable: string },
-): string | null {
-  if (result.unavailable === 'maintenance') {
-    return maintenanceNotice(result.maintenanceMessage, language, messages.maintenance);
-  }
+/** 7 言語すべての案内。`current` を先頭に置く。 */
+export function maintenanceNotices(current: Language): MaintenanceNotice[] {
+  const ordered = [current, ...SUPPORTED_LANGUAGES.filter((language) => language !== current)];
 
-  return result.unavailable === 'temporary' ? messages.unavailable : null;
+  return ordered.map((language) => ({
+    language,
+    name: LANGUAGE_NAMES[language],
+    text: translator(language)('submit.maintenance'),
+  }));
 }

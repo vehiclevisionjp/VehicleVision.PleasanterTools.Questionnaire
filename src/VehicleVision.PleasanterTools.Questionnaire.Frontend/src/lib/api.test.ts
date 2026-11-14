@@ -79,21 +79,10 @@ describe('submitAnswers の応答の振り分け（Issue #961）', () => {
     return submitAnswers('pub-1', 'token', [], context);
   }
 
-  it('503 の reason が maintenance なら、メンテナンスとしてサーバの案内を返す', async () => {
+  it('503 の reason が maintenance なら、メンテナンスとして扱う（サーバの案内は使わない）', async () => {
     const result = await submitWith(503, { reason: 'maintenance', message: '本日 22 時まで停止します' });
 
-    expect(result).toEqual({
-      accepted: false,
-      unavailable: 'maintenance',
-      maintenanceMessage: '本日 22 時まで停止します',
-    });
-  });
-
-  it('メンテナンスの案内が文字列でなければ空にする', async () => {
-    const result = await submitWith(503, { reason: 'maintenance', message: 42 });
-
-    expect(result.unavailable).toBe('maintenance');
-    expect(result.maintenanceMessage).toBe('');
+    expect(result).toEqual({ accepted: false, unavailable: 'maintenance' });
   });
 
   it('503 の reason が scannerUnavailable なら、スキャナ停止の表示にする', async () => {

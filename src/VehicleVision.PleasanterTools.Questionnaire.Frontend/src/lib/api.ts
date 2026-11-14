@@ -249,12 +249,10 @@ export interface SubmitResult {
   /**
    * サーバ側の都合で今は受け付けられない（Issue #961）。**画面は切り替えず、入力を残す。**
    *
-   * - `maintenance` はメンテナンス中。サーバが案内（`maintenanceMessage`）を添えることがある
+   * - `maintenance` はメンテナンス中。案内は画面の固定文言を使う（サーバの `message` は使わない）
    * - `temporary` は想定外の 5xx と、理由の分からない 503（途中の装置が返したものを含む）
    */
   unavailable?: 'maintenance' | 'temporary';
-  /** メンテナンスの案内。サーバが日本語か英語で選んだ文言。無ければ空。 */
-  maintenanceMessage?: string;
 }
 
 /** 送信するときに一緒に渡すもの。 */
@@ -359,14 +357,10 @@ export async function submitAnswers(
   if (response.status === 503) {
     // **503 は理由で分ける**（Issue #961）。状態コードだけで決めない。
     // 本文が JSON でない（途中の装置が返した 503 など）ときは、理由が分からないので一時的な不調として扱う
-    const body = (await response.json().catch(() => ({}))) as { reason?: unknown; message?: unknown };
+    const body = (await response.json().catch(() => ({}))) as { reason?: unknown };
 
     if (body.reason === 'maintenance') {
-      return {
-        accepted: false,
-        unavailable: 'maintenance',
-        maintenanceMessage: typeof body.message === 'string' ? body.message : '',
-      };
+      return { accepted: false, unavailable: 'maintenance' };
     }
 
     if (body.reason === 'scannerUnavailable') {
