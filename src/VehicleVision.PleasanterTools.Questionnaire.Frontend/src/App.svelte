@@ -26,6 +26,7 @@
   } from './lib/analytics';
   import { solveAltcha } from './lib/altcha';
   import { renewSubmitCredentials } from './lib/submitCredentials';
+  import { maintenanceNotices, type MaintenanceNotice } from './lib/submitUnavailable';
   import {
     renderCaptcha,
     usesExternalCaptcha,
@@ -326,6 +327,8 @@
   let canEdit = $state(false);
   /** 添付を受け付けなかった理由。**どのファイルが駄目かを出す。** */
   let attachmentMessages = $state<string[]>([]);
+  /** メンテナンス中の案内（7 言語ぶん。現在の言語が先頭）。 */
+  let maintenanceMessages = $state<MaintenanceNotice[]>([]);
   /** 引換券のリンクから完了画面だけを開いたか。 */
   let assetTicketVisit = $state(false);
 
@@ -774,6 +777,7 @@
     submitting = true;
     submitError = '';
     attachmentMessages = [];
+    maintenanceMessages = [];
 
     try {
       const result = await submitAnswers(
@@ -805,6 +809,20 @@
         return;
       }
 
+      // **サーバ側の都合（メンテナンス・一時的な 5xx）も画面は切り替えない**（Issue #961）。
+      // 「見つからない」へ切り替えると、入力中の回答が失われたように見える
+      if (result.unavailable) {
+        if (result.unavailable === 'maintenance') {
+          // **7 言語の固定文言を並べる。** 画面とサーバの言語判定の食い違いに依存しない
+          maintenanceMessages = maintenanceNotices(language);
+        } else {
+          submitError = t('submit.unavailable');
+        }
+        // **サーバが解答を使い切っていることがある**（Issue #959）。取り直す
+        await renewCredentials();
+        return;
+      }
+
       if (result.rejection) {
         rejection = result.rejection;
         screen = 'rejected';
@@ -823,6 +841,12 @@
         for (const [questionId, codes] of Object.entries(result.errors)) {
           if (codes.includes('SubmitButtonConditionNotMet')) {
             submitError = serverValidationMessage('SubmitButtonConditionNotMet');
+            continue;
+          }
+          // **設問に結び付かない理由（`''`）は送信ボタンの近くへ出す。**
+          // 鍵が `''` のままでは、どの設問にも表示されず、回答者へ届かない
+          if (questionId === '') {
+            submitError = codes.map(serverValidationMessage).join(' / ');
             continue;
           }
           mapped[questionId] = codes.map(serverValidationMessage).join(' / ');
@@ -1082,7 +1106,13 @@
         </div>
       {/if}
 
-      {#if attachmentMessages.length > 0}
+      {#if maintenanceMessages.length > 0}
+        <ul class="error maintenance-notices" role="alert">
+          {#each maintenanceMessages as notice (notice.language)}
+            <li lang={notice.language}><strong>{notice.name}</strong> {notice.text}</li>
+          {/each}
+        </ul>
+      {:else if attachmentMessages.length > 0}
         <ul class="error" role="alert">
           {#each attachmentMessages as message (message)}
             <li>{message}</li>
@@ -1422,6 +1452,16 @@
 
   .error {
     color: var(--error);
+  }
+
+  .maintenance-notices {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .maintenance-notices li + li {
+    margin-top: 0.4rem;
   }
 
   .note {

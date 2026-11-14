@@ -88,6 +88,10 @@ export const vi: Partial<Record<MessageKey, string>> = {
   'submit.rejected': 'Không thể tiếp nhận câu trả lời. Vui lòng nhấn “Gửi” một lần nữa.',
   'submit.insecureContext': 'Vui lòng mở trang này bằng kết nối an toàn (https). Không thể gửi trong trạng thái hiện tại.',
   'submit.failed': 'Không thể gửi. Nội dung đã nhập vẫn được giữ nguyên. Vui lòng chờ một lát rồi thử lại.',
+  'submit.maintenance':
+    'Không thể gửi trong lúc bảo trì. Nội dung đã nhập vẫn được giữ nguyên. Vui lòng thử lại sau.',
+  'submit.unavailable':
+    'Dịch vụ đang gặp sự cố tạm thời. Nội dung đã nhập vẫn được giữ nguyên. Vui lòng thử lại sau.',
 
   'attachment.defaultName': 'Tệp đính kèm',
   'attachment.extensionNotAllowed': '{name}: không tiếp nhận loại tệp này',
