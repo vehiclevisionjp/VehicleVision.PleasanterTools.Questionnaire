@@ -100,6 +100,16 @@ export const zh: Partial<Record<MessageKey, string>> = {
     '系统维护中，暂时无法提交。输入内容仍会保留。请稍后重试。',
   'submit.unavailable':
     '服务暂时出现问题。输入内容仍会保留。请稍后重试。',
+  'unavailable.title':
+    '暂时无法打开',
+  'unavailable.temporary':
+    '服务暂时出现问题。请稍后重新加载本页面。',
+  'unavailable.pending':
+    '目前无法读取已提交的回答。为避免内容被覆盖，未打开回答页面。请稍后重新加载本页面。',
+  'unavailable.maintenance':
+    '系统维护中，暂时无法打开。请稍后重新加载本页面。',
+  'unavailable.reload':
+    '重新加载',
 
   // ---- 附件 --------------------------------------------------------------
   'attachment.defaultName': '附件',

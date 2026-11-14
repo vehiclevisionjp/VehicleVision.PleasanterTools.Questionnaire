@@ -25,4 +25,13 @@ describe('maintenanceNotices', () => {
     expect(second).toMatchObject({ language: 'ja', name: '日本語' });
     expect(second?.text).toContain('メンテナンス');
   });
+
+  it('読み込み時の案内（Issue #965）も 7 言語を並べ、送信時とは別の文言になる', () => {
+    const loading = maintenanceNotices('en', 'unavailable.maintenance');
+    const submitting = maintenanceNotices('en');
+
+    expect(loading.map((notice) => notice.language)).toEqual(['en', ...SUPPORTED_LANGUAGES.filter((language) => language !== 'en')]);
+    expect(loading.map((notice) => notice.text)).not.toEqual(submitting.map((notice) => notice.text));
+    expect(loading[1]?.text).toContain('メンテナンス');
+  });
 });

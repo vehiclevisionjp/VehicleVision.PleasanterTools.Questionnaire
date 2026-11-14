@@ -33,7 +33,7 @@ export async function renewSubmitCredentials(
   solve: (challenge: AltchaChallenge) => Promise<string | null> = solveAltcha,
 ): Promise<FreshCredentials | null> {
   try {
-    const issued = await requestTicket(publicId);
+    const { ticket: issued } = await requestTicket(publicId);
     if (!issued) {
       return null;
     }

@@ -101,6 +101,16 @@ export const ko: Partial<Record<MessageKey, string>> = {
     '점검 중이라 제출할 수 없습니다. 입력 내용은 그대로입니다. 잠시 후 다시 시도하세요.',
   'submit.unavailable':
     '서비스에 일시적인 문제가 발생했습니다. 입력 내용은 그대로입니다. 잠시 후 다시 시도하세요.',
+  'unavailable.title':
+    '지금은 열 수 없습니다',
+  'unavailable.temporary':
+    '서비스에 일시적인 문제가 발생했습니다. 잠시 후 이 페이지를 다시 불러오세요.',
+  'unavailable.pending':
+    '제출한 응답을 지금은 불러올 수 없습니다. 내용이 덮어쓰이지 않도록 응답 화면을 열지 않았습니다. 잠시 후 이 페이지를 다시 불러오세요.',
+  'unavailable.maintenance':
+    '점검 중이라 열 수 없습니다. 잠시 후 이 페이지를 다시 불러오세요.',
+  'unavailable.reload':
+    '다시 불러오기',
 
   // ---- 첨부 ---------------------------------------------------------------
   'attachment.defaultName': '첨부 파일',
