@@ -108,6 +108,16 @@ export const de: Partial<Record<MessageKey, string>> = {
     'Während der Wartungsarbeiten kann nichts gesendet werden. Ihre Antworten sind noch vorhanden — bitte versuchen Sie es später erneut.',
   'submit.unavailable':
     'Beim Dienst ist vorübergehend ein Problem aufgetreten. Ihre Antworten sind noch vorhanden — bitte versuchen Sie es später erneut.',
+  'unavailable.title':
+    'Vorübergehend nicht verfügbar',
+  'unavailable.temporary':
+    'Beim Dienst ist vorübergehend ein Problem aufgetreten. Bitte laden Sie diese Seite später erneut.',
+  'unavailable.pending':
+    'Ihre gesendeten Antworten können gerade nicht geladen werden. Das Formular wurde nicht geöffnet, damit sie nicht überschrieben werden. Bitte laden Sie diese Seite später erneut.',
+  'unavailable.maintenance':
+    'Während der Wartungsarbeiten ist diese Seite nicht verfügbar. Bitte laden Sie diese Seite später erneut.',
+  'unavailable.reload':
+    'Neu laden',
 
   'attachment.defaultName': 'Anhang',
   'attachment.extensionNotAllowed': '{name}: Diese Art von Datei wird nicht angenommen',

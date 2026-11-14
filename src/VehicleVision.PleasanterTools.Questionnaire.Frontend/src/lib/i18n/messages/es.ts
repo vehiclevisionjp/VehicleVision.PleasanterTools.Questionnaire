@@ -100,6 +100,16 @@ export const es: Partial<Record<MessageKey, string>> = {
     'No se puede enviar durante el mantenimiento. Sus respuestas siguen aquí; inténtelo de nuevo más tarde.',
   'submit.unavailable':
     'El servicio tiene un problema temporal. Sus respuestas siguen aquí; inténtelo de nuevo más tarde.',
+  'unavailable.title':
+    'No disponible temporalmente',
+  'unavailable.temporary':
+    'El servicio tiene un problema temporal. Vuelva a cargar esta página más tarde.',
+  'unavailable.pending':
+    'Ahora no se pueden cargar sus respuestas enviadas. No se ha abierto el formulario para no sobrescribirlas. Vuelva a cargar esta página más tarde.',
+  'unavailable.maintenance':
+    'Esta página no está disponible durante el mantenimiento. Vuelva a cargar esta página más tarde.',
+  'unavailable.reload':
+    'Volver a cargar',
 
   'attachment.defaultName': 'Archivo adjunto',
   'attachment.extensionNotAllowed': '{name}: no se acepta este tipo de archivo',

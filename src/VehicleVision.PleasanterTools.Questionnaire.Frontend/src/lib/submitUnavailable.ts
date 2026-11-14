@@ -9,7 +9,7 @@
  */
 
 import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, type Language } from './i18n/language';
-import { translator } from './i18n/messages';
+import { translator, type MessageKey } from './i18n/messages';
 
 /** 案内 1 行ぶん。 */
 export interface MaintenanceNotice {
@@ -19,13 +19,20 @@ export interface MaintenanceNotice {
   text: string;
 }
 
-/** 7 言語すべての案内。`current` を先頭に置く。 */
-export function maintenanceNotices(current: Language): MaintenanceNotice[] {
+/**
+ * 7 言語すべての案内。`current` を先頭に置く。
+ *
+ * `key` は送信時の案内（既定）か、読み込み時の案内（`unavailable.maintenance`。Issue #965）。
+ */
+export function maintenanceNotices(
+  current: Language,
+  key: MessageKey = 'submit.maintenance',
+): MaintenanceNotice[] {
   const ordered = [current, ...SUPPORTED_LANGUAGES.filter((language) => language !== current)];
 
   return ordered.map((language) => ({
     language,
     name: LANGUAGE_NAMES[language],
-    text: translator(language)('submit.maintenance'),
+    text: translator(language)(key),
   }));
 }

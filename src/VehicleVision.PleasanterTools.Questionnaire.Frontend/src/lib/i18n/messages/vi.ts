@@ -92,6 +92,16 @@ export const vi: Partial<Record<MessageKey, string>> = {
     'Không thể gửi trong lúc bảo trì. Nội dung đã nhập vẫn được giữ nguyên. Vui lòng thử lại sau.',
   'submit.unavailable':
     'Dịch vụ đang gặp sự cố tạm thời. Nội dung đã nhập vẫn được giữ nguyên. Vui lòng thử lại sau.',
+  'unavailable.title':
+    'Tạm thời không mở được',
+  'unavailable.temporary':
+    'Dịch vụ đang gặp sự cố tạm thời. Vui lòng tải lại trang này sau.',
+  'unavailable.pending':
+    'Hiện không thể tải các câu trả lời đã gửi. Biểu mẫu chưa được mở để nội dung không bị ghi đè. Vui lòng tải lại trang này sau.',
+  'unavailable.maintenance':
+    'Trang này không mở được trong lúc bảo trì. Vui lòng tải lại trang này sau.',
+  'unavailable.reload':
+    'Tải lại',
 
   'attachment.defaultName': 'Tệp đính kèm',
   'attachment.extensionNotAllowed': '{name}: không tiếp nhận loại tệp này',

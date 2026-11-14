@@ -165,18 +165,54 @@ export async function activateAssetTicket(
   return (await redeemAssetTicket(publicId)) !== null;
 }
 
-export async function requestTicket(publicId: string): Promise<Ticket | null> {
-  const response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}/ticket`), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ responseToken: readResponseToken(publicId) }),
-  });
+/**
+ * サーバ側の都合で今は読み込めない理由（Issue #965）。
+ *
+ * - `maintenance` はメンテナンス中（503 で `reason` が `maintenance`）
+ * - `temporary` は想定外の 5xx・理由の分からない 503・混雑（429）・通信失敗
+ *
+ * **どちらも「見つからない」「URL が正しくない」ではない。** 再読み込みで直る可能性がある。
+ */
+export type UnavailableKind = 'maintenance' | 'temporary';
 
-  if (!response.ok) {return null;}
+/** 503 の本文の `reason` で、メンテナンスと一時的な不調を分ける。JSON でなければ一時的な不調。 */
+async function unavailableKindOf(response: Response): Promise<UnavailableKind> {
+  if (response.status !== 503) {return 'temporary';}
+  const body = (await response.json().catch(() => ({}))) as { reason?: unknown };
+  return body.reason === 'maintenance' ? 'maintenance' : 'temporary';
+}
+
+/** 再試行で直る可能性がある状態コードか。5xx と 429。 */
+function isTransientStatus(status: number): boolean {
+  return status >= 500 || status === 429;
+}
+
+export interface TicketResult {
+  ticket?: Ticket;
+  /** 一時的に取れなかった。`ticket` も無く、これも無いときは恒久的な失敗（404・400 など）。 */
+  unavailable?: UnavailableKind;
+}
+
+export async function requestTicket(publicId: string): Promise<TicketResult> {
+  let response: Response;
+  try {
+    response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}/ticket`), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ responseToken: readResponseToken(publicId) }),
+    });
+  } catch {
+    // 通信できなかった。URL の誤りではない
+    return { unavailable: 'temporary' };
+  }
+
+  if (!response.ok) {
+    return isTransientStatus(response.status) ? { unavailable: await unavailableKindOf(response) } : {};
+  }
 
   const ticket = (await response.json()) as Ticket;
   writeStorage(TOKEN_STORAGE_PREFIX + publicId, ticket.responseToken);
-  return ticket;
+  return { ticket };
 }
 
 /**
@@ -217,13 +253,25 @@ export function forgetSubmission(publicId: string): void {
 export interface LoadResult {
   form?: FormResponse;
   rejection?: RejectionReason;
+  /** 一時的に取れなかった（Issue #965）。**「見つからない」にしない。** */
+  unavailable?: UnavailableKind;
 }
 
-/** 公開中のアンケートを取りに行く。 */
+/**
+ * 公開中のアンケートを取りに行く。
+ *
+ * **「見つからない」は 404（と、理由の無い 403）だけ。** 5xx・503（メンテナンス含む）・通信失敗は
+ * 一時的な失敗として分ける（Issue #965）。
+ */
 export async function loadForm(publicId: string): Promise<LoadResult> {
-  const response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}`), {
-    headers: { accept: 'application/json', ...framedHeaders() },
-  });
+  let response: Response;
+  try {
+    response = await fetch(appUrl(`/api/forms/${encodeURIComponent(publicId)}`), {
+      headers: { accept: 'application/json', ...framedHeaders() },
+    });
+  } catch {
+    return { unavailable: 'temporary' };
+  }
 
   if (response.ok) {
     return { form: (await response.json()) as FormResponse };
@@ -232,6 +280,10 @@ export async function loadForm(publicId: string): Promise<LoadResult> {
   if (response.status === 403) {
     const body = (await response.json().catch(() => ({}))) as { reason?: RejectionReason };
     return { rejection: body.reason ?? 'notFound' };
+  }
+
+  if (isTransientStatus(response.status)) {
+    return { unavailable: await unavailableKindOf(response) };
   }
 
   return { rejection: 'notFound' };
@@ -399,17 +451,44 @@ export async function submitAnswers(
   return { accepted: false, rejection: 'notFound' };
 }
 
-/** 送信待ちにある自分の回答を読む。**Pleasanter より先に見る。** */
+export interface PendingResult {
+  /** 読めた回答。無い（404）ときは `undefined`。 */
+  answers?: PayloadAnswer[];
+  /**
+   * 今は読めない（Issue #965）。**「無い」とは別。** 空の回答として表示すると、
+   * 未送信の回答を上書きして送ってしまう。
+   */
+  unavailable?: UnavailableKind;
+}
+
+/**
+ * 送信待ちにある自分の回答を読む。**Pleasanter より先に見る。**
+ *
+ * **404（無い）と、503・5xx・通信失敗（今は読めない）を区別する。**
+ */
 export async function loadPendingAnswers(
   publicId: string,
   responseToken: string,
-): Promise<PayloadAnswer[] | null> {
-  const response = await fetch(
-    appUrl(`/api/forms/${encodeURIComponent(publicId)}/responses/${encodeURIComponent(responseToken)}`),
-    { headers: { accept: 'application/json' } },
-  );
+): Promise<PendingResult> {
+  let response: Response;
+  try {
+    response = await fetch(
+      appUrl(`/api/forms/${encodeURIComponent(publicId)}/responses/${encodeURIComponent(responseToken)}`),
+      { headers: { accept: 'application/json' } },
+    );
+  } catch {
+    return { unavailable: 'temporary' };
+  }
 
-  if (!response.ok) {return null;}
-  const body = (await response.json()) as { answers?: PayloadAnswer[] };
-  return body.answers ?? null;
+  if (!response.ok) {
+    return isTransientStatus(response.status) ? { unavailable: await unavailableKindOf(response) } : {};
+  }
+
+  const body = (await response.json().catch(() => null)) as { answers?: PayloadAnswer[] } | null;
+  if (body === null) {
+    // 200 なのに読めない本文（途中の装置が返したものなど）。無いとは断定できない
+    return { unavailable: 'temporary' };
+  }
+
+  return body.answers ? { answers: body.answers } : {};
 }

@@ -100,6 +100,16 @@ export const en: Record<MessageKey, string> = {
     'Submissions are unavailable during maintenance. Your answers are still here — please try again later.',
   'submit.unavailable':
     'The service is having a temporary problem. Your answers are still here — please try again later.',
+  'unavailable.title':
+    'Temporarily unavailable',
+  'unavailable.temporary':
+    'The service is having a temporary problem. Please try again later by reloading this page.',
+  'unavailable.pending':
+    'Your submitted answers cannot be loaded right now. The form has not been opened so that they are not overwritten. Please try again later by reloading this page.',
+  'unavailable.maintenance':
+    'This page is unavailable during maintenance. Please try again later by reloading this page.',
+  'unavailable.reload':
+    'Reload',
 
   'attachment.defaultName': 'Attachment',
   'attachment.extensionNotAllowed': '{name}: this kind of file is not accepted',

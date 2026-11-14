@@ -17,7 +17,7 @@
     requestTicket,
     submitAnswers,
   } from './lib/api';
-  import type { Attachment } from './lib/api';
+  import type { Attachment, UnavailableKind } from './lib/api';
   import {
     DISABLED_ANALYTICS,
     fetchAnalyticsSettings,
@@ -77,7 +77,14 @@
     type ReadabilityPreferences,
   } from './lib/readability';
 
-  type Screen = 'loading' | 'answering' | 'answered' | 'completed' | 'rejected' | 'error';
+  type Screen =
+    | 'loading'
+    | 'answering'
+    | 'answered'
+    | 'completed'
+    | 'rejected'
+    | 'error'
+    | 'unavailable';
 
   /**
     * 画面に出す言語。
@@ -152,6 +159,12 @@
 
   let screen = $state<Screen>('loading');
   let rejection = $state<RejectionReason>();
+
+  /**
+   * 初回の読み込みで、サーバ側の都合により先へ進めなかった理由（Issue #965）。
+   * `pending` は、送信済み・送信待ちの回答を読めなかったとき。**空の回答を出して上書きさせない。**
+   */
+  let unavailable = $state<{ kind: UnavailableKind; target: 'form' | 'pending' }>();
   let definition = $state<SurveyDefinition>();
 
   /**
@@ -481,6 +494,12 @@
     }
 
     const result = await loadForm(publicId);
+    if (result.unavailable) {
+      // **一時的な失敗を「見つからない」にしない**（Issue #965）。再読み込みを促す
+      unavailable = { kind: result.unavailable, target: 'form' };
+      screen = 'unavailable';
+      return;
+    }
     if (!result.form) {
       rejection = result.rejection ?? 'notFound';
       screen = 'rejected';
@@ -515,7 +534,13 @@
 
     // **回答トークンと送信チケットをサーバから受け取る。**
     // チケットが無いと送信できないので、ここで失敗したら回答させない
-    const issued = await requestTicket(publicId);
+    const { ticket: issued, unavailable: ticketUnavailable } = await requestTicket(publicId);
+    if (ticketUnavailable) {
+      // **一時的な失敗は「URL が正しくない」にしない**（Issue #965）
+      unavailable = { kind: ticketUnavailable, target: 'form' };
+      screen = 'unavailable';
+      return;
+    }
     if (!issued) {
       screen = 'error';
       return;
@@ -547,9 +572,17 @@
 
     // **送信待ちを先に見る。** 未送信の回答は Pleasanter にまだ無い
     const pending = await loadPendingAnswers(publicId, responseToken);
-    if (pending) {
+    if (pending.unavailable) {
+      // **「無い」ではなく「今は読めない」。** 空の回答で回答画面を開くと、
+      // 未送信の回答を上書きして送ってしまう。回答画面へ進まず、再読み込みを促す（Issue #965）。
+      // 端末の下書きは `answering` のときしか書かないので、ここでは触れない
+      unavailable = { kind: pending.unavailable, target: 'pending' };
+      screen = 'unavailable';
+      return;
+    }
+    if (pending.answers) {
       canEdit = true;
-      for (const answer of pending) {
+      for (const answer of pending.answers) {
         answers[answer.questionId] = {
           values: answer.values ?? [],
           otherText: answer.otherText ?? '',
@@ -934,6 +967,22 @@
         {t('rejected.embeddingNotAllowed.open')}
       </a>
     {/if}
+  {:else if screen === 'unavailable' && unavailable}
+    <!-- **一時的な失敗。** 「見つからない」「URL が正しくない」とは区別し、再読み込みを促す（Issue #965） -->
+    <h1>{t('unavailable.title')}</h1>
+    {#if unavailable.kind === 'maintenance'}
+      <!-- **7 言語の固定文言を並べる。** 送信時のメンテナンス（Issue #961）と同じ方式 -->
+      <ul class="status maintenance-notices" role="alert">
+        {#each maintenanceNotices(language, 'unavailable.maintenance') as notice (notice.language)}
+          <li lang={notice.language}><strong>{notice.name}</strong> {notice.text}</li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="status" role="alert">
+        {t(unavailable.target === 'pending' ? 'unavailable.pending' : 'unavailable.temporary')}
+      </p>
+    {/if}
+    <button type="button" onclick={() => location.reload()}>{t('unavailable.reload')}</button>
   {:else if screen === 'error'}
     <h1>{t('error.badUrl.title')}</h1>
     <p class="status">{t('error.badUrl')}</p>
