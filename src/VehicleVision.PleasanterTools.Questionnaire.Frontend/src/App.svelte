@@ -839,6 +839,12 @@
             submitError = serverValidationMessage('SubmitButtonConditionNotMet');
             continue;
           }
+          // **設問に結び付かない理由（`''`）は送信ボタンの近くへ出す。**
+          // 鍵が `''` のままでは、どの設問にも表示されず、回答者へ届かない
+          if (questionId === '') {
+            submitError = codes.map(serverValidationMessage).join(' / ');
+            continue;
+          }
           mapped[questionId] = codes.map(serverValidationMessage).join(' / ');
         }
         errors = mapped;
