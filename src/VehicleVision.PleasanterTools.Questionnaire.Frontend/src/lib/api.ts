@@ -246,6 +246,15 @@ export interface SubmitResult {
   rejection?: RejectionReason;
   /** 添付を受け付けてもらえなかった理由。 */
   attachmentErrors?: AttachmentError[];
+  /**
+   * サーバ側の都合で今は受け付けられない（Issue #961）。**画面は切り替えず、入力を残す。**
+   *
+   * - `maintenance` はメンテナンス中。サーバが案内（`maintenanceMessage`）を添えることがある
+   * - `temporary` は想定外の 5xx と、理由の分からない 503（途中の装置が返したものを含む）
+   */
+  unavailable?: 'maintenance' | 'temporary';
+  /** メンテナンスの案内。サーバが日本語か英語で選んだ文言。無ければ空。 */
+  maintenanceMessage?: string;
 }
 
 /** 送信するときに一緒に渡すもの。 */
@@ -348,8 +357,24 @@ export async function submitAnswers(
   }
 
   if (response.status === 503) {
-    // **ウイルススキャナへ到達できない。** 添付を受け付けられない状態が続いている
-    return { accepted: false, errors: { '': ['ScannerUnavailable'] } };
+    // **503 は理由で分ける**（Issue #961）。状態コードだけで決めない。
+    // 本文が JSON でない（途中の装置が返した 503 など）ときは、理由が分からないので一時的な不調として扱う
+    const body = (await response.json().catch(() => ({}))) as { reason?: unknown; message?: unknown };
+
+    if (body.reason === 'maintenance') {
+      return {
+        accepted: false,
+        unavailable: 'maintenance',
+        maintenanceMessage: typeof body.message === 'string' ? body.message : '',
+      };
+    }
+
+    if (body.reason === 'scannerUnavailable') {
+      // **ウイルススキャナへ到達できない。** 添付を受け付けられない状態が続いている
+      return { accepted: false, errors: { '': ['ScannerUnavailable'] } };
+    }
+
+    return { accepted: false, unavailable: 'temporary' };
   }
 
   if (response.status === 400 || response.status === 422) {
@@ -370,6 +395,11 @@ export async function submitAnswers(
   if (response.status === 429) {
     // **レート制限。** 少し待てば通る
     return { accepted: false, rejection: 'tooManyRequests' };
+  }
+
+  if (response.status >= 500) {
+    // **想定外の 5xx（500・502・504 など）は一時的な失敗。** 「見つからない」へ切り替えない
+    return { accepted: false, unavailable: 'temporary' };
   }
 
   return { accepted: false, rejection: 'notFound' };

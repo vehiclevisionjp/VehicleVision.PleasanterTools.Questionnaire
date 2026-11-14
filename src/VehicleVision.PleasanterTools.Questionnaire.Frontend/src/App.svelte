@@ -26,6 +26,7 @@
   } from './lib/analytics';
   import { solveAltcha } from './lib/altcha';
   import { renewSubmitCredentials } from './lib/submitCredentials';
+  import { unavailableNotice } from './lib/submitUnavailable';
   import {
     renderCaptcha,
     usesExternalCaptcha,
@@ -801,6 +802,19 @@
           result.rejection === 'tooManyRequests'
             ? t('submit.tooManyRequests')
             : t('submit.rejected');
+        await renewCredentials();
+        return;
+      }
+
+      // **サーバ側の都合（メンテナンス・一時的な 5xx）も画面は切り替えない**（Issue #961）。
+      // 「見つからない」へ切り替えると、入力中の回答が失われたように見える
+      const unavailable = unavailableNotice(result, language, {
+        maintenance: t('submit.maintenance'),
+        unavailable: t('submit.unavailable'),
+      });
+      if (unavailable) {
+        submitError = unavailable;
+        // **サーバが解答を使い切っていることがある**（Issue #959）。取り直す
         await renewCredentials();
         return;
       }

@@ -104,6 +104,10 @@ export const de: Partial<Record<MessageKey, string>> = {
     'Bitte öffnen Sie diese Seite über eine sichere Verbindung (https). In diesem Zustand kann sie nicht gesendet werden.',
   'submit.failed':
     'Wir konnten Ihre Antwort nicht senden. Ihre Antworten sind noch vorhanden — bitte warten Sie einen Moment und versuchen Sie es erneut.',
+  'submit.maintenance':
+    'Während der Wartungsarbeiten kann nichts gesendet werden. Ihre Antworten sind noch vorhanden — bitte versuchen Sie es später erneut.',
+  'submit.unavailable':
+    'Beim Dienst ist vorübergehend ein Problem aufgetreten. Ihre Antworten sind noch vorhanden — bitte versuchen Sie es später erneut.',
 
   'attachment.defaultName': 'Anhang',
   'attachment.extensionNotAllowed': '{name}: Diese Art von Datei wird nicht angenommen',

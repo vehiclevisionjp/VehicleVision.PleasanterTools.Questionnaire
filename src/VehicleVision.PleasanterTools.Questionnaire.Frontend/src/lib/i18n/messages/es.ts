@@ -96,6 +96,10 @@ export const es: Partial<Record<MessageKey, string>> = {
     'Abra esta página mediante una conexión segura (https). No se puede enviar en el estado actual.',
   'submit.failed':
     'No hemos podido enviar su respuesta. Sus respuestas siguen aquí; espere un momento e inténtelo de nuevo.',
+  'submit.maintenance':
+    'No se puede enviar durante el mantenimiento. Sus respuestas siguen aquí; inténtelo de nuevo más tarde.',
+  'submit.unavailable':
+    'El servicio tiene un problema temporal. Sus respuestas siguen aquí; inténtelo de nuevo más tarde.',
 
   'attachment.defaultName': 'Archivo adjunto',
   'attachment.extensionNotAllowed': '{name}: no se acepta este tipo de archivo',

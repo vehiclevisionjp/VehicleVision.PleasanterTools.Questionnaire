@@ -96,6 +96,10 @@ export const en: Record<MessageKey, string> = {
     'Please open this page over a secure connection (https). It cannot be submitted as is.',
   'submit.failed':
     'We could not submit your response. Your answers are still here — please wait a moment and try again.',
+  'submit.maintenance':
+    'Submissions are unavailable during maintenance. Your answers are still here — please try again later.',
+  'submit.unavailable':
+    'The service is having a temporary problem. Your answers are still here — please try again later.',
 
   'attachment.defaultName': 'Attachment',
   'attachment.extensionNotAllowed': '{name}: this kind of file is not accepted',

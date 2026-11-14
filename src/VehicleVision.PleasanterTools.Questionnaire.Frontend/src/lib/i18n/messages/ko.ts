@@ -97,6 +97,10 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'submit.rejected': '제출을 접수할 수 없습니다. “제출”을 다시 누르세요.',
   'submit.insecureContext': '이 화면은 안전한 연결(https)로 여세요. 현재 상태에서는 제출할 수 없습니다.',
   'submit.failed': '제출하지 못했습니다. 입력 내용은 그대로입니다. 잠시 후 다시 시도하세요.',
+  'submit.maintenance':
+    '점검 중이라 제출할 수 없습니다. 입력 내용은 그대로입니다. 잠시 후 다시 시도하세요.',
+  'submit.unavailable':
+    '서비스에 일시적인 문제가 발생했습니다. 입력 내용은 그대로입니다. 잠시 후 다시 시도하세요.',
 
   // ---- 첨부 ---------------------------------------------------------------
   'attachment.defaultName': '첨부 파일',

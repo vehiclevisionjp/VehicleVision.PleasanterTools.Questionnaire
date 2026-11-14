@@ -96,6 +96,10 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'submit.rejected': '未能受理提交。请再次点击“提交”。',
   'submit.insecureContext': '请通过安全连接（https）打开此页面。当前状态下无法提交。',
   'submit.failed': '提交失败。输入内容仍会保留。请稍后再次尝试。',
+  'submit.maintenance':
+    '系统维护中，暂时无法提交。输入内容仍会保留。请稍后重试。',
+  'submit.unavailable':
+    '服务暂时出现问题。输入内容仍会保留。请稍后重试。',
 
   // ---- 附件 --------------------------------------------------------------
   'attachment.defaultName': '附件',
