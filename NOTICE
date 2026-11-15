@@ -106,7 +106,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   sass 1.108.2 / MIT
   typescript 6.0.3 / Apache-2.0
   @typescript/native（npm:typescript@7.0.2 の別名。svelte-check --tsgo 用） / Apache-2.0
-  eslint 10.14.0 / MIT / https://www.npmjs.com/package/eslint
+  eslint 10.15.0 / MIT / https://www.npmjs.com/package/eslint
   typescript-eslint 8.72.2 / MIT / https://www.npmjs.com/package/typescript-eslint
   eslint-plugin-svelte 3.24.1 / MIT / https://www.npmjs.com/package/eslint-plugin-svelte
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
@@ -140,7 +140,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   xunit 2.9.3 / Apache-2.0
   xunit.runner.visualstudio 4.0.1 / Apache-2.0
   Microsoft.NET.Test.Sdk 18.12.0 / MIT
-  @playwright/test 1.62.1 / Apache-2.0 / https://github.com/microsoft/playwright
+  @playwright/test 1.65.1 / Apache-2.0 / https://github.com/microsoft/playwright
   Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。端末の書体の代わりに使うだけで、成果物へは入らない）
   Keycloak 26.7.3 / Apache-2.0 / https://github.com/keycloak/keycloak
     （SAML の検証用 IdP。**別のコンテナとして立てるだけで、成果物には含まれない**）
