@@ -58,6 +58,7 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | --- | --- |
 | `Service.json` の `TimeZoneDefault` | `QUESTIONNAIRE_TIMEZONE_DEFAULT` |
 | `Service.json` の `LookupEnabled` | `QUESTIONNAIRE_LOOKUP_ENABLED` |
+| `Service.json` の `RootRedirectUrl` | `QUESTIONNAIRE_ROOT_REDIRECT_URL` |
 | `Pleasanter.json` の `BaseUrl` | `QUESTIONNAIRE_PLEASANTER_BASEURL` |
 | `Pleasanter.json` の `ApiKey` | `QUESTIONNAIRE_PLEASANTER_APIKEY` |
 | `Pleasanter.json` の `ApiVersion` | `QUESTIONNAIRE_PLEASANTER_APIVERSION` |

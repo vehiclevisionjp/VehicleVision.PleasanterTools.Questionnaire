@@ -10,6 +10,7 @@ public static partial class ParameterFiles
         ("Service", "TimeZoneDefault", "QUESTIONNAIRE_TIMEZONE_DEFAULT"),
         ("Service", "PathBase", "QUESTIONNAIRE_PATH_BASE"),
         ("Service", "AdminPath", "QUESTIONNAIRE_ADMIN_PATH"),
+        ("Service", "RootRedirectUrl", "QUESTIONNAIRE_ROOT_REDIRECT_URL"),
         ("Service", "ColorScheme", "QUESTIONNAIRE_COLOR_SCHEME"),
         ("Service", "LookupEnabled", "QUESTIONNAIRE_LOOKUP_ENABLED"),
         ("Service", "MaintenanceMode", "QUESTIONNAIRE_MAINTENANCE_MODE"),

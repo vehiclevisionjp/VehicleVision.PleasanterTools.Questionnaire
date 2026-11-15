@@ -55,6 +55,11 @@ var pathBase = PathBaseOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(pathBase);
 builder.Services.AddSingleton<HtmlShell>();
 
+// **トップページ（`/`）の案内先も外部設定だけで決める**（Issue #967）。**未設定なら従来どおり入口の HTML。**
+// 宛先は設定した人だけが決め、要求の値では変えない。書き間違いは起動時に止める
+var rootRedirect = RootRedirectOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(rootRedirect);
+
 // **合言葉を塞ぐ指定と救済トークンも外部設定だけで決める。**
 // 画面から変えられると、その場で自分自身を締め出せるため。
 var adminPasswordSignInOptions =
@@ -1135,7 +1140,22 @@ static IResult IndexPage(HttpContext context, HtmlShell shell)
 }
 
 app.MapFallback("/f/{**path}", IndexPage);
-app.MapMethods("/", [HttpMethods.Get, HttpMethods.Head], IndexPage);
+
+// **`/` だけ、設定があれば 302 で案内する**（Issue #967。`/index.html`・`/f/…` は変えない）。
+// 宛先は設定から組み立てる（要求の値は使わない）。サイト内のパスは PathBase を足す。
+// 宛先は運用側が変えられるので、キャッシュさせず毎回確かめさせる（入口の HTML と同じ指示）
+IResult RootPage(HttpContext context, HtmlShell shell)
+{
+    if (!rootRedirect.IsConfigured)
+    {
+        return IndexPage(context, shell);
+    }
+
+    context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
+    return Results.Redirect(rootRedirect.Resolve(context.Request.PathBase));
+}
+
+app.MapMethods("/", [HttpMethods.Get, HttpMethods.Head], RootPage);
 app.MapMethods($"/{HtmlShell.IndexFile}", [HttpMethods.Get, HttpMethods.Head], IndexPage);
 
 // **管理画面の素の HTML は配らない。** 入口は設定した管理画面パスだけにする
