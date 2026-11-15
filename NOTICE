@@ -48,7 +48,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   Scalar.AspNetCore 2.21.0 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.21.0
     （OpenAPI 文書を読む画面。画面本体は埋め込みアセットで同梱し、CDN の既定フォントと
       利用状況テレメトリーは無効化する）
-  Jint 4.17.0 / BSD-2-Clause / https://github.com/sebastienros/jint
+  Jint 4.18.0 / BSD-2-Clause / https://github.com/sebastienros/jint
     （変換スクリプトの実行エンジン。Acornima などを推移的に伴う）
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
   nClam 9.0.0 / Apache-2.0 / https://github.com/tekmaven/nClam
