@@ -41,7 +41,8 @@ Google Forms / Microsoft Forms に近い回答画面を提供する。**アン�
 標準 API を利用する独立したアプリ。
 
 - 言語・ランタイムは **Pleasanter 本体に揃える**（[`_documents/アーキテクチャ方針.md`](../_documents/アーキテクチャ方針.md)）
-- 想定構成は Azure App Service で Pleasanter と本アプリを併設して動かすこと
+- 想定構成は Azure App Service で Pleasanter と本アプリを併設して動かすこと。
+  **Windows Web App を基本とし、Linux Web App でも動作する**（2026-11-16 決定）
 - **コード・ドキュメント・応答はすべて日本語で書くこと。**
     - ⚠️ **例外は、コマンドラインがコンソールへ出す文字列だけ。英語で書く。**
       Azure の Kudu の Debug console で日本語が化け、運用者が結果を読めない（Issue #225）。
