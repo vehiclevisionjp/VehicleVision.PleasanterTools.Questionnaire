@@ -110,11 +110,6 @@ ZIP は Web プロジェクトの発行結果、コンテナは Dockerfile の�
 
 配布元（2026-10-27 参照）:
 
-- Template 承認済み SHA: `3312f003fbe9827090e20bc643800824bdf30e22`
-- [配布手順][distribution]
-- 決定: vehiclevisionjp/VehicleVision.PleasanterTools.Template#61・
-  vehiclevisionjp/VehicleVision.PleasanterTools.Template#63
+- 承認済みの配布元のコミット: `3312f003fbe9827090e20bc643800824bdf30e22`
 - [git clone](https://git-scm.com/docs/git-clone) /
   [git fetch](https://git-scm.com/docs/git-fetch)
-
-[distribution]: https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Template/blob/3312f003fbe9827090e20bc643800824bdf30e22/_documents/参照ソースのオンデマンド取得への配布手順.md
