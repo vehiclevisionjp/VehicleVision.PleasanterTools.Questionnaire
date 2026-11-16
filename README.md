@@ -75,8 +75,8 @@ Pleasanter 本体（`Pleasanter_1.5.9.1`）に揃えている。
 
 ## 導入する
 
-GitHub Release には、Azure App Service（Windows Web App）とオンプレミス IIS で共用できる
-配置用 ZIP と SHA-256 を添付する。**Pleasanter の DB とは別に本アプリ専用 DB を作る。**
+GitHub Release には、Azure App Service（Windows Web App を基本とし、Linux Web App でも動作する）と
+オンプレミス IIS で共用できる配置用 ZIP と SHA-256 を添付する。**Pleasanter の DB とは別に本アプリ専用 DB を作る。**
 マイグレーションは起動時に自動で当たる（v0.5.0 から既定。無効にして手で当てることもできる）。
 
 初回導入、設定、DB作成、更新、ロールバックは
