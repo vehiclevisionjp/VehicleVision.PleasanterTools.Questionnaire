@@ -22,6 +22,14 @@ public abstract record AdminApiTokenReauthentication
     /// <b>このセッションを作った時刻</b>が、設定の時間内（既定 5 分）であること。
     /// </summary>
     public sealed record Relogin(DateTimeOffset SessionCreatedAt) : AdminApiTokenReauthentication;
+
+    /// <summary>
+    /// SAML の強制再認証（<c>ForceAuthn</c>。Issue #1034）。SAML で入った管理者。
+    /// <b>発行 1 回分の許可を、使い捨てで取り出せたときだけ通す。</b>
+    /// 許可は <see cref="SamlReauthService"/> が、IdP の応答（AuthnInstant）を確かめて置いたもの。
+    /// </summary>
+    /// <param name="TryConsumeGrant">許可を 1 回だけ取り出す。取り出せたら <c>true</c>。</param>
+    public sealed record SamlForced(Func<CancellationToken, Task<bool>> TryConsumeGrant) : AdminApiTokenReauthentication;
 }
 
 /// <summary>トークンの発行の依頼。</summary>
@@ -72,6 +80,9 @@ public enum AdminApiTokenIssueOutcome
 
     /// <summary>SSO の管理者で、直前の再ログインではない。</summary>
     ReloginRequired,
+
+    /// <summary>SAML の管理者で、強制再認証の許可が無い（未実施・期限切れ・使用済み・別のセッション）。</summary>
+    ReauthenticationRequired,
 }
 
 /// <summary>発行した直前のトークン。<b>平文を返せるのはこの時だけ。</b></summary>
@@ -153,7 +164,7 @@ public sealed class AdminApiTokenService(
 
     /// <summary>トークンを発行する。</summary>
     /// <remarks>
-    /// 順序は、機能 → 持ち主 → 役割 → 入力 → <b>本人確認</b> → 上限 → 作成。
+    /// 順序は、機能 → 持ち主 → 役割 → 入力 → <b>本人確認</b> → 上限 → （強制再認証の許可の取り出し）→ 作成。
     /// 本人確認（パスワードの試行は失敗を数える）は、入力の誤りで試行を消費しないよう、入力の検査の後に置く。
     /// </remarks>
     public async Task<(AdminApiTokenIssueOutcome Outcome, IssuedAdminApiToken? Issued)> IssueAsync(
@@ -224,6 +235,14 @@ public sealed class AdminApiTokenService(
             >= AdminApiTokenOptions.MaxActivePerOwner)
         {
             return (AdminApiTokenIssueOutcome.LimitReached, null);
+        }
+
+        // ⚠️ **強制再認証の許可は、作る直前に 1 回だけ取り出す。** 入力の誤りや上限で消費しないよう最後に置き、
+        // 同時に複数の発行が来ても、許可 1 回分で作れるのは 1 本だけ（取り出しが原子的）
+        if (reauthentication is AdminApiTokenReauthentication.SamlForced forced
+            && !await forced.TryConsumeGrant(cancellationToken).ConfigureAwait(false))
+        {
+            return (AdminApiTokenIssueOutcome.ReauthenticationRequired, null);
         }
 
         var secret = AdminApiTokenSecret.Create();
@@ -425,6 +444,10 @@ public sealed class AdminApiTokenService(
                     AdminUserOutcome.LockedOut => AdminApiTokenIssueOutcome.LockedOut,
                     _ => AdminApiTokenIssueOutcome.PasswordRejected,
                 };
+
+            case AdminApiTokenReauthentication.SamlForced:
+                // 許可の取り出しは、作る直前（IssueAsync）で行う
+                return AdminApiTokenIssueOutcome.Issued;
 
             default:
                 return AdminApiTokenIssueOutcome.PasswordRejected;
