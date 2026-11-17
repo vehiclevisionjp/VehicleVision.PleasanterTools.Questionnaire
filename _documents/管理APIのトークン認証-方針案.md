@@ -83,6 +83,7 @@ cookie `q.admin` を得る。[`非機能設計.md`](非機能設計.md) 1 章「
 | `surveys.publish` | **可** | 公開・停止など。**付けるのは最も慎重に**（誤公開の影響が大きい） |
 | 書き出し・取り込み（#1009） | **可（権限名は未定）** | 【要確認】`surveys.read` / `surveys.write` を流用するか、`surveys.export` / `surveys.import` を足すか。取り込みは定義を書き換えるので、少なくとも `surveys.write` 相当 |
 | `surveys.delete` | **不可** | 完全削除は `Administrator` の画面操作に限る |
+| `surveys.deleteTestResponses` | **不可** | Pleasanter のレコードを消す取り消せない操作。画面操作に限る |
 | `lookups.manage` | **不可** | ルックアップ専用の API キーを扱う |
 | `users.*`・`users.resetTwoFactor` | **不可** | 乗っ取りの足場になる。トークンで人・2 要素を触らせない |
 | `settings.*`・`maintenance.manage` | **不可** | SAML・SSO・アプリ設定・メンテナンス |

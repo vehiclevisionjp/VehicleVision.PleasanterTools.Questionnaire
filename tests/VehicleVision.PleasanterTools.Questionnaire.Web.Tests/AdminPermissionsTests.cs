@@ -42,6 +42,18 @@ public class AdminPermissionsTests
         }
     }
 
+    /// <summary>**完全削除とは別の権限。** テスト回答の削除は SurveyAdministrator にも許す（Issue #1024）。</summary>
+    [Fact]
+    public void テスト回答の削除は特権管理者とアンケート管理者だけが持つ()
+    {
+        foreach (var role in Enum.GetValues<AdminRole>())
+        {
+            Assert.Equal(
+                role is AdminRole.Administrator or AdminRole.SurveyAdministrator,
+                AdminPermissions.Of(role).Contains(AdminPermissions.SurveysDeleteTestResponses));
+        }
+    }
+
     [Fact]
     public void SAML設定は特権管理者だけが持つ()
     {
@@ -93,7 +105,10 @@ public class AdminPermissionsTests
 
         Assert.Contains(AdminPermissions.SurveysPublish, permissions);
         Assert.Contains(AdminPermissions.OutboxRequeue, permissions);
+
+        // **完全削除は持たないが、テスト回答の削除は持つ**（別の権限。Issue #1024）
         Assert.DoesNotContain(AdminPermissions.SurveysDelete, permissions);
+        Assert.Contains(AdminPermissions.SurveysDeleteTestResponses, permissions);
 
         // **人の出入りには触れない**
         Assert.DoesNotContain(AdminPermissions.UsersRead, permissions);

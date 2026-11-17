@@ -36,6 +36,15 @@ public static class AdminPermissions
     /// </remarks>
     public const string SurveysDelete = "surveys.delete";
 
+    /// <summary>Pleasanter 側のテスト回答の削除（Issue #1010・#1024）。</summary>
+    /// <remarks>
+    /// **完全削除（<see cref="SurveysDelete"/>）とは分ける。** 消す対象は本アプリの記録で
+    /// 「テスト回答」と確認できたものだけで、件数の突合・1 件ずつの照合・監査ログで守っており、
+    /// アンケートの追跡手掛かりを失う完全削除とは重さが違う。アンケートの運用を任せる
+    /// アンケート管理者にも持たせる（2026-11-18 のユーザー判断）。
+    /// </remarks>
+    public const string SurveysDeleteTestResponses = "surveys.deleteTestResponses";
+
     /// <summary>ルックアップの設定・専用 API キー・接続試験（仕様書 U7。Issue #879）。</summary>
     /// <remarks>**アンケート管理者だけ。** 編集者は設定を見られるが、変えられない。</remarks>
     public const string LookupsManage = "lookups.manage";
@@ -97,6 +106,7 @@ public static class AdminPermissions
         SurveysWrite,
         SurveysPublish,
         SurveysDelete,
+        SurveysDeleteTestResponses,
         LookupsManage,
         TemplatesRead,
         TemplatesWrite,
@@ -130,6 +140,7 @@ public static class AdminPermissions
                 SurveysRead,
                 SurveysWrite,
                 SurveysPublish,
+                SurveysDeleteTestResponses,
                 LookupsManage,
                 TemplatesRead,
                 TemplatesWrite,

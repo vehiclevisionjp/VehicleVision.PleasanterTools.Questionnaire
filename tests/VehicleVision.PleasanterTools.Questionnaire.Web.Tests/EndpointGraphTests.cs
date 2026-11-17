@@ -122,6 +122,22 @@ public class EndpointGraphTests
                         Services.AdminPermissions.PleasanterSsoSettings)));
         }
 
+        // **テスト回答の削除は専用の権限を要求し、完全削除の権限ではない**（Issue #1024）
+        foreach (var route in new[]
+                 {
+                     "/api/admin/surveys/{surveyId:guid}/test-responses",
+                     "/api/admin/surveys/{surveyId:guid}/test-responses/delete",
+                 })
+        {
+            var testResponseEndpoint = Assert.Single(
+                endpoints.OfType<RouteEndpoint>(),
+                endpoint => endpoint.RoutePattern.RawText == route);
+            Assert.Contains(
+                testResponseEndpoint.Metadata.GetOrderedMetadata<IAuthorizeData>(),
+                data => data.Policy == Services.AdminPermissions.PolicyOf(
+                    Services.AdminPermissions.SurveysDeleteTestResponses));
+        }
+
         // **CAPTCHA の検証より前にレート制限を通す。**
         // handler の中で検証するため、入口にこの metadata が無い変更を通さない。
         foreach (var route in new[] { "/api/admin/login", "/api/admin/invitations/accept" })
