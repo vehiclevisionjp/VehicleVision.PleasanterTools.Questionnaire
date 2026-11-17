@@ -524,6 +524,19 @@ builder.Services.AddSingleton(AdminApiTokenOptions.FromConfiguration(builder.Con
 builder.Services.AddSingleton<IAdminApiTokenStore, AdminApiTokenStore>();
 builder.Services.AddSingleton<AdminApiTokenService>();
 
+// SAML の管理者が API キーを発行する前の強制再認証（ForceAuthn。Issue #1034）。
+// 途中の状態と発行 1 回分の許可は、使い捨ての置き場に預ける。複数のプロセスでは共有状態の Redis を使う
+if (sharedStateOptions.UseRedis)
+{
+    builder.Services.AddSingleton<IAdminReauthStateStore, RedisAdminReauthStateStore>();
+}
+else
+{
+    builder.Services.AddSingleton<IAdminReauthStateStore, MemoryAdminReauthStateStore>();
+}
+
+builder.Services.AddSingleton<SamlReauthService>();
+
 // ---- bot 対策 --------------------------------------------------------------
 // **外部の CAPTCHA を使わない**（_documents/非機能設計.md 1 章）。
 // 完全匿名を掲げている以上、回答者の IP や操作の癖を第三者へ送れない。

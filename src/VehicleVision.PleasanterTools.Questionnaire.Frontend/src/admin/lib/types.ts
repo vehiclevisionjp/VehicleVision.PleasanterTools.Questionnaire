@@ -1071,8 +1071,11 @@ export interface ApiTokenOverview {
   defaultExpiresInDays: number;
   maxExpiresInDays: number;
   maxIpAllowListEntries: number;
-  /** 本人確認の手段。`password` はパスワード、`relogin` は SSO の管理者の直前の再ログイン。 */
-  reauthentication: 'password' | 'relogin';
+  /**
+   * 本人確認の手段。`password` はパスワード、`relogin` は Pleasanter のログインで入った管理者の直前の再ログイン、
+   * `saml-force` は SAML の管理者の IdP での強制再認証（ForceAuthn。Issue #1034）。
+   */
+  reauthentication: 'password' | 'relogin' | 'saml-force';
   reloginMinutes: number;
   tokens: ApiTokenRow[];
 }

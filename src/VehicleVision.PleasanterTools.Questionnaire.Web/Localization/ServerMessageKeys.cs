@@ -107,6 +107,12 @@ public static class ServerMessageKeys
     /// <summary>SSO の管理者が、直前の再ログインではない。{0} は許す分数。</summary>
     public const string ApiTokenReloginRequired = "apiTokens.reloginRequired";
 
+    /// <summary>SAML の管理者で、強制再認証の許可が無い（Issue #1034）。{0} は許す分数。</summary>
+    public const string ApiTokenReauthRequired = "apiTokens.reauthRequired";
+
+    /// <summary>再認証を始められない（SAML が無効、または SAML で入ったセッションではない）。</summary>
+    public const string ApiTokenReauthUnavailable = "apiTokens.reauthUnavailable";
+
     /// <summary>トークンが無い・他人のもの・すでに失効している（**区別しない**）。</summary>
     public const string ApiTokenNotFound = "apiTokens.notFound";
 

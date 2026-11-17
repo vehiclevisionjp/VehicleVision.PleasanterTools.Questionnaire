@@ -6,16 +6,26 @@
    * **ストレージ・URL・ログへは置かない**。閉じると消え、二度と出せない
    * （サーバが持つのはハッシュだけ）。
    *
-   * **発行の前に本人確認をする**（パスワードの再確認。SSO で入った管理者は直前の再ログイン）。
+   * **発行の前に本人確認をする**（パスワードの再確認。SSO で入った管理者は直前の再ログイン。
+   * SAML の管理者は IdP での強制再認証 = ForceAuthn。Issue #1034）。
    * 離席中の画面を奪われただけで、2 要素を迂回する資格情報を作らせないため。
+   *
+   * **強制再認証の流れ**: 発行を押す → 入力の途中の値（秘密を含めない）をこのタブの `sessionStorage` へ置く →
+   * サーバが出す IdP への URL へ移る → IdP で認証し直す → 管理画面へ戻る（`?apiTokenReauth=done|failed`。
+   * すぐ URL から消す）→ 置いた値を復元して、発行を完了させる。**戻り先は指定しない**（サーバが固定する）。
    * ⚠️ **ここで隠す・絞るのは画面の親切であって守りではない。** 守りはサーバ側にある。
    */
-  import { issueApiToken, revokeApiToken } from '../lib/api';
+  import { issueApiToken, revokeApiToken, startApiTokenReauth } from '../lib/api';
   import {
     API_TOKEN_SCOPES,
+    clearApiTokenDraft,
     isExpiryInRange,
     parseIpAllowListInput,
+    saveApiTokenDraft,
     scopeLabelKey,
+    takeApiTokenDraft,
+    takeReauthMarker,
+    type ReauthMarker,
   } from '../lib/apiTokens';
   import { confirmAction } from '../lib/confirmation.svelte';
   import type { ApiTokenOverview, ApiTokenRow, IssuedApiToken } from '../lib/types';
@@ -45,6 +55,11 @@
 
   let defaultsApplied = false;
 
+  /** IdP から戻った印。**読むのは 1 回だけ**（URL からも消す）。 */
+  let returnMarker: ReauthMarker | null = takeReauthMarker(window.location, (url) =>
+    window.history.replaceState(null, '', url),
+  );
+
   $effect(() => {
     // 既定の期限は、サーバの設定に従う（初回だけ当てる。入力中の値を上書きしない）
     if (overview !== null && !defaultsApplied) {
@@ -57,6 +72,41 @@
     API_TOKEN_SCOPES.filter((scope) => overview?.issuableScopes.includes(scope) ?? false),
   );
   const relogin = $derived(overview?.reauthentication === 'relogin');
+  const forced = $derived(overview?.reauthentication === 'saml-force');
+
+  $effect(() => {
+    // IdP から戻ったあと、概要が読めたら 1 回だけ処理する
+    if (overview === null || returnMarker === null) {
+      return;
+    }
+
+    const marker = returnMarker;
+    returnMarker = null;
+    void resumeAfterReauth(marker);
+  });
+
+  async function resumeAfterReauth(marker: ReauthMarker) {
+    const draft = takeApiTokenDraft();
+    if (draft !== null) {
+      name = draft.name;
+      selectedScopes = draft.scopes;
+      expiresInDays = draft.expiresInDays;
+      ipText = draft.ipText;
+    }
+
+    if (marker === 'failed') {
+      error = t('apiTokens.reauthFailed');
+      return;
+    }
+
+    if (draft === null) {
+      error = t('apiTokens.reauthNoDraft');
+      return;
+    }
+
+    // 再認証の許可は 1 回分だけ。ここで発行を完了させる
+    await submit();
+  }
 
   function toggleScope(scope: string, checked: boolean) {
     selectedScopes = checked
@@ -84,14 +134,45 @@
       return;
     }
 
+    if (forced) {
+      await startReauth();
+      return;
+    }
+
+    await submit();
+  }
+
+  /** IdP での強制再認証へ出る。**戻ったあとに復元できるよう、入力の途中の値を置く。** */
+  async function startReauth() {
+    busy = true;
+    saveApiTokenDraft({ name: name.trim(), scopes: selectedScopes, expiresInDays, ipText });
+
+    const result = await startApiTokenReauth();
+    if (!result.ok) {
+      busy = false;
+      clearApiTokenDraft();
+      error = result.message || t('apiTokens.reauthStartFailed');
+      return;
+    }
+
+    // busy のまま移る（二重に押させない）
+    window.location.assign(result.value.redirectUrl);
+  }
+
+  /** 発行を依頼する。SAML の管理者は、IdP から戻った直後の 1 回だけ通る。 */
+  async function submit() {
+    if (overview === null) {
+      return;
+    }
+
     busy = true;
     const result = await issueApiToken({
       name: name.trim(),
       scopes: selectedScopes,
       expiresInDays,
       ipAllowList: parseIpAllowListInput(ipText),
-      // 再ログインで確かめる管理者は、パスワードを送らない
-      password: relogin ? undefined : password,
+      // 再ログイン・強制再認証で確かめる管理者は、パスワードを送らない
+      password: relogin || forced ? undefined : password,
     });
     busy = false;
     password = '';
@@ -229,7 +310,10 @@
         </label>
         <p class="hint">{t('apiTokens.ipAllowListHint', { max: overview.maxIpAllowListEntries })}</p>
 
-        {#if relogin}
+        {#if forced}
+          <!-- **SAML の管理者は、発行のたびに IdP で再認証する**（ForceAuthn） -->
+          <p class="hint">{t('apiTokens.reauthNote')}</p>
+        {:else if relogin}
           <!-- **SSO の管理者はパスワードを持たない。** 直前の再ログインで確かめる -->
           <p class="hint">{t('apiTokens.reloginNote', { minutes: overview.reloginMinutes })}</p>
         {:else}
@@ -242,7 +326,15 @@
         {#if error}<p class="error" role="alert">{error}</p>{/if}
 
         <button type="submit" disabled={busy || selectedScopes.length === 0}>
-          {busy ? t('apiTokens.issuing') : t('apiTokens.issue')}
+          {#if busy && forced}
+            {t('apiTokens.reauthRedirecting')}
+          {:else if busy}
+            {t('apiTokens.issuing')}
+          {:else if forced}
+            {t('apiTokens.reauthIssue')}
+          {:else}
+            {t('apiTokens.issue')}
+          {/if}
         </button>
       </form>
     {:else if error}

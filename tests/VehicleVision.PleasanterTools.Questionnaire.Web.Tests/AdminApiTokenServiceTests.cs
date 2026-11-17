@@ -504,6 +504,64 @@ public class AdminApiTokenServiceTests
         Assert.Equal(AdminApiTokenIssueOutcome.ReloginRequired, outcome);
     }
 
+    // ---- SAML の強制再認証（Issue #1034） ----------------------------------------------
+
+    [Fact]
+    public async Task SAMLの管理者は強制再認証の許可がなければ発行できない()
+    {
+        var harness = Create();
+        var owner = await UserAsync(harness, AdminRole.Administrator, "saml-admin");
+
+        var (outcome, issued) = await harness.Service.IssueAsync(
+            owner.Id, Request(), new AdminApiTokenReauthentication.SamlForced(_ => Task.FromResult(false)));
+
+        Assert.Equal(AdminApiTokenIssueOutcome.ReauthenticationRequired, outcome);
+        Assert.Null(issued);
+        Assert.Empty(harness.Tokens.StoredHashes);
+    }
+
+    [Fact]
+    public async Task 強制再認証の許可は発行1回分で_同じ許可では2本目を作れない()
+    {
+        var harness = Create();
+        var owner = await UserAsync(harness, AdminRole.Administrator, "saml-admin");
+        var grants = 1;
+        var reauthentication = new AdminApiTokenReauthentication.SamlForced(
+            _ => Task.FromResult(Interlocked.Decrement(ref grants) >= 0));
+
+        var first = await harness.Service.IssueAsync(owner.Id, Request("first"), reauthentication);
+        var second = await harness.Service.IssueAsync(owner.Id, Request("second"), reauthentication);
+
+        Assert.Equal(AdminApiTokenIssueOutcome.Issued, first.Outcome);
+        Assert.Equal(AdminApiTokenIssueOutcome.ReauthenticationRequired, second.Outcome);
+        Assert.Single(harness.Tokens.StoredHashes);
+    }
+
+    [Fact]
+    public async Task 入力の誤りでは強制再認証の許可を消費しない()
+    {
+        var harness = Create();
+        var owner = await UserAsync(harness, AdminRole.Administrator, "saml-admin");
+        var consumed = 0;
+        var reauthentication = new AdminApiTokenReauthentication.SamlForced(_ =>
+        {
+            consumed++;
+            return Task.FromResult(true);
+        });
+
+        Assert.Equal(
+            AdminApiTokenIssueOutcome.NameInvalid,
+            (await harness.Service.IssueAsync(owner.Id, Request(""), reauthentication)).Outcome);
+        Assert.Equal(
+            AdminApiTokenIssueOutcome.ExpiryInvalid,
+            (await harness.Service.IssueAsync(owner.Id, Request(days: 9999), reauthentication)).Outcome);
+        Assert.Equal(0, consumed);
+
+        Assert.Equal(
+            AdminApiTokenIssueOutcome.Issued, (await harness.Service.IssueAsync(owner.Id, Request(), reauthentication)).Outcome);
+        Assert.Equal(1, consumed);
+    }
+
     // ---- 入力の検査 -------------------------------------------------------------------
 
     [Theory]

@@ -10,6 +10,7 @@ using ITfoxtec.Identity.Saml2.Schemas.Metadata;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using VehicleVision.PleasanterTools.Questionnaire.Data;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
@@ -51,6 +52,14 @@ public static class AdminSamlEndpoints
 
     /// <summary>データの保護に使う用途の名前。</summary>
     private const string ProtectorPurpose = "VehicleVision.Questionnaire.Saml.RelayState";
+
+    /// <summary>
+    /// 強制再認証（Issue #1034）の途中を預ける cookie。<b>ログインの cookie（<see cref="RelayCookieName"/>）とは別</b>にする。
+    /// ログイン中の別タブのやり取りと、お互いを上書きしない。
+    /// </summary>
+    private const string ReauthCookieName = "q.admin.saml.reauth";
+
+    private const string ReauthProtectorPurpose = "VehicleVision.Questionnaire.Saml.Reauth";
 
     public static IEndpointRouteBuilder MapAdminSamlEndpoints(
         this IEndpointRouteBuilder builder,
@@ -147,6 +156,7 @@ public static class AdminSamlEndpoints
             HttpContext context,
             ISamlOptionsProvider optionsProvider,
             SamlAuthenticator authenticator,
+            SamlReauthService reauth,
             IAdminUserStore store,
             IDataProtectionProvider protectionProvider,
             ILogger<SamlAuthenticator> logger,
@@ -156,6 +166,20 @@ public static class AdminSamlEndpoints
             if (!options.Enabled)
             {
                 return Results.NotFound();
+            }
+
+            // **API キーの発行の強制再認証（Issue #1034）の戻りは、先にここで受ける。**
+            // 出した要求（cookie が指す id）への応答でなければ、通常のログインとして続ける
+            var reauthRequestId = ReadReauthRequestId(context, protectionProvider);
+            if (reauthRequestId is not null)
+            {
+                var reauthResult = await TryCompleteReauthAsync(
+                    context, options, reauthRequestId, reauth, adminPath.Path, logger, cancellationToken)
+                    .ConfigureAwait(false);
+                if (reauthResult is not null)
+                {
+                    return reauthResult;
+                }
             }
 
             var relay = ReadRelay(context, protectionProvider, AdminEntry(context, adminPath.Path));
@@ -279,11 +303,270 @@ public static class AdminSamlEndpoints
             }
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
+        MapReauthStart(group);
         MapSingleLogout(group, adminPath.Path);
         MapSettings(group);
 
         return builder;
     }
+
+    /// <summary>
+    /// API キーの発行の前の、強制再認証を始める（Issue #1034。親 #1012）。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>ログイン済みの SAML のセッションだけが呼べる。</b><c>POST</c> で、状態を変える要求として
+    /// <see cref="AdminCsrfGuard"/>（別オリジンの拒否）の対象のまま。<b>戻り先は呼び出し側から受け取らない</b>
+    /// （受け口 <c>/acs</c> は固定の飛び先へ返す。オープンリダイレクトにならない）。
+    /// </para>
+    /// <para>
+    /// 出す要求は <c>ForceAuthn="true"</c>。<b>要求の id・利用者・セッション・時刻をサーバへ預け</b>
+    /// （<see cref="SamlReauthService.BeginAsync"/>）、出したブラウザを cookie で結び付ける。
+    /// 応答する URL（飛び先）を返すだけで、<b>秘密は載らない</b>（要求は署名しない設計。URL にあるのは要求の id と時刻だけ）。
+    /// </para>
+    /// </remarks>
+    private static void MapReauthStart(RouteGroupBuilder group)
+    {
+        group.MapPost("/reauth", async (
+            HttpContext context,
+            ClaimsPrincipal principal,
+            ISamlOptionsProvider optionsProvider,
+            SamlReauthService reauth,
+            AdminApiTokenOptions tokenOptions,
+            IAdminSessionStore sessions,
+            IDataProtectionProvider protectionProvider,
+            CancellationToken cancellationToken) =>
+        {
+            var options = (await optionsProvider.GetAsync(cancellationToken).ConfigureAwait(false)).Options;
+            var sessionId = principal.FindFirstValue(AdminSessionManager.SessionIdClaim);
+            var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            // **SAML で入ったセッションだけ。** それ以外は、再認証の対象ではない
+            if (!tokenOptions.Enabled
+                || !options.Enabled
+                || string.IsNullOrEmpty(sessionId)
+                || string.IsNullOrEmpty(principal.FindFirstValue(AdminAuthSchemes.SamlNameIdClaim)))
+            {
+                return Results.Json(
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.ApiTokenReauthUnavailable, RequestLanguage.Of(context)),
+                    },
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+
+            var request = new Saml2AuthnRequest(options.ToSaml2Configuration())
+            {
+                Destination = options.SingleSignOnUrl,
+                AssertionConsumerServiceUrl = AssertionConsumerServiceUrl(context),
+                ProtocolBinding = ProtocolBindings.HttpPost,
+
+                // ⚠️ **IdP のセッションを流用させず、その場で認証し直させる。**
+                // 流用されたかどうかは、戻りの AuthnInstant で確かめる（IdP が守らないこともある）
+                ForceAuthn = true,
+            };
+
+            var binding = new Saml2RedirectBinding();
+            binding.Bind(request);
+
+            await reauth.BeginAsync(request.IdAsString, userId, sessions.HandleOf(sessionId), cancellationToken)
+                .ConfigureAwait(false);
+            SaveReauthCookie(context, protectionProvider, request.IdAsString);
+
+            AuditNotes.Add(context, "purpose", SamlReauthService.Purpose);
+            return Results.Ok(new { redirectUrl = binding.RedirectLocation.OriginalString });
+        })
+            .RequireAuthorization(AdminAuthSchemes.SessionPolicy)
+            .RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
+    }
+
+    /// <summary>
+    /// 強制再認証の戻りを受ける。<b>この cookie の要求への応答でなければ <c>null</c>（通常のログインとして続ける）。</b>
+    /// </summary>
+    private static async Task<IResult?> TryCompleteReauthAsync(
+        HttpContext context,
+        SamlOptions options,
+        string cookieRequestId,
+        SamlReauthService reauth,
+        string adminPath,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var configuration = options.ToSaml2Configuration();
+        var response = new Saml2AuthnResponse(configuration);
+        ITfoxtec.Identity.Saml2.Http.HttpRequest httpRequest;
+
+        try
+        {
+            httpRequest = context.Request.ToGenericHttpRequest(validate: true);
+            httpRequest.Binding.ReadSamlResponse(httpRequest, response);
+        }
+        catch (Exception exception) when (IsSamlFailure(exception))
+        {
+            // 読めない応答は、再認証の戻りではない。通常のログインの扱い（失敗）に任せる
+            return null;
+        }
+
+        // ⚠️ **ここでの InResponseTo は署名を確かめる前の値。** 経路の選び分けにだけ使い、信用はしない
+        if (!string.Equals(response.InResponseToAsString, cookieRequestId, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        // **この cookie は 1 回で使い切る**（成功・失敗を問わない）
+        ClearReauthCookie(context);
+
+        var entry = AdminEntry(context, adminPath);
+        if (response.Status != Saml2StatusCodes.Success)
+        {
+            logger.LogWarning("IdP が再認証を断りました: {Status}", response.Status);
+            return ReauthFailedAudited(context, entry, "idp-refused");
+        }
+
+        try
+        {
+            // **署名・発行者・宛先・有効期間を確かめるのはここ**
+            httpRequest.Binding.Unbind(httpRequest, response);
+        }
+        catch (Exception exception) when (IsSamlFailure(exception))
+        {
+            logger.LogWarning(exception, "再認証の SAML 応答を受け取れませんでした。");
+            return ReauthFailedAudited(context, entry, "response-invalid");
+        }
+
+        var facts = new SamlAssertionFacts(
+            response.InResponseToAsString,
+            ReadLoginId(response.ClaimsIdentity, options),
+            AuthnInstantOf(response),
+            AuthnContextClassRefOf(response));
+
+        SamlReauthOutcome outcome;
+        try
+        {
+            outcome = await reauth.CompleteAsync(cookieRequestId, facts, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // **置き場に届かないときは、許可を作らない**（通す方向に倒さない）
+            logger.LogError(exception, "再認証の状態の置き場を使えませんでした。");
+            return ReauthFailedAudited(context, entry, "state-store-unavailable");
+        }
+
+        if (outcome is not SamlReauthOutcome.Granted)
+        {
+            logger.LogWarning("SAML の再認証を許可しませんでした: {Outcome}", outcome);
+            return ReauthFailedAudited(context, entry, ReauthReason(outcome));
+        }
+
+        AuditNotes.Add(context, "result", "reauth-granted");
+        AuditNotes.Add(context, "purpose", SamlReauthService.Purpose);
+        return ReauthReturn(entry, "done");
+    }
+
+    private static string ReauthReason(SamlReauthOutcome outcome) => outcome switch
+    {
+        SamlReauthOutcome.RequestUnknown => "reauth-request-unknown",
+        SamlReauthOutcome.RequestMismatch => "reauth-request-mismatch",
+        SamlReauthOutcome.UserMismatch => "reauth-user-mismatch",
+        SamlReauthOutcome.AuthnInstantMissing => "reauth-authn-instant-missing",
+        SamlReauthOutcome.AuthnInstantStale => "reauth-authn-instant-stale",
+        SamlReauthOutcome.AuthnInstantInFuture => "reauth-authn-instant-future",
+        SamlReauthOutcome.PreviousSession => "reauth-previous-session",
+        _ => "reauth-failed",
+    };
+
+    /// <summary>失敗の理由を監査へ残して、固定の飛び先へ戻す。<b>理由は画面へ返さない。</b></summary>
+    private static IResult ReauthFailedAudited(HttpContext context, string entry, string reason)
+    {
+        AuditNotes.Add(context, "result", "reauth-failed");
+        AuditNotes.Add(context, "reason", reason);
+        AuditNotes.SetStatus(context, StatusCodes.Status401Unauthorized);
+        return ReauthReturn(entry, "failed");
+    }
+
+    /// <summary>
+    /// 管理画面へ戻す。<b>飛び先は固定</b>（管理画面の入口 + 結果の印だけ。呼び出し側の入力を使わない）。
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ <b>302 ではなく、ページの側から遷移させる。</b>管理者のセッションの cookie は <c>SameSite=Strict</c> で、
+    /// IdP からの他サイトの POST に続く 302 の先へは、ブラウザが送らないことがある
+    /// （画面がログアウトに見える）。このページ自身（同じサイト）からの遷移なら送られる。
+    /// </remarks>
+    private static IResult ReauthReturn(string entry, string result)
+    {
+        var target = $"{entry}/me?apiTokenReauth={result}";
+        var html = "<!doctype html><html><head><meta charset=\"utf-8\">"
+            + $"<meta http-equiv=\"refresh\" content=\"0;url={target}\">"
+            + "<meta name=\"referrer\" content=\"no-referrer\"><title></title></head>"
+            + $"<body><a href=\"{target}\">Continue</a></body></html>";
+        return Results.Content(html, "text/html; charset=utf-8");
+    }
+
+    /// <summary>応答のアサーションから、IdP が認証した時刻を取り出す。<b>複数あれば最も古いもの。</b>無ければ <c>null</c>。</summary>
+    private static DateTimeOffset? AuthnInstantOf(Saml2AuthnResponse response)
+    {
+        var instants = (response.Saml2SecurityToken?.Assertion?.Statements ?? [])
+            .OfType<Saml2AuthenticationStatement>()
+            .Select(statement => statement.AuthenticationInstant)
+            .ToList();
+        if (instants.Count == 0)
+        {
+            return null;
+        }
+
+        var oldest = instants.Min();
+        return new DateTimeOffset(
+            oldest.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(oldest, DateTimeKind.Utc) : oldest.ToUniversalTime());
+    }
+
+    private static string? AuthnContextClassRefOf(Saml2AuthnResponse response) =>
+        (response.Saml2SecurityToken?.Assertion?.Statements ?? [])
+            .OfType<Saml2AuthenticationStatement>()
+            .Select(statement => statement.AuthenticationContext?.ClassReference?.OriginalString)
+            .FirstOrDefault(value => value is not null);
+
+    private static void SaveReauthCookie(HttpContext context, IDataProtectionProvider provider, string requestId) =>
+        context.Response.Cookies.Append(
+            ReauthCookieName,
+            provider.CreateProtector(ReauthProtectorPurpose).Protect(requestId),
+            new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.None,
+                Secure = true,
+                IsEssential = true,
+                Path = SamlCookiePath(context),
+                MaxAge = SamlReauthService.PendingLifetime,
+            });
+
+    private static string? ReadReauthRequestId(HttpContext context, IDataProtectionProvider provider)
+    {
+        if (!context.Request.Cookies.TryGetValue(ReauthCookieName, out var payload) || string.IsNullOrEmpty(payload))
+        {
+            return null;
+        }
+
+        try
+        {
+            var requestId = provider.CreateProtector(ReauthProtectorPurpose).Unprotect(payload);
+            return requestId.Length > 0 ? requestId : null;
+        }
+        catch (Exception exception) when (exception is FormatException
+            or System.Security.Cryptography.CryptographicException)
+        {
+            return null;
+        }
+    }
+
+    private static void ClearReauthCookie(HttpContext context) =>
+        context.Response.Cookies.Delete(ReauthCookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.None,
+            Secure = true,
+            Path = SamlCookiePath(context),
+        });
 
     /// <summary>単一ログアウト（Issue #191）。</summary>
     /// <remarks>
