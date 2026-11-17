@@ -81,6 +81,9 @@ public static class ServerMessages
         [ServerMessageKeys.SurveyDeleteRequiresArchive] = "완전히 삭제할 수 있는 것은 보관된 설문 조사뿐입니다. 먼저 보관하세요.",
         [ServerMessageKeys.SurveyDeleteTitleMismatch] = "입력한 제목이 설문 조사 제목과 일치하지 않습니다.",
         [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "전송 대기 또는 전송 중인 답변이나 메일이 남아 있어 완전히 삭제할 수 없습니다.",
+        [ServerMessageKeys.TestResponsesCountChanged] = "테스트 답변의 건수가 화면에 표시된 것과 달라졌습니다. 아무것도 삭제하지 않았습니다. 다시 불러오세요.",
+        [ServerMessageKeys.TestResponsesNotVerifiable] = "이 설문 조사에는 응답 JSON 열이 없어 삭제 대상을 확인할 수 없습니다. 아무것도 삭제하지 않았습니다.",
+        [ServerMessageKeys.TestResponsesForbidden] = "Pleasanter가 삭제를 허용하지 않았습니다. API 키 사용자에게 레코드 삭제 권한이 있는지 확인하세요.",
         [ServerMessageKeys.SiteIdLockedAfterPublish] = "정식 공개한 설문 조사의 Pleasanter 사이트 ID는 변경할 수 없습니다.",
         [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "전송 대기 중인 답변이 있어 Pleasanter 사이트 ID를 변경할 수 없습니다.",
         [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "복제 대상에는 원본과 다른 Pleasanter 사이트 ID를 지정하세요.",
@@ -245,6 +248,9 @@ public static class ServerMessages
             [ServerMessageKeys.SurveyDeleteRequiresArchive] = "只有已存档的问卷可以永久删除。请先存档此问卷。",
             [ServerMessageKeys.SurveyDeleteTitleMismatch] = "输入的标题与问卷标题不一致。",
             [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "仍有等待发送或正在发送的回答或邮件，因此无法永久删除。",
+            [ServerMessageKeys.TestResponsesCountChanged] = "测试回答的数量与画面显示的不一致，未删除任何内容。请重新加载。",
+            [ServerMessageKeys.TestResponsesNotVerifiable] = "此问卷没有回答 JSON 列，无法确认删除对象，未删除任何内容。",
+            [ServerMessageKeys.TestResponsesForbidden] = "Pleasanter 拒绝了删除。请确认 API 密钥的用户拥有删除记录的权限。",
             [ServerMessageKeys.SiteIdLockedAfterPublish] = "正式发布后的问卷无法更改 Pleasanter 站点 ID。",
             [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "仍有等待发送的回答，因此无法更改 Pleasanter 站点 ID。",
             [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "请为副本指定与原问卷不同的 Pleasanter 站点 ID。",
@@ -366,6 +372,9 @@ public static class ServerMessages
             [ServerMessageKeys.SurveyDeleteRequiresArchive] = "Solo se pueden eliminar permanentemente las encuestas archivadas. Archive primero esta encuesta.",
             [ServerMessageKeys.SurveyDeleteTitleMismatch] = "El título introducido no coincide con el título de la encuesta.",
             [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "Esta encuesta no se puede eliminar permanentemente mientras haya respuestas o correos pendientes o en proceso de envío.",
+            [ServerMessageKeys.TestResponsesCountChanged] = "El número de respuestas de prueba ya no coincide con el mostrado. No se eliminó nada. Vuelva a cargar la página.",
+            [ServerMessageKeys.TestResponsesNotVerifiable] = "Esta encuesta no tiene columna JSON de respuestas, por lo que no se puede comprobar qué eliminar. No se eliminó nada.",
+            [ServerMessageKeys.TestResponsesForbidden] = "Pleasanter rechazó la eliminación. Compruebe que el usuario de la clave de API tiene permiso para eliminar registros.",
             [ServerMessageKeys.SiteIdLockedAfterPublish] = "El ID del sitio de Pleasanter no se puede cambiar después de la publicación en producción.",
             [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "El ID del sitio de Pleasanter no se puede cambiar mientras haya respuestas pendientes de envío.",
             [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "Especifique un ID de sitio de Pleasanter distinto del sitio donde escribe la encuesta original.",
@@ -486,6 +495,9 @@ public static class ServerMessages
             [ServerMessageKeys.SurveyDeleteRequiresArchive] = "Nur archivierte Umfragen können dauerhaft gelöscht werden. Archivieren Sie diese Umfrage zuerst.",
             [ServerMessageKeys.SurveyDeleteTitleMismatch] = "Der eingegebene Titel stimmt nicht mit dem Titel der Umfrage überein.",
             [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "Diese Umfrage kann nicht dauerhaft gelöscht werden, solange Antworten oder E-Mails ausstehen oder gesendet werden.",
+            [ServerMessageKeys.TestResponsesCountChanged] = "Die Anzahl der Testantworten stimmt nicht mehr mit der Anzeige überein. Es wurde nichts gelöscht. Laden Sie die Seite neu.",
+            [ServerMessageKeys.TestResponsesNotVerifiable] = "Diese Umfrage hat keine JSON-Spalte für Antworten, daher kann das Löschziel nicht geprüft werden. Es wurde nichts gelöscht.",
+            [ServerMessageKeys.TestResponsesForbidden] = "Pleasanter hat das Löschen abgelehnt. Prüfen Sie, ob der Benutzer des API-Schlüssels Datensätze löschen darf.",
             [ServerMessageKeys.SiteIdLockedAfterPublish] = "Die Pleasanter-Site-ID kann nach der Produktionsveröffentlichung nicht geändert werden.",
             [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "Die Pleasanter-Site-ID kann nicht geändert werden, solange Antworten auf den Versand warten.",
             [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "Geben Sie eine andere Pleasanter-Site-ID an als diejenige, in die die ursprüngliche Umfrage schreibt.",
@@ -929,6 +941,24 @@ public static class ServerMessages
             "入力した題名がアンケートの題名と一致しません。",
             "The title you entered does not match the survey title.",
             "Tiêu đề đã nhập không khớp với tiêu đề khảo sát.");
+
+        Add(
+            ServerMessageKeys.TestResponsesCountChanged,
+            "画面に出ていた件数と今の件数が違うため、何も削除していません。再読み込みしてください。",
+            "The number of test responses no longer matches what the screen showed. Nothing was deleted. Reload the page.",
+            "Số phản hồi thử nghiệm không còn khớp với số hiển thị trên màn hình. Chưa xóa gì. Vui lòng tải lại trang.");
+
+        Add(
+            ServerMessageKeys.TestResponsesNotVerifiable,
+            "このアンケートには回答 JSON 列が無く、削除してよいレコードかを確かめられないため、何も削除していません。",
+            "This survey has no response JSON column, so the records to delete cannot be verified. Nothing was deleted.",
+            "Khảo sát này không có cột JSON câu trả lời nên không thể xác minh bản ghi cần xóa. Chưa xóa gì.");
+
+        Add(
+            ServerMessageKeys.TestResponsesForbidden,
+            "Pleasanter が削除を断りました。API キーのユーザーにレコードの削除権限があるか確認してください。",
+            "Pleasanter refused the deletion. Check that the API key's user is allowed to delete records.",
+            "Pleasanter đã từ chối việc xóa. Hãy kiểm tra người dùng của khóa API có quyền xóa bản ghi.");
 
         Add(
             ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery,

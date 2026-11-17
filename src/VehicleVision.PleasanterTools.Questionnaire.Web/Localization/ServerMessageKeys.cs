@@ -161,6 +161,15 @@ public static class ServerMessageKeys
     public const string SurveyDeleteBlockedByPendingDelivery =
         "surveys.deleteBlockedByPendingDelivery";
 
+    /// <summary>画面が見せたテスト回答の件数と今の件数が違う（Issue #1010）。何も消していない。</summary>
+    public const string TestResponsesCountChanged = "surveys.testResponsesCountChanged";
+
+    /// <summary>回答 JSON 列が無く、テスト回答の持ち主を確かめられない（Issue #1010）。何も消していない。</summary>
+    public const string TestResponsesNotVerifiable = "surveys.testResponsesNotVerifiable";
+
+    /// <summary>Pleasanter がテスト回答の削除を断った（API キーのユーザーに権限が無い。Issue #1010）。</summary>
+    public const string TestResponsesForbidden = "surveys.testResponsesForbidden";
+
     public const string SiteIdLockedAfterPublish = "surveys.siteIdLockedAfterPublish";
 
     public const string SiteIdBlockedByPendingResponses = "surveys.siteIdBlockedByPendingResponses";
