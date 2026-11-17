@@ -91,6 +91,19 @@ public class PleasanterGatewayTests
     }
 
     [Fact]
+    public async Task 削除は_ID_を指した_Delete_へ_API_キー入りの本文で送る()
+    {
+        var stub = new Stub(_ => Json(HttpStatusCode.OK, OkBody));
+
+        var response = await Create(stub).DeleteAsync(77);
+
+        Assert.True(response.IsSuccess);
+        var request = Assert.Single(stub.Requests);
+        Assert.Equal("/api/items/77/Delete", request.Uri.AbsolutePath);
+        Assert.Equal(ApiKey, JsonNode.Parse(request.Body)!["ApiKey"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task 取得と更新とサイト操作と照合は_従来のパスと本文で呼ぶ()
     {
         var stub = new Stub(_ => Json(HttpStatusCode.OK, OkBody));

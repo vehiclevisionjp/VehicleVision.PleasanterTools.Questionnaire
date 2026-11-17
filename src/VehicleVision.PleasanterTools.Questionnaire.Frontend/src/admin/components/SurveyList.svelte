@@ -2,8 +2,10 @@
   import { appUrl } from '../../lib/basePath';
   import {
     archiveSurvey,
+    countDeletableTestResponses,
     createSurvey,
     deleteSurvey,
+    deleteTestResponses,
     duplicateSurvey,
     importSurvey,
     surveyExportUrl,
@@ -60,6 +62,10 @@
   let surveys = $state<SurveySummary[]>([]);
   let loading = $state(true);
   let error = $state('');
+  /** テスト回答の削除の結果など、操作が終わったことの知らせ（Issue #1010）。 */
+  let notice = $state('');
+  /** テスト回答の削除の最中は、他の行の削除も押せなくする（二重実行を避ける） */
+  let cleanupBusy = $state(false);
 
   /** 1 ページの件数。**サーバ側の上限（200）より小さくしてある。** */
   const pageSize = 50;
@@ -460,6 +466,57 @@
     await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
+  /**
+   * Pleasanter 側のテスト回答を消す（Issue #1010）。**取り消せない。**
+   *
+   * **件数はサーバから取り直して確認に出す。** 一覧の件数には、まだ Pleasanter へ
+   * 届いていない回答も含まれ、消せる件数とは限らない。確認した件数をそのままサーバへ返し、
+   * 食い違えばサーバが何も消さない。
+   */
+  async function cleanupTestResponses(survey: SurveySummary) {
+    error = '';
+    notice = '';
+    cleanupBusy = true;
+    try {
+      const counted = await countDeletableTestResponses(survey.surveyId);
+      if (!counted.ok) {
+        error = counted.message;
+        return;
+      }
+
+      const count = counted.value.deletable;
+      if (count === 0) {
+        notice = t('list.deleteTestResponsesNone');
+        return;
+      }
+
+      const confirmed = await confirmAction({
+        title: t('list.deleteTestResponses'),
+        message: t('list.deleteTestResponsesConfirm', {
+          title: survey.title,
+          count,
+          max: counted.value.maxPerRun,
+        }),
+        confirmLabel: t('list.deleteTestResponses'),
+        danger: true,
+      });
+      if (!confirmed) {
+        return;
+      }
+
+      const result = await deleteTestResponses(survey.surveyId, count);
+      if (!result.ok) {
+        error = result.message;
+        return;
+      }
+
+      notice = t('list.deleteTestResponsesResult', { ...result.value });
+      await reload(offset, titleFilter, statusFilter, includeArchived);
+    } finally {
+      cleanupBusy = false;
+    }
+  }
+
   function openDelete(survey: SurveySummary) {
     error = '';
     deleting = survey;
@@ -770,6 +827,7 @@
 {/if}
 
 {#if error}<p class="error" role="alert">{error}</p>{/if}
+{#if notice}<p class="hint" role="status">{notice}</p>{/if}
 
 {#if loading}
   <p class="status">{t('app.loading')}</p>
@@ -894,6 +952,16 @@
             <button type="button" class="secondary" onclick={() => changeArchive(survey)}>
               {survey.archivedAt == null ? t('archive.open') : t('archive.restore')}
             </button>
+            {#if canDelete && survey.testResponseCount > 0}
+              <button
+                type="button"
+                class="secondary"
+                disabled={cleanupBusy}
+                onclick={() => cleanupTestResponses(survey)}
+              >
+                {t('list.deleteTestResponses')}
+              </button>
+            {/if}
             {#if canDelete && survey.archivedAt != null}
               <button type="button" class="danger" onclick={() => openDelete(survey)}>
                 {t('delete.open')}
@@ -908,10 +976,11 @@
   </div>
 
   <!--
-    ⚠️ **印だけにしない。** Pleasanter 側のテスト回答は本アプリから消せず、
-    運用側で消してもらうしかない。**やるべきことは文で残す**
+    ⚠️ **印だけにしない。** Pleasanter 側のテスト回答を消せるのは、削除の権限を持つ
+    Administrator だけ（行の「テスト回答を削除」。Issue #1010）。
+    **消せない相手には、運用側へ頼む旨を文で残す**
   -->
-  {#if surveys.some((survey) => survey.testResponseCount > 0)}
+  {#if !canDelete && surveys.some((survey) => survey.testResponseCount > 0)}
     <p class="hint test-response-note">※ {t('list.testResponseCleanup')}</p>
   {/if}
 
