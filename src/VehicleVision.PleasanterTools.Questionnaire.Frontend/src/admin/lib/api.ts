@@ -766,6 +766,38 @@ export const restoreSurvey = (surveyId: string) =>
  * **Pleasanter 側の回答は削除しない。** 題名は押し間違いを防ぐ確認値で、
  * サーバでも現在の題名との完全一致を確かめる。
  */
+/** Pleasanter 側のテスト回答の削除の結果（Issue #1010）。 */
+export interface TestResponseCleanupResult {
+  deleted: number;
+  alreadyGone: number;
+  skipped: number;
+  failed: number;
+  remaining: number;
+}
+
+/**
+ * 管理画面から消せるテスト回答の件数（Issue #1010）。
+ *
+ * **確認ダイアログに出す件数は、一覧の件数ではなくこちらを使う。**
+ * 一覧の件数には、まだ Pleasanter へ届いていない回答も含まれる。
+ */
+export const countDeletableTestResponses = (surveyId: string) =>
+  call<{ deletable: number; maxPerRun: number }>(
+    `/api/admin/surveys/${surveyId}/test-responses`,
+  );
+
+/**
+ * Pleasanter 側のテスト回答を削除する（Issue #1010）。**取り消せない。**
+ *
+ * **画面に見せた件数（expectedCount）を必ず送る。** 今の件数と違えばサーバは何も消さない。
+ * 消す対象はサーバが自分の記録から決め、**ここから ID は送らない。**
+ */
+export const deleteTestResponses = (surveyId: string, expectedCount: number) =>
+  call<TestResponseCleanupResult>(`/api/admin/surveys/${surveyId}/test-responses/delete`, {
+    method: 'POST',
+    json: { expectedCount },
+  });
+
 export const deleteSurvey = (surveyId: string, title: string) =>
   call<void>(`/api/admin/surveys/${surveyId}/delete`, {
     method: 'POST',

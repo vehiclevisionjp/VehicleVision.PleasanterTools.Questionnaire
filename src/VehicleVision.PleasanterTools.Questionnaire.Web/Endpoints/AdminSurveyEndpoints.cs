@@ -1187,6 +1187,95 @@ public static class AdminSurveyEndpoints
         // ---- 再編集リンクの一括失効（Issue #202）------------------------------
         // **漏れたと分かったときに、調べずに止められること。**
         // ⚠️ **個別の回答を特定して止めるのは、完全匿名の前提ではどのみちできない**
+        // ---- テスト回答の削除（Issue #1010） --------------------------------
+        // **Pleasanter 側のレコードを消す、取り返しの付かない操作。** 守りは次のとおり
+        // （詳細は `TestResponseCleaner`）。
+        // - 対象は本アプリの記録（IsTest = true・Pleasanter へ届いた・送信待ち無し）だけで決め、
+        //   **画面から ID を受け取らない**
+        // - **画面が見せた件数（expectedCount）と今の件数が違えば、何も消さない**
+        // - 消す前に 1 件ずつ取り出し、同じサイト・同じ ID・同じトークンを照合する
+        // - **特権管理者だけ**（`surveys.delete`）。操作は監査ログに残す
+        group.MapGet("/{surveyId:guid}/test-responses", async (
+            Guid surveyId,
+            TestResponseCleaner cleaner,
+            CancellationToken cancellationToken) =>
+        {
+            var deletable = await cleaner.CountAsync(surveyId, cancellationToken).ConfigureAwait(false);
+            return deletable is null
+                ? Results.NotFound()
+                : Results.Ok(new { deletable, maxPerRun = TestResponseCleaner.MaxPerRun });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysDelete));
+
+        group.MapPost("/{surveyId:guid}/test-responses/delete", async (
+            Guid surveyId,
+            // **件数を省略したら断る。** 「全部」の意味にしない
+            DeleteTestResponsesRequest? request,
+            HttpContext context,
+            TestResponseCleaner cleaner,
+            CancellationToken cancellationToken) =>
+        {
+            if (request?.ExpectedCount is not { } expectedCount || expectedCount < 0)
+            {
+                return Results.BadRequest();
+            }
+
+            var result = await cleaner.DeleteAsync(surveyId, expectedCount, cancellationToken)
+                .ConfigureAwait(false);
+
+            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+            AuditNotes.Add(context, "surveyId", surveyId.ToString());
+            AuditNotes.Add(
+                context, "expectedCount", expectedCount.ToString(CultureInfo.InvariantCulture));
+            AuditNotes.Add(context, "result", result.Status.ToString());
+            AuditNotes.Add(
+                context, "deleted", result.Deleted.ToString(CultureInfo.InvariantCulture));
+            AuditNotes.Add(
+                context, "alreadyGone", result.AlreadyGone.ToString(CultureInfo.InvariantCulture));
+            AuditNotes.Add(
+                context, "skipped", result.Skipped.ToString(CultureInfo.InvariantCulture));
+            AuditNotes.Add(
+                context, "failed", result.Failed.ToString(CultureInfo.InvariantCulture));
+            if (!result.ReferenceIds.IsDefaultOrEmpty)
+            {
+                AuditNotes.Add(
+                    context,
+                    "referenceIds",
+                    string.Join(",", result.ReferenceIds.Select(id => id.ToString(CultureInfo.InvariantCulture))));
+            }
+
+            var language = RequestLanguage.Of(context);
+            return result.Status switch
+            {
+                TestResponseCleanupStatus.SurveyNotFound => Results.NotFound(),
+                TestResponseCleanupStatus.NotVerifiable => Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.TestResponsesNotVerifiable, language),
+                }),
+                TestResponseCleanupStatus.CountChanged => Results.Conflict(new
+                {
+                    message = ServerMessages.Get(ServerMessageKeys.TestResponsesCountChanged, language),
+                    deletable = result.Current,
+                }),
+                TestResponseCleanupStatus.Forbidden => Results.Json(
+                    new
+                    {
+                        message = ServerMessages.Get(ServerMessageKeys.TestResponsesForbidden, language),
+                        deleted = result.Deleted,
+                    },
+                    statusCode: StatusCodes.Status502BadGateway),
+                _ => Results.Ok(new
+                {
+                    deleted = result.Deleted,
+                    alreadyGone = result.AlreadyGone,
+                    skipped = result.Skipped,
+                    failed = result.Failed,
+                    remaining = result.Remaining,
+                }),
+            };
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysDelete));
+
         group.MapPost("/{surveyId:guid}/edit-links/revoke", async (
             Guid surveyId,
             HttpContext context,
@@ -2264,6 +2353,10 @@ public static class AdminSurveyEndpoints
 
     /// <summary>完全削除の確認。**現在の題名と完全に一致しなければ削除しない。**</summary>
     public sealed record DeleteSurveyRequest(string? Title);
+
+    /// <summary>テスト回答の削除の確認（Issue #1010）。</summary>
+    /// <param name="ExpectedCount">画面が見せた、消せるテスト回答の件数。**今の件数と違えば何も消さない。**</param>
+    public sealed record DeleteTestResponsesRequest(int? ExpectedCount);
 
     /// <summary>下書きの保存。</summary>
     /// <param name="Revision">読んだときの版。**これが今の版と違えば拒否する。**</param>

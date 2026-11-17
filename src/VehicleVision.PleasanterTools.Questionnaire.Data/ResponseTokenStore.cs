@@ -80,6 +80,38 @@ public interface IResponseTokenStore
         Guid surveyId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Pleasanter 側のテスト回答のうち、管理画面から消せるものを読む（Issue #1010）。</summary>
+    /// <remarks>
+    /// <para>
+    /// **消せるのは、次をすべて満たす行だけ。** 取り違えて本番の回答を消さないための絞り込みである。
+    /// </para>
+    /// <list type="bullet">
+    /// <item><c>IsTest = true</c>（テスト公開中に初めて受け付けた回答。編集しても変わらない）</item>
+    /// <item><c>PleasanterReferenceId</c> がある（Pleasanter へ届いている）</item>
+    /// <item>送信待ちの行が無い（<c>Responses</c>。**未送信の編集が、消した後のレコードへ <c>Update</c> を打つのを避ける**）</item>
+    /// </list>
+    /// 既定は空。送信ワーカーなどの試験の偽物に、口を強いない。
+    /// </remarks>
+    Task<IReadOnlyList<TestResponseToken>> ListDeletableTestAsync(
+        Guid surveyId,
+        int limit,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TestResponseToken>>([]);
+
+    /// <summary>消せるテスト回答の件数（<see cref="ListDeletableTestAsync"/> と同じ条件）。</summary>
+    Task<int> CountDeletableTestAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(0);
+
+    /// <summary>テスト回答の対応を消す。**<c>IsTest</c> かつそのアンケートの行だけ。**</summary>
+    /// <returns>消したなら <c>true</c>。</returns>
+    Task<bool> DeleteTestAsync(
+        string responseToken,
+        Guid surveyId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
+
     /// <summary>対応を保存する。<paramref name="referenceId"/> が <c>null</c> なら未作成のまま記録する。</summary>
     Task SaveAsync(
         string responseToken,
@@ -92,6 +124,11 @@ public interface IResponseTokenStore
 /// <param name="SurveyId">そのトークンが属するアンケート。</param>
 /// <param name="ReferenceId">Pleasanter のレコード。まだ作っていなければ <c>null</c>。</param>
 public sealed record ResponseTokenEntry(Guid SurveyId, long? ReferenceId);
+
+/// <summary>削除の対象になるテスト回答（Issue #1010）。</summary>
+/// <param name="ResponseToken">回答トークン。</param>
+/// <param name="ReferenceId">Pleasanter のレコード。</param>
+public sealed record TestResponseToken(string ResponseToken, long ReferenceId);
 
 /// <summary>Dapper を使った実装。</summary>
 public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) : IResponseTokenStore
@@ -206,6 +243,61 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
             + "WHERE [SurveyId] = @SurveyId AND [IsTest] = @IsTest",
             new { SurveyId = surveyId, IsTest = false },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    /// <summary>消せるテスト回答の条件。**一覧・件数で同じ文を使う**（食い違うと件数の確認が意味を失う）。</summary>
+    private const string DeletableTestWhere =
+        "WHERE t.[SurveyId] = @SurveyId AND t.[IsTest] = @IsTest "
+        + "AND t.[PleasanterReferenceId] IS NOT NULL "
+        + "AND NOT EXISTS (SELECT 1 FROM [Responses] r WHERE r.[ResponseToken] = t.[ResponseToken])";
+
+    private sealed class DeletableRow
+    {
+        public string ResponseToken { get; set; } = string.Empty;
+
+        public long ReferenceId { get; set; }
+    }
+
+    public async Task<IReadOnlyList<TestResponseToken>> ListDeletableTestAsync(
+        Guid surveyId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await connection.QueryAsync<DeletableRow>(Sql(
+            "SELECT t.[ResponseToken], t.[PleasanterReferenceId] AS [ReferenceId] FROM [ResponseTokens] t "
+            + DeletableTestWhere + " ORDER BY t.[CreatedAt], t.[ResponseToken] "
+            + SqlDialect.Page(Provider),
+            new { SurveyId = surveyId, IsTest = true, Limit = limit, Offset = 0 },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return [.. rows.Select(row => new TestResponseToken(row.ResponseToken, row.ReferenceId))];
+    }
+
+    public async Task<int> CountDeletableTestAsync(
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await connection.ExecuteScalarAsync<int>(Sql(
+            "SELECT COUNT(*) FROM [ResponseTokens] t " + DeletableTestWhere,
+            new { SurveyId = surveyId, IsTest = true },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    public async Task<bool> DeleteTestAsync(
+        string responseToken,
+        Guid surveyId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // **本番の行は条件で守る。** 取り違えて呼ばれても、IsTest = false の行は消えない
+        var affected = await connection.ExecuteAsync(Sql(
+            "DELETE FROM [ResponseTokens] "
+            + "WHERE [ResponseToken] = @ResponseToken AND [SurveyId] = @SurveyId AND [IsTest] = @IsTest",
+            new { ResponseToken = responseToken, SurveyId = surveyId, IsTest = true },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return affected > 0;
     }
 
     public async Task SaveAsync(
