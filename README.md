@@ -204,6 +204,7 @@ QUESTIONNAIRE_INTEGRATION=1 dotnet test tests/VehicleVision.PleasanterTools.Ques
 | [`_documents/アンケート作成-運用手順書.md`](_documents/アンケート作成-運用手順書.md) | アンケートの作成から公開まで |
 | [`_documents/添付ファイル検査-運用手順書.md`](_documents/添付ファイル検査-運用手順書.md) | ウイルススキャンの構成と運用 |
 | [`_documents/管理者の棚卸し-運用手順書.md`](_documents/管理者の棚卸し-運用手順書.md) | 管理者アカウントの定期見直し |
+| [`_documents/管理APIのトークン認証-方針案.md`](_documents/管理APIのトークン認証-方針案.md) | 管理 API をトークン認証で使う設計案（Issue #1012。未実装） |
 | [`tools/pleasanter-testenv/`](tools/pleasanter-testenv/README.md) | 検証環境（Docker） |
 | `_reference/Implem.Pleasanter` | Pleasanter 本体（**AGPL v3 / 参照専用**）。[README](_reference/README.md) |
 | `App_Data/Parameters/` | 設定ファイル |
