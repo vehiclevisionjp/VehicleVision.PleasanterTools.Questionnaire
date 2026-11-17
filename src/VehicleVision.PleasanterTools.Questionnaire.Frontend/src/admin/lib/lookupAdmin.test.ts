@@ -116,6 +116,7 @@ describe('文言の鍵', () => {
     expect(problemMessageKey({ kind: 'column', code: 'ColumnNotFound' })).toBe('lookupAdmin.problem.ColumnNotFound');
     expect(problemMessageKey({ kind: 'column', code: 'Whatever' })).toBe('lookupAdmin.problem.unknown');
     expect(inspectFailureKey('Forbidden')).toBe('lookupAdmin.failure.forbidden');
+    expect(inspectFailureKey('SiteSettingsHidden')).toBe('lookupAdmin.failure.settingsHidden');
     expect(inspectFailureKey('???')).toBe('lookupAdmin.failure.other');
   });
 });

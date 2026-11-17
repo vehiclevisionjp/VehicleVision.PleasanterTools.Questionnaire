@@ -253,6 +253,9 @@ public static class ServerMessageKeys
     /// <summary>リンク先のサイトを Pleasanter から引けなかった。</summary>
     public const string LinkedSitesUnreachable = "surveys.linkedSitesUnreachable";
 
+    /// <summary>保存先サイトの設定を読めない（API キーの利用者にサイトの管理権限がない。Pleasanter 1.5.10.0 以降。Issue #995）。</summary>
+    public const string SiteSettingsNotReadable = "surveys.siteSettingsNotReadable";
+
     /// <summary>落とし先の言語が対応外。</summary>
     public const string FallbackLanguageUnsupported = "surveys.fallbackLanguageUnsupported";
 

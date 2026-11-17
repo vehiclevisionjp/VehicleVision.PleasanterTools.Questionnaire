@@ -508,6 +508,11 @@ public static class AdminSurveyEndpoints
                 return PleasanterFailure(current, context);
             }
 
+            if (SiteSettingsHidden(current.Body))
+            {
+                return SiteSettingsNotReadable(context);
+            }
+
             try
             {
                 var plan = SiteSettingsSynchronizer.Build(current.Body, draft.Mapping);
@@ -552,6 +557,11 @@ public static class AdminSurveyEndpoints
             if (!current.IsSuccess || current.Body is null)
             {
                 return PleasanterFailure(current, context);
+            }
+
+            if (SiteSettingsHidden(current.Body))
+            {
+                return SiteSettingsNotReadable(context);
             }
 
             SiteSettingsSyncPlan plan;
@@ -2018,6 +2028,21 @@ public static class AdminSurveyEndpoints
                 pair => ColumnBudget.StandardColumnsPerType + pair.Value,
                 StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// <c>GetSite</c> は成功したが、サイトの設定（<c>SiteSettings</c>）が返らなかったか。
+    /// Pleasanter 1.5.10.0 以降は、サイトを管理できない API キーの利用者に返さない（Issue #995）。
+    /// **この状態で <c>UpdateSite</c> へ進まない**（設定を丸ごと置き換える API なので、読めないまま書かない）。
+    /// </summary>
+    internal static bool SiteSettingsHidden(JsonNode? body) =>
+        body?["Response"]?["Data"] is JsonObject && body["Response"]!["Data"]!["SiteSettings"] is null;
+
+    private static IResult SiteSettingsNotReadable(HttpContext context) =>
+        Results.BadRequest(new
+        {
+            code = "SiteSettingsNotReadable",
+            message = ServerMessages.Get(ServerMessageKeys.SiteSettingsNotReadable, RequestLanguage.Of(context)),
+        });
 
     /// <summary>不備を画面に出せる形にする。</summary>
     private static object Describe(MappingProblem problem) => new

@@ -1340,6 +1340,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'lookupAdmin.problem.TargetColumnTypeIncompatible': '열 유형이 입력 대상 질문의 형식과 맞지 않습니다.',
   'lookupAdmin.failure.unauthorized': 'API 키가 올바르지 않거나 전용 계정이 사용 중지되었습니다.',
   'lookupAdmin.failure.forbidden': '전용 계정에 읽기 권한이 없습니다.',
+  'lookupAdmin.failure.settingsHidden': '전용 계정에 사이트 관리 권한이 없어 사이트 정의(열 설정)를 읽을 수 없습니다. Pleasanter 1.5.10.0 이후는 관리 권한이 없는 사용자에게 사이트 설정을 반환하지 않습니다.',
   'lookupAdmin.failure.notFound': '참조 대상 사이트를 찾을 수 없거나 읽기 권한이 없습니다.',
   'lookupAdmin.failure.credential': '전용 API 키를 사용할 수 없습니다(미등록, 무효화, 복호화 불가).',
   'lookupAdmin.failure.config': '연결 대상 설정을 사용할 수 없습니다. 관리자에게 문의하세요.',

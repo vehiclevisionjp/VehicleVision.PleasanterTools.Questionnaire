@@ -1473,6 +1473,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
     '列的类型与填入目标问题的格式不匹配。',
   'lookupAdmin.failure.unauthorized': 'API 密钥不正确，或专用账号已失效。',
   'lookupAdmin.failure.forbidden': '专用账号没有读取权限。',
+  'lookupAdmin.failure.settingsHidden': '专用账号没有站点管理权限，无法读取站点定义（列设置）。Pleasanter 1.5.10.0 及以后版本不会向没有管理权限的用户返回站点设置。',
   'lookupAdmin.failure.notFound': '找不到参照来源站点，或没有读取权限。',
   'lookupAdmin.failure.credential':
     '无法使用专用 API 密钥（未注册、已失效或无法解密）。',

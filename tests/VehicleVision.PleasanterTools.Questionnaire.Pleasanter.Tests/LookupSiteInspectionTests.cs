@@ -119,4 +119,40 @@ public sealed class LookupSiteInspectionTests
         Assert.Equal(LookupSearchFailure.InsecureTransport, insecure.Failure);
         Assert.Empty(handler.Uris);
     }
+
+    [Theory]
+    [InlineData("""{"StatusCode":200,"Response":{"Data":{"SiteId":123,"InheritPermission":123,"Title":"参照元"}}}""")]
+    [InlineData("""{"StatusCode":200,"Response":{"Data":{"SiteId":123,"InheritPermission":123,"SiteSettings":null}}}""")]
+    public async Task 設定が返らないサイトは壊れた応答と分けて返し_既定の列で補わない(string json)
+    {
+        // Pleasanter 1.5.10.0 の GetSite は、サイトを管理できない利用者に SiteSettings を返さない（Issue #995）。
+        // 実機の応答と同じ形（Data はあるが SiteSettings のキーが無い）
+        var result = await Client(new FakeHandler(() => Json(json)))
+            .InspectSiteAsync(new LookupSourceConnection(BaseUrl, SecretKey), 123);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(LookupSearchStatus.SourceInvalid, result.Status);
+        Assert.Equal(LookupSearchFailure.SiteSettingsHidden, result.Failure);
+        Assert.Empty(result.Columns);
+    }
+
+    [Fact]
+    public async Task 設定が返らなくても別のサイトの応答は壊れた応答のまま()
+    {
+        var result = await Client(new FakeHandler(() => Json(
+                """{"StatusCode":200,"Response":{"Data":{"SiteId":999,"SiteSettings":null}}}""")))
+            .InspectSiteAsync(new LookupSourceConnection(BaseUrl, SecretKey), 123);
+
+        Assert.Equal(LookupSearchFailure.InvalidResponse, result.Failure);
+    }
+
+    [Fact]
+    public async Task 設定が配列などオブジェクトでなければ壊れた応答()
+    {
+        var result = await Client(new FakeHandler(() => Json(
+                """{"StatusCode":200,"Response":{"Data":{"SiteId":123,"SiteSettings":[]}}}""")))
+            .InspectSiteAsync(new LookupSourceConnection(BaseUrl, SecretKey), 123);
+
+        Assert.Equal(LookupSearchFailure.InvalidResponse, result.Failure);
+    }
 }

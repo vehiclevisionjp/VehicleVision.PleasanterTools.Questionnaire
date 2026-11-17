@@ -1499,6 +1499,7 @@ export const en: Record<MessageKey, string> = {
   'lookupAdmin.problem.TargetColumnTypeIncompatible': 'The column type does not fit the target question type.',
   'lookupAdmin.failure.unauthorized': 'The API key is not valid or the dedicated account is disabled.',
   'lookupAdmin.failure.forbidden': 'The dedicated account has no read permission.',
+  'lookupAdmin.failure.settingsHidden': 'The site definition (column settings) cannot be read because the dedicated account cannot manage the site. Pleasanter 1.5.10.0 and later do not return site settings to users without manage permission.',
   'lookupAdmin.failure.notFound': 'The source site was not found or cannot be read.',
   'lookupAdmin.failure.credential': 'The dedicated API key cannot be used (not registered, revoked, or cannot be decrypted).',
   'lookupAdmin.failure.config': 'The connection settings cannot be used. Contact an administrator.',

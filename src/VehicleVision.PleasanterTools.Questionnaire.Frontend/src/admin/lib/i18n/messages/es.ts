@@ -1390,6 +1390,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "lookupAdmin.problem.TargetColumnTypeIncompatible": "El tipo de la columna no es compatible con el formato de la pregunta de destino.",
   "lookupAdmin.failure.unauthorized": "La clave de API no es correcta o la cuenta dedicada está deshabilitada.",
   "lookupAdmin.failure.forbidden": "La cuenta dedicada no tiene permiso de lectura.",
+  "lookupAdmin.failure.settingsHidden": "No se puede leer la definición del sitio (configuración de columnas) porque la cuenta dedicada no puede administrar el sitio. Pleasanter 1.5.10.0 y posteriores no devuelven la configuración del sitio a usuarios sin permiso de administración.",
   "lookupAdmin.failure.notFound": "No se encuentra el sitio de origen o no hay permiso de lectura.",
   "lookupAdmin.failure.credential": "No se puede usar la clave de API dedicada (sin registrar, revocada o imposible de descifrar).",
   "lookupAdmin.failure.config": "La configuración del destino de conexión no se puede usar. Póngase en contacto con un administrador.",

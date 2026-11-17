@@ -136,6 +136,13 @@ public enum LookupSearchFailure
 
     /// <summary>候補の上限（K）を超えた、または全件を確認できない。</summary>
     TooManyResults,
+
+    /// <summary>
+    /// サイトは読めたが、サイトの設定（<c>SiteSettings</c>）が返らなかった。
+    /// Pleasanter 1.5.10.0 以降の <c>GetSite</c> は、**そのサイトを管理できない利用者**にこれを返さない（Issue #995）。
+    /// 列の設定（選択肢・<c>Nullable</c>・小数の桁数）が分からないので、参照元の列の検証はできない。
+    /// </summary>
+    SiteSettingsHidden,
 }
 
 /// <summary>1 件の候補。許可列だけを持つ。</summary>
