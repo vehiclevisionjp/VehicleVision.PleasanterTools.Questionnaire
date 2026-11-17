@@ -576,6 +576,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "editor.tabs": "Secciones",
   "editor.tabQuestions": "Preguntas",
   "editor.tabMapping": "Asignación",
+  "editor.tabLookups": "Búsqueda",
   "editor.tabSettings": "Ajustes básicos",
   "editor.tabExtras": "Aspecto y respuesta automática",
   "editor.tabPublish": "Publicación",

@@ -553,6 +553,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'editor.tabs': '탭',
   'editor.tabQuestions': '설문',
   'editor.tabMapping': '매핑',
+  'editor.tabLookups': '룩업',
   'editor.tabSettings': '기본 설정',
   'editor.tabExtras': '디자인·자동 회신',
   'editor.tabPublish': '공개',
@@ -1235,7 +1236,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'lookupAdmin.credentialInput': 'API 키 입력',
   'lookupAdmin.credentialReenter': 'API 키 다시 입력(교체)',
   'lookupAdmin.credentialHint':
-    '값은 등록 후에 표시하거나 복사할 수 없습니다. 입력한 값은 전송 후에 지워집니다. 참조 대상에는 읽기 전용 전용 계정의 키를 사용하세요.',
+    '값은 등록 후에 표시하거나 복사할 수 없습니다. 입력한 값은 전송 후에 지워집니다. 참조 대상에는 읽기만 가능한 전용 계정의 키를 사용하세요.',
   'lookupAdmin.credentialRegister': '등록',
   'lookupAdmin.credentialRotate': '교체',
   'lookupAdmin.credentialRevoke': '무효화',

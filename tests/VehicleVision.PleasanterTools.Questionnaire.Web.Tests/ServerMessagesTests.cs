@@ -146,6 +146,32 @@ public class ServerMessagesTests
             $"日本語のまま英語のカタログに入っている: {string.Join("、", untranslated)}");
     }
 
+    [Fact]
+    public void ルックアップの文言は英語へ落ちずに各言語の訳がある()
+    {
+        // **訳の無い鍵は英語へ落ちるだけなので、上の試験では抜けを見つけられない。**
+        // ルックアップの文言は、日本語・英語以外の言語で英語と違う文字列であることを求める
+        var lookupKeys = DeclaredKeys()
+            .Where(key => key.StartsWith("lookups.", StringComparison.Ordinal)
+                || key.Contains("Lookup", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        Assert.NotEmpty(lookupKeys);
+
+        var fallenBack = new List<string>();
+        foreach (var key in lookupKeys)
+        {
+            foreach (var language in SupportedLanguages.All.Where(l => l is not ("ja" or "en")))
+            {
+                if (ServerMessages.Get(key, language) == ServerMessages.Get(key, "en"))
+                {
+                    fallenBack.Add($"{key}({language})");
+                }
+            }
+        }
+
+        Assert.True(fallenBack.Count == 0, $"英語へ落ちている: {string.Join("、", fallenBack)}");
+    }
+
     /// <summary>対応していない言語は英語へ落ちる。</summary>
     /// <remarks>
     /// ⚠️ **対応言語を決め打ちにしない。** 以前は <c>zh</c> を「未翻訳の例」に使っていたが、
