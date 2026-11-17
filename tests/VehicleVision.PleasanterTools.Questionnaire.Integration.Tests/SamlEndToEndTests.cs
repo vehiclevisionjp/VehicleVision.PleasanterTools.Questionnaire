@@ -489,4 +489,74 @@ public partial class SamlEndToEndTests
         var session = await SessionAsync(cookies);
         Assert.False(session!["authenticated"]!.GetValue<bool>());
     }
+
+    [Fact]
+    public async Task API_キーの発行の前に_IdPが強制再認証を求め_戻りで1回だけ発行できる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **Keycloak が ForceAuthn=true を尊重するか**を、本アプリの実装と組み合わせて確かめる（Issue #1034）。
+        // ⚠️ 本アプリ側で QUESTIONNAIRE_ADMIN_API_TOKENS=enabled が要る（compose は DEV_ADMIN_API_TOKENS）。
+        // Keycloak 以外の IdP（Google Workspace・Entra ID など）の挙動は、これでは分からない
+        var secret = await ResetAdminAsync(KnownUser);
+        var (_, cookies) = await RoundTripAsync(KnownUser, IdpPassword);
+        await CompleteSecondFactorIfNeededAsync(cookies, secret);
+
+        using var http = CreateClient(cookies, followRedirects: true);
+        using var stopper = CreateClient(cookies, followRedirects: false);
+
+        using var overview = await http.GetAsync("/api/admin/me/api-tokens");
+        overview.EnsureSuccessStatusCode();
+        var overviewJson = JsonNode.Parse(await overview.Content.ReadAsStringAsync())!;
+        Assert.True(overviewJson["enabled"]!.GetValue<bool>(), "本アプリの API キーの機能が無効");
+        Assert.Equal("saml-force", overviewJson["reauthentication"]!.GetValue<string>());
+
+        // ---- 再認証なしでは発行できない
+        var issueBody = new { name = "ci", scopes = new[] { "surveys.read" }, expiresInDays = 30, ipAllowList = Array.Empty<string>() };
+        using var denied = await http.PostAsJsonAsync("/api/admin/me/api-tokens", issueBody);
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        // ---- 再認証を始める（ForceAuthn=true の AuthnRequest が IdP へ向かう）
+        using var start = await http.PostAsJsonAsync("/api/admin/saml/reauth", new { });
+        start.EnsureSuccessStatusCode();
+        var idpUrl = JsonNode.Parse(await start.Content.ReadAsStringAsync())!["redirectUrl"]!.GetValue<string>();
+        Assert.Contains("SAMLRequest=", idpUrl, StringComparison.Ordinal);
+
+        // ---- IdP には、さきほどのログインのセッションが残っている。**それでもログイン画面を出し直すこと**
+        var loginHtml = await http.GetStringAsync(idpUrl);
+        var loginUrl = LoginFormAction().Match(loginHtml).Groups[1].Value.Replace("&amp;", "&", StringComparison.Ordinal);
+        Assert.False(
+            string.IsNullOrEmpty(loginUrl),
+            "IdP が ForceAuthn を無視して、ログイン画面を出さずに通した");
+
+        using var authenticated = await http.PostAsync(
+            loginUrl,
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["username"] = KnownUser,
+                ["password"] = IdpPassword,
+                ["credentialId"] = string.Empty,
+            }));
+        var postHtml = await authenticated.Content.ReadAsStringAsync();
+        var samlResponse = SamlResponseValue().Match(postHtml);
+        Assert.True(samlResponse.Success, "IdP が SAMLResponse を返さなかった");
+        var acs = FormAction().Match(postHtml).Groups[1].Value.Replace("&amp;", "&", StringComparison.Ordinal);
+
+        // ---- 戻りを受ける。固定の飛び先へ返る
+        using var back = await stopper.PostAsync(
+            acs,
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["SAMLResponse"] = samlResponse.Groups[1].Value }));
+        var backHtml = await back.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, back.StatusCode);
+        Assert.Contains("apiTokenReauth=done", backHtml, StringComparison.Ordinal);
+
+        // ---- 1 回だけ発行できる
+        using var issued = await http.PostAsJsonAsync("/api/admin/me/api-tokens", issueBody);
+        Assert.Equal(HttpStatusCode.OK, issued.StatusCode);
+        using var again = await http.PostAsJsonAsync("/api/admin/me/api-tokens", issueBody);
+        Assert.Equal(HttpStatusCode.Forbidden, again.StatusCode);
+    }
 }
