@@ -623,6 +623,55 @@ public class AdminSurveyEndToEndTests
     }
 
     [Fact]
+    public async Task テスト公開への反映が拒否されてもテスト公開のまま残る()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // Issue #1008。反映に失敗すると下書きへ落ち、テスト公開が外れていた
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: true)))
+        {
+            save.EnsureSuccessStatusCode();
+        }
+
+        using (var first = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { }))
+        {
+            first.EnsureSuccessStatusCode();
+        }
+
+        // テスト公開中に、公開を止める不備（履歴の投射先が回答先と同じ）を入れて保存する
+        using (var broken = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: true,
+                assetHistorySiteId: 1,
+                withAssetHistoryMapping: true)))
+        {
+            broken.EnsureSuccessStatusCode();
+        }
+
+        using var republish = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-republish", new { });
+
+        Assert.Equal(HttpStatusCode.BadRequest, republish.StatusCode);
+        var summary = await SummaryAsync(http, surveyId);
+        Assert.Equal(3, summary["status"]!.GetValue<int>());
+    }
+
+    [Fact]
     public async Task 公開していないものは再開できない()
     {
         if (!Enabled)

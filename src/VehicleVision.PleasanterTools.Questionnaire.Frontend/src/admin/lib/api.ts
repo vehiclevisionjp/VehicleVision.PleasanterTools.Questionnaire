@@ -656,6 +656,13 @@ export const testPublish = (surveyId: string) =>
     json: {},
   });
 
+/** テスト公開中の編集を反映する。**下書きへ戻さない。** 失敗してもテスト公開のまま残る（Issue #1008）。 */
+export const testRepublish = (surveyId: string) =>
+  call<{ version: number; warnings: MappingProblem[] }>(`/api/admin/surveys/${surveyId}/test-republish`, {
+    method: 'POST',
+    json: {},
+  });
+
 export const publish = (surveyId: string) =>
   call<{ status: string }>(`/api/admin/surveys/${surveyId}/publish`, {
     method: 'POST',

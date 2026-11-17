@@ -12,6 +12,7 @@
     loadVersion,
     revertToDraft,
     testPublish,
+    testRepublish,
     saveDraft,
     uploadContentAsset,
     type ColumnAvailabilityResponse,
@@ -792,13 +793,17 @@
 
   /** テスト公開する。**公開できたかを返す。** */
   async function doPublish(): Promise<boolean> {
+    return publishWith(testPublish);
+  }
+
+  async function publishWith(call: typeof testPublish): Promise<boolean> {
     saving = true;
     error = '';
     notice = '';
     warnings = [];
     publishFlow = [];
 
-    const result = await testPublish(surveyId);
+    const result = await call(surveyId);
     saving = false;
 
     if (!result.ok) {
@@ -827,31 +832,17 @@
   /**
    * テスト公開中の編集を、動いている版へ反映する。
    *
-   * **保存 → 下書きへ戻す → テスト公開 を 1 回で行う。** 反映するには版を固め直すしかなく
-   * （版は不変）、利用者に 3 つの操作を順に踏ませない。
-   * **保存できなかったら先へ進まない。** 版が合わない（他の人の更新）まま戻すと、
+   * **下書きへは戻さず、サーバが検証してから版を固め直す**（Issue #1008）。
+   * 以前は「保存 → 下書きへ戻す → テスト公開」を順に呼んでおり、割り当ての誤りなどで
+   * テスト公開が拒否されると、下書きのまま取り残されてテスト公開が外れていた。
+   * **失敗しても、反映前のテスト公開のまま残る**（表示の状態も変えない）。
+   * **保存できなかったら先へ進まない。** 版が合わない（他の人の更新）まま進むと、
    * 編集を失う。
    */
   async function republish() {
     if (hasUnsavedChanges && !(await save())) {return;}
 
-    saving = true;
-    error = '';
-    notice = '';
-    const reverted = await revertToDraft(surveyId);
-    saving = false;
-
-    if (!reverted.ok) {
-      error = reverted.message;
-      return;
-    }
-
-    // **処理が終わるまで表示は切り替えない**（下書きに戻した時点で切り替えると、
-    // 「テスト公開に反映する」が一瞬「テスト公開する」に変わる。Issue #558）。
-    // **公開に失敗したときは、実際に下書きへ戻っているので、その状態に合わせる**
-    if (!(await doPublish())) {
-      status = 0;
-    }
+    await publishWith(testRepublish);
   }
 
   /**
