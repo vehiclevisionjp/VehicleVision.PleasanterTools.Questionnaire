@@ -217,9 +217,11 @@ public static class MappingValidator
     private static bool HasMissingConfig(MappingConverter converter) =>
         converter.Operation switch
         {
+            // 置換元が 1 つも無くても、既定値があれば「空でなければ既定値」として成り立つ（Issue #1007）
             ConverterOperations.Map => !converter.Config.Keys.Any(key =>
                 key.StartsWith("map.", StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(key["map.".Length..])),
+                && !string.IsNullOrWhiteSpace(key["map.".Length..]))
+                && string.IsNullOrWhiteSpace(converter.Config.GetValueOrDefault("default")),
             ConverterOperations.ToNumber =>
                 !converter.Config.ContainsKey("default")
                 || !HasValidDecimals(converter.Config.GetValueOrDefault("decimals")),

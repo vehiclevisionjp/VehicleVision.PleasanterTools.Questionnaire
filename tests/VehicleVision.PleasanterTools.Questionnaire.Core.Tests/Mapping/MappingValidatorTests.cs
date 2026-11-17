@@ -206,6 +206,37 @@ public class MappingValidatorTests
     }
 
     [Fact]
+    public void mapは置換元が無くても既定値があれば整数列へ割り当てられる()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(ConverterOperations.Map, ("default", "100")),
+            new MappingSource("q1")));
+
+        var problems = MappingValidator.Validate(
+            mapping,
+            Definition("q1"),
+            targetValueKind: _ => MappingTargetValueKind.Integer);
+
+        Assert.DoesNotContain(MappingProblemCode.MissingConverterConfig, Codes(problems));
+        Assert.DoesNotContain(
+            MappingProblemCode.TargetColumnNeedsCompatibleValue, Codes(problems));
+    }
+
+    [Fact]
+    public void mapは置換元も既定値も空なら拒否する()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(ConverterOperations.Map, ("default", "")),
+            new MappingSource("q1")));
+
+        Assert.Contains(
+            MappingProblemCode.MissingConverterConfig,
+            Codes(MappingValidator.Validate(mapping, Definition("q1"))));
+    }
+
+    [Fact]
     public void mapの置換後と既定値がすべて整数なら整数列へ割り当てられる()
     {
         var mapping = Mapping(ColumnAssignment.Converted(
