@@ -943,6 +943,90 @@ public class AdminSurveyEndToEndTests
     }
 
     [Fact]
+    public async Task 受付期間を編集できる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **列と判定はあったが、どこからも書けなかった**（Issue #1006）
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+
+        using (var settings = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings",
+            new
+            {
+                responseLimit = (int?)null,
+                acceptPeriod = new
+                {
+                    from = "2026-12-01T00:00:00+09:00",
+                    to = "2026-12-31T23:59:00+09:00",
+                },
+            }))
+        {
+            settings.EnsureSuccessStatusCode();
+        }
+
+        var summary = await SummaryAsync(http, surveyId);
+        Assert.Equal(
+            DateTimeOffset.Parse("2026-11-30T15:00:00Z", System.Globalization.CultureInfo.InvariantCulture),
+            summary["acceptFrom"]!.GetValue<DateTimeOffset>());
+        Assert.Equal(
+            DateTimeOffset.Parse("2026-12-31T14:59:00Z", System.Globalization.CultureInfo.InvariantCulture),
+            summary["acceptTo"]!.GetValue<DateTimeOffset>());
+
+        // **項目を省略した保存では、期間を変えない**（古い画面が保存しても期間が消えない）
+        using (var untouched = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings", new { responseLimit = (int?)null }))
+        {
+            untouched.EnsureSuccessStatusCode();
+        }
+
+        Assert.NotNull((await SummaryAsync(http, surveyId))["acceptTo"]);
+
+        // **空を送れば、その側の制限なしへ戻せる**
+        using (var cleared = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings",
+            new { responseLimit = (int?)null, acceptPeriod = new { from = (string?)null, to = (string?)null } }))
+        {
+            cleared.EnsureSuccessStatusCode();
+        }
+
+        var after = await SummaryAsync(http, surveyId);
+        Assert.Null(after["acceptFrom"]);
+        Assert.Null(after["acceptTo"]);
+    }
+
+    [Fact]
+    public async Task 受付期間の終了が開始以前なら断る()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // **逆転を保存させない。** 公開しているのに誰も回答できないアンケートができる
+        using var http = await SignInAsync();
+        var surveyId = await PublishAsync(http);
+
+        using var settings = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/settings",
+            new
+            {
+                responseLimit = (int?)null,
+                acceptPeriod = new
+                {
+                    from = "2026-12-31T00:00:00+09:00",
+                    to = "2026-12-01T00:00:00+09:00",
+                },
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, settings.StatusCode);
+    }
+
+    [Fact]
     public async Task 上限に0以下は指定できない()
     {
         if (!Enabled)
