@@ -997,258 +997,31 @@ public static class AdminSurveyEndpoints
         });
 
         // ---- テスト公開 ------------------------------------------------------
-        group.MapPost("/{surveyId:guid}/test-publish", async (
+        group.MapPost("/{surveyId:guid}/test-publish", (
             Guid surveyId,
             HttpContext context,
             ISurveyDraftStore drafts,
             ISurveyRepository surveys,
             LookupPublishValidator lookupValidator,
             CancellationToken cancellationToken) =>
-        {
-            var draft = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
-            if (draft is null)
-            {
-                return Results.NotFound();
-            }
+            TestPublishAsync(
+                surveyId, context, drafts, surveys, lookupValidator, republish: false, cancellationToken))
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
-            // **テンプレートは公開できない**（Issue #58）。
-            // 書き込み先のサイトを持たないので、公開できてしまうと
-            // 受け付けた回答の行き先が無いまま溜まる。
-            // **ここで 1 回引くのは、公開の後に引き直す分とは別。**
-            // 後の引き直しは版が進んだ行を読むためのもので、前倒しにできない
-            var beforePublish = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
-                .ConfigureAwait(false);
-            if (beforePublish is { IsTemplate: true })
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.SurveyIsTemplate, RequestLanguage.Of(context)),
-                });
-            }
-
-            if (beforePublish is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (beforePublish.ArchivedAt is not null)
-            {
-                return ArchivedSurvey(context);
-            }
-
-            if (beforePublish.Status != (int)SurveyStatus.Draft)
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.InvalidSurveyStatus, RequestLanguage.Of(context)),
-                });
-            }
-
-            // **公開のときだけ拒否する。** 壊れた定義で回答を受け付けると、
-            // 受け付けた回答が Pleasanter へ届かないまま溜まる
-            var problems = MappingValidator.Validate(
-                draft.Mapping,
-                draft.Definition,
-                null,
-                PleasanterColumn.IsAttachment,
-                column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
-            var blocking = problems.Where(problem => problem.IsBlocking).ToList();
-            if (draft.AssetHistorySiteId > 0)
-            {
-                if (draft.AssetHistorySiteId == beforePublish.PleasanterSiteId)
-                {
-                    blocking.Add(new MappingProblem(
-                        MappingProblemCode.InvalidShape,
-                        Detail: "assetHistorySiteIdMustDiffer"));
-                }
-
-                if (draft.AssetHistoryMapping is null
-                    || draft.AssetHistoryMapping.Assignments.IsDefaultOrEmpty)
-                {
-                    blocking.Add(new MappingProblem(
-                        MappingProblemCode.InvalidShape,
-                        Detail: "assetHistory"));
-                }
-
-                blocking.AddRange(MappingValidator.Validate(
-                    draft.AssetHistoryMapping ?? new MappingDefinition(),
-                    draft.Definition,
-                    null,
-                    PleasanterColumn.IsAttachment,
-                    column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind,
-                    warnUnmappedQuestions: false).Where(problem => problem.IsBlocking));
-            }
-            if (blocking.Count > 0)
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.PublishBlockedByMapping, RequestLanguage.Of(context)),
-                    problems = blocking.Select(Describe),
-                });
-            }
-
-            // **分岐が壊れたまま公開しない**（Issue #41）。
-            // 無限に回る・辿り着けないページがある、といった不備は
-            // **公開してからでは回答者にしか見えない**
-            var flowProblems = SurveyFlowValidator.Validate(draft.Definition);
-            if (flowProblems.Length > 0)
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.PublishBlockedByFlow, RequestLanguage.Of(context)),
-                    flow = flowProblems.Select(problem => new
-                    {
-                        code = problem.Code.ToString(),
-                        pageId = problem.PageId,
-                        questionId = problem.QuestionId,
-                        detail = problem.Detail,
-                    }),
-                });
-            }
-
-            // **送れない自動返信のまま公開しない**（Issue #189）。
-            // 有効にしたのに宛先が無い・件名が空だと、**送ったつもりで 1 通も出ない。**
-            // 気付くのは回答者から問い合わせが来たときになる
-            var autoReplyProblems = AutoReplyValidator.Validate(draft.Definition);
-            if (autoReplyProblems.Length > 0)
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.PublishBlockedByAutoReply, RequestLanguage.Of(context)),
-                    autoReply = autoReplyProblems.Select(problem => new
-                    {
-                        code = problem.Code.ToString(),
-                        detail = problem.Detail,
-                    }),
-                });
-            }
-
-            if (draft.Definition.AssetDelivery is
-                {
-                    Expiration: AssetTicketExpiration.DaysAfterResponse,
-                    Days: < 1 or > AssetDeliverySettings.MaxDays,
-                })
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.PublishBlockedBySettings, RequestLanguage.Of(context)),
-                    settings = new[]
-                    {
-                        new
-                        {
-                            code = "AssetTicketDaysInvalid",
-                            questionId = (string?)null,
-                            detail = draft.Definition.AssetDelivery.Days.ToString(
-                                System.Globalization.CultureInfo.InvariantCulture),
-                        },
-                    },
-                });
-            }
-
-            // **答えようのない設問のまま公開しない**（Issue #101）。
-            // 「5 つの選択肢から 7 つ選べ」は回答者が何をしても通らない
-            var settingsProblems = QuestionSettingsValidator.Validate(draft.Definition);
-            if (settingsProblems.Length > 0)
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.PublishBlockedBySettings, RequestLanguage.Of(context)),
-                    settings = settingsProblems.Select(problem => new
-                    {
-                        code = problem.Code.ToString(),
-                        questionId = problem.QuestionId,
-                        detail = problem.Detail,
-                    }),
-                });
-            }
-
-            // **不備のあるルックアップのまま公開しない**（Issue #879・仕様書 3.2・8 章）。
-            // 構造・資格情報・参照元の列の型・統合/継承を見る。参照元の列定義を取得できなければ公開させない。
-            // ルックアップが無いアンケートでは外部を呼ばない
-            var lookupProblems = await lookupValidator
-                .ValidateAsync(surveyId, draft.Definition, cancellationToken).ConfigureAwait(false);
-            if (lookupProblems.Count > 0)
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.PublishBlockedByLookup, RequestLanguage.Of(context)),
-                    lookups = lookupProblems.Select(problem => new
-                    {
-                        lookupId = problem.LookupId,
-                        kind = problem.Kind,
-                        code = problem.Code,
-                        detail = problem.Detail,
-                    }),
-                });
-            }
-
-            if (draft.Definition.AllQuestions.All(question => question.IsDisplayOnly))
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.NoAnswerableQuestion, RequestLanguage.Of(context)),
-                });
-            }
-
-            var publishedBy = context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } id
-                && Guid.TryParse(id, out var adminUserId)
-                ? adminUserId
-                : (Guid?)null;
-
-            try
-            {
-                await surveys.PublishWithAssetHistoryAsync(
-                    surveyId,
-                    draft.Definition.Version,
-                    draft.Definition,
-                    draft.Mapping,
-                    publishedBy,
-                    draft.AssetHistorySiteId,
-                    draft.AssetHistoryMapping,
-                    draft.Revision,
-                    cancellationToken).ConfigureAwait(false);
-            }
-            catch (InvalidOperationException)
-            {
-                // **版は不変。** 同時に 2 人が公開を押した場合など。
-                // **例外の文言をそのまま返さない。** 内部の事情を管理画面へ出さないためと、
-                // 文言が日本語で焼き付いていて英語にできないため
-                return Results.Conflict(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.VersionAlreadyPublished, RequestLanguage.Of(context)),
-                });
-            }
-
-            var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
-                .ConfigureAwait(false);
-            if (record is not null)
-            {
-                await surveys.SaveAsync(
-                    record with { Status = (int)SurveyStatus.TestPublished }, cancellationToken)
-                    .ConfigureAwait(false);
-            }
-
-            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
-            AuditNotes.Add(context, "fromStatus", SurveyStatus.Draft.ToString());
-            AuditNotes.Add(context, "toStatus", SurveyStatus.TestPublished.ToString());
-
-            return Results.Ok(new
-            {
-                version = draft.Definition.Version,
-                // **未割り当ては拒否しないが、公開後も伝える**
-                warnings = problems.Where(problem => !problem.IsBlocking).Select(Describe),
-            });
-        })
+        // ---- テスト公開に反映する --------------------------------------------
+        // **下書きへ戻さずに版を固め直す**（Issue #1008）。
+        // 以前は画面が「下書きへ戻す → テスト公開」の順に呼んでおり、
+        // 割り当ての誤りなどでテスト公開が拒否されると、下書きのまま取り残されていた。
+        // **検証を通ってから版を固める。通らなければ、テスト公開中のまま何も変えない。**
+        group.MapPost("/{surveyId:guid}/test-republish", (
+            Guid surveyId,
+            HttpContext context,
+            ISurveyDraftStore drafts,
+            ISurveyRepository surveys,
+            LookupPublishValidator lookupValidator,
+            CancellationToken cancellationToken) =>
+            TestPublishAsync(
+                surveyId, context, drafts, surveys, lookupValidator, republish: true, cancellationToken))
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
         // ---- 本公開 ----------------------------------------------------------
@@ -1622,6 +1395,268 @@ public static class AdminSurveyEndpoints
         }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysDelete));
 
         return builder;
+    }
+
+    /// <summary>テスト公開、またはテスト公開中の版の固め直し。</summary>
+    /// <param name="republish">
+    /// <c>true</c> ならテスト公開中のアンケートの固め直し（Issue #1008）。
+    /// **状態は動かさない。** 検証に落ちても、版を固める段で失敗しても、反映前のテスト公開のまま残る。
+    /// </param>
+    internal static async Task<IResult> TestPublishAsync(
+        Guid surveyId,
+        HttpContext context,
+        ISurveyDraftStore drafts,
+        ISurveyRepository surveys,
+        LookupPublishValidator lookupValidator,
+        bool republish,
+        CancellationToken cancellationToken)
+    {
+        var draft = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
+        if (draft is null)
+        {
+            return Results.NotFound();
+        }
+
+        // **テンプレートは公開できない**（Issue #58）。
+        // 書き込み先のサイトを持たないので、公開できてしまうと
+        // 受け付けた回答の行き先が無いまま溜まる。
+        // **ここで 1 回引くのは、公開の後に引き直す分とは別。**
+        // 後の引き直しは版が進んだ行を読むためのもので、前倒しにできない
+        var beforePublish = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+            .ConfigureAwait(false);
+        if (beforePublish is { IsTemplate: true })
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.SurveyIsTemplate, RequestLanguage.Of(context)),
+            });
+        }
+
+        if (beforePublish is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (beforePublish.ArchivedAt is not null)
+        {
+            return ArchivedSurvey(context);
+        }
+
+        if (beforePublish.Status != (republish ? (int)SurveyStatus.TestPublished : (int)SurveyStatus.Draft))
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.InvalidSurveyStatus, RequestLanguage.Of(context)),
+            });
+        }
+
+        // **公開のときだけ拒否する。** 壊れた定義で回答を受け付けると、
+        // 受け付けた回答が Pleasanter へ届かないまま溜まる
+        var problems = MappingValidator.Validate(
+            draft.Mapping,
+            draft.Definition,
+            null,
+            PleasanterColumn.IsAttachment,
+            column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
+        var blocking = problems.Where(problem => problem.IsBlocking).ToList();
+        if (draft.AssetHistorySiteId > 0)
+        {
+            if (draft.AssetHistorySiteId == beforePublish.PleasanterSiteId)
+            {
+                blocking.Add(new MappingProblem(
+                    MappingProblemCode.InvalidShape,
+                    Detail: "assetHistorySiteIdMustDiffer"));
+            }
+
+            if (draft.AssetHistoryMapping is null
+                || draft.AssetHistoryMapping.Assignments.IsDefaultOrEmpty)
+            {
+                blocking.Add(new MappingProblem(
+                    MappingProblemCode.InvalidShape,
+                    Detail: "assetHistory"));
+            }
+
+            blocking.AddRange(MappingValidator.Validate(
+                draft.AssetHistoryMapping ?? new MappingDefinition(),
+                draft.Definition,
+                null,
+                PleasanterColumn.IsAttachment,
+                column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind,
+                warnUnmappedQuestions: false).Where(problem => problem.IsBlocking));
+        }
+        if (blocking.Count > 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.PublishBlockedByMapping, RequestLanguage.Of(context)),
+                problems = blocking.Select(Describe),
+            });
+        }
+
+        // **分岐が壊れたまま公開しない**（Issue #41）。
+        // 無限に回る・辿り着けないページがある、といった不備は
+        // **公開してからでは回答者にしか見えない**
+        var flowProblems = SurveyFlowValidator.Validate(draft.Definition);
+        if (flowProblems.Length > 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.PublishBlockedByFlow, RequestLanguage.Of(context)),
+                flow = flowProblems.Select(problem => new
+                {
+                    code = problem.Code.ToString(),
+                    pageId = problem.PageId,
+                    questionId = problem.QuestionId,
+                    detail = problem.Detail,
+                }),
+            });
+        }
+
+        // **送れない自動返信のまま公開しない**（Issue #189）。
+        // 有効にしたのに宛先が無い・件名が空だと、**送ったつもりで 1 通も出ない。**
+        // 気付くのは回答者から問い合わせが来たときになる
+        var autoReplyProblems = AutoReplyValidator.Validate(draft.Definition);
+        if (autoReplyProblems.Length > 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.PublishBlockedByAutoReply, RequestLanguage.Of(context)),
+                autoReply = autoReplyProblems.Select(problem => new
+                {
+                    code = problem.Code.ToString(),
+                    detail = problem.Detail,
+                }),
+            });
+        }
+
+        if (draft.Definition.AssetDelivery is
+            {
+                Expiration: AssetTicketExpiration.DaysAfterResponse,
+                Days: < 1 or > AssetDeliverySettings.MaxDays,
+            })
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.PublishBlockedBySettings, RequestLanguage.Of(context)),
+                settings = new[]
+                {
+                    new
+                    {
+                        code = "AssetTicketDaysInvalid",
+                        questionId = (string?)null,
+                        detail = draft.Definition.AssetDelivery.Days.ToString(
+                            System.Globalization.CultureInfo.InvariantCulture),
+                    },
+                },
+            });
+        }
+
+        // **答えようのない設問のまま公開しない**（Issue #101）。
+        // 「5 つの選択肢から 7 つ選べ」は回答者が何をしても通らない
+        var settingsProblems = QuestionSettingsValidator.Validate(draft.Definition);
+        if (settingsProblems.Length > 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.PublishBlockedBySettings, RequestLanguage.Of(context)),
+                settings = settingsProblems.Select(problem => new
+                {
+                    code = problem.Code.ToString(),
+                    questionId = problem.QuestionId,
+                    detail = problem.Detail,
+                }),
+            });
+        }
+
+        // **不備のあるルックアップのまま公開しない**（Issue #879・仕様書 3.2・8 章）。
+        // 構造・資格情報・参照元の列の型・統合/継承を見る。参照元の列定義を取得できなければ公開させない。
+        // ルックアップが無いアンケートでは外部を呼ばない
+        var lookupProblems = await lookupValidator
+            .ValidateAsync(surveyId, draft.Definition, cancellationToken).ConfigureAwait(false);
+        if (lookupProblems.Count > 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.PublishBlockedByLookup, RequestLanguage.Of(context)),
+                lookups = lookupProblems.Select(problem => new
+                {
+                    lookupId = problem.LookupId,
+                    kind = problem.Kind,
+                    code = problem.Code,
+                    detail = problem.Detail,
+                }),
+            });
+        }
+
+        if (draft.Definition.AllQuestions.All(question => question.IsDisplayOnly))
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.NoAnswerableQuestion, RequestLanguage.Of(context)),
+            });
+        }
+
+        var publishedBy = context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } id
+            && Guid.TryParse(id, out var adminUserId)
+            ? adminUserId
+            : (Guid?)null;
+
+        try
+        {
+            await surveys.PublishWithAssetHistoryAsync(
+                surveyId,
+                draft.Definition.Version,
+                draft.Definition,
+                draft.Mapping,
+                publishedBy,
+                draft.AssetHistorySiteId,
+                draft.AssetHistoryMapping,
+                draft.Revision,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            // **版は不変。** 同時に 2 人が公開を押した場合など。
+            // **例外の文言をそのまま返さない。** 内部の事情を管理画面へ出さないためと、
+            // 文言が日本語で焼き付いていて英語にできないため
+            return Results.Conflict(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.VersionAlreadyPublished, RequestLanguage.Of(context)),
+            });
+        }
+
+        var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+            .ConfigureAwait(false);
+        if (record is not null)
+        {
+            await surveys.SaveAsync(
+                record with { Status = (int)SurveyStatus.TestPublished }, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+        AuditNotes.Add(
+            context,
+            "fromStatus",
+            (republish ? SurveyStatus.TestPublished : SurveyStatus.Draft).ToString());
+        AuditNotes.Add(context, "toStatus", SurveyStatus.TestPublished.ToString());
+
+        return Results.Ok(new
+        {
+            version = draft.Definition.Version,
+            // **未割り当ては拒否しないが、公開後も伝える**
+            warnings = problems.Where(problem => !problem.IsBlocking).Select(Describe),
+        });
     }
 
     private static IResult ContentAssetRejected(
