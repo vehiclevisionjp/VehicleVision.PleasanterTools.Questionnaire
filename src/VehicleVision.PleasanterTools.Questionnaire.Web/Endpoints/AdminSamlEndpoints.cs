@@ -495,7 +495,7 @@ public static class AdminSamlEndpoints
     /// </remarks>
     private static IResult ReauthReturn(string entry, string result)
     {
-        var target = $"{entry}?apiTokenReauth={result}";
+        var target = $"{entry}/me?apiTokenReauth={result}";
         var html = "<!doctype html><html><head><meta charset=\"utf-8\">"
             + $"<meta http-equiv=\"refresh\" content=\"0;url={target}\">"
             + "<meta name=\"referrer\" content=\"no-referrer\"><title></title></head>"

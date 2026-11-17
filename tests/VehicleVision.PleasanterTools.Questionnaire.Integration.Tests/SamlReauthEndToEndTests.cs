@@ -251,7 +251,7 @@ public sealed class SamlReauthEndToEndTests : IAsyncLifetime
         Assert.Equal(Acs, request.AcsUrl);
 
         using var back = await PostResponseAsync(admin.Client, SignedResponse(request.Id, admin.LoginId));
-        Assert.Equal("/admin?apiTokenReauth=done", await ReturnTargetAsync(back));
+        Assert.Equal("/admin/me?apiTokenReauth=done", await ReturnTargetAsync(back));
 
         using var first = await IssueAsync(admin.Client, "first");
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
@@ -274,7 +274,7 @@ public sealed class SamlReauthEndToEndTests : IAsyncLifetime
         using var back = await PostResponseAsync(
             admin.Client, SignedResponse(request.Id, admin.LoginId, DateTimeOffset.UtcNow.AddHours(-1)));
 
-        Assert.Equal("/admin?apiTokenReauth=failed", await ReturnTargetAsync(back));
+        Assert.Equal("/admin/me?apiTokenReauth=failed", await ReturnTargetAsync(back));
         using var issue = await IssueAsync(admin.Client);
         Assert.Equal(HttpStatusCode.Forbidden, issue.StatusCode);
         Assert.Equal(0, await TokenCountAsync(admin.Client));
@@ -290,7 +290,7 @@ public sealed class SamlReauthEndToEndTests : IAsyncLifetime
         using var back = await PostResponseAsync(
             admin.Client, SignedResponse(request.Id, admin.LoginId, DateTimeOffset.UtcNow.AddSeconds(1)));
 
-        Assert.Equal("/admin?apiTokenReauth=done", await ReturnTargetAsync(back));
+        Assert.Equal("/admin/me?apiTokenReauth=done", await ReturnTargetAsync(back));
         using var issue = await IssueAsync(admin.Client);
         Assert.Equal(HttpStatusCode.OK, issue.StatusCode);
     }
@@ -303,7 +303,7 @@ public sealed class SamlReauthEndToEndTests : IAsyncLifetime
         var response = SignedResponse(request.Id, admin.LoginId);
 
         using var first = await PostResponseAsync(admin.Client, response);
-        Assert.Equal("/admin?apiTokenReauth=done", await ReturnTargetAsync(first));
+        Assert.Equal("/admin/me?apiTokenReauth=done", await ReturnTargetAsync(first));
         using var issued = await IssueAsync(admin.Client, "first");
         Assert.Equal(HttpStatusCode.OK, issued.StatusCode);
 
@@ -333,7 +333,7 @@ public sealed class SamlReauthEndToEndTests : IAsyncLifetime
         using var back = await PostResponseAsync(admin.Client, SignedResponse(request.Id, admin.LoginId));
         var target = await ReturnTargetAsync(back);
 
-        Assert.Equal("/admin?apiTokenReauth=done", target);
+        Assert.Equal("/admin/me?apiTokenReauth=done", target);
         Assert.DoesNotContain("evil.example", await back.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
@@ -346,7 +346,7 @@ public sealed class SamlReauthEndToEndTests : IAsyncLifetime
 
         using var back = await PostResponseAsync(admin.Client, SignedResponse(request.Id, other.LoginId));
 
-        Assert.Equal("/admin?apiTokenReauth=failed", await ReturnTargetAsync(back));
+        Assert.Equal("/admin/me?apiTokenReauth=failed", await ReturnTargetAsync(back));
         using var issue = await IssueAsync(admin.Client);
         Assert.Equal(HttpStatusCode.Forbidden, issue.StatusCode);
     }
@@ -361,7 +361,7 @@ public sealed class SamlReauthEndToEndTests : IAsyncLifetime
         using var back = await PostResponseAsync(
             admin.Client, SignedResponse(request.Id, admin.LoginId, signer: attacker));
 
-        Assert.Equal("/admin?apiTokenReauth=failed", await ReturnTargetAsync(back));
+        Assert.Equal("/admin/me?apiTokenReauth=failed", await ReturnTargetAsync(back));
         using var issue = await IssueAsync(admin.Client);
         Assert.Equal(HttpStatusCode.Forbidden, issue.StatusCode);
     }
@@ -388,7 +388,7 @@ public sealed class SamlReauthEndToEndTests : IAsyncLifetime
         var admin = await SamlSignedInAsync();
         var request = await StartReauthAsync(admin.Client);
         using var back = await PostResponseAsync(admin.Client, SignedResponse(request.Id, admin.LoginId));
-        Assert.Equal("/admin?apiTokenReauth=done", await ReturnTargetAsync(back));
+        Assert.Equal("/admin/me?apiTokenReauth=done", await ReturnTargetAsync(back));
 
         // 同じ人の、別のブラウザ（別のセッション）
         var seeded = new SeededAdmin(admin.LoginId, string.Empty);

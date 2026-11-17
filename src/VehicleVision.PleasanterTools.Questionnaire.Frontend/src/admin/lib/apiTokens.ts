@@ -91,3 +91,138 @@ export function shouldOfferTokenRevoke(
 
   return activeCount === null || activeCount > 0;
 }
+
+// ---- SAML の強制再認証（Issue #1034）-----------------------------------------------
+
+/** 再認証へ出る間、入力の途中の値を置く `sessionStorage` のキー。 */
+export const API_TOKEN_DRAFT_KEY = 'q.admin.apiTokenDraft';
+
+/** 入力の途中の値を置いておける長さ（IdP での再認証に掛かる分）。 */
+export const API_TOKEN_DRAFT_LIFETIME_MS = 15 * 60 * 1000;
+
+/**
+ * 再認証へ出る間だけ、このタブへ置く入力の途中の値。
+ *
+ * ⚠️ **秘密は含めない。** 名前・スコープ・期限・接続元の許可リストだけ。
+ * 平文のトークンは発行の応答の画面変数にしか無く、パスワードも置かない。
+ */
+export interface ApiTokenDraft {
+  name: string;
+  scopes: string[];
+  expiresInDays: number;
+  ipText: string;
+}
+
+/** 戻りの印（サーバが固定の飛び先に付ける `?apiTokenReauth=done|failed`）。 */
+export type ReauthMarker = 'done' | 'failed';
+
+/** `sessionStorage` を使えない環境（プライベートウィンドウ・無効化）では `null`。 */
+function draftStorage(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** 入力の途中の値を置く。**置けなくても失敗にしない**（戻ったあと入力し直すだけ）。 */
+export function saveApiTokenDraft(
+  draft: ApiTokenDraft,
+  now: number = Date.now(),
+  storage: Pick<Storage, 'setItem'> | null = draftStorage(),
+): void {
+  try {
+    storage?.setItem(API_TOKEN_DRAFT_KEY, JSON.stringify({ draft, savedAt: now }));
+  } catch {
+    // 容量超過など。置けないだけ
+  }
+}
+
+/** 置いた値を消す。 */
+export function clearApiTokenDraft(
+  storage: Pick<Storage, 'removeItem'> | null = draftStorage(),
+): void {
+  try {
+    storage?.removeItem(API_TOKEN_DRAFT_KEY);
+  } catch {
+    // 何もしない
+  }
+}
+
+/**
+ * 置いた値を読む。**読んだら消す**（1 回だけ使う）。
+ * 形が違う・古い（15 分より前）・無いものは `null`。
+ */
+export function takeApiTokenDraft(
+  now: number = Date.now(),
+  storage: Pick<Storage, 'getItem' | 'removeItem'> | null = draftStorage(),
+): ApiTokenDraft | null {
+  let raw: string | null = null;
+  try {
+    raw = storage?.getItem(API_TOKEN_DRAFT_KEY) ?? null;
+  } catch {
+    return null;
+  } finally {
+    clearApiTokenDraft(storage);
+  }
+
+  if (raw === null) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return null;
+    }
+
+    const { draft, savedAt } = parsed as { draft?: Partial<ApiTokenDraft>; savedAt?: unknown };
+    if (
+      typeof savedAt !== 'number' ||
+      now - savedAt > API_TOKEN_DRAFT_LIFETIME_MS ||
+      now < savedAt - 60_000
+    ) {
+      return null;
+    }
+
+    if (
+      typeof draft?.name !== 'string' ||
+      !Array.isArray(draft.scopes) ||
+      !draft.scopes.every((scope) => typeof scope === 'string') ||
+      typeof draft.expiresInDays !== 'number' ||
+      typeof draft.ipText !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      name: draft.name,
+      scopes: draft.scopes,
+      expiresInDays: draft.expiresInDays,
+      ipText: draft.ipText,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 戻りの印を読み、**URL から消す**（再読み込み・ブックマークで再び動かないように）。
+ * 印が無い・知らない値は `null`。
+ */
+export function takeReauthMarker(
+  location: Pick<Location, 'pathname' | 'search' | 'hash'>,
+  replaceUrl: (url: string) => void,
+): ReauthMarker | null {
+  const params = new URLSearchParams(location.search);
+  const value = params.get('apiTokenReauth');
+  if (value === null) {
+    return null;
+  }
+
+  params.delete('apiTokenReauth');
+  const rest = params.toString();
+  replaceUrl(`${location.pathname}${rest === '' ? '' : `?${rest}`}${location.hash}`);
+
+  return value === 'done' || value === 'failed' ? value : null;
+}

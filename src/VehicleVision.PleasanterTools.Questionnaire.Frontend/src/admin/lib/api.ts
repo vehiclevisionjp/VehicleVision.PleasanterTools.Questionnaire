@@ -302,6 +302,13 @@ export interface ApiTokenIssueRequest {
 export const issueApiToken = (request: ApiTokenIssueRequest) =>
   call<IssuedApiToken>('/api/admin/me/api-tokens', { method: 'POST', json: request });
 
+/**
+ * SAML の管理者が、API キーの発行の前に IdP での強制再認証（ForceAuthn）を始める（Issue #1034）。
+ * 返る `redirectUrl`（IdP へ向かう URL）へブラウザを移す。**戻り先は指定できない**（サーバが固定する）。
+ */
+export const startApiTokenReauth = () =>
+  call<{ redirectUrl: string }>('/api/admin/saml/reauth', { method: 'POST', json: {} });
+
 /** 他人の API キーの一覧（`users.read`）か、自分の一覧。 */
 export const listAdminUserApiTokens = (adminUserId: string) =>
   call<{ tokens: ApiTokenRow[] }>(`/api/admin/users/${adminUserId}/api-tokens`);
