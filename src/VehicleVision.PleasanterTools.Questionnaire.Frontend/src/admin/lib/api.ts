@@ -710,17 +710,28 @@ export const saveSurveySettings = (
   requireProofOfWork: boolean,
   allowDraft: boolean,
   allowEmbedding: boolean,
+  acceptFrom: string | null,
+  acceptTo: string | null,
 ) =>
   call<{
     responseLimit: number | null;
     requireProofOfWork: boolean;
     allowDraft: boolean;
     allowEmbedding: boolean;
+    acceptFrom?: string | null;
+    acceptTo?: string | null;
   }>(
     `/api/admin/surveys/${surveyId}/settings`,
     {
       method: 'PUT',
-      json: { responseLimit, requireProofOfWork, allowDraft, allowEmbedding },
+      json: {
+        responseLimit,
+        requireProofOfWork,
+        allowDraft,
+        allowEmbedding,
+        // **受付期間（Issue #1006）。** 空は「その側の制限なし」。ISO 8601（UTC）で送る
+        acceptPeriod: { from: acceptFrom, to: acceptTo },
+      },
     },
   );
 

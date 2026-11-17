@@ -183,6 +183,8 @@
     requireProofOfWork: true,
     allowDraft: false,
     allowEmbedding: false,
+    acceptFrom: null as string | null,
+    acceptTo: null as string | null,
   });
   let columnAvailability = $state<ColumnAvailabilityResponse>({
     source: 'standard',
@@ -400,6 +402,8 @@
       requireProofOfWork: result.value.requireProofOfWork ?? true,
       allowDraft: result.value.allowDraft ?? false,
       allowEmbedding: result.value.allowEmbedding ?? false,
+      acceptFrom: result.value.acceptFrom ?? null,
+      acceptTo: result.value.acceptTo ?? null,
     };
     await refreshColumnAvailability(id);
   }
@@ -1411,6 +1415,8 @@
     requireProofOfWork={publishSettings.requireProofOfWork}
     allowDraft={publishSettings.allowDraft}
     allowEmbedding={publishSettings.allowEmbedding}
+    acceptFrom={publishSettings.acceptFrom}
+    acceptTo={publishSettings.acceptTo}
     onsaved={(values) => (publishSettings = values)}
   />
   {/if}
