@@ -87,6 +87,7 @@ public sealed class AdminUserService(
     IAdminUserStore store,
     IAdminSessionStore sessions,
     IAdminInvitationStore invitations,
+    IAdminApiTokenStore apiTokens,
     AdminAuthenticator authenticator,
     PasswordHasher hasher,
     AdminAuthOptions options,
@@ -341,6 +342,12 @@ public sealed class AdminUserService(
 
         // **止めた相手宛ての招待は取り消す。** 止めたのにパスワードを決められては困る
         await invitations.RevokeUnusedAsync(targetId, cancellationToken).ConfigureAwait(false);
+
+        // **止めた相手の API キー（個人トークン）も失効させる**（Issue #1025）。
+        // 検証側も毎回持ち主の状態を見るが、有効へ戻したときに古いトークンが生き返らないよう、印を付けておく
+        await apiTokens
+            .RevokeAllForOwnerAsync(targetId, Now, actorId, AdminApiTokenRevokeReasons.OwnerDisabled, cancellationToken)
+            .ConfigureAwait(false);
 
         logger.LogInformation(
             "管理者を止めた（AdminUserId={AdminUserId}、操作したのは {ActorId}）", targetId, actorId);

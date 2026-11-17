@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Security.Cryptography;
 using Dapper;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data;
@@ -174,10 +175,18 @@ public sealed class AdminApiTokenStore(IDbConnectionFactory connectionFactory) :
 
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var row = await connection.QueryFirstOrDefaultAsync<Row>(Sql(
-            $"SELECT {Columns} FROM [AdminApiTokens] WHERE [TokenHash] = @TokenHash",
+            $"SELECT {Columns}, [TokenHash] FROM [AdminApiTokens] WHERE [TokenHash] = @TokenHash",
             new { TokenHash = tokenHash },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
-        return row?.ToRecord();
+
+        // **引いたうえで、定数時間で比べ直す。** 大文字小文字を区別しない照合順序（SQL Server の既定）でも、
+        // 別の値が当たらないようにする
+        return row is not null
+            && CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(row.TokenHash),
+                System.Text.Encoding.UTF8.GetBytes(tokenHash))
+                ? row.ToRecord()
+                : null;
     }
 
     public async Task<AdminApiTokenRecord?> FindAsync(Guid tokenId, CancellationToken cancellationToken = default)
@@ -331,6 +340,9 @@ public sealed class AdminApiTokenStore(IDbConnectionFactory connectionFactory) :
     private sealed class Row
     {
         public Guid TokenId { get; set; }
+
+        /// <summary>引いた値の突き合わせにだけ使う。<b>記録（<see cref="AdminApiTokenRecord"/>）へは載せない。</b></summary>
+        public string TokenHash { get; set; } = "";
 
         public Guid OwnerAdminUserId { get; set; }
 
