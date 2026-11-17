@@ -23,6 +23,8 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// <param name="RequireProofOfWork">回答の送信に proof-of-work を課すか。**既定は有効。**</param>
 /// <param name="AllowDraft">回答の下書きを端末へ残すか。**既定は無効。**</param>
 /// <param name="AllowEmbedding">回答画面を許可済みの親サイトへ埋め込んでよいか。**既定は無効。**</param>
+/// <param name="AcceptFrom">受付の開始日時（UTC）。<c>null</c> なら開始の制限なし（Issue #1006）。</param>
+/// <param name="AcceptTo">受付の終了日時（UTC）。<c>null</c> なら終了の制限なし（Issue #1006）。</param>
 public sealed record SurveyDraft(
     SurveyDefinition Definition,
     MappingDefinition Mapping,
@@ -35,7 +37,9 @@ public sealed record SurveyDraft(
     int? ResponseLimit = null,
     bool RequireProofOfWork = true,
     bool AllowDraft = false,
-    bool AllowEmbedding = false);
+    bool AllowEmbedding = false,
+    DateTime? AcceptFrom = null,
+    DateTime? AcceptTo = null);
 
 /// <summary>一覧に出すアンケートの要約。</summary>
 /// <param name="SuspendedReason">
@@ -63,6 +67,8 @@ public sealed record SurveyDraft(
 /// <param name="HasUnpublishedChanges">
 /// 公開中の版へ反映していない下書きの保存があるか（Issue #577）。
 /// </param>
+/// <param name="AcceptFrom">受付の開始日時（UTC）。<c>null</c> なら開始の制限なし（Issue #1006）。</param>
+/// <param name="AcceptTo">受付の終了日時（UTC）。<c>null</c> なら終了の制限なし（Issue #1006）。</param>
 public sealed record SurveySummary(
     Guid SurveyId,
     string PublicId,
@@ -80,7 +86,9 @@ public sealed record SurveySummary(
     bool AllowEmbedding = false,
     int TestResponseCount = 0,
     DateTime? ArchivedAt = null,
-    bool HasUnpublishedChanges = false);
+    bool HasUnpublishedChanges = false,
+    DateTime? AcceptFrom = null,
+    DateTime? AcceptTo = null);
 
 /// <summary>複製で作るアンケートの、**写さない値**（Issue #46）。</summary>
 /// <param name="SurveyId">複製先の内部 ID。</param>
@@ -270,7 +278,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         int? ResponseLimit,
         bool RequireProofOfWork,
         bool AllowDraft,
-        bool AllowEmbedding);
+        bool AllowEmbedding,
+        DateTime? AcceptFrom,
+        DateTime? AcceptTo);
 
     private sealed record PageRow(
         string PageId,
@@ -354,6 +364,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
         public bool AllowEmbedding { get; set; }
 
+        public DateTime? AcceptFrom { get; set; }
+
+        public DateTime? AcceptTo { get; set; }
+
         public long ResponseCount { get; set; }
 
         public long TestResponseCount { get; set; }
@@ -422,6 +436,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "            THEN 1 ELSE 0 END AS [HasUnpublishedChanges], "
             + "       s.[SuspendedReason], s.[SuspendedAt], s.[ResponseLimit], "
             + "       s.[RequireProofOfWork], s.[AllowDraft], s.[AllowEmbedding], "
+            + "       s.[AcceptFrom], s.[AcceptTo], "
             + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
             + "        WHERE t.[SurveyId] = s.[SurveyId] AND t.[IsTest] = @IsTest) AS [ResponseCount], "
             + "       (SELECT COUNT(*) FROM [ResponseTokens] t "
@@ -452,7 +467,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 row.AllowEmbedding,
                 (int)row.TestResponseCount,
                 row.ArchivedAt,
-                row.HasUnpublishedChanges)),
+                row.HasUnpublishedChanges,
+                AsUtc(row.AcceptFrom),
+                AsUtc(row.AcceptTo))),
         ];
     }
 
@@ -498,7 +515,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             + "       [PublishedVersion], "
             + "       [DraftRevision], [PublishedDraftRevision], [AssetHistorySiteId], "
             + "       [AssetHistoryMappingJson], [Status], [PublicId], [ResponseLimit], "
-            + "       [RequireProofOfWork], [AllowDraft], [AllowEmbedding] "
+            + "       [RequireProofOfWork], [AllowDraft], [AllowEmbedding], "
+            + "       [AcceptFrom], [AcceptTo] "
             + "FROM [Surveys] WHERE [SurveyId] = @SurveyId",
             new { SurveyId = surveyId },
             transaction,
@@ -679,8 +697,18 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             survey.ResponseLimit,
             survey.RequireProofOfWork,
             survey.AllowDraft,
-            survey.AllowEmbedding);
+            survey.AllowEmbedding,
+            AsUtc(survey.AcceptFrom),
+            AsUtc(survey.AcceptTo));
     }
+
+    /// <summary>
+    /// DB から読んだ日時を UTC として扱う（Issue #1006）。
+    /// **DB は UTC で持つが、読むと <c>Kind</c> が付かない。** そのまま JSON にすると
+    /// 末尾の <c>Z</c> が無く、ブラウザが現地時刻と解釈して受付期間がずれる。
+    /// </summary>
+    private static DateTime? AsUtc(DateTime? value) =>
+        value is { } time ? DateTime.SpecifyKind(time, DateTimeKind.Utc) : null;
 
     public async Task<int> SaveAsync(
         Guid surveyId,

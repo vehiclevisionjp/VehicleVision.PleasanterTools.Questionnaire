@@ -1353,6 +1353,10 @@ export const en: Record<MessageKey, string> = {
     'Leave it empty for no limit. Responses stop being accepted once the limit is reached. '
     + 'Responses that have not reached Pleasanter yet are counted too.',
   'settings.limitInvalid': 'Enter the response limit as a number of 1 or more.',
+  'settings.acceptFrom': 'Opening time (optional)',
+  'settings.acceptTo': 'Closing time (optional)',
+  'settings.acceptPeriodHint': 'A blank side means no limit. Outside the period, intake stops without showing respondents a reason. Saving takes effect immediately.',
+  'settings.acceptPeriodInvalid': 'The closing time must be later than the opening time.',
   'settings.noAutoResume':
     'Raising the limit does not resume the survey. Press Resume when you are ready.',
   'settings.submit': 'Save',

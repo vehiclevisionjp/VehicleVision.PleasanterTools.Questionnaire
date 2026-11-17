@@ -95,6 +95,7 @@ public static class ServerMessages
         [ServerMessageKeys.ContentAssetLimitReached] = "이 설문 조사에 저장할 수 있는 배포 자료의 한도에 도달했습니다.",
         [ServerMessageKeys.AssetScannerUnavailable] = "바이러스 검사를 사용할 수 없어 배포 자료를 저장할 수 없습니다. 관리자에게 문의하세요.",
         [ServerMessageKeys.ResponseLimitMustBePositive] = "답변 수 한도는 1 이상이어야 합니다. 한도를 두지 않으려면 비워 두세요.",
+        [ServerMessageKeys.AcceptPeriodInvalid] = "접수 종료 일시는 시작 일시보다 늦어야 합니다.",
         [ServerMessageKeys.ResponseLimitReached] = "답변 수가 한도에 도달했습니다({0} / {1}건). 다시 시작하려면 먼저 한도를 늘리세요.",
         [ServerMessageKeys.ResponseTokenRequired] = "되돌릴 답변을 지정하세요.",
         [ServerMessageKeys.DeadLetterNotFound] = "해당 답변을 찾을 수 없습니다. 이미 전송 대기로 되돌렸거나 전송이 완료되었을 수 있습니다.",
@@ -261,6 +262,7 @@ public static class ServerMessages
             [ServerMessageKeys.ContentAssetLimitReached] = "此问卷已达到可保存资源的上限。",
             [ServerMessageKeys.AssetScannerUnavailable] = "由于无法使用病毒扫描，无法保存资源。请联系管理员。",
             [ServerMessageKeys.ResponseLimitMustBePositive] = "回答数上限必须至少为 1。若不设上限，请留空。",
+            [ServerMessageKeys.AcceptPeriodInvalid] = "受理的结束时间必须晚于开始时间。",
             [ServerMessageKeys.ResponseLimitReached] = "回答数已达到上限（{0} / {1} 条）。请先提高上限后再继续。",
             [ServerMessageKeys.ResponseTokenRequired] = "请指定要恢复的回答。",
             [ServerMessageKeys.DeadLetterNotFound] = "未找到该回答。它可能已恢复为等待发送状态，或已发送完成。",
@@ -384,6 +386,7 @@ public static class ServerMessages
             [ServerMessageKeys.ContentAssetLimitReached] = "Esta encuesta ha alcanzado su límite de recursos.",
             [ServerMessageKeys.AssetScannerUnavailable] = "No se puede guardar el recurso porque el análisis de virus no está disponible. Póngase en contacto con un administrador.",
             [ServerMessageKeys.ResponseLimitMustBePositive] = "El límite de respuestas debe ser al menos 1. Déjelo vacío si no desea establecer un límite.",
+            [ServerMessageKeys.AcceptPeriodInvalid] = "La fecha de cierre debe ser posterior a la de inicio.",
             [ServerMessageKeys.ResponseLimitReached] = "Se ha alcanzado el límite de respuestas ({0} de {1}). Aumente el límite antes de reanudar.",
             [ServerMessageKeys.ResponseTokenRequired] = "Especifique qué respuesta desea devolver.",
             [ServerMessageKeys.DeadLetterNotFound] = "No se encontró esa respuesta. Es posible que ya se haya devuelto o que se haya enviado.",
@@ -506,6 +509,7 @@ public static class ServerMessages
             [ServerMessageKeys.ContentAssetLimitReached] = "Diese Umfrage hat das Asset-Limit erreicht.",
             [ServerMessageKeys.AssetScannerUnavailable] = "Das Asset kann nicht gespeichert werden, da die Virenprüfung nicht verfügbar ist. Wenden Sie sich an einen Administrator.",
             [ServerMessageKeys.ResponseLimitMustBePositive] = "Die Antwortgrenze muss mindestens 1 betragen. Lassen Sie das Feld für keine Begrenzung leer.",
+            [ServerMessageKeys.AcceptPeriodInvalid] = "Das Ende des Erfassungszeitraums muss nach dem Beginn liegen.",
             [ServerMessageKeys.ResponseLimitReached] = "Die Antwortgrenze wurde erreicht ({0} von {1}). Erhöhen Sie die Grenze vor der Fortsetzung.",
             [ServerMessageKeys.ResponseTokenRequired] = "Geben Sie an, welche Antwort zurückgesetzt werden soll.",
             [ServerMessageKeys.DeadLetterNotFound] = "Diese Antwort wurde nicht gefunden. Sie wurde möglicherweise bereits zurückgestellt oder bereits gesendet.",
@@ -1032,6 +1036,12 @@ public static class ServerMessages
             "回答数の上限は 1 以上にしてください。上限を設けない場合は空欄にしてください。",
             "The response limit must be at least 1. Leave it empty for no limit.",
             "Giới hạn số câu trả lời phải từ 1 trở lên. Để trống nếu không đặt giới hạn.");
+
+        Add(
+            ServerMessageKeys.AcceptPeriodInvalid,
+            "受付の終了日時は、開始日時より後にしてください。",
+            "The closing time must be later than the opening time.",
+            "Thời điểm kết thúc phải sau thời điểm bắt đầu.");
 
         Add(
             ServerMessageKeys.ResponseLimitReached,

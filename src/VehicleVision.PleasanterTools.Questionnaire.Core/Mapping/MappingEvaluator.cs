@@ -239,6 +239,17 @@ public sealed class MappingEvaluator(IScriptConverter? scriptConverter = null)
 
             case ConverterOperations.Map:
                 var mapDefault = converter.Config.GetValueOrDefault("default");
+
+                // **置換元が 1 つも無い map は「空でなければ既定値」を表す**（Issue #1007）。
+                // 空白だけの入力は未回答として扱い、複数の値があっても 1 つだけ出す
+                if (!converter.Config.Keys.Any(key =>
+                    key.StartsWith("map.", StringComparison.Ordinal)))
+                {
+                    return input.Any(value => !string.IsNullOrWhiteSpace(value))
+                        ? Output(mapDefault ?? string.Empty)
+                        : [];
+                }
+
                 return
                 [
                     .. input.SelectMany(value =>

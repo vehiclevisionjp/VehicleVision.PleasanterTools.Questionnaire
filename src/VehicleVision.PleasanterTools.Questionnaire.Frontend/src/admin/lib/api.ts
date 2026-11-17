@@ -676,6 +676,13 @@ export const testPublish = (surveyId: string) =>
     json: {},
   });
 
+/** テスト公開中の編集を反映する。**下書きへ戻さない。** 失敗してもテスト公開のまま残る（Issue #1008）。 */
+export const testRepublish = (surveyId: string) =>
+  call<{ version: number; warnings: MappingProblem[] }>(`/api/admin/surveys/${surveyId}/test-republish`, {
+    method: 'POST',
+    json: {},
+  });
+
 export const publish = (surveyId: string) =>
   call<{ status: string }>(`/api/admin/surveys/${surveyId}/publish`, {
     method: 'POST',
@@ -730,17 +737,28 @@ export const saveSurveySettings = (
   requireProofOfWork: boolean,
   allowDraft: boolean,
   allowEmbedding: boolean,
+  acceptFrom: string | null,
+  acceptTo: string | null,
 ) =>
   call<{
     responseLimit: number | null;
     requireProofOfWork: boolean;
     allowDraft: boolean;
     allowEmbedding: boolean;
+    acceptFrom?: string | null;
+    acceptTo?: string | null;
   }>(
     `/api/admin/surveys/${surveyId}/settings`,
     {
       method: 'PUT',
-      json: { responseLimit, requireProofOfWork, allowDraft, allowEmbedding },
+      json: {
+        responseLimit,
+        requireProofOfWork,
+        allowDraft,
+        allowEmbedding,
+        // **受付期間（Issue #1006）。** 空は「その側の制限なし」。ISO 8601（UTC）で送る
+        acceptPeriod: { from: acceptFrom, to: acceptTo },
+      },
     },
   );
 

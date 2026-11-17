@@ -592,6 +592,10 @@ export interface SurveyDraft {
   allowDraft?: boolean;
   /** 許可済みの親サイトへ埋め込んでよいか。**「無い」なら不可。** */
   allowEmbedding?: boolean;
+  /** 受付の開始日時（UTC, ISO 8601）。**「無い」なら開始の制限なし。** */
+  acceptFrom?: string | null;
+  /** 受付の終了日時（UTC, ISO 8601）。**「無い」なら終了の制限なし。** */
+  acceptTo?: string | null;
 }
 
 /** 固めた版の一覧の 1 行（Issue #544）。 */
@@ -651,6 +655,10 @@ export interface SurveySummary {
    * **既定は無効。**
    */
   allowEmbedding?: boolean;
+  /** 受付の開始日時（UTC, ISO 8601）。**「無い」なら開始の制限なし**（Issue #1006）。 */
+  acceptFrom?: string | null;
+  /** 受付の終了日時（UTC, ISO 8601）。**「無い」なら終了の制限なし**（Issue #1006）。 */
+  acceptTo?: string | null;
   /**
    * 受け付けた回答の件数。
    *
