@@ -59,6 +59,8 @@ public static class ServerMessages
         [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "접속 허용 목록은 CIDR(예: 203.0.113.0/24)을 최대 {0}개까지 지정할 수 있습니다. 형식을 확인하세요.",
         [ServerMessageKeys.ApiTokenLimitReached] = "사용 중인 API 키는 1인당 최대 {0}개입니다. 불필요한 키를 먼저 폐기하세요.",
         [ServerMessageKeys.ApiTokenReloginRequired] = "SSO로 로그인한 관리자는 다시 로그인한 뒤 {0}분 이내에 발급하세요.",
+        [ServerMessageKeys.ApiTokenReauthRequired] = "SSO(SAML)로 로그인한 관리자는 IdP에서 다시 인증해야 합니다. 화면의 재인증 버튼으로 다시 인증한 뒤 {0}분 이내에 발급하세요.",
+        [ServerMessageKeys.ApiTokenReauthUnavailable] = "재인증을 시작할 수 없습니다. SAML이 비활성화되었거나 이 세션이 SAML로 만들어진 것이 아닙니다.",
         [ServerMessageKeys.ApiTokenNotFound] = "해당 API 키를 찾을 수 없습니다.",
         [ServerMessageKeys.ResponseNotificationMailSubject] = "설문 조사에 새 답변이 있습니다",
         [ServerMessageKeys.ResponseNotificationMailBody] = "설문 조사 \"{0}\"에 새 답변이 {1}건 도착했습니다.\n집계 기간(UTC): {2} ~ {3}\n\n답변 내용은 Pleasanter에서 확인하세요.",
@@ -228,6 +230,8 @@ public static class ServerMessages
             [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "允许的来源地址列表最多可指定 {0} 条 CIDR（例如 203.0.113.0/24）。请检查格式。",
             [ServerMessageKeys.ApiTokenLimitReached] = "每人最多可拥有 {0} 个有效的 API 密钥。请先吊销不再需要的密钥。",
             [ServerMessageKeys.ApiTokenReloginRequired] = "通过 SSO 登录的管理员，请重新登录后在 {0} 分钟内签发。",
+            [ServerMessageKeys.ApiTokenReauthRequired] = "通过 SSO（SAML）登录的管理员需要在 IdP 重新认证。请使用页面上的重新认证按钮，并在 {0} 分钟内签发。",
+            [ServerMessageKeys.ApiTokenReauthUnavailable] = "无法开始重新认证。SAML 已被禁用，或此会话不是通过 SAML 创建的。",
             [ServerMessageKeys.ApiTokenNotFound] = "未找到该 API 密钥。",
             [ServerMessageKeys.ResponseNotificationMailSubject] = "问卷有新的回答",
             [ServerMessageKeys.ResponseNotificationMailBody] = "问卷“{0}”收到了 {1} 条新回答。\n"
@@ -360,6 +364,8 @@ public static class ServerMessages
             [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "La lista de orígenes permitidos admite hasta {0} entradas CIDR (por ejemplo, 203.0.113.0/24). Compruebe el formato.",
             [ServerMessageKeys.ApiTokenLimitReached] = "Cada persona puede tener hasta {0} claves de API activas. Revoque primero una que ya no necesite.",
             [ServerMessageKeys.ApiTokenReloginRequired] = "Los administradores que iniciaron sesión con SSO deben volver a iniciar sesión y emitir la clave en un plazo de {0} minutos.",
+            [ServerMessageKeys.ApiTokenReauthRequired] = "Los administradores que iniciaron sesión con SSO (SAML) deben volver a autenticarse en el IdP. Use el botón de reautenticación de la pantalla y emita la clave en un plazo de {0} minutos.",
+            [ServerMessageKeys.ApiTokenReauthUnavailable] = "No se puede iniciar la reautenticación. SAML está deshabilitado o esta sesión no se creó mediante SAML.",
             [ServerMessageKeys.ApiTokenNotFound] = "No se encontró esa clave de API.",
             [ServerMessageKeys.ResponseNotificationMailSubject] = "Nuevas respuestas de encuesta",
             [ServerMessageKeys.ResponseNotificationMailBody] = "La encuesta \"{0}\" recibió {1} respuesta(s) nueva(s).\n"
@@ -497,6 +503,8 @@ public static class ServerMessages
             [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "Die Liste zulässiger Quelladressen nimmt bis zu {0} CIDR-Einträge an (z. B. 203.0.113.0/24). Prüfen Sie das Format.",
             [ServerMessageKeys.ApiTokenLimitReached] = "Jede Person kann bis zu {0} aktive API-Schlüssel haben. Widerrufen Sie zuerst einen nicht mehr benötigten.",
             [ServerMessageKeys.ApiTokenReloginRequired] = "Mit SSO angemeldete Administratoren müssen sich erneut anmelden und den Schlüssel innerhalb von {0} Minuten ausstellen.",
+            [ServerMessageKeys.ApiTokenReauthRequired] = "Mit SSO (SAML) angemeldete Administratoren müssen sich beim IdP erneut authentifizieren. Verwenden Sie die Schaltfläche zur erneuten Authentifizierung und stellen Sie den Schlüssel innerhalb von {0} Minuten aus.",
+            [ServerMessageKeys.ApiTokenReauthUnavailable] = "Die erneute Authentifizierung kann nicht gestartet werden. SAML ist deaktiviert oder diese Sitzung wurde nicht über SAML erstellt.",
             [ServerMessageKeys.ApiTokenNotFound] = "Dieser API-Schlüssel wurde nicht gefunden.",
             [ServerMessageKeys.ResponseNotificationMailSubject] = "Neue Umfrageantworten",
             [ServerMessageKeys.ResponseNotificationMailBody] = "Die Umfrage „{0}“ hat {1} neue Antwort(en) erhalten.\nZeitraum (UTC): {2} bis {3}\n\nZeigen Sie den Antwortinhalt in Pleasanter an.",
@@ -835,6 +843,18 @@ public static class ServerMessages
             "SSO で入った管理者は、直前（{0} 分以内）にログインし直してから発行してください。",
             "Administrators who signed in with SSO must sign in again, then issue the key within {0} minutes.",
             "Quản trị viên đăng nhập bằng SSO phải đăng nhập lại, rồi phát hành khóa trong vòng {0} phút.");
+
+        Add(
+            ServerMessageKeys.ApiTokenReauthRequired,
+            "SSO（SAML）で入った管理者は、IdP で再認証が必要です。画面の再認証のボタンから認証し直し、{0} 分以内に発行してください。",
+            "Administrators who signed in with SSO (SAML) must re-authenticate at the IdP. Use the re-authenticate button on the page, then issue the key within {0} minutes.",
+            "Quản trị viên đăng nhập bằng SSO (SAML) phải xác thực lại tại IdP. Hãy dùng nút xác thực lại trên màn hình, rồi phát hành khóa trong vòng {0} phút.");
+
+        Add(
+            ServerMessageKeys.ApiTokenReauthUnavailable,
+            "再認証を始められません。SAML が無効になっているか、このセッションは SAML で入ったものではありません。",
+            "Re-authentication cannot start. SAML is disabled, or this session was not created through SAML.",
+            "Không thể bắt đầu xác thực lại. SAML đã bị tắt hoặc phiên này không được tạo qua SAML.");
 
         Add(
             ServerMessageKeys.ApiTokenNotFound,

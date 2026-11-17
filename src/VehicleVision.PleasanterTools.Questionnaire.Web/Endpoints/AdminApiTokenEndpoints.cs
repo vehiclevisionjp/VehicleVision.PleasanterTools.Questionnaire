@@ -52,7 +52,6 @@ public static class AdminApiTokenEndpoints
         {
             var role = principal.FindFirstValue(ClaimTypes.Role);
             var list = await service.ListAsync(ActorId(principal), cancellationToken).ConfigureAwait(false);
-            var viaSso = IsSsoSession(principal);
 
             return Results.Ok(new
             {
@@ -63,8 +62,9 @@ public static class AdminApiTokenEndpoints
                 defaultExpiresInDays = service.Options.DefaultDays,
                 maxExpiresInDays = service.Options.MaxDays,
                 maxIpAllowListEntries = AdminApiTokenOptions.MaxIpAllowListEntries,
-                // 本人確認の手段。**SSO の管理者はパスワードを持たないので、直前の再ログイン**
-                reauthentication = viaSso ? "relogin" : "password",
+                // 本人確認の手段。**SSO の管理者はパスワードを持たない。**
+                // SAML は強制再認証（ForceAuthn。Issue #1034）、Pleasanter のログインは直前の再ログイン
+                reauthentication = IsSamlSession(principal) ? "saml-force" : IsSsoSession(principal) ? "relogin" : "password",
                 reloginMinutes = (int)service.Options.ReloginWindow.TotalMinutes,
                 tokens = list.Select(token => View(token, time.GetUtcNow().UtcDateTime)).ToList(),
             });
@@ -76,16 +76,28 @@ public static class AdminApiTokenEndpoints
             HttpContext context,
             ClaimsPrincipal principal,
             AdminApiTokenService service,
+            SamlReauthService samlReauth,
             IAdminSessionStore sessions,
             CancellationToken cancellationToken) =>
         {
             var language = RequestLanguage.Of(context);
             var ownerId = ActorId(principal);
 
-            // **本人確認の手段。** SSO で入った管理者はパスワードを持たない（JIT で作る）ので、直前の再ログインを求める。
-            // それ以外はパスワードを確かめ直す
+            // **本人確認の手段。** SSO で入った管理者はパスワードを持たない（JIT で作る）。
+            // SAML は IdP での強制再認証（ForceAuthn）の許可を 1 回分だけ使う（Issue #1034）。
+            // Pleasanter のログインは、直前の再ログインを求める。それ以外はパスワードを確かめ直す
             AdminApiTokenReauthentication reauthentication;
-            if (IsSsoSession(principal))
+            if (IsSamlSession(principal))
+            {
+                // ⚠️ **セッション ID を取れなければ、許可は無いものとして断る**（通す方向に倒さない）
+                var handle = principal.FindFirstValue(AdminSessionManager.SessionIdClaim) is { Length: > 0 } sessionId
+                    ? sessions.HandleOf(sessionId)
+                    : null;
+                reauthentication = new AdminApiTokenReauthentication.SamlForced(
+                    async token => handle is not null
+                        && await samlReauth.TryConsumeGrantAsync(ownerId, handle, token).ConfigureAwait(false));
+            }
+            else if (IsSsoSession(principal))
             {
                 var createdAt = await SessionCreatedAtAsync(principal, ownerId, sessions, cancellationToken)
                     .ConfigureAwait(false);
@@ -307,6 +319,15 @@ public static class AdminApiTokenEndpoints
                 new { message = Message(ServerMessageKeys.OperationTemporarilyLocked) },
                 statusCode: StatusCodes.Status423Locked),
 
+            AdminApiTokenIssueOutcome.ReauthenticationRequired => Results.Json(
+                new
+                {
+                    message = Message(
+                        ServerMessageKeys.ApiTokenReauthRequired, (int)options.ReloginWindow.TotalMinutes),
+                    code = "reauth-required",
+                },
+                statusCode: StatusCodes.Status403Forbidden),
+
             AdminApiTokenIssueOutcome.ReloginRequired => Results.Json(
                 new
                 {
@@ -338,6 +359,10 @@ public static class AdminApiTokenEndpoints
         // active / revoked / expired。**失効を優先**する（失効してから期限が来ても「失効」）
         status = token.RevokedAt is not null ? "revoked" : token.ExpiresAt <= nowUtc ? "expired" : "active",
     };
+
+    /// <summary>SAML で入ったセッションか（強制再認証の対象。Issue #1034）。</summary>
+    private static bool IsSamlSession(ClaimsPrincipal principal) =>
+        !string.IsNullOrEmpty(principal.FindFirstValue(AdminAuthSchemes.SamlNameIdClaim));
 
     /// <summary>SSO（SAML・Pleasanter のログイン）で入ったセッションか。</summary>
     private static bool IsSsoSession(ClaimsPrincipal principal) =>
