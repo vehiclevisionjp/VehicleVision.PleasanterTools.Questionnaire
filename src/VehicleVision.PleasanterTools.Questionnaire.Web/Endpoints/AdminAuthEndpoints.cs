@@ -47,6 +47,7 @@ public static class AdminAuthEndpoints
             IPleasanterSsoOptionsProvider pleasanterSsoProvider,
             AdminPasswordSignInPolicy passwordSignIn,
             AdminAuthOptions options,
+            AdminApiTokenOptions apiTokenOptions,
             BotMitigationOptionsProvider botOptionsProvider,
             IMailSettingsProvider mailSettings,
             ILoggerFactory loggerFactory,
@@ -154,6 +155,11 @@ public static class AdminAuthEndpoints
                     // **認証済みの相手にだけ返す**（構成の情報を未認証へ出さない）
                     mailEnabled = mailReady,
                     responseNotificationEnabled,
+
+                    // **API キー（個人トークン）の機能が有効か**（Issue #1025）。
+                    // 画面が、パスワード変更・2 要素の解除の確認ダイアログに「API キーも失効させる」を出すのに使う。
+                    // 認証済みの相手にだけ返す（構成の情報を未認証へ出さない）
+                    apiTokensEnabled = apiTokenOptions.Enabled,
 
                     // **試し送信の宛先は自分のログイン ID に固定する**（Issue #319）。
                     // 画面で先に理由を出すため、メールアドレスとして読めるかだけ返す。
