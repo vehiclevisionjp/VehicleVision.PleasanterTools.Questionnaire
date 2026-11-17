@@ -3,7 +3,9 @@ import {
   acceptConfirmation,
   cancelConfirmation,
   confirmAction,
+  confirmActionWithChoice,
   currentConfirmation,
+  setConfirmationChecked,
   handleConfirmationKeydown,
 } from './confirmation.svelte';
 
@@ -85,5 +87,61 @@ describe('確認ダイアログ', () => {
     await new Promise<void>((resolve) => queueMicrotask(resolve));
 
     expect(focus).toHaveBeenCalledOnce();
+  });
+});
+
+describe('チェックつきの確認（API キーも失効させる。Issue #1025）', () => {
+  const withCheckbox = {
+    ...options,
+    checkbox: { label: 'この人の API キーも失効させる', checked: true },
+  };
+
+  it('初期値は呼び出し側が決め、そのまま決定すると true が返る', async () => {
+    const result = confirmActionWithChoice(withCheckbox);
+
+    expect(currentConfirmation()?.checkbox).toEqual({
+      label: 'この人の API キーも失効させる',
+      checked: true,
+    });
+    acceptConfirmation();
+
+    await expect(result).resolves.toEqual({ confirmed: true, checked: true });
+  });
+
+  it('チェックを外して決定すると、外した状態が返る', async () => {
+    const result = confirmActionWithChoice(withCheckbox);
+
+    setConfirmationChecked(false);
+    acceptConfirmation();
+
+    await expect(result).resolves.toEqual({ confirmed: true, checked: false });
+  });
+
+  it('取消なら、チェックが入っていても実行しない（checked は false）', async () => {
+    const result = confirmActionWithChoice(withCheckbox);
+
+    cancelConfirmation();
+
+    await expect(result).resolves.toEqual({ confirmed: false, checked: false });
+  });
+
+  it('呼び出し側が渡したオブジェクトを書き換えない', async () => {
+    const checkbox = { label: 'x', checked: true };
+    const result = confirmActionWithChoice({ ...options, checkbox });
+
+    setConfirmationChecked(false);
+    acceptConfirmation();
+    await result;
+
+    expect(checkbox.checked).toBe(true);
+  });
+
+  it('チェックを添えない確認では、チェックの切り替えは何もしない', async () => {
+    const result = confirmAction(options);
+
+    setConfirmationChecked(true);
+    acceptConfirmation();
+
+    await expect(result).resolves.toBe(true);
   });
 });

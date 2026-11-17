@@ -24,7 +24,9 @@
     roleLabel,
   } from '../lib/adminUsers';
   import AdminSessionList from './AdminSessionList.svelte';
-  import { confirmAction } from '../lib/confirmation.svelte';
+  import AdminUserApiTokens from './AdminUserApiTokens.svelte';
+  import { shouldOfferTokenRevoke } from '../lib/apiTokens';
+  import { confirmAction, confirmActionWithChoice } from '../lib/confirmation.svelte';
   import type { AdminUserRow, IssuedInvitation } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -35,16 +37,19 @@
     canWrite: boolean;
     /** 他人の 2 要素を解除できるか（`users.resetTwoFactor`）。 */
     canReset: boolean;
+    /** API キー（個人トークン）の機能が有効か（Issue #1025）。 */
+    apiTokensEnabled?: boolean;
     onback: () => void;
   }
 
-  let { ownAdminUserId, canWrite, canReset }: Props = $props();
+  let { ownAdminUserId, canWrite, canReset, apiTokensEnabled = false }: Props = $props();
 
   let users = $state<AdminUserRow[]>([]);
   let loading = $state(true);
   let error = $state('');
   let busy = $state('');
   let sessionsFor = $state('');
+  let apiTokensFor = $state('');
 
   /** 追加する相手。 */
   let newLoginId = $state('');
@@ -309,18 +314,24 @@
                     class="link danger"
                     disabled={busy !== ''}
                     onclick={async () => {
-                      if (
-                        !(await confirmAction({
-                          title: t('users.resetTwoFactor'),
-                          message: t('users.confirmResetTwoFactor', { loginId: user.loginId }),
-                          confirmLabel: t('users.resetTwoFactor'),
-                          danger: true,
-                        }))
-                      ) {
+                      // **「この人の API キーも失効させる」（初期値オン）**（Issue #1025）。
+                      // 相手のキーの有無は一覧に無いので、機能が有効なら常に出す
+                      const offerRevoke = shouldOfferTokenRevoke(apiTokensEnabled, null);
+                      const choice = await confirmActionWithChoice({
+                        title: t('users.resetTwoFactor'),
+                        message: t('users.confirmResetTwoFactor', { loginId: user.loginId }),
+                        confirmLabel: t('users.resetTwoFactor'),
+                        danger: true,
+                        checkbox: offerRevoke
+                          ? { label: t('apiTokens.revokeAlso'), checked: true }
+                          : undefined,
+                      });
+                      if (!choice.confirmed) {
                         return;
                       }
+                      // チェックを出さないときは、サーバの既定（失効させる）に任せる
                       void run(`totp:${user.adminUserId}`, () =>
-                        resetAdminUserTwoFactor(user.adminUserId),
+                        resetAdminUserTwoFactor(user.adminUserId, offerRevoke ? choice.checked : true),
                       );
                     }}
                   >
@@ -337,6 +348,15 @@
                   >
                     {t('users.sessions')}
                   </button>
+                  <!-- **発行はできない。** 一覧（users.read）と失効（users.write）だけ -->
+                  <button
+                    type="button"
+                    class="link"
+                    onclick={() =>
+                      (apiTokensFor = apiTokensFor === user.adminUserId ? '' : user.adminUserId)}
+                  >
+                    {t('users.apiTokens')}
+                  </button>
                 {/if}
               </td>
             </tr>
@@ -344,6 +364,13 @@
               <tr>
                 <td colspan="6">
                   <AdminSessionList adminUserId={user.adminUserId} canRevoke={canWrite} />
+                </td>
+              </tr>
+            {/if}
+            {#if apiTokensFor === user.adminUserId}
+              <tr>
+                <td colspan="6">
+                  <AdminUserApiTokens adminUserId={user.adminUserId} canRevoke={canWrite} />
                 </td>
               </tr>
             {/if}

@@ -976,6 +976,12 @@ export interface AdminSession {
   /** パスワードログインと招待受取に proof-of-work が必要か（Issue #252）。 */
   captchaEnabled?: boolean;
 
+  /**
+   * API キー（個人トークン）の機能が有効か（Issue #1025）。**認証済みのときだけ載る。**
+   * 確認ダイアログに「API キーも失効させる」を出すかの判断に使う。
+   */
+  apiTokensEnabled?: boolean;
+
   /** SAML の釦に出す文字。`null` なら決まった文言を使う */
   samlLabel?: string | null;
 
@@ -1028,6 +1034,53 @@ export interface AdminSession {
    * **画面の初期値を決めるためのもの**（`_documents/多言語対応方針.md` 2 章）。
    */
   language?: string | null;
+}
+
+/** API キー（個人トークン）の状態（Issue #1025）。**失効を優先**する。 */
+export type ApiTokenStatus = 'active' | 'expired' | 'revoked';
+
+/**
+ * API キー（個人トークン）1 本分。**値もハッシュも含まない**（一覧・失効で見せてよい形）。
+ * ⚠️ サーバの JSON は `null` を省くので、日時・理由は「無い」ことがある。
+ */
+export interface ApiTokenRow {
+  adminApiTokenId: string;
+  name: string;
+  /** 識別用の接頭辞（`qat_` ＋ 8 文字）。 */
+  prefix: string;
+  scopes: string[];
+  ipAllowList: string[];
+  createdAt: string;
+  expiresAt: string;
+  revokedAt?: string | null;
+  /** `owner` / `administrator` / `ownerDisabled` / `passwordChanged` / `twoFactorReset` */
+  revokeReason?: string | null;
+  lastUsedAt?: string | null;
+  lastUsedIp?: string | null;
+  status: ApiTokenStatus;
+}
+
+/** 自分の API キーの一覧と、画面が出すための情報。 */
+export interface ApiTokenOverview {
+  /** 機能が有効か（既定は無効）。 */
+  enabled: boolean;
+  /** 発行できるか（有効かつ、発行できる役割）。 */
+  canIssue: boolean;
+  /** 付けられるスコープ（役割の権限と許可リストの積）。 */
+  issuableScopes: string[];
+  defaultExpiresInDays: number;
+  maxExpiresInDays: number;
+  maxIpAllowListEntries: number;
+  /** 本人確認の手段。`password` はパスワード、`relogin` は SSO の管理者の直前の再ログイン。 */
+  reauthentication: 'password' | 'relogin';
+  reloginMinutes: number;
+  tokens: ApiTokenRow[];
+}
+
+/** 発行の応答。⚠️ **`token`（平文）はこの応答にしか出ない。** 保存しているのはハッシュのみ。 */
+export interface IssuedApiToken {
+  token: string;
+  apiToken: ApiTokenRow;
 }
 
 /** サーバ側に残っているログイン済み端末 1 件。 */
