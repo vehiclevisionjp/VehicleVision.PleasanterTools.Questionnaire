@@ -149,7 +149,8 @@ jobs:
           set -euo pipefail
           # **mail プロファイルも起こす**（Issue #189）。自動返信の通しを確かめるため
           # **saml プロファイルも起こす**（Issue #190）。SAML の往復を確かめるため
-          DEV_MAIL_ENABLED=true DEV_SAML_ENABLED=true \
+          # **API キーの機能も有効にする**（Issue #1034）。SAML の強制再認証（ForceAuthn）を Keycloak で確かめるため
+          DEV_MAIL_ENABLED=true DEV_SAML_ENABLED=true DEV_ADMIN_API_TOKENS=enabled \
             docker compose --profile "$E2E_PROFILE" --profile mail --profile saml up -d --wait
 
       - name: in-process 試験専用の DB を作る

@@ -181,8 +181,10 @@ public static class AdminUserEndpoints
             HttpContext context,
             ClaimsPrincipal principal,
             AdminAuthenticator authenticator,
+            AdminApiTokenService apiTokens,
             IAdminUserStore store,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            AdminRevokeApiTokensRequest? request = null) =>
         {
             var language = RequestLanguage.Of(context);
 
@@ -217,8 +219,18 @@ public static class AdminUserEndpoints
 
             await authenticator.DisableTotpAsync(adminUserId, cancellationToken).ConfigureAwait(false);
 
+            // **その人の API キーも失効させるか**（確認ダイアログのチェック。本文が無ければ失効させる。Issue #1025）
+            var revokedApiTokens = await AdminApiTokenEndpoints.RevokeOnCredentialChangeAsync(
+                context,
+                apiTokens,
+                adminUserId,
+                ActorId(principal),
+                request?.RevokeApiTokens,
+                AdminApiTokenRevokeReasons.TwoFactorReset,
+                cancellationToken).ConfigureAwait(false);
+
             // **必須の設定なら、この人は次回ログイン時に登録へ回る**（未登録になるため）
-            return Results.Ok(new { reset = true });
+            return Results.Ok(new { reset = true, revokedApiTokens });
         }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersResetTwoFactor));
 
         // ---- 役割の変更 ------------------------------------------------------
@@ -266,6 +278,7 @@ public static class AdminUserEndpoints
             HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
+            AdminApiTokenService apiTokens,
             CancellationToken cancellationToken) =>
         {
             var outcome = await service.ChangeOwnPasswordAsync(
@@ -288,7 +301,17 @@ public static class AdminUserEndpoints
                     cancellationToken)
                 .ConfigureAwait(false);
             AuditNotes.SetTargets(context, "AdminSession", revoked);
-            return Results.Ok(new { changed = true, revokedSessions = revoked.Count });
+
+            // **この人の API キーも失効させるか**（確認ダイアログのチェック。指定が無ければ失効させる。Issue #1025）
+            var revokedApiTokens = await AdminApiTokenEndpoints.RevokeOnCredentialChangeAsync(
+                context,
+                apiTokens,
+                ActorId(principal),
+                ActorId(principal),
+                request.RevokeApiTokens,
+                AdminApiTokenRevokeReasons.PasswordChanged,
+                cancellationToken).ConfigureAwait(false);
+            return Results.Ok(new { changed = true, revokedSessions = revoked.Count, revokedApiTokens });
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
         // ---- 表示言語 --------------------------------------------------------
@@ -349,6 +372,7 @@ public static class AdminUserEndpoints
             ClaimsPrincipal principal,
             AdminUserService service,
             AdminAuthenticator authenticator,
+            AdminApiTokenService apiTokens,
             IAdminUserStore store,
             AdminAuthOptions options,
             CancellationToken cancellationToken) =>
@@ -385,7 +409,17 @@ public static class AdminUserEndpoints
             }
 
             await authenticator.DisableTotpAsync(actorId, cancellationToken).ConfigureAwait(false);
-            return Results.Ok(new { removed = true });
+
+            // **この人の API キーも失効させるか**（確認ダイアログのチェック。指定が無ければ失効させる。Issue #1025）
+            var revokedApiTokens = await AdminApiTokenEndpoints.RevokeOnCredentialChangeAsync(
+                context,
+                apiTokens,
+                actorId,
+                actorId,
+                request.RevokeApiTokens,
+                AdminApiTokenRevokeReasons.TwoFactorReset,
+                cancellationToken).ConfigureAwait(false);
+            return Results.Ok(new { removed = true, revokedApiTokens });
         }).RequireRateLimiting(AdminAuthSchemes.LoginRateLimitPolicy);
 
         // ---- 2 要素の登録し直し（端末を替えたとき） --------------------------
@@ -670,10 +704,25 @@ public static class AdminUserEndpoints
     public sealed record AdminRoleRequest(string? Role);
 
     /// <summary>今のパスワードと、新しいパスワード。</summary>
-    public sealed record AdminPasswordChangeRequest(string? CurrentPassword, string? NewPassword);
+    /// <param name="CurrentPassword">今のパスワード。</param>
+    /// <param name="NewPassword">新しいパスワード。</param>
+    /// <param name="RevokeApiTokens">
+    /// この人の API キー（個人トークン）も失効させるか。<b>省略すると失効させる</b>（確認ダイアログのチェックの初期値はオン）。
+    /// </param>
+    public sealed record AdminPasswordChangeRequest(
+        string? CurrentPassword,
+        string? NewPassword,
+        bool? RevokeApiTokens = null);
 
     /// <summary>今のパスワード。</summary>
-    public sealed record AdminPasswordRequest(string? Password);
+    /// <param name="Password">今のパスワード。</param>
+    /// <param name="RevokeApiTokens">
+    /// 2 要素の解除と一緒に、この人の API キーも失効させるか。<b>省略すると失効させる</b>。
+    /// </param>
+    public sealed record AdminPasswordRequest(string? Password, bool? RevokeApiTokens = null);
+
+    /// <summary>他人の 2 要素の解除と一緒に、その人の API キーも失効させるか。<b>省略すると失効させる</b>。</summary>
+    public sealed record AdminRevokeApiTokensRequest(bool? RevokeApiTokens);
 
     /// <summary>管理画面を出す言語。**空なら「選んでいない」に戻す。**</summary>
     public sealed record AdminLanguageRequest(string? Language);

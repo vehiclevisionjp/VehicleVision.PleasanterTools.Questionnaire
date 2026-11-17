@@ -15,12 +15,15 @@
     changeOwnPassword,
     completeOwnTotp,
     disableOwnTotp,
+    getOwnApiTokens,
     saveResponseNotification,
   } from '../lib/api';
   import AdminSessionList from './AdminSessionList.svelte';
+  import ApiTokenPanel from './ApiTokenPanel.svelte';
   import { twoFactorPolicyLabel } from '../lib/adminUsers';
-  import { confirmAction } from '../lib/confirmation.svelte';
-  import type { AdminSession } from '../lib/types';
+  import { activeTokenCount, shouldOfferTokenRevoke } from '../lib/apiTokens';
+  import { confirmActionWithChoice } from '../lib/confirmation.svelte';
+  import type { AdminSession, ApiTokenOverview } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
   interface Props {
@@ -68,6 +71,31 @@
     responseNotificationEnabled = session.responseNotificationEnabled ?? false;
   });
 
+  /** 自分の API キーの一覧と、発行の画面が出す情報（Issue #1025）。 */
+  let apiTokens = $state<ApiTokenOverview | null>(null);
+
+  $effect(() => {
+    void loadApiTokens();
+  });
+
+  async function loadApiTokens() {
+    const result = await getOwnApiTokens();
+    if (result.ok) {
+      apiTokens = result.value;
+    }
+  }
+
+  /**
+   * パスワード変更・2 要素の解除の確認に、「この人の API キーも失効させる」を添えるか（初期値オン）。
+   * **いま使えるキーがあるときだけ**（無ければ出しても意味が無い）。
+   */
+  const offerTokenRevoke = $derived(
+    shouldOfferTokenRevoke(
+      session.apiTokensEnabled,
+      apiTokens === null ? null : activeTokenCount(apiTokens.tokens),
+    ) && apiTokens !== null,
+  );
+
   async function submitPassword(event: SubmitEvent) {
     event.preventDefault();
     passwordError = '';
@@ -83,8 +111,24 @@
       return;
     }
 
+    // **使えるキーがあるときは確認を挟み、「API キーも失効させる」を選ばせる**（Issue #1025。初期値オン）。
+    // 無ければ、今までどおり確認なしで変える
+    let revokeApiTokens = true;
+    if (offerTokenRevoke) {
+      const choice = await confirmActionWithChoice({
+        title: t('account.changePassword'),
+        message: t('account.confirmChangePassword'),
+        confirmLabel: t('account.changePassword'),
+        checkbox: { label: t('apiTokens.revokeAlso'), checked: true },
+      });
+      if (!choice.confirmed) {
+        return;
+      }
+      revokeApiTokens = choice.checked;
+    }
+
     passwordBusy = true;
-    const result = await changeOwnPassword(currentPassword, newPassword);
+    const result = await changeOwnPassword(currentPassword, newPassword, revokeApiTokens);
     passwordBusy = false;
 
     if (!result.ok) {
@@ -96,6 +140,7 @@
     newPassword = '';
     confirmation = '';
     passwordMessage = t('account.passwordChanged');
+    void loadApiTokens();
   }
 
   async function begin(event: SubmitEvent) {
@@ -141,19 +186,20 @@
   async function disable() {
     totpError = '';
 
-    if (
-      !(await confirmAction({
-        title: t('account.disableTwoFactor'),
-        message: t('account.confirmDisableTwoFactor'),
-        confirmLabel: t('account.disableTwoFactor'),
-        danger: true,
-      }))
-    ) {
+    // **「この人の API キーも失効させる」（初期値オン）**（Issue #1025）
+    const choice = await confirmActionWithChoice({
+      title: t('account.disableTwoFactor'),
+      message: t('account.confirmDisableTwoFactor'),
+      confirmLabel: t('account.disableTwoFactor'),
+      danger: true,
+      checkbox: offerTokenRevoke ? { label: t('apiTokens.revokeAlso'), checked: true } : undefined,
+    });
+    if (!choice.confirmed) {
       return;
     }
 
     totpBusy = true;
-    const result = await disableOwnTotp(totpPassword);
+    const result = await disableOwnTotp(totpPassword, offerTokenRevoke ? choice.checked : true);
     totpBusy = false;
 
     if (!result.ok) {
@@ -163,6 +209,7 @@
 
     totpPassword = '';
     onchanged();
+    void loadApiTokens();
   }
 
   async function saveNotificationSetting() {
@@ -319,6 +366,9 @@
       </form>
     {/if}
   </div>
+
+  <!-- ---- API キー（個人トークン。Issue #1025）----------------------------- -->
+  <ApiTokenPanel overview={apiTokens} onchanged={loadApiTokens} />
 
   <div class="session-card">
     <AdminSessionList />

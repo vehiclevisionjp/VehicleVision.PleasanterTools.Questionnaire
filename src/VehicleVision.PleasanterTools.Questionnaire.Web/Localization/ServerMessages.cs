@@ -50,6 +50,18 @@ public static class ServerMessages
         [ServerMessageKeys.UnsupportedLanguage] = "지원하지 않는 언어입니다.",
         [ServerMessageKeys.AdminSessionNotFound] = "해당 세션을 찾을 수 없습니다.",
         [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "현재 사용 중인 세션은 여기서 종료할 수 없습니다. 대신 로그아웃하세요.",
+        [ServerMessageKeys.ApiTokenFeatureDisabled] = "API 키 기능이 비활성화되어 있습니다. 사용하려면 운영자에게 설정 활성화를 요청하세요.",
+        [ServerMessageKeys.ApiTokenRoleNotAllowed] = "현재 역할로는 API 키를 발급할 수 없습니다.",
+        [ServerMessageKeys.ApiTokenNameInvalid] = "이름을 1~100자로 입력하세요(제어 문자는 사용할 수 없습니다).",
+        [ServerMessageKeys.ApiTokenScopesInvalid] = "범위를 하나 이상 선택하세요. 부여할 수 있는 것은 surveys.read, surveys.write, surveys.publish뿐입니다.",
+        [ServerMessageKeys.ApiTokenScopeExceedsRole] = "자신의 역할에 없는 권한은 범위로 부여할 수 없습니다.",
+        [ServerMessageKeys.ApiTokenExpiryInvalid] = "유효 기간은 1~{0}일로 지정하세요(무기한으로 할 수 없습니다).",
+        [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "접속 허용 목록은 CIDR(예: 203.0.113.0/24)을 최대 {0}개까지 지정할 수 있습니다. 형식을 확인하세요.",
+        [ServerMessageKeys.ApiTokenLimitReached] = "사용 중인 API 키는 1인당 최대 {0}개입니다. 불필요한 키를 먼저 폐기하세요.",
+        [ServerMessageKeys.ApiTokenReloginRequired] = "SSO로 로그인한 관리자는 다시 로그인한 뒤 {0}분 이내에 발급하세요.",
+        [ServerMessageKeys.ApiTokenReauthRequired] = "SSO(SAML)로 로그인한 관리자는 IdP에서 다시 인증해야 합니다. 화면의 재인증 버튼으로 다시 인증한 뒤 {0}분 이내에 발급하세요.",
+        [ServerMessageKeys.ApiTokenReauthUnavailable] = "재인증을 시작할 수 없습니다. SAML이 비활성화되었거나 이 세션이 SAML로 만들어진 것이 아닙니다.",
+        [ServerMessageKeys.ApiTokenNotFound] = "해당 API 키를 찾을 수 없습니다.",
         [ServerMessageKeys.ResponseNotificationMailSubject] = "설문 조사에 새 답변이 있습니다",
         [ServerMessageKeys.ResponseNotificationMailBody] = "설문 조사 \"{0}\"에 새 답변이 {1}건 도착했습니다.\n집계 기간(UTC): {2} ~ {3}\n\n답변 내용은 Pleasanter에서 확인하세요.",
         [ServerMessageKeys.RemovedSurvey] = "삭제된 설문 조사",
@@ -214,6 +226,18 @@ public static class ServerMessages
             [ServerMessageKeys.UnsupportedLanguage] = "不支持该语言。",
             [ServerMessageKeys.AdminSessionNotFound] = "未找到该会话。",
             [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "无法在此结束当前使用的会话。请改为注销。",
+            [ServerMessageKeys.ApiTokenFeatureDisabled] = "API 密钥功能已关闭。如需使用，请请求运维人员启用该设置。",
+            [ServerMessageKeys.ApiTokenRoleNotAllowed] = "当前角色无法签发 API 密钥。",
+            [ServerMessageKeys.ApiTokenNameInvalid] = "请输入 1 到 100 个字符的名称（不能包含控制字符）。",
+            [ServerMessageKeys.ApiTokenScopesInvalid] = "请至少选择一个范围。只能授予 surveys.read、surveys.write 和 surveys.publish。",
+            [ServerMessageKeys.ApiTokenScopeExceedsRole] = "无法授予自己角色不具备的权限范围。",
+            [ServerMessageKeys.ApiTokenExpiryInvalid] = "有效期请设置为 1 到 {0} 天（不能设为永久）。",
+            [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "允许的来源地址列表最多可指定 {0} 条 CIDR（例如 203.0.113.0/24）。请检查格式。",
+            [ServerMessageKeys.ApiTokenLimitReached] = "每人最多可拥有 {0} 个有效的 API 密钥。请先吊销不再需要的密钥。",
+            [ServerMessageKeys.ApiTokenReloginRequired] = "通过 SSO 登录的管理员，请重新登录后在 {0} 分钟内签发。",
+            [ServerMessageKeys.ApiTokenReauthRequired] = "通过 SSO（SAML）登录的管理员需要在 IdP 重新认证。请使用页面上的重新认证按钮，并在 {0} 分钟内签发。",
+            [ServerMessageKeys.ApiTokenReauthUnavailable] = "无法开始重新认证。SAML 已被禁用，或此会话不是通过 SAML 创建的。",
+            [ServerMessageKeys.ApiTokenNotFound] = "未找到该 API 密钥。",
             [ServerMessageKeys.ResponseNotificationMailSubject] = "问卷有新的回答",
             [ServerMessageKeys.ResponseNotificationMailBody] = "问卷“{0}”收到了 {1} 条新回答。\n"
                 + "统计期间（UTC）：{2} ～ {3}\n\n"
@@ -341,6 +365,18 @@ public static class ServerMessages
             [ServerMessageKeys.UnsupportedLanguage] = "Ese idioma no es compatible.",
             [ServerMessageKeys.AdminSessionNotFound] = "No se encontró esa sesión.",
             [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "La sesión actual no se puede cerrar desde aquí. Cierre sesión en su lugar.",
+            [ServerMessageKeys.ApiTokenFeatureDisabled] = "Las claves de API están desactivadas. Pida a su operador que active la configuración primero.",
+            [ServerMessageKeys.ApiTokenRoleNotAllowed] = "Su rol no puede emitir claves de API.",
+            [ServerMessageKeys.ApiTokenNameInvalid] = "Escriba un nombre de 1 a 100 caracteres (no se permiten caracteres de control).",
+            [ServerMessageKeys.ApiTokenScopesInvalid] = "Seleccione al menos un ámbito. Solo se pueden conceder surveys.read, surveys.write y surveys.publish.",
+            [ServerMessageKeys.ApiTokenScopeExceedsRole] = "No puede conceder un ámbito que su propio rol no tiene.",
+            [ServerMessageKeys.ApiTokenExpiryInvalid] = "Establezca la caducidad entre 1 y {0} días (no se pueden crear claves permanentes).",
+            [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "La lista de orígenes permitidos admite hasta {0} entradas CIDR (por ejemplo, 203.0.113.0/24). Compruebe el formato.",
+            [ServerMessageKeys.ApiTokenLimitReached] = "Cada persona puede tener hasta {0} claves de API activas. Revoque primero una que ya no necesite.",
+            [ServerMessageKeys.ApiTokenReloginRequired] = "Los administradores que iniciaron sesión con SSO deben volver a iniciar sesión y emitir la clave en un plazo de {0} minutos.",
+            [ServerMessageKeys.ApiTokenReauthRequired] = "Los administradores que iniciaron sesión con SSO (SAML) deben volver a autenticarse en el IdP. Use el botón de reautenticación de la pantalla y emita la clave en un plazo de {0} minutos.",
+            [ServerMessageKeys.ApiTokenReauthUnavailable] = "No se puede iniciar la reautenticación. SAML está deshabilitado o esta sesión no se creó mediante SAML.",
+            [ServerMessageKeys.ApiTokenNotFound] = "No se encontró esa clave de API.",
             [ServerMessageKeys.ResponseNotificationMailSubject] = "Nuevas respuestas de encuesta",
             [ServerMessageKeys.ResponseNotificationMailBody] = "La encuesta \"{0}\" recibió {1} respuesta(s) nueva(s).\n"
                 + "Período (UTC): de {2} a {3}\n\n"
@@ -473,6 +509,18 @@ public static class ServerMessages
             [ServerMessageKeys.UnsupportedLanguage] = "Diese Sprache wird nicht unterstützt.",
             [ServerMessageKeys.AdminSessionNotFound] = "Diese Sitzung wurde nicht gefunden.",
             [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "Die aktuelle Sitzung kann hier nicht beendet werden. Melden Sie sich stattdessen ab.",
+            [ServerMessageKeys.ApiTokenFeatureDisabled] = "API-Schlüssel sind deaktiviert. Bitten Sie Ihren Betreiber, die Einstellung zuerst zu aktivieren.",
+            [ServerMessageKeys.ApiTokenRoleNotAllowed] = "Ihre Rolle kann keine API-Schlüssel ausstellen.",
+            [ServerMessageKeys.ApiTokenNameInvalid] = "Geben Sie einen Namen mit 1 bis 100 Zeichen ein (Steuerzeichen sind nicht erlaubt).",
+            [ServerMessageKeys.ApiTokenScopesInvalid] = "Wählen Sie mindestens einen Bereich. Nur surveys.read, surveys.write und surveys.publish können vergeben werden.",
+            [ServerMessageKeys.ApiTokenScopeExceedsRole] = "Sie können keinen Bereich vergeben, den Ihre eigene Rolle nicht besitzt.",
+            [ServerMessageKeys.ApiTokenExpiryInvalid] = "Legen Sie die Gültigkeit auf 1 bis {0} Tage fest (unbefristete Schlüssel sind nicht möglich).",
+            [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "Die Liste zulässiger Quelladressen nimmt bis zu {0} CIDR-Einträge an (z. B. 203.0.113.0/24). Prüfen Sie das Format.",
+            [ServerMessageKeys.ApiTokenLimitReached] = "Jede Person kann bis zu {0} aktive API-Schlüssel haben. Widerrufen Sie zuerst einen nicht mehr benötigten.",
+            [ServerMessageKeys.ApiTokenReloginRequired] = "Mit SSO angemeldete Administratoren müssen sich erneut anmelden und den Schlüssel innerhalb von {0} Minuten ausstellen.",
+            [ServerMessageKeys.ApiTokenReauthRequired] = "Mit SSO (SAML) angemeldete Administratoren müssen sich beim IdP erneut authentifizieren. Verwenden Sie die Schaltfläche zur erneuten Authentifizierung und stellen Sie den Schlüssel innerhalb von {0} Minuten aus.",
+            [ServerMessageKeys.ApiTokenReauthUnavailable] = "Die erneute Authentifizierung kann nicht gestartet werden. SAML ist deaktiviert oder diese Sitzung wurde nicht über SAML erstellt.",
+            [ServerMessageKeys.ApiTokenNotFound] = "Dieser API-Schlüssel wurde nicht gefunden.",
             [ServerMessageKeys.ResponseNotificationMailSubject] = "Neue Umfrageantworten",
             [ServerMessageKeys.ResponseNotificationMailBody] = "Die Umfrage „{0}“ hat {1} neue Antwort(en) erhalten.\nZeitraum (UTC): {2} bis {3}\n\nZeigen Sie den Antwortinhalt in Pleasanter an.",
             [ServerMessageKeys.RemovedSurvey] = "Gelöschte Umfrage",
@@ -759,6 +807,80 @@ public static class ServerMessages
             "現在使っているセッションはここから終了できません。ログアウトしてください。",
             "The current session cannot be ended here. Sign out instead.",
             "Không thể kết thúc phiên đang sử dụng tại đây. Vui lòng đăng xuất.");
+
+        // ---- 管理 API の個人トークン（API キー。Issue #1025） ----------------------
+
+        Add(
+            ServerMessageKeys.ApiTokenFeatureDisabled,
+            "API キーの機能は無効です。使うには、運用者が設定を有効にする必要があります。",
+            "API keys are turned off. Ask your operator to enable the setting first.",
+            "Tính năng khóa API đang tắt. Hãy yêu cầu người vận hành bật cài đặt trước.");
+
+        Add(
+            ServerMessageKeys.ApiTokenRoleNotAllowed,
+            "この役割では API キーを発行できません。",
+            "Your role cannot issue API keys.",
+            "Vai trò của bạn không thể phát hành khóa API.");
+
+        Add(
+            ServerMessageKeys.ApiTokenNameInvalid,
+            "名前を 1〜100 文字で入力してください（制御文字は使えません）。",
+            "Enter a name of 1 to 100 characters (control characters are not allowed).",
+            "Vui lòng nhập tên từ 1 đến 100 ký tự (không được dùng ký tự điều khiển).");
+
+        Add(
+            ServerMessageKeys.ApiTokenScopesInvalid,
+            "スコープを 1 つ以上選んでください。付けられるのは surveys.read・surveys.write・surveys.publish だけです。",
+            "Select at least one scope. Only surveys.read, surveys.write and surveys.publish can be granted.",
+            "Vui lòng chọn ít nhất một phạm vi. Chỉ có thể cấp surveys.read, surveys.write và surveys.publish.");
+
+        Add(
+            ServerMessageKeys.ApiTokenScopeExceedsRole,
+            "自分の役割が持たない権限は、スコープに付けられません。",
+            "You cannot grant a scope that your own role does not have.",
+            "Bạn không thể cấp phạm vi mà vai trò của chính bạn không có.");
+
+        Add(
+            ServerMessageKeys.ApiTokenExpiryInvalid,
+            "有効期限は 1〜{0} 日で指定してください（無期限にはできません）。",
+            "Set the expiry to between 1 and {0} days (keys cannot be made permanent).",
+            "Vui lòng đặt thời hạn từ 1 đến {0} ngày (không thể đặt vô thời hạn).");
+
+        Add(
+            ServerMessageKeys.ApiTokenIpAllowListInvalid,
+            "接続元の許可リストは、CIDR（例: 203.0.113.0/24）を最大 {0} 件まで指定できます。書き方を確認してください。",
+            "The allowed source list accepts up to {0} CIDR entries (for example 203.0.113.0/24). Check the format.",
+            "Danh sách nguồn kết nối được phép chấp nhận tối đa {0} mục CIDR (ví dụ 203.0.113.0/24). Vui lòng kiểm tra định dạng.");
+
+        Add(
+            ServerMessageKeys.ApiTokenLimitReached,
+            "使える API キーは 1 人 {0} 本までです。不要なものを失効させてから発行してください。",
+            "Each person can have up to {0} active API keys. Revoke one you no longer need first.",
+            "Mỗi người có tối đa {0} khóa API đang dùng. Hãy thu hồi khóa không cần trước.");
+
+        Add(
+            ServerMessageKeys.ApiTokenReloginRequired,
+            "SSO で入った管理者は、直前（{0} 分以内）にログインし直してから発行してください。",
+            "Administrators who signed in with SSO must sign in again, then issue the key within {0} minutes.",
+            "Quản trị viên đăng nhập bằng SSO phải đăng nhập lại, rồi phát hành khóa trong vòng {0} phút.");
+
+        Add(
+            ServerMessageKeys.ApiTokenReauthRequired,
+            "SSO（SAML）で入った管理者は、IdP で再認証が必要です。画面の再認証のボタンから認証し直し、{0} 分以内に発行してください。",
+            "Administrators who signed in with SSO (SAML) must re-authenticate at the IdP. Use the re-authenticate button on the page, then issue the key within {0} minutes.",
+            "Quản trị viên đăng nhập bằng SSO (SAML) phải xác thực lại tại IdP. Hãy dùng nút xác thực lại trên màn hình, rồi phát hành khóa trong vòng {0} phút.");
+
+        Add(
+            ServerMessageKeys.ApiTokenReauthUnavailable,
+            "再認証を始められません。SAML が無効になっているか、このセッションは SAML で入ったものではありません。",
+            "Re-authentication cannot start. SAML is disabled, or this session was not created through SAML.",
+            "Không thể bắt đầu xác thực lại. SAML đã bị tắt hoặc phiên này không được tạo qua SAML.");
+
+        Add(
+            ServerMessageKeys.ApiTokenNotFound,
+            "その API キーは見つかりません。",
+            "That API key was not found.",
+            "Không tìm thấy khóa API đó.");
 
         Add(
             ServerMessageKeys.ResponseNotificationMailSubject,

@@ -12,6 +12,9 @@ import type {
   AdminSession,
   AdminSessionRow,
   AdminUserRow,
+  ApiTokenOverview,
+  ApiTokenRow,
+  IssuedApiToken,
   IssuedInvitation,
   AttachmentRejectionPage,
   AuditLogFilter,
@@ -229,18 +232,27 @@ export const setAdminUserDisabled = (adminUserId: string, isDisabled: boolean) =
  * ⚠️ **保護を外す操作。** 操作の記録に残る。
  * **次に入るときは登録し直しになる**（方針が必須のとき）。
  */
-export const resetAdminUserTwoFactor = (adminUserId: string) =>
-  call<{ reset: boolean }>(`/api/admin/users/${adminUserId}/totp/reset`, {
-    method: 'POST',
-    json: {},
-  });
+export const resetAdminUserTwoFactor = (adminUserId: string, revokeApiTokens = true) =>
+  call<{ reset: boolean; revokedApiTokens: number }>(
+    `/api/admin/users/${adminUserId}/totp/reset`,
+    {
+      method: 'POST',
+      // **「その人の API キーも失効させる」のチェック**（Issue #1025。初期値はオン）
+      json: { revokeApiTokens },
+    },
+  );
 
 // ---- 自分のアカウント（Issue #156）--------------------------------------------
 
-export const changeOwnPassword = (currentPassword: string, newPassword: string) =>
-  call<{ changed: boolean }>('/api/admin/me/password', {
+export const changeOwnPassword = (
+  currentPassword: string,
+  newPassword: string,
+  revokeApiTokens = true,
+) =>
+  call<{ changed: boolean; revokedApiTokens: number }>('/api/admin/me/password', {
     method: 'POST',
-    json: { currentPassword, newPassword },
+    // **「この人の API キーも失効させる」のチェック**（Issue #1025。初期値はオン）
+    json: { currentPassword, newPassword, revokeApiTokens },
   });
 
 /** 自分の 2 要素を登録し直す（端末を替えたとき）。**パスワードの再確認つき。** */
@@ -262,11 +274,53 @@ export const completeOwnTotp = (code: string) =>
  * ⚠️ **必須にしている間は断られる**（設定を無視して保護を外せないため）。
  * **口は DELETE ではなく POST**（Issue #170。最小 API は DELETE の本文を推論しない）。
  */
-export const disableOwnTotp = (password: string) =>
-  call<{ removed: boolean }>('/api/admin/me/totp/disable', {
+export const disableOwnTotp = (password: string, revokeApiTokens = true) =>
+  call<{ removed: boolean; revokedApiTokens: number }>('/api/admin/me/totp/disable', {
     method: 'POST',
-    json: { password },
+    json: { password, revokeApiTokens },
   });
+
+// ---- API キー（個人トークン。Issue #1025）------------------------------------
+
+/** 自分の API キーの一覧と、発行の画面が出す情報。**値は含まない。** */
+export const getOwnApiTokens = () => call<ApiTokenOverview>('/api/admin/me/api-tokens');
+
+/** 発行の依頼。 */
+export interface ApiTokenIssueRequest {
+  name: string;
+  scopes: string[];
+  expiresInDays: number;
+  ipAllowList: string[];
+  /** パスワードの再確認（SSO の管理者は直前の再ログインなので不要）。 */
+  password?: string;
+}
+
+/**
+ * API キーを発行する。**平文を受け取れるのはこの応答だけ**（再表示はできない）。
+ * 呼び出し側は、値をログ・ストレージ・URL へ置かないこと。
+ */
+export const issueApiToken = (request: ApiTokenIssueRequest) =>
+  call<IssuedApiToken>('/api/admin/me/api-tokens', { method: 'POST', json: request });
+
+/**
+ * SAML の管理者が、API キーの発行の前に IdP での強制再認証（ForceAuthn）を始める（Issue #1034）。
+ * 返る `redirectUrl`（IdP へ向かう URL）へブラウザを移す。**戻り先は指定できない**（サーバが固定する）。
+ */
+export const startApiTokenReauth = () =>
+  call<{ redirectUrl: string }>('/api/admin/saml/reauth', { method: 'POST', json: {} });
+
+/** 他人の API キーの一覧（`users.read`）か、自分の一覧。 */
+export const listAdminUserApiTokens = (adminUserId: string) =>
+  call<{ tokens: ApiTokenRow[] }>(`/api/admin/users/${adminUserId}/api-tokens`);
+
+/** API キーを失効させる。`adminUserId` を渡すと他人のもの（`users.write`）。 */
+export const revokeApiToken = (adminApiTokenId: string, adminUserId?: string) =>
+  call<{ revoked: boolean }>(
+    adminUserId === undefined
+      ? `/api/admin/me/api-tokens/${adminApiTokenId}/revoke`
+      : `/api/admin/users/${adminUserId}/api-tokens/${adminApiTokenId}/revoke`,
+    { method: 'POST', json: {} },
+  );
 
 export const logout = () => call<{ signedOut: boolean }>('/api/admin/logout', { method: 'POST', json: {} });
 

@@ -18,6 +18,7 @@ internal static class AdminTestSupport
     /// </summary>
     private static readonly string[] Tables =
     [
+        "AdminApiTokens",
         "Core_AdminSessions",
         "Core_AdminInvitations",
         "Core_AdminRecoveryCodes",
