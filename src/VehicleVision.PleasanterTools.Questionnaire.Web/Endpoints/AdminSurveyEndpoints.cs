@@ -1455,6 +1455,18 @@ public static class AdminSurveyEndpoints
                 });
             }
 
+            // **受付期間は、終了が開始より後でなければ断る**（Issue #1006）。
+            // 逆転したまま保存すると、公開しているのに誰も回答できないアンケートができる
+            if (request.AcceptPeriod is { From: { } periodFrom, To: { } periodTo }
+                && periodTo <= periodFrom)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.AcceptPeriodInvalid, RequestLanguage.Of(context)),
+                });
+            }
+
             var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
                 .ConfigureAwait(false);
             if (record is null)
@@ -1466,6 +1478,15 @@ public static class AdminSurveyEndpoints
             {
                 return ArchivedSurvey(context);
             }
+
+            // **受付期間も「指定が無ければ今の値のまま」。** 指定があれば、
+            // 空の端は「その側の制限なし」として消す。DB へは UTC で持つ
+            var acceptFrom = request.AcceptPeriod is { } fromPeriod
+                ? fromPeriod.From?.UtcDateTime
+                : record.AcceptFrom;
+            var acceptTo = request.AcceptPeriod is { } toPeriod
+                ? toPeriod.To?.UtcDateTime
+                : record.AcceptTo;
 
             // **指定が無ければ今の値のまま**（Issue #66）。
             // `bool` で受けて既定値の `false` を書き込むと、
@@ -1488,6 +1509,8 @@ public static class AdminSurveyEndpoints
                         RequireProofOfWork = requireProofOfWork,
                         AllowDraft = allowDraft,
                         AllowEmbedding = allowEmbedding,
+                        AcceptFrom = acceptFrom,
+                        AcceptTo = acceptTo,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -1499,6 +1522,8 @@ public static class AdminSurveyEndpoints
                     requireProofOfWork,
                     allowDraft,
                     allowEmbedding,
+                    acceptFrom = AsUtc(acceptFrom),
+                    acceptTo = AsUtc(acceptTo),
                 });
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
@@ -2181,11 +2206,23 @@ public static class AdminSurveyEndpoints
     /// 回答画面を運用側が許可した親サイトへ埋め込んでよいか（Issue #334）。
     /// **<c>null</c> は「変えない」。既定は無効。**
     /// </param>
+    /// <param name="AcceptPeriod">
+    /// 受付期間（Issue #1006）。**<c>null</c>（項目ごと省略）は「変えない」。**
+    /// 項目があれば、<c>From</c>・<c>To</c> の空は「その側の制限なし」として保存する。
+    /// 期間外の回答は、理由を出さずに受け付けない（受付を止めたときと同じ扱い）。
+    /// </param>
     public sealed record SurveySettingsRequest(
         int? ResponseLimit,
         bool? RequireProofOfWork = null,
         bool? AllowDraft = null,
-        bool? AllowEmbedding = null);
+        bool? AllowEmbedding = null,
+        AcceptPeriodRequest? AcceptPeriod = null);
+
+    /// <summary>受付期間。時刻は UTC かオフセット付きで受け取り、UTC に直して保存する。</summary>
+    public sealed record AcceptPeriodRequest(DateTimeOffset? From, DateTimeOffset? To);
+
+    private static DateTime? AsUtc(DateTime? value) =>
+        value is { } time ? DateTime.SpecifyKind(time, DateTimeKind.Utc) : null;
 
     /// <summary>テスト公開まで変更できる Pleasanter サイト ID。</summary>
     public sealed record UpdateSiteIdRequest(long PleasanterSiteId);

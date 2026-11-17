@@ -207,6 +207,9 @@ public static class ServerMessageKeys
     /// <summary>回答数の上限に 0 以下を指定した。**上限を外すなら未指定にする。**</summary>
     public const string ResponseLimitMustBePositive = "surveys.responseLimitMustBePositive";
 
+    /// <summary>受付の終了日時が開始日時以前だった（Issue #1006）。</summary>
+    public const string AcceptPeriodInvalid = "surveys.acceptPeriodInvalid";
+
     /// <summary>
     /// 上限に達しているので再開できない。**受付数（`{0}`）と上限（`{1}`）を差し込む。**
     /// </summary>
