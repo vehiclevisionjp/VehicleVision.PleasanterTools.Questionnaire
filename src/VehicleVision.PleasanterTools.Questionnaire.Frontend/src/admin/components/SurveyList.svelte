@@ -48,6 +48,8 @@
     canUseTemplates?: boolean;
     /** 完全削除を出してよい相手か。**Administrator だけ。** */
     canDelete?: boolean;
+    /** テスト回答の削除（`surveys.deleteTestResponses`）。完全削除とは別の権限（Issue #1024） */
+    canDeleteTestResponses?: boolean;
   }
 
   let {
@@ -55,6 +57,7 @@
     canDuplicate = false,
     canUseTemplates = false,
     canDelete = false,
+    canDeleteTestResponses = false,
   }: Props = $props();
 
   let surveys = $state<SurveySummary[]>([]);
@@ -821,7 +824,7 @@
             <button type="button" class="secondary" onclick={() => changeArchive(survey)}>
               {survey.archivedAt == null ? t('archive.open') : t('archive.restore')}
             </button>
-            {#if canDelete && survey.testResponseCount > 0}
+            {#if canDeleteTestResponses && survey.testResponseCount > 0}
               <button
                 type="button"
                 class="secondary"
@@ -845,11 +848,12 @@
   </div>
 
   <!--
-    ⚠️ **印だけにしない。** Pleasanter 側のテスト回答を消せるのは、削除の権限を持つ
-    Administrator だけ（行の「テスト回答を削除」。Issue #1010）。
+    ⚠️ **印だけにしない。** Pleasanter 側のテスト回答を消せるのは、
+    surveys.deleteTestResponses（Administrator と SurveyAdministrator）を持つ人だけ
+    （行の「テスト回答を削除」。Issues #1010・#1024）。
     **消せない相手には、運用側へ頼む旨を文で残す**
   -->
-  {#if !canDelete && surveys.some((survey) => survey.testResponseCount > 0)}
+  {#if !canDeleteTestResponses && surveys.some((survey) => survey.testResponseCount > 0)}
     <p class="hint test-response-note">※ {t('list.testResponseCleanup')}</p>
   {/if}
 

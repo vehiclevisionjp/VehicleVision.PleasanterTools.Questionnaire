@@ -1194,7 +1194,8 @@ public static class AdminSurveyEndpoints
         //   **画面から ID を受け取らない**
         // - **画面が見せた件数（expectedCount）と今の件数が違えば、何も消さない**
         // - 消す前に 1 件ずつ取り出し、同じサイト・同じ ID・同じトークンを照合する
-        // - **特権管理者だけ**（`surveys.delete`）。操作は監査ログに残す
+        // - **特権管理者とアンケート管理者だけ**（`surveys.deleteTestResponses`。完全削除の
+        //   `surveys.delete` とは別。Issue #1024）。操作は監査ログに残す
         group.MapGet("/{surveyId:guid}/test-responses", async (
             Guid surveyId,
             TestResponseCleaner cleaner,
@@ -1205,7 +1206,7 @@ public static class AdminSurveyEndpoints
                 ? Results.NotFound()
                 : Results.Ok(new { deletable, maxPerRun = TestResponseCleaner.MaxPerRun });
         })
-            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysDelete));
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysDeleteTestResponses));
 
         group.MapPost("/{surveyId:guid}/test-responses/delete", async (
             Guid surveyId,
@@ -1274,7 +1275,7 @@ public static class AdminSurveyEndpoints
                 }),
             };
         })
-            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysDelete));
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysDeleteTestResponses));
 
         group.MapPost("/{surveyId:guid}/edit-links/revoke", async (
             Guid surveyId,

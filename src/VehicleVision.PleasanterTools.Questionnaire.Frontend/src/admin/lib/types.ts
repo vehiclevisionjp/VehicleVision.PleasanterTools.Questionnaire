@@ -794,6 +794,7 @@ export type AdminPermission =
   | 'surveys.write'
   | 'surveys.publish'
   | 'surveys.delete'
+  | 'surveys.deleteTestResponses'
   | 'lookups.manage'
   | 'templates.read'
   | 'templates.write'
