@@ -305,6 +305,177 @@ public static class AdminSurveyEndpoints
                 : Results.NotFound();
         }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
+        // ---- 書き出し（Issue #1009） -----------------------------------------
+        // **定義とマッピングだけを JSON にして返す。** 書き込み先・公開用 ID・公開状態・
+        // 資格情報・画像は入れない（`SurveyExchange`）。**秘密を持たないので、
+        // 閲覧できる人なら書き出せる**（画面で見えるものと同じ）
+        group.MapGet("/{surveyId:guid}/export", async (
+            Guid surveyId,
+            ISurveyDraftStore drafts,
+            CancellationToken cancellationToken) =>
+        {
+            var draft = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
+            if (draft is null)
+            {
+                return Results.NotFound();
+            }
+
+            var json = SurveyExchange.Export(draft.Definition, draft.Mapping);
+            return Results.File(
+                System.Text.Encoding.UTF8.GetBytes(json),
+                "application/json",
+                // **題名をファイル名へ入れない。** 日本語や記号が環境ごとに化ける
+                fileDownloadName: $"survey-{surveyId:N}.json");
+        });
+
+        // ---- 取り込み（公開と同じ権限） --------------------------------------
+        // **新しいアンケートの下書きとして作る。** 複製と同じく、書き込み先のサイトを
+        // 新しく決める操作なので、公開と同じ権限を要る。
+        // **公開前の検査と同じ検査を通す**（`PublishInspector`）。通らなければ 1 行も作らない
+        group.MapPost("/import", async (
+            ImportSurveyRequest request,
+            HttpContext context,
+            ISurveyRepository surveys,
+            ISurveyDraftStore drafts,
+            IAppSettingsProvider appSettings,
+            CancellationToken cancellationToken) =>
+        {
+            if (request.Document.ValueKind != System.Text.Json.JsonValueKind.Object)
+            {
+                return ImportInvalid(context, SurveyExchangeError.Malformed);
+            }
+
+            var parsed = SurveyExchange.Parse(request.Document.GetRawText());
+            if (parsed.Document is not { } document)
+            {
+                return ImportInvalid(context, parsed.Error ?? SurveyExchangeError.Malformed, parsed.Detail);
+            }
+
+            var surveyId = Guid.NewGuid();
+            var definition = SurveyExchange.ToDraft(document, surveyId.ToString());
+
+            // **保存の関所を迂回させない**（フォールバック言語・色・埋め込み先）
+            var embeds = EmbedOptions.FromSnapshot(
+                await appSettings.GetAsync(cancellationToken).ConfigureAwait(false));
+            if (DefinitionSaveRules.Check(definition, embeds) is { } violation)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(violation.MessageKey, RequestLanguage.Of(context)),
+                    fields = violation.Fields,
+                });
+            }
+
+            // **ルックアップの設定を持ち込めるのはアンケート管理者だけ**（保存と同じ。Issue #879）
+            if (!definition.GetLookups().IsEmpty
+                && !AdminPermissions.Has(
+                    context.User.FindFirstValue(ClaimTypes.Role), AdminPermissions.LookupsManage))
+            {
+                return Results.Json(
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.LookupSettingsForbidden, RequestLanguage.Of(context)),
+                    },
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var inspection = PublishInspector.Inspect(definition, document.Mapping);
+            var report = new
+            {
+                mapping = inspection.MappingProblems.Where(problem => problem.IsBlocking).Select(Describe),
+                warnings = inspection.MappingProblems.Where(problem => !problem.IsBlocking).Select(Describe),
+                flow = inspection.Flow.Select(problem => new
+                {
+                    code = problem.Code.ToString(),
+                    pageId = problem.PageId,
+                    questionId = problem.QuestionId,
+                    detail = problem.Detail,
+                }),
+                autoReply = inspection.AutoReply.Select(problem => new
+                {
+                    code = problem.Code.ToString(),
+                    detail = problem.Detail,
+                }),
+                settings = inspection.Settings.Select(problem => new
+                {
+                    code = problem.Code.ToString(),
+                    questionId = problem.QuestionId,
+                    detail = problem.Detail,
+                }),
+                lookups = inspection.LookupStructure.Select(problem => new
+                {
+                    lookupId = problem.LookupId,
+                    code = problem.Code.ToString(),
+                    detail = problem.Detail,
+                }),
+                assetTicketDaysInvalid = inspection.AssetTicketDaysInvalid,
+                noAnswerableQuestion = inspection.NoAnswerableQuestion,
+                // **画像は運ばない。** 記法が指す画像は取り込み先に無いので、知らせる
+                omittedAssetReferences = SurveyAssetReferences.ReferencedAssetIds(definition).Count,
+            };
+
+            if (inspection.HasBlocking)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.SurveyImportBlocked, RequestLanguage.Of(context)),
+                    problems = report,
+                });
+            }
+
+            // **検査だけ**（取り込む前の確認）。何も作らない
+            if (request.DryRun)
+            {
+                return Results.Ok(new { valid = true, problems = report });
+            }
+
+            if (request.PleasanterSiteId <= 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PleasanterSiteIdRequired, RequestLanguage.Of(context)),
+                });
+            }
+
+            var title = definition.Title.Get(LocalizedText.DefaultLanguage).Trim();
+            var record = new SurveyRecord(
+                surveyId,
+                // **公開用 ID は新しく作る**（_documents/データモデル設計.md 3 章）
+                SurveyPublicId.Generate(),
+                title.Length == 0 ? surveyId.ToString() : title,
+                request.PleasanterSiteId,
+                string.IsNullOrWhiteSpace(request.ResponseJsonColumn)
+                    ? null
+                    : request.ResponseJsonColumn.Trim(),
+                (int)SurveyStatus.Draft,
+                PublishedVersion: null);
+
+            await surveys.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+            await drafts.SaveAsync(
+                surveyId, definition, document.Mapping, expectedRevision: 0, cancellationToken)
+                .ConfigureAwait(false);
+
+            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+            return Results.Created(
+                $"{context.Request.PathBase}/api/admin/surveys/{surveyId}",
+                new { surveyId, record.PublicId, problems = report });
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
+            .AddEndpointFilter(async (filterContext, next) =>
+            {
+                // **大きさを入口で絞る。** 既定の上限のまま JSON を読み切らない
+                var feature = filterContext.HttpContext.Features.Get<IHttpMaxRequestBodySizeFeature>();
+                if (feature is { IsReadOnly: false })
+                {
+                    feature.MaxRequestBodySize = SurveyExchange.MaxBytes + (64 * 1024);
+                }
+
+                return await next(filterContext);
+            });
+
         // ---- 下書きを読む ----------------------------------------------------
         group.MapGet("/{surveyId:guid}", async (
             Guid surveyId,
@@ -653,53 +824,16 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            if (!SupportedLanguages.All.Contains(
-                request.Definition.FallbackLanguage, StringComparer.Ordinal))
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.FallbackLanguageUnsupported, RequestLanguage.Of(context)),
-                    fields = new[] { "fallbackLanguage" },
-                });
-            }
-
-            // **色は形を検査してからでないと通さない**（Issue #56）。
-            // 画面の色欄は `#rrggbb` しか作れないので、ここへ形の違う値が来るのは
-            // **画面を通さずに送られたとき。** 黙って捨てず、断って気付かせる。
-            // **保存させない側に倒す。** 設問の不備（公開のときに弾く）と違い、
-            // これは直しようのある入力の誤りではなく、**画面が作り得ない値**
-            var invalidColors = request.Definition.Theme?.InvalidColors() ?? [];
-            if (!invalidColors.IsEmpty)
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.ThemeColorInvalid, RequestLanguage.Of(context)),
-                    fields = invalidColors,
-                });
-            }
-
-            // **許していない配信元は保存させない**（Issue #104 / #107）。
-            // **埋め込みは回答者の IP・時刻・User-Agent を第三者へ渡す。**
-            // 完全匿名を掲げている以上、どこへ渡るかを運用側が決められないと成り立たない。
-            // **公開のときではなく保存のときに弾く。** 設問の不備と違い、
-            // これは直せば通る類ではなく、**運用側が許していない相手**なので、
-            // 「保存はできたが公開できない」より、その場で断る方が早く分かる
+            // **保存の関所は取り込み（Issue #1009）と共通。** フォールバック言語・色の形・
+            // 許していない埋め込み先を、保存のときにその場で断る（`DefinitionSaveRules`）
             var embeds = EmbedOptions.FromSnapshot(
                 await appSettings.GetAsync(cancellationToken).ConfigureAwait(false));
-            var blockedEmbeds = request.Definition.AllQuestions
-                .Where(question => question.Type == QuestionType.Embed)
-                .Where(question => !embeds.IsAllowed(question.Settings.Embed?.Url))
-                .Select(question => question.QuestionId)
-                .ToArray();
-            if (blockedEmbeds.Length > 0)
+            if (DefinitionSaveRules.Check(request.Definition, embeds) is { } violation)
             {
                 return Results.BadRequest(new
                 {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.EmbedHostNotAllowed, RequestLanguage.Of(context)),
-                    fields = blockedEmbeds,
+                    message = ServerMessages.Get(violation.MessageKey, RequestLanguage.Of(context)),
+                    fields = violation.Fields,
                 });
             }
 
@@ -1048,12 +1182,10 @@ public static class AdminSurveyEndpoints
 
             // **公開のときだけ拒否する。** 壊れた定義で回答を受け付けると、
             // 受け付けた回答が Pleasanter へ届かないまま溜まる
-            var problems = MappingValidator.Validate(
-                draft.Mapping,
-                draft.Definition,
-                null,
-                PleasanterColumn.IsAttachment,
-                column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind);
+            // **取り込み（Issue #1009）と同じ検査を通す。** 定義だけで決まる検査は
+            // `PublishInspector` に 1 つだけ置き、片方に検査を足し漏らさない
+            var inspection = PublishInspector.Inspect(draft.Definition, draft.Mapping);
+            var problems = inspection.MappingProblems;
             var blocking = problems.Where(problem => problem.IsBlocking).ToList();
             if (draft.AssetHistorySiteId > 0)
             {
@@ -1093,7 +1225,7 @@ public static class AdminSurveyEndpoints
             // **分岐が壊れたまま公開しない**（Issue #41）。
             // 無限に回る・辿り着けないページがある、といった不備は
             // **公開してからでは回答者にしか見えない**
-            var flowProblems = SurveyFlowValidator.Validate(draft.Definition);
+            var flowProblems = inspection.Flow;
             if (flowProblems.Length > 0)
             {
                 return Results.BadRequest(new
@@ -1113,7 +1245,7 @@ public static class AdminSurveyEndpoints
             // **送れない自動返信のまま公開しない**（Issue #189）。
             // 有効にしたのに宛先が無い・件名が空だと、**送ったつもりで 1 通も出ない。**
             // 気付くのは回答者から問い合わせが来たときになる
-            var autoReplyProblems = AutoReplyValidator.Validate(draft.Definition);
+            var autoReplyProblems = inspection.AutoReply;
             if (autoReplyProblems.Length > 0)
             {
                 return Results.BadRequest(new
@@ -1128,11 +1260,7 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            if (draft.Definition.AssetDelivery is
-                {
-                    Expiration: AssetTicketExpiration.DaysAfterResponse,
-                    Days: < 1 or > AssetDeliverySettings.MaxDays,
-                })
+            if (inspection.AssetTicketDaysInvalid)
             {
                 return Results.BadRequest(new
                 {
@@ -1144,7 +1272,7 @@ public static class AdminSurveyEndpoints
                         {
                             code = "AssetTicketDaysInvalid",
                             questionId = (string?)null,
-                            detail = draft.Definition.AssetDelivery.Days.ToString(
+                            detail = (draft.Definition.AssetDelivery?.Days ?? 0).ToString(
                                 System.Globalization.CultureInfo.InvariantCulture),
                         },
                     },
@@ -1153,7 +1281,7 @@ public static class AdminSurveyEndpoints
 
             // **答えようのない設問のまま公開しない**（Issue #101）。
             // 「5 つの選択肢から 7 つ選べ」は回答者が何をしても通らない
-            var settingsProblems = QuestionSettingsValidator.Validate(draft.Definition);
+            var settingsProblems = inspection.Settings;
             if (settingsProblems.Length > 0)
             {
                 return Results.BadRequest(new
@@ -1190,7 +1318,7 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            if (draft.Definition.AllQuestions.All(question => question.IsDisplayOnly))
+            if (inspection.NoAnswerableQuestion)
             {
                 return Results.BadRequest(new
                 {
@@ -1677,6 +1805,18 @@ public static class AdminSurveyEndpoints
 
         return Results.Ok(new { archivedAt });
     }
+
+    private static IResult ImportInvalid(
+        HttpContext context,
+        SurveyExchangeError error,
+        string? detail = null) =>
+        Results.BadRequest(new
+        {
+            message = ServerMessages.Get(
+                ServerMessageKeys.SurveyImportInvalid, RequestLanguage.Of(context)),
+            code = error.ToString(),
+            detail,
+        });
 
     private static IResult ArchivedSurvey(HttpContext context) =>
         Results.Conflict(new
@@ -2201,4 +2341,15 @@ public static class AdminSurveyEndpoints
         int Revision,
         long AssetHistorySiteId = 0,
         MappingDefinition? AssetHistoryMapping = null);
+
+    /// <summary>取り込みの要求（Issue #1009）。</summary>
+    /// <param name="Document">書き出した JSON（<c>SurveyExchange</c> の入れ物）。</param>
+    /// <param name="PleasanterSiteId">書き込み先のサイト。**入れ物には入っていないので指定させる。**</param>
+    /// <param name="ResponseJsonColumn">回答 JSON の正本を入れる列。**サイトに紐づく値なので入れ物に無い。**</param>
+    /// <param name="DryRun"><c>true</c> なら検査だけで、何も作らない。</param>
+    public sealed record ImportSurveyRequest(
+        System.Text.Json.JsonElement Document,
+        long PleasanterSiteId,
+        string? ResponseJsonColumn,
+        bool DryRun = false);
 }

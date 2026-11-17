@@ -174,6 +174,14 @@ public static class ServerMessageKeys
     /// </summary>
     public const string SurveyIsTemplate = "surveys.isTemplate";
 
+    // ---- 書き出し・取り込み（Issue #1009） ----------------------------------
+
+    /// <summary>取り込む JSON を読めない（形・種類・版・大きさ・識別子）。</summary>
+    public const string SurveyImportInvalid = "surveys.importInvalid";
+
+    /// <summary>取り込む定義に、公開前の検査で止まる不備がある。</summary>
+    public const string SurveyImportBlocked = "surveys.importBlocked";
+
     // ---- テンプレート -------------------------------------------------------
 
     /// <summary>テンプレートの元にするアンケートを指定していない。</summary>
