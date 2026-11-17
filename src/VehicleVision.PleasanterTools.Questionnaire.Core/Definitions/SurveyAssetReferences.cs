@@ -5,6 +5,15 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 /// <summary>定義の記法から参照される自前資産を調べる。</summary>
 public static class SurveyAssetReferences
 {
+    /// <summary>定義の記法が参照している資産の識別子（重複なし）。</summary>
+    /// <remarks>書き出し・取り込みが「資産は運ばない」ことを伝えるために使う（Issue #1009）。</remarks>
+    public static IReadOnlyList<Guid> ReferencedAssetIds(SurveyDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+
+        return [.. Markups(definition).SelectMany(AssetIds).Distinct()];
+    }
+
     /// <summary>定義が指定した資産を参照しているか。</summary>
     public static bool Contains(SurveyDefinition definition, Guid assetId)
     {
