@@ -102,4 +102,16 @@ describe('文言の集合', () => {
       }
     }
   });
+
+  // **ルックアップの文言は 7 言語すべてに訳を置く。** 他の文言は訳が無いと en へ落ちるだけで済むが、
+  // ルックアップの文言（管理画面）は抜けを見逃さないよう、訳の抜けをテストで落とす
+  it('ルックアップの文言は 7 言語すべてにある', () => {
+    const isLookupKey = /^(lookupAdmin\.|editor\.tabLookups$|notifications\.(lookupId|kind\.Lookup))/;
+    const lookupKeys = Object.keys(ja).filter((key) => isLookupKey.test(key));
+    expect(lookupKeys.length).toBeGreaterThan(0);
+    for (const [language, catalog] of Object.entries(catalogs)) {
+      const missing = lookupKeys.filter((key) => !(key in catalog));
+      expect(missing, language).toEqual([]);
+    }
+  });
 });

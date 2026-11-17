@@ -556,6 +556,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "editor.tabs": "Bereiche",
   "editor.tabQuestions": "Fragen",
   "editor.tabMapping": "Zuordnung",
+  "editor.tabLookups": "Lookup",
   "editor.tabSettings": "Grundeinstellungen",
   "editor.tabExtras": "Darstellung und Auto-Antwort",
   "editor.tabPublish": "Veröffentlichung",

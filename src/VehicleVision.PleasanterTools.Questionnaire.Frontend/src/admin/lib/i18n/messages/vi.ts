@@ -556,6 +556,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "editor.tabs": "Thẻ",
   "editor.tabQuestions": "Câu hỏi",
   "editor.tabMapping": "Ánh xạ",
+  "editor.tabLookups": "Tra cứu",
   "editor.tabSettings": "Cài đặt cơ bản",
   "editor.tabExtras": "Giao diện và trả lời tự động",
   "editor.tabPublish": "Công khai",
