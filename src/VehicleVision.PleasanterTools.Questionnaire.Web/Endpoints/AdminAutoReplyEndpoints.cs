@@ -37,8 +37,7 @@ public static class AdminAutoReplyEndpoints
     {
         var group = builder.MapGroup("/api/admin/auto-reply")
             .WithTags("管理 API")
-            .RequireAuthorization(policy => policy.AddAuthenticationSchemes(AdminAuthSchemes.Session)
-                .RequireAuthenticatedUser());
+            .RequireAuthorization(AdminAuthSchemes.SessionPolicy);
 
         group.MapPost("/preview", async (
             AutoReplyPreviewRequest request,
