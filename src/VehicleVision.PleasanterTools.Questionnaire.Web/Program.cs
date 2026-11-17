@@ -171,7 +171,7 @@ if (MigrationCommand.IsRequested(args))
 }
 
 // ---- サービス --------------------------------------------------------------
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(AdminOpenApi.Configure);
 builder.Services.AddSingleton<IDbConnectionFactory>(
     new DbConnectionFactory(provider, connectionString));
 builder.Services.AddSingleton<IResponseOutbox, ResponseOutbox>();
@@ -1069,14 +1069,16 @@ if (monitoringToken is not null)
 
 if (openApiExposure.Enabled)
 {
-    app.MapOpenApi();
+    // **文書も画面も、ログイン済みの管理者にだけ返す**（Issue #1021）。
+    // 未認証には 401 を返し、API の一覧を出さない（同梱アセットも含めて同じ認可）
+    app.MapOpenApi().RequireAuthorization(AdminAuthSchemes.SessionPolicy);
     app.MapScalarApiReference((options, context) =>
     {
         // CDN の既定フォントと利用状況テレメトリーを止め、画面から第三者へ要求を出さない。
         options.DisableDefaultFonts().DisableTelemetry().DisableAgent().WithNonce(
             context.Items[SecurityHeadersMiddleware.ScalarCspNonceKey] as string
             ?? throw new InvalidOperationException("Scalar の CSP nonce を設定できなかった"));
-    });
+    }).RequireAuthorization(AdminAuthSchemes.SessionPolicy);
 }
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない。
