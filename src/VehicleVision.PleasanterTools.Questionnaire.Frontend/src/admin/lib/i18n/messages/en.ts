@@ -1067,6 +1067,22 @@ export const en: Record<MessageKey, string> = {
   'duplicate.jsonColumn': 'Column for the response JSON (optional)',
   'duplicate.submit': 'Duplicate',
   'duplicate.cancel': 'Cancel',
+  // ---- フォーム定義の書き出し・取り込み（Issue #1009） ----
+  'exchange.export': 'Export',
+  'exchange.exportHint':
+    'Saves the definition and mapping as JSON. The target site, publication state, credentials and images are not included.',
+  'exchange.open': 'Import',
+  'exchange.title': 'Import a survey definition',
+  'exchange.description':
+    'Creates a new draft survey from an exported JSON file. It is checked against the same rules as before publishing, and nothing is created if a problem is found. '
+    + 'Credentials and images are not imported; set them again afterwards if needed.',
+  'exchange.file': 'Exported JSON file',
+  'exchange.siteId': 'Pleasanter site ID to write to',
+  'exchange.jsonColumn': 'Column for the response JSON (optional)',
+  'exchange.submit': 'Import',
+  'exchange.fileRequired': 'Choose a JSON file.',
+  'exchange.fileUnreadable': 'The file could not be read as JSON.',
+  'exchange.problems': 'Problems found by the pre-publication checks: {codes}',
   // ---- 送信状況 -----------------------------------------------------------
   'outbox.open': 'Delivery',
   'outbox.title': 'Delivery status',

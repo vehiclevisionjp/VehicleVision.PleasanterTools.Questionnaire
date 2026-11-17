@@ -446,6 +446,26 @@ export const duplicateSurvey = (
     json: { pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
   });
 
+/**
+ * 書き出した JSON から、新しいアンケートを下書きとして取り込む（Issue #1009）。
+ *
+ * **書き込み先のサイトは書き出しに入っていない**ので、ここで指定する。
+ * **公開前の検査と同じ検査をサーバが行い、通らなければ 1 件も作らない。**
+ */
+export const importSurvey = (
+  document: unknown,
+  pleasanterSiteId: number,
+  responseJsonColumn?: string,
+) =>
+  call<{ surveyId: string; publicId: string }>('/api/admin/surveys/import', {
+    method: 'POST',
+    json: { document, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
+  });
+
+/** 書き出しのダウンロード先。**認証は cookie なので、リンクで開いてよい。** */
+export const surveyExportUrl = (surveyId: string) =>
+  appUrl(`/api/admin/surveys/${surveyId}/export`);
+
 // ---- テンプレート -----------------------------------------------------------
 
 /**
