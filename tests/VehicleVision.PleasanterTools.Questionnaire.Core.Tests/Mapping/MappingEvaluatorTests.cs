@@ -368,4 +368,35 @@ public class MappingEvaluatorTests
 
         Assert.Single(result.Problems);
     }
+
+    [Theory]
+    [InlineData("相談します", "100")]
+    [InlineData("  ", null)]
+    [InlineData("", null)]
+    public void 置換元の無いmapは空でなければ既定値を出す(string answer, string? expected)
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(ConverterOperations.Map, ("default", "100")),
+            new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [Answer.Of("q1", answer)], script: null);
+
+        Assert.Equal(
+            expected is null ? [] : new[] { expected },
+            result.Columns["Status"].ToArray());
+    }
+
+    [Fact]
+    public void 置換元の無いmapは未回答なら空を出す()
+    {
+        var mapping = Mapping(ColumnAssignment.Converted(
+            "Status",
+            MappingConverter.Of(ConverterOperations.Map, ("default", "100")),
+            new MappingSource("q1")));
+
+        var result = Evaluate(mapping, [], script: null);
+
+        Assert.Empty(result.Columns["Status"]);
+    }
 }
