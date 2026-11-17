@@ -14,9 +14,22 @@ internal static class LookupSiteInspector
     public static LookupSiteInspection Map(long siteId, JsonObject json)
     {
         if (json["Response"]?["Data"] is not JsonObject data
-            || data["SiteSettings"] is not JsonObject settings
             || !TryLong(data["SiteId"], out var returnedSiteId)
             || returnedSiteId != siteId)
+        {
+            return Fail(LookupSearchStatus.SourceInvalid, LookupSearchFailure.InvalidResponse);
+        }
+
+        // **サイトは読めたが設定が無い。** Pleasanter 1.5.10.0 以降は、サイトを管理できない利用者に
+        // SiteSettings を返さない（Issue #995）。壊れた応答とは分けて返す。
+        // **列の設定が分からないまま既定の列で補って通さない**（選択肢のある列を検索キーにすると全件が返る・
+        // Nullable でない数値列は 0 が空になる、といった不備を見逃すため）
+        if (data["SiteSettings"] is null)
+        {
+            return Fail(LookupSearchStatus.SourceInvalid, LookupSearchFailure.SiteSettingsHidden);
+        }
+
+        if (data["SiteSettings"] is not JsonObject settings)
         {
             return Fail(LookupSearchStatus.SourceInvalid, LookupSearchFailure.InvalidResponse);
         }

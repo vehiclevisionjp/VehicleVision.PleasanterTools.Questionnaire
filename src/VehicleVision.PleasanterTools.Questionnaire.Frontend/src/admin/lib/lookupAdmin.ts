@@ -231,6 +231,8 @@ export function inspectFailureKey(failure: string | null | undefined): MessageKe
       return 'lookupAdmin.failure.forbidden';
     case 'NotFound':
       return 'lookupAdmin.failure.notFound';
+    case 'SiteSettingsHidden':
+      return 'lookupAdmin.failure.settingsHidden';
     case 'CredentialMissing':
     case 'CredentialDisabled':
     case 'CredentialUndecryptable':

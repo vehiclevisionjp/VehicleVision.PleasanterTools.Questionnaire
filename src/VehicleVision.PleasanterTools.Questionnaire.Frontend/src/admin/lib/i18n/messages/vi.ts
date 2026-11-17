@@ -1324,6 +1324,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "lookupAdmin.problem.TargetColumnTypeIncompatible": "Loại cột không phù hợp với định dạng của câu hỏi đích.",
   "lookupAdmin.failure.unauthorized": "Khóa API không đúng hoặc tài khoản chuyên dụng đã bị vô hiệu hóa.",
   "lookupAdmin.failure.forbidden": "Tài khoản chuyên dụng không có quyền đọc.",
+  "lookupAdmin.failure.settingsHidden": "Không thể đọc định nghĩa trang (cài đặt cột) vì tài khoản chuyên dụng không có quyền quản lý trang. Từ Pleasanter 1.5.10.0, cài đặt trang không được trả về cho người dùng không có quyền quản lý.",
   "lookupAdmin.failure.notFound": "Không tìm thấy trang nguồn hoặc không có quyền đọc.",
   "lookupAdmin.failure.credential": "Không thể sử dụng khóa API chuyên dụng (chưa đăng ký, đã thu hồi hoặc không giải mã được).",
   "lookupAdmin.failure.config": "Không thể sử dụng cài đặt đích kết nối. Vui lòng liên hệ quản trị viên.",

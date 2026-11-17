@@ -1,5 +1,6 @@
 using VehicleVision.PleasanterTools.Questionnaire.Data;
 using VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Localization;
 using System.Text.Json.Nodes;
 using System.Collections.Immutable;
 using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
@@ -67,6 +68,29 @@ public class AdminSurveyListTests
         Assert.Null(query.TitleContains);
         Assert.Equal(0, query.Offset);
         Assert.False(query.IncludeArchived);
+    }
+
+    [Theory]
+    [InlineData("""{"Response":{"Data":{"SiteId":1,"Title":"x"}}}""", true)]
+    [InlineData("""{"Response":{"Data":{"SiteId":1,"SiteSettings":null}}}""", true)]
+    [InlineData("""{"Response":{"Data":{"SiteId":1,"SiteSettings":{"Columns":[]}}}}""", false)]
+    [InlineData("""{"Response":{}}""", false)]
+    public void GetSiteが設定を返さないことを見分ける(string json, bool expected)
+    {
+        // Pleasanter 1.5.10.0 は、サイトを管理できない利用者に SiteSettings を返さない（Issue #995）。
+        // Data 自体が無い応答（失敗）は「設定を隠された」とは見なさない
+        Assert.Equal(expected, AdminSurveyEndpoints.SiteSettingsHidden(JsonNode.Parse(json)));
+        Assert.False(AdminSurveyEndpoints.SiteSettingsHidden(null));
+    }
+
+    [Fact]
+    public void 設定を読めないときの文言は全言語にある()
+    {
+        foreach (var language in new[] { "ja", "en", "vi", "ko", "zh", "es", "de" })
+        {
+            var text = ServerMessages.Get(ServerMessageKeys.SiteSettingsNotReadable, language);
+            Assert.Contains("1.5.10.0", text, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

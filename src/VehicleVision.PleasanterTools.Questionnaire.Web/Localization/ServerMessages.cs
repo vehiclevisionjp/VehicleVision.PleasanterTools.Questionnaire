@@ -106,6 +106,7 @@ public static class ServerMessages
         [ServerMessageKeys.SettingFixedExternally] = "설정 “{0}”은(는) 외부 설정으로 고정되어 있어 화면에서 변경할 수 없습니다.",
         [ServerMessageKeys.ProofOfWorkRangeInvalid] = "proof-of-work의 탐색 하한은 탐색 상한 이하로 지정하세요.",
         [ServerMessageKeys.LinkedSitesUnreachable] = "연결된 사이트를 가져올 수 없습니다. 대상 사이트 ID와 API 키 사용자의 권한을 확인하세요.",
+        [ServerMessageKeys.SiteSettingsNotReadable] = "회답 저장 사이트의 설정을 읽을 수 없습니다. Pleasanter 1.5.10.0 이후는 사이트를 관리할 수 없는 API 키 사용자에게 사이트 설정을 반환하지 않습니다. API 키 사용자에게 이 사이트의 관리 권한을 부여하세요.",
         [ServerMessageKeys.FallbackLanguageUnsupported] = "대체 언어 코드가 지원되지 않는 언어입니다.",
         [ServerMessageKeys.PleasanterSiteWriteFailed] = "Pleasanter에서 사이트를 만들거나 업데이트할 수 없습니다. 권한과 설정을 확인하세요.",
         [ServerMessageKeys.SettingValueTooLong] = "{0}: {1}자 이내로 입력하세요.",
@@ -269,6 +270,7 @@ public static class ServerMessages
             [ServerMessageKeys.SettingFixedExternally] = "设置“{0}”由外部配置固定，无法在界面中更改。",
             [ServerMessageKeys.ProofOfWorkRangeInvalid] = "proof-of-work 的搜索下限必须小于或等于搜索上限。",
             [ServerMessageKeys.LinkedSitesUnreachable] = "无法获取链接目标的站点。请检查对方站点 ID 以及 API 密钥所属用户的权限。",
+            [ServerMessageKeys.SiteSettingsNotReadable] = "无法读取答复保存站点的设置。Pleasanter 1.5.10.0 及以后版本不会向无法管理该站点的 API 密钥用户返回站点设置。请为 API 密钥所属用户授予此站点的管理权限。",
             [ServerMessageKeys.FallbackLanguageUnsupported] = "指定的回退语言代码不是受支持的语言。",
             [ServerMessageKeys.PleasanterSiteWriteFailed] = "无法在 Pleasanter 中创建或更新站点。请检查权限和设置。",
             [ServerMessageKeys.SettingValueTooLong] = "{0}：请在 {1} 个字符以内输入。",
@@ -389,6 +391,7 @@ public static class ServerMessages
             [ServerMessageKeys.SettingFixedExternally] = "La configuración «{0}» está fijada por la configuración externa y no se puede cambiar desde la pantalla.",
             [ServerMessageKeys.ProofOfWorkRangeInvalid] = "El valor mínimo de búsqueda de proof-of-work no debe superar el máximo.",
             [ServerMessageKeys.LinkedSitesUnreachable] = "No se pudo obtener el sitio vinculado. Compruebe el ID del sitio de destino y los permisos del usuario de la clave de API.",
+            [ServerMessageKeys.SiteSettingsNotReadable] = "No se puede leer la configuración del sitio donde se guardan las respuestas. Pleasanter 1.5.10.0 y posteriores no devuelven la configuración del sitio a un usuario de clave de API que no puede administrarlo. Conceda al usuario de la clave de API el permiso de administración de este sitio.",
             [ServerMessageKeys.FallbackLanguageUnsupported] = "El código del idioma de reserva no es un idioma admitido.",
             [ServerMessageKeys.PleasanterSiteWriteFailed] = "No se pudo crear ni actualizar el sitio en Pleasanter. Compruebe los permisos y la configuración.",
             [ServerMessageKeys.SettingValueTooLong] = "{0}: introduzca {1} caracteres como máximo.",
@@ -508,6 +511,7 @@ public static class ServerMessages
             [ServerMessageKeys.SettingFixedExternally] = "Die Einstellung „{0}“ ist durch externe Konfiguration festgelegt und kann auf dem Bildschirm nicht geändert werden.",
             [ServerMessageKeys.ProofOfWorkRangeInvalid] = "Der untere Suchwert für Proof-of-Work darf den oberen nicht überschreiten.",
             [ServerMessageKeys.LinkedSitesUnreachable] = "Die verknüpfte Site konnte nicht abgerufen werden. Prüfen Sie die ID der Zielsite und die Berechtigungen des API-Schlüssel-Benutzers.",
+            [ServerMessageKeys.SiteSettingsNotReadable] = "Die Einstellungen der Antwort-Site können nicht gelesen werden. Pleasanter 1.5.10.0 und neuer geben einem API-Schlüssel-Benutzer, der die Site nicht verwalten darf, keine Site-Einstellungen zurück. Erteilen Sie dem API-Schlüssel-Benutzer die Verwaltungsberechtigung für diese Site.",
             [ServerMessageKeys.FallbackLanguageUnsupported] = "Der Code der Rückfallsprache ist keine unterstützte Sprache.",
             [ServerMessageKeys.PleasanterSiteWriteFailed] = "Die Site konnte in Pleasanter nicht erstellt oder aktualisiert werden. Prüfen Sie Berechtigungen und Einstellungen.",
             [ServerMessageKeys.SettingValueTooLong] = "{0}: Geben Sie höchstens {1} Zeichen ein.",
@@ -1089,6 +1093,12 @@ public static class ServerMessages
             "リンク先のサイトを引けませんでした。相手サイト ID か、API キーの利用者の権限を確認してください。",
             "The linked site could not be retrieved. Check the target site ID and the permissions of the API key's user.",
             "Không thể truy xuất trang được liên kết. Vui lòng kiểm tra ID trang đích và quyền của người dùng khóa API.");
+
+        Add(
+            ServerMessageKeys.SiteSettingsNotReadable,
+            "回答の保存先サイトの設定を読めません。Pleasanter 1.5.10.0 以降は、サイトを管理できない API キーの利用者にサイトの設定を返しません。API キーの利用者に、このサイトの管理権限を付けてください。",
+            "The settings of the answer destination site cannot be read. Pleasanter 1.5.10.0 and later do not return site settings to an API key user who cannot manage the site. Grant the API key user manage permission on this site.",
+            "Không thể đọc cài đặt của trang lưu câu trả lời. Từ Pleasanter 1.5.10.0, cài đặt trang không được trả về cho người dùng khóa API không có quyền quản lý trang. Hãy cấp quyền quản lý trang này cho người dùng khóa API.");
 
         Add(
             ServerMessageKeys.FallbackLanguageUnsupported,

@@ -1444,6 +1444,7 @@ export const ja = {
   'lookupAdmin.problem.TargetColumnTypeIncompatible': '入力先の設問の形式に列の種類が合いません。',
   'lookupAdmin.failure.unauthorized': 'API キーが正しくないか、専用アカウントが無効です。',
   'lookupAdmin.failure.forbidden': '専用アカウントに読み取り権限がありません。',
+  'lookupAdmin.failure.settingsHidden': '専用アカウントにサイトの管理権限がないため、サイトの定義（列の設定）を読めません。Pleasanter 1.5.10.0 以降は、管理権限のない利用者にサイトの設定を返しません。',
   'lookupAdmin.failure.notFound': '参照元サイトが見つからないか、読み取り権限がありません。',
   'lookupAdmin.failure.credential': '専用 API キーが使えません（未登録・失効・復号できない）。',
   'lookupAdmin.failure.config': '接続先の設定が使えません。管理者へ問い合わせてください。',

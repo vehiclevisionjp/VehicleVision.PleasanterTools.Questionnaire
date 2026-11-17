@@ -1361,6 +1361,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "lookupAdmin.failure.unauthorized":
     "Der API-Schlüssel ist ungültig oder das dedizierte Konto ist deaktiviert.",
   "lookupAdmin.failure.forbidden": "Das dedizierte Konto hat keine Leseberechtigung.",
+  "lookupAdmin.failure.settingsHidden": "Die Site-Definition (Spalteneinstellungen) kann nicht gelesen werden, weil das dedizierte Konto die Site nicht verwalten darf. Pleasanter 1.5.10.0 und neuer geben Benutzern ohne Verwaltungsberechtigung keine Site-Einstellungen zurück.",
   "lookupAdmin.failure.notFound":
     "Die Quell-Site wurde nicht gefunden oder kann nicht gelesen werden.",
   "lookupAdmin.failure.credential":
