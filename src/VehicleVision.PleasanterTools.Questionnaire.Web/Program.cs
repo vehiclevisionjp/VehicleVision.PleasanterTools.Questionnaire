@@ -516,6 +516,14 @@ builder.Services.AddSingleton<PleasanterSsoAuthenticator>();
 builder.Services.AddSingleton<PleasanterSsoSessionRevalidator>();
 builder.Services.AddSingleton<AdminUserService>();
 
+// **管理 API の個人トークン（API キー）**（Issue #1025。親 #1012）。
+// 表は本アプリの Data（AdminApiTokens。M0042）。**機能は既定で無効**（QUESTIONNAIRE_ADMIN_API_TOKENS）。
+// ⚠️ **Bearer の認証スキームはまだ無い**（#1026）。ここで作るのは、発行・一覧・失効と、
+// 値の検証（AdminApiTokenService.ValidateAsync）だけ
+builder.Services.AddSingleton(AdminApiTokenOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<IAdminApiTokenStore, AdminApiTokenStore>();
+builder.Services.AddSingleton<AdminApiTokenService>();
+
 // ---- bot 対策 --------------------------------------------------------------
 // **外部の CAPTCHA を使わない**（_documents/非機能設計.md 1 章）。
 // 完全匿名を掲げている以上、回答者の IP や操作の癖を第三者へ送れない。
@@ -1049,6 +1057,7 @@ app.MapAdminSamlEndpoints(adminPath);
 // **Pleasanter のログインも同じ**（Issue #464）。無効な間は確認の入口が 404 を返す
 app.MapAdminPleasanterSsoEndpoints();
 app.MapAdminUserEndpoints();
+app.MapAdminApiTokenEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();
 app.MapAdminAutoReplyEndpoints();

@@ -78,6 +78,38 @@ public static class ServerMessageKeys
 
     public const string CurrentSessionCannotBeRevoked = "sessions.currentCannotBeRevoked";
 
+    // ---- 管理 API の個人トークン（API キー。Issue #1025） ----------------------
+
+    /// <summary>機能が無効（既定）。</summary>
+    public const string ApiTokenFeatureDisabled = "apiTokens.featureDisabled";
+
+    /// <summary>この役割は発行できない（ユーザ管理者・監査担当）。</summary>
+    public const string ApiTokenRoleNotAllowed = "apiTokens.roleNotAllowed";
+
+    /// <summary>名前が空・長すぎる・制御文字を含む。</summary>
+    public const string ApiTokenNameInvalid = "apiTokens.nameInvalid";
+
+    /// <summary>スコープが空、または許可リストに無い。</summary>
+    public const string ApiTokenScopesInvalid = "apiTokens.scopesInvalid";
+
+    /// <summary>持ち主の役割が持たないスコープを付けようとした。</summary>
+    public const string ApiTokenScopeExceedsRole = "apiTokens.scopeExceedsRole";
+
+    /// <summary>期限が範囲外（**無期限は作れない**）。{0} は上限の日数。</summary>
+    public const string ApiTokenExpiryInvalid = "apiTokens.expiryInvalid";
+
+    /// <summary>接続元の許可リストが解釈できない・多すぎる。{0} は上限の件数。</summary>
+    public const string ApiTokenIpAllowListInvalid = "apiTokens.ipAllowListInvalid";
+
+    /// <summary>いま使えるトークンが上限に達している。{0} は上限の本数。</summary>
+    public const string ApiTokenLimitReached = "apiTokens.limitReached";
+
+    /// <summary>SSO の管理者が、直前の再ログインではない。{0} は許す分数。</summary>
+    public const string ApiTokenReloginRequired = "apiTokens.reloginRequired";
+
+    /// <summary>トークンが無い・他人のもの・すでに失効している（**区別しない**）。</summary>
+    public const string ApiTokenNotFound = "apiTokens.notFound";
+
     // ---- アンケート ---------------------------------------------------------
 
     public const string SurveyTitleRequired = "surveys.titleRequired";
