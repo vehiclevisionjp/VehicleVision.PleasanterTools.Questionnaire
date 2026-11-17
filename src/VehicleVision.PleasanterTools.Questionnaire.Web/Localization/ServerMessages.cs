@@ -88,6 +88,8 @@ public static class ServerMessages
         [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "전송 대기 중인 답변이 있어 Pleasanter 사이트 ID를 변경할 수 없습니다.",
         [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "복제 대상에는 원본과 다른 Pleasanter 사이트 ID를 지정하세요.",
         [ServerMessageKeys.SurveyIsTemplate] = "이것은 템플릿입니다. 템플릿은 공개할 수 없습니다. 먼저 템플릿에서 설문 조사를 만드세요.",
+        [ServerMessageKeys.SurveyImportInvalid] = "가져올 수 없는 파일입니다. 이 제품에서 내보낸 JSON인지, 크기와 버전을 확인하세요.",
+        [ServerMessageKeys.SurveyImportBlocked] = "가져올 수 없습니다. 공개 전 검사와 같은 기준에서 문제가 발견되었습니다.",
         [ServerMessageKeys.TemplateSourceRequired] = "템플릿의 원본으로 사용할 설문 조사를 지정하세요.",
         [ServerMessageKeys.ThemeColorInvalid] = "색상은 #rrggbb 형식으로 지정하세요.",
         [ServerMessageKeys.EmbedHostNotAllowed] = "삽입 대상이 허용된 출처에 포함되어 있지 않습니다. 관리자에게 출처 추가를 요청하세요.",
@@ -256,6 +258,8 @@ public static class ServerMessages
             [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "仍有等待发送的回答，因此无法更改 Pleasanter 站点 ID。",
             [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "请为副本指定与原问卷不同的 Pleasanter 站点 ID。",
             [ServerMessageKeys.SurveyIsTemplate] = "这是模板。模板无法发布。请先从模板创建问卷。",
+            [ServerMessageKeys.SurveyImportInvalid] = "无法导入此文件。请确认它是本产品导出的 JSON，并检查大小和版本。",
+            [ServerMessageKeys.SurveyImportBlocked] = "无法导入。发现了与发布前检查相同标准的问题。",
             [ServerMessageKeys.TemplateSourceRequired] = "请指定要作为模板来源的问卷。",
             [ServerMessageKeys.ThemeColorInvalid] = "颜色请指定为 #rrggbb 格式。",
             [ServerMessageKeys.EmbedHostNotAllowed] = "嵌入目标不在允许的来源中。请请求管理员添加来源。",
@@ -381,6 +385,8 @@ public static class ServerMessages
             [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "El ID del sitio de Pleasanter no se puede cambiar mientras haya respuestas pendientes de envío.",
             [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "Especifique un ID de sitio de Pleasanter distinto del sitio donde escribe la encuesta original.",
             [ServerMessageKeys.SurveyIsTemplate] = "Esta es una plantilla. Las plantillas no se pueden publicar. Primero cree una encuesta a partir de ella.",
+            [ServerMessageKeys.SurveyImportInvalid] = "No se puede importar el archivo. Compruebe que sea un JSON exportado por este producto, y su tamaño y versión.",
+            [ServerMessageKeys.SurveyImportBlocked] = "No se puede importar. Se encontraron problemas con el mismo criterio que la comprobación previa a la publicación.",
             [ServerMessageKeys.TemplateSourceRequired] = "Especifique la encuesta a partir de la cual crear una plantilla.",
             [ServerMessageKeys.ThemeColorInvalid] = "Especifique los colores con el formato #rrggbb.",
             [ServerMessageKeys.EmbedHostNotAllowed] = "La URL incrustada no está en los orígenes permitidos. Pida a un administrador que agregue el origen.",
@@ -505,6 +511,8 @@ public static class ServerMessages
             [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "Die Pleasanter-Site-ID kann nicht geändert werden, solange Antworten auf den Versand warten.",
             [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "Geben Sie eine andere Pleasanter-Site-ID an als diejenige, in die die ursprüngliche Umfrage schreibt.",
             [ServerMessageKeys.SurveyIsTemplate] = "Dies ist eine Vorlage. Vorlagen können nicht veröffentlicht werden. Erstellen Sie zuerst eine Umfrage daraus.",
+            [ServerMessageKeys.SurveyImportInvalid] = "Die Datei kann nicht importiert werden. Prüfen Sie, ob es ein von diesem Produkt exportiertes JSON ist, sowie Größe und Version.",
+            [ServerMessageKeys.SurveyImportBlocked] = "Import nicht möglich. Es wurden Probleme nach demselben Maßstab wie bei der Prüfung vor der Veröffentlichung gefunden.",
             [ServerMessageKeys.TemplateSourceRequired] = "Geben Sie die Umfrage an, aus der eine Vorlage erstellt werden soll.",
             [ServerMessageKeys.ThemeColorInvalid] = "Geben Sie Farben im Format #rrggbb an.",
             [ServerMessageKeys.EmbedHostNotAllowed] = "Die eingebettete URL befindet sich nicht in den zulässigen Quellen. Bitten Sie einen Administrator, sie hinzuzufügen.",
@@ -994,6 +1002,19 @@ public static class ServerMessages
                 + "テンプレートからアンケートを作成してください。",
             "This is a template. Templates cannot be published. Create a survey from it first.",
             "Đây là mẫu. Không thể công bố mẫu. Vui lòng tạo khảo sát từ mẫu.");
+
+        // ---- 書き出し・取り込み（Issue #1009） ------------------------------
+        Add(
+            ServerMessageKeys.SurveyImportInvalid,
+            "取り込めないファイルです。この製品が書き出した JSON か、大きさと版を確認してください。",
+            "This file cannot be imported. Check that it is a JSON exported by this product, and its size and version.",
+            "Không thể nhập tệp này. Hãy kiểm tra tệp là JSON do sản phẩm này xuất ra, cũng như kích thước và phiên bản.");
+
+        Add(
+            ServerMessageKeys.SurveyImportBlocked,
+            "取り込めません。公開前の検査と同じ基準で、不備が見つかりました。",
+            "The survey cannot be imported. Problems were found by the same checks as before publishing.",
+            "Không thể nhập. Đã phát hiện vấn đề theo cùng tiêu chuẩn với kiểm tra trước khi công bố.");
 
         // ---- テンプレート ---------------------------------------------------
         Add(

@@ -7,6 +7,8 @@
     deleteSurvey,
     deleteTestResponses,
     duplicateSurvey,
+    importSurvey,
+    surveyExportUrl,
     listSurveys,
     publish,
     revertToDraft,
@@ -99,6 +101,14 @@
   let copyJsonColumn = $state('');
   /** 二重送信で 2 つ複製されないようにする */
   let duplicateBusy = $state(false);
+
+  /** フォーム定義の取り込み（Issue #1009）。 */
+  let importing = $state(false);
+  let importDocument = $state<unknown>(null);
+  let importSiteId = $state('');
+  let importJsonColumn = $state('');
+  let importBusy = $state(false);
+  let importProblems = $state('');
 
   /** テンプレートの一覧を開いているか（Issue #58）。 */
   let showingTemplates = $state(false);
@@ -225,6 +235,83 @@
     duplicating = null;
     // **複製したものをそのまま開く。** 直すために複製している
     onopen(result.value.surveyId);
+  }
+
+  async function chooseImportFile(event: Event) {
+    importDocument = null;
+    error = '';
+    const file = (event.currentTarget as HTMLInputElement).files?.[0];
+    if (file === undefined) {
+      return;
+    }
+
+    try {
+      importDocument = JSON.parse(await file.text());
+    } catch {
+      error = t('exchange.fileUnreadable');
+    }
+  }
+
+  async function runImport(event: SubmitEvent) {
+    event.preventDefault();
+    if (importBusy) {
+      return;
+    }
+
+    error = '';
+    importProblems = '';
+
+    if (importDocument === null) {
+      error = t('exchange.fileRequired');
+      return;
+    }
+
+    const siteId = Number(importSiteId);
+    if (!Number.isInteger(siteId) || siteId <= 0) {
+      error = t('list.newSiteIdInvalid');
+      return;
+    }
+
+    importBusy = true;
+    const result = await importSurvey(importDocument, siteId, importJsonColumn);
+    importBusy = false;
+
+    if (!result.ok) {
+      error = result.message;
+      importProblems = summarizeImportProblems(result.body);
+      return;
+    }
+
+    importing = false;
+    // **取り込んだものをそのまま開く。** 直すために取り込んでいる
+    onopen(result.value.surveyId);
+  }
+
+  /** 検査で止まった不備の符号を並べる。**文言は持たず、符号だけ見せる。** */
+  function summarizeImportProblems(body: unknown): string {
+    const problems = (body as { problems?: Record<string, unknown> } | undefined)?.problems;
+    if (problems === undefined || problems === null) {
+      return '';
+    }
+
+    const codes: string[] = [];
+    for (const value of Object.values(problems)) {
+      if (!Array.isArray(value)) {
+        if (value === true) {
+          codes.push('invalid');
+        }
+        continue;
+      }
+
+      for (const item of value) {
+        const code = (item as { code?: unknown }).code;
+        if (typeof code === 'string' && !codes.includes(code)) {
+          codes.push(code);
+        }
+      }
+    }
+
+    return codes.length === 0 ? '' : t('exchange.problems', { codes: codes.join(', ') });
   }
 
   function openTemplate(survey: SurveySummary) {
@@ -513,6 +600,11 @@
       {t('template.open')}
     </button>
   {/if}
+  {#if canDuplicate}
+    <button type="button" class="secondary" onclick={() => (importing = !importing)}>
+      {t('exchange.open')}
+    </button>
+  {/if}
   <button type="button" onclick={() => (creating = !creating)}>
     {creating ? t('list.cancel') : t('list.create')}
   </button>
@@ -619,6 +711,36 @@
       </button>
     </div>
   </section>
+{/if}
+
+{#if importing && canDuplicate}
+  <form class="create" onsubmit={runImport}>
+    <h2>{t('exchange.title')}</h2>
+    <p class="hint">{t('exchange.description')}</p>
+    <label>
+      {t('exchange.file')}
+      <input type="file" accept="application/json,.json" onchange={chooseImportFile} required />
+    </label>
+    <label>
+      {t('exchange.siteId')}
+      <input type="text" inputmode="numeric" bind:value={importSiteId} required />
+    </label>
+    <label>
+      {t('exchange.jsonColumn')}
+      <input
+        type="text"
+        placeholder={t('list.newJsonColumnPlaceholder')}
+        bind:value={importJsonColumn}
+      />
+    </label>
+    {#if importProblems !== ''}<p class="error" role="alert">{importProblems}</p>{/if}
+    <div class="actions">
+      <button type="submit" disabled={importBusy}>{t('exchange.submit')}</button>
+      <button type="button" class="secondary" onclick={() => (importing = false)}>
+        {t('duplicate.cancel')}
+      </button>
+    </div>
+  </form>
 {/if}
 
 {#if duplicating}
@@ -816,6 +938,15 @@
                 {t('duplicate.open')}
               </button>
             {/if}
+            <!-- **ダウンロードは移動で足りる。** 応答が添付なので、画面は遷移しない -->
+            <button
+              type="button"
+              class="secondary"
+              title={t('exchange.exportHint')}
+              onclick={() => window.location.assign(surveyExportUrl(survey.surveyId))}
+            >
+              {t('exchange.export')}
+            </button>
             {#if canUseTemplates && survey.archivedAt == null}
               <button type="button" class="secondary" onclick={() => openTemplate(survey)}>
                 {t('template.save')}
