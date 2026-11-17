@@ -100,6 +100,97 @@ public class AdminNotificationStoreTests
         Assert.All(rows, row => Assert.Equal(1, row.Count));
     }
 
+    /// <summary>ルックアップの参照元の権限不足（<c>LookupSourceAccessDenied</c>）。</summary>
+    private const int LookupAccessDenied = 11;
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 検索IDと相関IDを行へ残し_同じ行へ足すときは直近の値で上書きする(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // Issue #836。集約の単位（種類・アンケート・未読）は変えない
+        var store = await CreateAsync(provider, connectionString).ConfigureAwait(true);
+        var surveyId = Guid.NewGuid();
+
+        await store.RaiseAsync(
+            LookupAccessDenied, surveyId, Now, new AdminNotificationDetail("l1", "trace-1"))
+            .ConfigureAwait(true);
+        await store.RaiseAsync(
+            LookupAccessDenied, surveyId, Now.AddMinutes(11), new AdminNotificationDetail("l2", "trace-2"))
+            .ConfigureAwait(true);
+
+        var row = Assert.Single(await store.ListAsync(new AdminNotificationQuery())
+            .ConfigureAwait(true));
+        Assert.Equal(2, row.Count);
+        Assert.Equal("l2", row.LookupId);
+        Assert.Equal("trace-2", row.LastCorrelationId);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 識別子の無い知らせでは列は空のまま_識別子の無い足し込みは直近の値を消さない(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var store = await CreateAsync(provider, connectionString).ConfigureAwait(true);
+        var surveyId = Guid.NewGuid();
+
+        await store.RaiseAsync(DeadLettered, Guid.NewGuid(), Now).ConfigureAwait(true);
+        await store.RaiseAsync(
+            LookupAccessDenied, surveyId, Now, new AdminNotificationDetail("l1", "trace-1"))
+            .ConfigureAwait(true);
+        await store.RaiseAsync(LookupAccessDenied, surveyId, Now.AddMinutes(1)).ConfigureAwait(true);
+
+        var rows = await store.ListAsync(new AdminNotificationQuery()).ConfigureAwait(true);
+        var plain = Assert.Single(rows, row => row.Kind == DeadLettered);
+        Assert.Null(plain.LookupId);
+        Assert.Null(plain.LastCorrelationId);
+
+        var lookup = Assert.Single(rows, row => row.Kind == LookupAccessDenied);
+        Assert.Equal(2, lookup.Count);
+        Assert.Equal("l1", lookup.LookupId);
+        Assert.Equal("trace-1", lookup.LastCorrelationId);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 識別子は制御文字を除き64文字で切り_空は空のままにする(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var store = await CreateAsync(provider, connectionString).ConfigureAwait(true);
+
+        await store.RaiseAsync(
+            LookupAccessDenied,
+            Guid.NewGuid(),
+            Now,
+            new AdminNotificationDetail("l\r\n1" + new string('x', 100), "  "))
+            .ConfigureAwait(true);
+
+        var row = Assert.Single(await store.ListAsync(new AdminNotificationQuery())
+            .ConfigureAwait(true));
+        Assert.Equal(AdminNotificationDetail.MaxLength, row.LookupId!.Length);
+        Assert.StartsWith("l1xxx", row.LookupId, StringComparison.Ordinal);
+        Assert.DoesNotContain('\n', row.LookupId);
+        Assert.Null(row.LastCorrelationId);
+    }
+
     [Theory]
     [MemberData(nameof(Providers))]
     public async Task 未読の件数は行数ではなく起きた回数(

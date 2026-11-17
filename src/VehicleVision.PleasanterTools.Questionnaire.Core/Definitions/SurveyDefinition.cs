@@ -69,6 +69,24 @@ public sealed record SurveyDefinition
     /// <remarks><c>null</c> は「回答から 30 日」の既定値として扱う。</remarks>
     public AssetDeliverySettings? AssetDelivery { get; init; }
 
+    /// <summary>ルックアップ定義（Issue #813・仕様書 3.1 節）。**<c>null</c> なら無い。**</summary>
+    /// <remarks>
+    /// <para>
+    /// **<c>null</c> を「無い」の意味で残す**（<see cref="Theme"/> と同じ理由）。
+    /// 空の配列を既定にすると、一度も触っていない定義の JSON にも <c>lookups</c> が載り、
+    /// **公開済みの版の JSON が版ごとに変わる。**
+    /// </para>
+    /// <para>
+    /// 資格情報の平文・暗号文は含めない（<see cref="LookupDefinition.CredentialId"/> は参照だけ）。
+    /// 読むときは <see cref="GetLookups"/> を使う。
+    /// </para>
+    /// </remarks>
+    public ImmutableArray<LookupDefinition>? Lookups { get; init; }
+
+    /// <summary>ルックアップ定義を返す。無ければ空。</summary>
+    public ImmutableArray<LookupDefinition> GetLookups() =>
+        Lookups is { IsDefault: false } lookups ? lookups : [];
+
     /// <summary>全ページの設問を順に返す。</summary>
     public IEnumerable<Question> AllQuestions => Pages.SelectMany(page => page.Questions);
 

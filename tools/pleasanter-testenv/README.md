@@ -19,7 +19,7 @@ Pleasanter 本体は**公式イメージを起動するだけ**で、ソース�
 |---|---|---|
 | `db` | `mcr.microsoft.com/mssql/server:2025-CU8-ubuntu-24.04` | SQL Server 2025 |
 | `codedefiner` | `implem/pleasanter:codedefiner` | スキーマ作成 ＋ 90 日トライアル登録 |
-| `pleasanter` | `implem/pleasanter:1.5.8.1` | 本体。AI 用の参照取得とは独立して試験用の版を固定 |
+| `pleasanter` | `implem/pleasanter:1.5.10.0` | 本体。AI 用の参照取得とは独立して試験用の版を固定 |
 | `verify` | `python:3.13-slim` | 検証の実行役。**ホストに python も curl も要求しない** |
 
 ## 使い方
@@ -51,7 +51,7 @@ docker compose down -v               # 後片付け（DB ごと破棄）
 | `sso-e2e-mail` | `SsoE2e#Mail1` | メールのワンタイムパスワード | パスワードだけでは入れず、コードの後に入れる |
 | `sso-e2e-stranger` | `SsoE2e#Stranger1` | なし | 本アプリに居ない人は断られる（`Administrator` は作りたてだと初回にパスワードの変更を求められるため使わない） |
 
-- **パスワードは SHA-512 の 16 進で DB へ直接入れている。** Pleasanter 1.5.8.1 は
+- **パスワードは SHA-512 の 16 進で DB へ直接入れている。** Pleasanter 1.5.9.1 は
   `Users_Password` を塩なしの SHA-512（`Sha512Cng()`）にして `Users.Password` と比べる
   （`Implem.Pleasanter/Models/Users/UserModel.cs` の `SetByForm`・`GetByCredentials`、
   `Implem.Libraries/Utilities/Encryptions.cs`）
@@ -73,6 +73,11 @@ docker compose down -v               # 後片付け（DB ごと破棄）
 **変数名には必ず `TESTENV_` 接頭辞を付けてある。** 素の `PLEASANTER_API_KEY` のような
 名前だと、**ホスト環境に同名の変数があったときに compose の既定値が黙って上書きされる**
 （実際に踏んで原因究明に時間を使った）。
+
+コンテナの中で検証スクリプトが読む変数は、共通の名前 `VVPT_PLEASANTER_BASE_URL`・`VVPT_PLEASANTER_API_KEY` に改名した
+（旧名 `PLEASANTER_BASE_URL`・`PLEASANTER_API_KEY` は読まない。Issue #940）。
+`VVPT_` 接頭辞が付いたので、素の名前でホストの変数と衝突する事故も起きない。
+ただし compose へ渡すホスト側の変数は、引き続き `TESTENV_*` である。
 
 | 変数 | 既定 |
 |---|---|
@@ -110,7 +115,7 @@ docker compose down -v               # 後片付け（DB ごと破棄）
 - **`DefaultDisable` は、`Users.EnableSecondaryAuthentication` を立てた利用者にだけ効く**
   （`Implem.Pleasanter/Models/Users/UserModel.cs:5704-5723` の `EnabledSecondaryAuthentication`）。
   `Administrator` と API キーで動く試験は素通りする（端から端まで通す試験の一式で確認）
-- **ファイルの中身は `implem/pleasanter:1.5.8.1` の `/app/App_Data/Parameters/Security.json`
+- **ファイルの中身は `implem/pleasanter:1.5.10.0` の `/app/App_Data/Parameters/Security.json`
   の写しで、`Mode` の 1 か所だけを変えてある。** Pleasanter は Parameters のファイルを
   丸ごと読むため、変えたい項目だけを置くことはできない
 - **JSON には注釈が書けないので、由来は先頭の `"//"` の項目とこの節に書いてある**

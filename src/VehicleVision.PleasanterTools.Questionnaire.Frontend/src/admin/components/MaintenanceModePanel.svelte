@@ -96,8 +96,7 @@
 <style lang="scss">
   .maintenance {
     display: grid;
-    gap: 0.75rem;
-
+    gap: var(--space-3);
     /*
       ⚠️ **ページの幅は呼び出し側が決める**（Issue #433）。
       ここで独自の幅（77rem）を持っていたため、本体（56rem / 100rem）と
@@ -107,10 +106,10 @@
 
     /* ⚠️ **枠と余白を幅の内側へ入れる。** 入れないと帯だけ外へ膨らみ、本体と端がずれる */
     box-sizing: border-box;
-    margin: 1rem auto 0;
-    padding: 0.9rem 1rem;
+    margin: var(--space-4) auto 0;
+    padding: 0.9rem var(--space-4);
     border: 2px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--surface);
 
     &.active {
@@ -122,7 +121,7 @@
 
   .summary {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-3);
     align-items: flex-start;
   }
 
@@ -135,7 +134,7 @@
   }
 
   details {
-    margin-left: 2rem;
+    margin-left: var(--space-8);
   }
 
   summary {
@@ -145,22 +144,22 @@
 
   .fields {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-3);
     max-width: 42rem;
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
   }
 
   label {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-1);
     font-weight: 600;
   }
 
   textarea {
     min-height: 4rem;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    padding: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     font-weight: 400;
   }

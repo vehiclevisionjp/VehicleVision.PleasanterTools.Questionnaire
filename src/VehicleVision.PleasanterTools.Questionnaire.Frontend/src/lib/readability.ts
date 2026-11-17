@@ -37,6 +37,7 @@ export const READABILITY_COLORS = {
     text: '#000000',
     muted: '#404040',
     border: '#595959',
+    borderStrong: '#595959',
     error: '#b00020',
     errorSurface: '#ffffff',
     success: '#006b35',
@@ -49,25 +50,28 @@ export const READABILITY_COLORS = {
     infoSurface: '#ffffff',
     infoText: '#000000',
   },
+  // **DesignReference のダーク**（styles/tokens.css の `[data-theme="dark"]`。値は readability.test.ts が突き合わせる）。
+  // accent は面にも文字にも使うので、文字用の淡い鉄紺（--color-primary-text）。その上の文字は鉄紺（--color-primary）
   dark: {
-    accent: '#8ab4f8',
-    accentText: '#101010',
-    background: '#121212',
-    surface: '#1e1e1e',
-    text: '#f5f5f5',
-    muted: '#c7c7c7',
-    border: '#8a8a8a',
-    error: '#ffb4ab',
-    errorSurface: '#3b2020',
-    success: '#75d69c',
-    successSurface: '#173528',
-    warning: '#ffca80',
-    warningSurface: '#3a2a14',
-    warningBorder: '#d59b4a',
-    disabledSurface: '#2c2c2c',
-    disabledText: '#c7c7c7',
-    infoSurface: '#1e2b43',
-    infoText: '#d8e6ff',
+    accent: '#d0d3ff',
+    accentText: '#17184b',
+    background: '#30334f',
+    surface: '#3b3f66',
+    text: '#f4f4f8',
+    muted: '#c4c6dc',
+    border: '#60668f',
+    borderStrong: '#9398c8',
+    error: '#ffb0b4',
+    errorSurface: '#5b3150',
+    success: '#7fdcae',
+    successSurface: '#2a5a52',
+    warning: '#f2b277',
+    warningSurface: '#5a4440',
+    warningBorder: '#f2b277',
+    disabledSurface: '#30334f',
+    disabledText: '#c4c6dc',
+    infoSurface: '#4a4f80',
+    infoText: '#f4f4f8',
   },
 } as const;
 
@@ -78,10 +82,27 @@ const FONT_SIZE_PERCENT: Record<FontSize, string> = {
 };
 
 /**
+ * 保存値が無いときの配色。
+ *
+ * **既定はライト**（DesignReference の明示型。Issue #776）。OS のダーク設定には従わない。
+ * - アンケートの配色固定 `Light` / `Dark` はそのとおりにする
+ * - `System` は、作成者が「OS に合わせる」を選んだ明示なので、OS（高コントラスト → ダーク → ライト）に従う
+ * - 固定が無いときだけ、OS の高コントラスト設定（アクセシビリティ）には従い、ダークには従わない
+ */
+function defaultColorMode(
+  colorScheme: ColorScheme | null | undefined,
+  system: SystemReadabilityPreferences,
+): ColorMode {
+  if (colorScheme === 'Light') {return 'default';}
+  if (colorScheme === 'Dark') {return 'dark';}
+  if (colorScheme === 'System') {return 'system';}
+  return system.highContrast ? 'highContrast' : 'default';
+}
+
+/**
  * 保存値と OS の設定から初期値を決める。
  *
- * 明示した配色は OS より優先する。保存値が無いときは、高コントラストを
- * ダークより先に見る。
+ * 明示した配色（保存値・アンケートの固定）は OS より優先する。
  */
 export function resolveReadabilityPreferences(
   stored: StoredReadabilityPreferences | null,
@@ -90,9 +111,7 @@ export function resolveReadabilityPreferences(
 ): ReadabilityPreferences {
   return {
     fontSize: stored?.fontSize ?? 'standard',
-    colorMode:
-      stored?.colorMode ??
-      (colorScheme === 'Light' ? 'default' : colorScheme === 'Dark' ? 'dark' : 'system'),
+    colorMode: stored?.colorMode ?? defaultColorMode(colorScheme, system),
     reducedMotion: system.reducedMotion,
   };
 }
@@ -129,6 +148,7 @@ export function readabilityCssProperties(
     '--text': colors?.text ?? null,
     '--muted': colors?.muted ?? null,
     '--border': colors?.border ?? null,
+    '--border-strong': colors?.borderStrong ?? null,
     '--error': colors?.error ?? null,
     '--error-surface': colors?.errorSurface ?? null,
     '--success': colors?.success ?? null,
@@ -156,6 +176,14 @@ export function applyReadability(
   system: SystemReadabilityPreferences,
 ): void {
   if (!target) {return;}
+
+  // **ダークのときだけ `data-theme="dark"`**（DesignReference の明示型）。
+  // 色のトークン（--color-*）と、ブラウザ標準の部品（スクロールバー・入力欄）の配色が切り替わる
+  if (resolvedColorMode(preferences.colorMode, system) === 'dark') {
+    target.setAttribute('data-theme', 'dark');
+  } else {
+    target.removeAttribute('data-theme');
+  }
 
   for (const [name, value] of Object.entries(readabilityCssProperties(preferences, system))) {
     if (value === null) {

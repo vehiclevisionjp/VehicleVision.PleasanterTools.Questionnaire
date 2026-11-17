@@ -1,5 +1,7 @@
 <script lang="ts">
   import QuestionField from '../../components/QuestionField.svelte';
+  import LookupControl from '../../components/LookupControl.svelte';
+  import { answerWithValue } from '../../lib/lookup';
   import NoteContent from '../../components/NoteContent.svelte';
   import { toSteps, tracePath } from '../../lib/flow';
   import { applyShuffle, createShuffleSeed } from '../../lib/shuffle';
@@ -17,7 +19,8 @@
   import type { SurveyDefinition } from '../lib/types';
   import { language as adminLanguage, t } from '../lib/i18n/state.svelte';
   import { applyTheme } from '../../lib/theme';
-  import { previewNotes } from '../lib/api';
+  import { previewNotes, previewSearchLookup } from '../lib/api';
+  import { previewDefinitions } from '../lib/lookupAdmin';
   import { listDesignPreviewPages } from '../lib/preview';
 
   /** 1 度に読んでもらう記法の上限。**サーバ側の上限と揃える。** */
@@ -53,10 +56,31 @@
     headerImageUrl?: string | null;
     /** 本文用資産を管理画面の配信口へ変換する。 */
     assetUrl?: (assetId: string) => string;
+    /** 検索のプレビューに使う（保存済みの下書きを引く）。 */
+    surveyId?: string;
     onclose: () => void;
   }
 
-  let { definition, headerImageUrl = null, assetUrl, onclose }: Props = $props();
+  let { definition, headerImageUrl = null, assetUrl, surveyId = '', onclose }: Props = $props();
+
+  /**
+   * ルックアップのボタン（Issue #880）。**回答画面と同じ部品**で描くが、検索は管理プレビュー専用の別経路
+   * （`previewSearchLookup`。保存済みの下書きを引く）。公開用の定義は下書きから作る別のもの（U9）。
+   */
+  const lookupPreviews = $derived(previewDefinitions(definition));
+  const lookupQuestions = $derived(
+    new Map(
+      definition.pages.flatMap((page) =>
+        page.questions.map((question) => [question.questionId, question as unknown as AnswerQuestion] as const),
+      ),
+    ),
+  );
+
+  function applyLookup(changes: { questionId: string; value: string }[]) {
+    for (const { questionId, value } of changes) {
+      answers[questionId] = answerWithValue(value);
+    }
+  }
 
   /**
    * テーマを写す枠（Issue #56）。
@@ -362,7 +386,7 @@
     </nav>
   {/if}
 
-  <div class="paper {previewWidth}" bind:this={paper}>
+  <div class="paper {previewWidth}" data-theme="light" bind:this={paper}>
     {#if previewMode !== 'design' || designTarget !== 'completed'}
       <!-- **飾り。** 回答画面と同じく `alt` は空にする -->
       {#if headerImageUrl}
@@ -458,8 +482,28 @@
             () => ensure(question.questionId), (value) => (answers[question.questionId] = value)
           }
           error={errors[question.questionId]}
-        />
+        >
+          {#snippet extra()}
+            {#each lookupPreviews.filter((item) => item.anchorQuestionId === question.questionId) as lookup (lookup.lookupId)}
+              <LookupControl
+                {lookup}
+                version={definition.version}
+                publicId=""
+                {language}
+                fallbackLanguage={definition.fallbackLanguage}
+                questions={lookupQuestions}
+                {answers}
+                visible={path.visible}
+                search={(keys) => previewSearchLookup(surveyId, lookup.lookupId, keys)}
+                onapply={applyLookup}
+              />
+            {/each}
+          {/snippet}
+        </QuestionField>
       {/each}
+      {#if lookupPreviews.length > 0}
+        <p class="lookup-note">{t('lookupAdmin.previewNote')}</p>
+      {/if}
 
       <nav class="actions">
         {#if stepIndex > 0}
@@ -477,10 +521,16 @@
 </section>
 
 <style lang="scss">
+  .lookup-note {
+    margin-block: var(--space-3);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
   .head {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   h1 {
@@ -496,16 +546,16 @@
     font: inherit;
     font-size: 0.85rem;
     padding: 0.2rem 0.35rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
   }
 
   /* **本物と見分けが付くようにする** */
   .notice {
-    margin: 0.75rem 0 1rem;
-    padding: 0.5rem 0.75rem;
+    margin: var(--space-3) 0 var(--space-4);
+    padding: var(--space-2) var(--space-3);
     border-left: 3px solid var(--accent);
     background: var(--info-surface);
     color: var(--info-text);
@@ -513,24 +563,29 @@
   }
 
   .paper {
-    /* **回答画面の既定値をここへ置き直す**（Issue #56）。
+    /* **回答画面の既定値は `data-theme="light"` で引き直す**（Issue #56・#776）。
+       意味名（--bg・--accent など）は styles/base.css が DesignReference のライトのトークンから引く。
        テーマがあれば `applyTheme` が同じ名前をこの要素の style へ入れて上書きする
        （要素に直接書いた値が、この規則より強い）。
-       **管理画面の `:root` の値をそのまま使わない。** 地の色が別物になる */
-    --bg: #fff;
-    --text: #101828;
-    /* **釦の文字色と入力欄の地**（Issue #109）。回答画面の `:root` と同じ値 */
-    --accent-text: #fff;
-    --surface: #fff;
-    --font: system-ui, sans-serif;
+       **管理画面の値（ダークのときを含む）をそのまま使わない。** 回答画面の既定とは別物になる */
+    --font: var(--font-sans);
 
     max-width: 40rem;
-    padding: 1.5rem;
+    padding: var(--space-6);
     background: var(--bg);
     color: var(--text);
     font-family: var(--font);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
+  }
+
+  /* **回答画面の見出し・釦は、作成者が選んだ書体（--font）にする。** 管理画面の全体に当てた
+     Zen Maru Gothic（--font-heading。AdminApp.svelte）を、下見の中へは持ち込まない（Issue #789） */
+  .paper :global(h1),
+  .paper :global(h2),
+  .paper :global(h3),
+  .paper :global(button) {
+    font-family: inherit;
   }
 
   .paper.tablet {
@@ -544,13 +599,13 @@
   .preview-options {
     display: flex;
     align-items: end;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
   }
 
   .preview-options fieldset {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-3);
     margin: 0;
     padding: 0;
     border: 0;
@@ -565,8 +620,8 @@
   .design-pages {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
   }
 
   .design-pages button.active {
@@ -579,8 +634,8 @@
     width: 100%;
     max-height: 10rem;
     object-fit: cover;
-    border-radius: 6px;
-    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
   }
 
   h2 {
@@ -589,7 +644,7 @@
   }
 
   h3 {
-    margin-top: 1.5rem;
+    margin-top: var(--space-6);
     font-size: 1.1rem;
   }
 
@@ -599,7 +654,7 @@
 
   .progress {
     height: 6px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     background: var(--border);
     overflow: hidden;
   }
@@ -618,8 +673,8 @@
   .actions {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-top: 1.5rem;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
   }
 
   .end {

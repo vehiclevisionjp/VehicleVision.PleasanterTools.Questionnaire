@@ -102,7 +102,7 @@ bash scripts/sync-reference.sh
 git ls-remote --tags https://github.com/Implem/Implem.Pleasanter.git 'refs/tags/Pleasanter_*^{}'
 ```
 
-検証環境の公式イメージ `implem/pleasanter:1.5.8.1` は取得先と独立して固定し、自動更新しない。
+検証環境の公式イメージ `implem/pleasanter:1.5.9.1` は取得先と独立して固定し、自動更新しない。
 ZIP は Web プロジェクトの発行結果、コンテナは Dockerfile の明示した対象だけを含める。
 既定先・共有先の本体と Git メタデータをビルド・配布物へ含めない。
 既存の `license-check.sh` と、取得先を検査する `reference-isolation-check.sh` を維持する。
@@ -110,11 +110,6 @@ ZIP は Web プロジェクトの発行結果、コンテナは Dockerfile の�
 
 配布元（2026-10-27 参照）:
 
-- Template 承認済み SHA: `3312f003fbe9827090e20bc643800824bdf30e22`
-- [配布手順][distribution]
-- 決定: vehiclevisionjp/VehicleVision.PleasanterTools.Template#61・
-  vehiclevisionjp/VehicleVision.PleasanterTools.Template#63
+- 承認済みの配布元のコミット: `3312f003fbe9827090e20bc643800824bdf30e22`
 - [git clone](https://git-scm.com/docs/git-clone) /
   [git fetch](https://git-scm.com/docs/git-fetch)
-
-[distribution]: https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Template/blob/3312f003fbe9827090e20bc643800824bdf30e22/_documents/参照ソースのオンデマンド取得への配布手順.md

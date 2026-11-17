@@ -1,3 +1,4 @@
+using PleasanterErrorKind = VehicleVision.PleasanterTools.DotNetClient.PleasanterErrorKind;
 using System.Collections.Immutable;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -38,10 +39,10 @@ public class PleasanterApiClientTests
         ApiKeyUserTimeZoneId = "Asia/Tokyo",
     };
 
-    private static (PleasanterApiClient Client, HttpClient Http) Create()
+    private static (PleasanterGateway Client, HttpClient Http) Create()
     {
         var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        return (new PleasanterApiClient(http, Options()), http);
+        return (new PleasanterGateway(http, Options()), http);
     }
 
     /// <summary>検証用のサイトを作る。運用では管理者が Pleasanter 上で用意する。</summary>
@@ -161,7 +162,7 @@ public class PleasanterApiClientTests
 
         var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(200) };
         using var _ = http;
-        var client = new PleasanterApiClient(http, new PleasanterOptions
+        var client = new PleasanterGateway(http, new PleasanterOptions
         {
             BaseUrl = "http://127.0.0.1:59999",
             ApiKey = ApiKey,

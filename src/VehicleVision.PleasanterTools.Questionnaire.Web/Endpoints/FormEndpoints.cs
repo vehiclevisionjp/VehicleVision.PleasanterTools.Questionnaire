@@ -80,6 +80,10 @@ public sealed record TicketResponse(
 /// 回答の下書きを端末へ残してよいか（Issue #59）。
 /// **下書きはサーバへ送らない**ので、伝えるのは可否だけ。
 /// </param>
+/// <param name="Lookups">
+/// 回答画面用のルックアップ定義（Issue #874）。<b>公開用の形だけ</b>（<see cref="LookupPublicDefinition"/>）。
+/// <c>Definition</c> の <c>lookups</c> には参照元の構造が入るので、回答者へは返さない。無ければ省く。
+/// </param>
 public sealed record FormResponse(
     string PublicId,
     SurveyDefinition Definition,
@@ -87,7 +91,58 @@ public sealed record FormResponse(
     bool AllowsDraft = false,
     bool IsTest = false,
     bool RecordsAssetHistory = false,
-    ThemeColorScheme ColorScheme = ThemeColorScheme.System);
+    ThemeColorScheme ColorScheme = ThemeColorScheme.System,
+    ImmutableArray<LookupPublicDefinition>? Lookups = null)
+{
+    /// <summary>
+    /// 公開版の定義から、回答画面へ返す応答を作る（Issue #874）。<b><see cref="FormResponse"/> はここで作る。</b>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>ルックアップの定義は公開用の形（<see cref="LookupPublicDefinition"/>）へ写して最上位の
+    /// <c>lookups</c> に載せ、<c>definition</c> からは生の <c>lookups</c> を除く。</b>
+    /// 参照元のサイト ID・資格情報の参照・列名・許可列・件数の上限を回答者へ返さないため
+    /// （<c>_documents/ルックアップ項目の仕様書.md</c> 3.1 節）。ルックアップが無ければ <c>lookups</c> は省く。
+    /// <b>サーバー全体のスイッチ（<see cref="LookupFeatureOptions"/>）が無効なら、既定の <paramref name="lookupsEnabled"/>
+    /// = <c>false</c> のまま <c>lookups</c> を載せない</b>（Issue #883）。
+    /// </para>
+    /// <para>
+    /// <b>自動返信（<c>autoReply</c>：BCC・返信先・件名・本文・差出人名・再編集リンクの日数）と、
+    /// 資産の引換券の期限（<c>assetDelivery</c>）も <c>definition</c> から除く</b>（Issue #876）。
+    /// どちらもサーバだけが使う設定で、回答画面は参照しない。BCC の宛先は社内のアドレスで、
+    /// 認証の無い回答者へ渡す理由が無い。
+    /// </para>
+    /// <para>
+    /// 回答画面へ <see cref="SurveyDefinition"/> を返す口は、必ずこれを通す。
+    /// </para>
+    /// </remarks>
+    public static FormResponse Create(
+        string publicId,
+        SurveyDefinition definition,
+        bool requiresProofOfWork,
+        bool allowsDraft = false,
+        bool isTest = false,
+        bool recordsAssetHistory = false,
+        ThemeColorScheme colorScheme = ThemeColorScheme.System,
+        bool lookupsEnabled = false)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+
+        // **サーバー全体のスイッチが無効なら、公開用の定義も載せない**（ボタンが出ない。Issue #883）
+        var lookups = lookupsEnabled
+            ? LookupPublicDefinition.FromDefinition(definition)
+            : [];
+        return new FormResponse(
+            publicId,
+            definition with { Lookups = null, AutoReply = null, AssetDelivery = null },
+            requiresProofOfWork,
+            allowsDraft,
+            isTest,
+            recordsAssetHistory,
+            colorScheme,
+            lookups.IsEmpty ? null : lookups);
+    }
+}
 
 /// <summary>回答画面向けの口。**認証は無い。**</summary>
 public static class FormEndpoints
@@ -119,6 +174,7 @@ public static class FormEndpoints
             ResponseIntake intake,
             MaintenanceMode maintenance,
             IAppSettingsProvider appSettings,
+            LookupFeatureOptions lookupFeature,
             CancellationToken cancellationToken) =>
         {
             // **同じ URL でも枠内申告で応答が変わる。**
@@ -138,14 +194,15 @@ public static class FormEndpoints
             var settings = await appSettings.GetAsync(cancellationToken).ConfigureAwait(false);
             var colorScheme = form.Definition.Theme?.ColorScheme
                 ?? ColorSchemeOptions.FromSnapshot(settings).ColorScheme;
-            return Results.Ok(new FormResponse(
+            return Results.Ok(FormResponse.Create(
                     publicId,
                     form.Definition,
                     form.RequiresProofOfWork,
                     form.AllowsDraft,
                     form.IsTest,
                     form.RecordsAssetHistory,
-                    colorScheme));
+                    colorScheme,
+                    lookupFeature.Enabled));
         });
 
         // **ヘッダ画像を配る**（Issue #56）。
@@ -378,24 +435,33 @@ public static class FormEndpoints
                         grant.ExpiresAtUtc, DateTimeKind.Utc)),
                     context.Request.PathBase));
 
-            return Results.Ok(new FormResponse(
+            return Results.Ok(FormResponse.Create(
                 publicId,
                 form.Definition,
-                RequiresProofOfWork: false,
-                RecordsAssetHistory: form.RecordsAssetHistory));
+                requiresProofOfWork: false,
+                recordsAssetHistory: form.RecordsAssetHistory));
         }).RequireRateLimiting(SubmitRateLimitPolicy);
 
         forms.MapGet("/{publicId}/responses/{responseToken}", async (
+            HttpContext context,
             string publicId,
             string responseToken,
-            ResponseIntake intake,
+            ResponseReader reader,
             CancellationToken cancellationToken) =>
         {
-            // **送信待ちを先に見る。** 未送信の回答は Pleasanter にまだ無い
-            var pending = await intake.FindPendingAsync(responseToken, cancellationToken);
-            return pending is null
-                ? Results.NotFound()
-                : Results.Ok(new { answers = pending.Answers });
+            // **回答本文を返す口。** 共有キャッシュ・ブラウザの履歴に残さない
+            context.Response.Headers.CacheControl = "private, no-store";
+
+            // **送信待ちを先に見て、無ければ Pleasanter から読む**（Issue #908。
+            // _documents/アーキテクチャ方針.md 10 章「読み出しも 2 段構え」）。
+            // 「無い」(404) と「今は読めない」(503) を区別する。どちらも本文は持たない
+            var result = await reader.ReadAsync(publicId, responseToken, cancellationToken);
+            return result.Status switch
+            {
+                ResponseReadStatus.Found => Results.Ok(new { answers = result.Answers }),
+                ResponseReadStatus.Unavailable => Results.StatusCode(StatusCodes.Status503ServiceUnavailable),
+                _ => Results.NotFound(),
+            };
         });
 
         // **添付は回答と同じ要求で受け取る**（`multipart/form-data`）。

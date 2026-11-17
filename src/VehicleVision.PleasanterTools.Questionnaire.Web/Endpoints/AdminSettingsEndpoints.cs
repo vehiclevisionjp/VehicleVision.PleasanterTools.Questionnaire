@@ -119,7 +119,7 @@ public static class AdminSettingsEndpoints
                     });
                 }
 
-                var client = new PleasanterApiClient(
+                var client = new PleasanterGateway(
                     httpClientFactory.CreateClient("pleasanter"),
                     options);
                 var connected = await client.CheckConnectionAsync(cancellationToken)
@@ -131,6 +131,17 @@ public static class AdminSettingsEndpoints
                         message = ServerMessages.Get(
                             ServerMessageKeys.PleasanterConnectionFailed, RequestLanguage.Of(context)),
                     });
+            }
+            catch (PleasanterConfigurationException)
+            {
+                // サーバー側の設定の誤り（内部エラー）。固定の文言だけを返す
+                return Results.Json(
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.PleasanterConfigurationInvalid, RequestLanguage.Of(context)),
+                    },
+                    statusCode: StatusCodes.Status500InternalServerError);
             }
             catch (AppSettingValidationException exception)
             {

@@ -66,7 +66,7 @@
         type="button"
         class="icon danger"
         onclick={() => remove(index)}
-        aria-label={t('mapping.config.removeMapRow')}>×</button
+        aria-label={t('mapping.config.removeMapRow')}><span class="material-icons" aria-hidden="true">close</span></button
       >
     </div>
   {/each}
@@ -78,7 +78,7 @@
 
 <style lang="scss">
   .map-config {
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
   }
 
   .map-row {
@@ -93,9 +93,9 @@
     display: block;
     width: 100%;
     min-width: 0;
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    padding: 0.4rem var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     background: var(--surface);
     color: var(--text);
@@ -109,7 +109,7 @@
     line-height: 1;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
 
     &.danger {
@@ -119,6 +119,6 @@
 
   .small {
     font-size: 0.85rem;
-    padding: 0.35rem 0.75rem;
+    padding: 0.35rem var(--space-3);
   }
 </style>

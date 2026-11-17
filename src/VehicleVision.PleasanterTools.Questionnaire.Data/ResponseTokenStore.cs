@@ -16,6 +16,16 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// </remarks>
 public interface IResponseTokenStore
 {
+    /// <summary>トークンの行を読む。無ければ <c>null</c>（Issue #908）。</summary>
+    /// <remarks>
+    /// **送信済みの回答を読み直すときの、持ち主の照合に使う。**
+    /// 既定は <c>null</c>。回答画面と送信ワーカーの試験の偽物に、読み出しだけの口を強いない。
+    /// </remarks>
+    Task<ResponseTokenEntry?> FindAsync(
+        string responseToken,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<ResponseTokenEntry?>(null);
+
     /// <summary>トークンに対応する <c>ReferenceId</c> を返す。まだ作っていなければ <c>null</c>。</summary>
     Task<long?> FindReferenceIdAsync(
         string responseToken,
@@ -78,6 +88,11 @@ public interface IResponseTokenStore
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>回答トークンの行（Issue #908）。</summary>
+/// <param name="SurveyId">そのトークンが属するアンケート。</param>
+/// <param name="ReferenceId">Pleasanter のレコード。まだ作っていなければ <c>null</c>。</param>
+public sealed record ResponseTokenEntry(Guid SurveyId, long? ReferenceId);
+
 /// <summary>Dapper を使った実装。</summary>
 public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) : IResponseTokenStore
 {
@@ -90,6 +105,26 @@ public sealed class ResponseTokenStore(IDbConnectionFactory connectionFactory) :
             "SELECT [IsTest] FROM [ResponseTokens] WHERE [ResponseToken] = @ResponseToken",
             new { ResponseToken = responseToken },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    public async Task<ResponseTokenEntry?> FindAsync(
+        string responseToken,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var row = await connection.QueryFirstOrDefaultAsync<TokenRow>(Sql(
+            "SELECT [SurveyId], [PleasanterReferenceId] AS [ReferenceId] FROM [ResponseTokens] "
+            + "WHERE [ResponseToken] = @ResponseToken",
+            new { ResponseToken = responseToken },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row is null ? null : new ResponseTokenEntry(row.SurveyId, row.ReferenceId);
+    }
+
+    private sealed class TokenRow
+    {
+        public Guid SurveyId { get; set; }
+
+        public long? ReferenceId { get; set; }
     }
 
     public async Task<long?> FindReferenceIdAsync(

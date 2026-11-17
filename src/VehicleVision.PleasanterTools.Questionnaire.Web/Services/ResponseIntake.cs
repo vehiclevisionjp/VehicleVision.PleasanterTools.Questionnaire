@@ -91,13 +91,20 @@ public sealed record IntakeResult(
 ///
 /// ⚠️ **既定は無効。** 端末は共有され得る。
 /// </param>
+/// <param name="SurveyId">
+/// アンケートの ID（Issue #832）。**回答画面へは返さない。** ルックアップの検索が、
+/// 専用資格情報・同時実行数をアンケートごとに引くために使う。
+/// </param>
+/// <param name="SurveyVersion">公開中の版の番号（Issue #832）。ルックアップの版の一致の確認に使う。</param>
 public sealed record PublishedForm(
     SurveyDefinition Definition,
     bool RequiresProofOfWork,
     bool AllowsDraft = false,
     bool IsTest = false,
     bool RecordsAssetHistory = false,
-    bool AllowEmbedding = false);
+    bool AllowEmbedding = false,
+    Guid SurveyId = default,
+    int SurveyVersion = 0);
 
 /// <summary>公開版から配る資産と、引換券が必要か。</summary>
 public sealed record PublishedAsset(
@@ -202,7 +209,9 @@ public sealed class ResponseIntake(
                     survey.AllowDraft,
                     survey.Status == (int)SurveyStatus.TestPublished,
                     snapshot.IsAssetHistoryEnabled,
-                    survey.AllowEmbedding),
+                    survey.AllowEmbedding,
+                    survey.SurveyId,
+                    survey.PublishedVersion.Value),
                 null);
     }
 

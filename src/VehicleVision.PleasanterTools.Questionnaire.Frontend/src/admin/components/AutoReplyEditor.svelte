@@ -433,24 +433,23 @@
 
 <style lang="scss">
   .auto-reply {
-    margin-block: 1.5rem;
-    padding: 1rem;
+    margin-block: var(--space-6);
+    padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
   }
 
   h2 {
-    margin-block: 0 0.5rem;
+    margin-block: 0 var(--space-2);
     font-size: 1.1rem;
   }
 
   label {
     display: block;
-    margin-block: 0.75rem;
-
+    margin-block: var(--space-3);
     &.toggle {
       display: flex;
-      gap: 0.5rem;
+      gap: var(--space-2);
       align-items: center;
     }
 
@@ -465,39 +464,39 @@
   select {
     display: block;
     width: 100%;
-    margin-block-start: 0.25rem;
+    margin-block-start: var(--space-1);
   }
 
   .hint {
-    margin-block: 0.25rem;
+    margin-block: var(--space-1);
     color: var(--muted);
     font-size: 0.85rem;
   }
 
   .warning {
-    margin-block: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.25rem;
-    background: var(--warning-surface, #fff4e5);
-    color: var(--warning-text, #7a4b00);
+    margin-block: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--warning-surface);
+    color: var(--warning-text);
     font-size: 0.85rem;
   }
 
   .keywords {
     display: grid;
     gap: 0.35rem;
-    margin-block: 0.75rem;
+    margin-block: var(--space-3);
   }
 
   .keyword {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-3);
     align-items: baseline;
     width: 100%;
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--border);
-    border-radius: 0.25rem;
-    background: var(--surface, #fff);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
     color: inherit;
     text-align: left;
   }
@@ -508,18 +507,18 @@
   }
 
   .mail-preview {
-    margin-block-start: 1rem;
-    padding-block-start: 1rem;
+    margin-block-start: var(--space-4);
+    padding-block-start: var(--space-4);
     border-top: 1px solid var(--border);
   }
 
   .mail-preview h3 {
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
     font-size: 1rem;
   }
 
   .preview-label {
-    margin: 0.75rem 0 0.25rem;
+    margin: var(--space-3) 0 var(--space-1);
     color: var(--muted);
     font-size: 0.8rem;
   }
@@ -527,17 +526,17 @@
   .mail-preview pre {
     min-height: 2rem;
     margin: 0;
-    padding: 0.75rem;
+    padding: var(--space-3);
     overflow-wrap: anywhere;
     white-space: pre-wrap;
     border: 1px solid var(--border);
-    border-radius: 0.25rem;
-    background: var(--surface, #fff);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
     color: inherit;
     font: inherit;
   }
 
   .test-send {
-    margin-block-start: 1rem;
+    margin-block-start: var(--space-4);
   }
 </style>

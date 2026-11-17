@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
     <!-- パスワードのハッシュ（PBKDF2）は ASP.NET Core の共有フレームワークに含まれるため
@@ -7,17 +7,17 @@
     <!-- bot 対策の proof-of-work（Issue #55）。BSD-2-Clause -->
     <PackageReference Include="Ixnas.AltchaNet" Version="1.2.1" />
     <!-- 管理画面の SAML 2.0 ログイン（Issue #166）。BSD-3-Clause -->
-    <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.21.1" />
-    <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.21.1" />
-    <PackageReference Include="AWSSDK.S3" Version="4.0.104.4" />
+    <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.22.0" />
+    <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.22.0" />
+    <PackageReference Include="AWSSDK.S3" Version="4.1.0" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.30.1" />
     <PackageReference Include="nClam" Version="9.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
     <PackageReference Include="Otp.NET" Version="1.4.1" />
-    <PackageReference Include="Scalar.AspNetCore" Version="2.17.14" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.21.0" />
     <!-- Pleasanter のログインの本人確認（PleasanterSessionVerifier）は Core.Web（NuGet）へ集約した（Issue #706） -->
-    <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.1.1" />
+    <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.2.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -69,4 +69,9 @@
     <Using Include="VehicleVision.PleasanterTools.Questionnaire.Web.TransportSecurityOptions" Alias="TransportSecurityOptions" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Pleasanter の応答の型は DotNetClient のもの（Issue #844）。名前空間ごとは取り込まない（PleasanterOptions などが本アプリのものと衝突する） -->
+    <Using Include="VehicleVision.PleasanterTools.DotNetClient.PleasanterErrorKind" Alias="PleasanterErrorKind" />
+    <Using Include="VehicleVision.PleasanterTools.DotNetClient.PleasanterResponse" Alias="PleasanterResponse" />
+  </ItemGroup>
 </Project>

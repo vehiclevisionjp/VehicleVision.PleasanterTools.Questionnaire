@@ -9,5 +9,7 @@
   "//SharedStateStore": "QUESTIONNAIRE_SHARED_STATE_STORE と同じ。",
   "SharedStateStore": null,
   "//SharedStateRedisPrefix": "QUESTIONNAIRE_SHARED_STATE_REDIS_PREFIX と同じ。",
-  "SharedStateRedisPrefix": null
+  "SharedStateRedisPrefix": null,
+  "//SharedStateTimeoutMs": "QUESTIONNAIRE_SHARED_STATE_TIMEOUT_MS と同じ。",
+  "SharedStateTimeoutMs": null
 }

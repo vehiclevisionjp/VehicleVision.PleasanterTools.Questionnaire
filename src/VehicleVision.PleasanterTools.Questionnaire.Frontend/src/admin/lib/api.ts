@@ -2,6 +2,11 @@ import { acceptLanguageHeader, t } from './i18n/state.svelte';
 import type { NoteBlock } from '../../lib/types';
 import { appUrl } from '../../lib/basePath';
 import type { AltchaChallenge } from '../../lib/altcha';
+import {
+  failureFromResponse,
+  parseLookupResponse,
+  type LookupSearchResult,
+} from '../../lib/lookup';
 import type {
   AdminNotificationPage,
   AdminSession,
@@ -12,6 +17,9 @@ import type {
   AuditLogFilter,
   AuditLogPage,
   DeadLetterPage,
+  LookupCredentialStatus,
+  LookupInspectResult,
+  LookupPublishProblem,
   MappingDefinition,
   OutboxStatus,
   MappingProblem,
@@ -883,3 +891,99 @@ export const sendAutoReplyTest = (definition: SurveyDefinition, language: string
     method: 'POST',
     json: { definition, language },
   });
+
+// ---- ルックアップ（Issue #880） ----------------------------------------------
+
+const lookupUrl = (surveyId: string, path: string) =>
+  `/api/admin/surveys/${encodeURIComponent(surveyId)}/lookups${path}`;
+
+/**
+ * 専用資格情報の状態を読む。**秘密は返ってこない**（設定済みの有無・有効状態・更新日時だけ）。
+ */
+export const loadLookupCredentials = (surveyId: string) =>
+  call<LookupCredentialStatus[]>(lookupUrl(surveyId, '/credentials'));
+
+/**
+ * 専用 API キーを登録する。**キーは本文で送るだけで、応答には載らない。**
+ * 呼び出し側は送ったら入力欄を空にすること。
+ */
+export const createLookupCredential = (surveyId: string, apiKey: string) =>
+  call<LookupCredentialStatus>(lookupUrl(surveyId, '/credentials'), {
+    method: 'POST',
+    json: { apiKey },
+  });
+
+/** 専用 API キーを入れ替える（再入力）。公開済みの版は書き換わらない。 */
+export const rotateLookupCredential = (surveyId: string, credentialId: string, apiKey: string) =>
+  call<LookupCredentialStatus>(
+    lookupUrl(surveyId, `/credentials/${encodeURIComponent(credentialId)}`),
+    { method: 'PUT', json: { apiKey } },
+  );
+
+/** 失効（`false`）・再開（`true`）。**公開し直さずに全公開版の実行時へ効く。** */
+export const setLookupCredentialEnabled = (
+  surveyId: string,
+  credentialId: string,
+  enabled: boolean,
+) =>
+  call<LookupCredentialStatus>(
+    lookupUrl(surveyId, `/credentials/${encodeURIComponent(credentialId)}/enabled`),
+    { method: 'PUT', json: { enabled } },
+  );
+
+/** 専用資格情報を解除（削除）する。 */
+export const deleteLookupCredential = (surveyId: string, credentialId: string) =>
+  call<void>(lookupUrl(surveyId, `/credentials/${encodeURIComponent(credentialId)}`), {
+    method: 'DELETE',
+  });
+
+/** 接続試験と列の取得。**読み取りだけ。** 結果は分類・統合/継承の有無・列の名前と種類だけ。 */
+export const inspectLookupSource = (
+  surveyId: string,
+  credentialId: string,
+  sourceSiteId: number,
+) =>
+  call<LookupInspectResult>(lookupUrl(surveyId, '/inspect'), {
+    method: 'POST',
+    json: { credentialId, sourceSiteId },
+  });
+
+/** 保存済みの下書きのルックアップの公開前検査（テスト公開と同じ検証）。 */
+export const loadLookupProblems = (surveyId: string) =>
+  call<LookupPublishProblem[]>(lookupUrl(surveyId, '/problems'));
+
+/**
+ * 管理プレビューの検索。**公開 API とは別経路**で、保存済みの下書きのルックアップを使う
+ * （回答者向けのトークン・版の照合は通らない）。失敗は種類で返し、サーバの本文は出さない。
+ */
+export async function previewSearchLookup(
+  surveyId: string,
+  lookupId: string,
+  keys: Record<string, string>,
+): Promise<LookupSearchResult> {
+  const result = await call<unknown>(
+    lookupUrl(surveyId, `/${encodeURIComponent(lookupId)}/preview-search`),
+    { method: 'POST', json: { keys } },
+  );
+
+  if (result.ok) {
+    const parsed = parseLookupResponse(result.value);
+    return parsed
+      ? { ok: true, response: parsed }
+      : { ok: false, failure: 'sourceInvalid', fieldIds: [], retryAfterSeconds: null };
+  }
+
+  if (result.status === 0) {
+    return { ok: false, failure: 'network', fieldIds: [], retryAfterSeconds: null };
+  }
+
+  const body = (result.body ?? {}) as { code?: string; fieldIds?: unknown };
+  return {
+    ok: false,
+    failure: failureFromResponse(body.code, result.status),
+    fieldIds: Array.isArray(body.fieldIds)
+      ? body.fieldIds.filter((id): id is string => typeof id === 'string')
+      : [],
+    retryAfterSeconds: null,
+  };
+}

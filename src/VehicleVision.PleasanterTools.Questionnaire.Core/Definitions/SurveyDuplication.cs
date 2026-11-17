@@ -59,6 +59,10 @@ public static class SurveyDuplication
             // **公開済みの版は写さないので、次に公開されるのは 1 版目**
             Version = 1,
             Title = renameAsCopy ? CopyTitle(source.Title) : source.Title,
+            // **資格情報の参照は他のアンケートへ引き継がない。** 再登録を求める（仕様書 3.2・12.5）
+            Lookups = source.Lookups is { IsDefault: false } lookups
+                ? [.. lookups.Select(lookup => lookup with { CredentialId = null })]
+                : source.Lookups,
         };
     }
 

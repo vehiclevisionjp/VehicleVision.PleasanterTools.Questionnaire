@@ -12,6 +12,8 @@
    CodeQL やセキュリティ警告の解説。すべて日本語
 2. **PR の base は分岐元の `develop`。** `master` を base にしないこと
 3. **PR 本文に `Closes #N` を書くこと。** Issue と PR を必ず紐付ける
+   作業に着手する前に、これからやること・やるべきこと（作業中に見つけたものを含む）を、先に Issue にする。
+   会話の「残りの作業」も Issue に起こし、リポジトリをまたぐ作業は、中心のリポジトリに親の Issue を起こして各リポジトリの Issue から参照する
 4. **コミットメッセージに `[skip ci]` を含めないこと。** 引用しただけでも push 全体の CI がスキップされる
 5. **作業中の PR タイトルには `WIP:` を付ける**（`[WIP]` ではない）。完了したら外す
 6. **Pleasanter 本体（AGPL v3）のコードを取り込まないこと。** コピー・流用・リンク・
@@ -19,7 +21,8 @@
    （[`_reference/README.md`](../_reference/README.md)）。
    **本製品はデュアルライセンス（AGPL ＋ 商用）。取り込むと商用側を提供できなくなる**
 7. **依存 OSS は寛容ライセンス（MIT / BSD 系 / Apache-2.0）に限定すること。**
-   追加時にライセンスを一次情報で確認し、[`NOTICE`](../NOTICE) へ追記する
+   追加時にライセンスを一次情報で確認し、[`NOTICE`](../NOTICE) へ追記する。
+   ただし、当社の共通部品（Core・DotNetClient）は、VehicleVision.PleasanterTools のツールが組み込む場合に呼び出し元と一体として扱うため例外とする（`LICENSING.md` の `core`・`dotnetclient`）
     - **フォントは SIL OFL 1.1 も可**（2026-09-08 決定）。日本語の自由フォントは実質すべて
       OFL であり、これを外すと同梱できるものが無くなる。**OFL はフォント以外へ
       copyleft が伸びない**ので、商用ライセンスでの提供と両立する。
@@ -38,7 +41,8 @@ Google Forms / Microsoft Forms に近い回答画面を提供する。**アン�
 標準 API を利用する独立したアプリ。
 
 - 言語・ランタイムは **Pleasanter 本体に揃える**（[`_documents/アーキテクチャ方針.md`](../_documents/アーキテクチャ方針.md)）
-- 想定構成は Azure App Service で Pleasanter と本アプリを併設して動かすこと
+- 想定構成は Azure App Service で Pleasanter と本アプリを併設して動かすこと。
+  **Windows Web App を基本とし、Linux Web App でも動作する**（2026-11-16 決定）
 - **コード・ドキュメント・応答はすべて日本語で書くこと。**
     - ⚠️ **例外は、コマンドラインがコンソールへ出す文字列だけ。英語で書く。**
       Azure の Kudu の Debug console で日本語が化け、運用者が結果を読めない（Issue #225）。

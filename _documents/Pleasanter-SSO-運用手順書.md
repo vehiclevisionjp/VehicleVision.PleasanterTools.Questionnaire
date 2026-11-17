@@ -505,7 +505,7 @@ Core.Web へ移した後も同じ名前で出す）と操作の記録（`POST /a
 | 再検証（間隔・別人・ログアウト・接続不可・機能の無効化）と `AdminSessionGuard` への組み込み | 単体テスト（`PleasanterSsoSessionRevalidatorTests`、`AdminSessionGuardTests`） |
 | SQL Server の Pleasanter 実機との往復・再検証・本アプリの 2 要素 | 2026-09-24 に手元で確認（2.2。当時の本人確認は拡張 SQL）。`users/get` での往復は下の自動試験で確かめている |
 | `users/get` と代わりの経路（一般利用者・管理者・未ログイン・`DisableApi` で API キーあり／なし／違うキー） | 2026-09-25 に実機で確認（2.2） |
-| `users/get` での往復: 一般の利用者で入れる・本アプリに居ない人は 401・外部設定の項目は画面から変えられない | **自動試験**（`PleasanterSsoEndToEndTests`。`e2e.yml` の SQL Server の job で毎回。検証環境の Pleasanter 1.5.8.1、本アプリは `compose.pleasanter-sso.yaml` で外部設定から有効） |
+| `users/get` での往復: 一般の利用者で入れる・本アプリに居ない人は 401・外部設定の項目は画面から変えられない | **自動試験**（`PleasanterSsoEndToEndTests`。`e2e.yml` の SQL Server の job で毎回。検証環境の Pleasanter 1.5.9.1、本アプリは `compose.pleasanter-sso.yaml` で外部設定から有効） |
 | Pleasanter でログアウトした後、再検証で締め出される | **自動試験**（同上。間隔は最短の 1 分。本アプリの cookie を持ったままでも入れず、管理 API は 401） |
 | Pleasanter の TOTP・メールのワンタイムパスワード | TOTP は 2026-09-25 に `users/get` で実機確認（2.2）。**メールのワンタイムパスワードは自動試験**（同上。パスワードだけ・違うコードでは入れず、正しいコードの後に入れる。コードは Pleasanter の DB から読み、メールの配送そのものは見ていない） |
 | 利用者ごとの API 禁止（`DisableApi` 以外の禁止） | **未検証**（`UserSettings.AllowApi` の同じ判定に入る） |

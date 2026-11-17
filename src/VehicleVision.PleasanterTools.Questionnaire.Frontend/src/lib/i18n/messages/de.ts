@@ -87,12 +87,12 @@ export const de: Partial<Record<MessageKey, string>> = {
   'question.rankingDown': 'Nach unten verschieben',
   'question.rankingClear': 'Rang entfernen',
   'question.rankingStatus': '{label}: Rang {rank} von {total}',
-  'question.fileCountLimit': 'Bis zu {count} Dateien',
+  'question.fileCountLimit': 'Bis zu {count} {count|Datei|Dateien}',
   'question.fileSizeLimitMegabytes': 'Bis zu {megabytes} MB pro Datei',
   'question.fileSizeLimitBytes': 'Bis zu {bytes} Bytes pro Datei',
   'question.selectionRange': 'Wählen Sie zwischen {minimum} und {maximum} Optionen',
-  'question.selectionMinimum': 'Wählen Sie mindestens {minimum} Optionen',
-  'question.selectionMaximum': 'Wählen Sie höchstens {maximum} Optionen',
+  'question.selectionMinimum': 'Wählen Sie mindestens {minimum} {minimum|Option|Optionen}',
+  'question.selectionMaximum': 'Wählen Sie höchstens {maximum} {maximum|Option|Optionen}',
   'question.normalizationNotice':
     'Nach der Eingabe werden Zeichenbreite und umgebende Leerzeichen gemäß der Konfiguration automatisch umgewandelt.',
 
@@ -104,6 +104,20 @@ export const de: Partial<Record<MessageKey, string>> = {
     'Bitte öffnen Sie diese Seite über eine sichere Verbindung (https). In diesem Zustand kann sie nicht gesendet werden.',
   'submit.failed':
     'Wir konnten Ihre Antwort nicht senden. Ihre Antworten sind noch vorhanden — bitte warten Sie einen Moment und versuchen Sie es erneut.',
+  'submit.maintenance':
+    'Während der Wartungsarbeiten kann nichts gesendet werden. Ihre Antworten sind noch vorhanden — bitte versuchen Sie es später erneut.',
+  'submit.unavailable':
+    'Beim Dienst ist vorübergehend ein Problem aufgetreten. Ihre Antworten sind noch vorhanden — bitte versuchen Sie es später erneut.',
+  'unavailable.title':
+    'Vorübergehend nicht verfügbar',
+  'unavailable.temporary':
+    'Beim Dienst ist vorübergehend ein Problem aufgetreten. Bitte laden Sie diese Seite später erneut.',
+  'unavailable.pending':
+    'Ihre gesendeten Antworten können gerade nicht geladen werden. Das Formular wurde nicht geöffnet, damit sie nicht überschrieben werden. Bitte laden Sie diese Seite später erneut.',
+  'unavailable.maintenance':
+    'Während der Wartungsarbeiten ist diese Seite nicht verfügbar. Bitte laden Sie diese Seite später erneut.',
+  'unavailable.reload':
+    'Neu laden',
 
   'attachment.defaultName': 'Anhang',
   'attachment.extensionNotAllowed': '{name}: Diese Art von Datei wird nicht angenommen',
@@ -118,13 +132,13 @@ export const de: Partial<Record<MessageKey, string>> = {
 
   'validation.required': 'Bitte beantworten Sie diese Frage',
   'validation.fileRequired': 'Bitte wählen Sie eine Datei aus',
-  'validation.fileCount': 'Wählen Sie höchstens {count} Dateien',
+  'validation.fileCount': 'Wählen Sie höchstens {count} {count|Datei|Dateien}',
   'validation.fileTooLarge': '{name}: Die Datei ist zu groß',
   'validation.singleValueOnly': 'Bitte wählen Sie nur eine Antwort',
   'validation.rowRequired': 'Bitte beantworten Sie jede Zeile',
   'validation.duplicateRank': 'Dasselbe Element hat mehr als einen Rang',
-  'validation.tooFewSelections': 'Wählen Sie mindestens {minimum} Optionen',
-  'validation.tooManySelections': 'Wählen Sie höchstens {maximum} Optionen',
+  'validation.tooFewSelections': 'Wählen Sie mindestens {minimum} {minimum|Option|Optionen}',
+  'validation.tooManySelections': 'Wählen Sie höchstens {maximum} {maximum|Option|Optionen}',
   'validation.pattern': 'Geben Sie den Wert im angeforderten Format ein',
   'validation.tooLong': 'Verwenden Sie höchstens {max} Zeichen',
   'validation.email': 'Geben Sie eine gültige E-Mail-Adresse ein',
@@ -158,4 +172,41 @@ export const de: Partial<Record<MessageKey, string>> = {
     'Anhänge können derzeit nicht geprüft werden, daher können wir dies noch nicht annehmen',
   'serverValidation.SubmitButtonConditionNotMet': 'Die Bedingungen zum Absenden sind nicht erfüllt',
   'serverValidation.unknown': 'Bitte überprüfen Sie Ihre Eingabe',
+
+  'lookup.search': 'Suchen und ausfüllen',
+  'lookup.keysMissing': 'Geben Sie zum Suchen {fields} ein.',
+  'lookup.searching': 'Es wird gesucht.',
+  'lookup.notFound': 'Es wurde nichts gefunden. Bitte prüfen Sie Ihre Eingabe.',
+  'lookup.chooseTitle': 'Wählen Sie einen Treffer zum Ausfüllen aus',
+  'lookup.candidateCount': 'Es gibt {count} Treffer.',
+  'lookup.candidateLabel': 'Treffer {number}',
+  'lookup.apply': 'Ausfüllen',
+  'lookup.cancel': 'Abbrechen',
+  'lookup.selectFirst': 'Wählen Sie einen Treffer aus, um ihn auszufüllen.',
+  'lookup.applied': 'Das Suchergebnis wurde eingetragen.',
+  'lookup.appliedNothing': 'Es gab keine Werte zum Ausfüllen. Ihre Eingaben wurden nicht geändert.',
+  'lookup.confirmTitle': 'Bereits eingegebene Werte überschreiben?',
+  'lookup.confirmOverwrite':
+    'Möchten Sie die bereits eingegebenen Werte mit dem Suchergebnis überschreiben?',
+  'lookup.confirmFields': 'Felder, die überschrieben werden: {fields}',
+  'lookup.confirmApply': 'Überschreiben und ausfüllen',
+  'lookup.choiceUnavailable':
+    'Der Wert ist keine Antwortoption von {question} und kann daher nicht eingetragen werden.',
+  'lookup.valueInvalid': 'Dieser Wert kann bei {question} nicht eingetragen werden.',
+  'lookup.tooMany': 'Es gibt zu viele Treffer. Bitte geben Sie genauere Suchwerte ein.',
+  'lookup.failed':
+    'Die Daten konnten nicht abgerufen werden. Bitte versuchen Sie es später erneut.',
+  'lookup.timeout': 'Die Suche dauert länger als erwartet. Bitte versuchen Sie es später erneut.',
+  'lookup.rateLimited':
+    'Das Limit für Suchen ist erreicht. Bitte versuchen Sie es in {seconds} Sekunden erneut.',
+  'lookup.rateLimitedLater':
+    'Das Limit für Suchen ist erreicht. Bitte versuchen Sie es später erneut.',
+  'lookup.versionChanged':
+    'Das Formular wurde aktualisiert. Laden Sie die Seite neu und prüfen Sie Ihre Eingaben.',
+  'lookup.sessionExpired': 'Die Suche ist abgelaufen. Bitte suchen Sie erneut.',
+  'lookup.closed': 'In diesem Formular ist die Suche derzeit nicht verfügbar.',
+  'lookup.invalidKeys': 'Bitte prüfen Sie die Suchwerte.',
+  'lookup.requestTooLarge': 'Die Eingabe ist zu lang. Bitte prüfen Sie die Suchwerte.',
+  'lookup.stale':
+    'Die Suchbedingungen haben sich geändert, daher wurde das vorherige Suchergebnis nicht verwendet. Bitte suchen Sie erneut.',
 };

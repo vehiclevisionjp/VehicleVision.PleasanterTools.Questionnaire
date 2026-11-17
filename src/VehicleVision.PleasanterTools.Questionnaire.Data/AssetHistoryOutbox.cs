@@ -47,6 +47,10 @@ public interface IAssetHistoryOutbox
     Task CompleteAsync(Guid eventId, CancellationToken cancellationToken = default);
     Task WaitAsync(Guid eventId, DateTime nextAttemptAtUtc, CancellationToken cancellationToken = default);
     Task RescheduleAsync(Guid eventId, DateTime nextAttemptAtUtc, string error, CancellationToken cancellationToken = default);
+
+    /// <summary>設定の誤りで送れなかったので、<c>RetryCount</c> を増やさずに後で再送する（Issue #853）。</summary>
+    Task PostponeAsync(Guid eventId, DateTime nextAttemptAtUtc, string error, CancellationToken cancellationToken = default);
+
     Task DeadLetterAsync(Guid eventId, string error, CancellationToken cancellationToken = default);
     Task<int> ReleaseExpiredLocksAsync(CancellationToken cancellationToken = default);
 }
@@ -150,6 +154,26 @@ public sealed class AssetHistoryOutbox(IDbConnectionFactory connectionFactory) :
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
             "UPDATE [AssetHistoryOutbox] SET [Status] = @Status, [RetryCount] = [RetryCount] + 1, "
+            + "[NextAttemptAt] = @NextAttemptAt, [LastError] = @Error, [LockedBy] = NULL, "
+            + "[LockedUntil] = NULL, [UpdatedAt] = @Now WHERE [EventId] = @EventId",
+            new
+            {
+                EventId = eventId,
+                Status = (int)AssetHistoryStatus.Pending,
+                NextAttemptAt = DbTime.ForDb(nextAttemptAtUtc),
+                Error = Truncate(error),
+                Now = DbTime.UtcNowTruncated(),
+            },
+            cancellationToken);
+
+    public Task PostponeAsync(
+        Guid eventId,
+        DateTime nextAttemptAtUtc,
+        string error,
+        CancellationToken cancellationToken = default) =>
+        // **RetryCount を増やさない**（RescheduleAsync との違いはここだけ。Issue #853）
+        ExecuteAsync(
+            "UPDATE [AssetHistoryOutbox] SET [Status] = @Status, "
             + "[NextAttemptAt] = @NextAttemptAt, [LastError] = @Error, [LockedBy] = NULL, "
             + "[LockedUntil] = NULL, [UpdatedAt] = @Now WHERE [EventId] = @EventId",
             new

@@ -11,7 +11,7 @@
 --
 -- **何度流してもよい。** 居なければ作り、居ればパスワードと状態を初期値へ戻す。
 --
--- **パスワードは SHA-512 の 16 進（小文字）で持つ。** Pleasanter 1.5.8.1 は
+-- **パスワードは SHA-512 の 16 進（小文字）で持つ。** Pleasanter 1.5.9.1 は
 -- Users_Password を Sha512Cng()（UTF-8 のバイト列の SHA-512 を小文字の 16 進にしたもの。
 -- 塩は無い）で変換して Users.Password とそのまま比べる
 -- （Models/Users/UserModel.cs の SetByForm と GetByCredentials、

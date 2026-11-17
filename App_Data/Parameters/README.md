@@ -57,6 +57,8 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 | ファイルのキー | 環境変数 |
 | --- | --- |
 | `Service.json` の `TimeZoneDefault` | `QUESTIONNAIRE_TIMEZONE_DEFAULT` |
+| `Service.json` の `LookupEnabled` | `QUESTIONNAIRE_LOOKUP_ENABLED` |
+| `Service.json` の `RootRedirectUrl` | `QUESTIONNAIRE_ROOT_REDIRECT_URL` |
 | `Pleasanter.json` の `BaseUrl` | `QUESTIONNAIRE_PLEASANTER_BASEURL` |
 | `Pleasanter.json` の `ApiKey` | `QUESTIONNAIRE_PLEASANTER_APIKEY` |
 | `Pleasanter.json` の `ApiVersion` | `QUESTIONNAIRE_PLEASANTER_APIVERSION` |
@@ -114,6 +116,7 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 | `QUESTIONNAIRE_ADMIN_SESSION_REDIS_PREFIX` | Redis キーの接頭辞。既定 `questionnaire:admin-session:`。同じ Redis を複数環境で共用するときに分ける |
 | `QUESTIONNAIRE_SHARED_STATE_STORE` | レート制限と滞留の見張りの保存先。`Process`（既定）/ `Redis`。⚠️ 未設定時はプロセスごとに数える |
 | `QUESTIONNAIRE_SHARED_STATE_REDIS_PREFIX` | 共有状態の Redis キー接頭辞。既定 `questionnaire:shared-state:`。同じ Redis を複数環境で共用するときに分ける |
+| `QUESTIONNAIRE_SHARED_STATE_TIMEOUT_MS` | 共有ストア（Redis・Valkey）への接続と命令の待ち時間（ミリ秒）。既定 `1000`、100〜10000。管理者セッションと共用する接続に効く。範囲外は起動時に止める |
 | `QUESTIONNAIRE_ASSET_STORE` | 資産の保存先。`Database`（既定）/ `Path` / `AzureBlob` / `S3` |
 | `QUESTIONNAIRE_ASSET_PATH` | `Path` の保存ディレクトリ。複数インスタンスでは全インスタンスが同じ共有領域を参照する |
 | `QUESTIONNAIRE_ASSET_AZURE_CONTAINERURI` | `AzureBlob` のコンテナー URI。マネージド ID を使う既定の指定方法 |

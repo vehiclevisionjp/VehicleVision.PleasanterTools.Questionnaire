@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { tick } from 'svelte';
+  import { focusFirstError, focusPageHeading, focusSubmitResult as focusSubmitResultIn } from './lib/focusError';
   import { appRoute, appUrl } from './lib/basePath';
   import QuestionField from './components/QuestionField.svelte';
   import NoteContent from './components/NoteContent.svelte';
+  import LookupControl from './components/LookupControl.svelte';
   import ReadabilityControls from './components/ReadabilityControls.svelte';
   import {
     forgetSubmission,
@@ -14,7 +17,7 @@
     requestTicket,
     submitAnswers,
   } from './lib/api';
-  import type { Attachment } from './lib/api';
+  import type { Attachment, UnavailableKind } from './lib/api';
   import {
     DISABLED_ANALYTICS,
     fetchAnalyticsSettings,
@@ -22,18 +25,28 @@
     type AnalyticsSettings,
   } from './lib/analytics';
   import { solveAltcha } from './lib/altcha';
+  import { renewSubmitCredentials } from './lib/submitCredentials';
+  import { maintenanceNotices, type MaintenanceNotice } from './lib/submitUnavailable';
   import {
     renderCaptcha,
     usesExternalCaptcha,
     type CaptchaChallenge,
     type CaptchaWidget,
   } from './lib/captcha';
+  import {
+    answerWithValue,
+    LookupSessionHolder,
+    lookupWarningId,
+    parsePublicLookups,
+    type LookupPublicDefinition,
+  } from './lib/lookup';
   import { conditionSatisfied, isAllowedButtonUrl, toSteps, tracePath } from './lib/flow';
   import { applyShuffle, createShuffleSeed } from './lib/shuffle';
   import type {
     AnswerState,
     PageButtonCondition,
     PayloadAnswer,
+    Question,
     RejectionReason,
     SurveyDefinition,
   } from './lib/types';
@@ -64,7 +77,14 @@
     type ReadabilityPreferences,
   } from './lib/readability';
 
-  type Screen = 'loading' | 'answering' | 'answered' | 'completed' | 'rejected' | 'error';
+  type Screen =
+    | 'loading'
+    | 'answering'
+    | 'answered'
+    | 'completed'
+    | 'rejected'
+    | 'error'
+    | 'unavailable';
 
   /**
     * 画面に出す言語。
@@ -139,6 +159,12 @@
 
   let screen = $state<Screen>('loading');
   let rejection = $state<RejectionReason>();
+
+  /**
+   * 初回の読み込みで、サーバ側の都合により先へ進めなかった理由（Issue #965）。
+   * `pending` は、送信済み・送信待ちの回答を読めなかったとき。**空の回答を出して上書きさせない。**
+   */
+  let unavailable = $state<{ kind: UnavailableKind; target: 'form' | 'pending' }>();
   let definition = $state<SurveyDefinition>();
 
   /**
@@ -149,6 +175,56 @@
   let colorScheme = $state<ThemeColorScheme>();
   let publicId = $state('');
   let responseToken = $state('');
+
+  /**
+   * 回答画面用のルックアップ定義（Issue #871）。**公開用の形だけを受け取る。**
+   * 無ければボタンは出ない（既定は無効のまま）。
+   */
+  let lookups = $state<LookupPublicDefinition[]>([]);
+  /** 検索用トークンの入れ物。**メモリだけ。長期保存しない。** */
+  let lookupSessions = $state<LookupSessionHolder>();
+  const lookupQuestions = $derived(
+    new Map<string, Question>(
+      (definition?.pages ?? []).flatMap((page) =>
+        page.questions.map((question) => [question.questionId, question] as const),
+      ),
+    ),
+  );
+
+  /**
+   * 警告が出ている入力先（定義の ID → 設問 ID）。入力先の `aria-describedby` へ警告を関連付ける（Issue #884）。
+   */
+  let lookupWarned = $state<Record<string, string[]>>({});
+
+  function setLookupWarnings(lookupId: string, questionIds: string[]) {
+    const current = lookupWarned[lookupId] ?? [];
+    if (current.length === questionIds.length && current.every((id, i) => id === questionIds[i])) {
+      return;
+    }
+    lookupWarned = { ...lookupWarned, [lookupId]: questionIds };
+  }
+
+  /** その設問へ関連付ける、ルックアップの警告の要素 ID。 */
+  function lookupWarningIdsFor(questionId: string): string[] {
+    return Object.entries(lookupWarned).flatMap(([lookupId, ids]) =>
+      ids.includes(questionId) ? [lookupWarningId(lookupId, questionId)] : [],
+    );
+  }
+
+  function lookupsFor(questionId: string): LookupPublicDefinition[] {
+    return lookups.filter((lookup) => lookup.anchorQuestionId === questionId);
+  }
+
+  /** 検索結果を、通常の入力と同じ回答の状態へ写す。**検証の誤り表示は、書いた設問だけ外す。** */
+  function applyLookup(changes: { questionId: string; value: string }[]) {
+    for (const { questionId, value } of changes) {
+      answers[questionId] = answerWithValue(value);
+      if (errors[questionId] !== undefined) {
+        const { [questionId]: _removed, ...rest } = errors;
+        errors = rest;
+      }
+    }
+  }
 
   $effect(() => {
     const queries = [
@@ -264,6 +340,8 @@
   let canEdit = $state(false);
   /** 添付を受け付けなかった理由。**どのファイルが駄目かを出す。** */
   let attachmentMessages = $state<string[]>([]);
+  /** メンテナンス中の案内（7 言語ぶん。現在の言語が先頭）。 */
+  let maintenanceMessages = $state<MaintenanceNotice[]>([]);
   /** 引換券のリンクから完了画面だけを開いたか。 */
   let assetTicketVisit = $state(false);
 
@@ -416,6 +494,12 @@
     }
 
     const result = await loadForm(publicId);
+    if (result.unavailable) {
+      // **一時的な失敗を「見つからない」にしない**（Issue #965）。再読み込みを促す
+      unavailable = { kind: result.unavailable, target: 'form' };
+      screen = 'unavailable';
+      return;
+    }
     if (!result.form) {
       rejection = result.rejection ?? 'notFound';
       screen = 'rejected';
@@ -424,6 +508,16 @@
 
     definition = result.form.definition;
     colorScheme = result.form.colorScheme;
+
+    // **形が違うものは捨てる。** 起点・キー・入力先が定義に無いものも使わない
+    const known = new Set(definition.pages.flatMap((page) => page.questions.map((q) => q.questionId)));
+    lookups = parsePublicLookups(result.form.lookups).filter(
+      (lookup) =>
+        [lookup.anchorQuestionId, ...lookup.keyQuestionIds, ...lookup.targetQuestionIds].every((id) =>
+          known.has(id),
+        ),
+    );
+    lookupSessions = new LookupSessionHolder(publicId);
 
     // **サーバが null の項目を落として返す**ので、`?? true` で受ける。
     // **分からなければ解く側に倒す**（解かずに送って断られる方が重い）
@@ -440,7 +534,13 @@
 
     // **回答トークンと送信チケットをサーバから受け取る。**
     // チケットが無いと送信できないので、ここで失敗したら回答させない
-    const issued = await requestTicket(publicId);
+    const { ticket: issued, unavailable: ticketUnavailable } = await requestTicket(publicId);
+    if (ticketUnavailable) {
+      // **一時的な失敗は「URL が正しくない」にしない**（Issue #965）
+      unavailable = { kind: ticketUnavailable, target: 'form' };
+      screen = 'unavailable';
+      return;
+    }
     if (!issued) {
       screen = 'error';
       return;
@@ -472,12 +572,22 @@
 
     // **送信待ちを先に見る。** 未送信の回答は Pleasanter にまだ無い
     const pending = await loadPendingAnswers(publicId, responseToken);
-    if (pending) {
+    if (pending.unavailable) {
+      // **「無い」ではなく「今は読めない」。** 空の回答で回答画面を開くと、
+      // 未送信の回答を上書きして送ってしまう。回答画面へ進まず、再読み込みを促す（Issue #965）。
+      // 端末の下書きは `answering` のときしか書かないので、ここでは触れない
+      unavailable = { kind: pending.unavailable, target: 'pending' };
+      screen = 'unavailable';
+      return;
+    }
+    if (pending.answers) {
       canEdit = true;
-      for (const answer of pending) {
+      for (const answer of pending.answers) {
         answers[answer.questionId] = {
           values: answer.values ?? [],
           otherText: answer.otherText ?? '',
+          // **グリッドの回答は rows にしか入っていない**（Issue #908）。落とすと再編集で空に戻る
+          ...(answer.rows ? { rows: answer.rows } : {}),
         };
       }
     }
@@ -535,6 +645,7 @@
     }
 
     draftNotice = t('draft.restored');
+    void focusPageTop();
   }
 
   /** 下書きを捨てる。**共有の端末で、前の人の回答を消せる口。** */
@@ -542,6 +653,7 @@
     clearDraft(publicId);
     draftFound = false;
     draftNotice = t('draft.discarded');
+    void focusPageTop();
   }
 
   /**
@@ -562,17 +674,40 @@
     return Object.keys(errors).length === 0;
   }
 
+  /** ページが変わったあと、描き直しを待ってから見出しへフォーカスを移す（Issue #900）。 */
+  async function focusPageTop() {
+    await tick();
+    focusPageHeading(document);
+  }
+
+  /** 送信のあと、フォーカスが落ちていたら戻す（Issue #900）。 */
+  async function focusSubmitResult() {
+    await tick();
+    focusSubmitResultIn(document);
+  }
+
+  /** 描き直しを待ってから、最初の誤りへフォーカスを移す。 */
+  async function focusErrors() {
+    await tick();
+    focusFirstError();
+  }
+
   function goNext() {
-    if (!checkCurrentStep()) {return;}
+    if (!checkCurrentStep()) {
+      void focusErrors();
+      return;
+    }
     stepIndex = Math.min(stepIndex + 1, Math.max(steps.length - 1, 0));
     errors = {};
     window.scrollTo({ top: 0 });
+    void focusPageTop();
   }
 
   function goBack() {
     stepIndex = Math.max(stepIndex - 1, 0);
     errors = {};
     window.scrollTo({ top: 0 });
+    void focusPageTop();
   }
 
   /** 選ばれた添付を、設問と組にして取り出す。 */
@@ -643,12 +778,39 @@
       }));
   }
 
+  /**
+   * 次の送信のために、チケットと proof-of-work の解答（と外部の CAPTCHA）を取り直す。
+   *
+   * **送信が受け付けられなかったときは毎回呼ぶ**（Issue #959）。
+   * 取り直せなければ、いまの値を残す。
+   */
+  async function renewCredentials() {
+    const fresh = await renewSubmitCredentials(publicId, requiresProofOfWork);
+    if (!fresh) {
+      return;
+    }
+
+    responseToken = fresh.responseToken;
+    ticket = fresh.ticket;
+    altcha = fresh.altcha;
+
+    // **外部の CAPTCHA も描き直す**（Issue #164）。同じ解答は 2 度通らない
+    if (usesCaptcha) {
+      captchaToken = '';
+      captchaWidget?.reset();
+    }
+  }
+
   async function submit() {
-    if (!checkCurrentStep()) {return;}
+    if (!checkCurrentStep()) {
+      void focusErrors();
+      return;
+    }
 
     submitting = true;
     submitError = '';
     attachmentMessages = [];
+    maintenanceMessages = [];
 
     try {
       const result = await submitAnswers(
@@ -676,25 +838,21 @@
           result.rejection === 'tooManyRequests'
             ? t('submit.tooManyRequests')
             : t('submit.rejected');
+        await renewCredentials();
+        return;
+      }
 
-        // **チケットが切れていただけのことがある。** 取り直して次の操作で通るようにする
-        const reissued = await requestTicket(publicId);
-        if (reissued) {
-          responseToken = reissued.responseToken;
-          ticket = reissued.ticket;
-
-          // **課題も取り直す。** 使い終えた解答は 2 度通らない
-          altcha = '';
-          if (requiresProofOfWork && reissued.altcha) {
-            altcha = (await solveAltcha(reissued.altcha)) ?? '';
-          }
-
-          // **外部の CAPTCHA も描き直す**（Issue #164）。同じ解答は 2 度通らない
-          if (usesCaptcha) {
-            captchaToken = '';
-            captchaWidget?.reset();
-          }
+      // **サーバ側の都合（メンテナンス・一時的な 5xx）も画面は切り替えない**（Issue #961）。
+      // 「見つからない」へ切り替えると、入力中の回答が失われたように見える
+      if (result.unavailable) {
+        if (result.unavailable === 'maintenance') {
+          // **7 言語の固定文言を並べる。** 画面とサーバの言語判定の食い違いに依存しない
+          maintenanceMessages = maintenanceNotices(language);
+        } else {
+          submitError = t('submit.unavailable');
         }
+        // **サーバが解答を使い切っていることがある**（Issue #959）。取り直す
+        await renewCredentials();
         return;
       }
 
@@ -718,14 +876,30 @@
             submitError = serverValidationMessage('SubmitButtonConditionNotMet');
             continue;
           }
+          // **設問に結び付かない理由（`''`）は送信ボタンの近くへ出す。**
+          // 鍵が `''` のままでは、どの設問にも表示されず、回答者へ届かない
+          if (questionId === '') {
+            submitError = codes.map(serverValidationMessage).join(' / ');
+            continue;
+          }
           mapped[questionId] = codes.map(serverValidationMessage).join(' / ');
         }
         errors = mapped;
+        void focusErrors();
       }
+
+      // **422・503 のあとも取り直す**（Issue #959）。サーバは解答を受付の前に使い切るので、
+      // 直して押し直したときに同じ解答では 403 になる
+      await renewCredentials();
     } catch {
       submitError = t('submit.failed');
+
+      // **通信が切れた場合も取り直す。** 要求がサーバへ届いていれば、解答は使い切られている。
+      // 取り直せなければ（まだ切れている）、いまの値を残す
+      await renewCredentials();
     } finally {
       submitting = false;
+      void focusSubmitResult();
     }
   }
 
@@ -793,6 +967,22 @@
         {t('rejected.embeddingNotAllowed.open')}
       </a>
     {/if}
+  {:else if screen === 'unavailable' && unavailable}
+    <!-- **一時的な失敗。** 「見つからない」「URL が正しくない」とは区別し、再読み込みを促す（Issue #965） -->
+    <h1>{t('unavailable.title')}</h1>
+    {#if unavailable.kind === 'maintenance'}
+      <!-- **7 言語の固定文言を並べる。** 送信時のメンテナンス（Issue #961）と同じ方式 -->
+      <ul class="status maintenance-notices" role="alert">
+        {#each maintenanceNotices(language, 'unavailable.maintenance') as notice (notice.language)}
+          <li lang={notice.language}><strong>{notice.name}</strong> {notice.text}</li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="status" role="alert">
+        {t(unavailable.target === 'pending' ? 'unavailable.pending' : 'unavailable.temporary')}
+      </p>
+    {/if}
+    <button type="button" onclick={() => location.reload()}>{t('unavailable.reload')}</button>
   {:else if screen === 'error'}
     <h1>{t('error.badUrl.title')}</h1>
     <p class="status">{t('error.badUrl')}</p>
@@ -916,7 +1106,28 @@
           assetUrl={contentAssetUrl}
           bind:answer={answers[question.questionId]}
           error={errors[question.questionId]}
-        />
+          describedBy={lookupWarningIdsFor(question.questionId)}
+        >
+          {#snippet extra()}
+            {#each lookupsFor(question.questionId) as lookup (lookup.lookupId)}
+              {#if lookupSessions && definition}
+                <LookupControl
+                  {lookup}
+                  version={definition.version}
+                  {publicId}
+                  {language}
+                  fallbackLanguage={definition.fallbackLanguage}
+                  questions={lookupQuestions}
+                  {answers}
+                  visible={path.visible}
+                  sessions={lookupSessions}
+                  onapply={applyLookup}
+                  onwarnings={setLookupWarnings}
+                />
+              {/if}
+            {/each}
+          {/snippet}
+        </QuestionField>
       {/each}
 
       <!-- **ハニーポット。** 画面にも読み上げにも出さず、キーボードでも辿れない場所に置く。
@@ -944,7 +1155,13 @@
         </div>
       {/if}
 
-      {#if attachmentMessages.length > 0}
+      {#if maintenanceMessages.length > 0}
+        <ul class="error maintenance-notices" role="alert">
+          {#each maintenanceMessages as notice (notice.language)}
+            <li lang={notice.language}><strong>{notice.name}</strong> {notice.text}</li>
+          {/each}
+        </ul>
+      {:else if attachmentMessages.length > 0}
         <ul class="error" role="alert">
           {#each attachmentMessages as message (message)}
             <li>{message}</li>
@@ -1047,59 +1264,44 @@
 </main>
 
 <style lang="scss">
-  /* **テーマで差し替わるのはここに書いた既定値**（Issue #56）。
-     何も指定されなければ、この値のまま＝今までの見た目 */
-  :global(:root) {
-    --border: #d0d5dd;
-    --muted: #667085;
-    --error: #b42318;
-    --accent: #175cd3;
-    --bg: #f9fafb;
-    --text: #101828;
-    /* **釦の文字色と入力欄の地**（Issue #109）。
-       今までは #fff を直に書いていた。既定値は変えていないので見た目は同じ */
-    --accent-text: #fff;
-    --surface: #fff;
-    --motion-duration: 0.2s;
-    /* **同梱した書体を既定にする**（Issue #152）。テーマで変えられる */
-    --font: 'Noto Sans JP Variable', system-ui, sans-serif;
-    --font-mono: 'M PLUS 1 Code Variable', ui-monospace, Consolas, monospace;
-  }
+  /* **テーマで差し替わる名前（--accent など）の既定値は styles/base.css に移した**（Issue #776）。
+     値は DesignReference のトークン（styles/tokens.css）から引く。
+     何も指定されなければその値＝既定の見た目。アンケートの作成者のテーマは lib/theme.ts が上書きする */
 
   :global(body) {
     margin: 0;
     background: var(--bg);
     font-family: var(--font);
     color: var(--text);
-    line-height: 1.6;
+    line-height: 1.7;
   }
 
   main {
     max-width: 46rem;
     margin: 0 auto;
-    padding: 2rem 1rem 4rem;
+    padding: var(--space-8) var(--space-4) 4rem;
   }
 
   h1 {
     font-size: 1.5rem;
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
   }
 
   h2 {
     font-size: 1.15rem;
-    margin: 1.5rem 0 0.5rem;
+    margin: var(--space-6) 0 var(--space-2);
   }
 
   .lead {
     color: var(--muted);
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
   }
 
   /* ---- 埋め込みの知らせ（Issue #107）--------------------------------------- */
 
   .embed-notice {
-    margin: 0 0 1rem;
-    padding: 0.5rem 0.75rem;
+    margin: 0 0 var(--space-4);
+    padding: var(--space-2) var(--space-3);
     border-left: 3px solid var(--muted);
     color: var(--muted);
     font-size: 0.9rem;
@@ -1111,13 +1313,13 @@
     border: 1px solid var(--border);
     /* **色だけに頼らない。** 左端の太い線でも「いつもと違う」が分かる */
     border-left: 4px solid var(--accent);
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    margin: 0 0 1rem;
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin: 0 0 var(--space-4);
   }
 
   .draft p {
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
   }
 
   .draft-note {
@@ -1128,14 +1330,14 @@
   .draft-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
   }
 
   .draft-notice {
     color: var(--muted);
     font-size: 0.9rem;
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
   }
 
   .status {
@@ -1145,9 +1347,9 @@
   .progress {
     height: 6px;
     background: var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
-    margin: 1rem 0 0.25rem;
+    margin: var(--space-4) 0 var(--space-1);
   }
 
   .bar {
@@ -1156,17 +1358,30 @@
     transition: width var(--motion-duration) ease;
   }
 
+  /* 強制カラー（Windows のコントラストテーマ）では背景色が OS の色に置き換わり、進捗バーが消える（Issue #902）。
+     枠と、システムカラーの塗りで示す */
+  @media (forced-colors: active) {
+    .progress {
+      border: 1px solid CanvasText;
+    }
+
+    .bar {
+      forced-color-adjust: none;
+      background: Highlight;
+    }
+  }
+
   .progress-text {
     color: var(--muted);
     font-size: 0.85rem;
-    margin: 0 0 1.5rem;
+    margin: 0 0 var(--space-6);
   }
 
   .actions {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-3);
     justify-content: flex-end;
-    margin-top: 1.5rem;
+    margin-top: var(--space-6);
   }
 
   .action-item {
@@ -1183,10 +1398,15 @@
   }
 
   .button-link {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: var(--control-h);
     font: inherit;
-    padding: 0.6rem 1.25rem;
-    border-radius: 6px;
+    font-weight: 700;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-md);
     border: 1px solid var(--accent);
     text-decoration: none;
     text-align: center;
@@ -1197,8 +1417,11 @@
     color: var(--accent);
   }
 
+  /* **無効は、色を落として枠だけにする**（透過にしない。DesignReference の部品の決まり） */
   .button-link.disabled {
-    opacity: 0.6;
+    background: var(--bg);
+    color: var(--muted);
+    border-color: var(--border);
     cursor: not-allowed;
   }
 
@@ -1208,8 +1431,8 @@
     width: 100%;
     max-height: 14rem;
     object-fit: cover;
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
   }
 
   .display-settings {
@@ -1217,8 +1440,8 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.75rem 1rem;
-    margin-bottom: 1rem;
+    gap: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-4);
     font-size: 0.85rem;
     color: var(--muted);
   }
@@ -1228,9 +1451,9 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.5rem 1rem;
-    margin-top: 2rem;
-    padding-top: 1rem;
+    gap: var(--space-2) var(--space-4);
+    margin-top: var(--space-8);
+    padding-top: var(--space-4);
     border-top: 1px solid var(--border);
     font-size: 0.85rem;
 
@@ -1246,16 +1469,22 @@
   }
 
   button {
+    box-sizing: border-box;
+    min-height: var(--control-h);
     font: inherit;
-    padding: 0.6rem 1.25rem;
-    border-radius: 6px;
+    font-weight: 700;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-md);
     border: 1px solid var(--accent);
     background: var(--accent);
     color: var(--accent-text);
     cursor: pointer;
 
+    /* **無効は、色を落として枠だけにする**（透過にしない） */
     &:disabled {
-      opacity: 0.6;
+      background: var(--bg);
+      color: var(--muted);
+      border-color: var(--border);
       cursor: not-allowed;
     }
 
@@ -1263,32 +1492,47 @@
       background: var(--surface);
       color: var(--accent);
     }
+
+    &.secondary:disabled {
+      background: var(--bg);
+      color: var(--muted);
+    }
   }
 
   .error {
     color: var(--error);
   }
 
+  .maintenance-notices {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .maintenance-notices li + li {
+    margin-top: 0.4rem;
+  }
+
   .note {
     color: var(--muted);
     font-size: 0.85rem;
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
   }
 
   /* **CAPTCHA は送信の直前に置く**（Issue #164） */
   .captcha {
-    margin: 1.5rem 0 0;
+    margin: var(--space-6) 0 0;
   }
 
   .captcha-notice {
-    margin: 0.5rem 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--muted);
     font-size: 0.8rem;
   }
 
   /* **告知は小さく、でも読める大きさで**（Issue #162） */
   .analytics-notice {
-    margin: 2rem 0 0;
+    margin: var(--space-8) 0 0;
     color: var(--muted);
     font-size: 0.8rem;
   }

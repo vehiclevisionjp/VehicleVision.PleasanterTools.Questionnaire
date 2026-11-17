@@ -446,15 +446,15 @@
   .panel {
     max-width: 24rem;
     margin: 4rem auto;
-    padding: 2rem;
+    padding: var(--space-8);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   h1 {
     font-size: 1.25rem;
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
   }
 
   .lead {
@@ -466,22 +466,22 @@
   .hint {
     color: var(--muted);
     font-size: 0.85rem;
-    margin: -0.5rem 0 0.75rem;
+    margin: -0.5rem 0 var(--space-3);
   }
 
   label {
     display: block;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
     font-size: 0.9rem;
   }
 
   input {
     display: block;
     width: 100%;
-    margin-top: 0.25rem;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    margin-top: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     box-sizing: border-box;
   }
@@ -490,7 +490,7 @@
   .or {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     margin: 1.25rem 0;
     color: var(--muted);
     font-size: 0.85rem;
@@ -510,7 +510,7 @@
     background: var(--surface);
     color: inherit;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     font: inherit;
     cursor: pointer;
   }
@@ -522,22 +522,22 @@
   }
 
   .waiting {
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
   }
 
   .saml:hover {
-    background: var(--surface, #f5f5f5);
+    background: var(--surface);
   }
 
   button[type='submit'] {
     width: 100%;
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
   }
 
   .link {
     display: block;
     width: 100%;
-    margin-top: 1rem;
+    margin-top: var(--space-4);
     background: none;
     border: none;
     color: var(--accent);

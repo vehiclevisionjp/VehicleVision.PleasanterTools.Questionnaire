@@ -71,7 +71,7 @@
   h2,
   h3,
   h4 {
-    margin: 0.75rem 0 0.25rem;
+    margin: var(--space-3) 0 var(--space-1);
     line-height: 1.4;
 
     &:first-child {
@@ -92,15 +92,15 @@
   }
 
   p {
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
     line-height: 1.7;
     white-space: pre-line;
   }
 
   ul,
   ol {
-    margin: 0 0 0.5rem;
-    padding-left: 1.5rem;
+    margin: 0 0 var(--space-2);
+    padding-left: var(--space-6);
     line-height: 1.7;
   }
 
@@ -112,7 +112,7 @@
     display: block;
     max-width: 100%;
     height: auto;
-    margin: 0.5rem 0;
+    margin: var(--space-2) 0;
   }
 
   :last-child {

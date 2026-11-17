@@ -88,6 +88,20 @@ export const vi: Partial<Record<MessageKey, string>> = {
   'submit.rejected': 'Không thể tiếp nhận câu trả lời. Vui lòng nhấn “Gửi” một lần nữa.',
   'submit.insecureContext': 'Vui lòng mở trang này bằng kết nối an toàn (https). Không thể gửi trong trạng thái hiện tại.',
   'submit.failed': 'Không thể gửi. Nội dung đã nhập vẫn được giữ nguyên. Vui lòng chờ một lát rồi thử lại.',
+  'submit.maintenance':
+    'Không thể gửi trong lúc bảo trì. Nội dung đã nhập vẫn được giữ nguyên. Vui lòng thử lại sau.',
+  'submit.unavailable':
+    'Dịch vụ đang gặp sự cố tạm thời. Nội dung đã nhập vẫn được giữ nguyên. Vui lòng thử lại sau.',
+  'unavailable.title':
+    'Tạm thời không mở được',
+  'unavailable.temporary':
+    'Dịch vụ đang gặp sự cố tạm thời. Vui lòng tải lại trang này sau.',
+  'unavailable.pending':
+    'Hiện không thể tải các câu trả lời đã gửi. Biểu mẫu chưa được mở để nội dung không bị ghi đè. Vui lòng tải lại trang này sau.',
+  'unavailable.maintenance':
+    'Trang này không mở được trong lúc bảo trì. Vui lòng tải lại trang này sau.',
+  'unavailable.reload':
+    'Tải lại',
 
   'attachment.defaultName': 'Tệp đính kèm',
   'attachment.extensionNotAllowed': '{name}: không tiếp nhận loại tệp này',
@@ -137,4 +151,34 @@ export const vi: Partial<Record<MessageKey, string>> = {
   'serverValidation.ScannerUnavailable': 'Không thể tiếp nhận lúc này vì không thể kiểm tra tệp đính kèm',
   'serverValidation.SubmitButtonConditionNotMet': 'Chưa đáp ứng điều kiện gửi',
   'serverValidation.unknown': 'Vui lòng kiểm tra nội dung đã nhập',
+
+  'lookup.search': 'Tìm kiếm và điền',
+  'lookup.keysMissing': 'Để tìm kiếm, vui lòng nhập {fields}.',
+  'lookup.searching': 'Đang tìm kiếm.',
+  'lookup.notFound': 'Không tìm thấy. Vui lòng kiểm tra nội dung đã nhập.',
+  'lookup.chooseTitle': 'Vui lòng chọn kết quả để điền',
+  'lookup.candidateCount': 'Có {count} kết quả phù hợp.',
+  'lookup.candidateLabel': 'Kết quả {number}',
+  'lookup.apply': 'Điền',
+  'lookup.cancel': 'Hủy',
+  'lookup.selectFirst': 'Chọn 1 kết quả để điền.',
+  'lookup.applied': 'Đã điền kết quả tìm kiếm.',
+  'lookup.appliedNothing': 'Không có giá trị nào để điền. Nội dung bạn đã nhập không bị thay đổi.',
+  'lookup.confirmTitle': 'Ghi đè các giá trị đã nhập?',
+  'lookup.confirmOverwrite': 'Bạn có muốn ghi đè các giá trị đã nhập bằng kết quả tìm kiếm không?',
+  'lookup.confirmFields': 'Các mục sẽ bị ghi đè: {fields}',
+  'lookup.confirmApply': 'Ghi đè và điền',
+  'lookup.choiceUnavailable': 'Không thể điền vì không nằm trong các lựa chọn của {question}.',
+  'lookup.valueInvalid': 'Giá trị này không thể nhập vào {question}.',
+  'lookup.tooMany': 'Có quá nhiều kết quả. Vui lòng nhập giá trị tìm kiếm cụ thể hơn.',
+  'lookup.failed': 'Không thể lấy kết quả. Vui lòng thử lại sau một lát.',
+  'lookup.timeout': 'Việc tìm kiếm đang mất nhiều thời gian. Vui lòng thử lại sau một lát.',
+  'lookup.rateLimited': 'Đã đạt giới hạn số lần tìm kiếm. Vui lòng thử lại sau {seconds} giây.',
+  'lookup.rateLimitedLater': 'Đã đạt giới hạn số lần tìm kiếm. Vui lòng thử lại sau một lát.',
+  'lookup.versionChanged': 'Biểu mẫu đã được cập nhật. Vui lòng tải lại trang và kiểm tra nội dung.',
+  'lookup.sessionExpired': 'Phiên tìm kiếm đã hết hạn. Vui lòng tìm kiếm lại.',
+  'lookup.closed': 'Hiện không thể tìm kiếm trong biểu mẫu này.',
+  'lookup.invalidKeys': 'Vui lòng kiểm tra các giá trị tìm kiếm.',
+  'lookup.requestTooLarge': 'Nội dung nhập quá dài. Vui lòng xem lại các giá trị tìm kiếm.',
+  'lookup.stale': 'Điều kiện tìm kiếm đã thay đổi nên kết quả trước đó không được sử dụng. Vui lòng tìm kiếm lại.',
 };

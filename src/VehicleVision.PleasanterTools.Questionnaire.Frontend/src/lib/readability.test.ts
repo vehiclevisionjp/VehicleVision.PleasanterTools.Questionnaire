@@ -17,33 +17,43 @@ describe('resolveReadabilityPreferences', () => {
     ).toEqual({ fontSize: 'large', colorMode: 'default', reducedMotion: true });
   });
 
-  it('保存値が無ければ OS の高コントラストを優先する', () => {
-    expect(
-      resolveReadabilityPreferences(null, {
-        dark: true,
-        highContrast: true,
-        reducedMotion: false,
-      }).colorMode,
-    ).toBe('system');
-  });
-
-  it('高コントラストでなければ OS のダーク設定を使う', () => {
+  it('保存値も固定も無ければ、OS がダークでもライトで始める', () => {
     expect(
       resolveReadabilityPreferences(null, {
         dark: true,
         highContrast: false,
         reducedMotion: false,
       }).colorMode,
-    ).toBe('system');
+    ).toBe('default');
   });
 
-  it('文字寸法だけを保存した場合は配色に OS の設定を使う', () => {
+  it('保存値も固定も無くても、OS の高コントラスト設定には従う', () => {
+    expect(
+      resolveReadabilityPreferences(null, {
+        dark: true,
+        highContrast: true,
+        reducedMotion: false,
+      }).colorMode,
+    ).toBe('highContrast');
+  });
+
+  it('文字寸法だけを保存した場合も、配色はライトで始める', () => {
     expect(
       resolveReadabilityPreferences(
         { fontSize: 'large' },
         { dark: true, highContrast: false, reducedMotion: false },
       ),
-    ).toEqual({ fontSize: 'large', colorMode: 'system', reducedMotion: false });
+    ).toEqual({ fontSize: 'large', colorMode: 'default', reducedMotion: false });
+  });
+
+  it('作成者が「OS に合わせる」を選んだときだけ、OS のダークに従う', () => {
+    expect(
+      resolveReadabilityPreferences(
+        null,
+        { dark: true, highContrast: false, reducedMotion: false },
+        'System',
+      ).colorMode,
+    ).toBe('system');
   });
 
   it('保存が無ければアンケートと運用側の固定を OS 設定より優先する', () => {

@@ -191,11 +191,11 @@
 <style lang="scss">
   .publish {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-3);
     padding: 1.25rem;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   h2 {
@@ -206,7 +206,7 @@
   .settings,
   fieldset {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   fieldset {
@@ -230,14 +230,14 @@
 
   .hint {
     display: block;
-    margin: 0.25rem 0 0;
+    margin: var(--space-1) 0 0;
     color: var(--muted);
     font-size: 0.8rem;
   }
 
   .warn {
     margin: 0;
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     background: var(--bg);
     border-left: 3px solid var(--error);
     font-size: 0.85rem;
@@ -256,6 +256,6 @@
 
   .actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 </style>

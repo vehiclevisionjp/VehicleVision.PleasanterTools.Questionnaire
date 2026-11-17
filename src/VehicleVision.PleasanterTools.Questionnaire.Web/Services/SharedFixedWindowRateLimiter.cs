@@ -104,7 +104,7 @@ public static class RateLimitPartitions
     /// </para>
     /// <para>
     /// ⚠️ **書体は文字の範囲ごとに分割されている**（<c>wwwroot/assets</c> に
-    /// woff2 が 366 個）。**表示する文字が増えるほど追加で読まれる**ので、
+    /// woff2 が 263 個）。**表示する文字が増えるほど追加で読まれる**ので、
     /// 1 画面あたりの本数は content 次第で増える（Issue #316）。
     /// </para>
     /// <para>

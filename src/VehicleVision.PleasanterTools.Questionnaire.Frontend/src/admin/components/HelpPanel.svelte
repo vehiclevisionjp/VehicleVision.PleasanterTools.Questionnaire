@@ -56,7 +56,7 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   h1 {
@@ -74,20 +74,20 @@
   }
 
   .guide {
-    margin-top: 1.5rem;
+    margin-top: var(--space-6);
     padding: 1.25rem;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--surface);
   }
 
   ol,
   ul {
-    margin: 0.75rem 0 0;
-    padding-left: 1.5rem;
+    margin: var(--space-3) 0 0;
+    padding-left: var(--space-6);
   }
 
   li + li {
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
   }
 </style>

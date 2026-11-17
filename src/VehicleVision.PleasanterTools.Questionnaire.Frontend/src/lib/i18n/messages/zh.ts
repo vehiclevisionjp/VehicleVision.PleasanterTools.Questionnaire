@@ -96,6 +96,20 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'submit.rejected': '未能受理提交。请再次点击“提交”。',
   'submit.insecureContext': '请通过安全连接（https）打开此页面。当前状态下无法提交。',
   'submit.failed': '提交失败。输入内容仍会保留。请稍后再次尝试。',
+  'submit.maintenance':
+    '系统维护中，暂时无法提交。输入内容仍会保留。请稍后重试。',
+  'submit.unavailable':
+    '服务暂时出现问题。输入内容仍会保留。请稍后重试。',
+  'unavailable.title':
+    '暂时无法打开',
+  'unavailable.temporary':
+    '服务暂时出现问题。请稍后重新加载本页面。',
+  'unavailable.pending':
+    '目前无法读取已提交的回答。为避免内容被覆盖，未打开回答页面。请稍后重新加载本页面。',
+  'unavailable.maintenance':
+    '系统维护中，暂时无法打开。请稍后重新加载本页面。',
+  'unavailable.reload':
+    '重新加载',
 
   // ---- 附件 --------------------------------------------------------------
   'attachment.defaultName': '附件',
@@ -148,4 +162,34 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'serverValidation.ScannerUnavailable': '无法检查附件，因此当前无法受理',
   'serverValidation.SubmitButtonConditionNotMet': '尚未满足提交条件',
   'serverValidation.unknown': '请确认输入内容',
+
+  'lookup.search': '检索并填入',
+  'lookup.keysMissing': '要检索，请填写{fields}。',
+  'lookup.searching': '正在检索。',
+  'lookup.notFound': '未找到。请确认填写的内容。',
+  'lookup.chooseTitle': '请选择要填入的候选项',
+  'lookup.candidateCount': '有 {count} 个候选项。',
+  'lookup.candidateLabel': '候选项 {number}',
+  'lookup.apply': '填入',
+  'lookup.cancel': '取消',
+  'lookup.selectFirst': '选择 1 个候选项后即可填入。',
+  'lookup.applied': '已填入检索结果。',
+  'lookup.appliedNothing': '没有可填入的值。填写的内容未作更改。',
+  'lookup.confirmTitle': '要覆盖已填写的值吗',
+  'lookup.confirmOverwrite': '要用检索结果覆盖已填写的值吗？',
+  'lookup.confirmFields': '将被覆盖的项目：{fields}',
+  'lookup.confirmApply': '覆盖并填入',
+  'lookup.choiceUnavailable': '不在 {question} 的选项中，因此无法填入。',
+  'lookup.valueInvalid': '无法填入 {question} 的值。',
+  'lookup.tooMany': '候选项过多。请填写更详细的检索值。',
+  'lookup.failed': '无法获取。请稍后再试。',
+  'lookup.timeout': '检索耗时较长。请稍后再试。',
+  'lookup.rateLimited': '已达到检索次数上限。请在 {seconds} 秒后再试。',
+  'lookup.rateLimitedLater': '已达到检索次数上限。请稍后再试。',
+  'lookup.versionChanged': '表单已更新。请重新加载并确认内容。',
+  'lookup.sessionExpired': '检索已过期。请重新检索。',
+  'lookup.closed': '目前此表单无法检索。',
+  'lookup.invalidKeys': '请确认检索的值。',
+  'lookup.requestTooLarge': '填写的内容过长。请重新检查检索的值。',
+  'lookup.stale': '由于检索条件已更改，未使用之前的检索结果。请再次检索。',
 };

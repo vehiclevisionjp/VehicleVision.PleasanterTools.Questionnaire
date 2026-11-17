@@ -110,7 +110,8 @@ public class ResponseSenderTests
         SurveySnapshot? snapshot = null,
         MappingDefinition? mapping = null,
         ResponseSenderOptions? options = null,
-        IAdminNotificationStore? notifications = null)
+        IAdminNotificationStore? notifications = null,
+        string baseUrl = "https://pleasanter.example.test")
     {
         var outbox = new FakeOutbox();
         var tokens = new FakeTokenStore();
@@ -120,11 +121,11 @@ public class ResponseSenderTests
             effective = effective with { Mapping = mapping };
         }
 
-        var client = new PleasanterApiClient(
+        var client = new PleasanterGateway(
             new HttpClient(handler),
             new PleasanterOptions
             {
-                BaseUrl = "http://pleasanter",
+                BaseUrl = baseUrl,
                 ApiKey = "key",
                 ApiKeyUserTimeZoneId = "Asia/Tokyo",
             });
@@ -349,6 +350,74 @@ public class ResponseSenderTests
 
         Assert.Equal(SendOutcome.DeadLettered, await sender.SendOnceAsync());
         Assert.Contains("マッピングの不備", outbox.DeadLettered.Single().Error);
+    }
+
+    [Theory]
+    [InlineData("http://pleasanter:8080")]
+    [InlineData("https://user:secret@pleasanter.example.test")]
+    [InlineData("https://pleasanter.example.test?x=1")]
+    public async Task BaseUrlが使えなければ_通信せず_再送の対象のまま残し_専用の知らせを出す(string baseUrl)
+    {
+        // **サーバー側の設定の誤り（内部エラー）。認証の失敗でも恒久的な失敗でもない**
+        var notifications = new FakeAdminNotificationStore();
+        var handler = new StubHandler();
+        var (sender, outbox, _) = Build(handler, notifications: notifications, baseUrl: baseUrl);
+        outbox.Enqueue(Pending());
+
+        Assert.Equal(SendOutcome.Rescheduled, await sender.SendOnceAsync());
+
+        Assert.Empty(outbox.DeadLettered);
+
+        // **RetryCount を増やさない更新で残す**（Issue #853）
+        Assert.Empty(outbox.Rescheduled);
+        var rescheduled = Assert.Single(outbox.Postponed);
+        Assert.DoesNotContain("secret", rescheduled.Error);
+        Assert.DoesNotContain("pleasanter", rescheduled.Error);
+        Assert.Equal(
+            [((int)AdminNotificationKind.PleasanterConfigurationInvalid, Guid.Empty)],
+            notifications.Raised);
+        Assert.Empty(handler.RequestedPaths);
+    }
+
+    [Fact]
+    public async Task BaseUrlが使えない間は_再送の上限に達してもデッドレターへ回さない()
+    {
+        var options = new ResponseSenderOptions { MaxRetryCount = 3 };
+        var (sender, outbox, _) = Build(new StubHandler(), options: options, baseUrl: "http://pleasanter:8080");
+        outbox.Enqueue(Pending(retryCount: 3));
+
+        Assert.Equal(SendOutcome.Rescheduled, await sender.SendOnceAsync());
+        Assert.Empty(outbox.DeadLettered);
+        Assert.Single(outbox.Postponed);
+        Assert.Empty(outbox.Rescheduled);
+    }
+
+    [Fact]
+    public async Task 設定の誤りが続いたあとの一時的な失敗_1_回では_デッドレターへ回さない()
+    {
+        // 設定の誤りの間は RetryCount が進まない（Postponed）ので、直したあとの最初の一時的な失敗は上限の手前に収まる（Issue #853）
+        var options = new ResponseSenderOptions { MaxRetryCount = 3 };
+        var (broken, brokenOutbox, _) = Build(new StubHandler(), options: options, baseUrl: "http://pleasanter:8080");
+        brokenOutbox.Enqueue(Pending(retryCount: 2));
+        Assert.Equal(SendOutcome.Rescheduled, await broken.SendOnceAsync());
+        Assert.Single(brokenOutbox.Postponed);
+
+        var handler = new StubHandler().Enqueue(HttpStatusCode.InternalServerError, "{}");
+        var (fixedSender, outbox, _) = Build(handler, options: options);
+        outbox.Enqueue(Pending(retryCount: 2));
+
+        Assert.Equal(SendOutcome.Rescheduled, await fixedSender.SendOnceAsync());
+        Assert.Single(outbox.Rescheduled);
+        Assert.Empty(outbox.DeadLettered);
+    }
+
+    [Fact]
+    public void 設定の誤りで送れなかったときは_再送間隔の上限だけ待つ()
+    {
+        var options = new ResponseSenderOptions { RetryMaxDelay = TimeSpan.FromMinutes(30) };
+        var now = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        Assert.Equal(now.AddMinutes(30), options.NextAttemptAtAfterConfigurationError(now));
     }
 
     [Fact]

@@ -81,12 +81,12 @@ export const es: Partial<Record<MessageKey, string>> = {
   'question.rankingDown': 'Bajar',
   'question.rankingClear': 'Quitar puesto',
   'question.rankingStatus': '{label}: puesto {rank} de {total}',
-  'question.fileCountLimit': 'Hasta {count} archivos',
+  'question.fileCountLimit': 'Hasta {count} {count|archivo|archivos}',
   'question.fileSizeLimitMegabytes': 'Hasta {megabytes} MB por archivo',
   'question.fileSizeLimitBytes': 'Hasta {bytes} bytes por archivo',
   'question.selectionRange': 'Elija entre {minimum} y {maximum} opciones',
-  'question.selectionMinimum': 'Elija al menos {minimum} opciones',
-  'question.selectionMaximum': 'Elija hasta {maximum} opciones',
+  'question.selectionMinimum': 'Elija al menos {minimum} {minimum|opción|opciones}',
+  'question.selectionMaximum': 'Elija hasta {maximum} {maximum|opción|opciones}',
   'question.normalizationNotice':
     'Después de introducir el texto, el ancho de los caracteres y los espacios circundantes se convierten automáticamente según la configuración.',
 
@@ -96,6 +96,20 @@ export const es: Partial<Record<MessageKey, string>> = {
     'Abra esta página mediante una conexión segura (https). No se puede enviar en el estado actual.',
   'submit.failed':
     'No hemos podido enviar su respuesta. Sus respuestas siguen aquí; espere un momento e inténtelo de nuevo.',
+  'submit.maintenance':
+    'No se puede enviar durante el mantenimiento. Sus respuestas siguen aquí; inténtelo de nuevo más tarde.',
+  'submit.unavailable':
+    'El servicio tiene un problema temporal. Sus respuestas siguen aquí; inténtelo de nuevo más tarde.',
+  'unavailable.title':
+    'No disponible temporalmente',
+  'unavailable.temporary':
+    'El servicio tiene un problema temporal. Vuelva a cargar esta página más tarde.',
+  'unavailable.pending':
+    'Ahora no se pueden cargar sus respuestas enviadas. No se ha abierto el formulario para no sobrescribirlas. Vuelva a cargar esta página más tarde.',
+  'unavailable.maintenance':
+    'Esta página no está disponible durante el mantenimiento. Vuelva a cargar esta página más tarde.',
+  'unavailable.reload':
+    'Volver a cargar',
 
   'attachment.defaultName': 'Archivo adjunto',
   'attachment.extensionNotAllowed': '{name}: no se acepta este tipo de archivo',
@@ -108,15 +122,15 @@ export const es: Partial<Record<MessageKey, string>> = {
 
   'validation.required': 'Responda a esta pregunta',
   'validation.fileRequired': 'Elija un archivo',
-  'validation.fileCount': 'Elija como máximo {count} archivos',
+  'validation.fileCount': 'Elija como máximo {count} {count|archivo|archivos}',
   'validation.fileTooLarge': '{name}: el archivo es demasiado grande',
   'validation.singleValueOnly': 'Elija solo una respuesta',
   'validation.rowRequired': 'Responda a todas las filas',
   'validation.duplicateRank': 'El mismo elemento tiene más de un puesto',
-  'validation.tooFewSelections': 'Elija al menos {minimum} opciones',
-  'validation.tooManySelections': 'Elija como máximo {maximum} opciones',
+  'validation.tooFewSelections': 'Elija al menos {minimum} {minimum|opción|opciones}',
+  'validation.tooManySelections': 'Elija como máximo {maximum} {maximum|opción|opciones}',
   'validation.pattern': 'Introduzca el valor en el formato solicitado',
-  'validation.tooLong': 'Use como máximo {max} caracteres',
+  'validation.tooLong': 'Use como máximo {max} {max|carácter|caracteres}',
   'validation.email': 'Introduzca una dirección de correo electrónico válida',
   'validation.url': 'Introduzca una URL que comience con http:// o https://',
   'validation.notANumber': 'Introduzca un número',
@@ -147,4 +161,34 @@ export const es: Partial<Record<MessageKey, string>> = {
     'No se pueden revisar los archivos adjuntos ahora, así que aún no se pueden aceptar',
   'serverValidation.SubmitButtonConditionNotMet': 'No se cumplen las condiciones para enviar',
   'serverValidation.unknown': 'Compruebe lo que ha introducido',
+
+  'lookup.search': 'Buscar y rellenar',
+  'lookup.keysMissing': 'Para buscar, introduzca {fields}.',
+  'lookup.searching': 'Buscando…',
+  'lookup.notFound': 'No se encontró nada. Compruebe lo que ha introducido.',
+  'lookup.chooseTitle': 'Elija el resultado que desea introducir',
+  'lookup.candidateCount': 'Hay {count} resultados.',
+  'lookup.candidateLabel': 'Resultado {number}',
+  'lookup.apply': 'Introducir',
+  'lookup.cancel': 'Cancelar',
+  'lookup.selectFirst': 'Elija un resultado para poder introducirlo.',
+  'lookup.applied': 'Se han introducido los resultados de la búsqueda.',
+  'lookup.appliedNothing': 'No había valores que introducir. No se ha cambiado nada de lo introducido.',
+  'lookup.confirmTitle': '¿Sobrescribir los valores ya introducidos?',
+  'lookup.confirmOverwrite': '¿Desea sobrescribir los valores ya introducidos con los resultados de la búsqueda?',
+  'lookup.confirmFields': 'Campos que se sobrescribirán: {fields}',
+  'lookup.confirmApply': 'Sobrescribir e introducir',
+  'lookup.choiceUnavailable': 'No se puede introducir porque no figura entre las opciones de la pregunta «{question}».',
+  'lookup.valueInvalid': 'Ese valor no se puede introducir en la pregunta «{question}».',
+  'lookup.tooMany': 'Hay demasiados resultados. Introduzca un valor de búsqueda más concreto.',
+  'lookup.failed': 'No se pudo obtener el resultado. Inténtelo de nuevo más tarde.',
+  'lookup.timeout': 'La búsqueda está tardando. Inténtelo de nuevo más tarde.',
+  'lookup.rateLimited': 'Se alcanzó el límite de búsquedas. Inténtelo de nuevo dentro de {seconds} segundos.',
+  'lookup.rateLimitedLater': 'Se alcanzó el límite de búsquedas. Inténtelo de nuevo más tarde.',
+  'lookup.versionChanged': 'El formulario se ha actualizado. Vuelva a cargar la página y compruebe el contenido.',
+  'lookup.sessionExpired': 'La búsqueda ha caducado. Vuelva a buscar.',
+  'lookup.closed': 'Ahora mismo no se puede buscar en este formulario.',
+  'lookup.invalidKeys': 'Compruebe los valores de búsqueda.',
+  'lookup.requestTooLarge': 'Lo introducido es demasiado largo. Revise los valores de búsqueda.',
+  'lookup.stale': 'Como han cambiado las condiciones de búsqueda, no se usaron los resultados anteriores. Vuelva a buscar.',
 };

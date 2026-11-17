@@ -122,7 +122,9 @@ public static class AdminNotificationEndpoints
             row.Count,
             DbTime.AsUtc(row.FirstOccurredAt),
             DbTime.AsUtc(row.LastOccurredAt),
-            DbTime.AsUtc(row.ReadAt));
+            DbTime.AsUtc(row.ReadAt),
+            row.LookupId,
+            row.LastCorrelationId);
     }
 
     /// <summary>DB の整数を画面が読む名前にする。</summary>
@@ -148,6 +150,8 @@ public sealed record AdminNotificationPageResponse(
 /// <param name="Kind">種類の名前（<c>DeadLettered</c> など）。</param>
 /// <param name="SurveyId">紐づくアンケート。**無ければ返らない。**</param>
 /// <param name="ReadAt">既読の時刻。**未読なら返らない。**</param>
+/// <param name="LookupId">ルックアップの検索 ID。**ルックアップ以外の知らせでは返らない。**（Issue #836）</param>
+/// <param name="CorrelationId">直近に起きたときの相関 ID。ログと突き合わせる。**無ければ返らない。**</param>
 public sealed record AdminNotificationResponse(
     Guid Id,
     string Kind,
@@ -156,4 +160,6 @@ public sealed record AdminNotificationResponse(
     int Count,
     DateTime FirstOccurredAt,
     DateTime LastOccurredAt,
-    DateTime? ReadAt);
+    DateTime? ReadAt,
+    string? LookupId = null,
+    string? CorrelationId = null);

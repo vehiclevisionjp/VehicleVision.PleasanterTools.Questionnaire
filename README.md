@@ -41,7 +41,7 @@ flowchart LR
 
 ## 技術スタック
 
-Pleasanter 本体（`Pleasanter_1.5.8.1`）に揃えている。
+Pleasanter 本体（`Pleasanter_1.5.9.1`）に揃えている。
 
 | 層 | 採用 |
 | --- | --- |
@@ -50,6 +50,24 @@ Pleasanter 本体（`Pleasanter_1.5.8.1`）に揃えている。
 | フロントエンド | TypeScript + Vite + Svelte + SCSS |
 | Pleasanter との接続 | 標準 Web API |
 
+## ご利用上の注意
+
+### 日本郵便の郵便番号・デジタルアドレス API を使うとき
+
+ルックアップ項目の参照元として、日本郵便の郵便番号・デジタルアドレス API を使う機能は、**準備中（未実装）** です。
+使えるようになった後の注意として、先に書いておきます。
+
+- **SaaS 型（API の認証キーを提供者が預かり、複数の顧客に使わせる形）では使用できません。**
+  日本郵便の利用規約は、API の第三者企業への提供を禁じています
+  （提供が要る場合は、システム登録時に「API 組込みシステムの第三者提供特約」への同意が要ります）。
+- 本アプリは、日本郵便の認証キーを預かりません。**本アプリを使う方が、自分で日本郵便の API を申し込み、
+  自分の認証キーを管理画面へ登録して使う**形です。
+- 利用の形が、日本郵便の利用規約・特約に合うかは、**利用者ご自身で、日本郵便の利用規約を読んで判断してください。**
+  本アプリの提供者は、規約への適合を保証しません。
+
+出典: 日本郵便の API のサービスご利用上の注意事項（参照日 2026-11-06）。
+詳細は [`_documents/日本郵便参照元の確認-運用手順書.md`](_documents/日本郵便参照元の確認-運用手順書.md)。
+
 ## 貢献する
 
 **貢献の前に [`CLA.md`](CLA.md) への署名が要ります**（デュアルライセンスのため）。
@@ -57,8 +75,8 @@ Pleasanter 本体（`Pleasanter_1.5.8.1`）に揃えている。
 
 ## 導入する
 
-GitHub Release には、Azure App Service（Windows Web App）とオンプレミス IIS で共用できる
-配置用 ZIP と SHA-256 を添付する。**Pleasanter の DB とは別に本アプリ専用 DB を作る。**
+GitHub Release には、Azure App Service（Windows Web App を基本とし、Linux Web App でも動作する）と
+オンプレミス IIS で共用できる配置用 ZIP と SHA-256 を添付する。**Pleasanter の DB とは別に本アプリ専用 DB を作る。**
 マイグレーションは起動時に自動で当たる（v0.5.0 から既定。無効にして手で当てることもできる）。
 
 初回導入、設定、DB作成、更新、ロールバックは
@@ -69,6 +87,18 @@ GitHub Release には、Azure App Service（Windows Web App）とオンプレミ
 - Pleasanter のログインで管理画面へ入る（シングルサインオン。v0.7.0）:
   [`_documents/Pleasanter-SSO-運用手順書.md`](_documents/Pleasanter-SSO-運用手順書.md)
 - 設定の一覧: [`_documents/設定パラメータ一覧.md`](_documents/設定パラメータ一覧.md)
+
+## 破壊的変更（0.13.x から更新する場合）
+
+- 検証用の環境変数 `PLEASANTER_ALLOW_INSECURE_HTTP` を `VVPT_PLEASANTER_ALLOW_INSECURE_HTTP` へ改名した。
+  **旧名は検出も受け付けもしない**（旧名だけの環境では新名が未設定として扱われる）。設定している環境は書き換える
+  （本番では有効にしない設定）。試験環境のスクリプトの `PLEASANTER_BASE_URL`・`PLEASANTER_API_KEY` も
+  `VVPT_PLEASANTER_BASE_URL`・`VVPT_PLEASANTER_API_KEY` へ改名した
+- `--migrate` / `--migrate-status`: DB の待機期限切れの終了コードが 2 から 1 になり、出力に `[OK]`・`[ERROR]` の接頭辞が付き、
+  進行表示は標準エラーへ移った。`--wait-for-db` は `N`・`=N`・`:N` の 3 書式を受ける
+
+対応表・直し方・影響は [`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md) の
+「3.4 破壊的変更（旧版から更新する場合）」を参照。
 
 ## 開発をはじめる
 

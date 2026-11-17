@@ -55,6 +55,11 @@ var pathBase = PathBaseOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(pathBase);
 builder.Services.AddSingleton<HtmlShell>();
 
+// **トップページ（`/`）の案内先も外部設定だけで決める**（Issue #967）。**未設定なら従来どおり入口の HTML。**
+// 宛先は設定した人だけが決め、要求の値では変えない。書き間違いは起動時に止める
+var rootRedirect = RootRedirectOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(rootRedirect);
+
 // **合言葉を塞ぐ指定と救済トークンも外部設定だけで決める。**
 // 画面から変えられると、その場で自分自身を締め出せるため。
 var adminPasswordSignInOptions =
@@ -101,8 +106,8 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 // ---- 設定 ------------------------------------------------------------------
 // **資格情報の実値はコミットしない。** .local.json・環境変数・Key Vault から読む
 // （App_Data/Parameters/README.md）
-var provider = Enum.Parse<DatabaseProvider>(
-    builder.Configuration["QUESTIONNAIRE_DB_PROVIDER"] ?? nameof(DatabaseProvider.SqlServer));
+var provider = StartupSettingValidation.ParseDatabaseProvider(
+    builder.Configuration[StartupSettingValidation.DatabaseProviderKey]);
 var usesSqlite = provider is DatabaseProvider.Sqlite;
 var databaseStartupState = new DatabaseStartupState();
 builder.Services.AddSingleton(databaseStartupState);
@@ -120,15 +125,18 @@ var useRedisSessionStore =
 // 別々に持つと、片方だけ接続先や資格情報を更新する事故が起きる。
 if (sharedStateOptions.UseRedis || useRedisSessionStore)
 {
-    var redisConnectionString =
-        builder.Configuration[SharedStateOptions.ConnectionStringKey]
-        ?? throw new InvalidOperationException(
-            $"{SharedStateOptions.ConnectionStringKey} is required when Redis is used.");
-    var redisConfiguration = ConfigurationOptions.Parse(redisConnectionString);
+    var redisConnectionString = StartupSettingValidation.RequireRedisConnectionString(
+        builder.Configuration[SharedStateOptions.ConnectionStringKey],
+        SharedStateOptions.ConnectionStringKey);
 
     // **一時的に到達できなくてもアプリ自体は起動する。**
     // 共有状態はプロセス内へ倒し、セッション照合はログアウト扱いにする。
-    redisConfiguration.AbortOnConnectFail = false;
+    // **待ち時間は短くする**（既定 1 秒・切断中はすぐ失敗。Issue #899）。
+    // 既定の 5 秒のままだと、ルックアップの拒否（503）が約 17 秒後になる
+    var redisConfiguration = SharedStateConnection.CreateOptions(
+        redisConnectionString,
+        StartupSettingValidation.ParseSharedStateTimeoutMilliseconds(
+            builder.Configuration[StartupSettingValidation.SharedStateTimeoutKey]));
     builder.Services.AddSingleton<IConnectionMultiplexer>(
         ConnectionMultiplexer.Connect(redisConfiguration));
 }
@@ -234,11 +242,51 @@ builder.Services.AddSingleton<IScriptConverter>(serviceProvider =>
     new JintScriptConverter(serviceProvider.GetRequiredService<ScriptConverterOptions>()));
 builder.Services.AddSingleton(serviceProvider =>
     new MappingEvaluator(serviceProvider.GetRequiredService<IScriptConverter>()));
+// **リダイレクトを追わない**（API キーは本文に載り、307・308 は本文を転送先へ再送するため。Issue #844）。
+// 時間切れは `PleasanterGateway` 側（接続設定の Timeout）で切るので、HttpClient の既定は無制限にする
 builder.Services.AddHttpClient("pleasanter", client =>
-    client.Timeout = Timeout.InfiniteTimeSpan);
-builder.Services.AddTransient(serviceProvider => new PleasanterApiClient(
+        client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(
+        VehicleVision.PleasanterTools.DotNetClient.PleasanterHttp.CreateHandler);
+builder.Services.AddTransient(serviceProvider => new PleasanterGateway(
     serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter"),
     serviceProvider.GetRequiredService<IPleasanterOptionsProvider>()));
+
+// **ルックアップ専用の検索クライアント**（Issue #829）。回答保存用とは別の HttpClient。
+// **リダイレクトを追わない**（専用の API キーを別のホストへ送らない）。時間切れはクライアント側で 5 秒に絞る。
+// 平文の HTTP（ループバックだけ）は開発用の `Lookup:AllowLoopbackHttp` を明示したときだけ
+builder.Services.AddHttpClient("pleasanter-lookup", client => client.Timeout = Timeout.InfiniteTimeSpan)
+    // 標準のログ（要求の URL・例外の文言を出す）は外す。接続先・証明書の詳細をログへ出さない（Issue #898）
+    .RemoveAllLoggers()
+    .ConfigurePrimaryHttpMessageHandler(LookupCertificateValidation.CreateHandler);
+builder.Services.AddSingleton(new LookupSearchOptions
+{
+    AllowLoopbackHttp = builder.Configuration.GetValue<bool>("Lookup:AllowLoopbackHttp"),
+});
+builder.Services.AddSingleton<ILookupCredentialStore, LookupCredentialStore>();
+builder.Services.AddTransient(serviceProvider => new LookupSearchClient(
+    serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("pleasanter-lookup"),
+    serviceProvider.GetRequiredService<LookupSearchOptions>()));
+builder.Services.AddTransient<LookupSearchService>();
+// 管理画面の接続試験・列の取得・公開前検証（Issue #879）
+builder.Services.AddTransient<ILookupSiteInspectionService, LookupSiteInspectionService>();
+builder.Services.AddTransient<LookupPublishValidator>();
+builder.Services.AddTransient<ILookupSearchService>(
+    serviceProvider => serviceProvider.GetRequiredService<LookupSearchService>());
+
+// **ルックアップの公開 API**（Issue #832）。署名つきの短命トークン・3 つの枠・同時実行数。
+// 枠は既存の共有レート制限ストアを再利用し、**ストア障害時は拒否する**（プロセス内へ退避しない）。
+// 上限は既定値だけで、環境変数・設定ファイルからは読まない
+builder.Services.AddSingleton(new LookupPublicOptions());
+// **サーバー全体のスイッチ。既定は無効**（実機の総合判定がそろうまで有効にしない。Issue #883）。
+// 書き間違いは設定名つきで起動時に止める。無効でも管理側（定義の編集・保存・接続試験など）は使える
+builder.Services.AddSingleton(LookupFeatureOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<ILookupRateGate>(serviceProvider => new LookupRateGate(
+    serviceProvider.GetService<ISharedRateLimitStore>(),
+    serviceProvider.GetRequiredService<ILogger<LookupRateGate>>()));
+builder.Services.AddSingleton<LookupConcurrencyGate>();
+// 参照元の不備（502）の管理者通知（Issue #833）。既存の管理者通知の表へ立てる。窓は LookupPublicOptions の既定値
+builder.Services.AddSingleton<ILookupFailureNotifier, LookupFailureNotifier>();
 
 // **溜まりすぎたら受付を止める**（Issue #72、_documents/非機能設計.md 2 章）。
 // **WAF が無い導入先を想定した最後の壁。** 分散した相手にはレート制限が効かない。
@@ -248,6 +296,7 @@ builder.Services.AddSingleton(backlogGuardOptions);
 builder.Services.AddSingleton<ResponseBacklogGuard>();
 
 builder.Services.AddSingleton<ResponseIntake>();
+builder.Services.AddTransient<ResponseReader>();
 
 // **HTTP でやり取りする JSON も定義と同じ設定にする。**
 // 既定のままだと LocalizedText が言語コードのオブジェクトにならず、
@@ -346,9 +395,8 @@ builder.Services.AddSingleton<CaptchaVerifier>();
 // ---- 管理者の認証 ----------------------------------------------------------
 // **共有鍵を復号するための鍵。** 失うと登録済みの 2 要素が全て使えなくなるので、
 // **App Service の設定か Key Vault に置き、控えを取っておくこと**
-var secretKey = builder.Configuration["QUESTIONNAIRE_SECRET_KEY"]
-    ?? throw new InvalidOperationException(
-        "QUESTIONNAIRE_SECRET_KEY が設定されていない（Base64 の 32 バイト）");
+var secretKey = StartupSettingValidation.RequireSecretKey(
+    builder.Configuration[StartupSettingValidation.SecretKeyKey]);
 
 // **管理者・復旧コード・セッションは Core.Data の共有ストア**（Core_AdminUsers ほか）。
 // TOTP の共有鍵の暗号化は、本アプリの SecretProtector を ISecretCipher に合わせたアダプタで渡す
@@ -488,6 +536,12 @@ var submissionGuardOptions = new SubmissionGuardOptions
 };
 
 builder.Services.AddSingleton(submissionGuardOptions);
+
+// 検索用トークンは送信チケットと鍵の派生も版も別（検索に送信権限を持たせない）
+builder.Services.AddSingleton(serviceProvider => new LookupSessionTokens(
+    secretKey,
+    serviceProvider.GetRequiredService<LookupPublicOptions>(),
+    serviceProvider.GetRequiredService<TimeProvider>()));
 builder.Services.AddSingleton(serviceProvider => new SubmissionGuard(
     secretKey, submissionGuardOptions, serviceProvider.GetRequiredService<TimeProvider>()));
 
@@ -952,6 +1006,11 @@ if (!app.Environment.IsDevelopment() && !transportSecurity.AllowInsecure)
 // 埋め込み先だけは 30 秒 TTL の設定スナップショットから要求ごとに差し替える。
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
+// **管理 API の状態を変える要求を、同一オリジンの画面からのものに限る**（Issue #907）。
+// `SameSite=Strict` は同一サイト（登録可能なドメインが同じ別オリジン）を止められない。
+// PathBase を剥がし、経路を照合した後・認証の前に置く（例外の経路は剥がした後の Path で見る）
+app.UseMiddleware<AdminCsrfMiddleware>();
+
 app.UseRateLimiter();
 
 app.UseAuthentication();
@@ -976,6 +1035,8 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.MapFormEndpoints();
+app.MapLookupEndpoints();
+app.MapAdminLookupEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminSessionEndpoints();
@@ -1079,7 +1140,22 @@ static IResult IndexPage(HttpContext context, HtmlShell shell)
 }
 
 app.MapFallback("/f/{**path}", IndexPage);
-app.MapMethods("/", [HttpMethods.Get, HttpMethods.Head], IndexPage);
+
+// **`/` だけ、設定があれば 302 で案内する**（Issue #967。`/index.html`・`/f/…` は変えない）。
+// 宛先は設定から組み立てる（要求の値は使わない）。サイト内のパスは PathBase を足す。
+// 宛先は運用側が変えられるので、キャッシュさせず毎回確かめさせる（入口の HTML と同じ指示）
+IResult RootPage(HttpContext context, HtmlShell shell)
+{
+    if (!rootRedirect.IsConfigured)
+    {
+        return IndexPage(context, shell);
+    }
+
+    context.Response.Headers.CacheControl = StaticCachePolicy.RevalidateValue;
+    return Results.Redirect(rootRedirect.Resolve(context.Request.PathBase));
+}
+
+app.MapMethods("/", [HttpMethods.Get, HttpMethods.Head], RootPage);
 app.MapMethods($"/{HtmlShell.IndexFile}", [HttpMethods.Get, HttpMethods.Head], IndexPage);
 
 // **管理画面の素の HTML は配らない。** 入口は設定した管理画面パスだけにする

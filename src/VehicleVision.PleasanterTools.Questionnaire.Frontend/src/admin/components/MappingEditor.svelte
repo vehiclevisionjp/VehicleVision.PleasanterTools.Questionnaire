@@ -471,7 +471,7 @@
                           type="button"
                           class="icon danger"
                           onclick={() => removeSource(index, sourceIndex)}
-                          aria-label={t('mapping.removeSource')}>×</button
+                          aria-label={t('mapping.removeSource')}><span class="material-icons" aria-hidden="true">close</span></button
                         >
                       {/if}
                     </li>
@@ -608,7 +608,7 @@
                   type="button"
                   class="icon danger"
                   onclick={() => remove(index)}
-                  aria-label={t('mapping.removeAssignment')}>×</button
+                  aria-label={t('mapping.removeAssignment')}><span class="material-icons" aria-hidden="true">close</span></button
                 >
               </td>
             </tr>
@@ -638,9 +638,9 @@
   .budget {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem 1rem;
+    gap: var(--space-2) var(--space-4);
     list-style: none;
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
     padding: 0;
     color: var(--muted);
     font-size: 0.85rem;
@@ -656,12 +656,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
   }
 
   .buttons {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   h2 {
@@ -673,7 +673,7 @@
   .status {
     color: var(--muted);
     font-size: 0.85rem;
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
   }
 
   /* **狭い画面では横へ流す。** 3 列の対応が読めなくなるので畳まない */
@@ -683,7 +683,7 @@
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--surface);
   }
 
@@ -696,11 +696,13 @@
   th {
     text-align: left;
     font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--muted);
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border);
+    padding: var(--space-2) var(--space-3);
     white-space: nowrap;
+    /* **見出し行は鉄紺・白文字**（DesignReference の表の決まり） */
+    background: var(--color-primary);
+    color: var(--color-on-fill);
+    font-weight: 700;
+    border-bottom: 1px solid var(--color-primary-edge);
   }
 
   /* **矢印で「ソース → 変換 → ターゲット」の向きを見せる。** 文言には入れない */
@@ -727,7 +729,7 @@
   }
 
   td {
-    padding: 0.6rem 0.75rem;
+    padding: 0.6rem var(--space-3);
     vertical-align: top;
     border-top: 1px solid var(--border);
   }
@@ -791,7 +793,6 @@
     gap: 0.4rem;
     align-items: center;
     margin-bottom: 0.4rem;
-
     select {
       flex: 1;
       min-width: 6rem;
@@ -831,9 +832,9 @@
   select {
     display: block;
     width: 100%;
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    padding: 0.4rem var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     background: var(--surface);
     color: var(--text);
@@ -846,9 +847,8 @@
 
   .converter-config {
     display: grid;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-
+    gap: var(--space-2);
+    margin-top: var(--space-2);
     label > span {
       display: block;
       color: var(--muted);
@@ -859,7 +859,7 @@
 
   .column-label {
     display: block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
     font-size: 0.8rem;
     color: var(--muted);
   }
@@ -884,7 +884,7 @@
     line-height: 1;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
 
     &.danger {
@@ -894,6 +894,6 @@
 
   .small {
     font-size: 0.85rem;
-    padding: 0.35rem 0.75rem;
+    padding: 0.35rem var(--space-3);
   }
 </style>

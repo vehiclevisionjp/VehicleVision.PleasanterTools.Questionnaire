@@ -69,6 +69,9 @@ public static class ServerMessages
         [ServerMessageKeys.InvitationMailSubject] = "설문 조사 관리 화면 초대",
         [ServerMessageKeys.InvitationMailBody] = "설문 조사 관리 화면 초대가 도착했습니다.\n\n다음 URL을 열고 비밀번호를 정하세요.\n{0}\n\n만료: {1} (UTC)\n\n이 메일을 예상하지 못했다면 URL을 열지 말고 삭제하세요.",
         [ServerMessageKeys.PublishBlockedByAutoReply] = "공개할 수 없습니다. 자동 회신 메일 설정으로는 메일을 보낼 수 없습니다.",
+        [ServerMessageKeys.PublishBlockedByLookup] = "공개할 수 없습니다. 룩업 설정에 문제가 있습니다.",
+        [ServerMessageKeys.LookupCredentialInvalid] = "API 키를 입력하세요(비어 있는 값, 512자를 초과하는 값, 제어 문자는 사용할 수 없습니다).",
+        [ServerMessageKeys.LookupSettingsForbidden] = "룩업 설정을 변경할 수 있는 사람은 설문 조사 관리자뿐입니다.",
         [ServerMessageKeys.NoAnswerableQuestion] = "답변할 수 있는 질문이 없습니다.",
         [ServerMessageKeys.NotPublishedYet] = "아직 공개되지 않았습니다.",
         [ServerMessageKeys.VersionAlreadyPublished] = "이 버전은 이미 공개되었습니다. 다시 불러온 후 다시 시도하세요.",
@@ -96,12 +99,14 @@ public static class ServerMessages
         [ServerMessageKeys.SettingsValuesRequired] = "설정 값을 지정하세요.",
         [ServerMessageKeys.PleasanterConnectionRequired] = "Pleasanter의 URL과 API 키를 지정하세요.",
         [ServerMessageKeys.PleasanterConnectionFailed] = "Pleasanter에 연결할 수 없습니다. URL, API 키, 연결 대상의 상태를 확인하세요.",
+        [ServerMessageKeys.PleasanterConfigurationInvalid] = "Pleasanter 접속 대상(BaseUrl) 설정을 사용할 수 없습니다. https(루프백만 http 허용)로 지정하고 자격 증명·쿼리·프래그먼트는 포함하지 마세요.",
         [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "로그인 ID가 이메일 주소가 아니므로 테스트 전송을 할 수 없습니다.",
         [ServerMessageKeys.MaintenanceMessageTooLong] = "메시지는 {0}자 이내로 입력하세요.",
         [ServerMessageKeys.SettingKeyNotManaged] = "관리 대상이 아닌 설정입니다: {0}",
         [ServerMessageKeys.SettingFixedExternally] = "설정 “{0}”은(는) 외부 설정으로 고정되어 있어 화면에서 변경할 수 없습니다.",
         [ServerMessageKeys.ProofOfWorkRangeInvalid] = "proof-of-work의 탐색 하한은 탐색 상한 이하로 지정하세요.",
         [ServerMessageKeys.LinkedSitesUnreachable] = "연결된 사이트를 가져올 수 없습니다. 대상 사이트 ID와 API 키 사용자의 권한을 확인하세요.",
+        [ServerMessageKeys.SiteSettingsNotReadable] = "회답 저장 사이트의 설정을 읽을 수 없습니다. Pleasanter 1.5.10.0 이후는 사이트를 관리할 수 없는 API 키 사용자에게 사이트 설정을 반환하지 않습니다. API 키 사용자에게 이 사이트의 관리 권한을 부여하세요.",
         [ServerMessageKeys.FallbackLanguageUnsupported] = "대체 언어 코드가 지원되지 않는 언어입니다.",
         [ServerMessageKeys.PleasanterSiteWriteFailed] = "Pleasanter에서 사이트를 만들거나 업데이트할 수 없습니다. 권한과 설정을 확인하세요.",
         [ServerMessageKeys.SettingValueTooLong] = "{0}: {1}자 이내로 입력하세요.",
@@ -228,6 +233,9 @@ public static class ServerMessages
                 + "到期时间：{1} (UTC)\n\n"
                 + "如果您未曾预期收到此邮件，请勿打开 URL 并删除此邮件。",
             [ServerMessageKeys.PublishBlockedByAutoReply] = "无法发布。自动回复邮件的设置无法发送电子邮件。",
+            [ServerMessageKeys.PublishBlockedByLookup] = "无法发布。查找设置存在问题。",
+            [ServerMessageKeys.LookupCredentialInvalid] = "请输入 API 密钥（不能为空，不能超过 512 个字符，也不能包含控制字符）。",
+            [ServerMessageKeys.LookupSettingsForbidden] = "只有问卷管理员才能更改查找设置。",
             [ServerMessageKeys.NoAnswerableQuestion] = "没有可回答的问题。",
             [ServerMessageKeys.NotPublishedYet] = "尚未发布。",
             [ServerMessageKeys.VersionAlreadyPublished] = "此版本已发布。请重新加载后再试。",
@@ -255,12 +263,14 @@ public static class ServerMessages
             [ServerMessageKeys.SettingsValuesRequired] = "请指定设置值。",
             [ServerMessageKeys.PleasanterConnectionRequired] = "请指定 Pleasanter 的 URL 和 API 密钥。",
             [ServerMessageKeys.PleasanterConnectionFailed] = "无法连接到 Pleasanter。请检查 URL、API 密钥和连接目标的状态。",
+            [ServerMessageKeys.PleasanterConfigurationInvalid] = "无法使用 Pleasanter 连接目标（BaseUrl）的设置。请使用 https（仅回环地址允许 http），且不要包含凭据、查询或片段。",
             [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "登录 ID 不是电子邮件地址，因此无法试发。",
             [ServerMessageKeys.MaintenanceMessageTooLong] = "消息请在 {0} 个字符以内输入。",
             [ServerMessageKeys.SettingKeyNotManaged] = "这不是受管理的设置：{0}",
             [ServerMessageKeys.SettingFixedExternally] = "设置“{0}”由外部配置固定，无法在界面中更改。",
             [ServerMessageKeys.ProofOfWorkRangeInvalid] = "proof-of-work 的搜索下限必须小于或等于搜索上限。",
             [ServerMessageKeys.LinkedSitesUnreachable] = "无法获取链接目标的站点。请检查对方站点 ID 以及 API 密钥所属用户的权限。",
+            [ServerMessageKeys.SiteSettingsNotReadable] = "无法读取答复保存站点的设置。Pleasanter 1.5.10.0 及以后版本不会向无法管理该站点的 API 密钥用户返回站点设置。请为 API 密钥所属用户授予此站点的管理权限。",
             [ServerMessageKeys.FallbackLanguageUnsupported] = "指定的回退语言代码不是受支持的语言。",
             [ServerMessageKeys.PleasanterSiteWriteFailed] = "无法在 Pleasanter 中创建或更新站点。请检查权限和设置。",
             [ServerMessageKeys.SettingValueTooLong] = "{0}：请在 {1} 个字符以内输入。",
@@ -344,6 +354,9 @@ public static class ServerMessages
                 + "Caduca: {1} (UTC)\n\n"
                 + "Si no esperaba este mensaje, descártelo sin abrir la URL.",
             [ServerMessageKeys.PublishBlockedByAutoReply] = "No se puede publicar. La configuración de respuesta automática no puede enviar un correo electrónico.",
+            [ServerMessageKeys.PublishBlockedByLookup] = "No se puede publicar. La configuración de la búsqueda tiene problemas.",
+            [ServerMessageKeys.LookupCredentialInvalid] = "Introduzca una clave de API (no se permiten valores vacíos, de más de 512 caracteres ni con caracteres de control).",
+            [ServerMessageKeys.LookupSettingsForbidden] = "Solo los administradores de encuestas pueden cambiar la configuración de la búsqueda.",
             [ServerMessageKeys.NoAnswerableQuestion] = "No hay ninguna pregunta que se pueda responder.",
             [ServerMessageKeys.NotPublishedYet] = "Esta encuesta aún no se ha publicado.",
             [ServerMessageKeys.VersionAlreadyPublished] = "Esta versión ya se ha publicado. Vuelva a cargar la página e inténtelo de nuevo.",
@@ -371,12 +384,14 @@ public static class ServerMessages
             [ServerMessageKeys.SettingsValuesRequired] = "Especifique los valores de configuración.",
             [ServerMessageKeys.PleasanterConnectionRequired] = "Especifique la URL y la clave de API de Pleasanter.",
             [ServerMessageKeys.PleasanterConnectionFailed] = "No se pudo conectar con Pleasanter. Compruebe la URL, la clave de API y el estado del destino.",
+            [ServerMessageKeys.PleasanterConfigurationInvalid] = "No se puede usar la configuración del destino de conexión de Pleasanter (BaseUrl). Especifique https (http solo para loopback) sin credenciales, consulta ni fragmento.",
             [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "El ID de inicio de sesión no es una dirección de correo, por lo que no se puede enviar una prueba.",
             [ServerMessageKeys.MaintenanceMessageTooLong] = "Introduzca un mensaje de {0} caracteres como máximo.",
             [ServerMessageKeys.SettingKeyNotManaged] = "Esta configuración no está administrada: {0}",
             [ServerMessageKeys.SettingFixedExternally] = "La configuración «{0}» está fijada por la configuración externa y no se puede cambiar desde la pantalla.",
             [ServerMessageKeys.ProofOfWorkRangeInvalid] = "El valor mínimo de búsqueda de proof-of-work no debe superar el máximo.",
             [ServerMessageKeys.LinkedSitesUnreachable] = "No se pudo obtener el sitio vinculado. Compruebe el ID del sitio de destino y los permisos del usuario de la clave de API.",
+            [ServerMessageKeys.SiteSettingsNotReadable] = "No se puede leer la configuración del sitio donde se guardan las respuestas. Pleasanter 1.5.10.0 y posteriores no devuelven la configuración del sitio a un usuario de clave de API que no puede administrarlo. Conceda al usuario de la clave de API el permiso de administración de este sitio.",
             [ServerMessageKeys.FallbackLanguageUnsupported] = "El código del idioma de reserva no es un idioma admitido.",
             [ServerMessageKeys.PleasanterSiteWriteFailed] = "No se pudo crear ni actualizar el sitio en Pleasanter. Compruebe los permisos y la configuración.",
             [ServerMessageKeys.SettingValueTooLong] = "{0}: introduzca {1} caracteres como máximo.",
@@ -459,6 +474,9 @@ public static class ServerMessages
             [ServerMessageKeys.InvitationMailSubject] = "Sie wurden zur Umfrageverwaltung eingeladen",
             [ServerMessageKeys.InvitationMailBody] = "Sie wurden zum Verwaltungsbildschirm für Umfragen eingeladen.\n\nÖffnen Sie die folgende URL und wählen Sie Ihr Passwort.\n{0}\n\nLäuft ab: {1} (UTC)\n\nWenn Sie dies nicht erwartet haben, löschen Sie diese Nachricht, ohne die URL zu öffnen.",
             [ServerMessageKeys.PublishBlockedByAutoReply] = "Veröffentlichung nicht möglich. Die Einstellungen für automatische Antworten können keine E-Mail senden.",
+            [ServerMessageKeys.PublishBlockedByLookup] = "Veröffentlichung nicht möglich. Die Lookup-Einstellungen sind fehlerhaft.",
+            [ServerMessageKeys.LookupCredentialInvalid] = "Geben Sie einen API-Schlüssel ein (leere Werte, mehr als 512 Zeichen und Steuerzeichen sind nicht zulässig).",
+            [ServerMessageKeys.LookupSettingsForbidden] = "Nur Umfrageadministratoren können die Lookup-Einstellungen ändern.",
             [ServerMessageKeys.NoAnswerableQuestion] = "Es gibt keine Frage, die beantwortet werden kann.",
             [ServerMessageKeys.NotPublishedYet] = "Diese Umfrage wurde noch nicht veröffentlicht.",
             [ServerMessageKeys.VersionAlreadyPublished] = "Diese Version wurde bereits veröffentlicht. Laden Sie die Seite neu und versuchen Sie es erneut.",
@@ -486,12 +504,14 @@ public static class ServerMessages
             [ServerMessageKeys.SettingsValuesRequired] = "Geben Sie die Einstellungswerte an.",
             [ServerMessageKeys.PleasanterConnectionRequired] = "Geben Sie die Pleasanter-URL und den API-Schlüssel an.",
             [ServerMessageKeys.PleasanterConnectionFailed] = "Die Verbindung zu Pleasanter ist fehlgeschlagen. Prüfen Sie URL, API-Schlüssel und den Zustand des Ziels.",
+            [ServerMessageKeys.PleasanterConfigurationInvalid] = "Die Einstellung für das Pleasanter-Verbindungsziel (BaseUrl) ist nicht verwendbar. Geben Sie https an (http nur für Loopback) – ohne Anmeldedaten, Abfrage oder Fragment.",
             [ServerMessageKeys.SettingsTestSendLoginIdNotEmail] = "Die Anmelde-ID ist keine E-Mail-Adresse, daher kann keine Testnachricht gesendet werden.",
             [ServerMessageKeys.MaintenanceMessageTooLong] = "Geben Sie eine Nachricht mit höchstens {0} Zeichen ein.",
             [ServerMessageKeys.SettingKeyNotManaged] = "Diese Einstellung wird nicht verwaltet: {0}",
             [ServerMessageKeys.SettingFixedExternally] = "Die Einstellung „{0}“ ist durch externe Konfiguration festgelegt und kann auf dem Bildschirm nicht geändert werden.",
             [ServerMessageKeys.ProofOfWorkRangeInvalid] = "Der untere Suchwert für Proof-of-Work darf den oberen nicht überschreiten.",
             [ServerMessageKeys.LinkedSitesUnreachable] = "Die verknüpfte Site konnte nicht abgerufen werden. Prüfen Sie die ID der Zielsite und die Berechtigungen des API-Schlüssel-Benutzers.",
+            [ServerMessageKeys.SiteSettingsNotReadable] = "Die Einstellungen der Antwort-Site können nicht gelesen werden. Pleasanter 1.5.10.0 und neuer geben einem API-Schlüssel-Benutzer, der die Site nicht verwalten darf, keine Site-Einstellungen zurück. Erteilen Sie dem API-Schlüssel-Benutzer die Verwaltungsberechtigung für diese Site.",
             [ServerMessageKeys.FallbackLanguageUnsupported] = "Der Code der Rückfallsprache ist keine unterstützte Sprache.",
             [ServerMessageKeys.PleasanterSiteWriteFailed] = "Die Site konnte in Pleasanter nicht erstellt oder aktualisiert werden. Prüfen Sie Berechtigungen und Einstellungen.",
             [ServerMessageKeys.SettingValueTooLong] = "{0}: Geben Sie höchstens {1} Zeichen ein.",
@@ -845,6 +865,24 @@ public static class ServerMessages
             "Không thể công bố. Cài đặt trả lời tự động không thể gửi email.");
 
         Add(
+            ServerMessageKeys.PublishBlockedByLookup,
+            "公開できません。ルックアップの設定に不備があります。",
+            "Cannot publish. The lookup settings have problems.",
+            "Không thể công bố. Cài đặt tra cứu có vấn đề.");
+
+        Add(
+            ServerMessageKeys.LookupCredentialInvalid,
+            "API キーを入力してください（空・512 文字超・制御文字は使えません）。",
+            "Enter an API key (empty values, more than 512 characters and control characters are not allowed).",
+            "Hãy nhập khóa API (không được để trống, quá 512 ký tự hoặc chứa ký tự điều khiển).");
+
+        Add(
+            ServerMessageKeys.LookupSettingsForbidden,
+            "ルックアップの設定を変更できるのは、アンケート管理者だけです。",
+            "Only a survey administrator can change the lookup settings.",
+            "Chỉ quản trị viên khảo sát mới có thể thay đổi cài đặt tra cứu.");
+
+        Add(
             ServerMessageKeys.NoAnswerableQuestion,
             "回答できる設問がありません。",
             "There is no question that can be answered.",
@@ -1009,6 +1047,12 @@ public static class ServerMessages
             "Vui lòng chỉ định URL và khóa API của Pleasanter.");
 
         Add(
+            ServerMessageKeys.PleasanterConfigurationInvalid,
+            "Pleasanter への接続先（BaseUrl）の設定が使えません。https（ループバックだけ http 可）で、資格情報・クエリ・フラグメントを含めずに指定してください。",
+            "The Pleasanter connection URL (BaseUrl) setting cannot be used. Specify an https URL (http is allowed only for loopback) without credentials, query or fragment.",
+            "Không thể sử dụng cấu hình URL kết nối Pleasanter (BaseUrl). Hãy chỉ định URL https (chỉ loopback mới được dùng http), không kèm thông tin xác thực, truy vấn hoặc đoạn.");
+
+        Add(
             ServerMessageKeys.PleasanterConnectionFailed,
             "Pleasanter へ接続できませんでした。URL、API キー、接続先の状態をご確認ください。",
             "Could not connect to Pleasanter. Check the URL, the API key and the state of the server.",
@@ -1049,6 +1093,12 @@ public static class ServerMessages
             "リンク先のサイトを引けませんでした。相手サイト ID か、API キーの利用者の権限を確認してください。",
             "The linked site could not be retrieved. Check the target site ID and the permissions of the API key's user.",
             "Không thể truy xuất trang được liên kết. Vui lòng kiểm tra ID trang đích và quyền của người dùng khóa API.");
+
+        Add(
+            ServerMessageKeys.SiteSettingsNotReadable,
+            "回答の保存先サイトの設定を読めません。Pleasanter 1.5.10.0 以降は、サイトを管理できない API キーの利用者にサイトの設定を返しません。API キーの利用者に、このサイトの管理権限を付けてください。",
+            "The settings of the answer destination site cannot be read. Pleasanter 1.5.10.0 and later do not return site settings to an API key user who cannot manage the site. Grant the API key user manage permission on this site.",
+            "Không thể đọc cài đặt của trang lưu câu trả lời. Từ Pleasanter 1.5.10.0, cài đặt trang không được trả về cho người dùng khóa API không có quyền quản lý trang. Hãy cấp quyền quản lý trang này cho người dùng khóa API.");
 
         Add(
             ServerMessageKeys.FallbackLanguageUnsupported,

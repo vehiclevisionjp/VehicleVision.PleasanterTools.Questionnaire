@@ -142,4 +142,18 @@ describe('interpolate', () => {
   it('空文字への置き換えもできる', () => {
     expect(interpolate('[{a}]', { a: '' }, 'ja')).toBe('[]');
   });
+
+  // Issue #906: 「Up to 1 files」を避ける
+  it('{name|単数形|複数形} は、数が 1 のときだけ単数形を選ぶ', () => {
+    const template = 'Up to {count} {count|file|files}';
+
+    expect(interpolate(template, { count: 1 }, 'en')).toBe('Up to 1 file');
+    expect(interpolate(template, { count: 2 }, 'en')).toBe('Up to 2 files');
+    expect(interpolate(template, { count: 0 }, 'en')).toBe('Up to 0 files');
+  });
+
+  it('数値でない引数・引数が無い名前の {name|単数形|複数形} はそのまま残す', () => {
+    expect(interpolate('{a|x|y}', { a: '1' }, 'en')).toBe('{a|x|y}');
+    expect(interpolate('{b|x|y}', { a: 1 }, 'en')).toBe('{b|x|y}');
+  });
 });

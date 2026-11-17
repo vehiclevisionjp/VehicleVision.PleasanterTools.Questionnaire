@@ -52,6 +52,7 @@
   import QuestionEditor from './QuestionEditor.svelte';
   import ConditionEditor from './ConditionEditor.svelte';
   import AutoReplyEditor from './AutoReplyEditor.svelte';
+  import LookupEditor from './LookupEditor.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
   import PublishPanel from './PublishPanel.svelte';
   import { adminAssetUrl } from '../lib/api';
@@ -59,6 +60,7 @@
   import { assetMarkup as markupForAsset } from '../lib/asset';
   import { requiredPortCount } from '../lib/columnBudget';
   import { confirmAction } from '../lib/confirmation.svelte';
+  import { shouldGoBackOnEscape } from '../lib/escapeKey';
   import {
     movePageTo,
     moveQuestionTo,
@@ -84,6 +86,8 @@
     testRecipientAvailable: boolean;
     /** 公開設定を保存してよい相手か（`surveys.publish`）。「公開」タブを読み取り専用にするかを決める。 */
     canPublish: boolean;
+    /** ルックアップの設定・API キー・接続試験をしてよい相手か（`lookups.manage`）。無ければ読み取り専用。 */
+    canManageLookups: boolean;
     onback: () => void;
     onbreadcrumbchange: (title: string | null) => void;
     onnavigationguardchange: (guard: (() => Promise<boolean>) | null) => void;
@@ -95,6 +99,7 @@
     testRecipient,
     testRecipientAvailable,
     canPublish,
+    canManageLookups,
     onback,
     onbreadcrumbchange,
     onnavigationguardchange,
@@ -197,7 +202,7 @@
    * 開いているタブ（Issue #546）。**見せ方だけで、編集の内容・保存・公開は変わらない。**
    * 設問と割り当てを同じ画面に置き、基本設定と見た目・自動返信は別のタブへ分ける。
    */
-  let tab = $state<'settings' | 'questions' | 'mapping' | 'extras' | 'publish'>('questions');
+  let tab = $state<'settings' | 'questions' | 'mapping' | 'lookups' | 'extras' | 'publish'>('questions');
   /** 開いているページのタブ。**無い・消えた ID のときは先頭のページ。** */
   let activePageId = $state<string | null>(null);
   const currentPageId = $derived(
@@ -779,7 +784,8 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape' && !previewing && !flowcharting) {
+    // **入力中・変換中・別の処理が受け持った Esc では戻らない**（Issue #903）
+    if (shouldGoBackOnEscape(event) && !previewing && !flowcharting) {
       back();
     }
   }
@@ -1167,7 +1173,7 @@
 
   <!-- **タブで分ける。** 1 枚に全部並べると縦に長く、設問と割り当てが離れる（Issue #546） -->
   <div class="tabs" role="tablist" aria-label={t('editor.tabs')}>
-    {#each [['questions', 'editor.tabQuestions'], ['mapping', 'editor.tabMapping'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras'], ['publish', 'editor.tabPublish']] as const as [key, label] (key)}
+    {#each [['questions', 'editor.tabQuestions'], ['mapping', 'editor.tabMapping'], ['lookups', 'editor.tabLookups'], ['settings', 'editor.tabSettings'], ['extras', 'editor.tabExtras'], ['publish', 'editor.tabPublish']] as const as [key, label] (key)}
       <button
         type="button"
         role="tab"
@@ -1354,6 +1360,18 @@
       <span class="next-version">{t('editor.nextVersion', { version: definition.version })}</span>
     </div>
   </section>
+  {/if}
+
+  {#if tab === 'lookups'}
+  <!-- **ルックアップは定義の一部**（保存・競合検知は設問とまとめて）。専用 API キーだけは別にその場で送る -->
+  <LookupEditor
+    {surveyId}
+    {definition}
+    {editing}
+    canManage={canManageLookups}
+    savedRevision={revision}
+    onchange={(next) => (definition = { ...definition!, lookups: next.length > 0 ? next : null })}
+  />
   {/if}
 
   {#if tab === 'extras'}
@@ -1694,6 +1712,7 @@
            公開前の画像は回答画面の口からは出ない -->
       <SurveyPreview
         {definition}
+        {surveyId}
         assetUrl={(assetId) => adminAssetUrl(surveyId, assetId)}
         headerImageUrl={definition.theme?.headerImageId
           ? adminAssetUrl(surveyId, definition.theme.headerImageId)
@@ -1791,15 +1810,15 @@
     inset: 0;
     z-index: 10;
     overflow-y: auto;
-    background: rgb(16 24 40 / 45%);
+    background: var(--overlay-bg);
   }
 
   .sheet {
     max-width: 56rem;
-    margin: 2rem auto;
-    padding: 1.5rem;
+    margin: var(--space-8) auto;
+    padding: var(--space-6);
     background: var(--bg);
-    border-radius: 10px;
+    border-radius: var(--radius-md);
   }
 
   .bar {
@@ -1823,27 +1842,27 @@
   .editing-language {
     display: flex;
     align-items: baseline;
-    gap: 1rem;
+    gap: var(--space-4);
     flex-wrap: wrap;
-    padding: 0.75rem 1.25rem;
-    margin-bottom: 1rem;
+    padding: var(--space-3) 1.25rem;
+    margin-bottom: var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     font-size: 0.85rem;
 
     label {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--space-2);
       margin: 0;
     }
 
     select {
       font: inherit;
-      padding: 0.25rem 0.4rem;
-      border: 1px solid var(--border);
-      border-radius: 4px;
+      padding: var(--space-1) 0.4rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
       background: var(--surface);
       color: var(--text);
     }
@@ -1859,8 +1878,8 @@
     padding: 1.25rem;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
   }
 
   .page {
@@ -1871,18 +1890,18 @@
   .page-tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
-    margin: 0 0 1rem;
+    gap: var(--space-1);
+    margin: 0 0 var(--space-4);
     border-bottom: 2px solid var(--border);
   }
 
   .tab,
   .page-tab {
     margin-bottom: -2px;
-    padding: 0.5rem 1rem;
+    padding: var(--space-2) var(--space-4);
     border: 0;
     border-bottom: 2px solid transparent;
-    border-radius: 6px 6px 0 0;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
     background: transparent;
     color: var(--muted);
     font: inherit;
@@ -1907,7 +1926,7 @@
 
   label {
     display: block;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
     font-size: 0.85rem;
     color: var(--muted);
   }
@@ -1922,9 +1941,9 @@
     display: block;
     width: 100%;
     margin-top: 0.2rem;
-    padding: 0.45rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    padding: 0.45rem var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     background: var(--surface);
     color: var(--text);
@@ -1953,7 +1972,7 @@
     ここで土台を決め、入れ子側は色の上書きだけにする
   */
   .hint {
-    margin: 0.25rem 0 0.75rem;
+    margin: var(--space-1) 0 var(--space-3);
     font-size: 0.85rem;
     line-height: 1.5;
     color: var(--muted);
@@ -1981,9 +2000,9 @@
 
   .page-head {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
     align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
   }
 
   .page-title {
@@ -1993,14 +2012,14 @@
   }
 
   .conflict {
-    padding: 1rem;
-    margin-bottom: 1rem;
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
     background: var(--error-surface);
     border: 1px solid var(--error);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 
     p {
-      margin: 0 0 0.5rem;
+      margin: 0 0 var(--space-2);
     }
 
     .small {
@@ -2010,11 +2029,11 @@
   }
 
   .flow-problems {
-    margin: 0 0 1rem;
-    padding: 0.75rem 1rem;
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4);
     background: var(--error-surface);
     border: 1px solid var(--error);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-size: 0.85rem;
 
     p {
@@ -2033,11 +2052,11 @@
   }
 
   .import-warnings {
-    margin: 0 0 1rem;
-    padding: 0.75rem 1rem;
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4);
     background: var(--warning-surface);
     border: 1px solid var(--warning-border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-size: 0.85rem;
 
     ul {
@@ -2049,27 +2068,27 @@
   .question-actions {
     display: flex;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: var(--space-2);
     flex-wrap: wrap;
   }
 
   .column-estimate {
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
     padding: 0.65rem 0.8rem;
     color: var(--muted);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-size: 0.85rem;
   }
 
   .page-next {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     flex-wrap: wrap;
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
     border-top: 1px dashed var(--border);
     font-size: 0.85rem;
     color: var(--muted);
@@ -2077,8 +2096,8 @@
     select {
       font: inherit;
       padding: 0.3rem 0.4rem;
-      border: 1px solid var(--border);
-      border-radius: 4px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
       background: var(--surface);
       color: var(--text);
     }
@@ -2091,9 +2110,9 @@
   .page-shuffle {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     flex-wrap: wrap;
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
     font-size: 0.85rem;
     color: var(--muted);
 
@@ -2103,8 +2122,8 @@
   }
 
   .page-buttons {
-    margin-top: 1rem;
-    padding-top: 0.75rem;
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
     border-top: 1px solid var(--border);
 
     summary {
@@ -2114,11 +2133,11 @@
   }
 
   .button-settings {
-    margin-top: 0.75rem;
-    padding: 0.75rem;
+    margin-top: var(--space-3);
+    padding: var(--space-3);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 
     h3 {
       margin: 0;
@@ -2128,15 +2147,15 @@
 
   .link-settings {
     display: grid;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .problems {
-    margin: 0 0 1rem;
-    padding: 0.75rem 1rem 0.75rem 2rem;
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4) var(--space-3) var(--space-8);
     background: var(--warning-surface);
     border: 1px solid var(--warning-border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-size: 0.85rem;
 
     .blocking {
@@ -2150,23 +2169,23 @@
   }
 
   .unpublished-changes-warning {
-    margin: 0 0 1rem;
-    padding: 0.75rem 1rem;
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4);
     color: var(--warning-text);
     background: var(--warning-surface);
     border: 1px solid var(--warning-border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-weight: 600;
   }
 
   .versions {
-    margin: 0 0 1rem;
-    padding: 0.75rem 1rem;
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 
     h3 {
-      margin: 0 0 0.5rem;
+      margin: 0 0 var(--space-2);
       font-size: 1rem;
     }
 
@@ -2180,8 +2199,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
-      padding: 0.25rem 0;
+      gap: var(--space-4);
+      padding: var(--space-1) 0;
     }
   }
 
@@ -2201,7 +2220,7 @@
     line-height: 1;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
 
     &.danger {
@@ -2211,7 +2230,7 @@
 
   .small {
     font-size: 0.85rem;
-    padding: 0.35rem 0.75rem;
+    padding: 0.35rem var(--space-3);
   }
 
   .reorder-backdrop {
@@ -2220,19 +2239,19 @@
     z-index: 1000;
     display: grid;
     place-items: center;
-    padding: 1rem;
-    background: rgb(16 24 40 / 55%);
+    padding: var(--space-4);
+    background: var(--overlay-bg);
   }
 
   .reorder-dialog {
     width: min(42rem, 100%);
     max-height: min(42rem, 100%);
     overflow-y: auto;
-    padding: 1.5rem;
+    padding: var(--space-6);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--surface);
-    box-shadow: 0 1rem 2.5rem rgb(16 24 40 / 25%);
+    box-shadow: var(--shadow-lg);
 
     h2 {
       margin: 0;
@@ -2240,24 +2259,24 @@
     }
 
     > p {
-      margin: 0.75rem 0 0;
+      margin: var(--space-3) 0 0;
     }
   }
 
   .reorder-destinations {
     display: grid;
     gap: 0.6rem;
-    margin-top: 1rem;
+    margin-top: var(--space-4);
   }
 
   .reorder-destination {
     padding: 0.65rem;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
   }
 
   .reorder-warning {
-    margin: 0.5rem 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--warning-text);
     font-size: 0.85rem;
   }
@@ -2265,6 +2284,6 @@
   .reorder-actions {
     display: flex;
     justify-content: flex-end;
-    margin-top: 1.5rem;
+    margin-top: var(--space-6);
   }
 </style>

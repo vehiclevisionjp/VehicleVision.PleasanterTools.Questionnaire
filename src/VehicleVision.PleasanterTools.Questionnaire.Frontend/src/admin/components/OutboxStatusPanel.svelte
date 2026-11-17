@@ -424,7 +424,7 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .head .reload {
@@ -438,7 +438,7 @@
 
   h2 {
     font-size: 1rem;
-    margin: 2rem 0 0.25rem;
+    margin: var(--space-8) 0 var(--space-1);
   }
 
   .lead {
@@ -449,18 +449,18 @@
   .cards {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
-    margin: 1rem 0 0;
+    gap: var(--space-4);
+    margin: var(--space-4) 0 0;
   }
 
   .card {
     flex: 1 1 16rem;
-    padding: 1rem;
+    padding: var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
     /* **色だけに頼らない。** 左端の太い線でも状態が分かるようにする */
     border-left-width: 4px;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   .card.warn {
@@ -494,7 +494,7 @@
     overflow-x: auto;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   table {
@@ -508,15 +508,18 @@
   th,
   td {
     text-align: left;
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
 
   th {
-    color: var(--muted);
-    font-weight: 600;
     white-space: nowrap;
+    /* **見出し行は鉄紺・白文字**（DesignReference の表の決まり） */
+    background: var(--color-primary);
+    color: var(--color-on-fill);
+    font-weight: 700;
+    border-bottom: 1px solid var(--color-primary-edge);
   }
 
   .nowrap {
@@ -543,8 +546,8 @@
   .pager {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
   }
 
   .range {
@@ -553,13 +556,13 @@
   }
 
   .backlog {
-    margin-top: 1.5rem;
-    padding: 1rem;
+    margin-top: var(--space-6);
+    padding: var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
     /* **色だけに頼らない。** 左端の太い線でも状態が分かるようにする */
     border-left: 4px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   .backlog.bad {
@@ -571,7 +574,7 @@
   }
 
   .backlog p {
-    margin: 0.25rem 0 0;
+    margin: var(--space-1) 0 0;
     font-size: 0.9rem;
   }
 

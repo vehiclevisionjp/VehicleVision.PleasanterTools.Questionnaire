@@ -81,12 +81,12 @@ export const en: Record<MessageKey, string> = {
   'question.rankingDown': 'Move down',
   'question.rankingClear': 'Remove rank',
   'question.rankingStatus': '{label}: rank {rank} of {total}',
-  'question.fileCountLimit': 'Up to {count} files',
+  'question.fileCountLimit': 'Up to {count} {count|file|files}',
   'question.fileSizeLimitMegabytes': 'Up to {megabytes} MB per file',
   'question.fileSizeLimitBytes': 'Up to {bytes} bytes per file',
   'question.selectionRange': 'Choose between {minimum} and {maximum} options',
-  'question.selectionMinimum': 'Choose at least {minimum} options',
-  'question.selectionMaximum': 'Choose up to {maximum} options',
+  'question.selectionMinimum': 'Choose at least {minimum} {minimum|option|options}',
+  'question.selectionMaximum': 'Choose up to {maximum} {maximum|option|options}',
   'question.normalizationNotice':
     'After entry, character width and surrounding whitespace are converted automatically as configured.',
 
@@ -96,6 +96,20 @@ export const en: Record<MessageKey, string> = {
     'Please open this page over a secure connection (https). It cannot be submitted as is.',
   'submit.failed':
     'We could not submit your response. Your answers are still here — please wait a moment and try again.',
+  'submit.maintenance':
+    'Submissions are unavailable during maintenance. Your answers are still here — please try again later.',
+  'submit.unavailable':
+    'The service is having a temporary problem. Your answers are still here — please try again later.',
+  'unavailable.title':
+    'Temporarily unavailable',
+  'unavailable.temporary':
+    'The service is having a temporary problem. Please try again later by reloading this page.',
+  'unavailable.pending':
+    'Your submitted answers cannot be loaded right now. The form has not been opened so that they are not overwritten. Please try again later by reloading this page.',
+  'unavailable.maintenance':
+    'This page is unavailable during maintenance. Please try again later by reloading this page.',
+  'unavailable.reload':
+    'Reload',
 
   'attachment.defaultName': 'Attachment',
   'attachment.extensionNotAllowed': '{name}: this kind of file is not accepted',
@@ -108,15 +122,15 @@ export const en: Record<MessageKey, string> = {
 
   'validation.required': 'Please answer this question',
   'validation.fileRequired': 'Please choose a file',
-  'validation.fileCount': 'Choose at most {count} files',
+  'validation.fileCount': 'Choose at most {count} {count|file|files}',
   'validation.fileTooLarge': '{name}: the file is too large',
   'validation.singleValueOnly': 'Please choose only one answer',
   'validation.rowRequired': 'Please answer every row',
   'validation.duplicateRank': 'The same item has more than one rank',
-  'validation.tooFewSelections': 'Choose at least {minimum} options',
-  'validation.tooManySelections': 'Choose at most {maximum} options',
+  'validation.tooFewSelections': 'Choose at least {minimum} {minimum|option|options}',
+  'validation.tooManySelections': 'Choose at most {maximum} {maximum|option|options}',
   'validation.pattern': 'Enter the value in the requested format',
-  'validation.tooLong': 'Use at most {max} characters',
+  'validation.tooLong': 'Use at most {max} {max|character|characters}',
   'validation.email': 'Enter a valid email address',
   'validation.url': 'Enter a URL starting with http:// or https://',
   'validation.notANumber': 'Enter a number',
@@ -147,4 +161,34 @@ export const en: Record<MessageKey, string> = {
     'Attachments cannot be checked right now, so we cannot accept this yet',
   'serverValidation.SubmitButtonConditionNotMet': 'The conditions for submitting have not been met',
   'serverValidation.unknown': 'Please check what you entered',
+
+  'lookup.search': 'Search and fill in',
+  'lookup.keysMissing': 'To search, enter {fields}.',
+  'lookup.searching': 'Searching…',
+  'lookup.notFound': 'No match was found. Please check what you entered.',
+  'lookup.chooseTitle': 'Choose a result to fill in',
+  'lookup.candidateCount': '{count} results found.',
+  'lookup.candidateLabel': 'Result {number}',
+  'lookup.apply': 'Fill in',
+  'lookup.cancel': 'Cancel',
+  'lookup.selectFirst': 'Choose one result to fill in.',
+  'lookup.applied': 'The search result has been filled in.',
+  'lookup.appliedNothing': 'There was no value to fill in. Your entries were not changed.',
+  'lookup.confirmTitle': 'Overwrite what you entered?',
+  'lookup.confirmOverwrite': 'Overwrite the values you entered with the search result?',
+  'lookup.confirmFields': 'Fields that will be overwritten: {fields}',
+  'lookup.confirmApply': 'Overwrite and fill in',
+  'lookup.choiceUnavailable': 'It is not one of the options for {question}, so it was not filled in.',
+  'lookup.valueInvalid': 'The value cannot be entered in {question}.',
+  'lookup.tooMany': 'There are too many results. Please enter more specific values.',
+  'lookup.failed': 'The search could not be completed. Please try again later.',
+  'lookup.timeout': 'The search is taking too long. Please try again later.',
+  'lookup.rateLimited': 'You have reached the search limit. Please try again in {seconds} seconds.',
+  'lookup.rateLimitedLater': 'You have reached the search limit. Please try again later.',
+  'lookup.versionChanged': 'This form has been updated. Reload the page and check your entries.',
+  'lookup.sessionExpired': 'The search session has expired. Please search again.',
+  'lookup.closed': 'Search is not available on this form right now.',
+  'lookup.invalidKeys': 'Please check the values you are searching for.',
+  'lookup.requestTooLarge': 'The input is too long. Please review the values you are searching for.',
+  'lookup.stale': 'The search values changed, so the earlier result was not used. Please search again.',
 };

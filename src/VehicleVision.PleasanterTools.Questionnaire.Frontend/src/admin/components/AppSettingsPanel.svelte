@@ -305,7 +305,7 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
   .lead,
   .hint {
@@ -313,10 +313,10 @@
   }
   form {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-4);
     padding: 1.25rem;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--surface);
   }
   label {
@@ -338,8 +338,8 @@
     box-sizing: border-box;
     width: 100%;
     padding: 0.55rem;
-    border: 1px solid var(--border);
-    border-radius: 5px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
     font: inherit;
   }
   input:disabled,
@@ -348,16 +348,16 @@
     color: var(--disabled-text);
   }
   .fixed {
-    margin-left: 0.5rem;
+    margin-left: var(--space-2);
     color: var(--warning-text);
     font-size: 0.85rem;
     font-weight: 400;
   }
   .preview {
     white-space: pre-wrap;
-    padding: 0.9rem 1rem;
+    padding: 0.9rem var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-weight: 400;
   }
   .error {
@@ -373,6 +373,6 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 </style>

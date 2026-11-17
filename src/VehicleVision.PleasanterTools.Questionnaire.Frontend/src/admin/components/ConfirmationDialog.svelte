@@ -77,17 +77,17 @@
     z-index: 1000;
     display: grid;
     place-items: center;
-    padding: 1rem;
-    background: rgb(16 24 40 / 55%);
+    padding: var(--space-4);
+    background: var(--overlay-bg);
   }
 
   .dialog {
     width: min(28rem, 100%);
-    padding: 1.5rem;
+    padding: var(--space-6);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--surface);
-    box-shadow: 0 1rem 2.5rem rgb(16 24 40 / 25%);
+    box-shadow: var(--shadow-lg);
   }
 
   h2 {
@@ -96,15 +96,15 @@
   }
 
   p {
-    margin: 0.75rem 0 0;
+    margin: var(--space-3) 0 0;
     color: var(--text);
   }
 
   .actions {
     display: flex;
     justify-content: flex-end;
-    gap: 0.75rem;
-    margin-top: 1.5rem;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
   }
 
   button.danger {

@@ -60,19 +60,23 @@ export interface SurveyTheme {
 }
 
 /**
- * 既定の色。**管理画面の色欄の初期値に使う。**
+ * 既定の色（**何も選ばなかったときの見た目**）。**管理画面の色欄の初期値に使う。**
  *
- * ⚠️ **`App.svelte` の `:global(:root)` に書いてある値と揃えること。**
- * CSS の変数を TypeScript から読めないので、ここだけは写しになる。
- * 食い違うと、色欄が「今の見た目と違う色」を初期値として出す。
+ * **DesignReference のライトのトークン**（Issue #776）。値は `styles/tokens.css` の `:root`
+ * （鉄紺 `--color-primary`、白練 `--color-bg`、黒橡 `--color-text`、白 `--color-on-fill`、
+ * 胡粉 `--color-surface`、白鼠 `--color-border`）と同じ。
+ *
+ * ⚠️ **`styles/tokens.css` と揃えること。** CSS の変数を TypeScript から読めないので、ここだけは写しになる。
+ * 食い違うと、色欄が「今の見た目と違う色」を初期値として出す。**`tokens.test.ts` が突き合わせる。**
+ * アンケートの作成者が選べるテーマ（プリセット・個別色・配色固定）の仕様は、この既定値とは別で変わらない。
  */
 export const DEFAULT_COLORS = {
-  accentColor: '#175cd3',
-  backgroundColor: '#f9fafb',
-  textColor: '#101828',
+  accentColor: '#17184b',
+  backgroundColor: '#f3f3f2',
+  textColor: '#0b1013',
   accentTextColor: '#ffffff',
-  surfaceColor: '#ffffff',
-  borderColor: '#d0d5dd',
+  surfaceColor: '#fffffc',
+  borderColor: '#bdc0ba',
 } as const;
 
 /**
@@ -152,15 +156,18 @@ export function safeColor(value: string | null | undefined): string | null {
  * **後ろに端末の書体も並べたままにする。** 配信に失敗しても文字が出なくならないため。
  */
 const FONT_STACKS: Record<ThemeFont, string | null> = {
-  // **既定は指定しない。** `:root` に書いてある今までの指定がそのまま効く
+  // **既定は指定しない。** `:root` の `--font`（styles/base.css。同梱の Zen Kaku Gothic New）がそのまま効く。
+  // ⚠️ **「端末の書体」ではない**（Issue #791。以前は `--font` が未定義で、回答者の端末の書体になっていた）
   System: null,
-  // **同梱した可変フォントを先頭に置く**（無い環境でも端末の書体へ落ちる）
-  Sans: '"Noto Sans JP Variable", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif',
+  // **同梱した Zen Kaku Gothic New を先頭に置く**（DesignReference 第 2.3 版の本文書体。管理画面と共用。無い環境でも端末の書体へ落ちる）
+  Sans: '"Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif',
   Serif: '"Noto Serif JP Variable", "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif',
   Rounded:
     '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Quicksand", "Hiragino Sans", sans-serif',
-  // **日本語も等幅**にしたいので M PLUS 1 Code を同梱している
-  Monospace: '"M PLUS 1 Code Variable", ui-monospace, SFMono-Regular, Consolas, monospace',
+  // **DesignReference の `--font-mono`（Myrica M）。管理画面と共用**。
+  // 半角:全角 = 1:2 で、**日本語も等幅になる**。同梱の範囲の外の字は、同梱の Zen Kaku Gothic New に落ちる
+  Monospace:
+    '"Myrica M", "Zen Kaku Gothic New", ui-monospace, SFMono-Regular, Consolas, monospace',
 };
 
 /**
@@ -208,10 +215,11 @@ export function applyTheme(
   const derive = background !== null || text !== null;
   set('--muted', derive ? 'color-mix(in srgb, var(--text) 62%, var(--bg))' : null);
   // **枠線は指定があればそちらを使う**（Issue #109）。無ければ今までどおり導く
-  set(
-    '--border',
-    border ?? (derive ? 'color-mix(in srgb, var(--text) 28%, var(--bg))' : null),
-  );
+  const derivedBorder = border ?? (derive ? 'color-mix(in srgb, var(--text) 28%, var(--bg))' : null);
+  set('--border', derivedBorder);
+  // **入力欄などの部品の枠も同じ色にする。** 既定（指定なし）のときだけ、
+  // DesignReference の「部品の枠は面に対し 3:1 以上」の色（--border-strong の既定）になる
+  set('--border-strong', derivedBorder);
 
   function set(name: string, value: string | null) {
     if (value === null) {

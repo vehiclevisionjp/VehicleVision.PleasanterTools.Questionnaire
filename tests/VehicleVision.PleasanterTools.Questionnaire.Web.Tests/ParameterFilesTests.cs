@@ -90,6 +90,24 @@ public sealed class ParameterFilesTests : IDisposable
     }
 
     [Fact]
+    public void Service_jsonのLookupEnabledは環境変数名の設定へ写す()
+    {
+        Write("Service.local.json", """{ "LookupEnabled": true }""");
+
+        Assert.Equal("True", Build()[LookupFeatureOptions.EnabledSetting]);
+        Assert.True(LookupFeatureOptions.FromConfiguration(Build()).Enabled);
+    }
+
+    [Fact]
+    public void Service_jsonのRootRedirectUrlは環境変数名の設定へ写す()
+    {
+        Write("Service.local.json", """{ "RootRedirectUrl": "https://example.com/" }""");
+
+        Assert.Equal("https://example.com/", Build()[RootRedirectOptions.Setting]);
+        Assert.Equal("https://example.com/", RootRedirectOptions.FromConfiguration(Build()).Target);
+    }
+
+    [Fact]
     public void 環境変数はjsonより強い()
     {
         Write("Pleasanter.json", """{ "BaseUrl": "https://from-json.example.jp" }""");

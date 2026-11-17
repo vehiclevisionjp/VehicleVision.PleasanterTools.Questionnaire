@@ -5,7 +5,7 @@
 # **日本語フォントを必ず入れる。** Playwright の公式イメージには日本語フォントが
 # 入っておらず、入れ忘れると文字がすべて豆腐（□）になる。しかも撮った画像を
 # 目で見るまで気付かないので、**撮る前に機械で確かめる**（lib/tofu.ts）。
-FROM mcr.microsoft.com/playwright:v1.62.1-noble
+FROM mcr.microsoft.com/playwright:v1.65.1-noble
 
 # **字形も指定する。** fonts-noto-cjk は SC / TC / JP / KR を 1 つに束ねており、
 # どの地域の面を使うかを指定しないと **SC（簡体字）の字形**が選ばれる。

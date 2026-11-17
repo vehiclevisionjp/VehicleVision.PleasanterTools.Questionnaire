@@ -368,10 +368,11 @@ public partial class SamlEndToEndTests
         Assert.Equal(beforeFailures + 2, await CountLockoutAuditsAsync(connection));
     }
 
+    // Succeeded は PostgreSQL では integer のため、bool を渡すと integer = boolean で落ちる。0 を渡す。
     private static Task<int> CountLockoutAuditsAsync(System.Data.Common.DbConnection connection) =>
         connection.ExecuteScalarAsync<int>(E2EDatabase.Sql(
             "SELECT COUNT(*) FROM [Core_AuditLogs] WHERE [Action] = @action AND [Succeeded] = @succeeded "
-            + "AND [StatusCode] = 423"), new { action = "POST /api/admin/saml/acs", succeeded = false });
+            + "AND [StatusCode] = 423"), new { action = "POST /api/admin/saml/acs", succeeded = 0 });
 
     [Fact]
     public async Task 管理者がゼロならSAMLの往復を終えても最初の管理者を作らない()

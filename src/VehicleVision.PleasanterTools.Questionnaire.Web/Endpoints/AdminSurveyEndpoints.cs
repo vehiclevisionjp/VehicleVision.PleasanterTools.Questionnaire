@@ -53,6 +53,27 @@ public static class AdminSurveyEndpoints
         // **管理操作を残す**（Issue #19）。読み取りは残さない
         group.AddEndpointFilter<AuditLogFilter>();
 
+        // **Pleasanter への接続先（BaseUrl）の設定が使えない。** 認証の失敗でも恒久的な失敗でもなく、サーバー側の設定の誤り（内部エラー）。
+        // 固定の文言だけを返す（URL・列名・API キーを含めない）
+        group.AddEndpointFilter(async (context, next) =>
+        {
+            try
+            {
+                return await next(context);
+            }
+            catch (PleasanterConfigurationException)
+            {
+                return Results.Json(
+                    new
+                    {
+                        message = ServerMessages.Get(
+                            ServerMessageKeys.PleasanterConfigurationInvalid,
+                            RequestLanguage.Of(context.HttpContext)),
+                    },
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
+        });
+
         // **管理画面の応答を途中の経路に残さない**
         group.AddEndpointFilter(async (context, next) =>
         {
@@ -134,7 +155,7 @@ public static class AdminSurveyEndpoints
             HttpContext context,
             ISurveyRepository surveys,
             ISurveyDraftStore drafts,
-            PleasanterApiClient pleasanter,
+            PleasanterGateway pleasanter,
             CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.Title))
@@ -426,7 +447,7 @@ public static class AdminSurveyEndpoints
             Guid surveyId,
             HttpContext context,
             ISurveyRepository surveys,
-            PleasanterApiClient pleasanter,
+            PleasanterGateway pleasanter,
             CancellationToken cancellationToken) =>
         {
             var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
@@ -464,7 +485,7 @@ public static class AdminSurveyEndpoints
             HttpContext context,
             ISurveyRepository surveys,
             ISurveyDraftStore drafts,
-            PleasanterApiClient pleasanter,
+            PleasanterGateway pleasanter,
             CancellationToken cancellationToken) =>
         {
             var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
@@ -485,6 +506,11 @@ public static class AdminSurveyEndpoints
             if (!current.IsSuccess || current.Body is null)
             {
                 return PleasanterFailure(current, context);
+            }
+
+            if (SiteSettingsHidden(current.Body))
+            {
+                return SiteSettingsNotReadable(context);
             }
 
             try
@@ -510,7 +536,7 @@ public static class AdminSurveyEndpoints
             HttpContext context,
             ISurveyRepository surveys,
             ISurveyDraftStore drafts,
-            PleasanterApiClient pleasanter,
+            PleasanterGateway pleasanter,
             CancellationToken cancellationToken) =>
         {
             var survey = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
@@ -531,6 +557,11 @@ public static class AdminSurveyEndpoints
             if (!current.IsSuccess || current.Body is null)
             {
                 return PleasanterFailure(current, context);
+            }
+
+            if (SiteSettingsHidden(current.Body))
+            {
+                return SiteSettingsNotReadable(context);
             }
 
             SiteSettingsSyncPlan plan;
@@ -670,6 +701,26 @@ public static class AdminSurveyEndpoints
                         ServerMessageKeys.EmbedHostNotAllowed, RequestLanguage.Of(context)),
                     fields = blockedEmbeds,
                 });
+            }
+
+            // **ルックアップの設定を変えられるのはアンケート管理者だけ**（Issue #879・仕様書 U7）。
+            // 編集者の保存では、ルックアップの定義を今の下書きから変えさせない（見る・他の項目を直すのは妨げない）
+            if (!AdminPermissions.Has(
+                context.User.FindFirstValue(ClaimTypes.Role), AdminPermissions.LookupsManage))
+            {
+                var current = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
+                var before = SurveyJson.Serialize(current?.Definition.GetLookups() ?? []);
+                var after = SurveyJson.Serialize(request.Definition.GetLookups());
+                if (!string.Equals(before, after, StringComparison.Ordinal))
+                {
+                    return Results.Json(
+                        new
+                        {
+                            message = ServerMessages.Get(
+                                ServerMessageKeys.LookupSettingsForbidden, RequestLanguage.Of(context)),
+                        },
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
             }
 
             // **不備があっても保存はさせる。** 直している途中で保存できないと作業にならない。
@@ -951,6 +1002,7 @@ public static class AdminSurveyEndpoints
             HttpContext context,
             ISurveyDraftStore drafts,
             ISurveyRepository surveys,
+            LookupPublishValidator lookupValidator,
             CancellationToken cancellationToken) =>
         {
             var draft = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
@@ -1112,6 +1164,27 @@ public static class AdminSurveyEndpoints
                     {
                         code = problem.Code.ToString(),
                         questionId = problem.QuestionId,
+                        detail = problem.Detail,
+                    }),
+                });
+            }
+
+            // **不備のあるルックアップのまま公開しない**（Issue #879・仕様書 3.2・8 章）。
+            // 構造・資格情報・参照元の列の型・統合/継承を見る。参照元の列定義を取得できなければ公開させない。
+            // ルックアップが無いアンケートでは外部を呼ばない
+            var lookupProblems = await lookupValidator
+                .ValidateAsync(surveyId, draft.Definition, cancellationToken).ConfigureAwait(false);
+            if (lookupProblems.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = ServerMessages.Get(
+                        ServerMessageKeys.PublishBlockedByLookup, RequestLanguage.Of(context)),
+                    lookups = lookupProblems.Select(problem => new
+                    {
+                        lookupId = problem.LookupId,
+                        kind = problem.Kind,
+                        code = problem.Code,
                         detail = problem.Detail,
                     }),
                 });
@@ -1621,7 +1694,7 @@ public static class AdminSurveyEndpoints
                         ServerMessageKeys.PleasanterSiteWriteFailed, RequestLanguage.Of(context))
                     : response.Message,
             },
-            statusCode: response.StatusCode ?? StatusCodes.Status502BadGateway);
+            statusCode: response.DisplayStatusCode() ?? StatusCodes.Status502BadGateway);
 
     /// <summary>停止と再開。**理由を必ず書き換える。**</summary>
     /// <remarks>
@@ -1955,6 +2028,21 @@ public static class AdminSurveyEndpoints
                 pair => ColumnBudget.StandardColumnsPerType + pair.Value,
                 StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// <c>GetSite</c> は成功したが、サイトの設定（<c>SiteSettings</c>）が返らなかったか。
+    /// Pleasanter 1.5.10.0 以降は、サイトを管理できない API キーの利用者に返さない（Issue #995）。
+    /// **この状態で <c>UpdateSite</c> へ進まない**（設定を丸ごと置き換える API なので、読めないまま書かない）。
+    /// </summary>
+    internal static bool SiteSettingsHidden(JsonNode? body) =>
+        body?["Response"]?["Data"] is JsonObject && body["Response"]!["Data"]!["SiteSettings"] is null;
+
+    private static IResult SiteSettingsNotReadable(HttpContext context) =>
+        Results.BadRequest(new
+        {
+            code = "SiteSettingsNotReadable",
+            message = ServerMessages.Get(ServerMessageKeys.SiteSettingsNotReadable, RequestLanguage.Of(context)),
+        });
 
     /// <summary>不備を画面に出せる形にする。</summary>
     private static object Describe(MappingProblem problem) => new

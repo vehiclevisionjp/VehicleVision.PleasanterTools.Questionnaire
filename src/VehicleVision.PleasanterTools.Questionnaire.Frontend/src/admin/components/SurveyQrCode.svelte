@@ -82,19 +82,19 @@
 <style lang="scss">
   .qr-panel {
     padding: 1.25rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-6);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
   }
 
   h2 {
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
     font-size: 1.05rem;
   }
 
   .hint {
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
     color: var(--muted);
     font-size: 0.8rem;
   }
@@ -106,17 +106,17 @@
     height: auto;
     max-width: 100%;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   .url {
-    margin: 0.75rem 0;
+    margin: var(--space-3) 0;
     font-size: 0.85rem;
 
     code {
-      padding: 0.35rem 0.5rem;
+      padding: 0.35rem var(--space-2);
       background: var(--bg);
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
       word-break: break-all;
     }
   }
@@ -124,7 +124,7 @@
   .actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .download {

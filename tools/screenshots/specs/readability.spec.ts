@@ -26,10 +26,11 @@ const highContrast = {
   text: '#000000',
 };
 
+// DesignReference のダーク（Frontend/src/styles/tokens.css。Issue #776）
 const dark = {
-  accent: '#8ab4f8',
-  background: '#121212',
-  text: '#f5f5f5',
+  accent: '#d0d3ff',
+  background: '#30334f',
+  text: '#f4f4f8',
 };
 
 async function cssVariable(page: Page, name: string): Promise<string> {
@@ -39,13 +40,24 @@ async function cssVariable(page: Page, name: string): Promise<string> {
   );
 }
 
+/**
+ * 色の変数が期待の値になるのを待って確かめる。
+ *
+ * **1 回だけ読まない。** 釦や選択を操作した直後は、Playwright 1.65 では、画面の反映
+ * （Svelte の更新）が済む前に操作が戻ることがある（Issue #976）。再試行つきの検査で待つ。
+ */
 async function expectColors(
   page: Page,
   colors: { accent: string; background: string; text: string },
 ): Promise<void> {
-  expect(await cssVariable(page, '--accent')).toBe(colors.accent);
-  expect(await cssVariable(page, '--bg')).toBe(colors.background);
-  expect(await cssVariable(page, '--text')).toBe(colors.text);
+  await expect.poll(() => cssVariable(page, '--accent')).toBe(colors.accent);
+  await expect.poll(() => cssVariable(page, '--bg')).toBe(colors.background);
+  await expect.poll(() => cssVariable(page, '--text')).toBe(colors.text);
+}
+
+/** `<html>` の文字の大きさが期待の値になるのを待って確かめる（理由は expectColors と同じ。Issue #976）。 */
+async function expectRootFontSize(page: Page, fontSize: string): Promise<void> {
+  await expect(page.locator('html')).toHaveCSS('font-size', fontSize);
 }
 
 async function expectNoHorizontalOverflow(page: Page): Promise<void> {
@@ -129,18 +141,14 @@ test.describe('読みやすさ設定の写し', () => {
   test('回答画面：作成者のテーマと標準文字', async ({ page }) => {
     const answer = await openAnswer(page);
     await expectColors(page, forest);
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe(
-      '16px',
-    );
+    await expectRootFontSize(page, '16px');
     await shoot(page, answer, 'answer-06-readability-default');
   });
 
   test('回答画面：特大文字', async ({ page }) => {
     const answer = await openAnswer(page);
     await chooseAnswerReadability(page, 'font-size', 'extraLarge');
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe(
-      '20px',
-    );
+    await expectRootFontSize(page, '20px');
     await expectNoHorizontalOverflow(page);
     await shoot(page, answer, 'answer-07-readability-large');
   });
@@ -203,9 +211,7 @@ test.describe('読みやすさ設定の写し', () => {
 
     try {
       await page.locator('#admin-readability-font-size').selectOption('extraLarge');
-      expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe(
-        '20px',
-      );
+      await expectRootFontSize(page, '20px');
       await expectNoHorizontalOverflow(page);
       await shoot(page, target, 'admin-18-readability-large');
     } finally {

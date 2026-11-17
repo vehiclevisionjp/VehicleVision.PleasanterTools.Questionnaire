@@ -222,10 +222,10 @@
 
 <style lang="scss">
   .import-panel {
-    margin-top: 0.75rem;
-    padding: 1rem;
+    margin-top: var(--space-3);
+    padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--surface);
   }
 
@@ -234,7 +234,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   h3 {
@@ -244,7 +244,7 @@
 
   label {
     display: block;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
     color: var(--muted);
     font-size: 0.85rem;
   }
@@ -252,10 +252,10 @@
   select {
     display: block;
     width: 100%;
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
     padding: 0.4rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
     font: inherit;
@@ -267,7 +267,7 @@
   }
 
   fieldset {
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
     border: 1px solid var(--border);
   }
 
@@ -286,7 +286,7 @@
   .status,
   .warning,
   .error {
-    margin: 0.5rem 0;
+    margin: var(--space-2) 0;
     font-size: 0.82rem;
   }
 
@@ -305,6 +305,6 @@
 
   .small {
     font-size: 0.85rem;
-    padding: 0.35rem 0.75rem;
+    padding: 0.35rem var(--space-3);
   }
 </style>

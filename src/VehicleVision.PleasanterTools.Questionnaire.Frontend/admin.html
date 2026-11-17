@@ -8,6 +8,11 @@
     <!-- **配置先のサブパス。** サーバが配信時に差し替える（Issue #465、HtmlShell.cs） -->
     <meta name="questionnaire-base-path" content="__QUESTIONNAIRE_BASE_PATH__" />
     <meta name="questionnaire-admin-path" content="__QUESTIONNAIRE_ADMIN_PATH__" />
+    <!-- **製品アイコン・ファビコンは DesignReference のもの**（Issue #776）。管理画面だけに付ける。
+         回答画面はアンケートの作成者のもので、製品のアイコンを出さない -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/biikurun-icon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/biikurun-icon-180.png" />
     <title>アンケート管理</title>
   </head>
   <body>

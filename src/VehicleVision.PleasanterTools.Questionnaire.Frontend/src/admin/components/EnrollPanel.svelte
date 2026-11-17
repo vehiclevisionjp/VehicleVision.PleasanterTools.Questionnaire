@@ -129,16 +129,16 @@
   .panel {
     max-width: 26rem;
     margin: 4rem auto;
-    padding: 2rem;
+    padding: var(--space-8);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     text-align: center;
   }
 
   h1 {
     font-size: 1.25rem;
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-4);
   }
 
   .lead {
@@ -150,9 +150,9 @@
 
   .qr {
     display: block;
-    margin: 0 auto 1rem;
+    margin: 0 auto var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   .secret {
@@ -162,9 +162,9 @@
     code {
       display: inline-block;
       margin-top: 0.35rem;
-      padding: 0.35rem 0.5rem;
+      padding: 0.35rem var(--space-2);
       background: var(--bg);
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
       letter-spacing: 0.08em;
       color: var(--text);
       word-break: break-all;
@@ -173,7 +173,7 @@
 
   label {
     display: block;
-    margin: 1rem 0 0.75rem;
+    margin: var(--space-4) 0 var(--space-3);
     font-size: 0.9rem;
     text-align: left;
   }
@@ -181,20 +181,20 @@
   input[type='text'] {
     display: block;
     width: 100%;
-    margin-top: 0.25rem;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    margin-top: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font: inherit;
     box-sizing: border-box;
   }
 
   .codes {
     list-style: none;
-    margin: 0 0 1rem;
-    padding: 1rem;
+    margin: 0 0 var(--space-4);
+    padding: var(--space-4);
     background: var(--bg);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.35rem;
@@ -206,8 +206,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    margin: 1rem 0;
+    gap: var(--space-2);
+    margin: var(--space-4) 0;
     font-size: 0.9rem;
   }
 

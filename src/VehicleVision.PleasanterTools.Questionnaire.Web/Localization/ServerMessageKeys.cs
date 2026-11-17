@@ -132,6 +132,15 @@ public static class ServerMessageKeys
     /// <summary>自動返信の設定が送れる形になっていなくて公開できない（Issue #189）。</summary>
     public const string PublishBlockedByAutoReply = "surveys.publishBlockedByAutoReply";
 
+    /// <summary>ルックアップの設定に不備があって公開できない（Issue #879）。</summary>
+    public const string PublishBlockedByLookup = "surveys.publishBlockedByLookup";
+
+    /// <summary>ルックアップの専用 API キーが空・長すぎる・制御文字を含む（Issue #879）。</summary>
+    public const string LookupCredentialInvalid = "lookups.credentialInvalid";
+
+    /// <summary>ルックアップの設定を変える権限が無い（Issue #879）。</summary>
+    public const string LookupSettingsForbidden = "lookups.settingsForbidden";
+
     public const string NotPublishedYet = "surveys.notPublishedYet";
 
     /// <summary>その版は既にある。**同時に 2 人が公開を押した場合など。**</summary>
@@ -220,6 +229,9 @@ public static class ServerMessageKeys
     /// <summary>接続確認に要る Pleasanter の URL と API キーが無い。</summary>
     public const string PleasanterConnectionRequired = "settings.pleasanterConnectionRequired";
 
+    /// <summary>Pleasanter への接続先（BaseUrl）の設定が使えない。**サーバー側の設定の誤り（内部エラー）。URL は載せない。**</summary>
+    public const string PleasanterConfigurationInvalid = "settings.pleasanterConfigurationInvalid";
+
     /// <summary>Pleasanter へ接続できなかった。</summary>
     public const string PleasanterConnectionFailed = "settings.pleasanterConnectionFailed";
 
@@ -240,6 +252,9 @@ public static class ServerMessageKeys
 
     /// <summary>リンク先のサイトを Pleasanter から引けなかった。</summary>
     public const string LinkedSitesUnreachable = "surveys.linkedSitesUnreachable";
+
+    /// <summary>保存先サイトの設定を読めない（API キーの利用者にサイトの管理権限がない。Pleasanter 1.5.10.0 以降。Issue #995）。</summary>
+    public const string SiteSettingsNotReadable = "surveys.siteSettingsNotReadable";
 
     /// <summary>落とし先の言語が対応外。</summary>
     public const string FallbackLanguageUnsupported = "surveys.fallbackLanguageUnsupported";

@@ -161,7 +161,7 @@
         class="icon danger"
         onclick={() => update({ rules: rules.filter((_, i) => i !== index) })}
         aria-label={t('condition.remove')}
-      >×</button>
+      ><span class="material-icons" aria-hidden="true">close</span></button>
     </div>
     {#if unknown}<p class="warn">{t('condition.unknownChoice')}</p>{/if}
   {/each}
