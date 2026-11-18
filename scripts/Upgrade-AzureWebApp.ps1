@@ -304,7 +304,9 @@ if ($Rollback) {
 }
 
 $temporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "QuestionnaireUpgrade-$([guid]::NewGuid().ToString('N'))"
-New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
+# ⚠️ **-WhatIf:$false を付けること。** 取得先の一時ディレクトリで、本番を書き換えない操作。
+# -WhatIf を引き継ぐとディレクトリが作られず、後段の取得が「パスが見つからない」で落ちる（Issue #1004）
+New-Item -ItemType Directory -Path $temporaryDirectory -WhatIf:$false | Out-Null
 
 try {
     if ($Version) {
@@ -415,6 +417,7 @@ try {
 }
 finally {
     if (Test-Path -LiteralPath $temporaryDirectory) {
-        Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force
+        # 作成時と同じ理由で -WhatIf:$false。付けないと -WhatIf の実行後に一時ディレクトリが残る
+        Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force -WhatIf:$false
     }
 }

@@ -5,6 +5,7 @@
     cancelConfirmation,
     currentConfirmation,
     handleConfirmationKeydown,
+    setConfirmationChecked,
   } from '../lib/confirmation.svelte';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -53,6 +54,17 @@
     >
       <h2 id={titleId}>{request.title}</h2>
       <p id={descriptionId}>{request.message}</p>
+      {#if request.checkbox}
+        <!-- **チェックの初期値は呼び出し側が決める**（API キーの失効は、初期値オン） -->
+        <label class="choice">
+          <input
+            type="checkbox"
+            checked={request.checkbox.checked}
+            onchange={(event) => setConfirmationChecked(event.currentTarget.checked)}
+          />
+          <span>{request.checkbox.label}</span>
+        </label>
+      {/if}
       <div class="actions">
         <button type="button" class="secondary" bind:this={cancelButton} onclick={cancelConfirmation}>
           {t('list.cancel')}
@@ -105,6 +117,18 @@
     justify-content: flex-end;
     gap: var(--space-3);
     margin-top: var(--space-6);
+  }
+
+  .choice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    font-size: 0.9rem;
+  }
+
+  .choice input {
+    margin-top: 0.2rem;
   }
 
   button.danger {

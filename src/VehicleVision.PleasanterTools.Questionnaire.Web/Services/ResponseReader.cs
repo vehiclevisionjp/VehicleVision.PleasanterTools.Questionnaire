@@ -180,7 +180,7 @@ public sealed class ResponseReader(
     }
 
     /// <summary>行から回答 JSON 列の値を取り出す。</summary>
-    private static string? ReadColumn(JsonNode row, string column)
+    internal static string? ReadColumn(JsonNode row, string column)
     {
         var kind = PleasanterColumn.KindOf(column);
         if (kind is not null && row[$"{kind}Hash"] is JsonObject hash

@@ -50,6 +50,18 @@ public static class ServerMessages
         [ServerMessageKeys.UnsupportedLanguage] = "지원하지 않는 언어입니다.",
         [ServerMessageKeys.AdminSessionNotFound] = "해당 세션을 찾을 수 없습니다.",
         [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "현재 사용 중인 세션은 여기서 종료할 수 없습니다. 대신 로그아웃하세요.",
+        [ServerMessageKeys.ApiTokenFeatureDisabled] = "API 키 기능이 비활성화되어 있습니다. 사용하려면 운영자에게 설정 활성화를 요청하세요.",
+        [ServerMessageKeys.ApiTokenRoleNotAllowed] = "현재 역할로는 API 키를 발급할 수 없습니다.",
+        [ServerMessageKeys.ApiTokenNameInvalid] = "이름을 1~100자로 입력하세요(제어 문자는 사용할 수 없습니다).",
+        [ServerMessageKeys.ApiTokenScopesInvalid] = "범위를 하나 이상 선택하세요. 부여할 수 있는 것은 surveys.read, surveys.write, surveys.publish뿐입니다.",
+        [ServerMessageKeys.ApiTokenScopeExceedsRole] = "자신의 역할에 없는 권한은 범위로 부여할 수 없습니다.",
+        [ServerMessageKeys.ApiTokenExpiryInvalid] = "유효 기간은 1~{0}일로 지정하세요(무기한으로 할 수 없습니다).",
+        [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "접속 허용 목록은 CIDR(예: 203.0.113.0/24)을 최대 {0}개까지 지정할 수 있습니다. 형식을 확인하세요.",
+        [ServerMessageKeys.ApiTokenLimitReached] = "사용 중인 API 키는 1인당 최대 {0}개입니다. 불필요한 키를 먼저 폐기하세요.",
+        [ServerMessageKeys.ApiTokenReloginRequired] = "SSO로 로그인한 관리자는 다시 로그인한 뒤 {0}분 이내에 발급하세요.",
+        [ServerMessageKeys.ApiTokenReauthRequired] = "SSO(SAML)로 로그인한 관리자는 IdP에서 다시 인증해야 합니다. 화면의 재인증 버튼으로 다시 인증한 뒤 {0}분 이내에 발급하세요.",
+        [ServerMessageKeys.ApiTokenReauthUnavailable] = "재인증을 시작할 수 없습니다. SAML이 비활성화되었거나 이 세션이 SAML로 만들어진 것이 아닙니다.",
+        [ServerMessageKeys.ApiTokenNotFound] = "해당 API 키를 찾을 수 없습니다.",
         [ServerMessageKeys.ResponseNotificationMailSubject] = "설문 조사에 새 답변이 있습니다",
         [ServerMessageKeys.ResponseNotificationMailBody] = "설문 조사 \"{0}\"에 새 답변이 {1}건 도착했습니다.\n집계 기간(UTC): {2} ~ {3}\n\n답변 내용은 Pleasanter에서 확인하세요.",
         [ServerMessageKeys.RemovedSurvey] = "삭제된 설문 조사",
@@ -81,10 +93,15 @@ public static class ServerMessages
         [ServerMessageKeys.SurveyDeleteRequiresArchive] = "완전히 삭제할 수 있는 것은 보관된 설문 조사뿐입니다. 먼저 보관하세요.",
         [ServerMessageKeys.SurveyDeleteTitleMismatch] = "입력한 제목이 설문 조사 제목과 일치하지 않습니다.",
         [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "전송 대기 또는 전송 중인 답변이나 메일이 남아 있어 완전히 삭제할 수 없습니다.",
+        [ServerMessageKeys.TestResponsesCountChanged] = "테스트 답변의 건수가 화면에 표시된 것과 달라졌습니다. 아무것도 삭제하지 않았습니다. 다시 불러오세요.",
+        [ServerMessageKeys.TestResponsesNotVerifiable] = "이 설문 조사에는 응답 JSON 열이 없어 삭제 대상을 확인할 수 없습니다. 아무것도 삭제하지 않았습니다.",
+        [ServerMessageKeys.TestResponsesForbidden] = "Pleasanter가 삭제를 허용하지 않았습니다. API 키 사용자에게 레코드 삭제 권한이 있는지 확인하세요.",
         [ServerMessageKeys.SiteIdLockedAfterPublish] = "정식 공개한 설문 조사의 Pleasanter 사이트 ID는 변경할 수 없습니다.",
         [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "전송 대기 중인 답변이 있어 Pleasanter 사이트 ID를 변경할 수 없습니다.",
         [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "복제 대상에는 원본과 다른 Pleasanter 사이트 ID를 지정하세요.",
         [ServerMessageKeys.SurveyIsTemplate] = "이것은 템플릿입니다. 템플릿은 공개할 수 없습니다. 먼저 템플릿에서 설문 조사를 만드세요.",
+        [ServerMessageKeys.SurveyImportInvalid] = "가져올 수 없는 파일입니다. 이 제품에서 내보낸 JSON인지, 크기와 버전을 확인하세요.",
+        [ServerMessageKeys.SurveyImportBlocked] = "가져올 수 없습니다. 공개 전 검사와 같은 기준에서 문제가 발견되었습니다.",
         [ServerMessageKeys.TemplateSourceRequired] = "템플릿의 원본으로 사용할 설문 조사를 지정하세요.",
         [ServerMessageKeys.ThemeColorInvalid] = "색상은 #rrggbb 형식으로 지정하세요.",
         [ServerMessageKeys.EmbedHostNotAllowed] = "삽입 대상이 허용된 출처에 포함되어 있지 않습니다. 관리자에게 출처 추가를 요청하세요.",
@@ -93,6 +110,7 @@ public static class ServerMessages
         [ServerMessageKeys.ContentAssetLimitReached] = "이 설문 조사에 저장할 수 있는 배포 자료의 한도에 도달했습니다.",
         [ServerMessageKeys.AssetScannerUnavailable] = "바이러스 검사를 사용할 수 없어 배포 자료를 저장할 수 없습니다. 관리자에게 문의하세요.",
         [ServerMessageKeys.ResponseLimitMustBePositive] = "답변 수 한도는 1 이상이어야 합니다. 한도를 두지 않으려면 비워 두세요.",
+        [ServerMessageKeys.AcceptPeriodInvalid] = "접수 종료 일시는 시작 일시보다 늦어야 합니다.",
         [ServerMessageKeys.ResponseLimitReached] = "답변 수가 한도에 도달했습니다({0} / {1}건). 다시 시작하려면 먼저 한도를 늘리세요.",
         [ServerMessageKeys.ResponseTokenRequired] = "되돌릴 답변을 지정하세요.",
         [ServerMessageKeys.DeadLetterNotFound] = "해당 답변을 찾을 수 없습니다. 이미 전송 대기로 되돌렸거나 전송이 완료되었을 수 있습니다.",
@@ -208,6 +226,18 @@ public static class ServerMessages
             [ServerMessageKeys.UnsupportedLanguage] = "不支持该语言。",
             [ServerMessageKeys.AdminSessionNotFound] = "未找到该会话。",
             [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "无法在此结束当前使用的会话。请改为注销。",
+            [ServerMessageKeys.ApiTokenFeatureDisabled] = "API 密钥功能已关闭。如需使用，请请求运维人员启用该设置。",
+            [ServerMessageKeys.ApiTokenRoleNotAllowed] = "当前角色无法签发 API 密钥。",
+            [ServerMessageKeys.ApiTokenNameInvalid] = "请输入 1 到 100 个字符的名称（不能包含控制字符）。",
+            [ServerMessageKeys.ApiTokenScopesInvalid] = "请至少选择一个范围。只能授予 surveys.read、surveys.write 和 surveys.publish。",
+            [ServerMessageKeys.ApiTokenScopeExceedsRole] = "无法授予自己角色不具备的权限范围。",
+            [ServerMessageKeys.ApiTokenExpiryInvalid] = "有效期请设置为 1 到 {0} 天（不能设为永久）。",
+            [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "允许的来源地址列表最多可指定 {0} 条 CIDR（例如 203.0.113.0/24）。请检查格式。",
+            [ServerMessageKeys.ApiTokenLimitReached] = "每人最多可拥有 {0} 个有效的 API 密钥。请先吊销不再需要的密钥。",
+            [ServerMessageKeys.ApiTokenReloginRequired] = "通过 SSO 登录的管理员，请重新登录后在 {0} 分钟内签发。",
+            [ServerMessageKeys.ApiTokenReauthRequired] = "通过 SSO（SAML）登录的管理员需要在 IdP 重新认证。请使用页面上的重新认证按钮，并在 {0} 分钟内签发。",
+            [ServerMessageKeys.ApiTokenReauthUnavailable] = "无法开始重新认证。SAML 已被禁用，或此会话不是通过 SAML 创建的。",
+            [ServerMessageKeys.ApiTokenNotFound] = "未找到该 API 密钥。",
             [ServerMessageKeys.ResponseNotificationMailSubject] = "问卷有新的回答",
             [ServerMessageKeys.ResponseNotificationMailBody] = "问卷“{0}”收到了 {1} 条新回答。\n"
                 + "统计期间（UTC）：{2} ～ {3}\n\n"
@@ -245,10 +275,15 @@ public static class ServerMessages
             [ServerMessageKeys.SurveyDeleteRequiresArchive] = "只有已存档的问卷可以永久删除。请先存档此问卷。",
             [ServerMessageKeys.SurveyDeleteTitleMismatch] = "输入的标题与问卷标题不一致。",
             [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "仍有等待发送或正在发送的回答或邮件，因此无法永久删除。",
+            [ServerMessageKeys.TestResponsesCountChanged] = "测试回答的数量与画面显示的不一致，未删除任何内容。请重新加载。",
+            [ServerMessageKeys.TestResponsesNotVerifiable] = "此问卷没有回答 JSON 列，无法确认删除对象，未删除任何内容。",
+            [ServerMessageKeys.TestResponsesForbidden] = "Pleasanter 拒绝了删除。请确认 API 密钥的用户拥有删除记录的权限。",
             [ServerMessageKeys.SiteIdLockedAfterPublish] = "正式发布后的问卷无法更改 Pleasanter 站点 ID。",
             [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "仍有等待发送的回答，因此无法更改 Pleasanter 站点 ID。",
             [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "请为副本指定与原问卷不同的 Pleasanter 站点 ID。",
             [ServerMessageKeys.SurveyIsTemplate] = "这是模板。模板无法发布。请先从模板创建问卷。",
+            [ServerMessageKeys.SurveyImportInvalid] = "无法导入此文件。请确认它是本产品导出的 JSON，并检查大小和版本。",
+            [ServerMessageKeys.SurveyImportBlocked] = "无法导入。发现了与发布前检查相同标准的问题。",
             [ServerMessageKeys.TemplateSourceRequired] = "请指定要作为模板来源的问卷。",
             [ServerMessageKeys.ThemeColorInvalid] = "颜色请指定为 #rrggbb 格式。",
             [ServerMessageKeys.EmbedHostNotAllowed] = "嵌入目标不在允许的来源中。请请求管理员添加来源。",
@@ -257,6 +292,7 @@ public static class ServerMessages
             [ServerMessageKeys.ContentAssetLimitReached] = "此问卷已达到可保存资源的上限。",
             [ServerMessageKeys.AssetScannerUnavailable] = "由于无法使用病毒扫描，无法保存资源。请联系管理员。",
             [ServerMessageKeys.ResponseLimitMustBePositive] = "回答数上限必须至少为 1。若不设上限，请留空。",
+            [ServerMessageKeys.AcceptPeriodInvalid] = "受理的结束时间必须晚于开始时间。",
             [ServerMessageKeys.ResponseLimitReached] = "回答数已达到上限（{0} / {1} 条）。请先提高上限后再继续。",
             [ServerMessageKeys.ResponseTokenRequired] = "请指定要恢复的回答。",
             [ServerMessageKeys.DeadLetterNotFound] = "未找到该回答。它可能已恢复为等待发送状态，或已发送完成。",
@@ -329,6 +365,18 @@ public static class ServerMessages
             [ServerMessageKeys.UnsupportedLanguage] = "Ese idioma no es compatible.",
             [ServerMessageKeys.AdminSessionNotFound] = "No se encontró esa sesión.",
             [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "La sesión actual no se puede cerrar desde aquí. Cierre sesión en su lugar.",
+            [ServerMessageKeys.ApiTokenFeatureDisabled] = "Las claves de API están desactivadas. Pida a su operador que active la configuración primero.",
+            [ServerMessageKeys.ApiTokenRoleNotAllowed] = "Su rol no puede emitir claves de API.",
+            [ServerMessageKeys.ApiTokenNameInvalid] = "Escriba un nombre de 1 a 100 caracteres (no se permiten caracteres de control).",
+            [ServerMessageKeys.ApiTokenScopesInvalid] = "Seleccione al menos un ámbito. Solo se pueden conceder surveys.read, surveys.write y surveys.publish.",
+            [ServerMessageKeys.ApiTokenScopeExceedsRole] = "No puede conceder un ámbito que su propio rol no tiene.",
+            [ServerMessageKeys.ApiTokenExpiryInvalid] = "Establezca la caducidad entre 1 y {0} días (no se pueden crear claves permanentes).",
+            [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "La lista de orígenes permitidos admite hasta {0} entradas CIDR (por ejemplo, 203.0.113.0/24). Compruebe el formato.",
+            [ServerMessageKeys.ApiTokenLimitReached] = "Cada persona puede tener hasta {0} claves de API activas. Revoque primero una que ya no necesite.",
+            [ServerMessageKeys.ApiTokenReloginRequired] = "Los administradores que iniciaron sesión con SSO deben volver a iniciar sesión y emitir la clave en un plazo de {0} minutos.",
+            [ServerMessageKeys.ApiTokenReauthRequired] = "Los administradores que iniciaron sesión con SSO (SAML) deben volver a autenticarse en el IdP. Use el botón de reautenticación de la pantalla y emita la clave en un plazo de {0} minutos.",
+            [ServerMessageKeys.ApiTokenReauthUnavailable] = "No se puede iniciar la reautenticación. SAML está deshabilitado o esta sesión no se creó mediante SAML.",
+            [ServerMessageKeys.ApiTokenNotFound] = "No se encontró esa clave de API.",
             [ServerMessageKeys.ResponseNotificationMailSubject] = "Nuevas respuestas de encuesta",
             [ServerMessageKeys.ResponseNotificationMailBody] = "La encuesta \"{0}\" recibió {1} respuesta(s) nueva(s).\n"
                 + "Período (UTC): de {2} a {3}\n\n"
@@ -366,10 +414,15 @@ public static class ServerMessages
             [ServerMessageKeys.SurveyDeleteRequiresArchive] = "Solo se pueden eliminar permanentemente las encuestas archivadas. Archive primero esta encuesta.",
             [ServerMessageKeys.SurveyDeleteTitleMismatch] = "El título introducido no coincide con el título de la encuesta.",
             [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "Esta encuesta no se puede eliminar permanentemente mientras haya respuestas o correos pendientes o en proceso de envío.",
+            [ServerMessageKeys.TestResponsesCountChanged] = "El número de respuestas de prueba ya no coincide con el mostrado. No se eliminó nada. Vuelva a cargar la página.",
+            [ServerMessageKeys.TestResponsesNotVerifiable] = "Esta encuesta no tiene columna JSON de respuestas, por lo que no se puede comprobar qué eliminar. No se eliminó nada.",
+            [ServerMessageKeys.TestResponsesForbidden] = "Pleasanter rechazó la eliminación. Compruebe que el usuario de la clave de API tiene permiso para eliminar registros.",
             [ServerMessageKeys.SiteIdLockedAfterPublish] = "El ID del sitio de Pleasanter no se puede cambiar después de la publicación en producción.",
             [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "El ID del sitio de Pleasanter no se puede cambiar mientras haya respuestas pendientes de envío.",
             [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "Especifique un ID de sitio de Pleasanter distinto del sitio donde escribe la encuesta original.",
             [ServerMessageKeys.SurveyIsTemplate] = "Esta es una plantilla. Las plantillas no se pueden publicar. Primero cree una encuesta a partir de ella.",
+            [ServerMessageKeys.SurveyImportInvalid] = "No se puede importar el archivo. Compruebe que sea un JSON exportado por este producto, y su tamaño y versión.",
+            [ServerMessageKeys.SurveyImportBlocked] = "No se puede importar. Se encontraron problemas con el mismo criterio que la comprobación previa a la publicación.",
             [ServerMessageKeys.TemplateSourceRequired] = "Especifique la encuesta a partir de la cual crear una plantilla.",
             [ServerMessageKeys.ThemeColorInvalid] = "Especifique los colores con el formato #rrggbb.",
             [ServerMessageKeys.EmbedHostNotAllowed] = "La URL incrustada no está en los orígenes permitidos. Pida a un administrador que agregue el origen.",
@@ -378,6 +431,7 @@ public static class ServerMessages
             [ServerMessageKeys.ContentAssetLimitReached] = "Esta encuesta ha alcanzado su límite de recursos.",
             [ServerMessageKeys.AssetScannerUnavailable] = "No se puede guardar el recurso porque el análisis de virus no está disponible. Póngase en contacto con un administrador.",
             [ServerMessageKeys.ResponseLimitMustBePositive] = "El límite de respuestas debe ser al menos 1. Déjelo vacío si no desea establecer un límite.",
+            [ServerMessageKeys.AcceptPeriodInvalid] = "La fecha de cierre debe ser posterior a la de inicio.",
             [ServerMessageKeys.ResponseLimitReached] = "Se ha alcanzado el límite de respuestas ({0} de {1}). Aumente el límite antes de reanudar.",
             [ServerMessageKeys.ResponseTokenRequired] = "Especifique qué respuesta desea devolver.",
             [ServerMessageKeys.DeadLetterNotFound] = "No se encontró esa respuesta. Es posible que ya se haya devuelto o que se haya enviado.",
@@ -455,6 +509,18 @@ public static class ServerMessages
             [ServerMessageKeys.UnsupportedLanguage] = "Diese Sprache wird nicht unterstützt.",
             [ServerMessageKeys.AdminSessionNotFound] = "Diese Sitzung wurde nicht gefunden.",
             [ServerMessageKeys.CurrentSessionCannotBeRevoked] = "Die aktuelle Sitzung kann hier nicht beendet werden. Melden Sie sich stattdessen ab.",
+            [ServerMessageKeys.ApiTokenFeatureDisabled] = "API-Schlüssel sind deaktiviert. Bitten Sie Ihren Betreiber, die Einstellung zuerst zu aktivieren.",
+            [ServerMessageKeys.ApiTokenRoleNotAllowed] = "Ihre Rolle kann keine API-Schlüssel ausstellen.",
+            [ServerMessageKeys.ApiTokenNameInvalid] = "Geben Sie einen Namen mit 1 bis 100 Zeichen ein (Steuerzeichen sind nicht erlaubt).",
+            [ServerMessageKeys.ApiTokenScopesInvalid] = "Wählen Sie mindestens einen Bereich. Nur surveys.read, surveys.write und surveys.publish können vergeben werden.",
+            [ServerMessageKeys.ApiTokenScopeExceedsRole] = "Sie können keinen Bereich vergeben, den Ihre eigene Rolle nicht besitzt.",
+            [ServerMessageKeys.ApiTokenExpiryInvalid] = "Legen Sie die Gültigkeit auf 1 bis {0} Tage fest (unbefristete Schlüssel sind nicht möglich).",
+            [ServerMessageKeys.ApiTokenIpAllowListInvalid] = "Die Liste zulässiger Quelladressen nimmt bis zu {0} CIDR-Einträge an (z. B. 203.0.113.0/24). Prüfen Sie das Format.",
+            [ServerMessageKeys.ApiTokenLimitReached] = "Jede Person kann bis zu {0} aktive API-Schlüssel haben. Widerrufen Sie zuerst einen nicht mehr benötigten.",
+            [ServerMessageKeys.ApiTokenReloginRequired] = "Mit SSO angemeldete Administratoren müssen sich erneut anmelden und den Schlüssel innerhalb von {0} Minuten ausstellen.",
+            [ServerMessageKeys.ApiTokenReauthRequired] = "Mit SSO (SAML) angemeldete Administratoren müssen sich beim IdP erneut authentifizieren. Verwenden Sie die Schaltfläche zur erneuten Authentifizierung und stellen Sie den Schlüssel innerhalb von {0} Minuten aus.",
+            [ServerMessageKeys.ApiTokenReauthUnavailable] = "Die erneute Authentifizierung kann nicht gestartet werden. SAML ist deaktiviert oder diese Sitzung wurde nicht über SAML erstellt.",
+            [ServerMessageKeys.ApiTokenNotFound] = "Dieser API-Schlüssel wurde nicht gefunden.",
             [ServerMessageKeys.ResponseNotificationMailSubject] = "Neue Umfrageantworten",
             [ServerMessageKeys.ResponseNotificationMailBody] = "Die Umfrage „{0}“ hat {1} neue Antwort(en) erhalten.\nZeitraum (UTC): {2} bis {3}\n\nZeigen Sie den Antwortinhalt in Pleasanter an.",
             [ServerMessageKeys.RemovedSurvey] = "Gelöschte Umfrage",
@@ -486,10 +552,15 @@ public static class ServerMessages
             [ServerMessageKeys.SurveyDeleteRequiresArchive] = "Nur archivierte Umfragen können dauerhaft gelöscht werden. Archivieren Sie diese Umfrage zuerst.",
             [ServerMessageKeys.SurveyDeleteTitleMismatch] = "Der eingegebene Titel stimmt nicht mit dem Titel der Umfrage überein.",
             [ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery] = "Diese Umfrage kann nicht dauerhaft gelöscht werden, solange Antworten oder E-Mails ausstehen oder gesendet werden.",
+            [ServerMessageKeys.TestResponsesCountChanged] = "Die Anzahl der Testantworten stimmt nicht mehr mit der Anzeige überein. Es wurde nichts gelöscht. Laden Sie die Seite neu.",
+            [ServerMessageKeys.TestResponsesNotVerifiable] = "Diese Umfrage hat keine JSON-Spalte für Antworten, daher kann das Löschziel nicht geprüft werden. Es wurde nichts gelöscht.",
+            [ServerMessageKeys.TestResponsesForbidden] = "Pleasanter hat das Löschen abgelehnt. Prüfen Sie, ob der Benutzer des API-Schlüssels Datensätze löschen darf.",
             [ServerMessageKeys.SiteIdLockedAfterPublish] = "Die Pleasanter-Site-ID kann nach der Produktionsveröffentlichung nicht geändert werden.",
             [ServerMessageKeys.SiteIdBlockedByPendingResponses] = "Die Pleasanter-Site-ID kann nicht geändert werden, solange Antworten auf den Versand warten.",
             [ServerMessageKeys.DuplicateSiteIdMustDiffer] = "Geben Sie eine andere Pleasanter-Site-ID an als diejenige, in die die ursprüngliche Umfrage schreibt.",
             [ServerMessageKeys.SurveyIsTemplate] = "Dies ist eine Vorlage. Vorlagen können nicht veröffentlicht werden. Erstellen Sie zuerst eine Umfrage daraus.",
+            [ServerMessageKeys.SurveyImportInvalid] = "Die Datei kann nicht importiert werden. Prüfen Sie, ob es ein von diesem Produkt exportiertes JSON ist, sowie Größe und Version.",
+            [ServerMessageKeys.SurveyImportBlocked] = "Import nicht möglich. Es wurden Probleme nach demselben Maßstab wie bei der Prüfung vor der Veröffentlichung gefunden.",
             [ServerMessageKeys.TemplateSourceRequired] = "Geben Sie die Umfrage an, aus der eine Vorlage erstellt werden soll.",
             [ServerMessageKeys.ThemeColorInvalid] = "Geben Sie Farben im Format #rrggbb an.",
             [ServerMessageKeys.EmbedHostNotAllowed] = "Die eingebettete URL befindet sich nicht in den zulässigen Quellen. Bitten Sie einen Administrator, sie hinzuzufügen.",
@@ -498,6 +569,7 @@ public static class ServerMessages
             [ServerMessageKeys.ContentAssetLimitReached] = "Diese Umfrage hat das Asset-Limit erreicht.",
             [ServerMessageKeys.AssetScannerUnavailable] = "Das Asset kann nicht gespeichert werden, da die Virenprüfung nicht verfügbar ist. Wenden Sie sich an einen Administrator.",
             [ServerMessageKeys.ResponseLimitMustBePositive] = "Die Antwortgrenze muss mindestens 1 betragen. Lassen Sie das Feld für keine Begrenzung leer.",
+            [ServerMessageKeys.AcceptPeriodInvalid] = "Das Ende des Erfassungszeitraums muss nach dem Beginn liegen.",
             [ServerMessageKeys.ResponseLimitReached] = "Die Antwortgrenze wurde erreicht ({0} von {1}). Erhöhen Sie die Grenze vor der Fortsetzung.",
             [ServerMessageKeys.ResponseTokenRequired] = "Geben Sie an, welche Antwort zurückgesetzt werden soll.",
             [ServerMessageKeys.DeadLetterNotFound] = "Diese Antwort wurde nicht gefunden. Sie wurde möglicherweise bereits zurückgestellt oder bereits gesendet.",
@@ -736,6 +808,80 @@ public static class ServerMessages
             "The current session cannot be ended here. Sign out instead.",
             "Không thể kết thúc phiên đang sử dụng tại đây. Vui lòng đăng xuất.");
 
+        // ---- 管理 API の個人トークン（API キー。Issue #1025） ----------------------
+
+        Add(
+            ServerMessageKeys.ApiTokenFeatureDisabled,
+            "API キーの機能は無効です。使うには、運用者が設定を有効にする必要があります。",
+            "API keys are turned off. Ask your operator to enable the setting first.",
+            "Tính năng khóa API đang tắt. Hãy yêu cầu người vận hành bật cài đặt trước.");
+
+        Add(
+            ServerMessageKeys.ApiTokenRoleNotAllowed,
+            "この役割では API キーを発行できません。",
+            "Your role cannot issue API keys.",
+            "Vai trò của bạn không thể phát hành khóa API.");
+
+        Add(
+            ServerMessageKeys.ApiTokenNameInvalid,
+            "名前を 1〜100 文字で入力してください（制御文字は使えません）。",
+            "Enter a name of 1 to 100 characters (control characters are not allowed).",
+            "Vui lòng nhập tên từ 1 đến 100 ký tự (không được dùng ký tự điều khiển).");
+
+        Add(
+            ServerMessageKeys.ApiTokenScopesInvalid,
+            "スコープを 1 つ以上選んでください。付けられるのは surveys.read・surveys.write・surveys.publish だけです。",
+            "Select at least one scope. Only surveys.read, surveys.write and surveys.publish can be granted.",
+            "Vui lòng chọn ít nhất một phạm vi. Chỉ có thể cấp surveys.read, surveys.write và surveys.publish.");
+
+        Add(
+            ServerMessageKeys.ApiTokenScopeExceedsRole,
+            "自分の役割が持たない権限は、スコープに付けられません。",
+            "You cannot grant a scope that your own role does not have.",
+            "Bạn không thể cấp phạm vi mà vai trò của chính bạn không có.");
+
+        Add(
+            ServerMessageKeys.ApiTokenExpiryInvalid,
+            "有効期限は 1〜{0} 日で指定してください（無期限にはできません）。",
+            "Set the expiry to between 1 and {0} days (keys cannot be made permanent).",
+            "Vui lòng đặt thời hạn từ 1 đến {0} ngày (không thể đặt vô thời hạn).");
+
+        Add(
+            ServerMessageKeys.ApiTokenIpAllowListInvalid,
+            "接続元の許可リストは、CIDR（例: 203.0.113.0/24）を最大 {0} 件まで指定できます。書き方を確認してください。",
+            "The allowed source list accepts up to {0} CIDR entries (for example 203.0.113.0/24). Check the format.",
+            "Danh sách nguồn kết nối được phép chấp nhận tối đa {0} mục CIDR (ví dụ 203.0.113.0/24). Vui lòng kiểm tra định dạng.");
+
+        Add(
+            ServerMessageKeys.ApiTokenLimitReached,
+            "使える API キーは 1 人 {0} 本までです。不要なものを失効させてから発行してください。",
+            "Each person can have up to {0} active API keys. Revoke one you no longer need first.",
+            "Mỗi người có tối đa {0} khóa API đang dùng. Hãy thu hồi khóa không cần trước.");
+
+        Add(
+            ServerMessageKeys.ApiTokenReloginRequired,
+            "SSO で入った管理者は、直前（{0} 分以内）にログインし直してから発行してください。",
+            "Administrators who signed in with SSO must sign in again, then issue the key within {0} minutes.",
+            "Quản trị viên đăng nhập bằng SSO phải đăng nhập lại, rồi phát hành khóa trong vòng {0} phút.");
+
+        Add(
+            ServerMessageKeys.ApiTokenReauthRequired,
+            "SSO（SAML）で入った管理者は、IdP で再認証が必要です。画面の再認証のボタンから認証し直し、{0} 分以内に発行してください。",
+            "Administrators who signed in with SSO (SAML) must re-authenticate at the IdP. Use the re-authenticate button on the page, then issue the key within {0} minutes.",
+            "Quản trị viên đăng nhập bằng SSO (SAML) phải xác thực lại tại IdP. Hãy dùng nút xác thực lại trên màn hình, rồi phát hành khóa trong vòng {0} phút.");
+
+        Add(
+            ServerMessageKeys.ApiTokenReauthUnavailable,
+            "再認証を始められません。SAML が無効になっているか、このセッションは SAML で入ったものではありません。",
+            "Re-authentication cannot start. SAML is disabled, or this session was not created through SAML.",
+            "Không thể bắt đầu xác thực lại. SAML đã bị tắt hoặc phiên này không được tạo qua SAML.");
+
+        Add(
+            ServerMessageKeys.ApiTokenNotFound,
+            "その API キーは見つかりません。",
+            "That API key was not found.",
+            "Không tìm thấy khóa API đó.");
+
         Add(
             ServerMessageKeys.ResponseNotificationMailSubject,
             "アンケートに新しい回答があります",
@@ -931,6 +1077,24 @@ public static class ServerMessages
             "Tiêu đề đã nhập không khớp với tiêu đề khảo sát.");
 
         Add(
+            ServerMessageKeys.TestResponsesCountChanged,
+            "画面に出ていた件数と今の件数が違うため、何も削除していません。再読み込みしてください。",
+            "The number of test responses no longer matches what the screen showed. Nothing was deleted. Reload the page.",
+            "Số phản hồi thử nghiệm không còn khớp với số hiển thị trên màn hình. Chưa xóa gì. Vui lòng tải lại trang.");
+
+        Add(
+            ServerMessageKeys.TestResponsesNotVerifiable,
+            "このアンケートには回答 JSON 列が無く、削除してよいレコードかを確かめられないため、何も削除していません。",
+            "This survey has no response JSON column, so the records to delete cannot be verified. Nothing was deleted.",
+            "Khảo sát này không có cột JSON câu trả lời nên không thể xác minh bản ghi cần xóa. Chưa xóa gì.");
+
+        Add(
+            ServerMessageKeys.TestResponsesForbidden,
+            "Pleasanter が削除を断りました。API キーのユーザーにレコードの削除権限があるか確認してください。",
+            "Pleasanter refused the deletion. Check that the API key's user is allowed to delete records.",
+            "Pleasanter đã từ chối việc xóa. Hãy kiểm tra người dùng của khóa API có quyền xóa bản ghi.");
+
+        Add(
             ServerMessageKeys.SurveyDeleteBlockedByPendingDelivery,
             "送信待ちまたは送信中の回答・メールが残っているため、完全に削除できません。",
             "This survey cannot be permanently deleted while responses or mail are pending or being sent.",
@@ -960,6 +1124,19 @@ public static class ServerMessages
                 + "テンプレートからアンケートを作成してください。",
             "This is a template. Templates cannot be published. Create a survey from it first.",
             "Đây là mẫu. Không thể công bố mẫu. Vui lòng tạo khảo sát từ mẫu.");
+
+        // ---- 書き出し・取り込み（Issue #1009） ------------------------------
+        Add(
+            ServerMessageKeys.SurveyImportInvalid,
+            "取り込めないファイルです。この製品が書き出した JSON か、大きさと版を確認してください。",
+            "This file cannot be imported. Check that it is a JSON exported by this product, and its size and version.",
+            "Không thể nhập tệp này. Hãy kiểm tra tệp là JSON do sản phẩm này xuất ra, cũng như kích thước và phiên bản.");
+
+        Add(
+            ServerMessageKeys.SurveyImportBlocked,
+            "取り込めません。公開前の検査と同じ基準で、不備が見つかりました。",
+            "The survey cannot be imported. Problems were found by the same checks as before publishing.",
+            "Không thể nhập. Đã phát hiện vấn đề theo cùng tiêu chuẩn với kiểm tra trước khi công bố.");
 
         // ---- テンプレート ---------------------------------------------------
         Add(
@@ -1011,6 +1188,12 @@ public static class ServerMessages
             "回答数の上限は 1 以上にしてください。上限を設けない場合は空欄にしてください。",
             "The response limit must be at least 1. Leave it empty for no limit.",
             "Giới hạn số câu trả lời phải từ 1 trở lên. Để trống nếu không đặt giới hạn.");
+
+        Add(
+            ServerMessageKeys.AcceptPeriodInvalid,
+            "受付の終了日時は、開始日時より後にしてください。",
+            "The closing time must be later than the opening time.",
+            "Thời điểm kết thúc phải sau thời điểm bắt đầu.");
 
         Add(
             ServerMessageKeys.ResponseLimitReached,

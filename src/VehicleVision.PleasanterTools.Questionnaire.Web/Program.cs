@@ -171,7 +171,7 @@ if (MigrationCommand.IsRequested(args))
 }
 
 // ---- サービス --------------------------------------------------------------
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(AdminOpenApi.Configure);
 builder.Services.AddSingleton<IDbConnectionFactory>(
     new DbConnectionFactory(provider, connectionString));
 builder.Services.AddSingleton<IResponseOutbox, ResponseOutbox>();
@@ -297,6 +297,7 @@ builder.Services.AddSingleton<ResponseBacklogGuard>();
 
 builder.Services.AddSingleton<ResponseIntake>();
 builder.Services.AddTransient<ResponseReader>();
+builder.Services.AddTransient<TestResponseCleaner>();
 
 // **HTTP でやり取りする JSON も定義と同じ設定にする。**
 // 既定のままだと LocalizedText が言語コードのオブジェクトにならず、
@@ -515,6 +516,27 @@ builder.Services.AddQuestionnairePleasanterSessionVerifier();
 builder.Services.AddSingleton<PleasanterSsoAuthenticator>();
 builder.Services.AddSingleton<PleasanterSsoSessionRevalidator>();
 builder.Services.AddSingleton<AdminUserService>();
+
+// **管理 API の個人トークン（API キー）**（Issue #1025。親 #1012）。
+// 表は本アプリの Data（AdminApiTokens。M0042）。**機能は既定で無効**（QUESTIONNAIRE_ADMIN_API_TOKENS）。
+// ⚠️ **Bearer の認証スキームはまだ無い**（#1026）。ここで作るのは、発行・一覧・失効と、
+// 値の検証（AdminApiTokenService.ValidateAsync）だけ
+builder.Services.AddSingleton(AdminApiTokenOptions.FromConfiguration(builder.Configuration));
+builder.Services.AddSingleton<IAdminApiTokenStore, AdminApiTokenStore>();
+builder.Services.AddSingleton<AdminApiTokenService>();
+
+// SAML の管理者が API キーを発行する前の強制再認証（ForceAuthn。Issue #1034）。
+// 途中の状態と発行 1 回分の許可は、使い捨ての置き場に預ける。複数のプロセスでは共有状態の Redis を使う
+if (sharedStateOptions.UseRedis)
+{
+    builder.Services.AddSingleton<IAdminReauthStateStore, RedisAdminReauthStateStore>();
+}
+else
+{
+    builder.Services.AddSingleton<IAdminReauthStateStore, MemoryAdminReauthStateStore>();
+}
+
+builder.Services.AddSingleton<SamlReauthService>();
 
 // ---- bot 対策 --------------------------------------------------------------
 // **外部の CAPTCHA を使わない**（_documents/非機能設計.md 1 章）。
@@ -1049,6 +1071,7 @@ app.MapAdminSamlEndpoints(adminPath);
 // **Pleasanter のログインも同じ**（Issue #464）。無効な間は確認の入口が 404 を返す
 app.MapAdminPleasanterSsoEndpoints();
 app.MapAdminUserEndpoints();
+app.MapAdminApiTokenEndpoints();
 app.MapAdminSurveyEndpoints();
 app.MapAdminNoteEndpoints();
 app.MapAdminAutoReplyEndpoints();
@@ -1069,14 +1092,16 @@ if (monitoringToken is not null)
 
 if (openApiExposure.Enabled)
 {
-    app.MapOpenApi();
+    // **文書も画面も、ログイン済みの管理者にだけ返す**（Issue #1021）。
+    // 未認証には 401 を返し、API の一覧を出さない（同梱アセットも含めて同じ認可）
+    app.MapOpenApi().RequireAuthorization(AdminAuthSchemes.SessionPolicy);
     app.MapScalarApiReference((options, context) =>
     {
         // CDN の既定フォントと利用状況テレメトリーを止め、画面から第三者へ要求を出さない。
         options.DisableDefaultFonts().DisableTelemetry().DisableAgent().WithNonce(
             context.Items[SecurityHeadersMiddleware.ScalarCspNonceKey] as string
             ?? throw new InvalidOperationException("Scalar の CSP nonce を設定できなかった"));
-    });
+    }).RequireAuthorization(AdminAuthSchemes.SessionPolicy);
 }
 
 // **管理画面は別の入口。** 回答者へ管理画面のコードを配らない。

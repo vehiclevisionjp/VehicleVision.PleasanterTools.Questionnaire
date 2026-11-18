@@ -78,6 +78,44 @@ public static class ServerMessageKeys
 
     public const string CurrentSessionCannotBeRevoked = "sessions.currentCannotBeRevoked";
 
+    // ---- 管理 API の個人トークン（API キー。Issue #1025） ----------------------
+
+    /// <summary>機能が無効（既定）。</summary>
+    public const string ApiTokenFeatureDisabled = "apiTokens.featureDisabled";
+
+    /// <summary>この役割は発行できない（ユーザ管理者・監査担当）。</summary>
+    public const string ApiTokenRoleNotAllowed = "apiTokens.roleNotAllowed";
+
+    /// <summary>名前が空・長すぎる・制御文字を含む。</summary>
+    public const string ApiTokenNameInvalid = "apiTokens.nameInvalid";
+
+    /// <summary>スコープが空、または許可リストに無い。</summary>
+    public const string ApiTokenScopesInvalid = "apiTokens.scopesInvalid";
+
+    /// <summary>持ち主の役割が持たないスコープを付けようとした。</summary>
+    public const string ApiTokenScopeExceedsRole = "apiTokens.scopeExceedsRole";
+
+    /// <summary>期限が範囲外（**無期限は作れない**）。{0} は上限の日数。</summary>
+    public const string ApiTokenExpiryInvalid = "apiTokens.expiryInvalid";
+
+    /// <summary>接続元の許可リストが解釈できない・多すぎる。{0} は上限の件数。</summary>
+    public const string ApiTokenIpAllowListInvalid = "apiTokens.ipAllowListInvalid";
+
+    /// <summary>いま使えるトークンが上限に達している。{0} は上限の本数。</summary>
+    public const string ApiTokenLimitReached = "apiTokens.limitReached";
+
+    /// <summary>SSO の管理者が、直前の再ログインではない。{0} は許す分数。</summary>
+    public const string ApiTokenReloginRequired = "apiTokens.reloginRequired";
+
+    /// <summary>SAML の管理者で、強制再認証の許可が無い（Issue #1034）。{0} は許す分数。</summary>
+    public const string ApiTokenReauthRequired = "apiTokens.reauthRequired";
+
+    /// <summary>再認証を始められない（SAML が無効、または SAML で入ったセッションではない）。</summary>
+    public const string ApiTokenReauthUnavailable = "apiTokens.reauthUnavailable";
+
+    /// <summary>トークンが無い・他人のもの・すでに失効している（**区別しない**）。</summary>
+    public const string ApiTokenNotFound = "apiTokens.notFound";
+
     // ---- アンケート ---------------------------------------------------------
 
     public const string SurveyTitleRequired = "surveys.titleRequired";
@@ -161,6 +199,15 @@ public static class ServerMessageKeys
     public const string SurveyDeleteBlockedByPendingDelivery =
         "surveys.deleteBlockedByPendingDelivery";
 
+    /// <summary>画面が見せたテスト回答の件数と今の件数が違う（Issue #1010）。何も消していない。</summary>
+    public const string TestResponsesCountChanged = "surveys.testResponsesCountChanged";
+
+    /// <summary>回答 JSON 列が無く、テスト回答の持ち主を確かめられない（Issue #1010）。何も消していない。</summary>
+    public const string TestResponsesNotVerifiable = "surveys.testResponsesNotVerifiable";
+
+    /// <summary>Pleasanter がテスト回答の削除を断った（API キーのユーザーに権限が無い。Issue #1010）。</summary>
+    public const string TestResponsesForbidden = "surveys.testResponsesForbidden";
+
     public const string SiteIdLockedAfterPublish = "surveys.siteIdLockedAfterPublish";
 
     public const string SiteIdBlockedByPendingResponses = "surveys.siteIdBlockedByPendingResponses";
@@ -173,6 +220,14 @@ public static class ServerMessageKeys
     /// **テンプレートは書き込み先を持たないので公開できない。**
     /// </summary>
     public const string SurveyIsTemplate = "surveys.isTemplate";
+
+    // ---- 書き出し・取り込み（Issue #1009） ----------------------------------
+
+    /// <summary>取り込む JSON を読めない（形・種類・版・大きさ・識別子）。</summary>
+    public const string SurveyImportInvalid = "surveys.importInvalid";
+
+    /// <summary>取り込む定義に、公開前の検査で止まる不備がある。</summary>
+    public const string SurveyImportBlocked = "surveys.importBlocked";
 
     // ---- テンプレート -------------------------------------------------------
 
@@ -206,6 +261,9 @@ public static class ServerMessageKeys
 
     /// <summary>回答数の上限に 0 以下を指定した。**上限を外すなら未指定にする。**</summary>
     public const string ResponseLimitMustBePositive = "surveys.responseLimitMustBePositive";
+
+    /// <summary>受付の終了日時が開始日時以前だった（Issue #1006）。</summary>
+    public const string AcceptPeriodInvalid = "surveys.acceptPeriodInvalid";
 
     /// <summary>
     /// 上限に達しているので再開できない。**受付数（`{0}`）と上限（`{1}`）を差し込む。**

@@ -46,6 +46,7 @@ public class AdminUserServiceTests
             users,
             sessions,
             invitations,
+            new FakeAdminApiTokenStore(),
             authenticator,
             hasher,
             options,

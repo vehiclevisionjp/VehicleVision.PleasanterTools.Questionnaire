@@ -84,6 +84,21 @@ public sealed class PleasanterGateway(
         CancellationToken cancellationToken = default)
         => PostAsync($"api/items/{referenceId}/Update", record, cancellationToken);
 
+    /// <summary>レコードを 1 件削除する（<c>api/items/{id}/Delete</c>）。</summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠️ **<c>{id}</c> に当たるのは、レコードだけではない。** Pleasanter はこの ID が指す
+    /// 種類（結果・記録・Wiki・**サイト**）に応じて削除する。**呼ぶ前に必ず
+    /// <see cref="GetRecordAsync"/> で、期待したサイトの回答レコードだと確かめること**
+    /// （<c>TestResponseCleaner</c>）。このクラスは確かめない。
+    /// </para>
+    /// <para>**削除は取り消せない前提で扱う**（ごみ箱へ入るかは実機で未確認）。</para>
+    /// </remarks>
+    public Task<PleasanterResponse> DeleteAsync(
+        long referenceId,
+        CancellationToken cancellationToken = default)
+        => PostAsync($"api/items/{referenceId}/Delete", new Dictionary<string, object?>(), cancellationToken);
+
     /// <summary>レコードを取り出す。</summary>
     public Task<PleasanterResponse> GetAsync(
         long siteId,

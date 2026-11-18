@@ -12,6 +12,9 @@ import type {
   AdminSession,
   AdminSessionRow,
   AdminUserRow,
+  ApiTokenOverview,
+  ApiTokenRow,
+  IssuedApiToken,
   IssuedInvitation,
   AttachmentRejectionPage,
   AuditLogFilter,
@@ -229,18 +232,27 @@ export const setAdminUserDisabled = (adminUserId: string, isDisabled: boolean) =
  * ⚠️ **保護を外す操作。** 操作の記録に残る。
  * **次に入るときは登録し直しになる**（方針が必須のとき）。
  */
-export const resetAdminUserTwoFactor = (adminUserId: string) =>
-  call<{ reset: boolean }>(`/api/admin/users/${adminUserId}/totp/reset`, {
-    method: 'POST',
-    json: {},
-  });
+export const resetAdminUserTwoFactor = (adminUserId: string, revokeApiTokens = true) =>
+  call<{ reset: boolean; revokedApiTokens: number }>(
+    `/api/admin/users/${adminUserId}/totp/reset`,
+    {
+      method: 'POST',
+      // **「その人の API キーも失効させる」のチェック**（Issue #1025。初期値はオン）
+      json: { revokeApiTokens },
+    },
+  );
 
 // ---- 自分のアカウント（Issue #156）--------------------------------------------
 
-export const changeOwnPassword = (currentPassword: string, newPassword: string) =>
-  call<{ changed: boolean }>('/api/admin/me/password', {
+export const changeOwnPassword = (
+  currentPassword: string,
+  newPassword: string,
+  revokeApiTokens = true,
+) =>
+  call<{ changed: boolean; revokedApiTokens: number }>('/api/admin/me/password', {
     method: 'POST',
-    json: { currentPassword, newPassword },
+    // **「この人の API キーも失効させる」のチェック**（Issue #1025。初期値はオン）
+    json: { currentPassword, newPassword, revokeApiTokens },
   });
 
 /** 自分の 2 要素を登録し直す（端末を替えたとき）。**パスワードの再確認つき。** */
@@ -262,11 +274,53 @@ export const completeOwnTotp = (code: string) =>
  * ⚠️ **必須にしている間は断られる**（設定を無視して保護を外せないため）。
  * **口は DELETE ではなく POST**（Issue #170。最小 API は DELETE の本文を推論しない）。
  */
-export const disableOwnTotp = (password: string) =>
-  call<{ removed: boolean }>('/api/admin/me/totp/disable', {
+export const disableOwnTotp = (password: string, revokeApiTokens = true) =>
+  call<{ removed: boolean; revokedApiTokens: number }>('/api/admin/me/totp/disable', {
     method: 'POST',
-    json: { password },
+    json: { password, revokeApiTokens },
   });
+
+// ---- API キー（個人トークン。Issue #1025）------------------------------------
+
+/** 自分の API キーの一覧と、発行の画面が出す情報。**値は含まない。** */
+export const getOwnApiTokens = () => call<ApiTokenOverview>('/api/admin/me/api-tokens');
+
+/** 発行の依頼。 */
+export interface ApiTokenIssueRequest {
+  name: string;
+  scopes: string[];
+  expiresInDays: number;
+  ipAllowList: string[];
+  /** パスワードの再確認（SSO の管理者は直前の再ログインなので不要）。 */
+  password?: string;
+}
+
+/**
+ * API キーを発行する。**平文を受け取れるのはこの応答だけ**（再表示はできない）。
+ * 呼び出し側は、値をログ・ストレージ・URL へ置かないこと。
+ */
+export const issueApiToken = (request: ApiTokenIssueRequest) =>
+  call<IssuedApiToken>('/api/admin/me/api-tokens', { method: 'POST', json: request });
+
+/**
+ * SAML の管理者が、API キーの発行の前に IdP での強制再認証（ForceAuthn）を始める（Issue #1034）。
+ * 返る `redirectUrl`（IdP へ向かう URL）へブラウザを移す。**戻り先は指定できない**（サーバが固定する）。
+ */
+export const startApiTokenReauth = () =>
+  call<{ redirectUrl: string }>('/api/admin/saml/reauth', { method: 'POST', json: {} });
+
+/** 他人の API キーの一覧（`users.read`）か、自分の一覧。 */
+export const listAdminUserApiTokens = (adminUserId: string) =>
+  call<{ tokens: ApiTokenRow[] }>(`/api/admin/users/${adminUserId}/api-tokens`);
+
+/** API キーを失効させる。`adminUserId` を渡すと他人のもの（`users.write`）。 */
+export const revokeApiToken = (adminApiTokenId: string, adminUserId?: string) =>
+  call<{ revoked: boolean }>(
+    adminUserId === undefined
+      ? `/api/admin/me/api-tokens/${adminApiTokenId}/revoke`
+      : `/api/admin/users/${adminUserId}/api-tokens/${adminApiTokenId}/revoke`,
+    { method: 'POST', json: {} },
+  );
 
 export const logout = () => call<{ signedOut: boolean }>('/api/admin/logout', { method: 'POST', json: {} });
 
@@ -445,6 +499,26 @@ export const duplicateSurvey = (
     method: 'POST',
     json: { pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
   });
+
+/**
+ * 書き出した JSON から、新しいアンケートを下書きとして取り込む（Issue #1009）。
+ *
+ * **書き込み先のサイトは書き出しに入っていない**ので、ここで指定する。
+ * **公開前の検査と同じ検査をサーバが行い、通らなければ 1 件も作らない。**
+ */
+export const importSurvey = (
+  document: unknown,
+  pleasanterSiteId: number,
+  responseJsonColumn?: string,
+) =>
+  call<{ surveyId: string; publicId: string }>('/api/admin/surveys/import', {
+    method: 'POST',
+    json: { document, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
+  });
+
+/** 書き出しのダウンロード先。**認証は cookie なので、リンクで開いてよい。** */
+export const surveyExportUrl = (surveyId: string) =>
+  appUrl(`/api/admin/surveys/${surveyId}/export`);
 
 // ---- テンプレート -----------------------------------------------------------
 
@@ -656,6 +730,13 @@ export const testPublish = (surveyId: string) =>
     json: {},
   });
 
+/** テスト公開中の編集を反映する。**下書きへ戻さない。** 失敗してもテスト公開のまま残る（Issue #1008）。 */
+export const testRepublish = (surveyId: string) =>
+  call<{ version: number; warnings: MappingProblem[] }>(`/api/admin/surveys/${surveyId}/test-republish`, {
+    method: 'POST',
+    json: {},
+  });
+
 export const publish = (surveyId: string) =>
   call<{ status: string }>(`/api/admin/surveys/${surveyId}/publish`, {
     method: 'POST',
@@ -710,17 +791,28 @@ export const saveSurveySettings = (
   requireProofOfWork: boolean,
   allowDraft: boolean,
   allowEmbedding: boolean,
+  acceptFrom: string | null,
+  acceptTo: string | null,
 ) =>
   call<{
     responseLimit: number | null;
     requireProofOfWork: boolean;
     allowDraft: boolean;
     allowEmbedding: boolean;
+    acceptFrom?: string | null;
+    acceptTo?: string | null;
   }>(
     `/api/admin/surveys/${surveyId}/settings`,
     {
       method: 'PUT',
-      json: { responseLimit, requireProofOfWork, allowDraft, allowEmbedding },
+      json: {
+        responseLimit,
+        requireProofOfWork,
+        allowDraft,
+        allowEmbedding,
+        // **受付期間（Issue #1006）。** 空は「その側の制限なし」。ISO 8601（UTC）で送る
+        acceptPeriod: { from: acceptFrom, to: acceptTo },
+      },
     },
   );
 
@@ -748,6 +840,38 @@ export const restoreSurvey = (surveyId: string) =>
  * **Pleasanter 側の回答は削除しない。** 題名は押し間違いを防ぐ確認値で、
  * サーバでも現在の題名との完全一致を確かめる。
  */
+/** Pleasanter 側のテスト回答の削除の結果（Issue #1010）。 */
+export interface TestResponseCleanupResult {
+  deleted: number;
+  alreadyGone: number;
+  skipped: number;
+  failed: number;
+  remaining: number;
+}
+
+/**
+ * 管理画面から消せるテスト回答の件数（Issue #1010）。
+ *
+ * **確認ダイアログに出す件数は、一覧の件数ではなくこちらを使う。**
+ * 一覧の件数には、まだ Pleasanter へ届いていない回答も含まれる。
+ */
+export const countDeletableTestResponses = (surveyId: string) =>
+  call<{ deletable: number; maxPerRun: number }>(
+    `/api/admin/surveys/${surveyId}/test-responses`,
+  );
+
+/**
+ * Pleasanter 側のテスト回答を削除する（Issue #1010）。**取り消せない。**
+ *
+ * **画面に見せた件数（expectedCount）を必ず送る。** 今の件数と違えばサーバは何も消さない。
+ * 消す対象はサーバが自分の記録から決め、**ここから ID は送らない。**
+ */
+export const deleteTestResponses = (surveyId: string, expectedCount: number) =>
+  call<TestResponseCleanupResult>(`/api/admin/surveys/${surveyId}/test-responses/delete`, {
+    method: 'POST',
+    json: { expectedCount },
+  });
+
 export const deleteSurvey = (surveyId: string, title: string) =>
   call<void>(`/api/admin/surveys/${surveyId}/delete`, {
     method: 'POST',

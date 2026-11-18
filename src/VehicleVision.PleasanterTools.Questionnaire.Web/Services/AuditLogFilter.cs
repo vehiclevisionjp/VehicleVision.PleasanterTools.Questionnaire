@@ -50,6 +50,8 @@ public sealed partial class AuditLogFilter(
     /// <summary>経路の値から対象を見分ける。**順番に見て、最初に当たったものを使う。**</summary>
     private static readonly (string RouteKey, string TargetType)[] Targets =
     [
+        // **トークンを先に見る。** `/users/{adminUserId}/api-tokens/{adminApiTokenId}/revoke` の対象はトークン（持ち主は補足の経路の値に残る）
+        ("adminApiTokenId", "AdminApiToken"),
         ("adminSessionId", "AdminSession"),
         ("adminUserId", "AdminUser"),
         ("surveyId", "Survey"),

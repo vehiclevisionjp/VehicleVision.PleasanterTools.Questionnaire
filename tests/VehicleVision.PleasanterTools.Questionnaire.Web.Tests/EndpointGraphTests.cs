@@ -54,6 +54,7 @@ public class EndpointGraphTests
         app.MapAdminSurveyEndpoints();
         app.MapAdminTemplateEndpoints();
         app.MapAdminUserEndpoints();
+        app.MapAdminApiTokenEndpoints();
         app.MapAdminVersionEndpoints(
             allowInsecure: false,
             usesSqlite: true,
@@ -107,6 +108,21 @@ public class EndpointGraphTests
             AdminPleasanterSsoEndpoints.CheckRateLimitPolicy,
             pleasanterCheck.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName);
 
+        // **API キー（個人トークン）の入口は、すべて認証を要求する**（Issue #1025）。
+        // ⚠️ **足し忘れて、認証なしで開く口を作らない。** 発行はパスワードの試行を数える枠にも載せる
+        var apiTokenRoutes = endpoints.OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.RoutePattern.RawText?.Contains("api-tokens", StringComparison.Ordinal) == true)
+            .ToList();
+        Assert.True(apiTokenRoutes.Count >= 6, "API キーの入口が足りない");
+        Assert.All(apiTokenRoutes, endpoint => Assert.NotEmpty(endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()));
+        Assert.Equal(
+            AdminAuthSchemes.LoginRateLimitPolicy,
+            Assert.Single(
+                apiTokenRoutes,
+                endpoint => endpoint.RoutePattern.RawText?.TrimEnd('/') == "/api/admin/me/api-tokens"
+                    && endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods.Contains("POST") == true)
+                .Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName);
+
         // **設定の入口は特権管理者の権限を要求する**
         foreach (var route in new[]
                  {
@@ -120,6 +136,22 @@ public class EndpointGraphTests
                     endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>(),
                     data => data.Policy == Services.AdminPermissions.PolicyOf(
                         Services.AdminPermissions.PleasanterSsoSettings)));
+        }
+
+        // **テスト回答の削除は専用の権限を要求し、完全削除の権限ではない**（Issue #1024）
+        foreach (var route in new[]
+                 {
+                     "/api/admin/surveys/{surveyId:guid}/test-responses",
+                     "/api/admin/surveys/{surveyId:guid}/test-responses/delete",
+                 })
+        {
+            var testResponseEndpoint = Assert.Single(
+                endpoints.OfType<RouteEndpoint>(),
+                endpoint => endpoint.RoutePattern.RawText == route);
+            Assert.Contains(
+                testResponseEndpoint.Metadata.GetOrderedMetadata<IAuthorizeData>(),
+                data => data.Policy == Services.AdminPermissions.PolicyOf(
+                    Services.AdminPermissions.SurveysDeleteTestResponses));
         }
 
         // **CAPTCHA の検証より前にレート制限を通す。**

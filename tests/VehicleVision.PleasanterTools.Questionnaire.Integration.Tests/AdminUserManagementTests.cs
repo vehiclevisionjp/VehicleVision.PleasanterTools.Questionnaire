@@ -66,6 +66,7 @@ public class AdminUserManagementTests
             users,
             sessions,
             invitations,
+            new AdminApiTokenStore(factory),
             authenticator,
             hasher,
             options,

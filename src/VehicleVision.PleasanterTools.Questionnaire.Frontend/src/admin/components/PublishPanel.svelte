@@ -32,11 +32,17 @@
     requireProofOfWork: boolean;
     allowDraft: boolean;
     allowEmbedding: boolean;
+    /** 受付の開始日時（UTC, ISO 8601）。無ければ開始の制限なし（Issue #1006）。 */
+    acceptFrom: string | null;
+    /** 受付の終了日時（UTC, ISO 8601）。無ければ終了の制限なし（Issue #1006）。 */
+    acceptTo: string | null;
     onsaved: (values: {
       responseLimit: number | null;
       requireProofOfWork: boolean;
       allowDraft: boolean;
       allowEmbedding: boolean;
+      acceptFrom: string | null;
+      acceptTo: string | null;
     }) => void;
   }
 
@@ -50,14 +56,44 @@
     requireProofOfWork,
     allowDraft,
     allowEmbedding,
+    acceptFrom,
+    acceptTo,
     onsaved,
   }: Props = $props();
+
+  /**
+   * UTC の ISO 文字列を、`datetime-local` 入力が受ける現地時刻（`YYYY-MM-DDTHH:mm`）にする。
+   * **入力欄は現地時刻、サーバへは UTC で送る**（Issue #1006）。
+   */
+  function toLocalInput(iso: string | null): string {
+    if (!iso) {
+      return '';
+    }
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  /** `datetime-local` の値を UTC の ISO 文字列にする。空は `null`。 */
+  function fromLocalInput(value: string): string | null {
+    if (value.trim() === '') {
+      return null;
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
 
   /** 回答数の上限。**空欄は「上限なし」。** */
   let limitText = $state('');
   let proofOfWork = $state(true);
   let draftEnabled = $state(false);
   let embedding = $state(false);
+  /** 受付期間（現地時刻）。**空欄は「その側の制限なし」。** */
+  let fromText = $state('');
+  let toText = $state('');
   let busy = $state(false);
   let error = $state('');
   let saved = $state(false);
@@ -70,6 +106,8 @@
     proofOfWork = requireProofOfWork;
     draftEnabled = allowDraft;
     embedding = allowEmbedding;
+    fromText = toLocalInput(acceptFrom);
+    toText = toLocalInput(acceptTo);
   });
 
   onMount(async () => {
@@ -105,8 +143,24 @@
       }
     }
 
+    // **終了は開始より後に。** サーバも断るが、ここで伝える方が早い
+    const from = fromLocalInput(fromText);
+    const to = fromLocalInput(toText);
+    if (from !== null && to !== null && new Date(to) <= new Date(from)) {
+      error = t('settings.acceptPeriodInvalid');
+      return;
+    }
+
     busy = true;
-    const result = await saveSurveySettings(surveyId, limit, proofOfWork, draftEnabled, embedding);
+    const result = await saveSurveySettings(
+      surveyId,
+      limit,
+      proofOfWork,
+      draftEnabled,
+      embedding,
+      from,
+      to,
+    );
     busy = false;
 
     if (!result.ok) {
@@ -115,7 +169,11 @@
     }
 
     saved = true;
-    onsaved(result.value);
+    onsaved({
+      ...result.value,
+      acceptFrom: result.value.acceptFrom ?? null,
+      acceptTo: result.value.acceptTo ?? null,
+    });
   }
 </script>
 
@@ -142,6 +200,17 @@
         <span class="hint">{t('settings.responseLimitHint')}</span>
       </label>
       <p class="hint">{t('settings.noAutoResume')}</p>
+
+      <!-- **受付期間**（Issue #1006）。期間外は回答者に理由を出さず受付を止める -->
+      <label>
+        {t('settings.acceptFrom')}
+        <input type="datetime-local" bind:value={fromText} />
+      </label>
+      <label>
+        {t('settings.acceptTo')}
+        <input type="datetime-local" bind:value={toText} />
+      </label>
+      <p class="hint">{t('settings.acceptPeriodHint')}</p>
 
       <!-- **切っても他の bot 対策は外れない**ことを併せて出す（Issue #66） -->
       <label class="check">

@@ -2,9 +2,13 @@
   import { appUrl } from '../../lib/basePath';
   import {
     archiveSurvey,
+    countDeletableTestResponses,
     createSurvey,
     deleteSurvey,
+    deleteTestResponses,
     duplicateSurvey,
+    importSurvey,
+    surveyExportUrl,
     listSurveys,
     publish,
     revertToDraft,
@@ -46,6 +50,8 @@
     canUseTemplates?: boolean;
     /** 完全削除を出してよい相手か。**Administrator だけ。** */
     canDelete?: boolean;
+    /** テスト回答の削除（`surveys.deleteTestResponses`）。完全削除とは別の権限（Issue #1024） */
+    canDeleteTestResponses?: boolean;
   }
 
   let {
@@ -53,11 +59,16 @@
     canDuplicate = false,
     canUseTemplates = false,
     canDelete = false,
+    canDeleteTestResponses = false,
   }: Props = $props();
 
   let surveys = $state<SurveySummary[]>([]);
   let loading = $state(true);
   let error = $state('');
+  /** テスト回答の削除の結果など、操作が終わったことの知らせ（Issue #1010）。 */
+  let notice = $state('');
+  /** テスト回答の削除の最中は、他の行の削除も押せなくする（二重実行を避ける） */
+  let cleanupBusy = $state(false);
 
   /** 1 ページの件数。**サーバ側の上限（200）より小さくしてある。** */
   const pageSize = 50;
@@ -90,6 +101,14 @@
   let copyJsonColumn = $state('');
   /** 二重送信で 2 つ複製されないようにする */
   let duplicateBusy = $state(false);
+
+  /** フォーム定義の取り込み（Issue #1009）。 */
+  let importing = $state(false);
+  let importDocument = $state<unknown>(null);
+  let importSiteId = $state('');
+  let importJsonColumn = $state('');
+  let importBusy = $state(false);
+  let importProblems = $state('');
 
   /** テンプレートの一覧を開いているか（Issue #58）。 */
   let showingTemplates = $state(false);
@@ -216,6 +235,83 @@
     duplicating = null;
     // **複製したものをそのまま開く。** 直すために複製している
     onopen(result.value.surveyId);
+  }
+
+  async function chooseImportFile(event: Event) {
+    importDocument = null;
+    error = '';
+    const file = (event.currentTarget as HTMLInputElement).files?.[0];
+    if (file === undefined) {
+      return;
+    }
+
+    try {
+      importDocument = JSON.parse(await file.text());
+    } catch {
+      error = t('exchange.fileUnreadable');
+    }
+  }
+
+  async function runImport(event: SubmitEvent) {
+    event.preventDefault();
+    if (importBusy) {
+      return;
+    }
+
+    error = '';
+    importProblems = '';
+
+    if (importDocument === null) {
+      error = t('exchange.fileRequired');
+      return;
+    }
+
+    const siteId = Number(importSiteId);
+    if (!Number.isInteger(siteId) || siteId <= 0) {
+      error = t('list.newSiteIdInvalid');
+      return;
+    }
+
+    importBusy = true;
+    const result = await importSurvey(importDocument, siteId, importJsonColumn);
+    importBusy = false;
+
+    if (!result.ok) {
+      error = result.message;
+      importProblems = summarizeImportProblems(result.body);
+      return;
+    }
+
+    importing = false;
+    // **取り込んだものをそのまま開く。** 直すために取り込んでいる
+    onopen(result.value.surveyId);
+  }
+
+  /** 検査で止まった不備の符号を並べる。**文言は持たず、符号だけ見せる。** */
+  function summarizeImportProblems(body: unknown): string {
+    const problems = (body as { problems?: Record<string, unknown> } | undefined)?.problems;
+    if (problems === undefined || problems === null) {
+      return '';
+    }
+
+    const codes: string[] = [];
+    for (const value of Object.values(problems)) {
+      if (!Array.isArray(value)) {
+        if (value === true) {
+          codes.push('invalid');
+        }
+        continue;
+      }
+
+      for (const item of value) {
+        const code = (item as { code?: unknown }).code;
+        if (typeof code === 'string' && !codes.includes(code)) {
+          codes.push(code);
+        }
+      }
+    }
+
+    return codes.length === 0 ? '' : t('exchange.problems', { codes: codes.join(', ') });
   }
 
   function openTemplate(survey: SurveySummary) {
@@ -373,6 +469,57 @@
     await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
+  /**
+   * Pleasanter 側のテスト回答を消す（Issue #1010）。**取り消せない。**
+   *
+   * **件数はサーバから取り直して確認に出す。** 一覧の件数には、まだ Pleasanter へ
+   * 届いていない回答も含まれ、消せる件数とは限らない。確認した件数をそのままサーバへ返し、
+   * 食い違えばサーバが何も消さない。
+   */
+  async function cleanupTestResponses(survey: SurveySummary) {
+    error = '';
+    notice = '';
+    cleanupBusy = true;
+    try {
+      const counted = await countDeletableTestResponses(survey.surveyId);
+      if (!counted.ok) {
+        error = counted.message;
+        return;
+      }
+
+      const count = counted.value.deletable;
+      if (count === 0) {
+        notice = t('list.deleteTestResponsesNone');
+        return;
+      }
+
+      const confirmed = await confirmAction({
+        title: t('list.deleteTestResponses'),
+        message: t('list.deleteTestResponsesConfirm', {
+          title: survey.title,
+          count,
+          max: counted.value.maxPerRun,
+        }),
+        confirmLabel: t('list.deleteTestResponses'),
+        danger: true,
+      });
+      if (!confirmed) {
+        return;
+      }
+
+      const result = await deleteTestResponses(survey.surveyId, count);
+      if (!result.ok) {
+        error = result.message;
+        return;
+      }
+
+      notice = t('list.deleteTestResponsesResult', { ...result.value });
+      await reload(offset, titleFilter, statusFilter, includeArchived);
+    } finally {
+      cleanupBusy = false;
+    }
+  }
+
   function openDelete(survey: SurveySummary) {
     error = '';
     deleting = survey;
@@ -451,6 +598,11 @@
       onclick={() => (showingTemplates = !showingTemplates)}
     >
       {t('template.open')}
+    </button>
+  {/if}
+  {#if canDuplicate}
+    <button type="button" class="secondary" onclick={() => (importing = !importing)}>
+      {t('exchange.open')}
     </button>
   {/if}
   <button type="button" onclick={() => (creating = !creating)}>
@@ -561,6 +713,36 @@
   </section>
 {/if}
 
+{#if importing && canDuplicate}
+  <form class="create" onsubmit={runImport}>
+    <h2>{t('exchange.title')}</h2>
+    <p class="hint">{t('exchange.description')}</p>
+    <label>
+      {t('exchange.file')}
+      <input type="file" accept="application/json,.json" onchange={chooseImportFile} required />
+    </label>
+    <label>
+      {t('exchange.siteId')}
+      <input type="text" inputmode="numeric" bind:value={importSiteId} required />
+    </label>
+    <label>
+      {t('exchange.jsonColumn')}
+      <input
+        type="text"
+        placeholder={t('list.newJsonColumnPlaceholder')}
+        bind:value={importJsonColumn}
+      />
+    </label>
+    {#if importProblems !== ''}<p class="error" role="alert">{importProblems}</p>{/if}
+    <div class="actions">
+      <button type="submit" disabled={importBusy}>{t('exchange.submit')}</button>
+      <button type="button" class="secondary" onclick={() => (importing = false)}>
+        {t('duplicate.cancel')}
+      </button>
+    </div>
+  </form>
+{/if}
+
 {#if duplicating}
   <form class="create" onsubmit={duplicate}>
     <h2>{t('duplicate.title', { title: duplicating.title })}</h2>
@@ -648,6 +830,7 @@
 {/if}
 
 {#if error}<p class="error" role="alert">{error}</p>{/if}
+{#if notice}<p class="hint" role="status">{notice}</p>{/if}
 
 {#if loading}
   <p class="status">{t('app.loading')}</p>
@@ -755,6 +938,15 @@
                 {t('duplicate.open')}
               </button>
             {/if}
+            <!-- **ダウンロードは移動で足りる。** 応答が添付なので、画面は遷移しない -->
+            <button
+              type="button"
+              class="secondary"
+              title={t('exchange.exportHint')}
+              onclick={() => window.location.assign(surveyExportUrl(survey.surveyId))}
+            >
+              {t('exchange.export')}
+            </button>
             {#if canUseTemplates && survey.archivedAt == null}
               <button type="button" class="secondary" onclick={() => openTemplate(survey)}>
                 {t('template.save')}
@@ -763,6 +955,16 @@
             <button type="button" class="secondary" onclick={() => changeArchive(survey)}>
               {survey.archivedAt == null ? t('archive.open') : t('archive.restore')}
             </button>
+            {#if canDeleteTestResponses && survey.testResponseCount > 0}
+              <button
+                type="button"
+                class="secondary"
+                disabled={cleanupBusy}
+                onclick={() => cleanupTestResponses(survey)}
+              >
+                {t('list.deleteTestResponses')}
+              </button>
+            {/if}
             {#if canDelete && survey.archivedAt != null}
               <button type="button" class="danger" onclick={() => openDelete(survey)}>
                 {t('delete.open')}
@@ -777,10 +979,12 @@
   </div>
 
   <!--
-    ⚠️ **印だけにしない。** Pleasanter 側のテスト回答は本アプリから消せず、
-    運用側で消してもらうしかない。**やるべきことは文で残す**
+    ⚠️ **印だけにしない。** Pleasanter 側のテスト回答を消せるのは、
+    surveys.deleteTestResponses（Administrator と SurveyAdministrator）を持つ人だけ
+    （行の「テスト回答を削除」。Issues #1010・#1024）。
+    **消せない相手には、運用側へ頼む旨を文で残す**
   -->
-  {#if surveys.some((survey) => survey.testResponseCount > 0)}
+  {#if !canDeleteTestResponses && surveys.some((survey) => survey.testResponseCount > 0)}
     <p class="hint test-response-note">※ {t('list.testResponseCleanup')}</p>
   {/if}
 
