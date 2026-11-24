@@ -278,6 +278,9 @@ export const en: Record<MessageKey, string> = {
   'sessions.confirmRevokeOthers': 'End all sessions except the current device?',
   'signIn.samlOr': 'or',
   'signIn.samlButton': 'Sign in with single sign-on',
+  'signIn.tabsLabel': 'Sign-in method',
+  'signIn.tabSso': 'SSO',
+  'signIn.tabPassword': 'ID / password',
   'signIn.samlError.invalid': 'Could not complete single sign-on. Please try again.',
   'signIn.samlError.unknownUser':
     'This account is not registered in administration. Ask an administrator to add it.',
@@ -300,9 +303,9 @@ export const en: Record<MessageKey, string> = {
   'saml.lead':
     'Values supplied by external configuration take precedence. Saving applies editable fields without restarting the application.',
   'saml.fixed': 'Fixed by configuration',
-  'saml.passwordFallbackTitle': 'Password sign-in always remains available.',
+  'saml.passwordFallbackTitle': 'Password sign-in remains available.',
   'saml.passwordFallback':
-    'The person enabling SAML may not be able to sign in with that configuration. If it is incorrect, sign in again with your ID, password and two-factor authentication when required, then correct it.',
+    'The person enabling SAML may not be able to sign in with that configuration. If it is incorrect, sign in again with your ID, password and two-factor authentication when required, then correct it. If ID / password is hidden, use the rescue URL (?rescue=).',
   'saml.enabled': 'Enable SAML sign-in',
   'saml.entityId': 'SP Entity ID',
   'saml.idpEntityId': 'IdP Entity ID',
@@ -323,6 +326,23 @@ export const en: Record<MessageKey, string> = {
   'saml.save': 'Save',
   'saml.saving': 'Working…',
   'saml.saved': 'SAML settings saved.',
+  'saml.signInTitle': 'Sign-in page methods',
+  'saml.hidePassword': 'Hide ID / password sign-in',
+  'saml.hidePasswordHint':
+    'While single sign-on (SAML or Pleasanter sign-in) is enabled, the sign-in page shows only SSO and hides the ID / password form. To sign in with an ID and password after hiding it, open the rescue URL (?rescue=). The default is to show it.',
+  'saml.signInSave': 'Save sign-in page settings',
+  'saml.signInSaved': 'Sign-in page settings saved.',
+  'saml.signInError.ssoDisabled':
+    'Neither SAML nor Pleasanter sign-in is enabled, so ID / password cannot be hidden. Enable SSO first.',
+  'saml.signInError.rescueTokenMissing':
+    'No rescue token is configured, so ID / password cannot be hidden: you could not get back in if locked out. Set QUESTIONNAIRE_ADMIN_RESCUE_TOKEN.',
+  'saml.signInError.fixed':
+    'This setting is fixed by external configuration (QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN) and cannot be changed here.',
+  'saml.signInError.failed': 'Could not save the sign-in page settings.',
+  'saml.signInNeedsSso':
+    'SSO is disabled, so ID / password cannot be hidden right now (it is always shown).',
+  'saml.signInNeedsRescue':
+    'No rescue token (QUESTIONNAIRE_ADMIN_RESCUE_TOKEN) is configured, so it cannot be hidden.',
   'saml.testTitle': 'Test connection',
   'saml.testLead':
     'This only checks that IdP metadata can be fetched from the URL. It does not redirect to the actual sign-in page.',

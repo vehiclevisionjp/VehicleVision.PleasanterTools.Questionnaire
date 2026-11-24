@@ -846,6 +846,21 @@ export interface SamlSettings {
   fixedFields: Record<SamlSettingField, boolean>;
 }
 
+/**
+ * 管理画面のログイン方式の設定（Issue #1056）。
+ *
+ * **ID/パスワードを隠すか。** 外部設定（`QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN`）が優先で、
+ * 指定があれば `fixedByConfiguration` が真になり画面からは変えられない。
+ */
+export interface AdminSignInSettings {
+  passwordSignInEnabled: boolean;
+  fixedByConfiguration: boolean;
+  /** SAML か Pleasanter のログインが有効か（「隠す」を選べる条件の 1 つ）。 */
+  ssoEnabled: boolean;
+  /** 救済トークンが設定済みか（「隠す」を選べる条件の 1 つ）。値は返らない。 */
+  rescueTokenConfigured: boolean;
+}
+
 /** Pleasanter のログインで入る設定（Issue #464）。**秘密の値は無い。** */
 export interface PleasanterSsoSettings {
   allowedDeptIds: string;
