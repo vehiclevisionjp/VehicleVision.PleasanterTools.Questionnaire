@@ -31,44 +31,7 @@ public class EndpointGraphTests
     [Fact]
     public void すべての口が組み立てられる()
     {
-        var builder = WebApplication.CreateBuilder();
-        builder.Services.AddAuthorization();
-        builder.Services.AddRouting();
-
-        // **本物を組み立てない。** ここで見たいのは引数の取り方だけで、
-        // 中身は呼ばない。最小 API は「DI に居るか」で
-        // サービスか本文かを決めるので、**居ることだけ分かればよい**
-        RegisterEndpointDependencies(builder.Services);
-
-        var app = builder.Build();
-
-        app.MapAdminAuditLogEndpoints();
-        app.MapAdminAuthEndpoints();
-        app.MapAdminSessionEndpoints();
-        app.MapAdminNoteEndpoints();
-        app.MapAdminAutoReplyEndpoints();
-        app.MapAdminNotificationEndpoints();
-        app.MapAdminOutboxEndpoints();
-        app.MapAdminSamlEndpoints(new AdminPathOptions(AdminPathOptions.DefaultPath));
-        app.MapAdminPleasanterSsoEndpoints();
-        app.MapAdminSurveyEndpoints();
-        app.MapAdminTemplateEndpoints();
-        app.MapAdminUserEndpoints();
-        app.MapAdminApiTokenEndpoints();
-        app.MapAdminVersionEndpoints(
-            allowInsecure: false,
-            usesSqlite: true,
-            new DatabaseStartupState());
-        app.MapAnalyticsEndpoints();
-        app.MapFormEndpoints();
-        app.MapLookupEndpoints();
-        app.MapMonitoringEndpoints(new MonitoringToken("test-monitoring-token"));
-
-        // **ここで初めて RequestDelegateFactory が走る。**
-        // 引数の取り方が通らない宣言は、この列挙で例外になる
-        var endpoints = ((IEndpointRouteBuilder)app).DataSources
-            .SelectMany(source => source.Endpoints)
-            .ToList();
+        var endpoints = BuildEndpoints();
 
         Assert.NotEmpty(endpoints);
         Assert.Contains(
@@ -186,6 +149,122 @@ public class EndpointGraphTests
         Assert.All(
             AdminCsrfGuard.CrossSitePostPaths,
             path => Assert.Contains(unsafeAdminRoutes, route => route.Method == "POST" && route.Path == path));
+    }
+
+    /// <summary>
+    /// <b>個人トークン（API キー）で入れる口の一覧を固定する</b>（Issue #1026）。口を足しても、許可宣言（<c>AllowAutomation</c>）が
+    /// 無ければトークンでは入れない（既定は拒否）。この一覧が変わるのは、トークンで触れる範囲が変わるとき。レビューで必ず見る。
+    /// </summary>
+    [Fact]
+    public void トークンで入れる口は_宣言した一覧だけ()
+    {
+        var endpoints = BuildEndpoints().OfType<RouteEndpoint>().ToList();
+
+        var allowed = endpoints
+            .Where(endpoint => endpoint.Metadata.GetMetadata<AutomationAccessMetadata>() is not null)
+            .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? [])
+                .Select(method => $"{method} {endpoint.RoutePattern.RawText} [{endpoint.Metadata.GetMetadata<AutomationAccessMetadata>()!.Scope}]"))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(
+            new[]
+            {
+                "GET /api/admin/surveys/ [surveys.read]",
+                "GET /api/admin/surveys/{surveyId:guid} [surveys.read]",
+                "GET /api/admin/surveys/{surveyId:guid}/problems [surveys.read]",
+                "GET /api/admin/surveys/{surveyId:guid}/versions [surveys.read]",
+                "GET /api/admin/surveys/{surveyId:guid}/versions/{version:int} [surveys.read]",
+                "POST /api/admin/surveys/{surveyId:guid}/publish [surveys.publish]",
+                "POST /api/admin/surveys/{surveyId:guid}/resume [surveys.publish]",
+                "POST /api/admin/surveys/{surveyId:guid}/suspend [surveys.publish]",
+                "POST /api/admin/surveys/{surveyId:guid}/test-publish [surveys.publish]",
+                "POST /api/admin/surveys/{surveyId:guid}/test-republish [surveys.publish]",
+                "PUT /api/admin/surveys/{surveyId:guid} [surveys.write]",
+            }.Order(StringComparer.Ordinal),
+            allowed);
+
+        foreach (var endpoint in endpoints.Where(item => item.Metadata.GetMetadata<AutomationAccessMetadata>() is not null))
+        {
+            var scope = endpoint.Metadata.GetMetadata<AutomationAccessMetadata>()!.Scope;
+            var route = endpoint.RoutePattern.RawText!;
+
+            // **トークンの管理・人・設定の口には宣言しない**（トークンでトークンは作れない）
+            Assert.StartsWith("/api/admin/surveys", route, StringComparison.Ordinal);
+
+            // **宣言のスコープは、その口が要求する権限のうち、いちばん口に近いもの**（群のものでなく）と一致する。
+            // 口の認可が、宣言と別の権限を要求していると、トークンの判定が食い違う
+            var policies = endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()
+                .Select(data => data.Policy)
+                .ToList();
+            Assert.Equal(AdminPermissions.PolicyOf(scope), policies.Last());
+
+            // **要求する権限は、すべてトークンに付けられるスコープ**（users.* などの口に誤って宣言しても開かない）
+            Assert.All(
+                policies,
+                policy => Assert.Contains(
+                    AdminPermissions.All.Where(AdminApiTokenScopes.IsAllowed),
+                    permission => AdminPermissions.PolicyOf(permission) == policy));
+        }
+    }
+
+    /// <summary>宣言できるのは、トークンに付けられるスコープだけ。外れていれば起動時に落ちる。</summary>
+    [Theory]
+    [InlineData("users.write")]
+    [InlineData("settings.manage")]
+    [InlineData("lookups.manage")]
+    [InlineData("surveys.delete")]
+    [InlineData("surveys.deleteTestResponses")]
+    [InlineData("nonexistent")]
+    public void トークンに付けられないスコープは_宣言できない(string scope)
+    {
+        var app = WebApplication.CreateBuilder().Build();
+
+        Assert.Throws<ArgumentException>(() => app.MapGet("/x", () => "x").AllowAutomation(scope));
+    }
+
+    private static List<Endpoint> BuildEndpoints()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddAuthorization();
+        builder.Services.AddRouting();
+
+        // **本物を組み立てない。** ここで見たいのは引数の取り方だけで、
+        // 中身は呼ばない。最小 API は「DI に居るか」で
+        // サービスか本文かを決めるので、**居ることだけ分かればよい**
+        RegisterEndpointDependencies(builder.Services);
+
+        var app = builder.Build();
+
+        app.MapAdminAuditLogEndpoints();
+        app.MapAdminAuthEndpoints();
+        app.MapAdminSessionEndpoints();
+        app.MapAdminNoteEndpoints();
+        app.MapAdminAutoReplyEndpoints();
+        app.MapAdminNotificationEndpoints();
+        app.MapAdminOutboxEndpoints();
+        app.MapAdminSamlEndpoints(new AdminPathOptions(AdminPathOptions.DefaultPath));
+        app.MapAdminPleasanterSsoEndpoints();
+        app.MapAdminSurveyEndpoints();
+        app.MapAdminTemplateEndpoints();
+        app.MapAdminUserEndpoints();
+        app.MapAdminApiTokenEndpoints();
+        app.MapAdminVersionEndpoints(
+            allowInsecure: false,
+            usesSqlite: true,
+            new DatabaseStartupState());
+        app.MapAnalyticsEndpoints();
+        app.MapFormEndpoints();
+        app.MapLookupEndpoints();
+        app.MapMonitoringEndpoints(new MonitoringToken("test-monitoring-token"));
+
+        // **ここで初めて RequestDelegateFactory が走る。**
+        // 引数の取り方が通らない宣言は、この列挙で例外になる
+        var endpoints = ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(source => source.Endpoints)
+            .ToList();
+
+        return endpoints;
     }
 
     /// <summary>口が受け取るサービスを、型だけ DI へ置く。</summary>
