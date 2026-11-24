@@ -1,6 +1,12 @@
 <script lang="ts">
-  import { getSamlSettings, saveSamlSettings, testSamlMetadata } from '../lib/api';
-  import type { SamlSettingField, SamlSettings } from '../lib/types';
+  import {
+    getAdminSignInSettings,
+    getSamlSettings,
+    saveAdminSignInSettings,
+    saveSamlSettings,
+    testSamlMetadata,
+  } from '../lib/api';
+  import type { AdminSignInSettings, SamlSettingField, SamlSettings } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
   interface Props {
@@ -17,9 +23,67 @@
   let testMessage = $state('');
   let testError = $state('');
 
+  // ---- ログイン画面の方式（Issue #1056） -------------------------------------
+  // **SAML の保存とは別の API・別の保存。** 外部設定で固定されていれば編集できない
+
+  let signIn = $state<AdminSignInSettings>();
+  /** 「ID/パスワードを隠す」のチェック（真なら隠す）。保存するまでサーバの値は変わらない。 */
+  let hidePassword = $state(false);
+  let signInBusy = $state(false);
+  let signInError = $state('');
+  let signInDone = $state('');
+
   $effect(() => {
     void load();
+    void loadSignIn();
   });
+
+  async function loadSignIn() {
+    const result = await getAdminSignInSettings();
+    if (!result.ok) {
+      signInError = result.message;
+      return;
+    }
+    signIn = result.value;
+    hidePassword = !result.value.passwordSignInEnabled;
+  }
+
+  /** 隠せない理由（保存前の案内）。**サーバも保存時に同じ検査をする。** */
+  const hideBlockedReason = $derived.by(() => {
+    if (!signIn || signIn.fixedByConfiguration) {return '';}
+    if (!signIn.ssoEnabled) {return t('saml.signInNeedsSso');}
+    if (!signIn.rescueTokenConfigured) {return t('saml.signInNeedsRescue');}
+    return '';
+  });
+
+  async function saveSignIn(event: SubmitEvent) {
+    event.preventDefault();
+    signInError = '';
+    signInDone = '';
+    signInBusy = true;
+    const result = await saveAdminSignInSettings(!hidePassword);
+    signInBusy = false;
+
+    if (!result.ok) {
+      const code =
+        typeof result.body === 'object' && result.body !== null && 'code' in result.body
+          ? String((result.body as { code: unknown }).code)
+          : '';
+      signInError =
+        code === 'fixed'
+          ? t('saml.signInError.fixed')
+          : code === 'sso-disabled'
+            ? t('saml.signInError.ssoDisabled')
+            : code === 'rescue-token-missing'
+              ? t('saml.signInError.rescueTokenMissing')
+              : t('saml.signInError.failed');
+      return;
+    }
+
+    signIn = result.value;
+    hidePassword = !result.value.passwordSignInEnabled;
+    signInDone = t('saml.signInSaved');
+  }
 
   async function load() {
     const result = await getSamlSettings();
@@ -203,6 +267,33 @@
       <button type="submit" disabled={busy}>{busy ? t('saml.saving') : t('saml.save')}</button>
     </form>
 
+    <form class="signin" onsubmit={saveSignIn}>
+      <h2>{t('saml.signInTitle')}</h2>
+      {#if signIn}
+        <label class="check">
+          <input
+            type="checkbox"
+            bind:checked={hidePassword}
+            disabled={signIn.fixedByConfiguration ||
+              (hideBlockedReason !== '' && !hidePassword)}
+          />
+          {t('saml.hidePassword')}
+          {#if signIn.fixedByConfiguration}<span class="fixed">{t('saml.fixed')}</span>{/if}
+        </label>
+        <p class="hint">{t('saml.hidePasswordHint')}</p>
+        {#if hideBlockedReason}<p class="hint" role="status">{hideBlockedReason}</p>{/if}
+        {#if signInError}<p class="error" role="alert">{signInError}</p>{/if}
+        {#if signInDone}<p class="done" role="status">{signInDone}</p>{/if}
+        <button type="submit" disabled={signInBusy || signIn.fixedByConfiguration}>
+          {signInBusy ? t('saml.saving') : t('saml.signInSave')}
+        </button>
+      {:else if signInError}
+        <p class="error" role="alert">{signInError}</p>
+      {:else}
+        <p>{t('app.loading')}</p>
+      {/if}
+    </form>
+
     <div class="test">
       <h2>{t('saml.testTitle')}</h2>
       <p class="hint">{t('saml.testLead')}</p>
@@ -232,6 +323,9 @@
   form,
   .test {
     max-width: 52rem;
+  }
+  .signin {
+    margin-top: var(--space-6);
   }
   .head {
     display: flex;

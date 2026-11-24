@@ -43,7 +43,7 @@
 | 単一ログアウト | **対応**（Issue #191）。`QUESTIONNAIRE_SAML_SINGLELOGOUTURL` を設定したときだけ使う。SP 起点・IdP 起点の両方を受ける |
 | 設定の反映 | DB の設定は**再起動なし**で次の要求から反映する |
 | 管理画面の入口 | `QUESTIONNAIRE_ADMIN_PATH` で変更できる。変更の反映にはアプリの再起動が必要 |
-| 合言葉ログイン | `QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false` で SAML（または Pleasanter のログイン）の有効時だけ停止できる |
+| 合言葉ログイン | 既定では SSO と並べて出す。`QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false`（外部設定）か、管理画面の「ログイン画面の方式」で、SAML（または Pleasanter のログイン）の有効時だけ隠せる（Issue #1056）。外部設定が優先 |
 | 緊急時の入口 | `{管理画面の入口}?rescue={救済トークン}`。成功・失敗を監査し、5 分あたりのログイン試行上限と同じ回数に制限する |
 | 設定できる人 | `Administrator` だけ。アンケートの権限とは別 |
 
@@ -92,8 +92,9 @@ sequenceDiagram
   締め出し中の利用者も Pending / Session の発行前に拒否し、失敗回数を成功扱いで戻さない
   IdP から来た人を最初の管理者にすると、誰でも全権を取れる
 - **ログイン ID とパスワードの入口は既定では残す。**
-  `QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false` を外部設定へ明示した場合だけ、
-  SAML の有効中は画面と認証 API の両方を塞ぐ
+  `QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false` を外部設定へ明示するか、管理画面の
+  「ログイン画面の方式」で「ID/パスワードのログインを隠す」を保存した場合だけ、
+  SAML の有効中は画面と認証 API の両方を塞ぐ（読む順序は外部設定 → DB → 既定。3.4 節）
   （**Pleasanter のログイン（Issue #464）が有効な間も同じ。**[`Pleasanter-SSO-運用手順書.md`](Pleasanter-SSO-運用手順書.md) 6 章）
 - ⚠️ **SAML が無効なとき（Pleasanter のログインも無効なとき）は、合言葉を塞ぐ指定を警告付きで無視する。**
   SAML は画面から再起動なしで無効にできるため、起動時の検証だけでは後から全員を
@@ -141,7 +142,7 @@ DB の保存先を作るため、更新後にマイグレーション 24 を適�
 証明書・URL・列挙値を読めない場合は保存を拒否し、直前の設定を使い続ける。
 
 ⚠️ **合言葉を塞ぐ前に、SAML で実際に入り直せることを別のブラウザで確認する。**
-`QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false` の状態で SAML 設定を壊すと、
+合言葉を塞いだ状態（外部設定でも画面の設定でも同じ）で SAML 設定を壊すと、
 **保存したその場で合言葉の入口も使えず、救済トークンがなければ詰む。**
 
 ### 3.3 外部設定で固定する
@@ -169,17 +170,42 @@ QUESTIONNAIRE_SAML_BUTTONLABEL=会社アカウントでログイン
 
 ### 3.4 合言葉ログインを塞ぐ
 
-SAML でのログインを本番の IdP で確認してから、次を**外部設定**へ追加してアプリを再起動する。
-管理画面の設定には出さない。
+SAML でのログインを本番の IdP で確認してから、次のどちらかで隠す（Issue #1056。既定は隠さない）。
+
+**画面から隠す**（`Administrator`。SAML 設定の画面の「ログイン画面の方式」）:
+
+1. 救済トークン（`QUESTIONNAIRE_ADMIN_RESCUE_TOKEN`）を外部設定へ入れて再起動しておく（下の「救済トークンを決めて保管する」）
+2. SAML か Pleasanter のログインを有効にしておく
+3. 「ID/パスワードのログインを隠す」にチェックを入れて保存する
+
+保存時にサーバが、**SAML か Pleasanter のログインが有効であること**と
+**救済トークンが設定済みであること**を確かめ、満たさなければ保存を断る（400。`sso-disabled` / `rescue-token-missing`）。
+元に戻す（隠さない）のは、条件なしでできる。`PUT /api/admin/sign-in-settings` の成功は
+`Core_AuditLogs`（対象 `AdminSignInSettings`、`changedFields=passwordSignIn`）に残る。
+
+**外部設定で固定する**（従来どおり。再起動が要る）:
 
 ```bash
 QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN=false
 QUESTIONNAIRE_ADMIN_RESCUE_TOKEN={32文字以上の推測できない値}
 ```
 
-`QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN` の既定は `true` で、未設定なら従来どおり
-合言葉でもログインできる。`false` は **SAML か Pleasanter のログインが有効な間だけ**効く。両方とも無効なら、
+外部設定に値があるとそれが優先され、画面の項目は「設定で固定されています」と出て編集できない
+（画面から保存しようとしても 409）。外部設定が無ければ画面の保存値、それも無ければ既定
+（隠さない）で動く。`QUESTIONNAIRE_ADMIN_RESCUE_TOKEN` は**画面からは設定も確認もできない**
+（外部設定だけ。締め出された人が自分で逃げ道を書き換えられないようにするため）。
+
+`false`（どちらの方法でも）は **SAML か Pleasanter のログインが有効な間だけ**効く。両方とも無効なら、
 全員を締め出さないため合言葉ログインを許可し、サーバログへ警告を出す。
+
+#### ログイン画面の表示
+
+SSO（SAML か Pleasanter のログイン）と ID/パスワードの **2 方式が使えるときだけ**、ログイン画面を
+「SSO」「ID/パスワード」のタブにする（初期選択は SSO）。どちらか 1 方式だけなら、タブにせず従来どおりその方式だけを出す。
+最初の管理者を作る画面には SSO を出さない（変わらない）。2 要素認証の画面・共通の案内はタブの外。
+どの方式を使えるかはサーバが決め（`/api/admin/session` の `passwordSignInEnabled` など）、画面は返った方式を並べるだけ。
+タブは WAI-ARIA の tablist / tab / tabpanel で、左右キーで循環、Home / End で先頭・末尾へ移る。
+設計の根拠は [画面設計](画面設計.md) の「ログイン画面」。
 
 #### 救済トークンを決めて保管する
 

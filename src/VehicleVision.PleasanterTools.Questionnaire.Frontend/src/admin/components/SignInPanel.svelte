@@ -21,6 +21,15 @@
     writeSuppressed,
     type PleasanterSsoFailure,
   } from '../lib/pleasanterSso';
+  import {
+    availableMethods,
+    nextTabIndex,
+    panelId,
+    resolveSelected,
+    shouldShowTabs,
+    tabId,
+    type LoginMethod,
+  } from '../lib/loginTabs';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -239,6 +248,53 @@
   const isSetup = $derived(session.setupRequired);
   const passwordSignInEnabled = $derived(session.passwordSignInEnabled !== false);
 
+  // ---- ログイン方式のタブ（Issue #1056） -------------------------------------
+  // **使える方式はサーバが決める**（`passwordSignInEnabled`・`samlEnabled`・`pleasanterSsoEnabled`）。
+  // 画面は返ってきた方式を並べるだけで、隠した方式を権限判定の代わりにしない。
+  // **最初の管理者を作る画面には SSO を出さない**（従来どおり）ので、その画面はタブにならない
+
+  const methods = $derived(
+    availableMethods({
+      ssoAvailable: !isSetup && (session.samlEnabled === true || pleasanterAvailable),
+      passwordAvailable: passwordSignInEnabled,
+    }),
+  );
+  const tabbed = $derived(shouldShowTabs(methods));
+
+  /** 利用者が選んだ方式。**使えない方式なら先頭（SSO）へ落ちる**（`resolveSelected`）。 */
+  let requestedMethod = $state<LoginMethod | null>(null);
+  const selectedMethod = $derived(resolveSelected(methods, requestedMethod));
+  const tabButtons: Partial<Record<LoginMethod, HTMLButtonElement>> = {};
+
+  function methodLabel(method: LoginMethod): string {
+    return method === 'sso' ? t('signIn.tabSso') : t('signIn.tabPassword');
+  }
+
+  function selectMethod(method: LoginMethod, focus: boolean) {
+    requestedMethod = method;
+    if (focus) {
+      tabButtons[method]?.focus();
+    }
+  }
+
+  function onTabKeydown(event: KeyboardEvent, index: number) {
+    const next = nextTabIndex(event.key, index, methods.length);
+    const method = next === null ? undefined : methods[next];
+    if (method === undefined) {return;}
+    event.preventDefault();
+    selectMethod(method, true);
+  }
+
+  /**
+   * 入力の検証が、隠れた区画で失敗したとき、その区画を開く
+   * （`hidden` の中の `required` は、ブラウザが案内を出せないため）。
+   */
+  function revealOnInvalid(method: LoginMethod) {
+    if (selectedMethod !== method) {
+      selectMethod(method, false);
+    }
+  }
+
   async function submitPassword(event: SubmitEvent) {
     event.preventDefault();
     error = '';
@@ -327,77 +383,130 @@
       </p>
     {/if}
 
-    {#if passwordSignInEnabled}
-      <form onsubmit={submitPassword}>
-        <label>
-          {t('signIn.loginId')}
-          <input type="text" autocomplete="username" bind:value={loginId} required />
-        </label>
+    {#snippet passwordForm()}
+  <form onsubmit={submitPassword}>
+    <label>
+      {t('signIn.loginId')}
+      <input type="text" autocomplete="username" bind:value={loginId} required />
+    </label>
 
-        <label>
-          {t('signIn.password')}
-          <input
-            type="password"
-            autocomplete={isSetup ? 'new-password' : 'current-password'}
-            bind:value={password}
-            required
-          />
-        </label>
+    <label>
+      {t('signIn.password')}
+      <input
+        type="password"
+        autocomplete={isSetup ? 'new-password' : 'current-password'}
+        bind:value={password}
+        required
+      />
+    </label>
 
-        {#if isSetup}
-          <label>
-            {t('signIn.passwordConfirmation')}
-            <input type="password" autocomplete="new-password" bind:value={confirmation} required />
-          </label>
-          <p class="hint">{t('signIn.passwordHint', { minimum: MINIMUM_PASSWORD_LENGTH })}</p>
-        {/if}
-
-        {#if error}<p class="error" role="alert">{error}</p>{/if}
-
-        <button type="submit" disabled={busy}>
-          {busy ? t('signIn.checking') : isSetup ? t('signIn.register') : t('signIn.next')}
-        </button>
-      </form>
+    {#if isSetup}
+      <label>
+        {t('signIn.passwordConfirmation')}
+        <input type="password" autocomplete="new-password" bind:value={confirmation} required />
+      </label>
+      <p class="hint">{t('signIn.passwordHint', { minimum: MINIMUM_PASSWORD_LENGTH })}</p>
     {/if}
 
-    {#if session.samlEnabled && !isSetup}
-      <!-- **最初の管理者を作る画面には出さない。** IdP から来た人を
-           最初の管理者にすると、誰でも全権を取れる -->
-      {#if passwordSignInEnabled}
-        <div class="or"><span>{t('signIn.samlOr')}</span></div>
+    {#if error}<p class="error" role="alert">{error}</p>{/if}
+
+    <button type="submit" disabled={busy}>
+      {busy ? t('signIn.checking') : isSetup ? t('signIn.register') : t('signIn.next')}
+    </button>
+  </form>
+    {/snippet}
+
+    <!-- **SSO の釦。** タブのときは SSO の区画の中に置くので、上に区切りは要らない -->
+    {#snippet ssoButtons(dividerAbove: boolean)}
+  {#if session.samlEnabled && !isSetup}
+    <!-- **最初の管理者を作る画面には出さない。** IdP から来た人を
+         最初の管理者にすると、誰でも全権を取れる -->
+    {#if dividerAbove && passwordSignInEnabled}
+      <div class="or"><span>{t('signIn.samlOr')}</span></div>
+    {/if}
+
+    {#if samlError}<p class="error" role="alert">{samlError}</p>{/if}
+
+    <button type="button" class="saml" onclick={startSaml}>
+      {session.samlLabel ?? t('signIn.samlButton')}
+    </button>
+  {/if}
+
+  {#if pleasanterAvailable && !isSetup}
+    <!-- **最初の管理者を作る画面には出さない**（SAML と同じ理由。Issue #464） -->
+    {#if (dividerAbove && passwordSignInEnabled) || session.samlEnabled}
+      <div class="or"><span>{t('signIn.samlOr')}</span></div>
+    {/if}
+
+    {#if pleasanterError}<p class="error" role="alert">{pleasanterError}</p>{/if}
+
+    {#if pleasanterWaiting}
+      <p class="hint waiting" role="status">{t('signIn.pleasanterWaiting')}</p>
+      {#if pleasanterPopupBlocked}
+        <p class="hint">{t('signIn.pleasanterPopupBlocked')}</p>
       {/if}
-
-      {#if samlError}<p class="error" role="alert">{samlError}</p>{/if}
-
-      <button type="button" class="saml" onclick={startSaml}>
-        {session.samlLabel ?? t('signIn.samlButton')}
+      <a class="saml" href={pleasanterLoginUrl} target="_blank" rel="noopener">
+        {t('signIn.pleasanterOpenLogin')}
+      </a>
+      <button type="button" class="link" onclick={stopPleasanterWaiting}>
+        {t('signIn.pleasanterCancel')}
+      </button>
+    {:else}
+      <button type="button" class="saml" disabled={busy} onclick={startPleasanter}>
+        {session.pleasanterSsoLabel ?? t('signIn.pleasanterButton')}
       </button>
     {/if}
+  {/if}
+    {/snippet}
 
-    {#if pleasanterAvailable && !isSetup}
-      <!-- **最初の管理者を作る画面には出さない**（SAML と同じ理由。Issue #464） -->
-      {#if passwordSignInEnabled || session.samlEnabled}
-        <div class="or"><span>{t('signIn.samlOr')}</span></div>
+    {#if tabbed}
+      <!-- **サーバが使えると返した方式が 2 つ以上のときだけタブにする**（Issue #1056）。
+           属性（data-vv-login-*）・ARIA・キー操作は DesignReference の自前ログインの契約に合わせる。
+           非選択の区画は hidden で残す（入力した値を捨てず、Tab の順からも外れる）。
+           MFA の画面と、画面全体の案内はタブの外 -->
+      <div class="methods" data-vv-login-tabs data-vv-login-ready data-vv-login-selected={selectedMethod}>
+        <div class="tabs" role="tablist" aria-label={t('signIn.tabsLabel')}>
+          {#each methods as method, index (method)}
+            <button
+              type="button"
+              role="tab"
+              id={tabId(method)}
+              aria-controls={panelId(method)}
+              aria-selected={selectedMethod === method}
+              tabindex={selectedMethod === method ? 0 : -1}
+              bind:this={tabButtons[method]}
+              onclick={() => selectMethod(method, false)}
+              onkeydown={(event) => onTabKeydown(event, index)}
+            >
+              {methodLabel(method)}
+            </button>
+          {/each}
+        </div>
+
+        {#each methods as method (method)}
+          <div
+            id={panelId(method)}
+            class="method"
+            role="tabpanel"
+            aria-labelledby={tabId(method)}
+            data-vv-login-panel={method}
+            data-vv-login-label={methodLabel(method)}
+            hidden={selectedMethod !== method}
+            oninvalidcapture={() => revealOnInvalid(method)}
+          >
+            {#if method === 'sso'}
+              {@render ssoButtons(false)}
+            {:else}
+              {@render passwordForm()}
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {:else}
+      {#if passwordSignInEnabled}
+        {@render passwordForm()}
       {/if}
-
-      {#if pleasanterError}<p class="error" role="alert">{pleasanterError}</p>{/if}
-
-      {#if pleasanterWaiting}
-        <p class="hint waiting" role="status">{t('signIn.pleasanterWaiting')}</p>
-        {#if pleasanterPopupBlocked}
-          <p class="hint">{t('signIn.pleasanterPopupBlocked')}</p>
-        {/if}
-        <a class="saml" href={pleasanterLoginUrl} target="_blank" rel="noopener">
-          {t('signIn.pleasanterOpenLogin')}
-        </a>
-        <button type="button" class="link" onclick={stopPleasanterWaiting}>
-          {t('signIn.pleasanterCancel')}
-        </button>
-      {:else}
-        <button type="button" class="saml" disabled={busy} onclick={startPleasanter}>
-          {session.pleasanterSsoLabel ?? t('signIn.pleasanterButton')}
-        </button>
-      {/if}
+      {@render ssoButtons(true)}
     {/if}
   {:else}
     <h1>{step === 'totp' ? t('signIn.totpTitle') : t('signIn.recoveryTitle')}</h1>
@@ -523,6 +632,53 @@
 
   .waiting {
     margin: 0 0 var(--space-3);
+  }
+
+  /*
+    ログイン方式のタブ（Issue #1056）。**DesignReference の app-login-tabs.css と同じ見た目の契約**
+    （等分・最小 44px・選択は下線と太字。色だけで選択を示さない）
+  */
+  .tabs {
+    display: flex;
+    margin: 0 0 var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tabs > button {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    margin: 0;
+    padding: var(--space-3) var(--space-2);
+    border: 1px solid var(--border);
+    border-bottom: 2px solid transparent;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  .tabs > button[aria-selected='true'] {
+    background: var(--surface);
+    border-bottom-color: var(--accent);
+    font-weight: 700;
+  }
+
+  .tabs > button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -4px;
+  }
+
+  .method[hidden] {
+    display: none;
+  }
+
+  /* 認証の実行ボタンは、方式が変わっても同じ高さにそろえる */
+  .method .saml,
+  .method button[type='submit'] {
+    min-height: 44px;
   }
 
   .saml:hover {

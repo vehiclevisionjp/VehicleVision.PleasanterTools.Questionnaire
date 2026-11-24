@@ -62,8 +62,11 @@ builder.Services.AddSingleton<HtmlShell>();
 var rootRedirect = RootRedirectOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(rootRedirect);
 
-// **合言葉を塞ぐ指定と救済トークンも外部設定だけで決める。**
-// 画面から変えられると、その場で自分自身を締め出せるため。
+// **救済トークンは外部設定だけで決める。** 画面から変えられると、締め出された人の逃げ道を
+// 締め出された側が書き換えられてしまうため。
+// **合言葉を隠す指定（QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN）は外部設定が優先で、無ければ管理画面の保存値**
+// （Issue #1056。IAdminSignInSettingsProvider）。画面から「隠す」へ変えるときは、SSO が有効で
+// 救済トークンが設定済みかを保存時に検査する（締め出しを防ぐ）。
 var adminPasswordSignInOptions =
     AdminPasswordSignInOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(adminPasswordSignInOptions);
@@ -191,6 +194,8 @@ builder.Services.AddSingleton<IMaintenanceModeStore, MaintenanceModeStore>();
 builder.Services.AddSingleton(maintenanceOptions);
 builder.Services.AddSingleton<MaintenanceMode>();
 builder.Services.AddSingleton<ISamlSettingStore, SamlSettingStore>();
+builder.Services.AddSingleton<IAdminSignInSettingStore, AdminSignInSettingStore>();
+builder.Services.AddSingleton<IAdminSignInSettingsProvider, AdminSignInSettingsProvider>();
 builder.Services.AddSingleton<IPleasanterSsoSettingStore, PleasanterSsoSettingStore>();
 builder.Services.AddSingleton<IAppSettingStore, AppSettingStore>();
 builder.Services.AddSingleton<BotMitigationOptionsProvider>();
@@ -1095,6 +1100,7 @@ app.MapAdminSessionEndpoints();
 app.MapAdminSamlEndpoints(adminPath);
 // **Pleasanter のログインも同じ**（Issue #464）。無効な間は確認の入口が 404 を返す
 app.MapAdminPleasanterSsoEndpoints();
+app.MapAdminSignInSettingsEndpoints();
 app.MapAdminUserEndpoints();
 app.MapAdminApiTokenEndpoints();
 app.MapAdminSurveyEndpoints();

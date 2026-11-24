@@ -9,31 +9,31 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 public class AdminPasswordSignInPolicyTests
 {
     [Fact]
-    public void 既定ではSAMLが有効でも合言葉を許可する()
+    public async Task 既定ではSAMLが有効でも合言葉を許可する()
     {
         var policy = Policy(enabled: true);
 
-        Assert.True(policy.IsAllowed(new DefaultHttpContext(), ssoEnabled: true));
+        Assert.True(await policy.IsAllowedAsync(new DefaultHttpContext(), ssoEnabled: true));
     }
 
     [Fact]
-    public void 停止指定とSAML有効が揃ったときだけ合言葉を拒否する()
+    public async Task 停止指定とSAML有効が揃ったときだけ合言葉を拒否する()
     {
         var policy = Policy(enabled: false);
 
-        Assert.False(policy.IsAllowed(new DefaultHttpContext(), ssoEnabled: true));
+        Assert.False(await policy.IsAllowedAsync(new DefaultHttpContext(), ssoEnabled: true));
     }
 
     [Fact]
-    public void Samlが無効なら停止指定を無視して締め出しを防ぐ()
+    public async Task Samlが無効なら停止指定を無視して締め出しを防ぐ()
     {
         var policy = Policy(enabled: false);
 
-        Assert.True(policy.IsAllowed(new DefaultHttpContext(), ssoEnabled: false));
+        Assert.True(await policy.IsAllowedAsync(new DefaultHttpContext(), ssoEnabled: false));
     }
 
     [Fact]
-    public void 正しい救済トークンだけが合言葉の入口を開く()
+    public async Task 正しい救済トークンだけが合言葉の入口を開く()
     {
         var policy = Policy(enabled: false, rescueToken: new string('x', 32));
         var rescue = new DefaultHttpContext();
@@ -44,11 +44,11 @@ public class AdminPasswordSignInPolicyTests
         Assert.NotEmpty(setCookie);
         var request = new DefaultHttpContext();
         request.Request.Headers.Cookie = setCookie[..setCookie.IndexOf(';')];
-        Assert.True(policy.IsAllowed(request, ssoEnabled: true));
+        Assert.True(await policy.IsAllowedAsync(request, ssoEnabled: true));
     }
 
     [Fact]
-    public void 違う救済トークンでは合言葉の入口を開かない()
+    public async Task 違う救済トークンでは合言葉の入口を開かない()
     {
         var policy = Policy(enabled: false, rescueToken: new string('x', 32));
 
@@ -56,7 +56,7 @@ public class AdminPasswordSignInPolicyTests
     }
 
     [Fact]
-    public void 救済トークンが未設定なら逃げ道は存在しない()
+    public async Task 救済トークンが未設定なら逃げ道は存在しない()
     {
         var policy = Policy(enabled: false);
 
@@ -67,7 +67,8 @@ public class AdminPasswordSignInPolicyTests
         bool enabled,
         string? rescueToken = null) =>
         new(
-            new AdminPasswordSignInOptions(enabled, rescueToken),
+            new AdminPasswordSignInOptions(null, rescueToken),
+            new FakeAdminSignInSettings(enabled),
             new EphemeralDataProtectionProvider(),
             TimeProvider.System,
             NullLogger<AdminPasswordSignInPolicy>.Instance);

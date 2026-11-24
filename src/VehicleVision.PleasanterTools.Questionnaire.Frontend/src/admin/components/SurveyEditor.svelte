@@ -11,8 +11,8 @@
     loadEmbedOptions,
     loadVersion,
     revertToDraft,
+    publish,
     testPublish,
-    testRepublish,
     saveDraft,
     uploadContentAsset,
     type ColumnAvailabilityResponse,
@@ -60,7 +60,13 @@
   import { addQuestionAssignment } from '../lib/mappingSelection';
   import { assetMarkup as markupForAsset } from '../lib/asset';
   import { requiredPortCount } from '../lib/columnBudget';
-  import { confirmAction } from '../lib/confirmation.svelte';
+  import { confirmAction, confirmActionWithChoice } from '../lib/confirmation.svelte';
+  import {
+    canPublish as statusAllowsPublish,
+    isTestPublishChecked,
+    needsReflectChoice,
+    showsTestPublishCheck,
+  } from '../lib/publishFlow';
   import { shouldGoBackOnEscape } from '../lib/escapeKey';
   import {
     movePageTo,
@@ -767,6 +773,9 @@
         conflict = true;
       }
       error = result.message;
+      // **テスト公開中の保存は、版へ反映できないと保存ごと断られる**（Issue #1057）。
+      // サーバが返した不備をそのまま出す
+      showProblems(result.body);
       return false;
     }
 
@@ -776,8 +785,32 @@
     savedAssetHistorySiteId = assetHistorySiteId;
     savedAssetHistoryMapping = assetHistoryMapping;
     hasUnpublishedChanges = status === 1 || status === 2 || status === 3;
-    notice = t('editor.saved');
+
+    if (result.value.reflected === true) {
+      // **テスト公開中の保存は、自動で次の版を固めた**（Issue #1057）
+      hasUnpublishedChanges = false;
+      warnings = result.value.warnings ?? [];
+      notice = t('editor.testPublished', { version: result.value.version ?? 0 });
+    } else if (result.value.reflected === false) {
+      // 保存はできたが、版を固める段で失敗した。状態はテスト公開のまま、未反映の表示が出る
+      error = result.value.reflectError ?? '';
+    } else {
+      notice = t('editor.saved');
+    }
+
     return true;
+  }
+
+  /** サーバが返した不備（割り当て・分岐）を表示へ載せる。値が無い項目は落として返ってくる。 */
+  function showProblems(body: unknown) {
+    const problems = body as { problems?: MappingProblem[]; flow?: FlowProblem[] } | undefined;
+    if (problems?.problems) {
+      warnings = problems.problems;
+    }
+
+    if (problems?.flow) {
+      publishFlow = problems.flow;
+    }
   }
 
   async function hasUnsavedChangesGuard(): Promise<boolean> {
@@ -795,58 +828,112 @@
     }
   }
 
-  /** テスト公開する。**公開できたかを返す。** */
-  async function doPublish(): Promise<boolean> {
-    return publishWith(testPublish);
-  }
-
-  async function publishWith(call: typeof testPublish): Promise<boolean> {
+  /**
+   * 版を固める操作（テスト公開・本公開）を呼び、結果を表示へ載せる。**成功したかを返す。**
+   * 成功したら読み直す（状態・版・未反映の表示が変わるため）。
+   */
+  async function runPublish(
+    call: () => Promise<
+      | { ok: true; value: { version: number; warnings?: MappingProblem[] } }
+      | { ok: false; message: string; body?: unknown }
+    >,
+    doneKey: 'editor.testPublished' | 'publishFlow.published',
+  ): Promise<boolean> {
     saving = true;
     error = '';
     notice = '';
     warnings = [];
     publishFlow = [];
 
-    const result = await call(surveyId);
+    const result = await call();
     saving = false;
 
     if (!result.ok) {
       error = result.message;
-      // **サーバが返した不備をそのまま出す。** 値が無い項目は落として返ってくる
-      const body = result.body as
-        | { problems?: MappingProblem[]; flow?: FlowProblem[] }
-        | undefined;
-      if (body?.problems) {
-        warnings = body.problems;
-      }
-
-      if (body?.flow) {
-        publishFlow = body.flow;
-      }
-
+      showProblems(result.body);
       return false;
     }
 
-    warnings = result.value.warnings;
-    notice = t('editor.testPublished', { version: result.value.version });
+    warnings = result.value.warnings ?? [];
+    notice = t(doneKey, { version: result.value.version });
     await load(surveyId);
     return true;
   }
 
   /**
-   * テスト公開中の編集を、動いている版へ反映する。
+   * テスト公開のチェックを切り替える（Issue #1057）。
    *
-   * **下書きへは戻さず、サーバが検証してから版を固め直す**（Issue #1008）。
-   * 以前は「保存 → 下書きへ戻す → テスト公開」を順に呼んでおり、割り当ての誤りなどで
-   * テスト公開が拒否されると、下書きのまま取り残されてテスト公開が外れていた。
-   * **失敗しても、反映前のテスト公開のまま残る**（表示の状態も変えない）。
-   * **保存できなかったら先へ進まない。** 版が合わない（他の人の更新）まま進むと、
-   * 編集を失う。
+   * - ON: 下書きをテスト公開する（公開 URL が付く）。**未保存の編集は先に保存する**
+   * - OFF: 下書きへ戻す。回答画面は閉じる（テスト公開は本番の回答を受けていない）。
+   *   **未保存の編集は先に保存する**（戻した後の読み直しで消えるため）
+   *
+   * 保存できなかったり断られたりしたら、チェックを元へ戻す（状態が変わらないため）。
    */
-  async function republish() {
+  async function toggleTestPublish(checked: boolean, box: HTMLInputElement) {
+    const restore = () => {
+      box.checked = isTestPublishChecked(status);
+    };
+
+    if (hasUnsavedChanges && !(await save())) {
+      restore();
+      return;
+    }
+
+    if (checked) {
+      if (!(await runPublish(() => testPublish(surveyId), 'editor.testPublished'))) {
+        restore();
+      }
+
+      return;
+    }
+
+    saving = true;
+    error = '';
+    notice = '';
+    const reverted = await revertToDraft(surveyId);
+    saving = false;
+    if (!reverted.ok) {
+      error = reverted.message;
+      restore();
+      return;
+    }
+
+    notice = t('publishFlow.testOff');
+    await load(surveyId);
+  }
+
+  /**
+   * 本公開する（Issue #1057）。**下書きからも、テスト公開中からも押せる。**
+   *
+   * - 下書きから: その場で版を固めて本公開する
+   * - テスト公開中: 固めた版のまま本公開する。下書きに版へ入っていない変更があるときは、
+   *   **「下書きを反映して本公開」を選べる**（既定は反映する）
+   *
+   * **未保存の編集は、確認の前に保存する**（保存できなかったら先へ進まない）。
+   * テスト公開中の保存は版へ自動で反映されるので、保存の後に食い違いが残るのは、
+   * 別の経路で保存された分だけになる。
+   */
+  async function publishLive() {
     if (hasUnsavedChanges && !(await save())) {return;}
 
-    await publishWith(testRepublish);
+    const diverged = needsReflectChoice(status, hasUnpublishedChanges, false);
+    const result = await confirmActionWithChoice({
+      title: t('publishFlow.confirmTitle'),
+      message: diverged
+        ? `${t('publishFlow.confirmTest')} ${t('publishFlow.confirmDiverged')}`
+        : status === 3
+          ? t('publishFlow.confirmTest')
+          : t('publishFlow.confirmDraft'),
+      confirmLabel: t('publishFlow.publish'),
+      checkbox: diverged ? { label: t('publishFlow.reflect'), checked: true } : undefined,
+    });
+    if (!result.confirmed) {return;}
+
+    // 反映の選択はテスト公開中だけで効く（下書きからは、サーバが常に固める）
+    await runPublish(
+      () => publish(surveyId, diverged && result.checked),
+      'publishFlow.published',
+    );
   }
 
   /**
@@ -854,7 +941,7 @@
    *
    * **回答画面が閉じる**ので確認を挟む。戻したあと、直してテスト公開すると次の版ができる。
    * **未保存の編集は先に保存する。** 戻した後の読み直しで消えるため。
-   * 保存できなかったら先へ進まない（`republish` と同じ）
+   * 保存できなかったら先へ進まない
    */
   async function revertLive() {
     const confirmed = await confirmAction({
@@ -1004,21 +1091,35 @@
       {t('flowchart.open')}
     </button>
     <button type="button" class="secondary" onclick={save} disabled={saving || loading}>
-      {saving ? t('editor.working') : t('editor.saveDraft')}
+      {saving
+        ? t('editor.working')
+        : isTestPublishChecked(status)
+          ? t('publishFlow.saveAndReflect')
+          : t('editor.saveDraft')}
     </button>
     {#if status === 0}
       <button type="button" class="secondary" onclick={toggleVersions} disabled={saving || loading}>
         {t('editor.versions')}
       </button>
     {/if}
-    <!-- **押せる操作は状態で決まる。** サーバは下書き以外のテスト公開を断る -->
-    {#if status === 0}
-      <button type="button" onclick={doPublish} disabled={saving || loading}>
-        {t('editor.testPublish')}
-      </button>
-    {:else if status === 3}
-      <button type="button" onclick={republish} disabled={saving || loading}>
-        {t('editor.republish')}
+    <!--
+      **公開は「下書き → 本公開」の 2 ステップ**（Issue #1057）。
+      テスト公開は段階ではなく、下書きに付けるチェック。ON の間の保存は、版へ自動で反映される
+    -->
+    {#if showsTestPublishCheck(status)}
+      <label class="test-publish-check" title={t('publishFlow.testCheckHint')}>
+        <input
+          type="checkbox"
+          checked={isTestPublishChecked(status)}
+          disabled={saving || loading}
+          onchange={(event) => toggleTestPublish(event.currentTarget.checked, event.currentTarget)}
+        />
+        <span>{t('publishFlow.testCheck')}</span>
+      </label>
+    {/if}
+    {#if statusAllowsPublish(status)}
+      <button type="button" onclick={publishLive} disabled={saving || loading}>
+        {t('publishFlow.publish')}
       </button>
     {:else if status === 1 || status === 2}
       <button type="button" onclick={revertLive} disabled={saving || loading}>
@@ -1822,18 +1923,30 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
     margin-bottom: 1.25rem;
   }
 
   .right {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.6rem;
   }
 
   .revision {
     color: var(--muted);
     font-size: 0.82rem;
+  }
+
+  .test-publish-check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: 0.9rem;
+    white-space: nowrap;
   }
 
   .editing-language {

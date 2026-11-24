@@ -35,6 +35,7 @@ import type {
   SurveyPage,
   SurveyTemplateSummary,
   SamlSettings,
+  AdminSignInSettings,
   AppSettings,
   PleasanterSsoSettings,
   PleasanterSsoTestResult,
@@ -400,6 +401,15 @@ export const saveSamlSettings = (settings: SamlSettings) =>
     json: settings,
   });
 
+export const getAdminSignInSettings = () =>
+  call<AdminSignInSettings>('/api/admin/sign-in-settings');
+
+export const saveAdminSignInSettings = (passwordSignInEnabled: boolean) =>
+  call<AdminSignInSettings>('/api/admin/sign-in-settings', {
+    method: 'PUT',
+    json: { passwordSignInEnabled },
+  });
+
 export const testSamlMetadata = (metadataUrl: string) =>
   call<{ reachable: boolean; entityId?: string | null }>('/api/admin/saml/settings/test', {
     method: 'POST',
@@ -667,7 +677,18 @@ export const saveDraft = (
   assetHistorySiteId: number,
   assetHistoryMapping: MappingDefinition,
 ) =>
-  call<{ revision: number }>(`/api/admin/surveys/${surveyId}`, {
+  call<{
+    revision: number;
+    /**
+     * テスト公開中の保存は、サーバが同時に版を固め直す（Issue #1057）。
+     * `true` なら反映した（`version`）、`false` なら保存はできたが版は固められなかった（`reflectError`）。
+     * テスト公開中でなければ付かない。
+     */
+    reflected?: boolean;
+    version?: number;
+    warnings?: MappingProblem[];
+    reflectError?: string;
+  }>(`/api/admin/surveys/${surveyId}`, {
     method: 'PUT',
     json: { definition, mapping, revision, assetHistorySiteId, assetHistoryMapping },
   });
@@ -737,11 +758,21 @@ export const testRepublish = (surveyId: string) =>
     json: {},
   });
 
-export const publish = (surveyId: string) =>
-  call<{ status: string }>(`/api/admin/surveys/${surveyId}/publish`, {
-    method: 'POST',
-    json: {},
-  });
+/**
+ * 本公開する（Issue #1057）。**下書きからも、テスト公開中からも押せる。**
+ *
+ * - 下書きからは、その場で版を固めて本公開する（`reflectDraft` は効かない）
+ * - テスト公開中からは、固めた版のまま本公開する。`reflectDraft: true` なら、下書きを新しい版へ
+ *   固めてから本公開する（テスト公開後に編集した分を入れる）
+ */
+export const publish = (surveyId: string, reflectDraft = false) =>
+  call<{ status: string; version: number; warnings?: MappingProblem[] }>(
+    `/api/admin/surveys/${surveyId}/publish`,
+    {
+      method: 'POST',
+      json: { reflectDraft },
+    },
+  );
 
 export const revertToDraft = (surveyId: string) =>
   call<{ status: string }>(`/api/admin/surveys/${surveyId}/revert-to-draft`, {

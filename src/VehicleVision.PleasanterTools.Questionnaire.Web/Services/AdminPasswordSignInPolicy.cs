@@ -5,9 +5,10 @@ using Microsoft.AspNetCore.DataProtection;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
-/// <summary>SAML・Pleasanter のログインの現在値を含め、合言葉ログインを許すかを決める。</summary>
+/// <summary>SAML・Pleasanter のログインの現在値と、外部設定・画面の指定を合わせ、合言葉ログインを許すかを決める。</summary>
 public sealed class AdminPasswordSignInPolicy(
     AdminPasswordSignInOptions options,
+    IAdminSignInSettingsProvider settings,
     IDataProtectionProvider protectionProvider,
     TimeProvider timeProvider,
     ILogger<AdminPasswordSignInPolicy> logger)
@@ -19,11 +20,16 @@ public sealed class AdminPasswordSignInPolicy(
     private int warnedWhileSamlDisabled;
 
     /// <param name="ssoEnabled">SAML か Pleasanter のログイン（Issue #464）のどちらかが有効か。</param>
-    public bool IsAllowed(HttpContext context, bool ssoEnabled)
+    public async ValueTask<bool> IsAllowedAsync(
+        HttpContext context,
+        bool ssoEnabled,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (options.Enabled)
+        // **外部設定 → 管理画面で保存した値 → 既定（許可）の順**（Issue #1056）
+        var current = await settings.GetAsync(cancellationToken).ConfigureAwait(false);
+        if (current.PasswordSignInEnabled)
         {
             return true;
         }

@@ -169,10 +169,10 @@ curl -sS -H "Authorization: Bearer ${QAT_TOKEN}" "$base/api/admin/surveys/"
 | `GET /api/admin/surveys/{surveyId}/problems`（公開前の検査の結果） | `surveys.read` |
 | `GET /api/admin/surveys/{surveyId}/versions`（固めた版の一覧） | `surveys.read` |
 | `GET /api/admin/surveys/{surveyId}/versions/{version}`（版の中身） | `surveys.read` |
-| `PUT /api/admin/surveys/{surveyId}`（下書きの保存） | `surveys.write` |
-| `POST /api/admin/surveys/{surveyId}/test-publish`（テスト公開） | `surveys.publish` |
+| `PUT /api/admin/surveys/{surveyId}`（下書きの保存。**テスト公開中は版へ自動で反映する**が、反映するのは `surveys.publish` も付いたキーだけ） | `surveys.write` |
+| `POST /api/admin/surveys/{surveyId}/test-publish`（テスト公開を ON。下書きだけ） | `surveys.publish` |
 | `POST /api/admin/surveys/{surveyId}/test-republish`（テスト公開に反映） | `surveys.publish` |
-| `POST /api/admin/surveys/{surveyId}/publish`（本公開） | `surveys.publish` |
+| `POST /api/admin/surveys/{surveyId}/publish`（本公開。**下書きからも、テスト公開中からも**。本文 `{"reflectDraft": true}` で下書きを反映して固め直す） | `surveys.publish` |
 | `POST /api/admin/surveys/{surveyId}/suspend`（停止） | `surveys.publish` |
 | `POST /api/admin/surveys/{surveyId}/resume`（再開） | `surveys.publish` |
 | `GET /api/admin/surveys/{surveyId}/export`（書き出し。キーでの書き出しは操作の記録へ残る） | `surveys.read` |
@@ -181,7 +181,7 @@ curl -sS -H "Authorization: Bearer ${QAT_TOKEN}" "$base/api/admin/surveys/"
 **キーでできないこと（画面操作に限る）。** 下書きへ戻す（`revert-to-draft`）・アーカイブ・復元・完全削除・複製・
 設問の取り込み・テスト回答の削除・設定・ユーザ・キーの管理。
 **公開中の定義を書き換えるには「下書きへ戻す」が要る**ので、キーだけでは公開中の版を書き換えられない
-（`publish` の口は、テスト公開中のアンケートだけを本公開する。公開状態は [`アンケート公開状態-フロー.md`](アンケート公開状態-フロー.md)）。
+（`publish` の口は、**下書きとテスト公開中のアンケートだけ**を本公開する（Issue #1057。下書きからは、その場で版を固めて本公開する）。本公開中・停止中は受け付けない。公開状態は [`アンケート公開状態-フロー.md`](アンケート公開状態-フロー.md)）。
 
 ### 4.2.1 OpenAPI の文書に出るもの
 
@@ -426,10 +426,13 @@ flowchart LR
 ### 8.3 版の履歴で影響を戻す
 
 **キーでできる変更は、下書きの保存・テスト公開・本公開・停止・再開だけ**（4.2）。
+**テスト公開中のアンケートは、キーで保存するだけで版が固まり直る**（`surveys.publish` 付きのキーの保存。Issue #1057）ので、版の履歴で見つかる版が増える。
 **固めた版は不変で、書き換えられない。** 次の順に確かめて戻す。
 
 1. **公開中のアンケートが書き換わっていないか**を優先して見る。キーでは公開中の版を直接は書き換えられない
-   （「下書きへ戻す」は画面操作）。ただし、**テスト公開中のアンケートは、`test-republish` で新しい版へ差し替えられる**
+   （「下書きへ戻す」は画面操作）。ただし、**テスト公開中のアンケートは、`test-republish`・保存・
+   `publish`（`reflectDraft`）で新しい版へ差し替えられる**。
+   **下書きのアンケートは、`publish` 1 回で本公開まで進められる**
 2. **版の一覧**（画面の「過去の版」、または `GET /api/admin/surveys/{surveyId}/versions`）で、
    **監査の時刻に合う新しい版**が無いかを見る。版の中身は `GET …/versions/{version}`（読むだけ）
 3. **改ざんされていたら、直前の正しい版を編集に読み込んで保存する**（画面の「過去の版」→「編集に読み込む」→ 保存）。
