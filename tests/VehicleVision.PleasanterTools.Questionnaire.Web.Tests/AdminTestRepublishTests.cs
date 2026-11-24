@@ -130,6 +130,228 @@ public class AdminTestRepublishTests
         Assert.Equal((int)SurveyStatus.TestPublished, fresh.Record!.Status);
     }
 
+    private static Task<IResult> PublishAsync(
+        FakeRepository surveys,
+        FakeDrafts drafts,
+        bool? reflectDraft = null) =>
+        AdminSurveyEndpoints.PublishAsync(
+            surveys.Record!.SurveyId,
+            reflectDraft is null ? null : new AdminSurveyEndpoints.PublishRequest(reflectDraft.Value),
+            new DefaultHttpContext(),
+            drafts,
+            surveys,
+            new LookupPublishValidator(null!, null!),
+            CancellationToken.None);
+
+    [Fact]
+    public async Task 下書きからその場で版を固めて本公開できる()
+    {
+        // Issue #1057。テスト公開を経由しない
+        var surveys = new FakeRepository(Record(SurveyStatus.Draft));
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await PublishAsync(surveys, drafts);
+
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        Assert.Equal([2], surveys.Published);
+        Assert.Equal((int)SurveyStatus.Published, surveys.Record!.Status);
+        Assert.Equal(2, surveys.Record.PublishedVersion);
+    }
+
+    [Fact]
+    public async Task 下書きからの本公開にも公開前の検査を掛ける()
+    {
+        // 履歴の投射先が回答先と同じ（公開を止める不備）。固めず、下書きのまま残る
+        var surveys = new FakeRepository(Record(SurveyStatus.Draft));
+        var drafts = new FakeDrafts(new SurveyDraft(
+            Definition(), new MappingDefinition(), 3, AssetHistorySiteId: SiteId));
+
+        var result = await PublishAsync(surveys, drafts);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, StatusOf(result));
+        Assert.Empty(surveys.Published);
+        Assert.Equal((int)SurveyStatus.Draft, surveys.Record!.Status);
+        Assert.Equal(0, surveys.SaveCount);
+    }
+
+    [Fact]
+    public async Task テスト公開中の本公開は固めた版をそのまま使う()
+    {
+        var surveys = new FakeRepository(Record(SurveyStatus.TestPublished));
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await PublishAsync(surveys, drafts);
+
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        Assert.Empty(surveys.Published);
+        Assert.Equal((int)SurveyStatus.Published, surveys.Record!.Status);
+        Assert.Equal(1, surveys.Record.PublishedVersion);
+
+        // 本文が `reflectDraft: false` でも同じ
+        var explicitFalse = new FakeRepository(Record(SurveyStatus.TestPublished));
+        await PublishAsync(explicitFalse, drafts, reflectDraft: false);
+        Assert.Empty(explicitFalse.Published);
+    }
+
+    [Fact]
+    public async Task テスト公開中でも下書きを反映して本公開できる()
+    {
+        var surveys = new FakeRepository(Record(SurveyStatus.TestPublished));
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await PublishAsync(surveys, drafts, reflectDraft: true);
+
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        Assert.Equal([2], surveys.Published);
+        Assert.Equal((int)SurveyStatus.Published, surveys.Record!.Status);
+        Assert.Equal(2, surveys.Record.PublishedVersion);
+    }
+
+    [Fact]
+    public async Task 反映して本公開が検査で断られたらテスト公開のまま残る()
+    {
+        var surveys = new FakeRepository(Record(SurveyStatus.TestPublished));
+        var drafts = new FakeDrafts(new SurveyDraft(
+            Definition(), new MappingDefinition(), 3, AssetHistorySiteId: SiteId));
+
+        var result = await PublishAsync(surveys, drafts, reflectDraft: true);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, StatusOf(result));
+        Assert.Equal((int)SurveyStatus.TestPublished, surveys.Record!.Status);
+        Assert.Equal(1, surveys.Record.PublishedVersion);
+        Assert.Empty(surveys.Published);
+    }
+
+    [Theory]
+    [InlineData(SurveyStatus.Published)]
+    [InlineData(SurveyStatus.Suspended)]
+    public async Task 本公開中と停止中からは本公開できない(SurveyStatus status)
+    {
+        var surveys = new FakeRepository(Record(status));
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await PublishAsync(surveys, drafts, reflectDraft: true);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, StatusOf(result));
+        Assert.Empty(surveys.Published);
+        Assert.Equal(0, surveys.SaveCount);
+    }
+
+    [Fact]
+    public async Task アーカイブ済みは本公開できない()
+    {
+        var surveys = new FakeRepository(
+            Record(SurveyStatus.Draft) with { ArchivedAt = DateTime.UtcNow });
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await PublishAsync(surveys, drafts);
+
+        Assert.NotEqual(StatusCodes.Status200OK, StatusOf(result));
+        Assert.Empty(surveys.Published);
+    }
+
+    private static HttpContext AdminContext(string role = "Administrator")
+    {
+        var context = new DefaultHttpContext();
+        context.User = new System.Security.Claims.ClaimsPrincipal(
+            new System.Security.Claims.ClaimsIdentity(
+                [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, role)],
+                "test"));
+        return context;
+    }
+
+    private static Task<IResult> SaveAsync(
+        FakeRepository surveys,
+        FakeDrafts drafts,
+        SurveyDefinition definition,
+        long assetHistorySiteId = 0,
+        string role = "Administrator") =>
+        AdminSurveyEndpoints.SaveDraftCoreAsync(
+            surveys.Record!.SurveyId,
+            new AdminSurveyEndpoints.SaveDraftRequest(
+                definition, new MappingDefinition(), 3, assetHistorySiteId),
+            surveys.Record,
+            AdminContext(role),
+            drafts,
+            surveys,
+            new LookupPublishValidator(null!, null!),
+            CancellationToken.None);
+
+    [Fact]
+    public async Task テスト公開中の保存は自動で次の版を固める()
+    {
+        // Issue #1057。保存のたびに版を固め直す。URL で見える内容＝最後に保存した内容
+        var surveys = new FakeRepository(Record(SurveyStatus.TestPublished));
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await SaveAsync(surveys, drafts, Definition());
+
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        Assert.Equal(1, drafts.SaveCount);
+        Assert.Equal([2], surveys.Published);
+        Assert.Equal((int)SurveyStatus.TestPublished, surveys.Record!.Status);
+    }
+
+    [Fact]
+    public async Task テスト公開中の保存は版へ反映できないなら保存もしない()
+    {
+        // 履歴の投射先が回答先と同じ（公開を止める不備）。**片方だけ進んで食い違わない**
+        var surveys = new FakeRepository(Record(SurveyStatus.TestPublished));
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await SaveAsync(surveys, drafts, Definition(), assetHistorySiteId: SiteId);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, StatusOf(result));
+        Assert.Equal(0, drafts.SaveCount);
+        Assert.Empty(surveys.Published);
+    }
+
+    [Fact]
+    public async Task 保存できても版を固める段で衝突したら_保存済みと未反映を伝えて状態は変えない()
+    {
+        var surveys = new FakeRepository(Record(SurveyStatus.TestPublished)) { PublishThrows = true };
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await SaveAsync(surveys, drafts, Definition());
+
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        Assert.Equal(1, drafts.SaveCount);
+        Assert.Equal((int)SurveyStatus.TestPublished, surveys.Record!.Status);
+        Assert.Equal(1, surveys.Record.PublishedVersion);
+        var body = System.Text.Json.JsonSerializer.SerializeToElement(((dynamic)result).Value);
+        Assert.False(body.GetProperty("reflected").GetBoolean());
+    }
+
+    [Theory]
+    [InlineData(SurveyStatus.Draft)]
+    [InlineData(SurveyStatus.Published)]
+    [InlineData(SurveyStatus.Suspended)]
+    public async Task テスト公開中以外の保存は版を固めない(SurveyStatus status)
+    {
+        var surveys = new FakeRepository(Record(status));
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await SaveAsync(surveys, drafts, Definition());
+
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        Assert.Equal(1, drafts.SaveCount);
+        Assert.Empty(surveys.Published);
+    }
+
+    [Fact]
+    public async Task 公開の権限が無い呼び出しの保存は版を固めない()
+    {
+        // 編集者（surveys.write のみ）。保存はできるが、版の固めは公開の権限
+        var surveys = new FakeRepository(Record(SurveyStatus.TestPublished));
+        var drafts = new FakeDrafts(new SurveyDraft(Definition(), new MappingDefinition(), 3));
+
+        var result = await SaveAsync(surveys, drafts, Definition(), role: "Editor");
+
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        Assert.Equal(1, drafts.SaveCount);
+        Assert.Empty(surveys.Published);
+    }
+
     private sealed class FakeRepository(SurveyRecord record) : ISurveyRepository
     {
         public SurveyRecord? Record { get; private set; } = record;
@@ -192,6 +414,8 @@ public class AdminTestRepublishTests
             SurveyListQuery query, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public int SaveCount { get; private set; }
+
         public Task<int> SaveAsync(
             Guid surveyId,
             SurveyDefinition definition,
@@ -199,8 +423,11 @@ public class AdminTestRepublishTests
             int expectedRevision,
             CancellationToken cancellationToken = default,
             long assetHistorySiteId = 0,
-            MappingDefinition? assetHistoryMapping = null) =>
-            throw new NotSupportedException();
+            MappingDefinition? assetHistoryMapping = null)
+        {
+            SaveCount++;
+            return Task.FromResult(expectedRevision + 1);
+        }
 
         public Task<bool> DuplicateAsync(
             Guid sourceSurveyId,

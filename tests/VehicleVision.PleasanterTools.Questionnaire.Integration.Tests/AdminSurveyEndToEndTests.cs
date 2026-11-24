@@ -650,25 +650,61 @@ public class AdminSurveyEndToEndTests
             first.EnsureSuccessStatusCode();
         }
 
-        // テスト公開中に、公開を止める不備（履歴の投射先が回答先と同じ）を入れて保存する
+        // テスト公開中に、公開を止める不備（履歴の投射先が回答先と同じ）を入れて保存する。
+        // Issue #1057: テスト公開中の保存は版へ自動で反映するので、**反映できない保存は保存ごと断る**
+        // （下書きと版が食い違わない）
+        var revisionBefore = await CurrentRevisionAsync(http, surveyId);
         using (var broken = await http.PutAsJsonAsync(
             $"/api/admin/surveys/{surveyId}",
             DraftBody(
                 surveyId,
-                await CurrentRevisionAsync(http, surveyId),
+                revisionBefore,
                 withMapping: true,
                 assetHistorySiteId: 1,
                 withAssetHistoryMapping: true)))
         {
-            broken.EnsureSuccessStatusCode();
+            Assert.Equal(HttpStatusCode.BadRequest, broken.StatusCode);
         }
 
-        using var republish = await http.PostAsJsonAsync(
-            $"/api/admin/surveys/{surveyId}/test-republish", new { });
-
-        Assert.Equal(HttpStatusCode.BadRequest, republish.StatusCode);
+        Assert.Equal(revisionBefore, await CurrentRevisionAsync(http, surveyId));
         var summary = await SummaryAsync(http, surveyId);
         Assert.Equal(3, summary["status"]!.GetValue<int>());
+        Assert.Equal(1, summary["publishedVersion"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task テスト公開中の保存は自動で次の版を固める()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // Issue #1057。保存のたびに版 +1。URL で見える内容＝最後に保存した内容
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var first = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { }))
+        {
+            first.EnsureSuccessStatusCode();
+        }
+
+        for (var expected = 2; expected <= 3; expected++)
+        {
+            using var save = await http.PutAsJsonAsync(
+                $"/api/admin/surveys/{surveyId}",
+                DraftBody(surveyId, await CurrentRevisionAsync(http, surveyId), withMapping: true));
+            save.EnsureSuccessStatusCode();
+            var body = (await ReadAsync(save))!;
+            Assert.True(body["reflected"]!.GetValue<bool>());
+            Assert.Equal(expected, body["version"]!.GetValue<int>());
+        }
+
+        var summary = await SummaryAsync(http, surveyId);
+        Assert.Equal(3, summary["status"]!.GetValue<int>());
+        Assert.Equal(3, summary["publishedVersion"]!.GetValue<int>());
+        Assert.False(summary["hasUnpublishedChanges"]!.GetValue<bool>());
     }
 
     [Fact]
@@ -735,6 +771,84 @@ public class AdminSurveyEndToEndTests
         var summary = await SummaryAsync(http, surveyId);
         Assert.Equal(0, summary["status"]!.GetValue<int>());
         Assert.Null(summary["suspendedReason"]);
+    }
+
+    [Fact]
+    public async Task 下書きから直接本公開でき_固めた版のままの本公開もできる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        // Issue #1057。**公開は下書き→本公開の 2 ステップ。** テスト公開は経由しなくてよい
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var published = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/publish", new { }))
+        {
+            published.EnsureSuccessStatusCode();
+            var body = (await ReadAsync(published))!;
+            Assert.Equal("Published", body["status"]!.GetValue<string>());
+            Assert.Equal(1, body["version"]!.GetValue<int>());
+        }
+
+        var summary = await SummaryAsync(http, surveyId);
+        Assert.Equal(1, summary["status"]!.GetValue<int>());
+        Assert.Equal(1, summary["publishedVersion"]!.GetValue<int>());
+
+        // 下書きへ戻して、テスト公開（チェック ON 相当）→ 本公開（反映しない）
+        using (var reverted = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/revert-to-draft", new { }))
+        {
+            reverted.EnsureSuccessStatusCode();
+        }
+
+        using (var tested = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { }))
+        {
+            tested.EnsureSuccessStatusCode();
+            Assert.Equal(2, (await ReadAsync(tested))!["version"]!.GetValue<int>());
+        }
+
+        // 反映しない本公開は、固めた版（2）のまま
+        using (var asIs = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/publish", new { reflectDraft = false }))
+        {
+            asIs.EnsureSuccessStatusCode();
+            Assert.Equal(2, (await ReadAsync(asIs))!["version"]!.GetValue<int>());
+        }
+
+        // 本公開中からは、もう本公開できない
+        using var again = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/publish", new { reflectDraft = true });
+        Assert.Equal(HttpStatusCode.BadRequest, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task テスト公開中の下書きを反映して本公開すると次の版になる()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        using var http = await SignInAsync();
+        var surveyId = await CreateSurveyAsync(http);
+
+        using (var tested = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/test-publish", new { }))
+        {
+            tested.EnsureSuccessStatusCode();
+        }
+
+        using var published = await http.PostAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}/publish", new { reflectDraft = true });
+        published.EnsureSuccessStatusCode();
+        var body = (await ReadAsync(published))!;
+        Assert.Equal("Published", body["status"]!.GetValue<string>());
+        Assert.Equal(2, body["version"]!.GetValue<int>());
     }
 
     [Fact]

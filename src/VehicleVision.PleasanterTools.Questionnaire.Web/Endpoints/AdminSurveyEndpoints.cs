@@ -824,6 +824,7 @@ public static class AdminSurveyEndpoints
             ISurveyDraftStore drafts,
             ISurveyRepository surveys,
             IAppSettingsProvider appSettings,
+            LookupPublishValidator lookupValidator,
             CancellationToken cancellationToken) =>
         {
             var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
@@ -880,32 +881,9 @@ public static class AdminSurveyEndpoints
                 }
             }
 
-            // **不備があっても保存はさせる。** 直している途中で保存できないと作業にならない。
-            // **拒否するのは公開のとき**
-            try
-            {
-                var revision = await drafts.SaveAsync(
-                    surveyId,
-                    request.Definition,
-                    request.Mapping,
-                    request.Revision,
-                    cancellationToken,
-                    request.AssetHistorySiteId,
-                    request.AssetHistoryMapping)
-                    .ConfigureAwait(false);
-
-                return Results.Ok(new { revision });
-            }
-            catch (SurveyDraftConflictException exception)
-            {
-                // **黙って上書きしない。** 読み直させる
-                return Results.Conflict(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.SurveyUpdatedByOther, RequestLanguage.Of(context)),
-                    actualRevision = exception.Actual,
-                });
-            }
+            return await SaveDraftCoreAsync(
+                surveyId, request, record, context, drafts, surveys, lookupValidator, cancellationToken)
+                .ConfigureAwait(false);
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite))
             .AllowAutomation(AdminPermissions.SurveysWrite);
@@ -1186,45 +1164,23 @@ public static class AdminSurveyEndpoints
             .AllowAutomation(AdminPermissions.SurveysPublish);
 
         // ---- 本公開 ----------------------------------------------------------
-        // **テスト公開で固めた版をそのまま使う。** ここで固め直すと、
-        // テストで確かめた版と本番で回答する版が別物になる。
-        group.MapPost("/{surveyId:guid}/publish", async (
+        // **公開は「下書き → 本公開」の 2 ステップ**（Issue #1057）。テスト公開は経由しなくてよい。
+        // - **下書き**から押すと、その場で版を固めて（版 +1）本公開する。検査はテスト公開と同じ
+        // - **テスト公開中**から押すと、テスト公開で固めた版をそのまま使う
+        //   （ここで固め直すと、テストで確かめた版と本番で回答する版が別物になる）。
+        //   ただし `reflectDraft = true` のときは、下書きを新しい版へ固めてから本公開する
+        //   （テスト公開後に編集した分を入れる。検査はテスト公開と同じ）
+        // 本文は省略できる（省略は `reflectDraft = false`。従来の呼び出しは変わらない）
+        group.MapPost("/{surveyId:guid}/publish", (
             Guid surveyId,
+            PublishRequest? request,
             HttpContext context,
+            ISurveyDraftStore drafts,
             ISurveyRepository surveys,
+            LookupPublishValidator lookupValidator,
             CancellationToken cancellationToken) =>
-        {
-            var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
-                .ConfigureAwait(false);
-            if (record is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (record.ArchivedAt is not null)
-            {
-                return ArchivedSurvey(context);
-            }
-
-            if (record.Status != (int)SurveyStatus.TestPublished
-                || record.PublishedVersion is null)
-            {
-                return Results.BadRequest(new
-                {
-                    message = ServerMessages.Get(
-                        ServerMessageKeys.InvalidSurveyStatus, RequestLanguage.Of(context)),
-                });
-            }
-
-            await surveys.SaveAsync(
-                record with { Status = (int)SurveyStatus.Published },
-                cancellationToken).ConfigureAwait(false);
-
-            AuditNotes.SetTarget(context, "survey", surveyId.ToString());
-            AuditNotes.Add(context, "fromStatus", SurveyStatus.TestPublished.ToString());
-            AuditNotes.Add(context, "toStatus", SurveyStatus.Published.ToString());
-            return Results.Ok(new { status = SurveyStatus.Published.ToString() });
-        })
+            PublishAsync(
+                surveyId, request, context, drafts, surveys, lookupValidator, cancellationToken))
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
             .AllowAutomation(AdminPermissions.SurveysPublish);
 
@@ -1676,6 +1632,180 @@ public static class AdminSurveyEndpoints
         return builder;
     }
 
+    /// <summary>
+    /// 下書きの保存の本体。テスト公開中なら、保存と同時に版を固め直す（Issue #1057）。
+    /// <paramref name="request"/> の定義とマッピングは <c>null</c> でないこと（呼び出し側が確かめる）。
+    /// </summary>
+    internal static async Task<IResult> SaveDraftCoreAsync(
+        Guid surveyId,
+        SaveDraftRequest request,
+        SurveyRecord record,
+        HttpContext context,
+        ISurveyDraftStore drafts,
+        ISurveyRepository surveys,
+        LookupPublishValidator lookupValidator,
+        CancellationToken cancellationToken)
+    {
+        var requestDefinition = request.Definition!;
+        var requestMapping = request.Mapping!;
+        // **テスト公開中の保存は、自動で版へ反映する**（Issue #1057）。
+        // 保存のたびに版を固め直す（+1）。URL で見える内容＝最後に保存した内容。
+        // 反映できるのは、公開の権限を持つ呼び出し（キーならスコープ）だけ。
+        // **保存と版固めは 1 つの操作として扱う。** 検査を、保存の**前に**候補の内容へ掛け、
+        // 通らなければ**保存もしない**（下書きと版が食い違わない）。
+        // ⚠️ 不備のある編集を保存したいときは、テスト公開を OFF（下書きへ戻す）にする
+        var reflect = record.Status == (int)SurveyStatus.TestPublished
+            && !record.IsTemplate
+            && CanPublish(context);
+        var warnings = new List<MappingProblem>();
+        SurveyDraft? candidate = null;
+        if (reflect)
+        {
+            candidate = new SurveyDraft(
+                requestDefinition with { Version = (record.PublishedVersion ?? 0) + 1 },
+                requestMapping,
+                request.Revision,
+                request.AssetHistorySiteId,
+                request.AssetHistoryMapping);
+            var rejected = await ValidateForFreezeAsync(
+                surveyId, candidate, record, context, lookupValidator, warnings, cancellationToken)
+                .ConfigureAwait(false);
+            if (rejected is not null)
+            {
+                return rejected;
+            }
+        }
+
+        // **それ以外は、不備があっても保存はさせる。** 直している途中で保存できないと作業にならない。
+        // **拒否するのは公開のとき**
+        try
+        {
+            var revision = await drafts.SaveAsync(
+                surveyId,
+                requestDefinition,
+                requestMapping,
+                request.Revision,
+                cancellationToken,
+                request.AssetHistorySiteId,
+                request.AssetHistoryMapping)
+                .ConfigureAwait(false);
+
+            if (candidate is null)
+            {
+                return Results.Ok(new { revision });
+            }
+
+            var committed = await CommitFreezeAsync(
+                surveyId,
+                candidate with { Revision = revision },
+                context,
+                surveys,
+                SurveyStatus.TestPublished,
+                SurveyStatus.TestPublished,
+                warnings,
+                cancellationToken).ConfigureAwait(false);
+
+            // **保存はできたが、版を固める段で失敗した**（同時の公開など）。
+            // 保存済みの版（revision）を返し、反映できなかったことを伝える。
+            // 状態はテスト公開のまま。画面は「下書きの変更が版に未反映」と出し、次の保存でやり直せる
+            return committed is IStatusCodeHttpResult { StatusCode: StatusCodes.Status200OK }
+                ? Results.Ok(new
+                {
+                    revision,
+                    reflected = true,
+                    version = candidate.Definition.Version,
+                    warnings = warnings.Select(Describe).ToList(),
+                })
+                : Results.Ok(new
+                {
+                    revision,
+                    reflected = false,
+                    reflectError = ServerMessages.Get(
+                        ServerMessageKeys.VersionAlreadyPublished, RequestLanguage.Of(context)),
+                });
+        }
+        catch (SurveyDraftConflictException exception)
+        {
+            // **黙って上書きしない。** 読み直させる
+            return Results.Conflict(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.SurveyUpdatedByOther, RequestLanguage.Of(context)),
+                actualRevision = exception.Actual,
+            });
+        }
+    }
+
+    /// <summary>
+    /// 呼び出しが公開の権限を持つか。**キー（Bearer）なら付けたスコープ、画面なら役割**で見る。
+    /// </summary>
+    private static bool CanPublish(HttpContext context) =>
+        AdminApiTokenAuthentication.IsApiToken(context.User)
+            ? AdminApiTokenAuthentication.PermissionsOf(context.User).Contains(AdminPermissions.SurveysPublish)
+            : AdminPermissions.Has(context.User.FindFirstValue(ClaimTypes.Role), AdminPermissions.SurveysPublish);
+
+    /// <summary>本公開（Issue #1057）。下書き・テスト公開中のどちらからも押せる。</summary>
+    internal static async Task<IResult> PublishAsync(
+        Guid surveyId,
+        PublishRequest? request,
+        HttpContext context,
+        ISurveyDraftStore drafts,
+        ISurveyRepository surveys,
+        LookupPublishValidator lookupValidator,
+        CancellationToken cancellationToken)
+    {
+        var record = await surveys.FindBySurveyIdAsync(surveyId, cancellationToken)
+            .ConfigureAwait(false);
+        if (record is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (record.ArchivedAt is not null)
+        {
+            return ArchivedSurvey(context);
+        }
+
+        // 下書きからは常にその場で固める。テスト公開中は、反映を求められたときだけ固め直す
+        if (record.Status == (int)SurveyStatus.Draft
+            || (record.Status == (int)SurveyStatus.TestPublished
+                && request?.ReflectDraft == true))
+        {
+            return await FreezeAndPublishAsync(
+                surveyId,
+                context,
+                drafts,
+                surveys,
+                lookupValidator,
+                (SurveyStatus)record.Status,
+                SurveyStatus.Published,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (record.Status != (int)SurveyStatus.TestPublished
+            || record.PublishedVersion is null)
+        {
+            return Results.BadRequest(new
+            {
+                message = ServerMessages.Get(
+                    ServerMessageKeys.InvalidSurveyStatus, RequestLanguage.Of(context)),
+            });
+        }
+
+        await surveys.SaveAsync(
+            record with { Status = (int)SurveyStatus.Published },
+            cancellationToken).ConfigureAwait(false);
+
+        AuditNotes.SetTarget(context, "survey", surveyId.ToString());
+        AuditNotes.Add(context, "fromStatus", SurveyStatus.TestPublished.ToString());
+        AuditNotes.Add(context, "toStatus", SurveyStatus.Published.ToString());
+        return Results.Ok(new
+        {
+            status = SurveyStatus.Published.ToString(),
+            version = record.PublishedVersion,
+        });
+    }
+
     /// <summary>テスト公開、またはテスト公開中の版の固め直し。</summary>
     /// <param name="republish">
     /// <c>true</c> ならテスト公開中のアンケートの固め直し（Issue #1008）。
@@ -1688,6 +1818,32 @@ public static class AdminSurveyEndpoints
         ISurveyRepository surveys,
         LookupPublishValidator lookupValidator,
         bool republish,
+        CancellationToken cancellationToken) =>
+        await FreezeAndPublishAsync(
+            surveyId,
+            context,
+            drafts,
+            surveys,
+            lookupValidator,
+            republish ? SurveyStatus.TestPublished : SurveyStatus.Draft,
+            SurveyStatus.TestPublished,
+            cancellationToken).ConfigureAwait(false);
+
+    /// <summary>
+    /// 下書きを検査して版を固め、<paramref name="target"/> の状態にする（Issue #1057）。
+    /// テスト公開・テスト公開の固め直し・下書きからの本公開・テスト公開からの「下書きを反映して本公開」が共有する。
+    /// **検査は 1 か所**（どの入口でも同じ検査を通す）。
+    /// </summary>
+    /// <param name="from">この状態のときだけ受け付ける。</param>
+    /// <param name="target">固めた後の状態（<c>TestPublished</c> か <c>Published</c>）。</param>
+    private static async Task<IResult> FreezeAndPublishAsync(
+        Guid surveyId,
+        HttpContext context,
+        ISurveyDraftStore drafts,
+        ISurveyRepository surveys,
+        LookupPublishValidator lookupValidator,
+        SurveyStatus from,
+        SurveyStatus target,
         CancellationToken cancellationToken)
     {
         var draft = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
@@ -1722,7 +1878,7 @@ public static class AdminSurveyEndpoints
             return ArchivedSurvey(context);
         }
 
-        if (beforePublish.Status != (republish ? (int)SurveyStatus.TestPublished : (int)SurveyStatus.Draft))
+        if (beforePublish.Status != (int)from)
         {
             return Results.BadRequest(new
             {
@@ -1731,6 +1887,33 @@ public static class AdminSurveyEndpoints
             });
         }
 
+        var warnings = new List<MappingProblem>();
+        var rejected = await ValidateForFreezeAsync(
+            surveyId, draft, beforePublish, context, lookupValidator, warnings, cancellationToken)
+            .ConfigureAwait(false);
+        if (rejected is not null)
+        {
+            return rejected;
+        }
+
+        return await CommitFreezeAsync(
+            surveyId, draft, context, surveys, from, target, warnings, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 版を固める前の検査（Issue #1057）。**テスト公開・本公開・テスト公開中の保存の反映が共有する 1 か所。**
+    /// 通らなければ断る応答を返す（<c>null</c> なら通った）。通ったときの警告は <paramref name="warnings"/> へ入れる。
+    /// </summary>
+    private static async Task<IResult?> ValidateForFreezeAsync(
+        Guid surveyId,
+        SurveyDraft draft,
+        SurveyRecord beforePublish,
+        HttpContext context,
+        LookupPublishValidator lookupValidator,
+        List<MappingProblem> warnings,
+        CancellationToken cancellationToken)
+    {
         // **公開のときだけ拒否する。** 壊れた定義で回答を受け付けると、
         // 受け付けた回答が Pleasanter へ届かないまま溜まる
         // **取り込み（Issue #1009）と同じ検査を通す。** 定義だけで決まる検査は
@@ -1878,6 +2061,24 @@ public static class AdminSurveyEndpoints
             });
         }
 
+        warnings.AddRange(problems.Where(problem => !problem.IsBlocking));
+        return null;
+    }
+
+    /// <summary>
+    /// 検査を通った下書きを版として固め、<paramref name="target"/> の状態にする（Issue #1057）。
+    /// 版を固める段で衝突したら、状態は変えずに 409 を返す。
+    /// </summary>
+    private static async Task<IResult> CommitFreezeAsync(
+        Guid surveyId,
+        SurveyDraft draft,
+        HttpContext context,
+        ISurveyRepository surveys,
+        SurveyStatus from,
+        SurveyStatus target,
+        List<MappingProblem> warnings,
+        CancellationToken cancellationToken)
+    {
         var publishedBy = context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } id
             && Guid.TryParse(id, out var adminUserId)
             ? adminUserId
@@ -1913,23 +2114,29 @@ public static class AdminSurveyEndpoints
         if (record is not null)
         {
             await surveys.SaveAsync(
-                record with { Status = (int)SurveyStatus.TestPublished }, cancellationToken)
+                record with { Status = (int)target }, cancellationToken)
                 .ConfigureAwait(false);
         }
 
         AuditNotes.SetTarget(context, "survey", surveyId.ToString());
-        AuditNotes.Add(
-            context,
-            "fromStatus",
-            (republish ? SurveyStatus.TestPublished : SurveyStatus.Draft).ToString());
-        AuditNotes.Add(context, "toStatus", SurveyStatus.TestPublished.ToString());
+        AuditNotes.Add(context, "fromStatus", from.ToString());
+        AuditNotes.Add(context, "toStatus", target.ToString());
 
-        return Results.Ok(new
-        {
-            version = draft.Definition.Version,
-            // **未割り当ては拒否しないが、公開後も伝える**
-            warnings = problems.Where(problem => !problem.IsBlocking).Select(Describe),
-        });
+        var warningBody = warnings.Select(Describe).ToList();
+
+        // 本公開のときだけ状態を返す（テスト公開の応答の形は変えない）
+        return target == SurveyStatus.Published
+            ? Results.Ok(new
+            {
+                status = target.ToString(),
+                version = draft.Definition.Version,
+                warnings = warningBody,
+            })
+            : Results.Ok(new
+            {
+                version = draft.Definition.Version,
+                warnings = warningBody,
+            });
     }
 
     private static IResult ContentAssetRejected(
@@ -2521,6 +2728,13 @@ public static class AdminSurveyEndpoints
 
     /// <summary>テスト公開まで変更できる Pleasanter サイト ID。</summary>
     public sealed record UpdateSiteIdRequest(long PleasanterSiteId);
+
+    /// <summary>本公開の要求（Issue #1057）。</summary>
+    /// <param name="ReflectDraft">
+    /// テスト公開中のとき、下書きを新しい版へ固めてから本公開するか。省略は <c>false</c>（固めた版のまま）。
+    /// 下書きからの本公開では常に固めるので、この値は効かない。
+    /// </param>
+    public sealed record PublishRequest(bool ReflectDraft = false);
 
     /// <summary>完全削除の確認。**現在の題名と完全に一致しなければ削除しない。**</summary>
     public sealed record DeleteSurveyRequest(string? Title);
