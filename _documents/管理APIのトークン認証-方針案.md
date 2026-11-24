@@ -81,7 +81,8 @@ cookie `q.admin` を得る。[`非機能設計.md`](非機能設計.md) 1 章「
 | `surveys.read` | **可** | アンケート定義・版の取得 |
 | `surveys.write` | **可** | 定義の更新 |
 | `surveys.publish` | **可** | 公開・停止など。**付けるのは最も慎重に**（誤公開の影響が大きい） |
-| 書き出し・取り込み（#1009） | **可（権限名は未定）** | 【要確認】`surveys.read` / `surveys.write` を流用するか、`surveys.export` / `surveys.import` を足すか。取り込みは定義を書き換えるので、少なくとも `surveys.write` 相当 |
+| 書き出し（#1009） | **可（`surveys.read` を流用）** | 新設しない。口の権限（閲覧）と同じ |
+| 取り込み（#1009） | **可（`surveys.publish` を流用）** | 新設しない。取り込みが今要る権限（公開相当）と同じ。**ルックアップを含む取り込みはトークンでは断る**（`lookups.manage` はスコープに付けられない） |
 | `surveys.delete` | **不可** | 完全削除は `Administrator` の画面操作に限る |
 | `surveys.deleteTestResponses` | **不可** | Pleasanter のレコードを消す取り消せない操作。画面操作に限る |
 | `lookups.manage` | **不可** | ルックアップ専用の API キーを扱う |
@@ -101,6 +102,16 @@ cookie `q.admin` を得る。[`非機能設計.md`](非機能設計.md) 1 章「
 **推奨は A。** 初版で許す口は、アンケートの取得・版・更新・公開・停止・再開・書き出し・取り込みに絞る。
 【要確認】`AdminSurveyEndpoints` の個々の口のうち、どれを初版に含めるか（2 章の一覧から確定する）。
 
+> **実装メモ（Issue #1029。2026-11-24）。** 書き出し・取り込みの口に、口ごとの許可宣言を付けた。
+>
+> - **書き出し** `GET /api/admin/surveys/{surveyId}/export`: `AllowAutomation(surveys.read)`。
+>   `AuditAutomationReads()` は #1027 で付いており、トークンでの書き出しは `actorKind=api-token`・`tokenId`・`tokenPrefix` つきで残る
+> - **取り込み** `POST /api/admin/surveys/import`: `AllowAutomation(surveys.publish)`。
+>   口の権限（`RequireAuthorization`）が `surveys.publish` なので、**宣言も同じ**にした（ずらすと別のスコープが通る）。
+>   `surveys.write` では取り込めない（403）。書き込みの記録（`AuditNotes.SetTarget`）はトークンの識別つきで残る
+> - **ルックアップを含む取り込みは、トークンでは `403`**（既存の `lookups.settingsForbidden` の文言）。
+>   無視して取り込まず、断る（黙って落とすと、設定が入ったつもりになる）。**検査だけ（`dryRun`）の要求でも断る**。
+>   人のセッションは今までどおり（役割に `lookups.manage` があれば持ち込める）
 **アンケート単位の絞り込み**（特定のアンケートだけに限るトークン）は、初版では**作らない**。
 【要確認】CI で 1 つのアンケートだけを更新する用途が主か。そうなら後の拡張として価値が高い。
 
@@ -194,7 +205,7 @@ CSRF は、ブラウザが**要求へ自動で付ける資格情報**（cookie �
 >   **Core.Data の `IRateLimitStore`（`Core_RateLimits`）は使わなかった。** 要求ごとに DB への書き込みが増え、
 >   「DB へ書く前に効かせる」に反するため。本アプリの既存の枠（`ISharedRateLimitStore`）を再利用した
 > - 「IP × 書き出し・取り込み」の枠（上の表の 3 行目）は**まだ作っていない**。書き出し・取り込みの口は、
->   トークンでは入れない（#1029 で対応する）。そのときに、通常の書き込みの枠で足りるかを確かめて決める
+>   #1029 でトークンを許したが、枠は**通常の読み取り・書き込みの枠**（トークンの枠）のまま。専用の枠が要るかは別途判断する
 > - 失敗の応答は区別しない（同じ `401`）。枠の超過は `429` と `Retry-After`（理由は区別しない）
 
 ### 3.7 操作の記録（監査）
@@ -366,7 +377,7 @@ OpenAPI の定義の生成・配信・Swagger UI は **Issue #1021** の範囲�
 
 ## 6. 要確認の一覧
 
-1. 書き出し・取り込み（#1009）の権限名（流用か新設か）
+1. ~~書き出し・取り込み（#1009）の権限名（流用か新設か）~~ → 流用（書き出しは `surveys.read`、取り込みは `surveys.publish`。3.2 章）
 2. 初版でトークンを許す口の確定（`AdminSurveyEndpoints` の口の洗い出し）
 3. アンケート単位のスコープ絞り込みを初版で要るか
 4. トークンの表の置き場所（Core.Data か、本アプリの `Data` か）
