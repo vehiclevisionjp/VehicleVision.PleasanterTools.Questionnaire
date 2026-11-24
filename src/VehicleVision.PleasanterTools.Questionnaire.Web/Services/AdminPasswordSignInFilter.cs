@@ -21,7 +21,12 @@ public sealed class AdminPasswordSignInFilter(
                 .GetAsync(context.HttpContext.RequestAborted)
                 .ConfigureAwait(false))
             .Options;
-        if (!passwordSignIn.IsAllowed(context.HttpContext, saml.Enabled || pleasanterSso.Enabled))
+        if (!await passwordSignIn
+                .IsAllowedAsync(
+                    context.HttpContext,
+                    saml.Enabled || pleasanterSso.Enabled,
+                    context.HttpContext.RequestAborted)
+                .ConfigureAwait(false))
         {
             return Results.NotFound();
         }

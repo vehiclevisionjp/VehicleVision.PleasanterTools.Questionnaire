@@ -76,7 +76,10 @@ public static class AdminAuthEndpoints
 
             // **合言葉を塞げるのは、ほかの入口（SAML か Pleasanter）が有効な間だけ**
             var passwordSignInEnabled =
-                setupRequired || passwordSignIn.IsAllowed(context, samlEnabled || pleasanterSsoEnabled);
+                setupRequired
+                || await passwordSignIn
+                    .IsAllowedAsync(context, samlEnabled || pleasanterSsoEnabled, cancellationToken)
+                    .ConfigureAwait(false);
 
             var session = await context.AuthenticateAsync(AdminAuthSchemes.Session).ConfigureAwait(false);
             if (session.Succeeded)
