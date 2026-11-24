@@ -327,7 +327,9 @@ public static class AdminSurveyEndpoints
                 "application/json",
                 // **題名をファイル名へ入れない。** 日本語や記号が環境ごとに化ける
                 fileDownloadName: $"survey-{surveyId:N}.json");
-        });
+        })
+            // **トークンでの書き出しは監査へ残す**（定義の一括持ち出し。#1027）。人の画面の読み取りは残さない
+            .AuditAutomationReads();
 
         // ---- 取り込み（公開と同じ権限） --------------------------------------
         // **新しいアンケートの下書きとして作る。** 複製と同じく、書き込み先のサイトを
