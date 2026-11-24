@@ -266,7 +266,7 @@ public sealed class AdminApiTokenBearerEndToEndTests
 
         var denied = new (HttpMethod Method, string Url)[]
         {
-            // アンケートの群でも、宣言の無い口（完全削除・アーカイブ・復元・作成・複製・書き出し・取り込み・テスト回答の削除・設定）
+            // アンケートの群でも、宣言の無い口（完全削除・アーカイブ・復元・作成・複製・テスト回答の削除・設定）
             (HttpMethod.Post, Missing("/delete")),
             (HttpMethod.Post, Missing("/archive")),
             (HttpMethod.Post, Missing("/restore")),
@@ -277,8 +277,6 @@ public sealed class AdminApiTokenBearerEndToEndTests
             (HttpMethod.Post, Missing("/site-settings/sync")),
             (HttpMethod.Post, Missing("/test-responses/delete")),
             (HttpMethod.Get, Missing("/test-responses")),
-            (HttpMethod.Get, Missing("/export")),
-            (HttpMethod.Post, $"{Surveys}/import"),
             (HttpMethod.Post, Surveys),
             (HttpMethod.Get, $"{Surveys}/embed-options"),
             // 人・設定・ルックアップ・監査・メンテナンス
