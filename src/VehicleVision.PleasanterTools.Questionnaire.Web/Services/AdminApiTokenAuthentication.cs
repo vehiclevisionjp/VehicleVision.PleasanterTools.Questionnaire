@@ -207,9 +207,26 @@ public sealed class AdminApiTokenAuthenticationHandler(
 /// <param name="Scope">この口が要るスコープ（<see cref="AdminApiTokenScopes.Allowed"/> のどれか）。</param>
 public sealed record AutomationAccessMetadata(string Scope);
 
+/// <summary>
+/// 個人トークンでこの口を読んだときも、監査へ残す印（エンドポイントのメタデータ。Issue #1027）。
+/// <b>書き出しのように、読み取りでも定義の一括持ち出しになる口だけ</b>に付ける（通常の読み取りは残さない）。
+/// </summary>
+public sealed record AuditAutomationReadMetadata;
+
 /// <summary>口ごとの許可宣言。</summary>
 public static class AutomationEndpointExtensions
 {
+    /// <summary>
+    /// この口を、個人トークンで読んだときも監査へ残す（書き出し用）。ブラウザのセッションの読み取りは今までどおり残さない。
+    /// </summary>
+    public static TBuilder AuditAutomationReads<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Add(endpoint => endpoint.Metadata.Add(new AuditAutomationReadMetadata()));
+        return builder;
+    }
+
     /// <summary>
     /// この口を、個人トークン（自動操作）からも使えるようにする。<b>宣言の無い口は、トークンでは入れない</b>（既定は拒否）。
     /// </summary>

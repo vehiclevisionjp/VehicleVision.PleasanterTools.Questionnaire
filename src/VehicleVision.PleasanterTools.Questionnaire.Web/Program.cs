@@ -525,6 +525,11 @@ builder.Services.AddSingleton<AdminUserService>();
 builder.Services.AddSingleton(AdminApiTokenOptions.FromConfiguration(builder.Configuration));
 builder.Services.AddSingleton<IAdminApiTokenStore, AdminApiTokenStore>();
 builder.Services.AddSingleton<AdminApiTokenService>();
+// 枠（認証の失敗は IP ごとの別枠・トークン単位の枠。#1027）と、トークンの出来事の監査（認証の失敗・403・枠の超過）
+builder.Services.AddSingleton(serviceProvider => new AdminApiTokenRateGate(
+    serviceProvider.GetService<ISharedRateLimitStore>(),
+    serviceProvider.GetRequiredService<ILogger<AdminApiTokenRateGate>>()));
+builder.Services.AddSingleton<AdminApiTokenAuditor>();
 
 // SAML の管理者が API キーを発行する前の強制再認証（ForceAuthn。Issue #1034）。
 // 途中の状態と発行 1 回分の許可は、使い捨ての置き場に預ける。複数のプロセスでは共有状態の Redis を使う
@@ -1048,7 +1053,14 @@ app.UseMiddleware<AdminCsrfMiddleware>();
 
 app.UseRateLimiter();
 
+// **トークンの枠（Issue #1027）。順序は 全体の IP の枠（上） → 失敗の枠（認証の前に見る） → 認証 → トークンの枠（認証の後）**。
+// 失敗の枠を超えた IP の Bearer の要求は、DB を引く前に 429。cookie の要求は対象にしない
+app.UseMiddleware<AdminApiTokenFailureGateMiddleware>();
+
 app.UseAuthentication();
+
+// 認証の失敗を数えて監査へ残し、通ったトークンの枠を数える（DB へ書く前に 429）。認可の 403 も残す
+app.UseMiddleware<AdminApiTokenLimitMiddleware>();
 app.UseAuthorization();
 
 // 回答画面（TypeScript + Vite + Svelte のビルド成果物）。

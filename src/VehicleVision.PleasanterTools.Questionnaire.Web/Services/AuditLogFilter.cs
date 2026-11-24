@@ -41,7 +41,7 @@ public sealed partial class AuditLogFilter(
     /// （<c>UnsafeRelaxedJsonEscaping</c> ではなく <c>UnicodeRanges.All</c> を使う理由）。
     /// 画面へ出すときの逃がし忘れが、そのまま script の挿し込みにならないようにする。
     /// </remarks>
-    private static readonly JsonSerializerOptions DetailOptions = new()
+    internal static readonly JsonSerializerOptions DetailOptions = new()
     {
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(
             System.Text.Unicode.UnicodeRanges.All),
@@ -60,6 +60,21 @@ public sealed partial class AuditLogFilter(
         ("templateId", "SurveyTemplate"),
     ];
 
+    /// <summary>補足の、操作の主体の種別の名前。</summary>
+    public const string ActorKindKey = "actorKind";
+
+    /// <summary>補足の、操作の主体が人（ブラウザのセッション）のときの値。</summary>
+    public const string ActorKindHuman = "human";
+
+    /// <summary>補足の、操作の主体が個人トークンのときの値。</summary>
+    public const string ActorKindApiToken = "api-token";
+
+    /// <summary>補足の、トークンの識別子の名前。</summary>
+    public const string TokenIdKey = "tokenId";
+
+    /// <summary>補足の、トークンの接頭辞の名前。</summary>
+    public const string TokenPrefixKey = "tokenPrefix";
+
     public async ValueTask<object?> InvokeAsync(
         EndpointFilterInvocationContext context,
         EndpointFilterDelegate next)
@@ -70,8 +85,11 @@ public sealed partial class AuditLogFilter(
         var http = context.HttpContext;
 
         // **読み取りは残さない**
+        // **例外は、入口が明示した読み取りと、トークンでの書き出し**（`AuditAutomationReadMetadata`。
+        // 定義の一括持ち出しなので、漏えい時の追跡に要る。通常の読み取りは残さない）
         if ((HttpMethods.IsGet(http.Request.Method) || HttpMethods.IsHead(http.Request.Method))
-            && !AuditNotes.ShouldRecordRead(http))
+            && !AuditNotes.ShouldRecordRead(http)
+            && !IsRecordedAutomationRead(http))
         {
             return await next(context).ConfigureAwait(false);
         }
@@ -102,6 +120,10 @@ public sealed partial class AuditLogFilter(
         return result;
     }
 
+    private static bool IsRecordedAutomationRead(HttpContext http) =>
+        AdminApiTokenAuthentication.IsApiToken(http.User)
+        && http.GetEndpoint()?.Metadata.GetMetadata<AuditAutomationReadMetadata>() is not null;
+
     /// <summary>この応答の状態。</summary>
     /// <remarks>
     /// **応答オブジェクトから読む。** 最小 API では、まだ書き出されていないので
@@ -121,7 +143,7 @@ public sealed partial class AuditLogFilter(
     /// **実際の URL ではなく経路の型を残す。** 識別子は <c>TargetId</c> に入るので、
     /// 型で残しておくと「役割の変更」をまとめて数えられる。
     /// </remarks>
-    private static string ActionOf(HttpContext http)
+    internal static string ActionOf(HttpContext http)
     {
         var pattern = (http.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText;
         return $"{http.Request.Method} {Readable(pattern ?? http.Request.Path.Value ?? "/")}";
@@ -145,7 +167,7 @@ public sealed partial class AuditLogFilter(
     /// Kestrel は IPv4 の接続を <c>::ffff:172.18.0.7</c> の形で返すことがある。
     /// **同じ相手が 2 通りの書き方で残ると、送信元で絞れなくなる。**
     /// </remarks>
-    private static string? IpAddressOf(HttpContext http)
+    internal static string? IpAddressOf(HttpContext http)
     {
         var address = http.Connection.RemoteIpAddress;
         if (address is null)
@@ -238,6 +260,20 @@ public sealed partial class AuditLogFilter(
             AuditNotes.Of(http) ?? (IReadOnlyDictionary<string, string>)new Dictionary<string, string>())
         {
             values[key] = value;
+        }
+
+        // **操作の主体の種別を残す**（人／トークン。Issue #1027）。`Core_AuditLogs` に列が無いので補足へ入れる。
+        // **値は入れない**（トークンの識別子と接頭辞だけ）。経路の値・預けた補足と名前がぶつかったら、こちらを勝たせる。
+        // 認証を通っていない試み（ログインの失敗など）には付けない
+        if (AdminApiTokenAuthentication.IsApiToken(http.User))
+        {
+            values[ActorKindKey] = ActorKindApiToken;
+            values[TokenIdKey] = LogSafe.Text(http.User.FindFirstValue(AdminApiTokenAuthentication.TokenIdClaim));
+            values[TokenPrefixKey] = LogSafe.Text(http.User.FindFirstValue(AdminApiTokenAuthentication.TokenPrefixClaim));
+        }
+        else if (AdminUserIdOf(http) is not null)
+        {
+            values[ActorKindKey] = ActorKindHuman;
         }
 
         return values.Count == 0 ? null : JsonSerializer.Serialize(values, DetailOptions);
