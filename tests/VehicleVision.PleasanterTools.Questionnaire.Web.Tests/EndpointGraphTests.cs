@@ -101,6 +101,19 @@ public class EndpointGraphTests
                         Services.AdminPermissions.PleasanterSsoSettings)));
         }
 
+        // **管理画面のログイン方式の設定は SAML 設定と同じ権限（Administrator のみ）を要求する**（Issue #1056）。
+        // ⚠️ **新しい権限は作らない（2026-11-24 の決定）。認証なしで開く口を作らない**
+        var signInSettings = endpoints.OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.RoutePattern.RawText?.TrimEnd('/') == "/api/admin/sign-in-settings")
+            .ToList();
+        Assert.Equal(2, signInSettings.Count);
+        Assert.All(
+            signInSettings,
+            endpoint => Assert.Contains(
+                endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>(),
+                data => data.Policy == Services.AdminPermissions.PolicyOf(
+                    Services.AdminPermissions.SamlSettings)));
+
         // **テスト回答の削除は専用の権限を要求し、完全削除の権限ではない**（Issue #1024）
         foreach (var route in new[]
                  {
@@ -247,6 +260,7 @@ public class EndpointGraphTests
         app.MapAdminOutboxEndpoints();
         app.MapAdminSamlEndpoints(new AdminPathOptions(AdminPathOptions.DefaultPath));
         app.MapAdminPleasanterSsoEndpoints();
+        app.MapAdminSignInSettingsEndpoints();
         app.MapAdminSurveyEndpoints();
         app.MapAdminTemplateEndpoints();
         app.MapAdminUserEndpoints();

@@ -104,7 +104,8 @@ public class AdminPasswordSignInFilterTests
         bool passwordSignInEnabled)
     {
         var policy = new AdminPasswordSignInPolicy(
-            new AdminPasswordSignInOptions(passwordSignInEnabled, RescueToken: null),
+            new AdminPasswordSignInOptions(Enabled: null, RescueToken: null),
+            new FakeAdminSignInSettings(passwordSignInEnabled),
             new EphemeralDataProtectionProvider(),
             TimeProvider.System,
             NullLogger<AdminPasswordSignInPolicy>.Instance);

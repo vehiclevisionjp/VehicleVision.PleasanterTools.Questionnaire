@@ -35,6 +35,7 @@ import type {
   SurveyPage,
   SurveyTemplateSummary,
   SamlSettings,
+  AdminSignInSettings,
   AppSettings,
   PleasanterSsoSettings,
   PleasanterSsoTestResult,
@@ -398,6 +399,15 @@ export const saveSamlSettings = (settings: SamlSettings) =>
   call<SamlSettings>('/api/admin/saml/settings', {
     method: 'PUT',
     json: settings,
+  });
+
+export const getAdminSignInSettings = () =>
+  call<AdminSignInSettings>('/api/admin/sign-in-settings');
+
+export const saveAdminSignInSettings = (passwordSignInEnabled: boolean) =>
+  call<AdminSignInSettings>('/api/admin/sign-in-settings', {
+    method: 'PUT',
+    json: { passwordSignInEnabled },
   });
 
 export const testSamlMetadata = (metadataUrl: string) =>

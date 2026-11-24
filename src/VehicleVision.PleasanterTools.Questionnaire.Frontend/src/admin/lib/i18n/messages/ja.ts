@@ -278,6 +278,9 @@ export const ja = {
   'sessions.confirmRevokeOthers': '現在の端末を除くすべてのセッションを終了します。よろしいですか？',
   'signIn.samlOr': 'または',
   'signIn.samlButton': 'シングルサインオンでログイン',
+  'signIn.tabsLabel': 'ログイン方法',
+  'signIn.tabSso': 'SSO',
+  'signIn.tabPassword': 'ID/パスワード',
   'signIn.samlError.invalid': 'シングルサインオンでのログインを完了できませんでした。もう一度お試しください。',
   'signIn.samlError.unknownUser':
     'このアカウントは管理画面に登録されていません。管理者に追加を依頼してください。',
@@ -300,9 +303,9 @@ export const ja = {
   'saml.lead':
     '外部設定に値がある項目は、その値が優先されます。設定を保存すると、編集できる項目は再起動なしで反映されます。',
   'saml.fixed': '設定で固定されています',
-  'saml.passwordFallbackTitle': 'パスワードで入る経路は常に残ります。',
+  'saml.passwordFallbackTitle': 'パスワードで入る経路は残ります。',
   'saml.passwordFallback':
-    'SAML を有効にした本人が SAML で入れるとは限りません。設定を誤った場合は、ログイン ID・パスワード・必要に応じて 2 要素認証で入り直して修正してください。',
+    'SAML を有効にした本人が SAML で入れるとは限りません。設定を誤った場合は、ログイン ID・パスワード・必要に応じて 2 要素認証で入り直して修正してください。ID/パスワードを隠している場合は、救済 URL（?rescue=）から入ってください。',
   'saml.enabled': 'SAML ログインを有効にする',
   'saml.entityId': 'SP の Entity ID',
   'saml.idpEntityId': 'IdP の Entity ID',
@@ -323,6 +326,19 @@ export const ja = {
   'saml.save': '保存する',
   'saml.saving': '処理しています…',
   'saml.saved': 'SAML 設定を保存しました。',
+  'saml.signInTitle': 'ログイン画面の方式',
+  'saml.hidePassword': 'ID/パスワードのログインを隠す',
+  'saml.hidePasswordHint':
+    'SSO（SAML か Pleasanter のログイン）が有効なとき、ログイン画面に ID/パスワードを出さず、SSO だけを表示します。隠したあとに ID/パスワードで入るには、救済 URL（?rescue=）を開いてください。既定は隠しません。',
+  'saml.signInSave': 'ログイン画面の設定を保存する',
+  'saml.signInSaved': 'ログイン画面の設定を保存しました。',
+  'saml.signInError.ssoDisabled': 'SAML も Pleasanter のログインも無効なため、ID/パスワードを隠せません。先に SSO を有効にしてください。',
+  'saml.signInError.rescueTokenMissing':
+    '救済トークンが設定されていないため、ID/パスワードを隠せません。締め出されたときに戻れなくなります。QUESTIONNAIRE_ADMIN_RESCUE_TOKEN を設定してください。',
+  'saml.signInError.fixed': 'この設定は外部設定（QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN）で固定されているため、画面からは変えられません。',
+  'saml.signInError.failed': 'ログイン画面の設定を保存できませんでした。',
+  'saml.signInNeedsSso': 'SSO が無効なため、現在は隠せません（ID/パスワードのログインは常に表示されます）。',
+  'saml.signInNeedsRescue': '救済トークン（QUESTIONNAIRE_ADMIN_RESCUE_TOKEN）が未設定のため、隠せません。',
   'saml.testTitle': '接続の試験',
   'saml.testLead':
     '指定した URL から IdP メタデータを取得できることだけを確かめます。実際のログイン画面へは移動しません。',

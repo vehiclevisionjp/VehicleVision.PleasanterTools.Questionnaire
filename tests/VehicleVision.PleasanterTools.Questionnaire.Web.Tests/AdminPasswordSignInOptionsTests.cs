@@ -27,11 +27,12 @@ public class AdminPasswordSignInOptionsTests
     }
 
     [Fact]
-    public void 未設定なら合言葉ログインを塞がず逃げ道も作らない()
+    public void 未設定なら外部設定では指定せず逃げ道も作らない()
     {
         var options = AdminPasswordSignInOptions.FromConfiguration(Configuration());
 
-        Assert.True(options.Enabled);
+        // **null は「外部設定の指定なし」**（Issue #1056）。DB の値、無ければ既定（隠さない）へ進む
+        Assert.Null(options.Enabled);
         Assert.Null(options.RescueToken);
     }
 

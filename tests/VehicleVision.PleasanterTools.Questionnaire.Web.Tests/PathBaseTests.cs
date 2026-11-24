@@ -165,6 +165,7 @@ public class PathBaseTests
     {
         var policy = new AdminPasswordSignInPolicy(
             new AdminPasswordSignInOptions(false, new string('x', 32)),
+            new FakeAdminSignInSettings(),
             new EphemeralDataProtectionProvider(),
             TimeProvider.System,
             NullLogger<AdminPasswordSignInPolicy>.Instance);
