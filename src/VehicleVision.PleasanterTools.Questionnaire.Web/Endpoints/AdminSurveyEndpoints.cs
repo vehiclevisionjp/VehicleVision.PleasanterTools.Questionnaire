@@ -331,7 +331,9 @@ public static class AdminSurveyEndpoints
             // **トークンでの書き出しは監査へ残す**（定義の一括持ち出し。#1027）。人の画面の読み取りは残さない
             .AuditAutomationReads()
             // **閲覧と同じ `surveys.read` でトークンを許す**（スコープは新設しない。#1029）
-            .AllowAutomation(AdminPermissions.SurveysRead);
+            .AllowAutomation(AdminPermissions.SurveysRead)
+            // OpenAPI の説明（#1030）。トークンで呼べること・スコープは、許可宣言から生成される
+            .WithDescription("アンケートの定義とマッピングを JSON で書き出す（書き込み先・公開用 ID・公開状態・資格情報・画像は入れない）。");
 
         // ---- 取り込み（公開と同じ権限） --------------------------------------
         // **新しいアンケートの下書きとして作る。** 複製と同じく、書き込み先のサイトを
@@ -477,6 +479,11 @@ public static class AdminSurveyEndpoints
             // **取り込みが今要る権限（公開相当 `surveys.publish`）と同じスコープでトークンを許す**（#1029）。
             // ⚠️ 宣言は口の権限（RequireAuthorization）と同じにする。ずらすと、別のスコープのトークンが通ってしまう
             .AllowAutomation(AdminPermissions.SurveysPublish)
+            // OpenAPI の説明（#1030）。トークンで呼べること・スコープは、許可宣言から生成される
+            .WithDescription(
+                "書き出した JSON から、新しいアンケートの下書きを作る。公開前の検査と同じ検査を通らなければ 1 行も作らない。"
+                + "ルックアップの設定を含む取り込みは、個人トークンでは 403（lookups.manage はスコープに付けられない。"
+                + "検査だけ（dryRun）の要求でも断る）。人のセッションでは、役割に lookups.manage があれば持ち込める。")
             .AddEndpointFilter(async (filterContext, next) =>
             {
                 // **大きさを入口で絞る。** 既定の上限のまま JSON を読み切らない
