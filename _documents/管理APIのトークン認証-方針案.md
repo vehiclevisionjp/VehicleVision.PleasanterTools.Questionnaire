@@ -346,7 +346,17 @@ OpenAPI の定義の生成・配信・Swagger UI は **Issue #1021** の範囲�
 - **トークンを許さない口には、API キー・OAuth の `security` を書かない**（セッションのみ）。使えない口を、使えるように見せない
 - ⚠️ **Swagger UI の「Try it out」は、ブラウザからトークンを送る。** 同一オリジンの画面から出せば、現行のガードでは `Sec-Fetch-Site: same-origin` で通るが、
   3.5 章の「トークンをブラウザ上のスクリプトで使わせない」とは緊張する。**初版は Try it out を無効にし、定義の閲覧だけにする**ことを推奨する。最終判断は #1021 に委ねる【要確認】
-- 閲覧画面は**認証済みの管理者だけ**が見られる（#1021 の方針）。トークンでの閲覧を許すかは未決【要確認】
+- 閲覧画面は**認証済みの管理者だけ**が見られる（#1021 の方針）。トークンでの閲覧は許さない（セッションのみ。#1030）
+
+> **実装メモ（Issue #1030。2026-11-24）。** 本章の前提どおりに実装した（`Web/AdminOpenApi.cs`）。
+>
+> - `securitySchemes` へ `adminApiToken`（`http`・`bearer`・`bearerFormat: opaque`）を足した。既存の `adminSession`（cookie）はそのまま。
+>   説明に値の例は書かない。スコープの一覧は `AdminApiTokenScopes.Allowed` から作る
+> - 各操作の `security` は、口の `AllowAutomation(scope)` のメタデータから生成する（手書きの一覧は無い）。
+>   宣言のある口は「`adminSession` または `adminApiToken: [scope]`」の 2 要求（OR）、**宣言の無い口は `adminSession` だけ**
+> - 書き出し・取り込みの口は `WithDescription` で、ルックアップを含む取り込みがトークンでは 403 になることを説明に載せた
+> - 「Try it」（Scalar の Test Request）は `HideTestRequestButton()` で出さない。それまでは既定のまま出ていたので、**この PR で明示的に止めた**
+> - 食い違いの検出は結合テスト `AdminOpenApiTests`（宣言のある口だけ `security` にトークンが付く・スコープが宣言と一致する）
 
 ## 4. 推奨案のまとめ
 
@@ -374,7 +384,7 @@ OpenAPI の定義の生成・配信・Swagger UI は **Issue #1021** の範囲�
 | 3 | レート制限（失敗の別枠・トークンの枠）・操作の記録 | 2 |
 | 4 | 運用手順書・棚卸しの節・設定一覧への追記 | 3 |
 | 5 | 書き出し・取り込みの口をトークン対応にする | #1009・2 |
-| 6 | OpenAPI の `securitySchemes` へ API キーを追記 | #1021・2 |
+| 6 | OpenAPI の `securitySchemes` へ API キーを追記（実装済み。#1030） | #1021・2 |
 | 7（後段） | 外部 IdP の OAuth アクセストークンの検証・連携クライアントの登録 | 2・要望の確認 |
 
 ## 6. 要確認の一覧
@@ -395,7 +405,7 @@ OpenAPI の定義の生成・配信・Swagger UI は **Issue #1021** の範囲�
 14. 外部 IdP のトークンを検証する場合の最大の寿命と、`client_id` を連携クライアントへ対応づける方法
 15. JWT 検証・認可サーバ関連ライブラリのライセンス（一次情報で未確認。寛容ライセンスに限る）
 16. 自前の認可サーバ（O1）を「採らない」で確定してよいか
-17. OpenAPI の Try it out を初版で無効にするか、トークンでの閲覧を許すか（#1021 で決める）
+17. ~~OpenAPI の Try it out を初版で無効にするか、トークンでの閲覧を許すか~~ → Try it は出さない（`HideTestRequestButton`）。文書の閲覧はセッションの管理者だけ（#1030）
 
 ## 参照
 
