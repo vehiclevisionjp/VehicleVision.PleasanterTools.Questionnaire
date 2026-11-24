@@ -1123,7 +1123,9 @@ if (openApiExposure.Enabled)
     app.MapScalarApiReference((options, context) =>
     {
         // CDN の既定フォントと利用状況テレメトリーを止め、画面から第三者へ要求を出さない。
-        options.DisableDefaultFonts().DisableTelemetry().DisableAgent().WithNonce(
+        // 「Try it」（Test Request）は出さない（Issue #1030。方針案 3.11 章）。
+        // ブラウザ上のスクリプトからトークンを送らせず、定義の閲覧だけにする
+        options.DisableDefaultFonts().DisableTelemetry().DisableAgent().HideTestRequestButton().WithNonce(
             context.Items[SecurityHeadersMiddleware.ScalarCspNonceKey] as string
             ?? throw new InvalidOperationException("Scalar の CSP nonce を設定できなかった"));
     }).RequireAuthorization(AdminAuthSchemes.SessionPolicy);
