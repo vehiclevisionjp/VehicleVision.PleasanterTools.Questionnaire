@@ -660,6 +660,16 @@ public static class AdminAuthSchemes
     /// </remarks>
     public const string SamlSessionIndexClaim = "q.saml.sessionindex";
 
+    /// <summary>
+    /// <b>認証スキームの選び分け</b>（Issue #1026）。管理 API で <c>Authorization: Bearer</c> があれば
+    /// <see cref="ApiToken"/>、無ければ <see cref="Session"/>。<b>Bearer がある要求は cookie を評価しない。</b>
+    /// 既定の認証スキームと、全ポリシーがこれを見る。
+    /// </summary>
+    public const string Auto = "Admin.Auto";
+
+    /// <summary>個人トークン（API キー）の Bearer 認証（Issue #1026）。<b>cookie は見ない。</b></summary>
+    public const string ApiToken = "Admin.ApiToken";
+
     /// <summary>ログインの試行に掛けるレート制限の名前。</summary>
     public const string LoginRateLimitPolicy = "admin-login";
 

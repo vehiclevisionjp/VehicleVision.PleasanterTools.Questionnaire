@@ -29,6 +29,24 @@ public sealed record AdminApiTokenOptions
     /// <summary>SSO の管理者が、直前の再ログインとみなす分数の設定。</summary>
     public const string ReloginMinutesSetting = "QUESTIONNAIRE_ADMIN_API_TOKEN_RELOGIN_MINUTES";
 
+    /// <summary>トークンの認証の失敗を、送信元 IP ごとに 5 分あたり何回まで許すかの設定（Issue #1027）。</summary>
+    public const string FailuresPer5MinSetting = "QUESTIONNAIRE_ADMIN_API_TOKEN_FAILURES_PER_5MIN";
+
+    /// <summary>トークン 1 本あたり、読み取りを 1 分に何回まで許すかの設定（Issue #1027）。</summary>
+    public const string ReadsPerMinSetting = "QUESTIONNAIRE_ADMIN_API_TOKEN_READS_PER_MIN";
+
+    /// <summary>トークン 1 本あたり、書き込みを 1 分に何回まで許すかの設定（Issue #1027）。</summary>
+    public const string WritesPerMinSetting = "QUESTIONNAIRE_ADMIN_API_TOKEN_WRITES_PER_MIN";
+
+    /// <summary>認証の失敗の枠の既定（IP ごと・5 分）。</summary>
+    public const int DefaultFailuresPer5Min = 20;
+
+    /// <summary>トークン単位の読み取りの枠の既定（1 分）。</summary>
+    public const int DefaultReadsPerMin = 120;
+
+    /// <summary>トークン単位の書き込みの枠の既定（1 分。読み取りより低く）。</summary>
+    public const int DefaultWritesPerMin = 30;
+
     /// <summary>期限の上限として許す最大の日数。<b>設定でもこれを超えられない。</b></summary>
     public const int AbsoluteMaxDays = 365;
 
@@ -59,6 +77,15 @@ public sealed record AdminApiTokenOptions
     /// <summary>SSO の管理者が、直前の再ログインとみなす長さ。</summary>
     public TimeSpan ReloginWindow { get; init; } = TimeSpan.FromMinutes(DefaultReloginMinutes);
 
+    /// <summary>送信元 IP ごとの、トークンの認証の失敗を許す回数（5 分）。<b>超えると、その IP の Bearer の要求だけ 429</b>。</summary>
+    public int FailuresPer5Min { get; init; } = DefaultFailuresPer5Min;
+
+    /// <summary>トークン 1 本あたりの、読み取りを許す回数（1 分）。</summary>
+    public int ReadsPerMin { get; init; } = DefaultReadsPerMin;
+
+    /// <summary>トークン 1 本あたりの、書き込みを許す回数（1 分）。</summary>
+    public int WritesPerMin { get; init; } = DefaultWritesPerMin;
+
     /// <summary>設定を読む。範囲外・解釈できない値は、設定名つきで起動を止める。</summary>
     public static AdminApiTokenOptions FromConfiguration(IConfiguration configuration)
     {
@@ -75,9 +102,17 @@ public sealed record AdminApiTokenOptions
             1,
             AbsoluteMaxReloginMinutes);
 
+        var failures = ParseInt(
+            configuration[FailuresPer5MinSetting], FailuresPer5MinSetting, DefaultFailuresPer5Min, 1, 100000);
+        var reads = ParseInt(configuration[ReadsPerMinSetting], ReadsPerMinSetting, DefaultReadsPerMin, 1, 1000000);
+        var writes = ParseInt(configuration[WritesPerMinSetting], WritesPerMinSetting, DefaultWritesPerMin, 1, 1000000);
+
         return new AdminApiTokenOptions
         {
             Enabled = enabled,
+            FailuresPer5Min = failures,
+            ReadsPerMin = reads,
+            WritesPerMin = writes,
             DefaultDays = defaultDays,
             MaxDays = maxDays,
             ReloginWindow = TimeSpan.FromMinutes(reloginMinutes),

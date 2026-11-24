@@ -442,23 +442,31 @@ public sealed class AdminApiTokenEndToEndTests
         Assert.True((await service.ValidateAsync(secondToken.Token, IPAddress.Loopback)).Succeeded);
     }
 
-    // ---- 認証スキームはまだ無い（#1026） ----------------------------------------------------
+    // ---- トークンでトークンは作れない（#1026 の Bearer 認証が入った後も通し続ける） ------------------
 
     [Fact]
     public async Task トークンでは管理APIに入れず_トークンでトークンも作れない()
     {
         await using var host = await AdminContractHost.StartAsync(settings: Enabled);
         var (client, _) = await NewAsync(host, AdminRole.Administrator);
-        var (_, token, _) = await IssueAsync(client);
+        var (_, token, _) = await IssueAsync(client, scopes: ["surveys.read", "surveys.write", "surveys.publish"]);
 
-        // cookie を持たない別の client が、Bearer だけで叩く。**Bearer の認証スキームは #1026**。ここでは通らないこと
+        // cookie を持たない別の client が、Bearer だけで叩く。
+        // **#1026 で、許可を宣言した口（アンケートの取得など）には入れる。トークンの管理・人・設定の口には、宣言が無いので入れない**
         using var bare = host.CreateClient();
         bare.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         using var list = await bare.GetAsync("/api/admin/surveys");
-        Assert.Equal(HttpStatusCode.Unauthorized, list.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        using var users = await bare.GetAsync("/api/admin/users");
+        Assert.Equal(HttpStatusCode.Forbidden, users.StatusCode);
         using var issue = await bare.PostAsJsonAsync(Tokens, new { name = "x", scopes = new[] { "surveys.read" }, password = Password });
-        Assert.Equal(HttpStatusCode.Unauthorized, issue.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, issue.StatusCode);
         using var mine = await bare.GetAsync(Tokens);
-        Assert.Equal(HttpStatusCode.Unauthorized, mine.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, mine.StatusCode);
+        using var revoke = await bare.PostAsync($"{Tokens}/{Guid.NewGuid()}/revoke", null);
+        Assert.Equal(HttpStatusCode.Forbidden, revoke.StatusCode);
+
+        // 試みの後も、トークンは増えていない
+        Assert.Single(await ListAsync(client));
     }
 }

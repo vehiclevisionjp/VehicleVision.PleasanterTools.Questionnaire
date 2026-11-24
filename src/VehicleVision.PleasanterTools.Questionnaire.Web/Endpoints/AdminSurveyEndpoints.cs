@@ -147,7 +147,8 @@ public static class AdminSurveyEndpoints
                 cancellationToken).ConfigureAwait(false);
 
             return Results.Ok(ToResponse(rows, take));
-        });
+        })
+            .AllowAutomation(AdminPermissions.SurveysRead);
 
         // ---- 作成 ------------------------------------------------------------
         group.MapPost("/", async (
@@ -326,7 +327,13 @@ public static class AdminSurveyEndpoints
                 "application/json",
                 // **題名をファイル名へ入れない。** 日本語や記号が環境ごとに化ける
                 fileDownloadName: $"survey-{surveyId:N}.json");
-        });
+        })
+            // **トークンでの書き出しは監査へ残す**（定義の一括持ち出し。#1027）。人の画面の読み取りは残さない
+            .AuditAutomationReads()
+            // **閲覧と同じ `surveys.read` でトークンを許す**（スコープは新設しない。#1029）
+            .AllowAutomation(AdminPermissions.SurveysRead)
+            // OpenAPI の説明（#1030）。トークンで呼べること・スコープは、許可宣言から生成される
+            .WithDescription("アンケートの定義とマッピングを JSON で書き出す（書き込み先・公開用 ID・公開状態・資格情報・画像は入れない）。");
 
         // ---- 取り込み（公開と同じ権限） --------------------------------------
         // **新しいアンケートの下書きとして作る。** 複製と同じく、書き込み先のサイトを
@@ -366,10 +373,15 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            // **ルックアップの設定を持ち込めるのはアンケート管理者だけ**（保存と同じ。Issue #879）
+            // **ルックアップの設定を持ち込めるのはアンケート管理者だけ**（保存と同じ。Issue #879）。
+            // **トークンでは持ち込めない**（`lookups.manage` はスコープに付けられない。#1029）。
+            // 無視して取り込まず、403 で断る（黙って落とすと、設定が入ったつもりになる）。
+            // トークンの principal は役割の claim を持たないので役割の判定でも落ちるが、
+            // 役割の持たせ方が変わっても開かないよう、トークンかどうかを明示して見る
             if (!definition.GetLookups().IsEmpty
-                && !AdminPermissions.Has(
-                    context.User.FindFirstValue(ClaimTypes.Role), AdminPermissions.LookupsManage))
+                && (AdminApiTokenAuthentication.IsApiToken(context.User)
+                    || !AdminPermissions.Has(
+                        context.User.FindFirstValue(ClaimTypes.Role), AdminPermissions.LookupsManage)))
             {
                 return Results.Json(
                     new
@@ -464,6 +476,14 @@ public static class AdminSurveyEndpoints
                 new { surveyId, record.PublicId, problems = report });
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
+            // **取り込みが今要る権限（公開相当 `surveys.publish`）と同じスコープでトークンを許す**（#1029）。
+            // ⚠️ 宣言は口の権限（RequireAuthorization）と同じにする。ずらすと、別のスコープのトークンが通ってしまう
+            .AllowAutomation(AdminPermissions.SurveysPublish)
+            // OpenAPI の説明（#1030）。トークンで呼べること・スコープは、許可宣言から生成される
+            .WithDescription(
+                "書き出した JSON から、新しいアンケートの下書きを作る。公開前の検査と同じ検査を通らなければ 1 行も作らない。"
+                + "ルックアップの設定を含む取り込みは、個人トークンでは 403（lookups.manage はスコープに付けられない。"
+                + "検査だけ（dryRun）の要求でも断る）。人のセッションでは、役割に lookups.manage があれば持ち込める。")
             .AddEndpointFilter(async (filterContext, next) =>
             {
                 // **大きさを入口で絞る。** 既定の上限のまま JSON を読み切らない
@@ -484,7 +504,8 @@ public static class AdminSurveyEndpoints
         {
             var draft = await drafts.LoadAsync(surveyId, cancellationToken).ConfigureAwait(false);
             return draft is null ? Results.NotFound() : Results.Ok(draft);
-        });
+        })
+            .AllowAutomation(AdminPermissions.SurveysRead);
 
         // ---- 固めた版を読む（Issue #544）--------------------------------------
         // **読むだけ。** 版は不変なので、ここからは何も書き換えない。
@@ -493,7 +514,8 @@ public static class AdminSurveyEndpoints
             Guid surveyId,
             ISurveySnapshotStore snapshots,
             CancellationToken cancellationToken) =>
-            Results.Ok(await snapshots.ListAsync(surveyId, cancellationToken).ConfigureAwait(false)));
+            Results.Ok(await snapshots.ListAsync(surveyId, cancellationToken).ConfigureAwait(false)))
+            .AllowAutomation(AdminPermissions.SurveysRead);
 
         group.MapGet("/{surveyId:guid}/versions/{version:int}", async (
             Guid surveyId,
@@ -512,7 +534,8 @@ public static class AdminSurveyEndpoints
                     assetHistorySiteId = snapshot.AssetHistorySiteId,
                     assetHistoryMapping = snapshot.AssetHistoryMapping,
                 });
-        });
+        })
+            .AllowAutomation(AdminPermissions.SurveysRead);
 
         // ---- ほかのアンケートから設問を取り込む（Issue #358）----------------
         // **読み取りにも取り込み先を含める。** URL の surveyId を変えて、
@@ -884,7 +907,8 @@ public static class AdminSurveyEndpoints
                 });
             }
         })
-            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite))
+            .AllowAutomation(AdminPermissions.SurveysWrite);
 
         // ---- ヘッダ画像（Issue #56） ------------------------------------------
         // **回答の添付と同じ道を通す**（拡張子・先頭バイト・大きさ）。
@@ -1128,7 +1152,8 @@ public static class AdminSurveyEndpoints
                     column => PleasanterColumn.RecordPropertyOf(column)?.ValueKind,
                     warnUnmappedQuestions: false);
             return Results.Ok(problems.Concat(historyProblems).Select(Describe));
-        });
+        })
+            .AllowAutomation(AdminPermissions.SurveysRead);
 
         // ---- テスト公開 ------------------------------------------------------
         group.MapPost("/{surveyId:guid}/test-publish", (
@@ -1140,7 +1165,8 @@ public static class AdminSurveyEndpoints
             CancellationToken cancellationToken) =>
             TestPublishAsync(
                 surveyId, context, drafts, surveys, lookupValidator, republish: false, cancellationToken))
-            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
+            .AllowAutomation(AdminPermissions.SurveysPublish);
 
         // ---- テスト公開に反映する --------------------------------------------
         // **下書きへ戻さずに版を固め直す**（Issue #1008）。
@@ -1156,7 +1182,8 @@ public static class AdminSurveyEndpoints
             CancellationToken cancellationToken) =>
             TestPublishAsync(
                 surveyId, context, drafts, surveys, lookupValidator, republish: true, cancellationToken))
-            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
+            .AllowAutomation(AdminPermissions.SurveysPublish);
 
         // ---- 本公開 ----------------------------------------------------------
         // **テスト公開で固めた版をそのまま使う。** ここで固め直すと、
@@ -1198,7 +1225,8 @@ public static class AdminSurveyEndpoints
             AuditNotes.Add(context, "toStatus", SurveyStatus.Published.ToString());
             return Results.Ok(new { status = SurveyStatus.Published.ToString() });
         })
-            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
+            .AllowAutomation(AdminPermissions.SurveysPublish);
 
         // ---- 下書きへ戻す ----------------------------------------------------
         // **テスト公開・本公開・停止中のどれからでも戻せる**（Issue #542）。
@@ -1534,7 +1562,8 @@ public static class AdminSurveyEndpoints
             CancellationToken cancellationToken) =>
             ChangeStatusAsync(
                 surveyId, SurveyStatus.Suspended, context, surveys, tokens, cancellationToken))
-            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
+            .AllowAutomation(AdminPermissions.SurveysPublish);
 
         group.MapPost("/{surveyId:guid}/resume", (
             Guid surveyId,
@@ -1544,7 +1573,8 @@ public static class AdminSurveyEndpoints
             CancellationToken cancellationToken) =>
             ChangeStatusAsync(
                 surveyId, SurveyStatus.Published, context, surveys, tokens, cancellationToken))
-            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
+            .AllowAutomation(AdminPermissions.SurveysPublish);
 
         // ---- アーカイブと復元 ------------------------------------------------
         group.MapPost("/{surveyId:guid}/archive", (

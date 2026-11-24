@@ -1,6 +1,8 @@
 using System.Threading.RateLimiting;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -519,11 +521,15 @@ builder.Services.AddSingleton<AdminUserService>();
 
 // **管理 API の個人トークン（API キー）**（Issue #1025。親 #1012）。
 // 表は本アプリの Data（AdminApiTokens。M0042）。**機能は既定で無効**（QUESTIONNAIRE_ADMIN_API_TOKENS）。
-// ⚠️ **Bearer の認証スキームはまだ無い**（#1026）。ここで作るのは、発行・一覧・失効と、
-// 値の検証（AdminApiTokenService.ValidateAsync）だけ
+// 値の検証（AdminApiTokenService.ValidateAsync）を Bearer の認証スキーム（Admin.ApiToken。#1026）が呼ぶ
 builder.Services.AddSingleton(AdminApiTokenOptions.FromConfiguration(builder.Configuration));
 builder.Services.AddSingleton<IAdminApiTokenStore, AdminApiTokenStore>();
 builder.Services.AddSingleton<AdminApiTokenService>();
+// 枠（認証の失敗は IP ごとの別枠・トークン単位の枠。#1027）と、トークンの出来事の監査（認証の失敗・403・枠の超過）
+builder.Services.AddSingleton(serviceProvider => new AdminApiTokenRateGate(
+    serviceProvider.GetService<ISharedRateLimitStore>(),
+    serviceProvider.GetRequiredService<ILogger<AdminApiTokenRateGate>>()));
+builder.Services.AddSingleton<AdminApiTokenAuditor>();
 
 // SAML の管理者が API キーを発行する前の強制再認証（ForceAuthn。Issue #1034）。
 // 途中の状態と発行 1 回分の許可は、使い捨ての置き場に預ける。複数のプロセスでは共有状態の Redis を使う
@@ -570,7 +576,14 @@ builder.Services.AddSingleton(serviceProvider => new SubmissionGuard(
 // **既定は厳しく。** 緩めるのは検証環境だけにすること。
 // 端から端まで通す試験は 1 つの IP から大量に叩くので、既定のままだと自分で枠を使い切る
 builder.Services
-    .AddAuthentication(AdminAuthSchemes.Session)
+    // ⚠️ **既定の認証スキームも Admin.Auto（Authorization: Bearer があれば Bearer、無ければ Session）。**
+    // Session のままだと、要求の先頭の認証が Bearer の要求でも cookie を読んでしまう（#1026）
+    .AddAuthentication(AdminAuthSchemes.Auto)
+    .AddPolicyScheme(AdminAuthSchemes.Auto, displayName: null, options =>
+        options.ForwardDefaultSelector = context => AdminApiTokenAuthentication.UsesBearer(context.Request)
+            ? AdminAuthSchemes.ApiToken
+            : AdminAuthSchemes.Session)
+    .AddScheme<AuthenticationSchemeOptions, AdminApiTokenAuthenticationHandler>(AdminAuthSchemes.ApiToken, null)
     .AddCookie(AdminAuthSchemes.Session, options =>
     {
         AdminAuthSchemes.Configure(options, "q.admin", AdminAuthSchemes.SessionLifetime);
@@ -591,18 +604,24 @@ builder.Services.Configure<CookieAuthenticationOptions>(
     AdminAuthSchemes.Reenroll,
     options => options.Events.OnValidatePrincipal = AdminSessionGuard.ValidateReenrollAsync);
 
+// **認可の要求は 1 種類。** セッションは役割の権限、トークンは口の許可宣言＋実効の権限で判定する
+// （AdminPermissionAuthorizationHandler）。**全ポリシーが Admin.Auto を見る**ので、Bearer がある要求は
+// どのポリシーでも cookie を評価しない。群のポリシーへ Bearer を足す形にはしない（#1026）
+builder.Services.AddSingleton<IAuthorizationHandler, AdminPermissionAuthorizationHandler>();
 builder.Services.AddAuthorization(options =>
 {
     // **ログイン済み（2 要素まで通った状態）だけを通す。**
-    // 途中状態の cookie では何も操作させない
+    // 途中状態の cookie では何も操作させない。**トークンは通さない**（Permission = null）
     options.AddPolicy(AdminAuthSchemes.SessionPolicy, policy => policy
-        .AddAuthenticationSchemes(AdminAuthSchemes.Session)
-        .RequireAuthenticatedUser());
-
-    // **他人に触れるのは特権管理者だけ**（_documents/非機能設計.md 1 章）
-    options.AddPolicy(AdminAuthSchemes.AdministratorPolicy, policy => policy
-        .AddAuthenticationSchemes(AdminAuthSchemes.Session)
+        .AddAuthenticationSchemes(AdminAuthSchemes.Auto)
         .RequireAuthenticatedUser()
+        .AddRequirements(new AdminPermissionRequirement(null)));
+
+    // **他人に触れるのは特権管理者だけ**（_documents/非機能設計.md 1 章）。トークンは通さない
+    options.AddPolicy(AdminAuthSchemes.AdministratorPolicy, policy => policy
+        .AddAuthenticationSchemes(AdminAuthSchemes.Auto)
+        .RequireAuthenticatedUser()
+        .AddRequirements(new AdminPermissionRequirement(null))
         .RequireRole(nameof(AdminRole.Administrator)));
 
     // **操作は権限で要求する**（Issue #160）。
@@ -612,10 +631,9 @@ builder.Services.AddAuthorization(options =>
     foreach (var permission in AdminPermissions.All)
     {
         options.AddPolicy(AdminPermissions.PolicyOf(permission), policy => policy
-            .AddAuthenticationSchemes(AdminAuthSchemes.Session)
+            .AddAuthenticationSchemes(AdminAuthSchemes.Auto)
             .RequireAuthenticatedUser()
-            .RequireAssertion(context =>
-                AdminPermissions.Has(context.User.FindFirstValue(ClaimTypes.Role), permission)));
+            .AddRequirements(new AdminPermissionRequirement(permission)));
     }
 });
 
@@ -1035,7 +1053,14 @@ app.UseMiddleware<AdminCsrfMiddleware>();
 
 app.UseRateLimiter();
 
+// **トークンの枠（Issue #1027）。順序は 全体の IP の枠（上） → 失敗の枠（認証の前に見る） → 認証 → トークンの枠（認証の後）**。
+// 失敗の枠を超えた IP の Bearer の要求は、DB を引く前に 429。cookie の要求は対象にしない
+app.UseMiddleware<AdminApiTokenFailureGateMiddleware>();
+
 app.UseAuthentication();
+
+// 認証の失敗を数えて監査へ残し、通ったトークンの枠を数える（DB へ書く前に 429）。認可の 403 も残す
+app.UseMiddleware<AdminApiTokenLimitMiddleware>();
 app.UseAuthorization();
 
 // 回答画面（TypeScript + Vite + Svelte のビルド成果物）。
@@ -1098,7 +1123,9 @@ if (openApiExposure.Enabled)
     app.MapScalarApiReference((options, context) =>
     {
         // CDN の既定フォントと利用状況テレメトリーを止め、画面から第三者へ要求を出さない。
-        options.DisableDefaultFonts().DisableTelemetry().DisableAgent().WithNonce(
+        // 「Try it」（Test Request）は出さない（Issue #1030。方針案 3.11 章）。
+        // ブラウザ上のスクリプトからトークンを送らせず、定義の閲覧だけにする
+        options.DisableDefaultFonts().DisableTelemetry().DisableAgent().HideTestRequestButton().WithNonce(
             context.Items[SecurityHeadersMiddleware.ScalarCspNonceKey] as string
             ?? throw new InvalidOperationException("Scalar の CSP nonce を設定できなかった"));
     }).RequireAuthorization(AdminAuthSchemes.SessionPolicy);

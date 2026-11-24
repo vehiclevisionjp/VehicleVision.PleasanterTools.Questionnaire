@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Web;
 
@@ -14,6 +15,16 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web;
 /// **文書と画面は認証済みの管理者にだけ返す**（Program.cs の <c>MapOpenApi</c> /
 /// <c>MapScalarApiReference</c> に <c>SessionPolicy</c> を掛ける）。未認証には 401 を返し、API の一覧を出さない。
 /// </para>
+/// <para>
+/// **個人トークン（API キー）の記述は、口ごとの許可宣言（<c>AllowAutomation(scope)</c>）から生成する**
+/// （Issue #1030。親 #1012）。宣言のある口には、セッションと並べて Bearer の要求（スコープつき）を書く。
+/// **宣言の無い口は、セッションのままで、Bearer を書かない**（使えない口を、使えるように見せない）。
+/// 手書きの一覧は持たない。宣言を足せば文書に出る。食い違いは <c>AdminOpenApiTests</c> が拾う。
+/// </para>
+/// <para>
+/// 閲覧画面（Scalar）の「Try it」（Test Request）は出さない。ブラウザ上のスクリプトからトークンを
+/// 送らせないため（方針案 3.5 章・3.11 章）。
+/// </para>
 /// </remarks>
 public static class AdminOpenApi
 {
@@ -22,6 +33,9 @@ public static class AdminOpenApi
 
     /// <summary>現行のセッション方式の securityScheme の名前。</summary>
     public const string SessionSchemeName = "adminSession";
+
+    /// <summary>個人トークン（API キー）の securityScheme の名前。<c>Authorization: Bearer</c>。</summary>
+    public const string TokenSchemeName = "adminApiToken";
 
     /// <summary>セッション cookie の名前（Program.cs の <c>AddCookie</c> と同じ値）。</summary>
     public const string SessionCookieName = "q.admin";
@@ -42,7 +56,9 @@ public static class AdminOpenApi
             document.Info.Title = "アンケート 管理 API";
             document.Info.Description =
                 "管理画面が使う API。外部連携として互換性を約束するものではない。"
-                + "認証は管理者のセッション cookie。状態を変える要求は同一オリジンの画面から送ること（CSRF 対策）。";
+                + "認証は管理者のセッション cookie（adminSession）。状態を変える要求は同一オリジンの画面から送ること（CSRF 対策）。"
+                + "一部の口だけは、個人トークン（API キー。adminApiToken）を Authorization: Bearer で送っても呼べる。"
+                + "呼べる口と要るスコープは、各操作の security に書いてある。security にトークンが無い口は、トークンでは 403。";
 
             document.Components ??= new OpenApiComponents();
             document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
@@ -54,14 +70,21 @@ public static class AdminOpenApi
                 Description = "ログイン（2 要素まで完了）で発行されるセッション cookie。HttpOnly・SameSite=Strict。",
             };
 
-            // 追記の場所（Issue #1012 トークン認証。設計案は PR #1015。未実装なので定義しない）:
-            //   1. ここの SecuritySchemes へ、実装した方式のスキームを足す。
-            //      例: document.Components.SecuritySchemes["adminToken"] =
-            //              new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer" };
-            //   2. 下の操作ごとの変換で、認可の方針が受け付ける方式に合わせて
-            //      operation.Security へ要求を足す。要求を複数並べると「いずれか」（OR）になる。
-            //   3. 受け付ける方式は、認可の方針（Program.cs の AddAuthorization）と一致させる。
-            //      食い違いは AdminOpenApiDriftTests が拾う。
+            document.Components.SecuritySchemes[TokenSchemeName] = new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "opaque",
+                Description =
+                    "個人トークン（API キー）。管理画面の「自分のアカウント」で発行し、Authorization: Bearer で送る"
+                    + "（形式は qat_ で始まる文字列）。URL・クエリ・本文・cookie では受けない。"
+                    + "Bearer を付けた要求は cookie を評価しない。"
+                    + "スコープは " + string.Join("・", AdminApiTokenScopes.Allowed)
+                    + "。実効の権限は「持ち主の今の役割」と「スコープ」の共通部分。"
+                    + "キーの発行・失効はセッションだけ（キーではできない）。"
+                    + "ブラウザ上のスクリプトでは使わず、curl・CI・サーバ側のスクリプトから使うこと。",
+            };
+
             return Task.CompletedTask;
         });
 
@@ -81,9 +104,43 @@ public static class AdminOpenApi
             {
                 [new OpenApiSecuritySchemeReference(SessionSchemeName, context.Document)] = [],
             });
+
+            // **トークンを書くのは、口が許可を宣言しているときだけ**（`AllowAutomation`）。要求を並べると「いずれか」（OR）。
+            // スコープは宣言の値をそのまま使う（認可の判定が見るのと同じ値）
+            var access = metadata.OfType<AutomationAccessMetadata>().FirstOrDefault();
+            if (access is not null)
+            {
+                operation.Security.Add(new OpenApiSecurityRequirement
+                {
+                    [new OpenApiSecuritySchemeReference(TokenSchemeName, context.Document)] = [access.Scope],
+                });
+
+                var note = "個人トークン（API キー）でも呼べる。要るスコープ: " + access.Scope + "。"
+                    + (metadata.OfType<AuditAutomationReadMetadata>().Any()
+                        ? "トークンでの読み取りは操作の記録へ残る。"
+                        : string.Empty);
+                operation.Description = string.IsNullOrEmpty(operation.Description)
+                    ? note
+                    : operation.Description + Environment.NewLine + Environment.NewLine + note;
+            }
+
             operation.Responses ??= [];
-            operation.Responses.TryAdd("401", new OpenApiResponse { Description = "未ログイン、またはセッションの期限切れ" });
-            operation.Responses.TryAdd("403", new OpenApiResponse { Description = "権限が足りない" });
+            operation.Responses.TryAdd(
+                "401",
+                new OpenApiResponse
+                {
+                    Description = access is null
+                        ? "未ログイン、またはセッションの期限切れ"
+                        : "未ログイン、またはセッションの期限切れ。トークンの場合は、無効・期限切れ・失効・接続元の不許可（理由は区別しない）",
+                });
+            operation.Responses.TryAdd(
+                "403",
+                new OpenApiResponse
+                {
+                    Description = access is null
+                        ? "権限が足りない"
+                        : "権限が足りない（トークンのスコープ不足、持ち主の役割の権限不足を含む）",
+                });
             return Task.CompletedTask;
         });
     }

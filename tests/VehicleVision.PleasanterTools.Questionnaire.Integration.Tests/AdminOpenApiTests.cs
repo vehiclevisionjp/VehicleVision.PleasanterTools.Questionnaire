@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Patterns;
 using VehicleVision.PleasanterTools.Questionnaire.Web;
+using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
@@ -111,6 +112,117 @@ public sealed class AdminOpenApiTests
         {
             Assert.True(secured == documented[operation], $"認可の有無が文書と食い違う: {operation}");
         }
+    }
+
+    [Fact]
+    public async Task 個人トークンのスキームは_httpのbearerで_cookieのスキームを壊さない()
+    {
+        await using var host = await AdminContractHost.StartAsync(settings: Enabled);
+        using var client = await SignedInAsync(host);
+        using var document = await ReadDocumentAsync(client);
+
+        var schemes = document.RootElement.GetProperty("components").GetProperty("securitySchemes");
+        var token = schemes.GetProperty(AdminOpenApi.TokenSchemeName);
+        Assert.Equal("http", token.GetProperty("type").GetString());
+        Assert.Equal("bearer", token.GetProperty("scheme").GetString());
+        // 値の例は書かない（秘密スキャンの誤検知と、漏えいの見本を避ける）
+        Assert.DoesNotMatch(@"qat_[0-9a-f]{8}_", token.GetProperty("description").GetString()!);
+
+        var session = schemes.GetProperty(AdminOpenApi.SessionSchemeName);
+        Assert.Equal("apiKey", session.GetProperty("type").GetString());
+        Assert.Equal("cookie", session.GetProperty("in").GetString());
+    }
+
+    /// <summary>
+    /// 許可宣言（<c>AllowAutomation</c>）と文書の食い違いを拾う（Issue #1030）。
+    /// 宣言のある口だけにトークンの security が付き、スコープが宣言と一致する。宣言の無い口にはセッションだけ。
+    /// </summary>
+    [Fact]
+    public async Task 文書のトークンの要求は_許可宣言と一致する()
+    {
+        await using var host = await AdminContractHost.StartAsync(settings: Enabled);
+        using var client = await SignedInAsync(host);
+        using var document = await ReadDocumentAsync(client);
+
+        var documented = new Dictionary<string, (bool Session, List<string>? TokenScopes)>(StringComparer.Ordinal);
+        foreach (var path in document.RootElement.GetProperty("paths").EnumerateObject())
+        {
+            foreach (var operation in path.Value.EnumerateObject())
+            {
+                var session = false;
+                List<string>? token = null;
+                if (operation.Value.TryGetProperty("security", out var security))
+                {
+                    foreach (var requirement in security.EnumerateArray())
+                    {
+                        foreach (var scheme in requirement.EnumerateObject())
+                        {
+                            var scopes = scheme.Value.EnumerateArray().Select(v => v.GetString()!).ToList();
+                            if (scheme.Name == AdminOpenApi.SessionSchemeName)
+                            {
+                                session = true;
+                                Assert.Empty(scopes);
+                            }
+                            else if (scheme.Name == AdminOpenApi.TokenSchemeName)
+                            {
+                                Assert.Null(token);
+                                token = scopes;
+                            }
+                            else
+                            {
+                                Assert.Fail($"未知のスキーム: {scheme.Name}");
+                            }
+                        }
+                    }
+                }
+
+                documented.Add($"{operation.Name.ToUpperInvariant()} {path.Name.TrimEnd('/')}", (session, token));
+            }
+        }
+
+        var declared = 0;
+        var endpoints = host.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.RoutePattern.RawText is { } raw
+                && raw.TrimStart('/').StartsWith(AdminOpenApi.PathPrefix, StringComparison.Ordinal)
+                && endpoint.Metadata.GetMetadata<IExcludeFromDescriptionMetadata>() is not { ExcludeFromDescription: true });
+        foreach (var endpoint in endpoints)
+        {
+            var access = endpoint.Metadata.GetMetadata<AutomationAccessMetadata>();
+            foreach (var method in endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? [])
+            {
+                var key = $"{method.ToUpperInvariant()} {NormalizedPath(endpoint.RoutePattern)}";
+                var actual = documented[key];
+                if (access is null)
+                {
+                    Assert.True(actual.TokenScopes is null, $"宣言が無いのにトークンが書かれている: {key}");
+                }
+                else
+                {
+                    declared++;
+                    Assert.True(actual.Session, $"セッションの要求が無い: {key}");
+                    Assert.True(
+                        actual.TokenScopes is { Count: 1 } scopes && scopes[0] == access.Scope,
+                        $"スコープが宣言（{access.Scope}）と一致しない: {key}");
+                    Assert.True(AdminApiTokenScopes.IsAllowed(access.Scope), $"許可リスト外のスコープ: {key}");
+                }
+            }
+        }
+
+        // 宣言が 1 つも無い（＝検査が空振り）状態を許さない
+        Assert.True(declared > 0);
+        Assert.Equal(declared, documented.Values.Count(value => value.TokenScopes is not null));
+    }
+
+    [Fact]
+    public async Task 閲覧画面はTry_itを出さない()
+    {
+        await using var host = await AdminContractHost.StartAsync(settings: Enabled);
+        using var client = await SignedInAsync(host);
+
+        using var page = await client.GetAsync("/scalar/");
+        var html = await page.Content.ReadAsStringAsync();
+        Assert.Matches(@"hideTestRequestButton&quot;:\s*true|""hideTestRequestButton"":\s*true", html);
     }
 
     private static async Task<HttpClient> SignedInAsync(AdminContractHost host)

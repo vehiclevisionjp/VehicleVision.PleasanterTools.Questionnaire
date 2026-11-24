@@ -387,4 +387,118 @@ public class AuditLogFilterTests
         var entry = Assert.Single(store.Written);
         Assert.DoesNotContain("秘密", entry.DetailJson ?? string.Empty, StringComparison.Ordinal);
     }
+    // ---- 操作の主体の種別（Issue #1027） ----------------------------------------------------------
+
+    private static void AsApiToken(DefaultHttpContext context, Guid owner, Guid tokenId, string prefix)
+    {
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, owner.ToString()),
+                new Claim(ClaimTypes.Name, "owner@example.test"),
+                new Claim(AdminApiTokenAuthentication.AuthKindClaim, AdminApiTokenAuthentication.AuthKindApiToken),
+                new Claim(AdminApiTokenAuthentication.TokenIdClaim, tokenId.ToString()),
+                new Claim(AdminApiTokenAuthentication.TokenPrefixClaim, prefix),
+            ],
+            "Admin.ApiToken"));
+    }
+
+    [Fact]
+    public async Task 人の操作には_主体の種別_humanを残す()
+    {
+        var store = await RunAsync(
+            Request("PUT", "/api/admin/surveys/{surveyId}", Guid.NewGuid(), [("surveyId", "abc")]),
+            Results.Ok());
+
+        var detail = JsonSerializer.Deserialize<Dictionary<string, string>>(Assert.Single(store.Written).DetailJson!)!;
+        Assert.Equal("human", detail["actorKind"]);
+        Assert.DoesNotContain("tokenId", detail.Keys);
+    }
+
+    [Fact]
+    public async Task トークンの書き込みには_主体の種別とトークンの識別を残し_値は残さない()
+    {
+        var owner = Guid.NewGuid();
+        var tokenId = Guid.NewGuid();
+        var context = Request("PUT", "/api/admin/surveys/{surveyId}", routeValues: [("surveyId", "abc")]);
+        AsApiToken(context, owner, tokenId, "qat_0123abcd");
+        context.Request.Headers.Authorization = "Bearer qat_0123abcd_do-not-record-this-secret";
+
+        var store = await RunAsync(context, Results.Ok());
+
+        var entry = Assert.Single(store.Written);
+        Assert.Equal(owner.ToString("D"), entry.ActorKey);
+        var detail = JsonSerializer.Deserialize<Dictionary<string, string>>(entry.DetailJson!)!;
+        Assert.Equal("api-token", detail["actorKind"]);
+        Assert.Equal(tokenId.ToString(), detail["tokenId"]);
+        Assert.Equal("qat_0123abcd", detail["tokenPrefix"]);
+        Assert.DoesNotContain("do-not-record-this-secret", entry.DetailJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Bearer", entry.DetailJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 認証を通っていない試みには_主体の種別を付けない()
+    {
+        var store = await RunAsync(
+            Request("POST", "/api/admin/login", routeValues: [("x", "y")]),
+            Results.Unauthorized());
+
+        var detail = JsonSerializer.Deserialize<Dictionary<string, string>>(Assert.Single(store.Written).DetailJson!)!;
+        Assert.DoesNotContain("actorKind", detail.Keys);
+    }
+
+    [Fact]
+    public async Task 口が預けた補足より_主体の種別を優先する()
+    {
+        var context = Request("POST", "/api/admin/x", Guid.NewGuid());
+        AuditNotes.Add(context, "actorKind", "api-token");
+
+        var store = await RunAsync(context, Results.Ok());
+
+        var detail = JsonSerializer.Deserialize<Dictionary<string, string>>(Assert.Single(store.Written).DetailJson!)!;
+        Assert.Equal("human", detail["actorKind"]);
+    }
+
+    private static DefaultHttpContext ExportRequest(bool withMetadata)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = "GET";
+        context.Request.Path = "/api/admin/surveys/abc/export";
+        var metadata = withMetadata
+            ? new EndpointMetadataCollection(new AuditAutomationReadMetadata())
+            : new EndpointMetadataCollection();
+        context.SetEndpoint(new RouteEndpoint(
+            _ => Task.CompletedTask,
+            RoutePatternFactory.Parse("/api/admin/surveys/{surveyId}/export"),
+            order: 0,
+            metadata,
+            displayName: null));
+        context.Request.RouteValues["surveyId"] = "abc";
+        return context;
+    }
+
+    [Fact]
+    public async Task トークンでの書き出しは読み取りでも残す()
+    {
+        var context = ExportRequest(withMetadata: true);
+        AsApiToken(context, Guid.NewGuid(), Guid.NewGuid(), "qat_0123abcd");
+
+        var store = await RunAsync(context, Results.Ok());
+
+        var entry = Assert.Single(store.Written);
+        Assert.Equal("GET /api/admin/surveys/{surveyId}/export", entry.Action);
+        Assert.Equal("Survey", entry.TargetType);
+        Assert.Contains("\"actorKind\":\"api-token\"", entry.DetailJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 人の画面の書き出しと_印の無いトークンの読み取りは残さない()
+    {
+        var human = ExportRequest(withMetadata: true);
+        human.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())], "Test"));
+        var plainRead = ExportRequest(withMetadata: false);
+        AsApiToken(plainRead, Guid.NewGuid(), Guid.NewGuid(), "qat_0123abcd");
+
+        Assert.Empty((await RunAsync(human, Results.Ok())).Written);
+        Assert.Empty((await RunAsync(plainRead, Results.Ok())).Written);
+    }
 }

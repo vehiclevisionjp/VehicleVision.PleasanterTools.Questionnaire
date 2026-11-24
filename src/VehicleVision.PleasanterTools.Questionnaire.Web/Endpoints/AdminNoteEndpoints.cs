@@ -45,8 +45,7 @@ public static class AdminNoteEndpoints
     {
         var group = builder.MapGroup("/api/admin/note")
             .WithTags("管理 API")
-            .RequireAuthorization(policy => policy.AddAuthenticationSchemes(AdminAuthSchemes.Session)
-                .RequireAuthenticatedUser());
+            .RequireAuthorization(AdminAuthSchemes.SessionPolicy);
 
         group.MapPost("/preview", (NotePreviewRequest request) =>
         {
