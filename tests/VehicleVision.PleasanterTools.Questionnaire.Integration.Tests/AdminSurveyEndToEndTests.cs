@@ -169,6 +169,21 @@ public class AdminSurveyEndToEndTests
         return (await ReadAsync(created))!["surveyId"]!.GetValue<string>();
     }
 
+    /// <summary>
+    /// 回答先の割り当てを持つ、公開できる下書きを保存する（Issue #1061）。
+    /// 作りたての下書きは割り当てが空で、公開の検査（PublishInspector）に断られる。
+    /// </summary>
+    private static async Task SaveValidDraftAsync(HttpClient http, string surveyId)
+    {
+        using var save = await http.PutAsJsonAsync(
+            $"/api/admin/surveys/{surveyId}",
+            DraftBody(
+                surveyId,
+                await CurrentRevisionAsync(http, surveyId),
+                withMapping: true));
+        save.EnsureSuccessStatusCode();
+    }
+
     /// <summary>保存に使う、その時点の下書きの版を読む。</summary>
     private static async Task<int> CurrentRevisionAsync(HttpClient http, string surveyId)
     {
@@ -683,6 +698,7 @@ public class AdminSurveyEndToEndTests
         // Issue #1057。保存のたびに版 +1。URL で見える内容＝最後に保存した内容
         using var http = await SignInAsync();
         var surveyId = await CreateSurveyAsync(http);
+        await SaveValidDraftAsync(http, surveyId);
 
         using (var first = await http.PostAsJsonAsync(
             $"/api/admin/surveys/{surveyId}/test-publish", new { }))
@@ -784,6 +800,7 @@ public class AdminSurveyEndToEndTests
         // Issue #1057。**公開は下書き→本公開の 2 ステップ。** テスト公開は経由しなくてよい
         using var http = await SignInAsync();
         var surveyId = await CreateSurveyAsync(http);
+        await SaveValidDraftAsync(http, surveyId);
 
         using (var published = await http.PostAsJsonAsync(
             $"/api/admin/surveys/{surveyId}/publish", new { }))
@@ -836,6 +853,7 @@ public class AdminSurveyEndToEndTests
 
         using var http = await SignInAsync();
         var surveyId = await CreateSurveyAsync(http);
+        await SaveValidDraftAsync(http, surveyId);
 
         using (var tested = await http.PostAsJsonAsync(
             $"/api/admin/surveys/{surveyId}/test-publish", new { }))
