@@ -12,6 +12,7 @@
     listSurveys,
     publish,
     revertToDraft,
+    testPublish,
     resume,
     restoreSurvey,
     saveAsTemplate,
@@ -28,7 +29,8 @@
   } from '../lib/types';
   import { formatDateTime, t } from '../lib/i18n/state.svelte';
   import { canConfirmSurveyDeletion, deletionResponseCount } from '../lib/surveyDeletion';
-  import { confirmAction } from '../lib/confirmation.svelte';
+  import { confirmAction, confirmActionWithChoice } from '../lib/confirmation.svelte';
+  import { canPublish, isTestPublishChecked, showsTestPublishCheck } from '../lib/publishFlow';
   import TemplatePanel from './TemplatePanel.svelte';
 
   interface Props {
@@ -353,12 +355,9 @@
     await reload(offset, titleFilter, statusFilter, includeArchived);
   }
 
-  async function changePublication(survey: SurveySummary, publishNow: boolean) {
-    // **本公開中・停止中から戻すと回答画面が閉じる**（Issue #542）。確認を挟む。
-    // テスト公開からの戻しは、もともと本番の回答を受けていないので挟まない
+  /** 本公開中・停止中を下書きへ戻す。**回答画面が閉じる**（Issue #542）ので確認を挟む。 */
+  async function revertLive(survey: SurveySummary) {
     if (
-      !publishNow &&
-      (survey.status === 1 || survey.status === 2) &&
       !(await confirmAction({
         title: t('list.revertToDraft'),
         message: t('list.revertLiveConfirm', { title: survey.title }),
@@ -369,11 +368,56 @@
       return;
     }
 
-    const result = publishNow
-      ? await publish(survey.surveyId)
+    const result = await revertToDraft(survey.surveyId);
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    await reload(offset, titleFilter, statusFilter, includeArchived);
+  }
+
+  /**
+   * 本公開する（Issue #1057）。**下書きからも、テスト公開中からも押せる。**
+   * 下書きに版へ入っていない変更があるテスト公開中は、「下書きを反映して本公開」を選べる（既定は反映する）。
+   */
+  async function publishLive(survey: SurveySummary) {
+    const diverged = survey.status === 3 && survey.hasUnpublishedChanges === true;
+    const choice = await confirmActionWithChoice({
+      title: t('publishFlow.confirmTitle'),
+      message: diverged
+        ? `${t('publishFlow.confirmTest')} ${t('publishFlow.confirmDiverged')}`
+        : survey.status === 3
+          ? t('publishFlow.confirmTest')
+          : t('publishFlow.confirmDraft'),
+      confirmLabel: t('publishFlow.publish'),
+      checkbox: diverged ? { label: t('publishFlow.reflect'), checked: true } : undefined,
+    });
+    if (!choice.confirmed) {
+      return;
+    }
+
+    const result = await publish(survey.surveyId, diverged && choice.checked);
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    await reload(offset, titleFilter, statusFilter, includeArchived);
+  }
+
+  /**
+   * テスト公開のチェック（Issue #1057）。ON は下書きをテスト公開し（公開 URL が付く）、OFF は下書きへ戻す。
+   * 断られたら、チェックを元へ戻す（状態が変わらないため）。
+   */
+  async function toggleTestPublish(survey: SurveySummary, checked: boolean, box: HTMLInputElement) {
+    error = '';
+    const result = checked
+      ? await testPublish(survey.surveyId)
       : await revertToDraft(survey.surveyId);
     if (!result.ok) {
       error = result.message;
+      box.checked = isTestPublishChecked(survey.status);
       return;
     }
 
@@ -911,20 +955,27 @@
           <td class="muted compact-column">{formatDate(survey.updatedAt)}</td>
           <td class="row-actions">
             <div class="row-actions-inner">
+            {#if survey.archivedAt == null && canPublish(survey.status)}
+              <!-- **本公開が主操作。** 下書きからも、テスト公開中からも押せる（Issue #1057） -->
+              <button type="button" onclick={() => publishLive(survey)}>
+                {t('publishFlow.publish')}
+              </button>
+            {/if}
+            {#if survey.archivedAt == null && showsTestPublishCheck(survey.status)}
+              <label class="test-publish-check" title={t('publishFlow.testCheckHint')}>
+                <input
+                  type="checkbox"
+                  checked={isTestPublishChecked(survey.status)}
+                  onchange={(event) => toggleTestPublish(survey, event.currentTarget.checked, event.currentTarget)}
+                />
+                <span>{t('publishFlow.testCheck')}</span>
+              </label>
+            {/if}
             {#if survey.archivedAt == null && (survey.status === 1 || survey.status === 2)}
               <button type="button" class="secondary" onclick={() => toggle(survey)}>
                 {survey.status === 1 ? t('list.suspend') : t('list.resume')}
               </button>
-              <button type="button" class="secondary" onclick={() => changePublication(survey, false)}>
-                {t('list.revertToDraft')}
-              </button>
-              <!-- **公開していないものには出さない。** 出しても読めない URL になる -->
-            {/if}
-            {#if survey.archivedAt == null && survey.status === 3}
-              <button type="button" onclick={() => changePublication(survey, true)}>
-                {t('list.publish')}
-              </button>
-              <button type="button" class="secondary" onclick={() => changePublication(survey, false)}>
+              <button type="button" class="secondary" onclick={() => revertLive(survey)}>
                 {t('list.revertToDraft')}
               </button>
             {/if}
@@ -1136,6 +1187,15 @@
     ⚠️ **nowrap にしないこと。** 「テンプレートに保存」のような長い札が
     枠からはみ出して切れる。**折り返せば、はみ出しようがない**
   */
+  .test-publish-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    margin: 0;
+    font-size: 0.78rem;
+  }
+
   .row-actions-inner button {
     padding: var(--space-1) 0.4rem;
     font-size: 0.78rem;
