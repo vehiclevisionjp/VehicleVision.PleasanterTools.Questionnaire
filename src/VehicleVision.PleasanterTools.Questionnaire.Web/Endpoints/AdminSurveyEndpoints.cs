@@ -329,7 +329,9 @@ public static class AdminSurveyEndpoints
                 fileDownloadName: $"survey-{surveyId:N}.json");
         })
             // **トークンでの書き出しは監査へ残す**（定義の一括持ち出し。#1027）。人の画面の読み取りは残さない
-            .AuditAutomationReads();
+            .AuditAutomationReads()
+            // **閲覧と同じ `surveys.read` でトークンを許す**（スコープは新設しない。#1029）
+            .AllowAutomation(AdminPermissions.SurveysRead);
 
         // ---- 取り込み（公開と同じ権限） --------------------------------------
         // **新しいアンケートの下書きとして作る。** 複製と同じく、書き込み先のサイトを
@@ -369,10 +371,15 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            // **ルックアップの設定を持ち込めるのはアンケート管理者だけ**（保存と同じ。Issue #879）
+            // **ルックアップの設定を持ち込めるのはアンケート管理者だけ**（保存と同じ。Issue #879）。
+            // **トークンでは持ち込めない**（`lookups.manage` はスコープに付けられない。#1029）。
+            // 無視して取り込まず、403 で断る（黙って落とすと、設定が入ったつもりになる）。
+            // トークンの principal は役割の claim を持たないので役割の判定でも落ちるが、
+            // 役割の持たせ方が変わっても開かないよう、トークンかどうかを明示して見る
             if (!definition.GetLookups().IsEmpty
-                && !AdminPermissions.Has(
-                    context.User.FindFirstValue(ClaimTypes.Role), AdminPermissions.LookupsManage))
+                && (AdminApiTokenAuthentication.IsApiToken(context.User)
+                    || !AdminPermissions.Has(
+                        context.User.FindFirstValue(ClaimTypes.Role), AdminPermissions.LookupsManage)))
             {
                 return Results.Json(
                     new
@@ -467,6 +474,9 @@ public static class AdminSurveyEndpoints
                 new { surveyId, record.PublicId, problems = report });
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
+            // **取り込みが今要る権限（公開相当 `surveys.publish`）と同じスコープでトークンを許す**（#1029）。
+            // ⚠️ 宣言は口の権限（RequireAuthorization）と同じにする。ずらすと、別のスコープのトークンが通ってしまう
+            .AllowAutomation(AdminPermissions.SurveysPublish)
             .AddEndpointFilter(async (filterContext, next) =>
             {
                 // **大きさを入口で絞る。** 既定の上限のまま JSON を読み切らない

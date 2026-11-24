@@ -172,9 +172,11 @@ public class EndpointGraphTests
             {
                 "GET /api/admin/surveys/ [surveys.read]",
                 "GET /api/admin/surveys/{surveyId:guid} [surveys.read]",
+                "GET /api/admin/surveys/{surveyId:guid}/export [surveys.read]",
                 "GET /api/admin/surveys/{surveyId:guid}/problems [surveys.read]",
                 "GET /api/admin/surveys/{surveyId:guid}/versions [surveys.read]",
                 "GET /api/admin/surveys/{surveyId:guid}/versions/{version:int} [surveys.read]",
+                "POST /api/admin/surveys/import [surveys.publish]",
                 "POST /api/admin/surveys/{surveyId:guid}/publish [surveys.publish]",
                 "POST /api/admin/surveys/{surveyId:guid}/resume [surveys.publish]",
                 "POST /api/admin/surveys/{surveyId:guid}/suspend [surveys.publish]",
