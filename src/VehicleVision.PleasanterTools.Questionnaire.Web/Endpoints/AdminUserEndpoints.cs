@@ -51,9 +51,30 @@ public static class AdminUserEndpoints
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersRead));
 
         // ---- 一覧 ------------------------------------------------------------
-        users.MapGet("", async (AdminUserService service, CancellationToken cancellationToken) =>
+        users.MapGet("", async (
+            AdminUserService service,
+            IAdminPasskeyStore passkeys,
+            AdminPasskeyOptions passkeyOptions,
+            ClaimsPrincipal principal,
+            CancellationToken cancellationToken) =>
         {
             var list = await service.ListAsync(cancellationToken).ConfigureAwait(false);
+
+            // **パスキーの件数は、復旧の権限（`users.resetPasskeys`）を持つ相手にだけ返す**（Issue #1087）。
+            // 復旧の確認ダイアログに「何件消すか」を出すために要る。Core の仕様書 3.10.6 は
+            // 「本人以外には存在も知らせない」としているので、**名前・資格情報 ID は返さず、件数だけ**にする。
+            // パスキーが無効のときは返さない（無効の間の口は 404 で、復旧もできない）
+            var counts = new Dictionary<Guid, int>();
+            if (passkeyOptions.Enabled
+                && AdminPermissions.Has(principal.FindFirstValue(ClaimTypes.Role), AdminPermissions.UsersResetPasskeys))
+            {
+                foreach (var user in list)
+                {
+                    counts[user.AdminUserId] = await passkeys
+                        .CountForUserAsync(user.AdminUserId, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
             return Results.Ok(new
             {
                 users = list.Select(user => new
@@ -63,6 +84,8 @@ public static class AdminUserEndpoints
                     role = user.Role,
                     isDisabled = user.IsDisabled,
                     hasTotp = user.HasTotp,
+                    // 件数を返さないときは null（JSON から省かれる）
+                    passkeyCount = counts.TryGetValue(user.AdminUserId, out var count) ? count : (int?)null,
                     // まだ招待を受け取っていない（＝一度も入っていない）
                     invitationPending = user.InvitationPending,
                     // **止め忘れを見つける唯一の手掛かり**
