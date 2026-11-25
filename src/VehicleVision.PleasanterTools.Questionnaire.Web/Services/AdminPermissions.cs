@@ -80,6 +80,14 @@ public static class AdminPermissions
     /// </remarks>
     public const string UsersResetTwoFactor = "users.resetTwoFactor";
 
+    /// <summary>他人のパスキーの削除（復旧。Issue #1082。Core の仕様書 3.10.11）。</summary>
+    /// <remarks>
+    /// **2 要素の解除（<see cref="UsersResetTwoFactor"/>）とは分けて持つ。** 流用すると、2 要素の解除を任された相手が
+    /// 自動でパスキーも消せてしまう。名前は Core の <c>users.resetPasskeys</c> と同じ。
+    /// 対象者の全セッションを失効させ、監査ログへ <c>Passkey.Removed</c> を残す。
+    /// </remarks>
+    public const string UsersResetPasskeys = AdminPasskeyEndpoints.ResetPermission;
+
     /// <summary>SAML の設定の閲覧・変更。</summary>
     /// <remarks>認証の入口を変えるため、特権管理者だけに持たせる。</remarks>
     public const string SamlSettings = "settings.saml";
@@ -117,6 +125,7 @@ public static class AdminPermissions
         UsersRead,
         UsersWrite,
         UsersResetTwoFactor,
+        UsersResetPasskeys,
         SamlSettings,
         PleasanterSsoSettings,
         SettingsManage,
@@ -155,6 +164,7 @@ public static class AdminPermissions
                 UsersRead,
                 UsersWrite,
                 UsersResetTwoFactor,
+                UsersResetPasskeys,
                 AuditRead,
             }.ToFrozenSet(StringComparer.Ordinal),
 

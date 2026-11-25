@@ -173,6 +173,7 @@ public static class AdminSessionEndpoints
         SessionVia.Password => "Password",
         SessionVia.Saml => "Saml",
         SessionVia.Pleasanter => "PleasanterSso",
+        SessionVia.Passkey => "Passkey",
         _ => null,
     };
 
