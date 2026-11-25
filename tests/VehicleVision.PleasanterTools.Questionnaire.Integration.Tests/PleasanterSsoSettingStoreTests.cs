@@ -63,7 +63,6 @@ public class PleasanterSsoSettingStoreTests
             RegisterRole = "Editor",
             RevalidateMinutes = "5",
             TimeoutSeconds = "10",
-            ButtonLabel = "社内ポータルでログイン",
         };
 
         try

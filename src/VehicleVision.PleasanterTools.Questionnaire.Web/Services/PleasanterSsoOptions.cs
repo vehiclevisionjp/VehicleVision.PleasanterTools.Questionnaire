@@ -18,7 +18,6 @@ public sealed class PleasanterSsoOptions : IPleasanterSsoVerificationOptions
     public const string RegisterRoleKey = "QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE";
     public const string RevalidateMinutesKey = "QUESTIONNAIRE_PLEASANTERSSO_REVALIDATEMINUTES";
     public const string TimeoutSecondsKey = "QUESTIONNAIRE_PLEASANTERSSO_TIMEOUTSECONDS";
-    public const string ButtonLabelKey = "QUESTIONNAIRE_PLEASANTERSSO_BUTTONLABEL";
     public const string OwnCookiePrefix = "q.";
 
     public const string DefaultCookieNames = CoreOptions.DefaultCookieNames;
@@ -43,7 +42,6 @@ public sealed class PleasanterSsoOptions : IPleasanterSsoVerificationOptions
     public AdminRole RegisterRole { get; init; } = AdminRole.Editor;
     public TimeSpan RevalidateInterval { get; init; } = TimeSpan.FromMinutes(DefaultRevalidateMinutes);
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(DefaultTimeoutSeconds);
-    public string ButtonLabel { get; init; } = string.Empty;
 
     public static PleasanterSsoOptions FromValues(Func<string, string?> valueOf)
     {
@@ -68,7 +66,6 @@ public sealed class PleasanterSsoOptions : IPleasanterSsoVerificationOptions
             RegisterRole = Enum.Parse<AdminRole>(options.RegisterRole),
             RevalidateInterval = options.RevalidateInterval,
             Timeout = options.Timeout,
-            ButtonLabel = options.ButtonLabel,
         };
     }
 

@@ -298,7 +298,6 @@ public static class AdminPleasanterSsoEndpoints
             old.RevalidateMinutes,
             next.RevalidateMinutes);
         Add("timeoutSeconds", PleasanterSsoOptions.TimeoutSecondsKey, old.TimeoutSeconds, next.TimeoutSeconds);
-        Add("buttonLabel", PleasanterSsoOptions.ButtonLabelKey, old.ButtonLabel, next.ButtonLabel);
 
         return changed;
     }
@@ -321,7 +320,6 @@ public static class AdminPleasanterSsoEndpoints
             registerRole = values.RegisterRole,
             revalidateMinutes = values.RevalidateMinutes,
             timeoutSeconds = values.TimeoutSeconds,
-            buttonLabel = values.ButtonLabel,
             fixedFields = new
             {
                 enabled = Fixed(PleasanterSsoOptions.EnabledKey),
@@ -335,7 +333,6 @@ public static class AdminPleasanterSsoEndpoints
                 registerRole = Fixed(PleasanterSsoOptions.RegisterRoleKey),
                 revalidateMinutes = Fixed(PleasanterSsoOptions.RevalidateMinutesKey),
                 timeoutSeconds = Fixed(PleasanterSsoOptions.TimeoutSecondsKey),
-                buttonLabel = Fixed(PleasanterSsoOptions.ButtonLabelKey),
             },
         };
     }
@@ -354,7 +351,6 @@ public static class AdminPleasanterSsoEndpoints
         string? RegisterRole,
         string? RevalidateMinutes,
         string? TimeoutSeconds,
-        string? ButtonLabel,
         string? AllowedDeptIds = null,
         string? AllowedGroupIds = null)
     {
@@ -371,7 +367,6 @@ public static class AdminPleasanterSsoEndpoints
             RegisterRole = RegisterRole,
             RevalidateMinutes = RevalidateMinutes,
             TimeoutSeconds = TimeoutSeconds,
-            ButtonLabel = ButtonLabel,
         };
     }
 }

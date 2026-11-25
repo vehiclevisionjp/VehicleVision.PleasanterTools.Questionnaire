@@ -218,7 +218,6 @@ public class PleasanterSsoOptionsProviderTests
             Enabled = "true",
             InternalBaseUrl = "http://db-pleasanter/",
             LoginUrl = "/users/login",
-            ButtonLabel = "DB の表示",
         });
         var provider = Create(
             new() { [PleasanterSsoOptions.InternalBaseUrlKey] = "http://env-pleasanter:8080/" },
@@ -228,9 +227,7 @@ public class PleasanterSsoOptionsProviderTests
 
         Assert.True(snapshot.Options.Enabled);
         Assert.Equal(new Uri("http://env-pleasanter:8080/"), snapshot.Options.InternalBaseUrl);
-        Assert.Equal("DB の表示", snapshot.Options.ButtonLabel);
         Assert.Contains(PleasanterSsoOptions.InternalBaseUrlKey, snapshot.FixedKeys);
-        Assert.DoesNotContain(PleasanterSsoOptions.ButtonLabelKey, snapshot.FixedKeys);
     }
 
     [Fact]
