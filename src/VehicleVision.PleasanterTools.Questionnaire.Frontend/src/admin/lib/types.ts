@@ -841,7 +841,6 @@ export interface SamlSettings {
   registerRole: string;
   loginIdSource: string;
   loginIdClaim: string;
-  buttonLabel: string;
   singleLogoutUrl: string;
   fixedFields: Record<SamlSettingField, boolean>;
 }
@@ -874,7 +873,6 @@ export interface PleasanterSsoSettings {
   registerRole: string;
   revalidateMinutes: string;
   timeoutSeconds: string;
-  buttonLabel: string;
   fixedFields: Record<PleasanterSsoSettingField, boolean>;
 }
 
@@ -889,8 +887,7 @@ export type PleasanterSsoSettingField =
   | 'unknownUser'
   | 'registerRole'
   | 'revalidateMinutes'
-  | 'timeoutSeconds'
-  | 'buttonLabel';
+  | 'timeoutSeconds';
 
 /** 設定画面の「接続の試験」の結果（Issue #464）。 */
 export interface PleasanterSsoTestResult {
@@ -915,7 +912,6 @@ export type SamlSettingField =
   | 'registerRole'
   | 'loginIdSource'
   | 'loginIdClaim'
-  | 'buttonLabel'
   | 'singleLogoutUrl';
 
 /**
@@ -998,14 +994,8 @@ export interface AdminSession {
    */
   apiTokensEnabled?: boolean;
 
-  /** SAML の釦に出す文字。`null` なら決まった文言を使う */
-  samlLabel?: string | null;
-
   /** Pleasanter のログインで入れるか（Issue #464）。**既定は無効** */
   pleasanterSsoEnabled?: boolean;
-
-  /** Pleasanter の釦に出す文字。`null` なら決まった文言を使う */
-  pleasanterSsoLabel?: string | null;
 
   /**
    * ブラウザで開く Pleasanter のログイン画面（Issue #464）。

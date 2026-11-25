@@ -428,7 +428,7 @@
     {#if samlError}<p class="error" role="alert">{samlError}</p>{/if}
 
     <button type="button" class="saml" onclick={startSaml}>
-      {session.samlLabel ?? t('signIn.samlButton')}
+      {t('signIn.samlButton')}
     </button>
   {/if}
 
@@ -453,7 +453,7 @@
       </button>
     {:else}
       <button type="button" class="saml" disabled={busy} onclick={startPleasanter}>
-        {session.pleasanterSsoLabel ?? t('signIn.pleasanterButton')}
+        {t('signIn.pleasanterButton')}
       </button>
     {/if}
   {/if}
