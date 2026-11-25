@@ -48,6 +48,7 @@ public static class AdminAuthEndpoints
             AdminPasswordSignInPolicy passwordSignIn,
             AdminAuthOptions options,
             AdminApiTokenOptions apiTokenOptions,
+            AdminPasskeyOptions passkeyOptions,
             BotMitigationOptionsProvider botOptionsProvider,
             IMailSettingsProvider mailSettings,
             ILoggerFactory loggerFactory,
@@ -66,6 +67,10 @@ public static class AdminAuthEndpoints
             // **SAML が使えるかは未認証の相手にも返す。** ログイン画面にボタンを出すため。
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
             var samlEnabled = saml.Enabled;
+
+            // **パスキーが使えるかも未認証の相手に返す**（Issue #1082）。ログイン画面のタブを出すため。
+            // ⚠️ **設定の中身（RP ID・Origin）は返さない。** 認証済みの応答にも同じ値を返す（マイアカウントの管理の出し分け）
+            var passkeyEnabled = passkeyOptions.Enabled;
 
             // **Pleasanter のログインも同じ扱い**（Issue #464）。
             // 返すのはブラウザで開くログイン画面の URL だけ。**内部 URL は返さない**
@@ -137,6 +142,7 @@ public static class AdminAuthEndpoints
                     pleasanterSsoEnabled,
                     pleasanterSsoLoginUrl,
                     passwordSignInEnabled,
+                    passkeyEnabled,
                     captchaEnabled = botOptions.AdminCaptcha.Enabled,
 
                     // **IdP へログアウトを頼めるか**（Issue #191）。
@@ -194,6 +200,7 @@ public static class AdminAuthEndpoints
                 pleasanterSsoEnabled,
                 pleasanterSsoLoginUrl,
                 passwordSignInEnabled,
+                passkeyEnabled,
                 captchaEnabled = botOptions.AdminCaptcha.Enabled,
             });
         });
@@ -598,7 +605,14 @@ public static class AdminAuthEndpoints
     /// それ以外の入り方では <c>null</c>。
     /// ⚠️ **SAML のアサーション全体は残さない。** 要らないものを持たない。
     /// </param>
-    internal static async Task SignInSessionAsync(HttpContext context, Guid userId, SessionSso? sso = null)
+    /// <param name="via">
+    /// 入った方式（<see cref="SessionVia"/>）。パスキーのように鍵から導けない方式を保存するときだけ渡す（Issue #1082）。
+    /// </param>
+    internal static async Task SignInSessionAsync(
+        HttpContext context,
+        Guid userId,
+        SessionSso? sso = null,
+        string? via = null)
     {
         var sessions = context.RequestServices.GetRequiredService<AdminSessionManager>();
 
@@ -611,7 +625,8 @@ public static class AdminAuthEndpoints
             AdminSessionKinds.Session,
             userId,
             AdminAuthSchemes.SessionLifetime,
-            sso).ConfigureAwait(false);
+            sso,
+            via).ConfigureAwait(false);
     }
 
     /// <summary>ログイン ID とパスワード。</summary>

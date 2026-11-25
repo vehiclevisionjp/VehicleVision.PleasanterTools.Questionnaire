@@ -482,10 +482,29 @@ if (builder.Configuration[AdminAuthOptions.TwoFactorSetting] is { Length: > 0 } 
     }
 }
 
-builder.Services.AddSingleton(new AdminAuthOptions { TwoFactor = twoFactorPolicy });
+var adminAuthOptions = new AdminAuthOptions { TwoFactor = twoFactorPolicy };
+builder.Services.AddSingleton(adminAuthOptions);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AdminAuthenticator>();
 builder.Services.AddSingleton<AdminPasswordSignInPolicy>();
+
+// **管理画面のパスキー（WebAuthn）**（Issue #1082。親 Core#213）。**既定は無効**（QUESTIONNAIRE_ADMIN_PASSKEY）。
+// 有効なのに RP ID・Origin（_RPID・_ORIGINS）が未設定・空なら、ここで足りない設定名を挙げて起動を止める。
+// **Host ヘッダーから補わない**（偽装されると攻撃者の値になる）。無効の間は検証しない。
+// **経路は常に登録し、無効な間は各入口が 404 を返す**（Core.Web。既存の行は消さない）
+var passkeyOptions = AdminPasskeySettings.FromConfiguration(builder.Configuration, adminAuthOptions.Issuer);
+builder.Services.AddSingleton<IAdminPasskeyStore>(serviceProvider => new AdminPasskeyStore(
+    serviceProvider.GetRequiredService<IDbConnectionFactory>(),
+    serviceProvider.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton<IAdminPasskeyChallengeStore>(serviceProvider => new AdminPasskeyChallengeStore(
+    serviceProvider.GetRequiredService<IDbConnectionFactory>(),
+    serviceProvider.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton<IPasskeyCredentialStore, PasskeyCredentialStoreAdapter>();
+builder.Services.AddSingleton<IPasskeyChallengeStore, PasskeyChallengeStoreAdapter>();
+builder.Services.AddSingleton<IPasskeyAccounts, PasskeyAccountsAdapter>();
+builder.Services.AddSingleton<IPasskeyAuditSink, PasskeyAuditSink>();
+builder.Services.AddSingleton<IAdminPasskeyHost, AdminPasskeyHost>();
+builder.Services.AddAdminPasskeys(passkeyOptions);
 
 // **外部設定だけで有効にしている従来構成は、起動時の検証も保つ。**
 // 書き間違いを 500 応答になるまで見つけられない構成へ後退させない。
@@ -1092,6 +1111,10 @@ app.MapAdminLookupEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapAdminAuthEndpoints();
 app.MapAdminSessionEndpoints();
+// **パスキーの口は Core.Web が持つ**（経路は Core の仕様書 3.10.6）。ログインの 2 つの口と、パスワードを受ける再認証の口は、
+// パスワードのログインと**同じ方針名**（admin-login）でレート制限を掛け、同じ IP の同じ枠を共有する（Issue #1082 の設計 2/4）。
+// ⚠️ **監査フィルタ（AuditLogFilter）は掛けない。** 5 つのイベントは Core のサービスが IPasskeyAuditSink へ明示して書くので、二重に残さない
+app.MapAdminPasskeyEndpoints(AdminCsrfGuard.ProtectedPrefix, AdminAuthSchemes.LoginRateLimitPolicy);
 // **経路は常に登録し、無効な間は各入口が 404 にする。**
 // ⚠️ **元は「有効なときだけ生やす」だった**（Issue #166。使わない構成で
 // 認証の外の口を開けたままにしないため）が、**管理画面から設定を変えられるように
