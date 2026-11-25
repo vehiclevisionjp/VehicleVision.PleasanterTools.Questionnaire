@@ -171,6 +171,46 @@ const FONT_STACKS: Record<ThemeFont, string | null> = {
 };
 
 /**
+ * 無効の入力欄の地に混ぜる文字色の割合（%）。**有効の入力欄の地（`--surface`）に対する。**
+ * 小さすぎると有効と見分けがつかず、大きすぎると文字との差が縮む。
+ */
+export const DISABLED_SURFACE_TEXT_PERCENT = 10;
+
+/** 無効の入力欄の文字に使う、文字色の割合（%）。**無効の地に対する。** `--muted`（62%）より少し濃くして、無効の地の上でも AA を保つ。 */
+export const DISABLED_TEXT_PERCENT = 72;
+
+/**
+ * 2 色を sRGB のまま混ぜる（CSS の `color-mix(in srgb, …)` と同じ計算）。**`first` を `percent`% 混ぜる。**
+ * **テーマの導出を試験で確かめるための写し**（CSS の中身は実行時にブラウザが計算するので、ここで同じ値を出して比べる）。
+ * どちらかが読めない色なら `null`。
+ */
+export function mixColors(first: string, second: string, percent: number): string | null {
+  const a = hexChannels(first);
+  const b = hexChannels(second);
+  if (a === null || b === null) {return null;}
+
+  const ratio = percent / 100;
+  const mixed = a.map((value, i) => Math.round(value * ratio + b[i]! * (1 - ratio)));
+  return `#${mixed.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** `#rgb` / `#rrggbb` を 0〜255 の 3 つ組にする。 */
+function hexChannels(color: string): [number, number, number] | null {
+  const hex = safeColor(color);
+  if (hex === null) {return null;}
+
+  const body = hex.slice(1);
+  const full =
+    body.length === 3
+      ? body
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : body;
+  return [0, 2, 4].map((i) => Number.parseInt(full.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+/**
  * テーマを CSS のカスタムプロパティへ写す。
  *
  * ⚠️ **スタイル表を組み立てて差し込まないこと。** `<style>` の中身を文字列で作ると、
@@ -220,6 +260,25 @@ export function applyTheme(
   // **入力欄などの部品の枠も同じ色にする。** 既定（指定なし）のときだけ、
   // DesignReference の「部品の枠は面に対し 3:1 以上」の色（--border-strong の既定）になる
   set('--border-strong', derivedBorder);
+
+  // **無効の入力欄の地と文字も、地・文字・設問枠の色から導く**（Issue #1069）。
+  // 既定の `--disabled-surface`（明るい灰）のままだと、暗い地の上で無効の入力欄だけ白く浮く。
+  // 地は「有効の入力欄の地（--surface）に文字色を少し混ぜる」ので、明るい地では少し暗く、暗い地では少し明るくなり、
+  // **有効と見分けがつく**。文字は無効の地に文字色を濃く混ぜる（`--muted`（62%）より少し濃くして、無効の地の上でも AA を保つ）。コントラストは theme.test.ts が検査する。
+  // **設問枠の色だけを変えたときも引き直す**（入力欄の地は --surface なので、そちらに追随させる）
+  const deriveDisabled = derive || surface !== null;
+  set(
+    '--disabled-surface',
+    deriveDisabled
+      ? `color-mix(in srgb, var(--text) ${DISABLED_SURFACE_TEXT_PERCENT}%, var(--surface))`
+      : null,
+  );
+  set(
+    '--disabled-text',
+    deriveDisabled
+      ? `color-mix(in srgb, var(--text) ${DISABLED_TEXT_PERCENT}%, var(--disabled-surface))`
+      : null,
+  );
 
   function set(name: string, value: string | null) {
     if (value === null) {
