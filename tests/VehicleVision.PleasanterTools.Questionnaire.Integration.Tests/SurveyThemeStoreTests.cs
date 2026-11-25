@@ -218,8 +218,8 @@ public class SurveyThemeStoreTests
         Assert.NotNull(copied);
         Assert.Equal("#175cd3", copied.Definition.Theme?.AccentColor);
 
-        // **識別子は写さず、画像そのものを写す。**
-        // 写さないと、読み出しがアンケートで絞られているので複製先から見えない
+        // **識別子はコピーせず、画像そのものをコピーする。**
+        // コピーしないと、読み出しがアンケートで絞られているので複製先から見えない
         var copiedAssetId = copied.Definition.Theme?.HeaderImage();
         Assert.NotNull(copiedAssetId);
         Assert.NotEqual(assetId, copiedAssetId);

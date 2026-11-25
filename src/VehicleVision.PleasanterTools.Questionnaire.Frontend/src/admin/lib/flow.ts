@@ -49,7 +49,7 @@ export function hasChoiceTransitions(question: Question): boolean {
 /**
  * 編集中の定義から不備を挙げる。
  *
- * **サーバの `SurveyFlowValidator` の写し。** 公開して初めて弾かれると作り直しになるので、
+ * **サーバの `SurveyFlowValidator` のコピー。** 公開して初めて弾かれると作り直しになるので、
  * 編集中にも同じことを見せる（Issue #44）。
  *
  * **こちらは緩めない。** 画面で防ぎきれなかったものを拾うためのもので、

@@ -13,14 +13,14 @@ import { readEnrollmentSecret, totp } from '../lib/totp';
  * - ログイン画面の「Pleasanter でログイン」→ 別窓で Pleasanter にログイン → 管理画面へ入る往復
  *
  * **Pleasanter の利用者は `tools/pleasanter-testenv/seed/03_sso_users.sql` が入れておく**
- * （e2e.yml の写しの一式の job）。
+ * （e2e.yml のスクリーンショットの一式の job）。
  *
  * **Pleasanter と本アプリを同じホスト名で開く。** 容器の中に `localhost:8080`（Pleasanter）と
  * `localhost:8081`（本アプリ）の素通しを立てる（`lib/tcp-forward.ts`）。
  * 本アプリの設定の「ログイン画面」も `http://localhost:8080/users/login` にする。
  *
- * ⚠️ **設定は画面から有効にし、終わったら無効へ戻す。** 写しの一式の本アプリは外部設定を持たない。
- * 有効のまま残すと、後に走る spec のログイン画面に釦が増える。
+ * ⚠️ **設定は画面から有効にし、終わったら無効へ戻す。** スクリーンショットの一式の本アプリは外部設定を持たない。
+ * 有効のまま残すと、後に走る spec のログイン画面にボタンが増える。
  * ⚠️ **まっさらな検証環境が前提。** 往復で本アプリに作られる管理者（その場で登録）は、
  * 2 回目には 2 要素を登録済みになり、途中の画面が変わる。
  */
@@ -45,7 +45,7 @@ const settingsPath = '/api/admin/pleasanter-sso/settings';
 
 /**
  * **素通しを立てない。** 容器の外（手元）で走らせ、`localhost:8080` と `localhost:8081` に
- * Pleasanter と本アプリが既に居るときだけ `1` にする。写しの一式の容器では使わない
+ * Pleasanter と本アプリが既に居るときだけ `1` にする。スクリーンショットの一式の容器では使わない
  */
 const skipForward = process.env['SSO_SKIP_FORWARD'] === '1';
 
@@ -137,7 +137,7 @@ test('設定画面から Pleasanter のログインを有効にする', async ({
 });
 
 test('外部設定で決まった項目はロックして出す', async ({ browser, baseURL }) => {
-  // ⚠️ **写しの一式の本アプリは外部設定を持たない**（持たせると画面から有効にできない）。
+  // ⚠️ **スクリーンショットの一式の本アプリは外部設定を持たない**（持たせると画面から有効にできない）。
   // そこで**サーバの応答の fixedFields だけを「全部固定」に書き換えて**、画面の出し方を確かめる。
   // サーバが外部設定を優先して保存を拒むことは、端から端まで通す試験
   // （PleasanterSsoEndToEndTests。外部設定で有効にした本アプリ）が確かめている
@@ -174,7 +174,7 @@ test('外部設定で決まった項目はロックして出す', async ({ brows
   }
 });
 
-test('ログイン画面の釦から別窓で Pleasanter にログインし、管理画面へ入る', async ({ browser }) => {
+test('ログイン画面のボタンから別窓で Pleasanter にログインし、管理画面へ入る', async ({ browser }) => {
   test.setTimeout(120_000);
 
   // **本アプリも localhost で開く。** Pleasanter の cookie が届くのは同じホスト名だけ
@@ -188,7 +188,7 @@ test('ログイン画面の釦から別窓で Pleasanter にログインし、�
     await expect(button).toBeVisible();
     await shoot(page, 'admin-20-pleasanter-login');
 
-    // ---- 釦を押すと、Pleasanter のログイン画面が別窓で開く
+    // ---- ボタンを押すと、Pleasanter のログイン画面が別窓で開く
     const popupPromise = page.waitForEvent('popup');
     await button.click();
     const popup = await popupPromise;
@@ -241,7 +241,7 @@ async function saveSettings(
   expect(response.ok(), `Pleasanter ログイン設定を保存できなかった: ${response.status()}`).toBe(true);
 }
 
-/** 撮った写しに豆腐が無いことを、撮るたびに確かめる。 */
+/** 撮ったスクリーンショットに豆腐が無いことを、撮るたびに確かめる。 */
 async function shoot(page: Page, name: string): Promise<void> {
   const report = await findTofu(page, japaneseSamples);
   expect(

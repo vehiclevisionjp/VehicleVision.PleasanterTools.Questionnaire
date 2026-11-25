@@ -12,7 +12,7 @@ public sealed record Answer(string QuestionId, ImmutableArray<string> Values)
     /// <summary>「その他」を選んだときの自由記述。</summary>
     /// <remarks>
     /// **マッピングの入力になる**（入力ノードの <c>other</c> ポート）。
-    /// グラフの外に置くと、どこへ写すかを設定できなくなる。
+    /// グラフの外に置くと、どこへコピーするかを設定できなくなる。
     /// </remarks>
     public string? OtherText { get; init; }
 

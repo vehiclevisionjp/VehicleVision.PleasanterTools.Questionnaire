@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { findTofu, japaneseSamples } from '../lib/tofu';
 
 /**
- * **写しを撮る前に、日本語が描けることを確かめる。**
+ * **スクリーンショットを撮る前に、日本語が描けることを確かめる。**
  *
  * Linux のコンテナには日本語フォントが無いのが普通で、入れ忘れれば
  * 文字がすべて豆腐（□）になる。**撮った画像を目で見るまで気付かない**ので、

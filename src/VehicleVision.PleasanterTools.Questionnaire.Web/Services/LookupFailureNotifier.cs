@@ -52,7 +52,7 @@ public sealed class LookupFailureNotifier(
 
     private readonly ConcurrentDictionary<(Guid SurveyId, string LookupId, AdminNotificationKind Kind), DateTimeOffset> windows = new();
 
-    /// <summary>失敗の分類を、知らせの種類へ写す。</summary>
+    /// <summary>失敗の分類を、知らせの種類へコピーする。</summary>
     public static AdminNotificationKind KindOf(LookupSearchFailure failure) => failure switch
     {
         LookupSearchFailure.CredentialMissing

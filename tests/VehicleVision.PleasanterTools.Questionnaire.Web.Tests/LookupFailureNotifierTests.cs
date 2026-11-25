@@ -66,7 +66,7 @@ public sealed class LookupFailureNotifierTests
         for (var i = 0; i < 50; i++)
         {
             await f.Notifier.NotifyAsync(surveyId, "l1", LookupSearchFailure.Unauthorized, "t" + i);
-            // 同じ種類へ写る別の分類も同じ窓
+            // 同じ種類へコピーされる別の分類も同じ窓
             await f.Notifier.NotifyAsync(surveyId, "l1", LookupSearchFailure.Forbidden, "t" + i);
         }
 

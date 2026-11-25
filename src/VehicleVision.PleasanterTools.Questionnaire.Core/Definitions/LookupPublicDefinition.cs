@@ -21,7 +21,7 @@ public sealed record LookupPublicDisplayField
 /// </para>
 /// <para>
 /// **スナップショット（<see cref="SurveyDefinition"/>）をそのまま回答画面へ返さない。**
-/// 必ずこの形へ写してから返す。
+/// 必ずこの形へコピーしてから返す。
 /// </para>
 /// </remarks>
 public sealed record LookupPublicDefinition
@@ -43,7 +43,7 @@ public sealed record LookupPublicDefinition
     /// <summary>モーダルに出す列（表示 ID と見出し）。順序は定義のとおり。</summary>
     public ImmutableArray<LookupPublicDisplayField> DisplayFields { get; init; } = [];
 
-    /// <summary>サーバー用の定義から、回答画面用へ写す。</summary>
+    /// <summary>サーバー用の定義から、回答画面用へコピーする。</summary>
     public static LookupPublicDefinition From(LookupDefinition lookup)
     {
         ArgumentNullException.ThrowIfNull(lookup);
@@ -65,7 +65,7 @@ public sealed record LookupPublicDefinition
         };
     }
 
-    /// <summary>定義が持つルックアップを、回答画面用へ写す。無ければ空。</summary>
+    /// <summary>定義が持つルックアップを、回答画面用へコピーする。無ければ空。</summary>
     public static ImmutableArray<LookupPublicDefinition> FromDefinition(SurveyDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);

@@ -4,7 +4,7 @@ import { currentRevision } from './survey';
 /**
  * v0.12.0 の編集・回答画面を撮るための見本を作る。
  *
- * 移動の警告、ページ下部の釦、選択肢の備考を 1 つの定義に集め、
+ * 移動の警告、ページ下部のボタン、選択肢の備考を 1 つの定義に集め、
  * 管理画面と回答画面で同じ設定を確かめられるようにする。
  */
 export async function prepareFeatureSurvey(

@@ -1156,7 +1156,7 @@ export const en: Record<MessageKey, string> = {
   'duplicate.jsonColumn': 'Column for the response JSON (optional)',
   'duplicate.submit': 'Duplicate',
   'duplicate.cancel': 'Cancel',
-  // ---- フォーム定義の書き出し・取り込み（Issue #1009） ----
+  // ---- フォーム定義のエクスポート・インポート（Issue #1009） ----
   'exchange.export': 'Export',
   'exchange.exportHint':
     'Saves the definition and mapping as JSON. The target site, publication state, credentials and images are not included.',

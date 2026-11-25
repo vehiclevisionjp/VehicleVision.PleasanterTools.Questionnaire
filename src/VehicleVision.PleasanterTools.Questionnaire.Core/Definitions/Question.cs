@@ -86,7 +86,7 @@ public sealed record Question
     /// <summary>回答を持たない表示専用の要素か。</summary>
     /// <remarks>
     /// <see cref="QuestionType.Note"/> は説明文ブロック、
-    /// <see cref="QuestionType.Embed"/> は埋め込みで、どちらも Pleasanter の列へ写さない
+    /// <see cref="QuestionType.Embed"/> は埋め込みで、どちらも Pleasanter の列へコピーしない
     /// （<c>_documents/データモデル設計.md</c> 2.2）。
     /// </remarks>
     public bool IsDisplayOnly => Type is QuestionType.Note or QuestionType.Embed;

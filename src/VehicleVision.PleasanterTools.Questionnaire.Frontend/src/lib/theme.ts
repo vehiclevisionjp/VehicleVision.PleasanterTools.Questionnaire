@@ -46,7 +46,7 @@ export interface SurveyTheme {
   accentColor?: string | null;
   backgroundColor?: string | null;
   textColor?: string | null;
-  /** 釦の文字色（Issue #109）。 */
+  /** ボタンの文字色（Issue #109）。 */
   accentTextColor?: string | null;
   /** 設問枠の地の色（Issue #109）。 */
   surfaceColor?: string | null;
@@ -66,7 +66,7 @@ export interface SurveyTheme {
  * （鉄紺 `--color-primary`、白練 `--color-bg`、黒橡 `--color-text`、白 `--color-on-fill`、
  * 胡粉 `--color-surface`、白鼠 `--color-border`）と同じ。
  *
- * ⚠️ **`styles/tokens.css` と揃えること。** CSS の変数を TypeScript から読めないので、ここだけは写しになる。
+ * ⚠️ **`styles/tokens.css` と揃えること。** CSS の変数を TypeScript から読めないので、ここだけはコピーになる。
  * 食い違うと、色欄が「今の見た目と違う色」を初期値として出す。**`tokens.test.ts` が突き合わせる。**
  * アンケートの作成者が選べるテーマ（プリセット・個別色・配色固定）の仕様は、この既定値とは別で変わらない。
  */
@@ -83,7 +83,7 @@ export const DEFAULT_COLORS = {
  * 名前の付いた配色の中身（Issue #109）。
  *
  * **サーバは「どれを選んだか」しか持たない。** 実際の色をここだけに置くのは、
- * **既定値との写しが 2 か所になると、片方だけ直す事故が起きる**ため。
+ * **既定値とのコピーが 2 か所になると、片方だけ直す事故が起きる**ため。
  *
  * **どれも読める組み合わせであることを確かめてある**（背景と文字のコントラスト比は
  * いずれも 4.5:1 以上。WCAG 2.1 AA）。
@@ -181,7 +181,7 @@ export const DISABLED_TEXT_PERCENT = 72;
 
 /**
  * 2 色を sRGB のまま混ぜる（CSS の `color-mix(in srgb, …)` と同じ計算）。**`first` を `percent`% 混ぜる。**
- * **テーマの導出を試験で確かめるための写し**（CSS の中身は実行時にブラウザが計算するので、ここで同じ値を出して比べる）。
+ * **テーマの導出を試験で確かめるためのコピー**（CSS の中身は実行時にブラウザが計算するので、ここで同じ値を出して比べる）。
  * どちらかが読めない色なら `null`。
  */
 export function mixColors(first: string, second: string, percent: number): string | null {
@@ -211,7 +211,7 @@ function hexChannels(color: string): [number, number, number] | null {
 }
 
 /**
- * テーマを CSS のカスタムプロパティへ写す。
+ * テーマを CSS のカスタムプロパティへコピーする。
  *
  * ⚠️ **スタイル表を組み立てて差し込まないこと。** `<style>` の中身を文字列で作ると、
  * `</style>` を混ぜられて画面を乗っ取られる。
@@ -223,7 +223,7 @@ function hexChannels(color: string): [number, number, number] | null {
  * **指定の無い項目はプロパティごと消す。** 空文字を入れると
  * 「指定はあるが空」になり、`:root` に書いた既定値へ落ちない。
  *
- * @param target 写す先。**回答画面は `:root`、プレビューは差し込む枠。**
+ * @param target コピーする先。**回答画面は `:root`、プレビューは差し込む枠。**
  */
 export function applyTheme(
   target: HTMLElement | null | undefined,
@@ -295,8 +295,8 @@ export function applyTheme(
  * **個別の指定が勝つ。** 「配色を選んだうえで 1 色だけ変える」が普通の使い方なので、
  * 逆にすると選び直すたびに個別の指定が消える。
  *
- * **管理画面の下見もこれを使う。** 解き方が 2 か所にあると、
- * 下見と本物で色が食い違う。
+ * **管理画面のプレビューもこれを使う。** 解き方が 2 か所にあると、
+ * プレビューと本物で色が食い違う。
  */
 export function resolveTheme(theme: SurveyTheme | null | undefined): SurveyTheme {
   if (!theme) {return {};}

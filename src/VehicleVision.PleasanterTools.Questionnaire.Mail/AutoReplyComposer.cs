@@ -99,7 +99,7 @@ public static class AutoReplyComposer
                 : null;
     }
 
-    /// <summary>回答の写しを作る。</summary>
+    /// <summary>回答のコピーを作る。</summary>
     /// <remarks>
     /// <para>
     /// ⚠️ **添付の中身は載せない。** ファイル名だけにする。
@@ -120,7 +120,7 @@ public static class AutoReplyComposer
 
         foreach (var question in definition.AllQuestions)
         {
-            // **説明文や埋め込みは回答ではない。** 写しに出さない
+            // **説明文や埋め込みは回答ではない。** コピーに出さない
             if (question.IsDisplayOnly)
             {
                 continue;
@@ -172,7 +172,7 @@ public static class AutoReplyComposer
             parts.AddRange(answer.FileNames.Where(name => !string.IsNullOrWhiteSpace(name)));
         }
 
-        // **改行を潰す。** 段落の回答がそのまま入ると、写しの行と行の境が分からなくなる
+        // **改行を潰す。** 段落の回答がそのまま入ると、コピーの行と行の境が分からなくなる
         return string.Join(", ", parts).ReplaceLineEndings(" ");
     }
 

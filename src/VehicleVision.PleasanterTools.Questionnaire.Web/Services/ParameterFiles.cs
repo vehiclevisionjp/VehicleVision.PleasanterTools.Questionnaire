@@ -19,12 +19,12 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// ⚠️ **ファイルのキーと環境変数の名前が違うものがある。**
 /// <c>Pleasanter.json</c> は Pleasanter 本体に合わせた短い名前（<c>BaseUrl</c> など）で、
 /// 環境変数は衝突を避けるため <c>QUESTIONNAIRE_*</c> で始まる。
-/// **そのままでは片方しか効かない**ので、<see cref="Aliases"/> で正式な名前へ写している。
+/// **そのままでは片方しか効かない**ので、<see cref="Aliases"/> で正式な名前へコピーしている。
 /// </para>
 /// <para>
-/// **値が <c>null</c> のキーは写さない。** <c>Pleasanter.json</c> の <c>ApiKey</c> は
+/// **値が <c>null</c> のキーはコピーしない。** <c>Pleasanter.json</c> の <c>ApiKey</c> は
 /// 既定で <c>null</c>（＝ここへ書かせない）なので、
-/// 写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
+/// コピーすると**環境変数で与えた API キーを空で塗り潰してしまう。**
 /// </para>
 /// </remarks>
 public static partial class ParameterFiles
@@ -64,7 +64,7 @@ public static partial class ParameterFiles
 
         // ⚠️ **絶対パスへ直してから積む。**
         // JSON の側（AddJsonFile）は content root を基準にするが、
-        // 別名を写すために自分で読む側は現在のディレクトリを基準にする。
+        // 別名をコピーするために自分で読む側は現在のディレクトリを基準にする。
         // **基準が食い違うと、片方だけ読めて気付けない**（実際に踏んだ）
         var resolved = Path.IsPathRooted(directory)
             ? directory
@@ -124,10 +124,10 @@ public static partial class ParameterFiles
             ? physical.Root
             : Directory.GetCurrentDirectory();
 
-    /// <summary>ファイルのキーを正式な名前へ写したものを作る。</summary>
+    /// <summary>ファイルのキーを正式な名前へコピーしたものを作る。</summary>
     /// <remarks>
-    /// **写す前に一度だけ読む。** 積んだ後の設定から読むと、
-    /// 環境変数の値まで巻き込んで写してしまう。
+    /// **コピーする前に一度だけ読む。** 積んだ後の設定から読むと、
+    /// 環境変数の値まで巻き込んでコピーしてしまう。
     /// </remarks>
     private static IEnumerable<KeyValuePair<string, string?>> AliasesOf(string directory, bool local)
     {
@@ -144,7 +144,7 @@ public static partial class ParameterFiles
             foreach (var alias in Aliases.Where(alias => alias.File == name))
             {
                 var value = configuration[alias.Key];
-                // null と空は未指定。false と 0 は明示された値として写す。
+                // null と空は未指定。false と 0 は明示された値としてコピーする。
                 if (!string.IsNullOrEmpty(value))
                 {
                     yield return new KeyValuePair<string, string?>(alias.Setting, value);

@@ -2,11 +2,11 @@ using FluentMigrator;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
-/// <summary>管理者の招待を、Core.Data の共有表（<c>Core_AdminInvitations</c>）へ写す。</summary>
+/// <summary>管理者の招待を、Core.Data の共有表（<c>Core_AdminInvitations</c>）へコピーする。</summary>
 /// <remarks>
 /// <para>
-/// 旧 <c>AdminInvitations</c> の行を <c>Core_AdminInvitations</c> へ写し、旧表を落とす（<see cref="LegacyStoreMigration"/>）。
-/// 列は同名で、そのまま写す。<b>使用済みの行も写す</b>（使われた事実として残す）。
+/// 旧 <c>AdminInvitations</c> の行を <c>Core_AdminInvitations</c> へコピーし、旧表を落とす（<see cref="LegacyStoreMigration"/>）。
+/// 列は同名で、そのままコピーする。<b>使用済みの行もコピーする</b>（使われた事実として残す）。
 /// </para>
 /// <para>
 /// <b><c>TokenHash</c> は旧が 128 文字の列、Core は 64 文字の列。</b>

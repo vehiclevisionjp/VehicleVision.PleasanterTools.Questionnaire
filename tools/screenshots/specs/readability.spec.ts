@@ -8,7 +8,7 @@ import { findTofu, japaneseSamples } from '../lib/tofu';
  * 読みやすさ設定を実ブラウザで切り替え、見た目と CSS 変数を確かめる（Issue #340）。
  *
  * **作成者の Forest テーマを付けた同じアンケートを使う。**
- * 高コントラストとダークが作成者の色より優先されたことを、写しと値の両方で確認する。
+ * 高コントラストとダークが作成者の色より優先されたことを、スクリーンショットと値の両方で確認する。
  */
 const baseUrl = process.env['QUESTIONNAIRE_BASE_URL'] ?? 'http://questionnaire-app:8080';
 const demoSiteId = Number(process.env['SHOT_SITE_ID'] ?? '1');
@@ -43,7 +43,7 @@ async function cssVariable(page: Page, name: string): Promise<string> {
 /**
  * 色の変数が期待の値になるのを待って確かめる。
  *
- * **1 回だけ読まない。** 釦や選択を操作した直後は、Playwright 1.65 では、画面の反映
+ * **1 回だけ読まない。** ボタンや選択を操作した直後は、Playwright 1.65 では、画面の反映
  * （Svelte の更新）が済む前に操作が戻ることがある（Issue #976）。再試行つきの検査で待つ。
  */
 async function expectColors(
@@ -95,7 +95,7 @@ async function shoot(page: Page, target: Locator, name: string): Promise<void> {
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('読みやすさ設定の写し', () => {
+test.describe('読みやすさ設定のスクリーンショット', () => {
   let authFile = '';
   let publicId = '';
   let requiredPublicId = '';

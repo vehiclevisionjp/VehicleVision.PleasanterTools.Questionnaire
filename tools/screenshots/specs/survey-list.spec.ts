@@ -155,7 +155,7 @@ test.describe('アンケート一覧のページ送りと絞り込み', () => {
     test.use({ storageState: 'artifacts/survey-list-auth.json' });
 
     test.beforeAll(async ({ browser, baseURL }) => {
-      // **控えの場所は beforeAll より先に決まらない**ので、いま使うものへ写す
+      // **控えの場所は beforeAll より先に決まらない**ので、いま使うものへコピーする
       const context = await browser.newContext({ baseURL, storageState: authFile });
       await context.storageState({ path: 'artifacts/survey-list-auth.json' });
 

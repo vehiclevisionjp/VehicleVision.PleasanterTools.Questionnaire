@@ -8,7 +8,7 @@ public class SurveyDuplicationTests
 {
     private const string NewSurveyId = "22222222-2222-2222-2222-222222222222";
 
-    /// <summary>分岐を持った定義。**写し漏れを見つけるための材料。**</summary>
+    /// <summary>分岐を持った定義。**コピー漏れを見つけるための材料。**</summary>
     private static SurveyDefinition CreateDefinition() => new()
     {
         SurveyId = "11111111-1111-1111-1111-111111111111",
@@ -83,7 +83,7 @@ public class SurveyDuplicationTests
         Assert.Equal(NewSurveyId, copy.SurveyId);
     }
 
-    /// <summary>**公開済みの版は写さない**ので、次に公開されるのは 1 版目。</summary>
+    /// <summary>**公開済みの版はコピーしない**ので、次に公開されるのは 1 版目。</summary>
     [Fact]
     public void 版が_1_に戻る()
     {
@@ -135,7 +135,7 @@ public class SurveyDuplicationTests
         Assert.False(copy.AllowEditingAfterSubmit);
     }
 
-    /// <summary>**分岐は最近入った項目なので写し漏らしやすい**（Issue #41 → #46）。</summary>
+    /// <summary>**分岐は最近入った項目なのでコピーし漏らしやすい**（Issue #41 → #46）。</summary>
     [Fact]
     public void ページ末尾の行き先が写る()
     {
@@ -182,7 +182,7 @@ public class SurveyDuplicationTests
     /// <summary>
     /// **識別子は振り直さない。** 分岐もマッピングもこの識別子を指しており、
     /// 振り直すと参照先を全部書き換えることになる。
-    /// **アンケートの中でだけ一意**なので、写しても衝突しない。
+    /// **アンケートの中でだけ一意**なので、コピーしても衝突しない。
     /// </summary>
     [Fact]
     public void ページと設問の識別子は振り直さない()
@@ -233,7 +233,7 @@ public class SurveyDuplicationTests
     }
 
     /// <summary>
-    /// テンプレートは題名をそのまま写す（Issue #58）。
+    /// テンプレートは題名をそのままコピーする（Issue #58）。
     ///
     /// **「のコピー」を付けない。** テンプレートは元と並べて置くものではなく、
     /// そこから作ったアンケートに付くと、**回答者に見える題名**が汚れる。
@@ -247,17 +247,17 @@ public class SurveyDuplicationTests
         Assert.Equal("Satisfaction survey", copy.Title.Get("en"));
     }
 
-    /// <summary>題名を写しても、写すもの・写さないものは複製と同じ。</summary>
+    /// <summary>題名をコピーしても、コピーするもの・コピーしないものは複製と同じ。</summary>
     [Fact]
     public void 題名を写しても版と_ID_は作り直す()
     {
         var copy = SurveyDuplication.Copy(CreateDefinition(), NewSurveyId, renameAsCopy: false);
 
         Assert.Equal(NewSurveyId, copy.SurveyId);
-        // **公開済みの版は写さないので、次に公開されるのは 1 版目**
+        // **公開済みの版はコピーしないので、次に公開されるのは 1 版目**
         Assert.Equal(1, copy.Version);
 
-        // **設問も分岐もそのまま写る**（複製と同じ道を通っていること）
+        // **設問も分岐もそのままコピーされる**（複製と同じ道を通っていること）
         Assert.Equal("p3", copy.Pages[0].Next!.PageId);
         Assert.Equal(
             PageTransitionKind.Submit, copy.Pages[0].Questions[0].Choices[0].Next!.Kind);

@@ -215,7 +215,7 @@
     return lookups.filter((lookup) => lookup.anchorQuestionId === questionId);
   }
 
-  /** 検索結果を、通常の入力と同じ回答の状態へ写す。**検証の誤り表示は、書いた設問だけ外す。** */
+  /** 検索結果を、通常の入力と同じ回答の状態へコピーする。**検証の誤り表示は、書いた設問だけ外す。** */
   function applyLookup(changes: { questionId: string; value: string }[]) {
     for (const { questionId, value } of changes) {
       answers[questionId] = answerWithValue(value);
@@ -348,7 +348,7 @@
   /**
    * 回答から辿る経路。**答えを変えると変わる。**
    *
-   * **正はサーバ側**（`Core/Flow/SurveyFlow.cs`）。ここはその写しで、
+   * **正はサーバ側**（`Core/Flow/SurveyFlow.cs`）。ここはそのコピーで、
    * 画面を進めるためだけのもの（`lib/flow.ts`）。
    */
   const path = $derived(tracePath(definition, answers));

@@ -5,7 +5,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// <summary>送信待ちのメールを、2 要素の共有鍵と同じ仕掛けで守る（Issue #189）。</summary>
 /// <remarks>
 /// <para>
-/// ⚠️ **宛先は回答者のメールアドレスで、本文には回答の写しが入り得る。**
+/// ⚠️ **宛先は回答者のメールアドレスで、本文には回答のコピーが入り得る。**
 /// 完全匿名を前提にした本アプリで、**個人を指す値が DB に載る唯一の場所**なので、
 /// 平文で置かない（<c>_documents/データモデル設計.md</c> 2.6 と同じ考え方）。
 /// </para>

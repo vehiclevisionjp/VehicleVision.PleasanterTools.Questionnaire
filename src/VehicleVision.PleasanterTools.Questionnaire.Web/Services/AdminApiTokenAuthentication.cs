@@ -209,7 +209,7 @@ public sealed record AutomationAccessMetadata(string Scope);
 
 /// <summary>
 /// 個人トークンでこの口を読んだときも、監査へ残す印（エンドポイントのメタデータ。Issue #1027）。
-/// <b>書き出しのように、読み取りでも定義の一括持ち出しになる口だけ</b>に付ける（通常の読み取りは残さない）。
+/// <b>エクスポートのように、読み取りでも定義の一括持ち出しになる口だけ</b>に付ける（通常の読み取りは残さない）。
 /// </summary>
 public sealed record AuditAutomationReadMetadata;
 
@@ -217,7 +217,7 @@ public sealed record AuditAutomationReadMetadata;
 public static class AutomationEndpointExtensions
 {
     /// <summary>
-    /// この口を、個人トークンで読んだときも監査へ残す（書き出し用）。ブラウザのセッションの読み取りは今までどおり残さない。
+    /// この口を、個人トークンで読んだときも監査へ残す（エクスポート用）。ブラウザのセッションの読み取りは今までどおり残さない。
     /// </summary>
     public static TBuilder AuditAutomationReads<TBuilder>(this TBuilder builder)
         where TBuilder : IEndpointConventionBuilder

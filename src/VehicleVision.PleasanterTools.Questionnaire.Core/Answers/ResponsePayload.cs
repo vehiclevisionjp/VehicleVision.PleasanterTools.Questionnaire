@@ -56,7 +56,7 @@ public sealed record ResponsePayload(
         }),
     ];
 
-    /// <summary>添付の中身を落とした写しを返す。</summary>
+    /// <summary>添付の中身を落としたコピーを返す。</summary>
     /// <remarks>
     /// **Pleasanter の回答 JSON 列へ Base64 を載せない。** 列が添付本文で埋まるうえ、
     /// 応答不明時の照合はこの列を部分一致で引くため、巨大な文字列は検索の邪魔になる

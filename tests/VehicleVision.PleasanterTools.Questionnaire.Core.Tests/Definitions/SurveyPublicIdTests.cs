@@ -6,7 +6,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Definitions;
 public class SurveyPublicIdTests
 {
     /// <summary>
-    /// **使い回さない。** 複製で元の値を写すと、
+    /// **使い回さない。** 複製で元の値をコピーすると、
     /// 2 つのアンケートが同じ回答用 URL を指すことになる（Issue #46）。
     /// </summary>
     [Fact]

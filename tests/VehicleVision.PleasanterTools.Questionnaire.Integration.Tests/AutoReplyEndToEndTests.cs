@@ -283,7 +283,7 @@ public class AutoReplyEndToEndTests
         Assert.Equal("ご回答ありがとうございました", mail["Subject"]!.GetValue<string>());
         Assert.Contains("受け付けました。", mail["Text"]!.GetValue<string>(), StringComparison.Ordinal);
 
-        // **写しを付けない設定なので、回答の中身は載らない**
+        // **コピーを付けない設定なので、回答の中身は載らない**
         Assert.DoesNotContain("よかった", mail["Text"]!.GetValue<string>(), StringComparison.Ordinal);
     }
 

@@ -401,7 +401,7 @@ public partial class SamlEndToEndTests
         }
 
         // ⚠️ **こちらの cookie だけ消すと、IdP のセッションが残る。**
-        // 釦を押し直すだけで入り直せてしまい、共用の端末では
+        // ボタンを押し直すだけで入り直せてしまい、共用の端末では
         // **ログアウトしたつもりで座席を明け渡す**ことになる（Issue #191）
         var secret = await ResetAdminAsync(KnownUser);
         var (_, cookies) = await RoundTripAsync(KnownUser, IdpPassword);

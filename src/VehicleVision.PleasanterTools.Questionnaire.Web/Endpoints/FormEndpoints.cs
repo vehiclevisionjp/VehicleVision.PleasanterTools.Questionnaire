@@ -99,7 +99,7 @@ public sealed record FormResponse(
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>ルックアップの定義は公開用の形（<see cref="LookupPublicDefinition"/>）へ写して最上位の
+    /// <b>ルックアップの定義は公開用の形（<see cref="LookupPublicDefinition"/>）へコピーして最上位の
     /// <c>lookups</c> に載せ、<c>definition</c> からは生の <c>lookups</c> を除く。</b>
     /// 参照元のサイト ID・資格情報の参照・列名・許可列・件数の上限を回答者へ返さないため
     /// （<c>_documents/ルックアップ項目の仕様書.md</c> 3.1 節）。ルックアップが無ければ <c>lookups</c> は省く。

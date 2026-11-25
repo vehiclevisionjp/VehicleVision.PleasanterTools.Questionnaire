@@ -203,7 +203,7 @@ public class AutoReplyComposerTests
     [Fact]
     public void 写しの中の改行は潰す()
     {
-        // **段落の回答がそのまま入ると、写しの行と行の境が分からなくなる**
+        // **段落の回答がそのまま入ると、コピーの行と行の境が分からなくなる**
         var mail = Compose(
             Enabled with { Body = LocalizedText.Japanese("{{answers}}") },
             Payload(Answer("mail", "a@example.test"), Answer("opinion", "1 行目\n2 行目")));

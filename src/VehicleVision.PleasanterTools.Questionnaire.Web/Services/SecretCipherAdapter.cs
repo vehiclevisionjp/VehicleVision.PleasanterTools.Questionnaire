@@ -13,7 +13,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// </para>
 /// <para>
 /// <b>旧の暗号文（文脈を持たない形）も、そのまま読める。</b>旧の <c>AdminUserStore</c> と <c>SecretProtector</c> は
-/// 文脈を使っていなかった（暗号文は鍵だけに束縛されていた）ので、移行（M100004）が写した暗号文は、
+/// 文脈を使っていなかった（暗号文は鍵だけに束縛されていた）ので、移行（M100004）がコピーした暗号文は、
 /// <see cref="SecretProtector.Unprotect(string, string?)"/> が文脈を問わずに復号する。
 /// 再び書き込まれたとき（TOTP の登録し直し）から、新しい文脈に束縛した形になる。
 /// </para>

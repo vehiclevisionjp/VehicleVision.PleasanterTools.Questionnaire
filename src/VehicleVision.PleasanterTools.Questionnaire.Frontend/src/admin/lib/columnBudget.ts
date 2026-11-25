@@ -5,7 +5,7 @@ import { hasRowPorts, isDisplayOnly, rowPorts } from './types';
  * Pleasanter の列がいくつ要るかを数える。
  *
  * ⚠️ **サーバ側（`Core/Mapping/ColumnBudget.cs`）が正。**
- * ここはその写しで、**保存や公開を待たずに編集画面へ出すためだけ**にある。
+ * ここはそのコピーで、**保存や公開を待たずに編集画面へ出すためだけ**にある。
  * **片方だけ直さないこと。** 食い違うと、画面では収まっているのに公開で弾かれる。
  *
  * **標準の列は型ごとに 26 本**（`A`〜`Z`。`_documents/実機検証結果.md`）。
@@ -95,7 +95,7 @@ function availableFor(prefix: string, available: number | ColumnAvailability): n
 }
 
 /**
- * この定義を「行ごとに 1 列」で写すと、いくつ入力が要るか。
+ * この定義を「行ごとに 1 列」でコピーすると、いくつ入力が要るか。
  *
  * **見積もりであって、実際の消費ではない。** まとめて 1 列へ入れる人もいる。
  * **「このままだと何本要るか」を作る前に見せるための数**（Issue #74）。

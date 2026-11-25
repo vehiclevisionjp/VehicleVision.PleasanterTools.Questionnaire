@@ -85,7 +85,7 @@ public class SurveyDefinitionTests
     [Fact]
     public void 説明文ブロックは表示専用として扱う()
     {
-        // Note は Pleasanter の列へ写さない。マッピングを持たないことで表現する
+        // Note は Pleasanter の列へコピーしない。マッピングを持たないことで表現する
         var definition = CreateDefinition();
 
         Assert.True(definition.FindQuestion("note1")!.IsDisplayOnly);

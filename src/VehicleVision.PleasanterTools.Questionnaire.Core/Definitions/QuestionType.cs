@@ -40,7 +40,7 @@ public enum QuestionType
     /// <summary>選択グリッド（行列・行ごとに 1 つ選ぶ）。</summary>
     /// <remarks>
     /// **1 設問が行数ぶんの列を食い得る**（Issue #54）。
-    /// どう写すかはマッピングが決める。**行ごとに 1 つの入力を出す**ので、
+    /// どうコピーするかはマッピングが決める。**行ごとに 1 つの入力を出す**ので、
     /// 行ごとに列へ繋ぐことも、まとめて 1 列へ入れることもできる。
     /// </remarks>
     Grid,
@@ -55,10 +55,10 @@ public enum QuestionType
     /// </remarks>
     Ranking,
 
-    /// <summary>説明文ブロック。設問ではなく、Pleasanter の列へ写さない。</summary>
+    /// <summary>説明文ブロック。設問ではなく、Pleasanter の列へコピーしない。</summary>
     Note,
 
-    /// <summary>埋め込み（画像・動画・外部ページ）。設問ではなく、列へ写さない。</summary>
+    /// <summary>埋め込み（画像・動画・外部ページ）。設問ではなく、列へコピーしない。</summary>
     /// <remarks>
     /// **回答者の情報が第三者へ渡る唯一の要素**（Issue #104 / #107）。
     /// <c>iframe</c> を出した時点で、回答者の IP・時刻・User-Agent が埋め込み先へ渡る。

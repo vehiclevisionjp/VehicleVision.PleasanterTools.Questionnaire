@@ -323,7 +323,7 @@ export interface Page {
    * **説明文ブロックは動かさない。**
    */
   shuffleQuestions?: boolean;
-  /** ページ下部の釦。未指定なら従来どおり常に表示し、有効。 */
+  /** ページ下部のボタン。未指定なら従来どおり常に表示し、有効。 */
   buttons?: PageButtons | null;
 }
 
@@ -708,19 +708,19 @@ export interface SurveyTemplateSummary {
   updatedAt: string;
 }
 
-/** 設問の取り込み元にあるページ。**ページ自体は取り込まない。** */
+/** 設問のインポート元にあるページ。**ページ自体はインポートしない。** */
 export interface QuestionImportPage {
   pageId: string;
   title?: LocalizedText | null;
   questions: Pick<Question, 'questionId' | 'type' | 'title'>[];
 }
 
-/** 取り込み元から選べる設問。 */
+/** インポート元から選べる設問。 */
 export interface QuestionImportSource {
   pages: QuestionImportPage[];
 }
 
-/** 設問を取り込み用に写した結果。 */
+/** 設問をインポート用にコピーした結果。 */
 export interface QuestionImportResult {
   questions: Question[];
   removedChoiceTransitions: number;
@@ -787,7 +787,7 @@ export function problemKey(code: string): MessageKey | null {
  *
  * **画面はこれで出し分ける。**「Administrator かどうか」で分けると、
  * 役割を増やすたびに画面を直すことになる。
- * **サーバ側でも同じ権限で判定している**ので、隠すのは押せない釦を出さないため。
+ * **サーバ側でも同じ権限で判定している**ので、隠すのは押せないボタンを出さないため。
  */
 export type AdminPermission =
   | 'surveys.read'

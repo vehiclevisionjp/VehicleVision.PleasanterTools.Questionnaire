@@ -8,7 +8,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 /// <summary>アンケート 1 本あたりの枠が、回答画面以外を巻き込まないことを見る。</summary>
 /// <remarks>
 /// ⚠️ **レート制限には試験が 1 つも無かった。** Issue #311 の取り違えも、
-/// 写しの一式が 429 で全滅して初めて分かった。
+/// スクリーンショットの一式が 429 で全滅して初めて分かった。
 /// </remarks>
 public class RateLimitPartitionsTests
 {
