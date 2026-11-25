@@ -102,7 +102,7 @@ public sealed record MappingConverter(
 /// （<c>_documents/アーキテクチャ方針.md</c> 8 章）。
 /// </para>
 /// <para>
-/// 1 つの設問を複数の列へ写したい場合（複数選択 → 複数のチェック列）は、
+/// 1 つの設問を複数の列へコピーしたい場合（複数選択 → 複数のチェック列）は、
 /// **同じ設問を入力にした割り当てを列の数だけ並べる。**
 /// </para>
 /// </remarks>
@@ -117,7 +117,7 @@ public sealed record ColumnAssignment
     /// <summary>変換。<c>null</c> なら入力をそのまま書く（このとき入力は 1 つ）。</summary>
     public MappingConverter? Converter { get; init; }
 
-    /// <summary><c>1 : 0 : 1</c>。入力をそのまま列へ写す。</summary>
+    /// <summary><c>1 : 0 : 1</c>。入力をそのまま列へコピーする。</summary>
     public static ColumnAssignment Direct(string targetColumn, MappingSource source) => new()
     {
         TargetColumn = targetColumn,
@@ -125,7 +125,7 @@ public sealed record ColumnAssignment
         Converter = null,
     };
 
-    /// <summary><c>N : 1 : 1</c>。入力を変換して列へ写す。</summary>
+    /// <summary><c>N : 1 : 1</c>。入力を変換して列へコピーする。</summary>
     public static ColumnAssignment Converted(
         string targetColumn,
         MappingConverter converter,

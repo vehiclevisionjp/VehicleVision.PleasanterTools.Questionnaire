@@ -55,7 +55,7 @@ public static class PathBaseMiddleware
 
                 // **要求の綴りではなく、設定した綴りを PathBase にする。**
                 // 照合は大文字小文字を区別しないので `/QUESTIONNAIRE/` も通る。
-                // 要求の綴りを写すと cookie の Path（ブラウザは区別する）が綴りごとに割れ、
+                // 要求の綴りをコピーすると cookie の Path（ブラウザは区別する）が綴りごとに割れ、
                 // 入口 HTML のキャッシュも綴りの組み合わせだけ増える
                 request.PathBase = originalPathBase.Add(pathBase);
 

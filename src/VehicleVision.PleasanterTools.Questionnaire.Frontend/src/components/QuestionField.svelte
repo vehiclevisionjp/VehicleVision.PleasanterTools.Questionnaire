@@ -767,7 +767,7 @@
 
   .rank-item {
     display: flex;
-    /* **狭い幅では ↑↓ の釦を次の行へ回す**（Issue #901）。選択肢名の列が 1 文字幅まで潰れるのを防ぐ */
+    /* **狭い幅では ↑↓ のボタンを次の行へ回す**（Issue #901）。選択肢名の列が 1 文字幅まで潰れるのを防ぐ */
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);

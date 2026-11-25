@@ -7,7 +7,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
 /// <summary>
-/// 取り込みが通る検査（Issue #1009）。**公開前の検査と保存の関所を共有していること**を確かめる。
+/// インポートが通る検査（Issue #1009）。**公開前の検査と保存の関所を共有していること**を確かめる。
 /// </summary>
 public class SurveyImportRulesTests
 {

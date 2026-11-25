@@ -95,7 +95,7 @@ test.describe('グリッドとランキング', () => {
     await expect(page.getByRole('button', { name: /1 位.*安さ/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /2 位.*速さ/ })).toBeVisible();
 
-    // **一番上では上げられない。** 押せる釦が何もしないのが一番たちが悪い
+    // **一番上では上げられない。** 押せるボタンが何もしないのが一番たちが悪い
     await expect(page.getByRole('button', { name: '安さ: 順位を上げる' })).toBeDisabled();
   });
 

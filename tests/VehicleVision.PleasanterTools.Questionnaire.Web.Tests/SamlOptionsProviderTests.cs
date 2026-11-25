@@ -30,13 +30,11 @@ public class SamlOptionsProviderTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [SamlOptions.EnabledKey] = "false",
-                [SamlOptions.ButtonLabelKey] = "外部設定の表示",
             })
             .Build();
         var store = new FakeStore(new SamlSettingValues
         {
             Enabled = "true",
-            ButtonLabel = "DB の表示",
             UnknownUser = "Register",
         });
         var provider = new SamlOptionsProvider(configuration, store);
@@ -44,10 +42,8 @@ public class SamlOptionsProviderTests
         var snapshot = await provider.GetAsync();
 
         Assert.False(snapshot.Options.Enabled);
-        Assert.Equal("外部設定の表示", snapshot.Values.ButtonLabel);
         Assert.Equal("Register", snapshot.Values.UnknownUser);
         Assert.Contains(SamlOptions.EnabledKey, snapshot.FixedKeys);
-        Assert.Contains(SamlOptions.ButtonLabelKey, snapshot.FixedKeys);
         Assert.DoesNotContain(SamlOptions.UnknownUserKey, snapshot.FixedKeys);
     }
 
@@ -58,13 +54,11 @@ public class SamlOptionsProviderTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [SamlOptions.EnabledKey] = "false",
-                [SamlOptions.ButtonLabelKey] = "外部設定の表示",
             })
             .Build();
         var store = new FakeStore(new SamlSettingValues
         {
             Enabled = "true",
-            ButtonLabel = "退避している表示",
             UnknownUser = "Reject",
         });
         var provider = new SamlOptionsProvider(configuration, store);
@@ -72,12 +66,10 @@ public class SamlOptionsProviderTests
         await provider.SaveAsync(new SamlSettingValues
         {
             Enabled = "false",
-            ButtonLabel = "画面からの表示",
             UnknownUser = "Register",
         });
 
         Assert.Equal("true", store.Values.Enabled);
-        Assert.Equal("退避している表示", store.Values.ButtonLabel);
         Assert.Equal("Register", store.Values.UnknownUser);
     }
 

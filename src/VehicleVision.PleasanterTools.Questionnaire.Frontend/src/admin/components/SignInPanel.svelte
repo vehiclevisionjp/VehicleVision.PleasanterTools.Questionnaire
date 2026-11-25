@@ -226,7 +226,7 @@
   }
 
   // **ログイン画面を開いたとき、黙って一度だけ確かめる。**
-  // Pleasanter に既にログインしていれば、釦を押さずに入れる。
+  // Pleasanter に既にログインしていれば、ボタンを押さずに入れる。
   // ⚠️ **自分でログアウトした直後は確かめない**（入り直してしまい、ログアウトできないように見える）
   $effect(() => {
     const auto = untrack(() =>
@@ -426,7 +426,7 @@
   </form>
     {/snippet}
 
-    <!-- **SSO の釦。** タブのときは SSO の区画の中に置くので、上に区切りは要らない -->
+    <!-- **SSO のボタン。** タブのときは SSO の区画の中に置くので、上に区切りは要らない -->
     {#snippet ssoButtons(dividerAbove: boolean)}
   {#if session.samlEnabled && !isSetup}
     <!-- **最初の管理者を作る画面には出さない。** IdP から来た人を
@@ -438,7 +438,7 @@
     {#if samlError}<p class="error" role="alert">{samlError}</p>{/if}
 
     <button type="button" class="saml" onclick={startSaml}>
-      {session.samlLabel ?? t('signIn.samlButton')}
+      {t('signIn.samlButton')}
     </button>
   {/if}
 
@@ -463,7 +463,7 @@
       </button>
     {:else}
       <button type="button" class="saml" disabled={busy} onclick={startPleasanter}>
-        {session.pleasanterSsoLabel ?? t('signIn.pleasanterButton')}
+        {t('signIn.pleasanterButton')}
       </button>
     {/if}
   {/if}

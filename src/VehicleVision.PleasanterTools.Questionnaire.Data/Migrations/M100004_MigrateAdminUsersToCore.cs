@@ -3,14 +3,14 @@ using FluentMigrator;
 namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
 /// <summary>
-/// 管理者・復旧コード・初期設定の印を、Core.Data の共有表（<c>Core_AdminUsers</c> ほか）へ写し、
-/// 管理者のセッション（<c>AdminSessions</c>）は<b>写さずに落とす</b>。
+/// 管理者・復旧コード・初期設定の印を、Core.Data の共有表（<c>Core_AdminUsers</c> ほか）へコピーし、
+/// 管理者のセッション（<c>AdminSessions</c>）は<b>コピーせずに落とす</b>。
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>稼働中のデータがあり得るので、行を写してから旧表を落とす</b>（<see cref="LegacyStoreMigration"/>）。
+/// <b>稼働中のデータがあり得るので、行をコピーしてから旧表を落とす</b>（<see cref="LegacyStoreMigration"/>）。
 /// 旧 <c>AdminUsers</c>・<c>AdminRecoveryCodes</c>・<c>AdminSessions</c> を落とす。冪等（旧表が無ければ何もしない。
-/// Core の表に同じキーの行があれば写さない）。
+/// Core の表に同じキーの行があればコピーしない）。
 /// </para>
 /// <para>列の対応は次のとおり。</para>
 /// <list type="bullet">
@@ -23,10 +23,10 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// <item><description><c>IsDisabled</c>（真偽値）→ 整数 0 / 1。<b>PostgreSQL だけ真偽値を <c>= true</c> で比べる</b></description></item>
 /// <item><description><c>TotpSecretEncrypted</c> → <c>TotpSecretCipher</c>（<b>暗号文のまま</b>。復号しない。
 /// 旧の暗号文は文脈を持たないので、アプリのアダプタが読み替えて復号する）。
-/// 旧は <c>TotpEnabledAt</c> が無ければ 2 要素を未登録と扱ったので、その行の共有鍵は写さない</description></item>
+/// 旧は <c>TotpEnabledAt</c> が無ければ 2 要素を未登録と扱ったので、その行の共有鍵はコピーしない</description></item>
 /// <item><description><c>Language</c>（NULL = まだ選んでいない）→ 空文字（Core の列は NULL を許さない。空文字が「選んでいない」）</description></item>
 /// <item><description><c>ResponseNotificationEnabled</c> → Q の表 <c>AdminUserSettings</c>（受け取る管理者の行だけ）。
-/// <c>UpdatedAt</c>・<c>TotpEnabledAt</c> は Core の表に列が無く、アプリも読まないので写さない</description></item>
+/// <c>UpdatedAt</c>・<c>TotpEnabledAt</c> は Core の表に列が無く、アプリも読まないのでコピーしない</description></item>
 /// <item><description><c>AdminRecoveryCodes</c> → <c>Core_AdminRecoveryCodes</c>（<c>RecoveryCodeId</c>・<c>CreatedAt</c> は持たない。
 /// ハッシュは PBKDF2 の 79 文字で、Core の列（128 文字）に収まる）</description></item>
 /// <item><description>管理者が 1 人でも居れば、<c>Core_AdminSetup</c> に印（Id = 1）を入れる。
@@ -38,7 +38,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// <b>どの行かを示して失敗</b>する（何も書かず、旧表も落とさない）。
 /// </para>
 /// <para>
-/// <b>旧セッションは写さない</b>（切り替え時に失効させる。管理者は再ログインする）。
+/// <b>旧セッションはコピーしない</b>（切り替え時に失効させる。管理者は再ログインする）。
 /// 旧は外部キー（<c>AdminSessions → AdminUsers</c>）があるので、<b>セッション → 復旧コード → 管理者の順</b>に落とす。
 /// 管理者を参照する外部キーはほかに無い（<c>AdminInvitations</c> などは外部キー無しで、Core の共有表へ移済み）。
 /// </para>
@@ -103,7 +103,7 @@ public sealed class M100004_MigrateAdminUsersToCore : Migration
         DatabaseProvider provider,
         string sql) => LegacyStoreMigration.ExecuteNonQuery(connection, transaction, provider, sql);
 
-    /// <summary>写す前の検査。<b>問題があれば、どの行かを示して例外にする</b>（旧表は落ちない）。</summary>
+    /// <summary>コピーする前の検査。<b>問題があれば、どの行かを示して例外にする</b>（旧表は落ちない）。</summary>
     private static void Verify(
         System.Data.IDbConnection connection,
         System.Data.IDbTransaction? transaction,
@@ -160,7 +160,7 @@ public sealed class M100004_MigrateAdminUsersToCore : Migration
         if (problems.Count > 0)
         {
             throw new InvalidOperationException(
-                "管理者を Core.Data の共有表へ写せない。旧表は残してある。" + string.Join(" / ", problems));
+                "管理者を Core.Data の共有表へコピーできない。旧表は残してある。" + string.Join(" / ", problems));
         }
     }
 
@@ -199,7 +199,7 @@ public sealed class M100004_MigrateAdminUsersToCore : Migration
     private static string CopyRecoveryCodes(DatabaseProvider provider) =>
         "INSERT INTO [Core_AdminRecoveryCodes] ([UserId], [CodeHash], [UsedAt]) "
         + "SELECT r.[AdminUserId], r.[CodeHash], r.[UsedAt] FROM [AdminRecoveryCodes] r "
-        // 管理者の居ない復旧コードは写さない（孤児）
+        // 管理者の居ない復旧コードはコピーしない（孤児）
         + "WHERE EXISTS (SELECT 1 FROM [Core_AdminUsers] c WHERE c.[Id] = "
         + LegacyStoreMigration.KeyOf(provider, "r.[AdminUserId]") + ") "
         + "AND NOT EXISTS (SELECT 1 FROM [Core_AdminRecoveryCodes] k WHERE k.[UserId] = "

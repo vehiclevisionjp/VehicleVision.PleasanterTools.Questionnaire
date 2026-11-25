@@ -9,7 +9,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Endpoints;
 /// <remarks>
 /// <para>
 /// **よくある形を毎回作り直さずに済ませるためのもの。**
-/// 複製（Issue #46）と同じく設問・選択肢・分岐・マッピングを写すが、
+/// 複製（Issue #46）と同じく設問・選択肢・分岐・マッピングをコピーするが、
 /// **テンプレートは Pleasanter のサイトを持たない**ので、複製と同じ扱いにはできない。
 /// **そこからアンケートを作るときに、書き込み先のサイトを指定させる。**
 /// </para>
@@ -64,7 +64,7 @@ public static class AdminTemplateEndpoints
                 SurveyPublicId.Generate());
 
             // **元がテンプレートなら断る**（ストア側で見ている）。
-            // テンプレートからテンプレートを作れると、写しの写しが増えるだけになる
+            // テンプレートからテンプレートを作れると、コピーのコピーが増えるだけになる
             var created = await drafts.SaveAsTemplateAsync(surveyId, target, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -85,7 +85,7 @@ public static class AdminTemplateEndpoints
             CancellationToken cancellationToken) =>
         {
             // **サイト ID は必ず指定させる。** テンプレートは持っていないので、
-            // 写して埋めることができない
+            // コピーして埋めることができない
             if (request.PleasanterSiteId <= 0)
             {
                 return Results.BadRequest(new
@@ -138,11 +138,11 @@ public static class AdminTemplateEndpoints
 
     /// <summary>アンケートからテンプレートを作る。</summary>
     /// <param name="SurveyId">
-    /// 写す元のアンケート。**経路ではなく本文で受ける。**
+    /// コピーする元のアンケート。**経路ではなく本文で受ける。**
     /// テンプレートの入口に置いており、経路の識別子は作られるテンプレートを指すため。
     /// </param>
     /// <remarks>
-    /// **題名は指定させない。** 元のアンケートの題名をそのまま写す。
+    /// **題名は指定させない。** 元のアンケートの題名をそのままコピーする。
     /// 題名は多言語の器（<see cref="LocalizedText"/>）であり、
     /// ここで 1 つの文字列を受け取ると、**日本語の題名が英語として保存される**
     /// （<c>_documents/多言語対応方針.md</c> 5 章）。
@@ -155,7 +155,7 @@ public static class AdminTemplateEndpoints
     /// **書き込み先のサイト。テンプレートは持っていないので、必ず指定させる。**
     /// </param>
     /// <param name="ResponseJsonColumn">
-    /// 回答 JSON の正本を入れる列。**サイトに紐づく値なので写さない。**
+    /// 回答 JSON の正本を入れる列。**サイトに紐づく値なのでコピーしない。**
     /// </param>
     public sealed record CreateFromTemplateRequest(
         long PleasanterSiteId,

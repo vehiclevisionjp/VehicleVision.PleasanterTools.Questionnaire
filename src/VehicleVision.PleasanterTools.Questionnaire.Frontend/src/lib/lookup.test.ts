@@ -121,7 +121,7 @@ describe('キーの状態', () => {
     });
   });
 
-  it('キーが変われば写しが変わる', () => {
+  it('キーが変わればコピーが変わる', () => {
     const before = keySnapshot(lookup, { k1: answer('1'), k2: answer('2') });
     expect(keySnapshot(lookup, { k1: answer('1'), k2: answer('2') })).toBe(before);
     expect(keySnapshot(lookup, { k1: answer('1'), k2: answer('3') })).not.toBe(before);

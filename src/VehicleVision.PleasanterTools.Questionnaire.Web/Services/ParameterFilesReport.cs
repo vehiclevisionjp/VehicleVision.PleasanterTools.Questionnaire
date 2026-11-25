@@ -12,6 +12,18 @@ public sealed class ParameterFilesReport(
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        // **SSO のログインボタンの表示名は廃止した**（Issue #1079）。読まずに、無視した旨を 1 回だけ出す。
+        // 設定ファイルの有無にかかわらず、環境変数だけの構成にも出すため、最初に調べる
+        var removed = RemovedSsoButtonLabelSettings.Find(configuration);
+        if (removed.Count > 0)
+        {
+            logger.LogWarning(
+                "SSO のログインボタンの表示名の設定は廃止した。指定されていても無視し、"
+                + "固定の文言（SAML は「SSO でログイン」、Pleasanter は「Pleasanter でログイン」）を出す。"
+                + "設定から削除すること: {Names}",
+                string.Join(", ", removed));
+        }
+
         var directory = configuration[ParameterFiles.DirectoryKey];
         var found = configuration[ParameterFiles.FoundFilesKey];
 

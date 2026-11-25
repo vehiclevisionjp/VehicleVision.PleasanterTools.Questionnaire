@@ -247,7 +247,7 @@ describe('validateFlow の表示条件', () => {
     expect(codes(survey)).toContain('UnknownChoiceValue');
   });
 
-  it('釦条件は同じページの設問を参照できる', () => {
+  it('ボタン条件は同じページの設問を参照できる', () => {
     const survey = definition(
       page('p1', {
         questions: [question('q1')],

@@ -222,7 +222,7 @@ export interface Page {
    * **説明文ブロックは動かさない。**
    */
   shuffleQuestions?: boolean;
-  /** ページ下部の釦。未指定なら従来どおり常に表示し、有効。 */
+  /** ページ下部のボタン。未指定なら従来どおり常に表示し、有効。 */
   buttons?: PageButtons | null;
 }
 

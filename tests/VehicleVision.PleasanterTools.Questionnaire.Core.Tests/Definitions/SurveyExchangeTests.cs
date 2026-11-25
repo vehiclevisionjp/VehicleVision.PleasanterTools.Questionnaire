@@ -5,7 +5,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Definitions;
 
-/// <summary>フォーム定義の書き出し・取り込み（Issue #1009）。**DB を使わない。**</summary>
+/// <summary>フォーム定義のエクスポート・インポート（Issue #1009）。**DB を使わない。**</summary>
 public class SurveyExchangeTests
 {
     private const string HeaderImageId = "33333333-3333-4333-8333-333333333333";

@@ -118,7 +118,7 @@ public static class ColumnBudget
         columnName.Length > 1
         && (char.IsAsciiLetterUpper(columnName[^1]) || char.IsAsciiDigit(columnName[^1]));
 
-    /// <summary>この定義を「行ごとに 1 列」で写すと、いくつ入力が要るか。</summary>
+    /// <summary>この定義を「行ごとに 1 列」でコピーすると、いくつ入力が要るか。</summary>
     /// <remarks>
     /// **見積もりであって、実際の消費ではない。**
     /// まとめて 1 列へ入れる人もいるので、**編集画面で「このままだと何本要るか」を

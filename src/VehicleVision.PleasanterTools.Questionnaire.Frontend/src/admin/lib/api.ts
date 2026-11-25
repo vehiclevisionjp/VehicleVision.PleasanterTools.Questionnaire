@@ -549,7 +549,7 @@ export const createSurvey = (
  * アンケートを複製する（Issue #46）。
  *
  * **公開用 ID はサーバが作り直す。** 使い回すと 2 つのアンケートが同じ URL を指す。
- * **書き込み先のサイトは写さない**ので、ここで新しく指定する。
+ * **書き込み先のサイトはコピーしない**ので、ここで新しく指定する。
  * **Administrator だけが通る**（サーバ側で判定する）。
  */
 export const duplicateSurvey = (
@@ -563,9 +563,9 @@ export const duplicateSurvey = (
   });
 
 /**
- * 書き出した JSON から、新しいアンケートを下書きとして取り込む（Issue #1009）。
+ * エクスポートした JSON から、新しいアンケートを下書きとしてインポートする（Issue #1009）。
  *
- * **書き込み先のサイトは書き出しに入っていない**ので、ここで指定する。
+ * **書き込み先のサイトはエクスポートに入っていない**ので、ここで指定する。
  * **公開前の検査と同じ検査をサーバが行い、通らなければ 1 件も作らない。**
  */
 export const importSurvey = (
@@ -578,7 +578,7 @@ export const importSurvey = (
     json: { document, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
   });
 
-/** 書き出しのダウンロード先。**認証は cookie なので、リンクで開いてよい。** */
+/** エクスポートのダウンロード先。**認証は cookie なので、リンクで開いてよい。** */
 export const surveyExportUrl = (surveyId: string) =>
   appUrl(`/api/admin/surveys/${surveyId}/export`);
 
@@ -594,7 +594,7 @@ export const listTemplates = () => call<SurveyTemplateSummary[]>('/api/admin/tem
 /**
  * アンケートをテンプレートにする。
  *
- * **題名は指定しない。** 元のアンケートの題名をそのまま写す。
+ * **題名は指定しない。** 元のアンケートの題名をそのままコピーする。
  * 題名は多言語の器なので、1 つの文字列を送ると
  * 日本語の題名が英語として保存されてしまう。
  */
@@ -637,14 +637,14 @@ export const listVersions = (surveyId: string) =>
 export const loadVersion = (surveyId: string, version: number) =>
   call<SurveyVersionContent>(`/api/admin/surveys/${surveyId}/versions/${version}`);
 
-/** 取り込み元のページと設問を読む。**マッピングは返さない。** */
+/** インポート元のページと設問を読む。**マッピングは返さない。** */
 export const loadQuestionImportSource = (surveyId: string, sourceSurveyId: string) =>
   call<QuestionImportSource>(
     `/api/admin/surveys/${surveyId}/question-import/${sourceSurveyId}`,
   );
 
 /**
- * 選んだ設問を取り込み先用に写す。
+ * 選んだ設問をインポート先用にコピーする。
  *
  * **ID の再採番と、分岐・表示条件・資産参照の除去はサーバが行う。**
  */

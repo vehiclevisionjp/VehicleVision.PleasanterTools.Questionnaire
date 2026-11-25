@@ -270,7 +270,7 @@ public class AuditLogFilterTests
     public async Task 時刻はこれまでと同じ目盛りでサーバのローカル時刻の数字を残す()
     {
         // **旧は DateTime.Now（ローカル時刻の数字）をそのまま持っていた。** 目盛りを変えると、
-        // 旧表から写した行と新しい行で、画面の時刻が食い違う（AuditLogTime）
+        // 旧表からコピーした行と新しい行で、画面の時刻が食い違う（AuditLogTime）
         var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(
             new DateTimeOffset(2026, 10, 20, 0, 30, 0, TimeSpan.Zero));
         time.SetLocalTimeZone(TimeZoneInfo.CreateCustomTimeZone("JST", TimeSpan.FromHours(9), "JST", "JST"));

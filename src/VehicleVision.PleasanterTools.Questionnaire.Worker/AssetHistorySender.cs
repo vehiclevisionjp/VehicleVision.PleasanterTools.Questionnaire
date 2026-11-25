@@ -119,7 +119,7 @@ public sealed class AssetHistorySender(
         var record = recordBuilder.Build(mapped.Columns);
         if (!record.Problems.IsEmpty)
         {
-            return await DeadLetterAsync(claimed, "履歴を列へ写せない", cancellationToken)
+            return await DeadLetterAsync(claimed, "履歴を列へコピーできない", cancellationToken)
                 .ConfigureAwait(false);
         }
 

@@ -3,7 +3,7 @@
    * ほかの管理者の API キーの一覧と失効（Issue #1025）。**管理者の一覧から開く。**
    *
    * **見るのは `users.read`、失効は `users.write`**（発行はできない。値も見えない）。
-   * ⚠️ **押せない釦を出さないのは画面の親切であって、守りはサーバ側にある。**
+   * ⚠️ **押せないボタンを出さないのは画面の親切であって、守りはサーバ側にある。**
    */
   import { listAdminUserApiTokens, revokeApiToken } from '../lib/api';
   import { confirmAction } from '../lib/confirmation.svelte';

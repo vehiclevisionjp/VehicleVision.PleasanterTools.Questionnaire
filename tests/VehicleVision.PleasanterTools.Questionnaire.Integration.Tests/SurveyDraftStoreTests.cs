@@ -583,8 +583,8 @@ public class SurveyDraftStoreTests
     }
 
     /// <summary>
-    /// 複製で設問・選択肢・**分岐**・マッピングが写ること（Issue #46）。
-    /// **下書きは列で持っている**ので、写し漏れると黙って消える。
+    /// 複製で設問・選択肢・**分岐**・マッピングがコピーされること（Issue #46）。
+    /// **下書きは列で持っている**ので、コピーし漏れると黙って消える。
     /// </summary>
     [Theory]
     [MemberData(nameof(Providers))]
@@ -676,8 +676,8 @@ public class SurveyDraftStoreTests
     }
 
     /// <summary>
-    /// **公開用 ID・サイト・公開状態・公開済みの版は写さない**（Issue #46）。
-    /// 写すと 2 つのアンケートが同じ URL と同じサイトを指す。
+    /// **公開用 ID・サイト・公開状態・公開済みの版はコピーしない**（Issue #46）。
+    /// コピーすると 2 つのアンケートが同じ URL と同じサイトを指す。
     /// </summary>
     [Theory]
     [MemberData(nameof(Providers))]
@@ -694,7 +694,7 @@ public class SurveyDraftStoreTests
         await drafts.SaveAsync(
             surveyId, Definition(surveyId, "q1"), new MappingDefinition(), expectedRevision: 0);
 
-        // 元を公開しておく。**公開済みの版が写らないことを見る**
+        // 元を公開しておく。**公開済みの版がコピーされないことを見る**
         var published = await drafts.LoadAsync(surveyId);
         await surveys.PublishAsync(surveyId, 1, published!.Definition, published.Mapping, null);
         var original = await surveys.FindBySurveyIdAsync(surveyId);
@@ -772,7 +772,7 @@ public class SurveyDraftStoreTests
     // ---- テンプレート（Issue #58） -----------------------------------------
 
     /// <summary>
-    /// テンプレートにすると、設問も分岐もマッピングも写る（Issue #58）。
+    /// テンプレートにすると、設問も分岐もマッピングもコピーされる（Issue #58）。
     ///
     /// **題名には「のコピー」を付けない。** そこから作るアンケートの題名になる。
     /// **書き込み先のサイトは持たない。** そこから作るときに指定させる。

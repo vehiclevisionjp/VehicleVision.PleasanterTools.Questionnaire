@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "取説用の画面の写しを撮る",
+  "description": "取説用の画面のスクリーンショットを撮る",
   "scripts": {
     "shot": "playwright test specs/manual.spec.ts && playwright test --grep-invert @standalone"
   },

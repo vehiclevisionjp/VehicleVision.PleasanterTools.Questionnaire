@@ -52,7 +52,7 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 
 **`Pleasanter.json` と `Service.json` は、キーの名前が環境変数と違う**
 （Pleasanter 本体に合わせた短い名前を使っているため）。
-**読み込み時に下表のとおり写している**ので、どちらで書いても効く。
+**読み込み時に下表のとおりコピーしている**ので、どちらで書いても効く。
 
 | ファイルのキー | 環境変数 |
 | --- | --- |
@@ -69,7 +69,7 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 追加した短いキーの対応は[設定ファイル対応一覧](../../_documents/設定ファイル対応一覧.md)を参照してください。
 
 > ⚠️ **値が `null` や空のキーは無視する。** `Pleasanter.json` の `ApiKey` は既定で `null`
-> （ここへ書かせないため）なので、写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
+> （ここへ書かせないため）なので、コピーすると**環境変数で与えた API キーを空で塗り潰してしまう。**
 
 ## 環境変数
 
@@ -157,7 +157,6 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 | `QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE` | Pleasanter SSO の JIT 役割。許可値・既定値は SAML と同じ |
 | `QUESTIONNAIRE_SAML_LOGINIDSOURCE` | ログイン ID の取り出し先。`NameId`（既定）/ `Claim` |
 | `QUESTIONNAIRE_SAML_LOGINIDCLAIM` | `LOGINIDSOURCE=Claim` のときに読む属性名 |
-| `QUESTIONNAIRE_SAML_BUTTONLABEL` | ログイン画面の釦に出す文字（省略時は「シングルサインオンでログイン」） |
 | `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |

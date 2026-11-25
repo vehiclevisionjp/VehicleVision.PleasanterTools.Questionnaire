@@ -22,8 +22,10 @@ public sealed class SamlOptions
     public const string RegisterRoleKey = "QUESTIONNAIRE_SAML_REGISTERROLE";
     public const string LoginIdSourceKey = "QUESTIONNAIRE_SAML_LOGINIDSOURCE";
     public const string LoginIdClaimKey = "QUESTIONNAIRE_SAML_LOGINIDCLAIM";
-    public const string ButtonLabelKey = "QUESTIONNAIRE_SAML_BUTTONLABEL";
     public const string SingleLogoutUrlKey = "QUESTIONNAIRE_SAML_SINGLELOGOUTURL";
+
+    /// <summary>廃止した表示名の鍵（Issue #1079）。**読まない。** Core.Web の鍵の一覧と揃えるためだけに残す。</summary>
+    public const string ButtonLabelKey = "QUESTIONNAIRE_SAML_BUTTONLABEL";
 
     private static readonly SamlSettingKeys Keys = new("QUESTIONNAIRE_");
 
@@ -38,7 +40,6 @@ public sealed class SamlOptions
     public AdminRole RegisterRole { get; init; } = AdminRole.Editor;
     public SamlLoginIdSource LoginIdSource { get; init; }
     public string LoginIdClaim { get; init; } = string.Empty;
-    public string ButtonLabel { get; init; } = string.Empty;
 
     public static SamlOptions FromConfiguration(IConfiguration configuration)
     {
@@ -69,7 +70,6 @@ public sealed class SamlOptions
             RegisterRole = Enum.Parse<AdminRole>(options.RegisterRole),
             LoginIdSource = options.LoginIdSource,
             LoginIdClaim = options.LoginIdClaim,
-            ButtonLabel = options.ButtonLabel,
         };
     }
 

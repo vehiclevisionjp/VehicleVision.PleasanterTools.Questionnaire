@@ -221,12 +221,6 @@
         </label>
       </div>
 
-      <label>
-        {t('pleasanterSso.buttonLabel')}
-        {#if fixed('buttonLabel')}<span class="fixed">{t('pleasanterSso.fixed')}</span>{/if}
-        <input type="text" bind:value={settings.buttonLabel} disabled={fixed('buttonLabel')} />
-      </label>
-
       {#if error}<p class="error" role="alert">{error}</p>{/if}
       {#if done}<p class="done" role="status">{done}</p>{/if}
       <button type="submit" disabled={busy}>

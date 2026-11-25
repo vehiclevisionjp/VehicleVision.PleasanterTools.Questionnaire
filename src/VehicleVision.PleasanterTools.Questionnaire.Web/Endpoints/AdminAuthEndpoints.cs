@@ -63,15 +63,13 @@ public static class AdminAuthEndpoints
                 cancellationToken).ConfigureAwait(false);
             var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
 
-            // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。
+            // **SAML が使えるかは未認証の相手にも返す。** ログイン画面にボタンを出すため。
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
             var samlEnabled = saml.Enabled;
-            var samlLabel = saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null;
 
             // **Pleasanter のログインも同じ扱い**（Issue #464）。
             // 返すのはブラウザで開くログイン画面の URL だけ。**内部 URL は返さない**
             var pleasanterSsoEnabled = pleasanterSso.Enabled;
-            var pleasanterSsoLabel = pleasanterSso.ButtonLabel.Length > 0 ? pleasanterSso.ButtonLabel : null;
             var pleasanterSsoLoginUrl = pleasanterSsoEnabled ? pleasanterSso.LoginUrl : null;
 
             // **合言葉を塞げるのは、ほかの入口（SAML か Pleasanter）が有効な間だけ**
@@ -136,9 +134,7 @@ public static class AdminAuthEndpoints
                     twoFactor = options.TwoFactor.ToString(),
                     hasTotp,
                     samlEnabled,
-                    samlLabel,
                     pleasanterSsoEnabled,
-                    pleasanterSsoLabel,
                     pleasanterSsoLoginUrl,
                     passwordSignInEnabled,
                     captchaEnabled = botOptions.AdminCaptcha.Enabled,
@@ -195,9 +191,7 @@ public static class AdminAuthEndpoints
                 pendingLoginId = pending.Succeeded ? pending.Principal?.Identity?.Name : null,
                 needsEnrollment,
                 samlEnabled,
-                samlLabel,
                 pleasanterSsoEnabled,
-                pleasanterSsoLabel,
                 pleasanterSsoLoginUrl,
                 passwordSignInEnabled,
                 captchaEnabled = botOptions.AdminCaptcha.Enabled,

@@ -134,16 +134,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          # **npm-audit だけは、この確認から除く**（2026-11-18、Issue #1020・#1043）。
-          # picomatch の high に修正版が無く、npm-audit が赤のまま続くため。必須ステータスチェックからも
-          # 外してある。**修正版が出て npm audit が 0 になったら、この除外を外す**（#1020 の戻す条件）
           sha="$(git rev-parse HEAD)"
           failed="$(gh api "repos/$REPOSITORY/commits/$sha/check-runs" \
               --paginate \
               --jq '[.check_runs[]
                      | select(.status == "completed")
                      | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "cancelled")
-                     | select(.name != "npm-audit")
                      | .name] | unique | join(", ")')"
 
           if [ -z "$failed" ]; then
@@ -164,7 +160,7 @@ jobs:
         if: ${{ !inputs.dry_run }}
         env:
           ACKNOWLEDGE: ${{ inputs.acknowledge }}
-          # **`secrets` / `vars` は `if` から参照できない。** env へ写して判定する
+          # **`secrets` / `vars` は `if` から参照できない。** env へコピーして判定する
           # （Dealer の ci.yml と同じ理由）
           HAS_CLIENT_ID: ${{ vars.MY_REPO_AUTOMATION_BOT_CLIENT_ID != '' }}
           HAS_PRIVATE_KEY: ${{ secrets.MY_REPO_AUTOMATION_BOT_PRIVATE_KEY != '' }}

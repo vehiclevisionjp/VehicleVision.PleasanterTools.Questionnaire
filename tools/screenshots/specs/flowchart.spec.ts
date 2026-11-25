@@ -23,7 +23,7 @@ test.beforeAll(async ({ browser, baseURL }) => {
   await ensureAdminStorageState(browser, baseURL ?? '');
 });
 
-test.describe('分岐の全体図の写し', { tag: '@standalone' }, () => {
+test.describe('分岐の全体図のスクリーンショット', { tag: '@standalone' }, () => {
   test('不備のない分岐の全体図を撮る', async ({ browser, baseURL }) => {
     const context = await signedInContext(browser, baseURL ?? '');
     try {

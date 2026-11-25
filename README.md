@@ -4,7 +4,7 @@
 
 - 回答画面は **Google Forms / Microsoft Forms に近い見た目・操作感**
 - **アンケートの定義（設問・選択肢・分岐・テーマなど）は本アプリの管理画面で作り、本アプリの DB に持つ。**
-  Pleasanter のサイトの列へは、設問ごとのマッピングで回答を写す
+  Pleasanter のサイトの列へは、設問ごとのマッピングで回答をコピーする
   （[`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) 7・8 章）
 - **回答データは Pleasanter のレコードとして蓄積する**
 - **Pleasanter 本体は改造しない。** 標準 Web API を利用する独立したアプリ
@@ -31,7 +31,7 @@ flowchart LR
 
     U --> SPA --> BFF
     BFF --> QDB
-    BFF -->|"回答を列へ写して保存<br/>GetSite で列を調べる<br/>（APIキーはサーバ側のみ）"| PL
+    BFF -->|"回答を列へコピーして保存<br/>GetSite で列を調べる<br/>（APIキーはサーバ側のみ）"| PL
 ```
 
 **API キーはサーバ側だけが持つ。** Pleasanter の API キーはリクエストボディに載せる方式のため、

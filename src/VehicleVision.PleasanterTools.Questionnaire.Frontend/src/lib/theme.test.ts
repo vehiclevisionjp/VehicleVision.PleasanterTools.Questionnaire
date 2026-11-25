@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTRAST_AA,
   DEFAULT_COLORS,
+  DISABLED_SURFACE_TEXT_PERCENT,
+  DISABLED_TEXT_PERCENT,
   THEME_PRESETS,
   THEME_PRESET_COLORS,
   applyTheme,
   contrastRatio,
+  mixColors,
   resolveTheme,
   safeColor,
   type SurveyTheme,
@@ -152,5 +155,88 @@ describe('等幅の書体', () => {
     const font = target.style.get('--font') ?? '';
     expect(font.startsWith('"Zen Kaku Gothic New", ')).toBe(true);
     expect(font).not.toContain('Noto');
+  });
+});
+
+/** `applyTheme` が `style` へ入れた値を覚えておく入れ物。 */
+function styleTarget() {
+  const values = new Map<string, string>();
+  const el = {
+    style: {
+      setProperty: (name: string, value: string) => values.set(name, value),
+      removeProperty: (name: string) => values.delete(name),
+    },
+  } as unknown as HTMLElement;
+  return { values, el };
+}
+
+describe('無効の入力欄の色（Issue #1069）', () => {
+  it('何も指定していなければ触らない（既定の見た目のまま）', () => {
+    const { values, el } = styleTarget();
+
+    applyTheme(el, {});
+
+    expect(values.has('--disabled-surface')).toBe(false);
+    expect(values.has('--disabled-text')).toBe(false);
+  });
+
+  it.each<[string, SurveyTheme]>([
+    ['地だけ', { backgroundColor: '#101820' }],
+    ['文字だけ', { textColor: '#eeeeee' }],
+    ['設問枠だけ', { surfaceColor: '#1f2937' }],
+    ['配色', { preset: 'Midnight' }],
+  ])('%s を指定すると、地・文字・設問枠から導く', (_name, theme) => {
+    const { values, el } = styleTarget();
+
+    applyTheme(el, theme);
+
+    expect(values.get('--disabled-surface')).toBe(
+      `color-mix(in srgb, var(--text) ${DISABLED_SURFACE_TEXT_PERCENT}%, var(--surface))`,
+    );
+    expect(values.get('--disabled-text')).toBe(
+      `color-mix(in srgb, var(--text) ${DISABLED_TEXT_PERCENT}%, var(--disabled-surface))`,
+    );
+  });
+
+  it('指定を外すと導いた値も消える', () => {
+    const { values, el } = styleTarget();
+
+    applyTheme(el, { backgroundColor: '#101820' });
+    applyTheme(el, {});
+
+    expect(values.has('--disabled-surface')).toBe(false);
+    expect(values.has('--disabled-text')).toBe(false);
+  });
+
+  // **CSS の `color-mix` はブラウザが実行時に計算する**ので、同じ計算（mixColors）で値を出して比べる。
+  const palettes: [string, { text: string; surface: string }][] = [
+    ...THEME_PRESETS.filter((preset) => preset !== 'None').map(
+      (preset): [string, { text: string; surface: string }] => [
+        `配色 ${preset}`,
+        {
+          text: THEME_PRESET_COLORS[preset].textColor!,
+          surface: THEME_PRESET_COLORS[preset].surfaceColor!,
+        },
+      ],
+    ),
+    ['作成者のダーク（黒に近い地）', { text: '#f5f5f5', surface: '#111111' }],
+    ['作成者のダーク（紺の地）', { text: '#e8eefc', surface: '#1f2937' }],
+    ['作成者のライト（白の地）', { text: '#000000', surface: '#ffffff' }],
+    ['作成者のライト（既定の色）', { text: DEFAULT_COLORS.textColor, surface: DEFAULT_COLORS.surfaceColor }],
+  ];
+
+  it.each(palettes)('%s: 読めて、有効の入力欄と見分けがつく', (_name, { text, surface }) => {
+    const disabledSurface = mixColors(text, surface, DISABLED_SURFACE_TEXT_PERCENT)!;
+    const disabledText = mixColors(text, disabledSurface, DISABLED_TEXT_PERCENT)!;
+
+    // 無効でも読める（WCAG 2.1 AA。目安の 3:1 より厳しく）
+    expect(contrastRatio(disabledText, disabledSurface)!).toBeGreaterThanOrEqual(CONTRAST_AA);
+    // 地は有効の入力欄の地と違う色になる（同じ色ではない）
+    expect(disabledSurface).not.toBe(surface);
+    // 文字は有効の文字より薄い（有効の文字と同じにならない）
+    expect(disabledText).not.toBe(text);
+    expect(contrastRatio(disabledText, disabledSurface)!).toBeLessThan(
+      contrastRatio(text, surface)!,
+    );
   });
 });

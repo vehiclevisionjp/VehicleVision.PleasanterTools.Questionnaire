@@ -24,8 +24,6 @@ public sealed record SamlSettingValues
 
     public string? LoginIdClaim { get; init; }
 
-    public string? ButtonLabel { get; init; }
-
     public string? SingleLogoutUrl { get; init; }
 }
 
@@ -49,7 +47,7 @@ public sealed class SamlSettingStore(IDbConnectionFactory connectionFactory) : I
         return await connection.QuerySingleAsync<SamlSettingValues>(Sql(
             "SELECT [Enabled], [EntityId], [IdpEntityId], [SingleSignOnUrl], "
             + "       [IdpCertificate], [UnknownUser], [RegisterRole], [LoginIdSource], "
-            + "       [LoginIdClaim], [ButtonLabel], [SingleLogoutUrl] "
+            + "       [LoginIdClaim], [SingleLogoutUrl] "
             + "FROM [SamlSettings] WHERE [SamlSettingId] = 1",
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -68,7 +66,7 @@ public sealed class SamlSettingStore(IDbConnectionFactory connectionFactory) : I
             + "[SingleSignOnUrl] = @SingleSignOnUrl, [IdpCertificate] = @IdpCertificate, "
             + "[UnknownUser] = @UnknownUser, [RegisterRole] = @RegisterRole, "
             + "[LoginIdSource] = @LoginIdSource, [LoginIdClaim] = @LoginIdClaim, "
-            + "[ButtonLabel] = @ButtonLabel, [SingleLogoutUrl] = @SingleLogoutUrl "
+            + "[SingleLogoutUrl] = @SingleLogoutUrl "
             + "WHERE [SamlSettingId] = 1",
             values,
             cancellationToken: cancellationToken)).ConfigureAwait(false);

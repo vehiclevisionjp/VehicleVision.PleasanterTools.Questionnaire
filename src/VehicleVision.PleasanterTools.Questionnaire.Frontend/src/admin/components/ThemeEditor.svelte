@@ -500,7 +500,7 @@
     gap: var(--space-3);
   }
 
-  /* **入力欄そのものは出さず、ラベルを釦に見せる** */
+  /* **入力欄そのものは出さず、ラベルをボタンに見せる** */
   .file {
     display: inline-block;
     padding: 0.35rem var(--space-3);

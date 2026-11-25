@@ -34,7 +34,6 @@ public sealed class SamlOptionsProvider(
         (SamlOptions.RegisterRoleKey, values => values.RegisterRole),
         (SamlOptions.LoginIdSourceKey, values => values.LoginIdSource),
         (SamlOptions.LoginIdClaimKey, values => values.LoginIdClaim),
-        (SamlOptions.ButtonLabelKey, values => values.ButtonLabel),
         (SamlOptions.SingleLogoutUrlKey, values => values.SingleLogoutUrl),
     ];
 
@@ -69,8 +68,6 @@ public sealed class SamlOptionsProvider(
                 SamlOptions.LoginIdSourceKey, values.LoginIdSource, current.LoginIdSource),
             LoginIdClaim = Mutable(
                 SamlOptions.LoginIdClaimKey, values.LoginIdClaim, current.LoginIdClaim),
-            ButtonLabel = Mutable(
-                SamlOptions.ButtonLabelKey, values.ButtonLabel, current.ButtonLabel),
             SingleLogoutUrl = Mutable(
                 SamlOptions.SingleLogoutUrlKey, values.SingleLogoutUrl, current.SingleLogoutUrl),
         };
@@ -110,15 +107,19 @@ public sealed class SamlOptionsProvider(
             RegisterRole = ValueOf(SamlOptions.RegisterRoleKey) ?? nameof(AdminRole.Editor),
             LoginIdSource = ValueOf(SamlOptions.LoginIdSourceKey) ?? nameof(SamlLoginIdSource.NameId),
             LoginIdClaim = ValueOf(SamlOptions.LoginIdClaimKey) ?? string.Empty,
-            ButtonLabel = ValueOf(SamlOptions.ButtonLabelKey) ?? string.Empty,
             SingleLogoutUrl = ValueOf(SamlOptions.SingleLogoutUrlKey) ?? string.Empty,
         };
 
         return new SamlOptionsSnapshot(
-            SamlOptions.FromValues(key => Fields.First(field => field.Key == key).Read(effective)),
+            SamlOptions.FromValues(ReadEffective(effective)),
             effective,
             fixedKeys);
     }
+
+    /// <summary>Core.Web へ値を渡す。**Fields に無い名前（廃止した名前）は未指定として返す。**</summary>
+    /// <remarks>Core.Web はログインボタンの表示名も読みに来るが、固定の文言にしたため（Issue #1079）渡さない。</remarks>
+    private static Func<string, string?> ReadEffective(SamlSettingValues effective) =>
+        key => Fields.FirstOrDefault(field => field.Key == key).Read?.Invoke(effective);
 
     private string? Mutable(string key, string? requested, string? current) =>
         configuration[key] is null ? requested?.Trim() : current;

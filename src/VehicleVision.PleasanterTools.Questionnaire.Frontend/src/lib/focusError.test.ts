@@ -58,7 +58,7 @@ describe('送信のあとのフォーカス（Issue #900）', () => {
     expect(message.focus).toHaveBeenCalledOnce();
   });
 
-  it('誤りの一覧が無ければ送信釦へ移す', () => {
+  it('誤りの一覧が無ければ送信ボタンへ移す', () => {
     const button = { focus: vi.fn() };
     const root = focusRoot({ 'nav.actions': {}, 'nav.actions button:not([disabled])': button }, null);
 

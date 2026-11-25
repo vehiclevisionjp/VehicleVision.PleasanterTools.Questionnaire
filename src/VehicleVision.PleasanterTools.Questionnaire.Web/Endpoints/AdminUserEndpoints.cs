@@ -605,7 +605,7 @@ public static class AdminUserEndpoints
             : Failure(outcome, RequestLanguage.Of(context));
     }
 
-    /// <summary>結果を応答へ写す。</summary>
+    /// <summary>結果を応答へコピーする。</summary>
     /// <remarks>
     /// **招待だけは理由を分けない。** 無い・期限切れ・使用済みを区別して返すと、
     /// トークンの当たり外れを外から確かめられる。

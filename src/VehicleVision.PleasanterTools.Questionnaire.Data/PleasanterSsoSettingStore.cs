@@ -31,8 +31,6 @@ public sealed record PleasanterSsoSettingValues
     public string? RevalidateMinutes { get; init; }
 
     public string? TimeoutSeconds { get; init; }
-
-    public string? ButtonLabel { get; init; }
 }
 
 /// <summary>Pleasanter シングルサインオン設定を読み書きする。</summary>
@@ -60,7 +58,7 @@ public sealed class PleasanterSsoSettingStore(IDbConnectionFactory connectionFac
         return await connection.QuerySingleAsync<PleasanterSsoSettingValues>(Sql(
             "SELECT [Enabled], [InternalBaseUrl], [LoginUrl], [LogoutUrl], "
             + "       [CookieNames], [UnknownUser], [RegisterRole], [RevalidateMinutes], "
-            + "       [TimeoutSeconds], [ButtonLabel], [AllowedDeptIds], [AllowedGroupIds] "
+            + "       [TimeoutSeconds], [AllowedDeptIds], [AllowedGroupIds] "
             + "FROM [PleasanterSsoSettings] WHERE [PleasanterSsoSettingId] = 1",
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -79,7 +77,7 @@ public sealed class PleasanterSsoSettingStore(IDbConnectionFactory connectionFac
             + "[LoginUrl] = @LoginUrl, [LogoutUrl] = @LogoutUrl, "
             + "[CookieNames] = @CookieNames, [UnknownUser] = @UnknownUser, "
             + "[RegisterRole] = @RegisterRole, [RevalidateMinutes] = @RevalidateMinutes, "
-            + "[TimeoutSeconds] = @TimeoutSeconds, [ButtonLabel] = @ButtonLabel, "
+            + "[TimeoutSeconds] = @TimeoutSeconds, "
             + "[AllowedDeptIds] = @AllowedDeptIds, [AllowedGroupIds] = @AllowedGroupIds "
             + "WHERE [PleasanterSsoSettingId] = 1",
             values,

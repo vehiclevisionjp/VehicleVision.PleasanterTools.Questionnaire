@@ -12,7 +12,7 @@
    * **他のタブと保存の性質が違う。** 設問などは下書きにだけ効くが、ここは保存すると
    * 公開中の回答画面へ即時に反映される（定義ではなく運用の設定。公開し直しは要らず、
    * 版にも `DraftRevision` にも入らない）。**混ぜると「保存したのに効かない」と誤解される**ので、
-   * 独自の保存釦を持ち、その旨を明記する。
+   * 独自の保存ボタンを持ち、その旨を明記する。
    */
   interface Props {
     surveyId: string;
@@ -187,7 +187,7 @@
   {/if}
 
   <form class="settings" onsubmit={save}>
-    <!-- **ここだけ保存の性質が違う**ことを、保存釦の前に必ず読ませる -->
+    <!-- **ここだけ保存の性質が違う**ことを、保存ボタンの前に必ず読ませる -->
     <p class="warn">{t('publish.immediateNotice')}</p>
     {#if !canPublish}
       <p class="hint">{t('publish.readOnly')}</p>

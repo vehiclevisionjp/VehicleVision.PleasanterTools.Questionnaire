@@ -10,7 +10,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// </para>
 /// <para>
 /// ⚠️ **中身は暗号化して入れる**（<c>MailOutbox.PayloadProtected</c>）。
-/// 宛先は回答者のメールアドレスで、本文には回答の写しが入り得る。
+/// 宛先は回答者のメールアドレスで、本文には回答のコピーが入り得る。
 /// **完全匿名を前提にしたアプリで、個人を指す値を DB へ置く唯一の場所**なので、
 /// 平文の列を作らない。**列を作らなければ、後から平文が入る余地も無い。**
 /// </para>

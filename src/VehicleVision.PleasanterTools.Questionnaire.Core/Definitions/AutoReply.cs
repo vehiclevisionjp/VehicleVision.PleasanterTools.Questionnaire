@@ -33,7 +33,7 @@ public sealed record AutoReplySettings
 
     /// <summary>本文。**平文。** 書式は持たない。</summary>
     /// <remarks>
-    /// **HTML にしない**（<c>OutgoingMail</c>）。管理者が書いた文面と回答の写しが
+    /// **HTML にしない**（<c>OutgoingMail</c>）。管理者が書いた文面と回答のコピーが
     /// そのまま入るので、逃がし漏れが即そのまま差し込みになる経路を作らない。
     /// </remarks>
     public LocalizedText? Body { get; init; }
@@ -46,7 +46,7 @@ public sealed record AutoReplySettings
 
     /// <summary>BCC。**未設定なら付けない。**</summary>
     /// <remarks>
-    /// 回答者の宛先と、本文へ差し込んだ回答の写しがこの宛先へ届く。
+    /// 回答者の宛先と、本文へ差し込んだ回答のコピーがこの宛先へ届く。
     /// **完全匿名の回答から個人を指す値が外へ出る設定**なので、既定は無効。
     /// </remarks>
     public string? BccAddress { get; init; }

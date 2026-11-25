@@ -277,7 +277,7 @@ export const en: Record<MessageKey, string> = {
   'sessions.confirmRevoke': 'End this device session?',
   'sessions.confirmRevokeOthers': 'End all sessions except the current device?',
   'signIn.samlOr': 'or',
-  'signIn.samlButton': 'Sign in with single sign-on',
+  'signIn.samlButton': 'Sign in with SSO',
   'signIn.tabsLabel': 'Sign-in method',
   'signIn.tabSso': 'SSO',
   'signIn.tabPassword': 'ID / password',
@@ -365,7 +365,6 @@ export const en: Record<MessageKey, string> = {
   'saml.loginIdSource': 'Sign-in ID source',
   'saml.loginIdSourceClaim': 'Claim',
   'saml.loginIdClaim': 'Claim used as the sign-in ID',
-  'saml.buttonLabel': 'Sign-in button label',
   'saml.singleLogoutUrl': 'IdP single logout URL',
   'saml.singleLogoutUrlHint': 'Leave blank to sign out from this application only.',
   'saml.save': 'Save',
@@ -422,7 +421,6 @@ export const en: Record<MessageKey, string> = {
   'pleasanterSso.revalidateMinutes': 'Re-check interval with Pleasanter (minutes)',
   'pleasanterSso.revalidateMinutesHint': 'Users who sign out of Pleasanter are signed out of this application within this interval (1-60).',
   'pleasanterSso.timeoutSeconds': 'Request timeout (seconds)',
-  'pleasanterSso.buttonLabel': 'Sign-in button label',
   'pleasanterSso.save': 'Save',
   'pleasanterSso.saving': 'Processing…',
   'pleasanterSso.saved': 'Pleasanter sign-in settings were saved.',
@@ -1203,7 +1201,7 @@ export const en: Record<MessageKey, string> = {
   'duplicate.jsonColumn': 'Column for the response JSON (optional)',
   'duplicate.submit': 'Duplicate',
   'duplicate.cancel': 'Cancel',
-  // ---- フォーム定義の書き出し・取り込み（Issue #1009） ----
+  // ---- フォーム定義のエクスポート・インポート（Issue #1009） ----
   'exchange.export': 'Export',
   'exchange.exportHint':
     'Saves the definition and mapping as JSON. The target site, publication state, credentials and images are not included.',

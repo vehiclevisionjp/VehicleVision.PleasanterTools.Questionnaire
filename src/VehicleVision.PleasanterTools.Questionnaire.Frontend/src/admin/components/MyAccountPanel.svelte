@@ -480,7 +480,7 @@
     padding: 0.4rem 0.6rem;
     background: var(--disabled-surface);
     border-radius: var(--radius-sm);
-    /* **写し間違いを減らす。** 桁が揃う書体で出す */
+    /* **コピー間違いを減らす。** 桁が揃う書体で出す */
     font-family: var(--font-mono, monospace);
     letter-spacing: 0.08em;
     word-break: break-all;

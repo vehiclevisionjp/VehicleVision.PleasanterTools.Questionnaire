@@ -2,15 +2,15 @@ using FluentMigrator;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
-/// <summary>メールの送信待ちを、Core.Data の共有表（<c>Core_MailOutbox</c>）へ写す。</summary>
+/// <summary>メールの送信待ちを、Core.Data の共有表（<c>Core_MailOutbox</c>）へコピーする。</summary>
 /// <remarks>
 /// <para>
-/// 旧 <c>MailOutbox</c> の行を <c>Core_MailOutbox</c> へ写し、旧表を落とす（<see cref="LegacyStoreMigration"/>）。
+/// 旧 <c>MailOutbox</c> の行を <c>Core_MailOutbox</c> へコピーし、旧表を落とす（<see cref="LegacyStoreMigration"/>）。
 /// </para>
 /// <para>
 /// <b>送信待ちの行は、まだ送っていないメール。失わない。</b>
-/// <c>SurveyId</c> は <c>SubjectId</c> へ写す。<b>旧はアンケートに紐づかないメールを <c>Guid.Empty</c>（全部ゼロ）で持っていたので、
-/// <c>NULL</c> にする</b>（Core は「紐づかない」を NULL で持つ）。そのほかは同名の列をそのまま写す。
+/// <c>SurveyId</c> は <c>SubjectId</c> へコピーする。<b>旧はアンケートに紐づかないメールを <c>Guid.Empty</c>（全部ゼロ）で持っていたので、
+/// <c>NULL</c> にする</b>（Core は「紐づかない」を NULL で持つ）。そのほかは同名の列をそのままコピーする。
 /// </para>
 /// </remarks>
 [Migration(100001, "メールの送信待ちを Core.Data の共有表へ写す")]

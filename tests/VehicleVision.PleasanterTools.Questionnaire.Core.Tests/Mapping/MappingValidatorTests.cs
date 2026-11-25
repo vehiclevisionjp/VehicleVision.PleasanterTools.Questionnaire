@@ -527,7 +527,7 @@ public class MappingValidatorTests
     [Fact]
     public void 未割り当ての設問は警告するが保存は拒否しない()
     {
-        // **回答の正本 JSON には残る**ので、列へ写らないだけでは拒否しない
+        // **回答の正本 JSON には残る**ので、列へコピーされないだけでは拒否しない
         var mapping = Mapping(ColumnAssignment.Direct("ClassA", new MappingSource("q1")));
 
         var problems = MappingValidator.Validate(mapping, Definition("q1", "q2"));
