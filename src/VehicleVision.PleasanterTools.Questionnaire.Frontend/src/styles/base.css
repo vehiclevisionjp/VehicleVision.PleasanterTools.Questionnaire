@@ -127,12 +127,140 @@ a {
   color: var(--accent);
 }
 
-/* 入力欄の地と文字も、トークン（ダークでも読める組み合わせ）に揃える。回答画面ではテーマが --surface / --text を上書きする */
-input:not([type='checkbox'], [type='radio'], [type='color'], [type='range'], [type='file'], [type='button'], [type='submit']),
-select,
-textarea {
+/*
+ * 入力欄（Input・Select・Textarea）の共通の見た目。DesignReference の components/app-ui.css の
+ * `.vv-input` / `.vv-select` / `.vv-textarea` に揃える（Issue #1066）。
+ *
+ *   - 枠は `--border-strong`（面に対し 3:1 以上）、角丸 `--radius-md`、最小の高さ `--control-h`
+ *   - hover は枠を `--muted` に、focus-visible は枠を `--accent` に（外側のリングは下の `:focus-visible`）
+ *   - `aria-invalid="true"` は `--error` の枠 + 1px の影（色だけに頼らず、太さでも示す。検証エラーの文言と対になる）
+ *   - disabled は地を `--disabled-surface`、文字を `--disabled-text`、枠を `--border` に落とす
+ *
+ * ⚠️ **すべて `:where` の中に置き、詳細度を 0 にする。** 各画面の指定（幅・余白・フォントの大きさなど画面固有のもの）が
+ * 常に勝つ。**ただし各画面が `border` / `padding` / `border-radius` / `background` を書き直すと、ここを打ち消して揃わなくなる。**
+ * 画面固有の寸法（幅・上の余白・フォントの大きさ）だけを書くこと。
+ * 色は意味名（--surface / --text / --accent / --border-strong / --error）から引くので、回答画面のテーマの上書きと
+ * 読みやすさ設定（ダーク・高コントラスト）にそのまま追随する。
+ * 文字の大きさは `font: inherit`（DesignReference の 14px 固定にしない。回答画面は作成者のテーマ・読みやすさ設定の大きさに従い、
+ * 16px 未満にすると iOS が入力時に拡大する）。
+ * 日付・時刻・数値などの入力も含める。チェック・ラジオ・色・範囲・ファイル・釦は含めない（別の見た目を持つ）
+ */
+:where(
+    input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='color'],
+        [type='range'],
+        [type='file'],
+        [type='button'],
+        [type='submit'],
+        [type='reset'],
+        [type='image'],
+        [type='hidden']
+      ),
+    select,
+    textarea
+  ) {
+  box-sizing: border-box;
+  min-height: var(--control-h);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
   background: var(--surface);
   color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+:where(textarea) {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+:where(
+    input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='color'],
+        [type='range'],
+        [type='file'],
+        [type='button'],
+        [type='submit'],
+        [type='reset'],
+        [type='image'],
+        [type='hidden']
+      ):hover,
+    select:hover,
+    textarea:hover
+  ) {
+  border-color: var(--muted);
+}
+
+:where(
+    input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='color'],
+        [type='range'],
+        [type='file'],
+        [type='button'],
+        [type='submit'],
+        [type='reset'],
+        [type='image'],
+        [type='hidden']
+      ):focus-visible,
+    select:focus-visible,
+    textarea:focus-visible
+  ) {
+  border-color: var(--accent);
+}
+
+:where(
+    input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='color'],
+        [type='range'],
+        [type='file'],
+        [type='button'],
+        [type='submit'],
+        [type='reset'],
+        [type='image'],
+        [type='hidden']
+      )[aria-invalid='true'],
+    select[aria-invalid='true'],
+    textarea[aria-invalid='true']
+  ) {
+  border-color: var(--error);
+  box-shadow: 0 0 0 1px var(--error);
+}
+
+:where(
+    input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='color'],
+        [type='range'],
+        [type='file'],
+        [type='button'],
+        [type='submit'],
+        [type='reset'],
+        [type='image'],
+        [type='hidden']
+      ):disabled,
+    select:disabled,
+    textarea:disabled
+  ) {
+  background: var(--disabled-surface);
+  color: var(--disabled-text);
+  border-color: var(--border);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+@media (forced-colors: active) {
+  :where(input:not([type='checkbox'], [type='radio']), select, textarea) {
+    border-color: CanvasText;
+  }
 }
 
 /*

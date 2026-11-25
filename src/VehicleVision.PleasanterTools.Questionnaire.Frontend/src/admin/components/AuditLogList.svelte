@@ -289,14 +289,6 @@
     gap: 0.4rem;
   }
 
-  .filters input,
-  .filters select {
-    font: inherit;
-    padding: 0.35rem var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-  }
-
   .actions {
     display: flex;
     gap: var(--space-2);

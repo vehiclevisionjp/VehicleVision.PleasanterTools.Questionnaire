@@ -1092,9 +1092,6 @@
   .filter select {
     display: block;
     margin-top: var(--space-1);
-    padding: var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
   }
 
   .pager {
@@ -1218,11 +1215,6 @@
     display: block;
     width: 100%;
     margin-top: var(--space-1);
-    padding: var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    box-sizing: border-box;
   }
 
   /*

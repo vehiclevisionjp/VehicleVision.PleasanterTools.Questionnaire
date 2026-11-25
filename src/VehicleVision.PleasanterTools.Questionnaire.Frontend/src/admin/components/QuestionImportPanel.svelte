@@ -253,12 +253,6 @@
     display: block;
     width: 100%;
     margin-top: var(--space-1);
-    padding: 0.4rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
   }
 
   .questions {

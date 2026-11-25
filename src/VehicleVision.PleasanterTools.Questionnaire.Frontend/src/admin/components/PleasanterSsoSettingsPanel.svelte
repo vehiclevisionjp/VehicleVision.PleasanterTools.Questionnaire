@@ -297,17 +297,7 @@
   }
   input:not([type='checkbox']),
   select {
-    box-sizing: border-box;
     width: 100%;
-    padding: 0.55rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-    font: inherit;
-  }
-  input:disabled,
-  select:disabled {
-    background: var(--disabled-surface);
-    color: var(--disabled-text);
   }
   .row {
     display: grid;

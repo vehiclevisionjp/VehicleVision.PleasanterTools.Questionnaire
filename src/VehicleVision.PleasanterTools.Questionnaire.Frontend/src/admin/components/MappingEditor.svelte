@@ -832,17 +832,6 @@
   select {
     display: block;
     width: 100%;
-    padding: 0.4rem var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    background: var(--surface);
-    color: var(--text);
-    box-sizing: border-box;
-  }
-
-  textarea {
-    resize: vertical;
   }
 
   .converter-config {
