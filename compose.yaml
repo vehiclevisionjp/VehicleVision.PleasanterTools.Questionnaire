@@ -84,7 +84,6 @@ x-app-environment: &app-environment
     # **管理 API のトークン（API キー）の機能。** 既定は無効（製品の既定と同じ）。
     # SAML の強制再認証（ForceAuthn。Issue #1034）の試験で `enabled` にする
     QUESTIONNAIRE_ADMIN_API_TOKENS: ${DEV_ADMIN_API_TOKENS:-disabled}
-    QUESTIONNAIRE_SAML_BUTTONLABEL: ${DEV_SAML_BUTTONLABEL:-検証用 IdP でログイン}
     # ---- メール（Issue #189）------------------------------------------------
     # **既定は無効。** mail profile の Mailpit と合わせて使うときだけ有効にする
     #
