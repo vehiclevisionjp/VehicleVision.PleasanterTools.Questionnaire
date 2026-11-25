@@ -183,6 +183,66 @@ public class ExternalStoreIntegrationTests
         }
     }
 
+    [Fact]
+    public async Task Valkeyのセッションは入った方式を保存し_方式が無い保存済みの値は従来の導き方で補う()
+    {
+        var connectionString =
+            Environment.GetEnvironmentVariable("QUESTIONNAIRE_VALKEY_CONNECTIONSTRING");
+        if (connectionString is null)
+        {
+            return;
+        }
+
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(connectionString);
+        var prefix = $"questionnaire:test:{Guid.NewGuid():N}:";
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(DateTimeOffset.UtcNow);
+        var store = new RedisAdminSessionStore(connection, time, prefix);
+        var userId = Guid.NewGuid();
+        var database = connection.GetDatabase();
+
+        try
+        {
+            // 鍵から導けない方式（パスキー）は、保存した値が返る
+            var passkeyId = await store.CreateWithViaAsync(
+                userId, AdminSessionKinds.Session, TimeSpan.FromMinutes(5), SessionVia.Passkey);
+            // 明示しない作り方は、導き方（SAML → Pleasanter → パスワード）の結果が保存される
+            var passwordId = await store.CreateAsync(userId, AdminSessionKinds.Session, TimeSpan.FromMinutes(5));
+            var samlId = await store.CreateAsync(
+                userId, AdminSessionKinds.Session, TimeSpan.FromMinutes(5),
+                sso: new SessionSso(Saml: new SamlSessionKeys("name-id", "index-1")));
+
+            // **導入前に保存された値（Via の項目が無い）を作る。** ログアウトさせず、従来の導き方で補う
+            var legacyHandle = Convert.ToHexStringLower(
+                System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("legacy-session")));
+            var legacyJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                userId,
+                kind = AdminSessionKinds.Session,
+                createdAt = time.GetUtcNow().AddMinutes(-1),
+                expiresAt = time.GetUtcNow().AddMinutes(5),
+                pleasanterTenantId = 1,
+                pleasanterUserId = 7,
+                pleasanterVerifiedAt = time.GetUtcNow().AddMinutes(-1),
+            }, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+            await database.StringSetAsync($"{prefix}entry:{legacyHandle}", legacyJson, TimeSpan.FromMinutes(5));
+            await database.SetAddAsync($"{prefix}user:{userId:N}", legacyHandle);
+
+            var listed = (await store.ListForUserAsync(userId)).ToDictionary(row => row.Handle, row => row.Via);
+            Assert.Equal(4, listed.Count);
+            Assert.Equal(SessionVia.Passkey, listed[store.HandleOf(passkeyId)]);
+            Assert.Equal(SessionVia.Password, listed[store.HandleOf(passwordId)]);
+            Assert.Equal(SessionVia.Saml, listed[store.HandleOf(samlId)]);
+            Assert.Equal(SessionVia.Pleasanter, listed[legacyHandle]);
+        }
+        finally
+        {
+            foreach (var key in connection.GetServer(connection.GetEndPoints()[0]).Keys(pattern: prefix + "*"))
+            {
+                await database.KeyDeleteAsync(key);
+            }
+        }
+    }
+
     private static async Task VerifyAssetLifecycleAsync(IConfiguration configuration)
     {
         var factory = new DbConnectionFactory(
