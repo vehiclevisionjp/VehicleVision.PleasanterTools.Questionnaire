@@ -295,8 +295,8 @@ export function applyTheme(
  * **個別の指定が勝つ。** 「配色を選んだうえで 1 色だけ変える」が普通の使い方なので、
  * 逆にすると選び直すたびに個別の指定が消える。
  *
- * **管理画面の下見もこれを使う。** 解き方が 2 か所にあると、
- * 下見と本物で色が食い違う。
+ * **管理画面のプレビューもこれを使う。** 解き方が 2 か所にあると、
+ * プレビューと本物で色が食い違う。
  */
 export function resolveTheme(theme: SurveyTheme | null | undefined): SurveyTheme {
   if (!theme) {return {};}

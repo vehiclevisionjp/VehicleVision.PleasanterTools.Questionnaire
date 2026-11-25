@@ -206,9 +206,9 @@
   const isLastStep = $derived(stepIndex >= steps.length - 1);
 
   /**
-   * 下見でも並べ替えを掛ける（Issue #103）。**回答者が見るとおりに見せるため。**
+   * プレビューでも並べ替えを掛ける（Issue #103）。**回答者が見るとおりに見せるため。**
    *
-   * **種は下見を開いている間ずっと同じ。** 押すたびに並びが変わると確かめようがない。
+   * **種はプレビューを開いている間ずっと同じ。** 押すたびに並びが変わると確かめようがない。
    */
   const previewSeed = createShuffleSeed();
 
@@ -576,7 +576,7 @@
   }
 
   /* **回答画面の見出し・ボタンは、作成者が選んだ書体（--font）にする。** 管理画面の全体に当てた
-     Zen Maru Gothic（--font-heading。AdminApp.svelte）を、下見の中へは持ち込まない（Issue #789） */
+     Zen Maru Gothic（--font-heading。AdminApp.svelte）を、プレビューの中へは持ち込まない（Issue #789） */
   .paper :global(h1),
   .paper :global(h2),
   .paper :global(h3),
