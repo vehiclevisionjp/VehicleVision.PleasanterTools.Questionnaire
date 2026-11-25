@@ -138,6 +138,9 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 | `QUESTIONNAIRE_OPENAPI_ENABLED` | `true` で `/openapi/v1.json` を公開する。**既定は `false`** |
 | `QUESTIONNAIRE_OPENAPI_NETWORKS` | OpenAPI 文書を許す送信元 CIDR。複数はカンマ区切り。`inherit` なら `QUESTIONNAIRE_HEALTH_NETWORKS` を引き継ぐ。**未設定なら制限しない** |
 | `QUESTIONNAIRE_ADMIN_TWOFACTOR` | 管理者の 2 要素認証。`required` / `optional`（既定） / `disabled`。**知らない値は起動時に落ちる。** ⚠️ `disabled` にしても、登録済みの管理者からは 2 要素を外さない |
+| `QUESTIONNAIRE_ADMIN_PASSKEY` | 管理画面のパスキー（WebAuthn）を使うか。`true` / `false`（既定）。**真偽値の書き間違いは起動時に落ちる。** パラメータファイルの別名は無く、環境変数で指定する |
+| `QUESTIONNAIRE_ADMIN_PASSKEY_RPID` | パスキーの RP ID（ホスト名だけ）。**`QUESTIONNAIRE_ADMIN_PASSKEY=true` のとき必須。** 未設定・空なら起動を止める。⚠️ 変えると登録済みのパスキーはすべて使えなくなる |
+| `QUESTIONNAIRE_ADMIN_PASSKEY_ORIGINS` | パスキーを許す Origin（`https://ホスト名[:ポート]`。複数はカンマ区切り）。**`true` のとき必須。** 手順は `_documents/パスキー-運用手順書.md` |
 | `PasswordMinimumLength` | パスワードの最低の長さ（既定 12）。`Security.json` にも書ける（Issue #157） |
 | `PasswordAllowSameAsLoginId` | ログイン ID と同じパスワードを許すか（既定 `false`）。同上 |
 | `AnalyticsProvider` | アクセス解析のサービス。`None`（既定）/ `Ga4` / `Gtm` / `Matomo` / `Plausible`。`Analytics.json` にも書ける |
