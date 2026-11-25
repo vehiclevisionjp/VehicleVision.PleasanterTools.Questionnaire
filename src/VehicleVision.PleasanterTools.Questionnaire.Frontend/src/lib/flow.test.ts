@@ -260,7 +260,7 @@ describe('toSteps', () => {
     expect(steps.map((step) => step.page.pageId)).toEqual(['p1']);
   });
 
-  describe('ページ下部の釦条件', () => {
+  describe('ページ下部のボタン条件', () => {
     it('設問の表示と同じ規則で条件を評価する', () => {
       const condition = {
         match: 'All' as const,

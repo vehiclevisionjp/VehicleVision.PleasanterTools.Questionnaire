@@ -46,7 +46,7 @@ export interface SurveyTheme {
   accentColor?: string | null;
   backgroundColor?: string | null;
   textColor?: string | null;
-  /** 釦の文字色（Issue #109）。 */
+  /** ボタンの文字色（Issue #109）。 */
   accentTextColor?: string | null;
   /** 設問枠の地の色（Issue #109）。 */
   surfaceColor?: string | null;

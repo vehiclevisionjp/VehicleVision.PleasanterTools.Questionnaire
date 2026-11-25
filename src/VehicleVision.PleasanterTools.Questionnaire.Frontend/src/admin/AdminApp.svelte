@@ -360,7 +360,7 @@
    * ログアウトする。
    *
    * ⚠️ **SAML で入った人は、IdP 側も落とす**（Issue #191）。
-   * こちらの cookie だけ消すと、**IdP のセッションが残っているので釦を押し直すだけで
+   * こちらの cookie だけ消すと、**IdP のセッションが残っているのでボタンを押し直すだけで
    * 入り直せてしまう。** 共用の端末だとログアウトしたつもりで座席を明け渡すことになる。
    *
    * **行き先はサーバが決める**（`samlSingleLogout`）。画面は行くだけ。
@@ -411,7 +411,7 @@
    * Administrator か。
    *
    * **入口を隠すだけでは守りにならない**ので、サーバ側でも同じ判定をしている。
-   * ここで隠すのは、押せない釦を出さないため。
+   * ここで隠すのは、押せないボタンを出さないため。
    */
   function can(permission: AdminPermission): boolean {
     return session?.permissions?.includes(permission) ?? false;
@@ -726,7 +726,7 @@
     line-height: 1.7;
   }
 
-  /* **見出しと釦は Zen Maru Gothic（Bold）**（DesignReference 第 2.3 版。--font-heading。Issue #789） */
+  /* **見出しとボタンは Zen Maru Gothic（Bold）**（DesignReference 第 2.3 版。--font-heading。Issue #789） */
   :global(h1),
   :global(h2),
   :global(h3) {
@@ -760,7 +760,7 @@
       <span class="material-icons" aria-hidden="true">save</span>
 
     中身は**アイコンの名前**（リガチャで字形へ置き換わる）。
-    **意味は文字でも書くこと。** アイコンだけの釦は読み上げで何も伝わらない。
+    **意味は文字でも書くこと。** アイコンだけのボタンは読み上げで何も伝わらない。
     **`aria-hidden="true"` を必ず付ける。** 付けないと 'save' という英単語が読み上げられる。
 
     **表の中で使うときは `fixed` を足す**（下記）。桁が揃う
@@ -789,7 +789,7 @@
     text-align: center;
   }
 
-  /* **表の中・小さい釦は 32px**（DesignReference の「小」。一覧の行ごとに釦が並ぶので 40px だと行が伸びる） */
+  /* **表の中・小さいボタンは 32px**（DesignReference の「小」。一覧の行ごとにボタンが並ぶので 40px だと行が伸びる） */
   :global(table button),
   :global(button.small),
   :global(button.icon) {
@@ -943,7 +943,7 @@
   /*
     **どの画面も同じ幅にする**（Issue #436）。
     ⚠️ **画面ごとに端の位置が変わると、行き来したときに落ち着かない。**
-    一覧は 7 桁あり行ごとに釦が最大 7 つ並ぶ、編集は左右 2 カラムと、
+    一覧は 7 桁あり行ごとにボタンが最大 7 つ並ぶ、編集は左右 2 カラムと、
     **広い側に合わせないと成り立たない画面がある**ので、そちらへ揃える。
   */
   .shell {

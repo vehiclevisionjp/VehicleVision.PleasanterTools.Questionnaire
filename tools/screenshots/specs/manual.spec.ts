@@ -249,7 +249,7 @@ test.describe('取説用の写し（ログイン済み）', { tag: '@standalone'
     await expect(page.getByRole('heading', { name: 'パスワードの変更' })).toBeVisible();
 
     // ⚠️ **検証環境は 2 要素が必須**（Issue #172）なので、
-    // 「解除する」の釦は出ない状態の図になる。取説にその旨を書いてある
+    // 「解除する」のボタンは出ない状態の図になる。取説にその旨を書いてある
     await shoot(page, 'admin-14-my-account');
   });
 

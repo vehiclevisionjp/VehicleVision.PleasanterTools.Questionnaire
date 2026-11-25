@@ -181,7 +181,7 @@
   let hasUnpublishedChanges = $state(false);
   /**
    * 公開設定（Issue #580）。**定義ではなく運用の設定**なので、下書きの保存・未保存の判定
-   * （`hasUnsavedChanges`）とは切り離し、「公開」タブの保存釦で別に保存する。
+   * （`hasUnsavedChanges`）とは切り離し、「公開」タブの保存ボタンで別に保存する。
    * 既定値はサーバと同じ（上限なし・proof-of-work 有効・下書き無効・埋め込み無効）。
    */
   let publicId = $state('');
@@ -1472,7 +1472,7 @@
 
   {#if tab === 'extras'}
   <!-- **見た目は設問と同じく定義の一部**（Issue #56）。
-       保存も公開も、設問とまとめてこの画面の釦で行う -->
+       保存も公開も、設問とまとめてこの画面のボタンで行う -->
   <ThemeEditor
     {surveyId}
     theme={definition.theme}

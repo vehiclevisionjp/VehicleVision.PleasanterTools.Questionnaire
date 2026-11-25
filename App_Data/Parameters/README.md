@@ -157,7 +157,7 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 | `QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE` | Pleasanter SSO の JIT 役割。許可値・既定値は SAML と同じ |
 | `QUESTIONNAIRE_SAML_LOGINIDSOURCE` | ログイン ID の取り出し先。`NameId`（既定）/ `Claim` |
 | `QUESTIONNAIRE_SAML_LOGINIDCLAIM` | `LOGINIDSOURCE=Claim` のときに読む属性名 |
-| `QUESTIONNAIRE_SAML_BUTTONLABEL` | ログイン画面の釦に出す文字（省略時は「シングルサインオンでログイン」） |
+| `QUESTIONNAIRE_SAML_BUTTONLABEL` | ログイン画面のボタンに出す文字（省略時は「シングルサインオンでログイン」） |
 | `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |

@@ -148,7 +148,7 @@ public sealed record SurveyTheme
     /// </summary>
     public ThemeColorScheme? ColorScheme { get; init; }
 
-    /// <summary>釦・進捗バー・強調に使う色。</summary>
+    /// <summary>ボタン・進捗バー・強調に使う色。</summary>
     public string? AccentColor { get; init; }
 
     /// <summary>ページの地の色。</summary>
@@ -157,7 +157,7 @@ public sealed record SurveyTheme
     /// <summary>本文の色。</summary>
     public string? TextColor { get; init; }
 
-    /// <summary>釦の文字色（Issue #109）。</summary>
+    /// <summary>ボタンの文字色（Issue #109）。</summary>
     /// <remarks>
     /// **アクセント色から自動で決めていた**ため、
     /// **濃い地に濃い文字**になる組み合わせを避けられなかった。

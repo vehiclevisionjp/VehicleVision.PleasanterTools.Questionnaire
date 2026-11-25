@@ -71,7 +71,7 @@ function isVisible(
   return conditionSatisfied(question.visibleWhen, answers, visibleSoFar);
 }
 
-/** 設問とページ下部の釦で共有する条件評価。未指定または空なら成立する。 */
+/** 設問とページ下部のボタンで共有する条件評価。未指定または空なら成立する。 */
 export function conditionSatisfied(
   condition: VisibilityCondition | null | undefined,
   answers: Record<string, AnswerState>,

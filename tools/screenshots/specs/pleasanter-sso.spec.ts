@@ -20,7 +20,7 @@ import { readEnrollmentSecret, totp } from '../lib/totp';
  * 本アプリの設定の「ログイン画面」も `http://localhost:8080/users/login` にする。
  *
  * ⚠️ **設定は画面から有効にし、終わったら無効へ戻す。** 写しの一式の本アプリは外部設定を持たない。
- * 有効のまま残すと、後に走る spec のログイン画面に釦が増える。
+ * 有効のまま残すと、後に走る spec のログイン画面にボタンが増える。
  * ⚠️ **まっさらな検証環境が前提。** 往復で本アプリに作られる管理者（その場で登録）は、
  * 2 回目には 2 要素を登録済みになり、途中の画面が変わる。
  */
@@ -174,7 +174,7 @@ test('外部設定で決まった項目はロックして出す', async ({ brows
   }
 });
 
-test('ログイン画面の釦から別窓で Pleasanter にログインし、管理画面へ入る', async ({ browser }) => {
+test('ログイン画面のボタンから別窓で Pleasanter にログインし、管理画面へ入る', async ({ browser }) => {
   test.setTimeout(120_000);
 
   // **本アプリも localhost で開く。** Pleasanter の cookie が届くのは同じホスト名だけ
@@ -188,7 +188,7 @@ test('ログイン画面の釦から別窓で Pleasanter にログインし、�
     await expect(button).toBeVisible();
     await shoot(page, 'admin-20-pleasanter-login');
 
-    // ---- 釦を押すと、Pleasanter のログイン画面が別窓で開く
+    // ---- ボタンを押すと、Pleasanter のログイン画面が別窓で開く
     const popupPromise = page.waitForEvent('popup');
     await button.click();
     const popup = await popupPromise;

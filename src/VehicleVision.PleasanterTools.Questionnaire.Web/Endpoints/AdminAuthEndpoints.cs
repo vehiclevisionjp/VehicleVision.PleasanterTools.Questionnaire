@@ -63,7 +63,7 @@ public static class AdminAuthEndpoints
                 cancellationToken).ConfigureAwait(false);
             var botOptions = await botOptionsProvider.GetAsync(cancellationToken).ConfigureAwait(false);
 
-            // **SAML が使えるかは未認証の相手にも返す。** ログイン画面に釦を出すため。
+            // **SAML が使えるかは未認証の相手にも返す。** ログイン画面にボタンを出すため。
             // ⚠️ **設定の中身は返さない**（証明書・EntityID は画面に要らない）
             var samlEnabled = saml.Enabled;
             var samlLabel = saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null;

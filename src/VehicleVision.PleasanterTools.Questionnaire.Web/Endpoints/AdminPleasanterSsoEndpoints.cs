@@ -69,7 +69,7 @@ public static class AdminPleasanterSsoEndpoints
             }
 
             // **最初の管理者を Pleasanter から作らせない。** 誰でも全権を取れてしまう
-            // （SAML の釦を最初の管理者を作る画面に出さないのと同じ理由）
+            // （SAML のボタンを最初の管理者を作る画面に出さないのと同じ理由）
             if (await store.CountAsync(cancellationToken).ConfigureAwait(false) == 0)
             {
                 AuditNotes.Add(context, "result", "setup-required");

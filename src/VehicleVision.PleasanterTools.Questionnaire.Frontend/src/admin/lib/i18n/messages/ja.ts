@@ -1411,8 +1411,8 @@ export const ja = {
   'settings.proofOfWorkHint':
     '回答者のブラウザに短い計算をさせ、機械的な大量送信のコストを上げます。一般公開するアンケートでは有効のままにしてください。社内向けなど、URL を知る人が限られる場合は無効にしても構いません。',
   'settings.proofOfWorkKeepsOthers': '無効にしても、送信チケット・最短送信時間・ハニーポットは有効なままです。',
-  'pageButtons.title': 'ページ下部の釦',
-  'pageButtons.hint': '未指定の釦は、これまでどおり常に表示され、押せます。',
+  'pageButtons.title': 'ページ下部のボタン',
+  'pageButtons.hint': '未指定のボタンは、これまでどおり常に表示され、押せます。',
   'pageButtons.previous': '前へ',
   'pageButtons.next': '次へ',
   'pageButtons.submit': '送信',
@@ -1428,7 +1428,7 @@ export const ja = {
   'pageButtons.addLink': '任意リンクを追加',
   'flow.InvalidButtonUrl': '任意リンクの URL が許可されていません',
   'flow.DuplicateButtonId': '任意リンクの識別子が重複しています',
-  'flow.AllButtonsMayBeHidden': 'すべての釦が同時に非表示になる回答があります',
+  'flow.AllButtonsMayBeHidden': 'すべてのボタンが同時に非表示になる回答があります',
   // ---- ルックアップ設定（Issue #880） ----
   'editor.tabLookups': 'ルックアップ',
   'lookupAdmin.title': 'ルックアップ設定',

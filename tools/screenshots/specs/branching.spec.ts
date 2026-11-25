@@ -156,7 +156,7 @@ test.describe('分岐', () => {
     await expect(sheet.getByRole('heading', { name: 'ご意見' })).toBeVisible();
     await expect(sheet.getByRole('heading', { name: '良かった点' })).toBeHidden();
 
-    // **送信の釦は出さない。** 押せる釦があると、押した人は送れたと思う
+    // **送信のボタンは出さない。** 押せるボタンがあると、押した人は送れたと思う
     await expect(sheet.getByRole('button', { name: '送信する' })).toBeHidden();
     await expect(sheet.getByText('ここが最後のページです')).toBeVisible();
 
@@ -168,7 +168,7 @@ test.describe('分岐', () => {
     await expect(sheet).toBeHidden();
     await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
 
-    // 釦でも閉じられる
+    // ボタンでも閉じられる
     await page.getByRole('button', { name: 'プレビュー' }).click();
     await expect(sheet).toBeVisible();
     await sheet.getByRole('button', { name: '編集へ戻る' }).click();

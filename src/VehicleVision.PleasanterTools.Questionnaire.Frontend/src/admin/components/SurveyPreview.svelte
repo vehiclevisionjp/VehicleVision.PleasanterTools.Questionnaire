@@ -510,7 +510,7 @@
           <button type="button" class="secondary" onclick={goBack}>{t('preview.back')}</button>
         {/if}
         {#if isLastStep}
-          <!-- **送信の釦は出さない。** 押せる釦があると、押した人は送れたと思う -->
+          <!-- **送信のボタンは出さない。** 押せるボタンがあると、押した人は送れたと思う -->
           <span class="end">{t('preview.end')}</span>
         {:else}
           <button type="button" onclick={goNext}>{t('preview.next')}</button>
@@ -575,7 +575,7 @@
     border-radius: var(--radius-md);
   }
 
-  /* **回答画面の見出し・釦は、作成者が選んだ書体（--font）にする。** 管理画面の全体に当てた
+  /* **回答画面の見出し・ボタンは、作成者が選んだ書体（--font）にする。** 管理画面の全体に当てた
      Zen Maru Gothic（--font-heading。AdminApp.svelte）を、下見の中へは持ち込まない（Issue #789） */
   .paper :global(h1),
   .paper :global(h2),

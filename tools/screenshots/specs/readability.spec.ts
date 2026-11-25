@@ -43,7 +43,7 @@ async function cssVariable(page: Page, name: string): Promise<string> {
 /**
  * 色の変数が期待の値になるのを待って確かめる。
  *
- * **1 回だけ読まない。** 釦や選択を操作した直後は、Playwright 1.65 では、画面の反映
+ * **1 回だけ読まない。** ボタンや選択を操作した直後は、Playwright 1.65 では、画面の反映
  * （Svelte の更新）が済む前に操作が戻ることがある（Issue #976）。再試行つきの検査で待つ。
  */
 async function expectColors(

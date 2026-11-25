@@ -65,8 +65,8 @@ const pairs: [string, string, string, number][] = [
   ['補助の文字/面', 'color-text-muted', 'color-surface', CONTRAST_AA],
   ['リンク/面', 'color-primary-text', 'color-surface', CONTRAST_AA],
   ['リンク/地', 'color-primary-text', 'color-bg', CONTRAST_AA],
-  ['主要釦の文字', 'color-on-fill', 'color-primary', CONTRAST_AA],
-  ['危険釦・バッジの文字', 'color-on-fill', 'color-danger', CONTRAST_AA],
+  ['主要ボタンの文字', 'color-on-fill', 'color-primary', CONTRAST_AA],
+  ['危険ボタン・バッジの文字', 'color-on-fill', 'color-danger', CONTRAST_AA],
   ['エラー文/面', 'color-danger-text', 'color-surface', CONTRAST_AA],
   ['エラー文/淡い面', 'color-danger-text', 'color-danger-subtle', CONTRAST_AA],
   ['成功/淡い面', 'color-success-text', 'color-success-subtle', CONTRAST_AA],
@@ -87,10 +87,10 @@ describe.each([
   ['ライト', light],
   ['ダーク', dark],
 ])('色の組み合わせ（%s）', (_name, scheme) => {
-  // ダークの主要釦は面と文字を入れ替える（base.css）。ダークでは 淡い鉄紺の面 + 鉄紺の文字
+  // ダークの主要ボタンは面と文字を入れ替える（base.css）。ダークでは 淡い鉄紺の面 + 鉄紺の文字
   const resolved = (key: string) => scheme[key]!;
   it.each(pairs)('%s', (_label, fg, bg, min) => {
-    // ダークの釦文字は color-on-fill ではなく color-primary（base.css の --accent-text）。別途検査する
+    // ダークのボタン文字は color-on-fill ではなく color-primary（base.css の --accent-text）。別途検査する
     const isFillPair = fg === 'color-on-fill' && bg === 'color-primary';
     const f = isFillPair && scheme === dark ? resolved('color-primary') : resolved(fg);
     const b = isFillPair && scheme === dark ? resolved('color-primary-text') : resolved(bg);

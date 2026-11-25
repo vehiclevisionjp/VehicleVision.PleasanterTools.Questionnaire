@@ -51,10 +51,10 @@ test.describe('v0.12.0 の取説用の写し', { tag: '@standalone' }, () => {
     await shoot(page, dialog, 'admin-22-page-reorder');
   });
 
-  test('ページ下部の釦の設定を撮る', async ({ page }) => {
+  test('ページ下部のボタンの設定を撮る', async ({ page }) => {
     await openEditor(page, surveyId);
 
-    await page.getByText('ページ下部の釦', { exact: true }).click();
+    await page.getByText('ページ下部のボタン', { exact: true }).click();
     await expect(page.getByRole('heading', { name: '任意リンク' })).toBeVisible();
     await expect(page.getByLabel('リンク先 URL（http / https / mailto）')).toHaveValue(
       'https://www.example.com/guide',
@@ -71,7 +71,7 @@ test.describe('v0.12.0 の取説用の写し', { tag: '@standalone' }, () => {
     await shoot(page, question, 'admin-24-unsaved-question');
   });
 
-  test('備考と無効な次へ釦を回答画面で撮る', async ({ page }) => {
+  test('備考と無効な次へボタンを回答画面で撮る', async ({ page }) => {
     test.skip(publicId === '', '下ごしらえでアンケートを公開できていない');
 
     await page.goto(`/f/${publicId}`);
@@ -83,7 +83,7 @@ test.describe('v0.12.0 の取説用の写し', { tag: '@standalone' }, () => {
     await shoot(page, page.locator('main'), 'answer-11-choice-remarks-disabled-next');
   });
 
-  test('無効な送信釦と理由を回答画面で撮る', async ({ page }) => {
+  test('無効な送信ボタンと理由を回答画面で撮る', async ({ page }) => {
     test.skip(publicId === '', '下ごしらえでアンケートを公開できていない');
 
     await page.goto(`/f/${publicId}`);
