@@ -1,11 +1,13 @@
 <script lang="ts">
   /**
-   * 本人のパスキーの管理（Issue #1068。Core の仕様書 3.10.3・3.10.6）。
+   * 本人のパスキーの管理（Issue #1068。Core の仕様書 3.10.3・3.10.6。Core#222 で確定）。
    *
    * 一覧・登録（名前を付ける）・名前の変更・削除。**ログイン中の本人の分だけ**で、
    * 他人の分を見る・登録する口は無い（サーバも 404）。
-   * **登録・削除は直近の再認証が要る。** 画面は、サーバが 401 を返したときにパスワードの確認を求めて
-   * やり直すだけで、「再認証済み」を画面の側で判断しない（古い cookie・画面操作時刻を再認証の証拠にしない）。
+   * **登録・削除は、要求ごとに再認証の証拠を添える**（時間窓は 0。401 でやり直す方式ではない）。
+   * 操作を始めたら、パスワードかパスキーで確認する欄を出し、確認できた 1 回の要求だけに添える。
+   * パスワードを持たない人（SAML・Pleasanter のみ）は、パスキーで確認する。
+   * 画面は「再認証済み」を覚えず、判断もしない（古い cookie・画面操作時刻を証拠にしない。判断はサーバ）。
    * ⚠️ **一覧に資格情報の ID・公開鍵は出ない**（サーバも返さない）。名前にも使わない。
    * ⚠️ **PIN・生体情報は、ブラウザーと端末の画面で扱う。ここに入力欄は作らない。**
    */
@@ -15,12 +17,18 @@
     failureMessage,
     formatPasskeyDate,
     isLastPasskey,
-    needsReauthentication,
     normalizePasskeyName,
     PASSKEY_NAME_MAX_LENGTH,
   } from '../lib/passkeys';
   import type { PasskeyRow } from '../lib/types';
-  import { passkeySupport, registerPasskey, type PasskeyFailure } from '../lib/webauthn';
+  import {
+    errorCodeOf,
+    getPasskeyAssertion,
+    passkeySupport,
+    registerPasskey,
+    type PasskeyFailure,
+    type Reauthentication,
+  } from '../lib/webauthn';
   import { t } from '../lib/i18n/state.svelte';
 
   const support = passkeySupport(window);
@@ -38,9 +46,18 @@
   let editingId = $state<string | null>(null);
   let editingName = $state('');
 
-  /** 再認証を求められて、やり直しを待っている操作。 */
-  let pending = $state<{ kind: 'register' } | { kind: 'remove'; row: PasskeyRow } | null>(null);
+  /** 再認証の確認を待っている操作。 */
+  let pending = $state<
+    { kind: 'register'; name: string } | { kind: 'remove'; row: PasskeyRow } | null
+  >(null);
   let reauthPassword = $state('');
+
+  /** 確認の欄を開いたままにする失敗（証拠をやり直せば通る）。それ以外は操作ごとやめる。 */
+  const RETRYABLE_CODES = new Set([
+    'passkeys.reauthRequired',
+    'users.currentPasswordRejected',
+    'users.operationTemporarilyLocked',
+  ]);
 
   $effect(() => {
     void load();
@@ -61,18 +78,37 @@
 
   function showFailure(failure: PasskeyFailure) {
     const message = failureMessage(failure, 'manage');
-    error = 'key' in message ? t(message.key) : message.serverMessage;
+    if ('serverMessage' in message) {
+      error = message.serverMessage;
+      return;
+    }
+    error = t(message.key, message.max === undefined ? undefined : { max: message.max });
   }
 
-  /** パスワードを送るのは、再認証を求められたあとの 1 回だけ。**送ったら消す。** */
-  function takePassword(): string | undefined {
-    const password = reauthPassword === '' ? undefined : reauthPassword;
-    reauthPassword = '';
-    return password;
+  /** HTTP の失敗を、失敗の種類へ。 */
+  function serverFailureOf(result: { status: number; message: string; body?: unknown }): PasskeyFailure {
+    return {
+      kind: 'server',
+      status: result.status,
+      code: errorCodeOf(result.body),
+      message: result.message,
+    };
   }
 
-  async function register(event?: SubmitEvent) {
-    event?.preventDefault();
+  /** 失敗のあと、確認の欄を残すか閉じるか。 */
+  function settleFailure(failure: PasskeyFailure) {
+    showFailure(failure);
+    const retry =
+      failure.kind === 'server' &&
+      (RETRYABLE_CODES.has(failure.code) || failure.status === 429 || failure.status === 423);
+    if (!retry) {
+      pending = null;
+    }
+  }
+
+  /** 登録を始める。名前を確かめたら、確認の欄を出す（証拠はまだ送らない）。 */
+  function startRegister(event: SubmitEvent) {
+    event.preventDefault();
     error = '';
     done = '';
 
@@ -82,27 +118,7 @@
       return;
     }
 
-    busy = true;
-    const outcome = await registerPasskey(passkeyApi, navigator.credentials, {
-      name,
-      password: takePassword(),
-    });
-    busy = false;
-
-    if (!outcome.ok) {
-      if (needsReauthentication(outcome.failure) && pending === null) {
-        pending = { kind: 'register' };
-        return;
-      }
-
-      showFailure(outcome.failure);
-      return;
-    }
-
-    pending = null;
-    newName = '';
-    done = t('passkey.added');
-    await load();
+    pending = { kind: 'register', name };
   }
 
   function startRename(row: PasskeyRow) {
@@ -127,7 +143,7 @@
     busy = false;
 
     if (!result.ok) {
-      error = result.message;
+      showFailure(serverFailureOf(result));
       return;
     }
 
@@ -136,59 +152,88 @@
     await load();
   }
 
-  async function remove(row: PasskeyRow, confirmed = false) {
+  /** 削除を始める。対象名の確認のあと、再認証の欄を出す。 */
+  async function startRemove(row: PasskeyRow) {
     error = '';
     done = '';
 
-    if (!confirmed) {
-      const last = isLastPasskey(rows, row.id);
-      const ok = await confirmAction({
-        title: t('passkey.remove'),
-        message: t(last ? 'passkey.confirmRemoveLast' : 'passkey.confirmRemove', { name: row.name }),
-        confirmLabel: t('passkey.removeConfirmLabel'),
-        danger: true,
-        // 取り返しのつかない操作なので、初期の focus はキャンセル
-        focusCancel: true,
-      });
-      if (!ok) {
-        return;
-      }
+    const last = isLastPasskey(rows, row.id);
+    const ok = await confirmAction({
+      title: t('passkey.remove'),
+      message: t(last ? 'passkey.confirmRemoveLast' : 'passkey.confirmRemove', { name: row.name }),
+      confirmLabel: t('passkey.removeConfirmLabel'),
+      danger: true,
+      // 取り返しのつかない操作なので、初期の focus はキャンセル
+      focusCancel: true,
+    });
+    if (ok) {
+      pending = { kind: 'remove', row };
+    }
+  }
+
+  /** 証拠を添えて、止まっていた操作を 1 回だけ行う。 */
+  async function proceed(proof: Reauthentication) {
+    const current = pending;
+    if (current === null) {
+      return;
     }
 
+    error = '';
     busy = true;
-    const result = await passkeyApi.remove(row.id, takePassword());
-    busy = false;
 
-    if (!result.ok) {
-      if (result.status === 401 && pending === null) {
-        pending = { kind: 'remove', row };
+    if (current.kind === 'register') {
+      const outcome = await registerPasskey(passkeyApi, navigator.credentials, {
+        name: current.name,
+        proof,
+      });
+      busy = false;
+      if (!outcome.ok) {
+        settleFailure(outcome.failure);
         return;
       }
 
-      // 409（最後のログイン方法になる）などは、サーバの文言を出す
-      error = result.message;
-      return;
+      newName = '';
+      done = t('passkey.added');
+    } else {
+      const result = await passkeyApi.remove(current.row.id, proof);
+      busy = false;
+      if (!result.ok) {
+        settleFailure(serverFailureOf(result));
+        return;
+      }
+
+      done = t('passkey.removed');
     }
 
     pending = null;
-    done = t('passkey.removed');
     await load();
   }
 
-  /** パスワードを添えて、止まっていた操作をやり直す。 */
-  async function continuePending(event: SubmitEvent) {
+  /** パスワードで確認する。**送ったら消す。** */
+  async function confirmWithPassword(event: SubmitEvent) {
     event.preventDefault();
-    const current = pending;
-    if (current === null || reauthPassword === '') {
+    if (reauthPassword === '') {
       return;
     }
 
-    // 2 回目の 401（パスワード違い）は、入力欄を出したまま、サーバの文言をエラーに出す
-    if (current.kind === 'register') {
-      await register();
-    } else {
-      await remove(current.row, true);
+    const password = reauthPassword;
+    reauthPassword = '';
+    await proceed({ password });
+  }
+
+  /** パスキーで確認する（パスワードを持たない人の道）。 */
+  async function confirmWithPasskey() {
+    error = '';
+    busy = true;
+    const assertion = await getPasskeyAssertion(passkeyApi, navigator.credentials);
+    busy = false;
+    if (!assertion.ok) {
+      // 取り消しなどでは確認の欄を残す（やり直せる）
+      showFailure(assertion.failure);
+      return;
     }
+
+    await proceed({ assertion: assertion.value });
   }
 
   function cancelPending() {
@@ -243,7 +288,7 @@
                 <button type="button" class="link" disabled={busy} onclick={() => startRename(row)}>
                   {t('passkey.rename')}
                 </button>
-                <button type="button" class="link danger" disabled={busy} onclick={() => remove(row)}>
+                <button type="button" class="link danger" disabled={busy} onclick={() => startRemove(row)}>
                   {t('passkey.remove')}
                 </button>
               </div>
@@ -255,17 +300,25 @@
   {/if}
 
   {#if pending !== null}
-    <!-- **直近の再認証が要るとサーバが返したとき**（登録・削除）。画面は再認証済みかを判断しない -->
-    <form class="reauth" onsubmit={continuePending}>
+    <!-- **操作ごとに再認証の証拠を添える**（時間窓は 0）。画面は再認証済みかを覚えない -->
+    <form class="reauth" onsubmit={confirmWithPassword}>
       <p class="hint">{t('passkey.reauthLead')}</p>
       <label>
         {t('passkey.reauthPassword')}
-        <input type="password" autocomplete="current-password" bind:value={reauthPassword} required />
+        <input type="password" autocomplete="current-password" bind:value={reauthPassword} />
       </label>
       <div class="row">
-        <button type="submit" disabled={busy}>{t('passkey.reauthContinue')}</button>
+        <button type="submit" disabled={busy || reauthPassword === ''}>
+          {t('passkey.reauthContinue')}
+        </button>
+        {#if support === 'ok'}
+          <button type="button" class="secondary" disabled={busy} onclick={confirmWithPasskey}>
+            {t('passkey.reauthWithPasskey')}
+          </button>
+        {/if}
         <button type="button" class="link" onclick={cancelPending}>{t('passkey.reauthCancel')}</button>
       </div>
+      {#if support === 'ok'}<p class="hint">{t('passkey.reauthPasskeyHint')}</p>{/if}
     </form>
   {/if}
 
@@ -273,7 +326,7 @@
   {#if done}<p class="done" role="status">{done}</p>{/if}
 
   {#if support === 'ok'}
-    <form class="add" onsubmit={register}>
+    <form class="add" onsubmit={startRegister}>
       <label>
         {t('passkey.nameLabel')}
         <input
@@ -286,16 +339,16 @@
       </label>
       <p class="hint">{t('passkey.nameHint', { max: PASSKEY_NAME_MAX_LENGTH })}</p>
 
-      {#if busy && pending === null}
+      {#if busy && pending?.kind === 'register'}
         <p class="hint" role="status">{t('passkey.addWaiting')}</p>
       {/if}
 
-      <button type="submit" disabled={busy}>
-        {busy && pending === null ? t('passkey.adding') : t('passkey.add')}
+      <button type="submit" disabled={busy || pending !== null}>
+        {busy && pending?.kind === 'register' ? t('passkey.adding') : t('passkey.add')}
       </button>
     </form>
   {:else}
-    <!-- 非対応のブラウザでは、動かない登録の釦を残さない -->
+    <!-- 非対応のブラウザでは、動かない登録のボタンを残さない -->
     <p class="hint" role="status">{t('passkey.unsupported')}</p>
   {/if}
 </div>
@@ -365,6 +418,7 @@
 
   .row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-4);
   }
@@ -392,6 +446,21 @@
   button[type='submit']:disabled {
     background: var(--border);
     cursor: default;
+  }
+
+  .secondary {
+    padding: var(--space-2) 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .secondary:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 
   .link {

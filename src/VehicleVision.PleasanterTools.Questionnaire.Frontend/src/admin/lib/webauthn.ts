@@ -4,10 +4,12 @@
  * **ここは画面の都合だけを持つ。** 資格情報の検証・保管・どの方式を使えるかの判断はサーバ側の責務で、
  * 画面が隠した・出した方式を権限判定の代わりにしない。
  *
- * 仕様は Core の「認証とセッションの仕様書」3.10（登録 3.10.3・認証 3.10.4・API 3.10.6）。
- * **サーバとやり取りする値の形（base64url・フィールド名）は Fido2NetLib の JSON に合わせた想定**で、
- * Core#216 の実装と食い違ったら、ここの変換（`creationOptionsFromJson` など）と
- * `api.ts` の `passkeyApi` だけを直す。画面（`.svelte`）はこの層の戻り値だけを見る。
+ * 仕様は Core の「認証とセッションの仕様書」3.10（登録 3.10.3・認証 3.10.4・API 3.10.6・確定 3.10.11）。
+ * **サーバとやり取りする値の形は Core#222 で確定したもの**（`AdminPasskeyEndpoints`）:
+ * オプションは Fido2NetLib の JSON がそのまま返る（包みなし。バイト列は base64url）。
+ * 完了の要求は `{ credential, name? }`（登録）・`{ credential }`（ログイン）。
+ * 再認証は要求ごとに `{ password }` か `{ assertion }` を添える（時間窓は 0）。
+ * 形が変わったら、ここの変換と `api.ts` の `passkeyApi` だけを直す。画面（`.svelte`）はこの層の戻り値だけを見る。
  *
  * **ブラウザの機能はすべて引数で受ける**（`credentials`・`environment`）。単体試験でモックするため。
  */
@@ -81,6 +83,8 @@ export interface AttestationJson {
   rawId: string;
   type: 'public-key';
   response: { attestationObject: string; clientDataJSON: string; transports?: string[] };
+  /** 拡張は要求しないので常に空。Fido2NetLib の応答の形に合わせて添える。 */
+  clientExtensionResults: Record<string, never>;
 }
 
 /** ログインの完了でサーバへ返す応答。バイト列は base64url の文字列。 */
@@ -94,7 +98,18 @@ export interface AssertionJson {
     signature: string;
     userHandle: string | null;
   };
+  /** 拡張は要求しないので常に空。 */
+  clientExtensionResults: Record<string, never>;
 }
+
+/**
+ * 直近の再認証の証拠（3.10.6）。**要求ごとに本文へ添える**（時間窓は 0。サーバは「さっき確認した」を覚えない）。
+ *
+ * - `password`: 現在のパスワード
+ * - `assertion`: パスキーでの確認。`/login/passkey/begin` のオプションへ、**本人の**パスキーで応答したもの
+ *   （パスワードを持たない人＝SAML・Pleasanter のみの人が、パスキーで確認する道）
+ */
+export type Reauthentication = { password: string } | { assertion: AssertionJson };
 
 function toDescriptors(
   descriptors: CredentialDescriptorJson[] | undefined,
@@ -143,24 +158,11 @@ export function requestOptionsFromJson(json: RequestOptionsJson): PublicKeyCrede
 }
 
 /**
- * サーバの応答を、オプション本体へ開く。
- *
- * **オプションがそのまま返る形と、`options` / `publicKey` で包まれた形のどちらも受ける**
- * （仕様書 3.10.6 は「オプション」としか書いていない）。
+ * サーバの応答を、オプションとして読む。**包みは無い**（Core#222 で確定。Fido2NetLib の JSON がそのまま返る）。
+ * オブジェクトでなければ `null`。
  */
-export function unwrapOptions<T extends object>(value: unknown): T | null {
-  if (typeof value !== 'object' || value === null) {
-    return null;
-  }
-
-  const record = value as Record<string, unknown>;
-  for (const key of ['options', 'publicKey']) {
-    const inner = record[key];
-    if (typeof inner === 'object' && inner !== null) {
-      return inner as T;
-    }
-  }
-  return value as T;
+export function asOptions<T extends object>(value: unknown): T | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as T) : null;
 }
 
 interface PublicKeyCredentialLike {
@@ -203,6 +205,7 @@ export function attestationToJson(credential: unknown): AttestationJson | null {
       clientDataJSON: bytesToBase64Url(response.clientDataJSON),
       ...(transports === undefined || transports.length === 0 ? {} : { transports }),
     },
+    clientExtensionResults: {},
   };
 }
 
@@ -227,6 +230,7 @@ export function assertionToJson(credential: unknown): AssertionJson | null {
       signature: bytesToBase64Url(response.signature),
       userHandle: response.userHandle ? bytesToBase64Url(response.userHandle) : null,
     },
+    clientExtensionResults: {},
   };
 }
 
@@ -281,7 +285,7 @@ export type PasskeyFailure =
   | { kind: 'invalidOptions' }
   | { kind: 'noResponse' }
   | { kind: 'failed' }
-  | { kind: 'server'; status: number; message: string };
+  | { kind: 'server'; status: number; code: string; message: string };
 
 /** `navigator.credentials` が投げた例外を、失敗の種類へ分ける。 */
 export function classifyWebAuthnError(error: unknown): PasskeyFailure {
@@ -317,28 +321,48 @@ export interface CredentialsLike {
 /** 薄い API 層（`api.ts` の `passkeyApi`）。単体試験で差し替える。 */
 export interface PasskeyApi {
   beginSignIn(): Promise<Result<unknown>>;
-  completeSignIn(response: AssertionJson): Promise<Result<{ next?: string }>>;
-  beginRegistration(password?: string): Promise<Result<unknown>>;
-  completeRegistration(name: string, response: AttestationJson): Promise<Result<unknown>>;
+  completeSignIn(credential: AssertionJson): Promise<Result<{ next?: string }>>;
+  beginRegistration(proof: Reauthentication): Promise<Result<unknown>>;
+  completeRegistration(name: string, credential: AttestationJson): Promise<Result<unknown>>;
 }
 
 export type PasskeyOutcome<T> = { ok: true; value: T } | { ok: false; failure: PasskeyFailure };
 
-function serverFailure(result: { status: number; message: string }): PasskeyOutcome<never> {
-  return { ok: false, failure: { kind: 'server', status: result.status, message: result.message } };
+/** エラー応答の本文（`{ code }`）から、理由の鍵を取り出す。**無ければ空。** */
+export function errorCodeOf(body: unknown): string {
+  if (typeof body === 'object' && body !== null && 'code' in body) {
+    const code = (body as { code: unknown }).code;
+    return typeof code === 'string' ? code : '';
+  }
+  return '';
+}
+
+function serverFailure(result: {
+  status: number;
+  message: string;
+  body?: unknown;
+}): PasskeyOutcome<never> {
+  return {
+    ok: false,
+    failure: {
+      kind: 'server',
+      status: result.status,
+      code: errorCodeOf(result.body),
+      message: result.message,
+    },
+  };
 }
 
 /**
- * パスキーでログインする（3.10.4）。**ユーザー名は取らない**（ディスコバラブル）。
- *
- * **成功しても「ログイン完了」とは言わない。** サーバが Session を発行したあとに、
- * 呼び出し側が状態を読み直す。
+ * パスキーで応答する（`/login/passkey/begin` のオプション → `navigator.credentials.get`）。
+ * **ログインと、パスキーでの再認証の両方がこの 1 つを使う**（再認証の `{assertion}` はログインと同じ形）。
+ * ユーザー名は取らない（ディスコバラブル）。
  */
-export async function signInWithPasskey(
+export async function getPasskeyAssertion(
   api: PasskeyApi,
   credentials: CredentialsLike,
   options: { signal?: AbortSignal } = {},
-): Promise<PasskeyOutcome<{ next: string }>> {
+): Promise<PasskeyOutcome<AssertionJson>> {
   const begin = await api.beginSignIn();
   if (!begin.ok) {
     return serverFailure(begin);
@@ -346,7 +370,7 @@ export async function signInWithPasskey(
 
   let publicKey: PublicKeyCredentialRequestOptions;
   try {
-    const json = unwrapOptions<RequestOptionsJson>(begin.value);
+    const json = asOptions<RequestOptionsJson>(begin.value);
     if (json === null) {
       return { ok: false, failure: { kind: 'invalidOptions' } };
     }
@@ -367,7 +391,26 @@ export async function signInWithPasskey(
     return { ok: false, failure: { kind: 'noResponse' } };
   }
 
-  const complete = await api.completeSignIn(assertion);
+  return { ok: true, value: assertion };
+}
+
+/**
+ * パスキーでログインする（3.10.4）。**ユーザー名は取らない**（ディスコバラブル）。
+ *
+ * **成功しても「ログイン完了」とは言わない。** サーバが Session を発行したあとに、
+ * 呼び出し側が状態を読み直す。
+ */
+export async function signInWithPasskey(
+  api: PasskeyApi,
+  credentials: CredentialsLike,
+  options: { signal?: AbortSignal } = {},
+): Promise<PasskeyOutcome<{ next: string }>> {
+  const assertion = await getPasskeyAssertion(api, credentials, options);
+  if (!assertion.ok) {
+    return assertion;
+  }
+
+  const complete = await api.completeSignIn(assertion.value);
   if (!complete.ok) {
     return serverFailure(complete);
   }
@@ -376,22 +419,22 @@ export async function signInWithPasskey(
 }
 
 /**
- * パスキーを登録する（3.10.3）。**開始に直近の再認証を要する**ので、
- * 要求されたとき（401）は `server` の `status: 401` で返り、呼び出し側が本人確認を求める。
+ * パスキーを登録する（3.10.3）。**開始に再認証の証拠（`proof`）を添える**（要求ごと。時間窓は 0）。
+ * 証拠が足りない・違うときは `server`（401 `passkeys.reauthRequired`・`users.currentPasswordRejected`・423）で返る。
  */
 export async function registerPasskey(
   api: PasskeyApi,
   credentials: CredentialsLike,
-  input: { name: string; password?: string; signal?: AbortSignal },
+  input: { name: string; proof: Reauthentication; signal?: AbortSignal },
 ): Promise<PasskeyOutcome<null>> {
-  const begin = await api.beginRegistration(input.password);
+  const begin = await api.beginRegistration(input.proof);
   if (!begin.ok) {
     return serverFailure(begin);
   }
 
   let publicKey: PublicKeyCredentialCreationOptions;
   try {
-    const json = unwrapOptions<CreationOptionsJson>(begin.value);
+    const json = asOptions<CreationOptionsJson>(begin.value);
     if (json === null) {
       return { ok: false, failure: { kind: 'invalidOptions' } };
     }

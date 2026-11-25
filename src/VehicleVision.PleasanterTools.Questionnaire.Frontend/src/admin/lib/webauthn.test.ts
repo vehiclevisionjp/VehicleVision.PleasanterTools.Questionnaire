@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  asOptions,
   assertionToJson,
   attestationToJson,
   base64UrlToBytes,
   bytesToBase64Url,
   classifyWebAuthnError,
   creationOptionsFromJson,
+  errorCodeOf,
   passkeySupport,
   registerPasskey,
   requestOptionsFromJson,
+  getPasskeyAssertion,
   signInWithPasskey,
-  unwrapOptions,
   type CreationOptionsJson,
   type CredentialsLike,
   type PasskeyApi,
@@ -19,7 +21,6 @@ import {
   failureMessage,
   formatPasskeyDate,
   isLastPasskey,
-  needsReauthentication,
   normalizePasskeyName,
 } from './passkeys';
 
@@ -28,8 +29,13 @@ function buffer(...values: number[]): ArrayBuffer {
 }
 
 const ok = <T>(value: T) => Promise.resolve({ ok: true as const, value });
-const ng = (status: number, message = 'x') =>
-  Promise.resolve({ ok: false as const, status, message });
+const ng = (status: number, code?: string, message = 'x') =>
+  Promise.resolve({
+    ok: false as const,
+    status,
+    message,
+    ...(code === undefined ? {} : { body: { code } }),
+  });
 
 /** API 層のモック。呼ばれた順と引数を残す。 */
 function fakeApi(overrides: Partial<PasskeyApi> = {}) {
@@ -43,16 +49,15 @@ function fakeApi(overrides: Partial<PasskeyApi> = {}) {
       calls.push('completeSignIn');
       return ok({ next: 'done' });
     },
-    beginRegistration: (password) => {
-      calls.push(`beginRegistration:${password ?? ''}`);
+    beginRegistration: (proof) => {
+      calls.push(`beginRegistration:${JSON.stringify(proof)}`);
+      // Core#222: オプションは包みなしで返る
       return ok({
-        options: {
-          rp: { id: 'example.test', name: 'Q' },
-          user: { id: 'AQID', name: 'a', displayName: 'a' },
-          challenge: 'BAUG',
-          pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-          excludeCredentials: [{ id: 'BwgJ', type: 'public-key' }],
-        },
+        rp: { id: 'example.test', name: 'Q' },
+        user: { id: 'AQID', name: 'a', displayName: 'a' },
+        challenge: 'BAUG',
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+        excludeCredentials: [{ id: 'BwgJ', type: 'public-key' }],
       });
     },
     completeRegistration: (name) => {
@@ -110,8 +115,8 @@ describe('オプションの変換', () => {
 
   it('登録のオプションは、ID とチャレンジをバイト列にする', async () => {
     const { api } = fakeApi();
-    const result = await api.beginRegistration();
-    const json = unwrapOptions<CreationOptionsJson>(result.ok ? result.value : null);
+    const result = await api.beginRegistration({ password: 'pw' });
+    const json = asOptions<CreationOptionsJson>(result.ok ? result.value : null);
     expect(json).not.toBeNull();
 
     const options = creationOptionsFromJson(json!);
@@ -119,11 +124,11 @@ describe('オプションの変換', () => {
     expect(options.user.name).toBe('a');
   });
 
-  it('包まれた形と、そのままの形のどちらも開く', () => {
-    expect(unwrapOptions({ options: { a: 1 } })).toEqual({ a: 1 });
-    expect(unwrapOptions({ publicKey: { a: 2 } })).toEqual({ a: 2 });
-    expect(unwrapOptions({ challenge: 'x' })).toEqual({ challenge: 'x' });
-    expect(unwrapOptions('x')).toBeNull();
+  it('オプションは包まずにそのまま読む（オブジェクト以外は null）', () => {
+    expect(asOptions({ challenge: 'x' })).toEqual({ challenge: 'x' });
+    expect(asOptions('x')).toBeNull();
+    expect(asOptions(null)).toBeNull();
+    expect(asOptions([])).toBeNull();
   });
 });
 
@@ -133,12 +138,14 @@ describe('資格情報の JSON 化', () => {
     expect(json.rawId).toBe('AQID');
     expect(json.response.attestationObject).toBe('BA');
     expect(json.response.transports).toEqual(['internal']);
+    expect(json.clientExtensionResults).toEqual({});
   });
 
   it('ログインの応答を base64url にする', () => {
     const json = assertionToJson(assertionCredential)!;
     expect(json.response.signature).toBe('Bg');
     expect(json.response.userHandle).toBe('Bw');
+    expect(json.clientExtensionResults).toEqual({});
   });
 
   it('形の違う値は null', () => {
@@ -232,7 +239,7 @@ describe('ログインの流れ', () => {
   });
 
   it('完了が 401 ならサーバの失敗。画面へは決まった文言だけ出す', async () => {
-    const { api } = fakeApi({ completeSignIn: () => ng(401, '理由') });
+    const { api } = fakeApi({ completeSignIn: () => ng(401, 'auth.invalidCredentials', '理由') });
     const credentials: CredentialsLike = {
       ...nothing,
       get: () => Promise.resolve(assertionCredential as unknown as Credential),
@@ -242,7 +249,12 @@ describe('ログインの流れ', () => {
 
     expect(outcome.ok).toBe(false);
     if (!outcome.ok) {
-      expect(outcome.failure).toEqual({ kind: 'server', status: 401, message: '理由' });
+      expect(outcome.failure).toEqual({
+        kind: 'server',
+        status: 401,
+        code: 'auth.invalidCredentials',
+        message: '理由',
+      });
       expect(failureMessage(outcome.failure, 'signIn')).toEqual({ key: 'passkey.error.signInFailed' });
     }
   });
@@ -257,22 +269,57 @@ describe('ログインの流れ', () => {
   });
 });
 
+describe('パスキーでの応答（ログインと再認証で共通）', () => {
+  it('開始→取得だけ行い、完了は呼ばない（再認証の assertion として使う）', async () => {
+    const { api, calls } = fakeApi();
+    const credentials: CredentialsLike = {
+      create: () => Promise.resolve(null),
+      get: () => Promise.resolve(assertionCredential as unknown as Credential),
+    };
+
+    const outcome = await getPasskeyAssertion(api, credentials);
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.ok && outcome.value.rawId).toBe('AQID');
+    expect(calls).toEqual(['beginSignIn']);
+  });
+});
+
 describe('登録の流れ', () => {
-  it('開始（パスワードを添える）→作成→名前つきで完了', async () => {
+  it('開始（パスワードの証拠を添える）→作成→名前つきで完了', async () => {
     const { api, calls } = fakeApi();
     const credentials: CredentialsLike = {
       create: () => Promise.resolve(attestationCredential as unknown as Credential),
       get: () => Promise.resolve(null),
     };
 
-    const outcome = await registerPasskey(api, credentials, { name: '仕事用 PC', password: 'pw' });
+    const outcome = await registerPasskey(api, credentials, {
+      name: '仕事用 PC',
+      proof: { password: 'pw' },
+    });
 
     expect(outcome.ok).toBe(true);
-    expect(calls).toEqual(['beginRegistration:pw', 'completeRegistration:仕事用 PC']);
+    expect(calls).toEqual([
+      'beginRegistration:{"password":"pw"}',
+      'completeRegistration:仕事用 PC',
+    ]);
   });
 
-  it('再認証が要る（401）なら、認証器を呼ばずに 401 を返す', async () => {
-    const { api } = fakeApi({ beginRegistration: () => ng(401) });
+  it('パスキーの証拠（assertion）も開始へそのまま添える', async () => {
+    const { api, calls } = fakeApi();
+    const credentials: CredentialsLike = {
+      create: () => Promise.resolve(attestationCredential as unknown as Credential),
+      get: () => Promise.resolve(null),
+    };
+    const assertion = assertionToJson(assertionCredential)!;
+
+    await registerPasskey(api, credentials, { name: 'a', proof: { assertion } });
+
+    expect(calls[0]).toBe(`beginRegistration:${JSON.stringify({ assertion })}`);
+  });
+
+  it('再認証が通らない（401）なら、認証器を呼ばずに code つきで返す', async () => {
+    const { api } = fakeApi({ beginRegistration: () => ng(401, 'passkeys.reauthRequired') });
     let called = false;
     const credentials: CredentialsLike = {
       create: () => {
@@ -282,10 +329,20 @@ describe('登録の流れ', () => {
       get: () => Promise.resolve(null),
     };
 
-    const outcome = await registerPasskey(api, credentials, { name: 'a' });
+    const outcome = await registerPasskey(api, credentials, {
+      name: 'a',
+      proof: { password: 'x' },
+    });
 
     expect(called).toBe(false);
-    expect(outcome.ok === false && needsReauthentication(outcome.failure)).toBe(true);
+    expect(outcome.ok === false && outcome.failure).toMatchObject({
+      kind: 'server',
+      status: 401,
+      code: 'passkeys.reauthRequired',
+    });
+    expect(outcome.ok === false && failureMessage(outcome.failure, 'manage')).toEqual({
+      key: 'passkey.error.reauthRequired',
+    });
   });
 
   it('同じ認証器は alreadyRegistered', async () => {
@@ -295,7 +352,9 @@ describe('登録の流れ', () => {
       get: () => Promise.resolve(null),
     };
 
-    expect(await registerPasskey(api, credentials, { name: 'a' })).toEqual({
+    expect(
+      await registerPasskey(api, credentials, { name: 'a', proof: { password: 'x' } }),
+    ).toEqual({
       ok: false,
       failure: { kind: 'alreadyRegistered' },
     });
@@ -322,12 +381,47 @@ describe('画面の判断', () => {
     expect(isLastPasskey([row, { ...row, id: 'b' }], 'a')).toBe(false);
   });
 
-  it('管理の失敗はサーバの文言を使い、空なら決まった文言', () => {
-    expect(failureMessage({ kind: 'server', status: 409, message: '最後です' }, 'manage')).toEqual({
-      serverMessage: '最後です',
+  it('名前は制御文字を含むものも断る（サーバと同じ規則）', () => {
+    expect(normalizePasskeyName('a\nb')).toBeNull();
+    expect(normalizePasskeyName('a\u0000b')).toBeNull();
+  });
+
+  it.each([
+    [409, 'passkeys.limitReached', { key: 'passkey.error.limitReached' }],
+    [400, 'passkeys.invalidName', { key: 'passkey.nameInvalid', max: 100 }],
+    [400, 'passkeys.invalidResponse', { key: 'passkey.error.invalidResponse' }],
+    [400, 'passkeys.originNotAllowed', { key: 'passkey.error.insecure' }],
+    [409, 'passkeys.duplicateCredential', { key: 'passkey.error.alreadyRegistered' }],
+    [409, 'passkeys.lastSignInMethod', { key: 'passkey.error.lastSignInMethod' }],
+    [401, 'passkeys.reauthRequired', { key: 'passkey.error.reauthRequired' }],
+    [401, 'users.currentPasswordRejected', { key: 'passkey.error.passwordRejected' }],
+    [423, 'users.operationTemporarilyLocked', { key: 'passkey.error.locked' }],
+    [404, 'passkeys.notFound', { key: 'passkey.error.notFound' }],
+    [429, '', { key: 'passkey.error.rateLimited' }],
+    [500, 'unknown', { key: 'passkey.error.failed' }],
+  ])('管理の失敗 %i %s は決まった文言になる', (status, code, expected) => {
+    expect(failureMessage({ kind: 'server', status, code, message: 'x' }, 'manage')).toEqual(expected);
+  });
+
+  it('ネットワークの失敗（status 0）は、その文言を使う', () => {
+    expect(
+      failureMessage({ kind: 'server', status: 0, code: '', message: '通信できません' }, 'manage'),
+    ).toEqual({ serverMessage: '通信できません' });
+  });
+
+  it('ログインの失敗は理由を出さず、レート制限だけ区別する', () => {
+    expect(
+      failureMessage({ kind: 'server', status: 401, code: 'auth.invalidCredentials', message: '' }, 'signIn'),
+    ).toEqual({ key: 'passkey.error.signInFailed' });
+    expect(failureMessage({ kind: 'server', status: 429, code: '', message: '' }, 'signIn')).toEqual({
+      key: 'passkey.error.rateLimited',
     });
-    expect(failureMessage({ kind: 'server', status: 500, message: '' }, 'manage')).toEqual({
-      key: 'passkey.error.failed',
-    });
+  });
+
+  it('エラー本文の code を取り出す', () => {
+    expect(errorCodeOf({ code: 'a.b' })).toBe('a.b');
+    expect(errorCodeOf({ code: 1 })).toBe('');
+    expect(errorCodeOf('x')).toBe('');
+    expect(errorCodeOf(undefined)).toBe('');
   });
 });

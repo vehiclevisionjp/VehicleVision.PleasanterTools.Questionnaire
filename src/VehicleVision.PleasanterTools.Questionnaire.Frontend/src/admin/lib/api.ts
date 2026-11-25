@@ -42,7 +42,7 @@ import type {
   PleasanterSsoTestResult,
 } from './types';
 import type { PleasanterSsoCheckResponse } from './pleasanterSso';
-import type { AssertionJson, AttestationJson, PasskeyApi } from './webauthn';
+import type { AssertionJson, AttestationJson, PasskeyApi, Reauthentication } from './webauthn';
 
 /**
  * 呼び出しの結果。
@@ -283,53 +283,51 @@ export const disableOwnTotp = (password: string, revokeApiTokens = true) =>
     json: { password, revokeApiTokens },
   });
 
-// ---- パスキー（Issue #1068。Core の仕様書 3.10.6）-----------------------------
+// ---- パスキー（Issue #1068。Core の仕様書 3.10.6・API 契約 5.3.1。Core#222 で確定）---
 //
-// **経路・形はこの節だけに閉じ込める。** 仕様書の経路は「案」で、Core#216 の実装と食い違ったら
-// ここだけ直す。画面は `passkeyApi` の戻り値しか見ない。試験ではこのオブジェクトを差し替える。
+// **経路・形はこの節だけに閉じ込める。** 画面は `passkeyApi` の戻り値しか見ない。試験ではこのオブジェクトを差し替える。
+// エラーは `{ code }`（Core は文言を持たない）。理由の鍵は `Result.body.code` から `lib/passkeys.ts` が文言にする。
+// 削除は DELETE ではなく POST `…/remove`（API 契約 5.6.1）。
 
 /** パスキーの API。 */
 export const passkeyApi = {
-  /** 自分のパスキーの一覧。公開鍵・資格情報 ID は返らない。 */
+  /** 自分のパスキーの一覧。公開鍵・資格情報 ID は返らない。再認証は要らない。 */
   list: () => call<{ passkeys: PasskeyRow[] }>('/api/admin/me/passkeys'),
 
-  /** 登録の開始。**直近の再認証が要る**（要るのに無ければ 401）。パスワードで確かめるなら `password` を添える。 */
-  beginRegistration: (password?: string) =>
-    call<unknown>('/api/admin/me/passkeys/begin', {
+  /** 登録の開始。**再認証の証拠（`{password}` か `{assertion}`）を要求ごとに添える**（時間窓は 0）。 */
+  beginRegistration: (proof: Reauthentication) =>
+    call<unknown>('/api/admin/me/passkeys/begin', { method: 'POST', json: proof }),
+
+  /** 登録の完了。`name` は本人が付ける名前（空ならサーバが `Passkey` にする）。 */
+  completeRegistration: (name: string, credential: AttestationJson) =>
+    call<{ passkey: PasskeyRow }>('/api/admin/me/passkeys/complete', {
       method: 'POST',
-      json: password === undefined ? {} : { password },
+      json: { credential, name },
     }),
 
-  /** 登録の完了。`name` は本人が付ける名前。 */
-  completeRegistration: (name: string, response: AttestationJson) =>
-    call<unknown>('/api/admin/me/passkeys/complete', {
-      method: 'POST',
-      json: { name, response },
-    }),
-
-  /** 名前の変更。 */
+  /** 名前の変更（再認証は要らない）。 */
   rename: (id: string, name: string) =>
     call<{ name: string }>(`/api/admin/me/passkeys/${encodeURIComponent(id)}`, {
       method: 'PUT',
       json: { name },
     }),
 
-  /** 削除。**直近の再認証が要る。** 最後のログイン方法になるときは 409。 */
-  remove: (id: string, password?: string) =>
-    call<void>(`/api/admin/me/passkeys/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      json: password === undefined ? undefined : { password },
+  /** 削除。**再認証の証拠を添える。** 最後のログイン方法になるときは 409 `passkeys.lastSignInMethod`。 */
+  remove: (id: string, proof: Reauthentication) =>
+    call<{ removed: boolean }>(`/api/admin/me/passkeys/${encodeURIComponent(id)}/remove`, {
+      method: 'POST',
+      json: proof,
     }),
 
-  /** ログインの開始（認証の外。ユーザー名は送らない）。 */
+  /** ログインの開始（認証の外。ユーザー名は送らない）。パスキーでの再認証のオプションにも使う。 */
   beginSignIn: () =>
-    call<unknown>('/api/admin/passkeys/login/begin', { method: 'POST', json: {} }),
+    call<unknown>('/api/admin/login/passkey/begin', { method: 'POST', json: {} }),
 
   /** ログインの完了。成功するとサーバが Session（via=passkey）を発行する。 */
-  completeSignIn: (response: AssertionJson) =>
-    call<{ next?: string }>('/api/admin/passkeys/login/complete', {
+  completeSignIn: (credential: AssertionJson) =>
+    call<{ next?: string }>('/api/admin/login/passkey/complete', {
       method: 'POST',
-      json: { response },
+      json: { credential },
     }),
 } satisfies PasskeyApi & Record<string, unknown>;
 

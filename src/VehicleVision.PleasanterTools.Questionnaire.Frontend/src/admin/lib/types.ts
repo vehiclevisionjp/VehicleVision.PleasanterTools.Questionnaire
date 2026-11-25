@@ -986,7 +986,8 @@ export interface AdminSession {
    * パスキーが使えるか（Issue #1068。Core の仕様書 3.10）。**サーバが決める。** 既定は無効。
    *
    * **無い・偽のときは、ログインのタブも管理の画面も出さない**（API が無い環境でも画面を崩さない）。
-   * ⚠️ 仕様書 3.10 に、この値をどの応答で返すかの記述は無い（確認事項）。ここでは session の応答に載る想定。
+   * **`GET /api/admin/session` の応答に載せる**（Core の API 契約 5.3.1。アプリが実装する。Core#222 で確定）。
+   * ログイン画面のタブ（未認証の応答）と、マイアカウントの管理（認証済みの応答）の**両方の応答**に要る。
    */
   passkeyEnabled?: boolean;
 
@@ -1357,7 +1358,7 @@ export interface DeadLetterPage {
   hasMore: boolean;
 }
 
-/** 自分のパスキー 1 件（Core の仕様書 3.10.6 の一覧）。**公開鍵・資格情報 ID は返ってこない。** */
+/** 自分のパスキー 1 件（Core の仕様書 3.10.6 の一覧。登録の完了の `passkey` も同じ形）。**公開鍵・資格情報 ID は返ってこない。** */
 export interface PasskeyRow {
   id: string;
   /** 本人が付けた名前 */
