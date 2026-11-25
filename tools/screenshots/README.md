@@ -197,6 +197,36 @@ docker compose --profile sqlserver --profile screenshots run --rm     screenshot
 - 手元（容器の外）で走らせるときは、`localhost:8080` と `localhost:8081` に Pleasanter と本アプリが
   既に居る前提で `SSO_SKIP_FORWARD=1 SSO_PLEASANTER_HOST=localhost` を付ける
 
+## パスキーのブラウザ試験（Issue #1085）
+
+`specs/passkey.spec.ts` が、管理画面のパスキーを**実際の Chromium の画面から**通す。
+登録（パスワードで再認証）・一覧・名前の変更・削除と、ログイン画面のパスキーでのログイン
+（ユーザー名なし。ディスコバラブル資格情報）・ログイン中の端末の `loginMethod = Passkey`。
+**取説用のスクリーンショットではない**ので、設定（`playwright.passkey.config.ts`）も分けてある。
+`npm run shot` には混ぜない（`@passkey` を除外している）。CI は
+[`passkey-browser.yml`](../../.github/workflows/passkey-browser.yml)（**必須チェックではない**。安定してから別に決める）。
+
+```bash
+# パスキーを有効にして本アプリだけ起動する（Pleasanter は要らない）。まっさらな DB から
+export DEV_ADMIN_PASSKEY=true DEV_ADMIN_PASSKEY_RPID=questionnaire-app        DEV_ADMIN_PASSKEY_ORIGINS=https://questionnaire-app:8443
+docker compose --profile sqlserver down -v
+docker compose --profile sqlserver up -d --build --wait app
+docker compose --profile screenshots build screenshots
+docker compose --profile sqlserver --profile screenshots run --rm screenshots npm run passkey
+```
+
+- **仮想認証器は CDP の WebAuthn ドメイン**（`WebAuthn.enable` → `WebAuthn.addVirtualAuthenticator`。
+  `ctap2`・`internal`・resident key・本人確認つき・タッチは自動）。Chromium 専用。
+  **実機の端末・認証器の確認ではない**（運用手順書の 7 章。Core#217）
+- **自己署名の https の `questionnaire-app` のまま通る**（2026-11-26 に Playwright 1.65.1 の Chromium で実測）。
+  `ignoreHTTPSErrors: true` のままで `window.isSecureContext` は `true`、登録・ログインとも通った。
+  そのため `localhost` への素通し（`pleasanter-sso.spec.ts` のような転送）は要らない。
+  **RP ID は `questionnaire-app`、Origin は `https://questionnaire-app:8443`**（Origin はスキーム・ホスト・ポートの完全一致）
+- **失敗したとき**は `report/passkey-artifacts/` にスクリーンショットとトレース（`trace.zip`。
+  `npx playwright show-trace` か <https://trace.playwright.dev> で開く）、`report/passkey-html/` に HTML の報告書が出る。
+  CI は `tools/screenshots/report` を artifact にする
+- **画面でのパスキーの表示名は確かめていない。** 端末の一覧の「ログイン方式」は、API の値（`Passkey`）だけを見る（画面は「不明」と出る。#1088）
+
 ## 安全なコンテキスト（https）でも試す
 
 **`crypto.subtle` は https か localhost でしか使えない。** 平文だけで試していると、
