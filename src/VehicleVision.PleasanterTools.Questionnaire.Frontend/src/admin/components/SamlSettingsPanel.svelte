@@ -246,12 +246,6 @@
       </div>
 
       <label>
-        {t('saml.buttonLabel')}
-        {#if fixed('buttonLabel')}<span class="fixed">{t('saml.fixed')}</span>{/if}
-        <input type="text" bind:value={settings.buttonLabel} disabled={fixed('buttonLabel')} />
-      </label>
-
-      <label>
         {t('saml.singleLogoutUrl')}
         {#if fixed('singleLogoutUrl')}<span class="fixed">{t('saml.fixed')}</span>{/if}
         <input

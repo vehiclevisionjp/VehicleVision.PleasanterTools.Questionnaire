@@ -143,7 +143,7 @@ flowchart LR
 | 値 | 渡す環境変数 | 既定 | 内容 |
 | --- | --- | --- | --- |
 | `config.pathBase` | `QUESTIONNAIRE_PATH_BASE` | `""`（渡さない。`/` で動く） | 例 `/questionnaire`。書式はサブパス配置-運用手順書 2 章。`values.schema.json` でも書式を検査する |
-| `config.pleasanterSso.<項目>` | `QUESTIONNAIRE_PLEASANTERSSO_<項目の大文字>` | `{}`（何も渡さない。無効） | 項目は `enabled`・`internalBaseUrl`・`loginUrl`・`logoutUrl`・`cookieNames`・`unknownUser`・`registerRole`・`revalidateMinutes`・`timeoutSeconds`・`buttonLabel`。綴り違いは schema で止まる |
+| `config.pleasanterSso.<項目>` | `QUESTIONNAIRE_PLEASANTERSSO_<項目の大文字>` | `{}`（何も渡さない。無効） | 項目は `enabled`・`internalBaseUrl`・`loginUrl`・`logoutUrl`・`cookieNames`・`unknownUser`・`registerRole`・`revalidateMinutes`・`timeoutSeconds`。綴り違いは schema で止まる（廃止した `buttonLabel` も止まる。Issue #1079。ボタンの文言は固定） |
 | `ingress.path` | — | `""`（`config.pathBase`、それも無ければ `/`） | Ingress で本アプリへ振り分けるパス。`config.pathBase` で始まらない値は `helm template` の時点で止まる |
 | `ingress.pathType` | — | `Prefix` | `Prefix`・`Exact`・`ImplementationSpecific` |
 

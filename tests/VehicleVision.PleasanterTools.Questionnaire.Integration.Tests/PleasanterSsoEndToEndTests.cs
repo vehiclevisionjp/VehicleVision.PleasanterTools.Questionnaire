@@ -291,7 +291,6 @@ public class PleasanterSsoEndToEndTests
             registerRole = settings["registerRole"]!.GetValue<string>(),
             revalidateMinutes = "30",
             timeoutSeconds = settings["timeoutSeconds"]!.GetValue<string>(),
-            buttonLabel = settings["buttonLabel"]!.GetValue<string>(),
         });
         saved.EnsureSuccessStatusCode();
 

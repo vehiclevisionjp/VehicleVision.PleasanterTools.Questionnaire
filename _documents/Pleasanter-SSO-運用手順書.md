@@ -323,7 +323,12 @@ SAML と同じ。**外部設定（環境変数・`App_Data/Parameters` など）
 | `QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE` | JIT で作るときの役割 | `Editor` |
 | `QUESTIONNAIRE_PLEASANTERSSO_REVALIDATEMINUTES` | 確かめ直す間隔（分、1〜60） | `5` |
 | `QUESTIONNAIRE_PLEASANTERSSO_TIMEOUTSECONDS` | 問い合わせを待つ時間（秒、1〜30） | `5` |
-| `QUESTIONNAIRE_PLEASANTERSSO_BUTTONLABEL` | ログイン画面のボタンの文字 | なし（「Pleasanter でログイン」） |
+
+**ログイン画面のボタンの文言は固定。** 「Pleasanter でログイン」を、画面の言語ごとの翻訳で出す（設定では変えられない。Issue #1079）。
+旧版の `QUESTIONNAIRE_PLEASANTERSSO_BUTTONLABEL`・`Authentication.json` の `PleasanterSsoButtonLabel`・
+Helm の `config.pleasanterSso.buttonLabel` は読まない。環境変数やファイルに指定が残っていると、
+起動時に無視した旨の警告を 1 回だけ記録へ出す。**設定から削除すること**（Helm は schema で止まるので、`values` から消す）。
+DB の `PleasanterSsoSettings.ButtonLabel` 列は残してあるが、読み書きしない。
 
 - **内部 URL は Pleasanter へ直接つないでよい**（例 `http://127.0.0.1:8080/`）。cookie はホスト名に
   結び付いた値ではないので、リバースプロキシを経由しなくても Pleasanter は同じ人と判断する。

@@ -841,7 +841,6 @@ public static class AdminSamlEndpoints
             old.LoginIdSource,
             request.LoginIdSource);
         Add("loginIdClaim", SamlOptions.LoginIdClaimKey, old.LoginIdClaim, request.LoginIdClaim);
-        Add("buttonLabel", SamlOptions.ButtonLabelKey, old.ButtonLabel, request.ButtonLabel);
         Add(
             "singleLogoutUrl",
             SamlOptions.SingleLogoutUrlKey,
@@ -867,7 +866,6 @@ public static class AdminSamlEndpoints
             registerRole = values.RegisterRole,
             loginIdSource = values.LoginIdSource,
             loginIdClaim = values.LoginIdClaim,
-            buttonLabel = values.ButtonLabel,
             singleLogoutUrl = values.SingleLogoutUrl,
             fixedFields = new
             {
@@ -880,7 +878,6 @@ public static class AdminSamlEndpoints
                 registerRole = Fixed(SamlOptions.RegisterRoleKey),
                 loginIdSource = Fixed(SamlOptions.LoginIdSourceKey),
                 loginIdClaim = Fixed(SamlOptions.LoginIdClaimKey),
-                buttonLabel = Fixed(SamlOptions.ButtonLabelKey),
                 singleLogoutUrl = Fixed(SamlOptions.SingleLogoutUrlKey),
             },
         };
@@ -896,7 +893,6 @@ public static class AdminSamlEndpoints
         string? RegisterRole,
         string? LoginIdSource,
         string? LoginIdClaim,
-        string? ButtonLabel,
         string? SingleLogoutUrl)
     {
         public SamlSettingValues ToValues() => new()
@@ -910,7 +906,6 @@ public static class AdminSamlEndpoints
             RegisterRole = RegisterRole,
             LoginIdSource = LoginIdSource,
             LoginIdClaim = LoginIdClaim,
-            ButtonLabel = ButtonLabel,
             SingleLogoutUrl = SingleLogoutUrl,
         };
     }

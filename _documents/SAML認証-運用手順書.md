@@ -161,8 +161,13 @@ MIID...（IdP から落とした証明書をそのまま）
 # 単一ログアウト（任意）。**設定しなければ、これまでどおり本アプリの cookie を消すだけ**
 QUESTIONNAIRE_SAML_SINGLELOGOUTURL=https://accounts.google.com/o/saml2/idp?idpid=XXXXXXXX
 QUESTIONNAIRE_SAML_UNKNOWNUSER=Reject
-QUESTIONNAIRE_SAML_BUTTONLABEL=会社アカウントでログイン
 ```
+
+**ログイン画面のボタンの文言は固定。** 「SSO でログイン」を、画面の言語ごとの翻訳で出す（設定では変えられない。Issue #1079）。
+Pleasanter のログインも有効にしているときは、そちらが「Pleasanter でログイン」になるので、2 つは区別できる。
+旧版の `QUESTIONNAIRE_SAML_BUTTONLABEL`・`Authentication.json` の `SamlButtonLabel` は読まない。
+指定が残っていると、起動時に無視した旨の警告を 1 回だけ記録へ出す。**設定から削除すること。**
+DB の `SamlSettings.ButtonLabel` 列は残してあるが、読み書きしない。
 
 外部設定だけで `ENABLED=true` にしている従来構成では、足りない設定があると
 **起動時に例外で止まる。** 管理画面から保存する場合は、保存時に同じ検証を行う。
@@ -343,7 +348,7 @@ ACS URL が正しく組み立たない（[`サブパス配置-運用手順書.md
 
 ### 確かめること
 
-1. 管理画面（既定は `/admin`。`QUESTIONNAIRE_ADMIN_PATH` で変えていればその入口）を開き、**「シングルサインオンでログイン」のボタンが出ている**こと
+1. 管理画面（既定は `/admin`。`QUESTIONNAIRE_ADMIN_PATH` で変えていればその入口）を開き、**「SSO でログイン」のボタンが出ている**こと
 2. ボタンを押して Google のログインへ飛ぶこと
 3. 戻ってきて管理画面に入れること（`Reject` のときは、
    本アプリ側に同じログイン ID の管理者を先に作っておく）
