@@ -15,7 +15,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>旧スキーマの段階（M0037 まで）で行を入れてから、Core の共有表（M10001〜M10007）を作り、
+/// <b>旧スキーマの段階（M0037 まで）で行を入れてから、Core の共有表（M10001〜M10009）を作り、
 /// 最後にコピーする移行（M100000〜）まで上げる。</b> 稼働中のデータがある導入先が、更新で通る道そのもの。
 /// 各 RDBMS に<b>使い捨ての DB</b>を作って確かめる（ほかの試験が残した表・行の影響を受けない）。
 /// </para>
@@ -31,7 +31,7 @@ public class CoreStoreMigrationTests
 {
     private const long LastLegacyVersion = 37;
 
-    private const long LastCoreVersion = 10007;
+    private const long LastCoreVersion = 10009;
 
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
@@ -99,6 +99,43 @@ public class CoreStoreMigrationTests
         // もう一度当てても何も起きない
         QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
         Assert.Equal(5, (await new AuditLogStore(factory).ListAsync(new AuditLogQuery())).Count);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task Coreのパスキーの共有移行が通り表と列ができる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+
+        // 0.2.0 までの Core の共有表（M10007）まで当ててから、アプリが起動時に通る道で全適用する（0.3.0 へ上げた更新の再現）
+        MigrateTo(provider, database.ConnectionString, 10007);
+        Assert.False(await TableExistsAsync(factory, "Core_AdminPasskeys"));
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+
+        Assert.False(QuestionnaireDatabase.Instance.Migrator.HasPendingMigrations(provider, database.ConnectionString));
+        Assert.True(await TableExistsAsync(factory, "Core_AdminPasskeys"));
+        Assert.True(await TableExistsAsync(factory, "Core_AdminPasskeyChallenges"));
+
+        await using var connection = factory.Create();
+        await connection.OpenAsync();
+
+        // M10009: Core_AdminSessions に NULL 可の Via 列。既存の行は NULL のまま
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
+            SqlDialect.Format(provider, "SELECT COUNT([Via]) FROM [Core_AdminSessions]")));
+
+        // 番号が Questionnaire の移行（M00xx・M100000〜）と衝突せず、10008・10009 が 1 本ずつ記録される
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>(
+            SqlDialect.Format(provider, "SELECT COUNT(*) FROM [VersionInfo] WHERE [Version] = 10008")));
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>(
+            SqlDialect.Format(provider, "SELECT COUNT(*) FROM [VersionInfo] WHERE [Version] = 10009")));
     }
 
     [Theory]
