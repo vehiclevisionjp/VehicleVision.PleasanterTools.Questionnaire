@@ -54,6 +54,8 @@ jobs:
       DEV_ADMIN_PASSKEY: "true"
       DEV_ADMIN_PASSKEY_RPID: questionnaire-app
       DEV_ADMIN_PASSKEY_ORIGINS: https://questionnaire-app:8443
+      # **検証環境用の固定値。** 本番の資格情報ではない（e2e.yml と同じ。wait_sqlserver.py が読む）
+      TESTENV_SA_PASSWORD: Questionnaire#Test1
 
     steps:
       - name: ソースを取得する
