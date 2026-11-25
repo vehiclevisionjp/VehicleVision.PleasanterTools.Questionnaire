@@ -5,7 +5,8 @@
   "type": "module",
   "description": "取説用の画面のスクリーンショットを撮る",
   "scripts": {
-    "shot": "playwright test specs/manual.spec.ts && playwright test --grep-invert @standalone"
+    "shot": "playwright test specs/manual.spec.ts && playwright test --grep-invert \"@standalone|@passkey\"",
+    "passkey": "playwright test --config playwright.passkey.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1"

@@ -84,6 +84,15 @@ x-app-environment: &app-environment
     # **管理 API のトークン（API キー）の機能。** 既定は無効（製品の既定と同じ）。
     # SAML の強制再認証（ForceAuthn。Issue #1034）の試験で `enabled` にする
     QUESTIONNAIRE_ADMIN_API_TOKENS: ${DEV_ADMIN_API_TOKENS:-disabled}
+    # ---- パスキー（Issue #1082 / #1085）-------------------------------------
+    # **既定は無効**（製品の既定と同じ）。ブラウザ試験（tools/screenshots/specs/passkey.spec.ts）で有効にする
+    #
+    #   DEV_ADMIN_PASSKEY=true DEV_ADMIN_PASSKEY_RPID=questionnaire-app     #   DEV_ADMIN_PASSKEY_ORIGINS=https://questionnaire-app:8443 docker compose --profile sqlserver up -d --build --wait app
+    #
+    # ⚠️ **RP ID・Origin は、ブラウザが開く名前と https のポートに合わせる。** 食い違うとブラウザが拒む
+    QUESTIONNAIRE_ADMIN_PASSKEY: ${DEV_ADMIN_PASSKEY:-false}
+    QUESTIONNAIRE_ADMIN_PASSKEY_RPID: ${DEV_ADMIN_PASSKEY_RPID:-}
+    QUESTIONNAIRE_ADMIN_PASSKEY_ORIGINS: ${DEV_ADMIN_PASSKEY_ORIGINS:-}
     # ---- メール（Issue #189）------------------------------------------------
     # **既定は無効。** mail profile の Mailpit と合わせて使うときだけ有効にする
     #
@@ -517,6 +526,8 @@ services:
       # 平文の経路も残っている（控えの SHA-256）ので、**両方を試す**
       # （specs/secure-context.spec.ts）
       QUESTIONNAIRE_HTTPS_BASE_URL: https://questionnaire-app:8443
+      # パスキーのブラウザ試験の入口（specs/passkey.spec.ts）。RP ID・Origin は app 側の DEV_ADMIN_PASSKEY_* と合わせる
+      QUESTIONNAIRE_PASSKEY_BASE_URL: https://questionnaire-app:8443
       # **回答画面とは別生成元の親ページ。** 同じ screenshots コンテナの別ポートで
       # HTTPS 配信し、iframe の Cookie と frame-ancestors を実ブラウザで確かめる
       EMBED_PARENT_CERTIFICATE_PATH: /https/aspnetapp.pfx
