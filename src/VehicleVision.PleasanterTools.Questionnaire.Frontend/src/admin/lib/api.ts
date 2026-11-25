@@ -245,6 +245,19 @@ export const resetAdminUserTwoFactor = (adminUserId: string, revokeApiTokens = t
     },
   );
 
+/**
+ * 他人のパスキーをすべて削除する（復旧。Issue #1087。Core の仕様書 3.10.9）。
+ *
+ * ⚠️ **取り返しのつかない操作。** 対象者の**全セッションが失効**し、監査ログに残る。
+ * **自分は対象にできない**（400 `users.selfNotAllowed`。自分の分は「自分の設定」から削除する）。
+ * 失敗は `{ code }` だけが返る（文言は `lib/adminUsers.ts` の `resetPasskeysFailureKey` が作る）。
+ */
+export const resetAdminUserPasskeys = (adminUserId: string) =>
+  call<{ reset: boolean; removed: number }>(
+    `/api/admin/users/${adminUserId}/passkeys/reset`,
+    { method: 'POST', json: {} },
+  );
+
 // ---- 自分のアカウント（Issue #156）--------------------------------------------
 
 export const changeOwnPassword = (

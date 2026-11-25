@@ -445,7 +445,7 @@
    * 管理者の管理を見せてよい相手か（Issue #156）。
    *
    * **`users.read` を持つ相手だけ。** 追加・役割変更・停止は `users.write`、
-   * 2 要素の解除は `users.resetTwoFactor` で更に絞る。
+   * 2 要素の解除は `users.resetTwoFactor`、パスキーの復旧は `users.resetPasskeys` で更に絞る。
    * **サーバ側でも同じ権限で判定している**（`AdminUserEndpoints`）。
    */
   const canSeeUsers = $derived(can('users.read'));
@@ -629,6 +629,8 @@
           ownAdminUserId={session.adminUserId ?? ''}
           canWrite={can('users.write')}
           canReset={can('users.resetTwoFactor')}
+          canResetPasskeys={can('users.resetPasskeys')}
+          passkeyEnabled={session.passkeyEnabled ?? false}
           apiTokensEnabled={session.apiTokensEnabled ?? false}
           onback={back}
         />
