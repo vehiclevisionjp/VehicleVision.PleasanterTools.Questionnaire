@@ -25,6 +25,7 @@ import type {
   LookupPublishProblem,
   MappingDefinition,
   OutboxStatus,
+  PasskeyRow,
   MappingProblem,
   SurveyDefinition,
   SurveyDraft,
@@ -41,6 +42,7 @@ import type {
   PleasanterSsoTestResult,
 } from './types';
 import type { PleasanterSsoCheckResponse } from './pleasanterSso';
+import type { AssertionJson, AttestationJson, PasskeyApi } from './webauthn';
 
 /**
  * 呼び出しの結果。
@@ -280,6 +282,56 @@ export const disableOwnTotp = (password: string, revokeApiTokens = true) =>
     method: 'POST',
     json: { password, revokeApiTokens },
   });
+
+// ---- パスキー（Issue #1068。Core の仕様書 3.10.6）-----------------------------
+//
+// **経路・形はこの節だけに閉じ込める。** 仕様書の経路は「案」で、Core#216 の実装と食い違ったら
+// ここだけ直す。画面は `passkeyApi` の戻り値しか見ない。試験ではこのオブジェクトを差し替える。
+
+/** パスキーの API。 */
+export const passkeyApi = {
+  /** 自分のパスキーの一覧。公開鍵・資格情報 ID は返らない。 */
+  list: () => call<{ passkeys: PasskeyRow[] }>('/api/admin/me/passkeys'),
+
+  /** 登録の開始。**直近の再認証が要る**（要るのに無ければ 401）。パスワードで確かめるなら `password` を添える。 */
+  beginRegistration: (password?: string) =>
+    call<unknown>('/api/admin/me/passkeys/begin', {
+      method: 'POST',
+      json: password === undefined ? {} : { password },
+    }),
+
+  /** 登録の完了。`name` は本人が付ける名前。 */
+  completeRegistration: (name: string, response: AttestationJson) =>
+    call<unknown>('/api/admin/me/passkeys/complete', {
+      method: 'POST',
+      json: { name, response },
+    }),
+
+  /** 名前の変更。 */
+  rename: (id: string, name: string) =>
+    call<{ name: string }>(`/api/admin/me/passkeys/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      json: { name },
+    }),
+
+  /** 削除。**直近の再認証が要る。** 最後のログイン方法になるときは 409。 */
+  remove: (id: string, password?: string) =>
+    call<void>(`/api/admin/me/passkeys/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      json: password === undefined ? undefined : { password },
+    }),
+
+  /** ログインの開始（認証の外。ユーザー名は送らない）。 */
+  beginSignIn: () =>
+    call<unknown>('/api/admin/passkeys/login/begin', { method: 'POST', json: {} }),
+
+  /** ログインの完了。成功するとサーバが Session（via=passkey）を発行する。 */
+  completeSignIn: (response: AssertionJson) =>
+    call<{ next?: string }>('/api/admin/passkeys/login/complete', {
+      method: 'POST',
+      json: { response },
+    }),
+} satisfies PasskeyApi & Record<string, unknown>;
 
 // ---- API キー（個人トークン。Issue #1025）------------------------------------
 
