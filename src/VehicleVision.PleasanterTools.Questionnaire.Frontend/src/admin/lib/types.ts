@@ -708,19 +708,19 @@ export interface SurveyTemplateSummary {
   updatedAt: string;
 }
 
-/** 設問の取り込み元にあるページ。**ページ自体は取り込まない。** */
+/** 設問のインポート元にあるページ。**ページ自体はインポートしない。** */
 export interface QuestionImportPage {
   pageId: string;
   title?: LocalizedText | null;
   questions: Pick<Question, 'questionId' | 'type' | 'title'>[];
 }
 
-/** 取り込み元から選べる設問。 */
+/** インポート元から選べる設問。 */
 export interface QuestionImportSource {
   pages: QuestionImportPage[];
 }
 
-/** 設問を取り込み用にコピーした結果。 */
+/** 設問をインポート用にコピーした結果。 */
 export interface QuestionImportResult {
   questions: Question[];
   removedChoiceTransitions: number;

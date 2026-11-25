@@ -104,7 +104,7 @@
   /** 二重送信で 2 つ複製されないようにする */
   let duplicateBusy = $state(false);
 
-  /** フォーム定義の取り込み（Issue #1009）。 */
+  /** フォーム定義のインポート（Issue #1009）。 */
   let importing = $state(false);
   let importDocument = $state<unknown>(null);
   let importSiteId = $state('');
@@ -285,7 +285,7 @@
     }
 
     importing = false;
-    // **取り込んだものをそのまま開く。** 直すために取り込んでいる
+    // **インポートしたものをそのまま開く。** 直すためにインポートしている
     onopen(result.value.surveyId);
   }
 

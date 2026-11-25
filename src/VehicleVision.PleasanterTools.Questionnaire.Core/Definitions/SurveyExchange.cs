@@ -4,21 +4,21 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
-/// <summary>書き出した定義の入れ物（Issue #1009）。</summary>
+/// <summary>エクスポートした定義の入れ物（Issue #1009）。</summary>
 /// <remarks>
 /// **定義とマッピングだけを持つ。** 書き込み先のサイト・公開用 ID・公開状態・公開済みの版・
 /// 受付期間・回答上限・資格情報は、**環境ごとに決め直すものなので入れない。**
 /// </remarks>
 public sealed record SurveyExchangeDocument
 {
-    /// <summary>この入れ物の種類。**他の JSON を取り込ませないための目印。**</summary>
+    /// <summary>この入れ物の種類。**他の JSON をインポートさせないための目印。**</summary>
     public string Format { get; init; } = SurveyExchange.FormatName;
 
     /// <summary>入れ物の版。**読めない新しい版は断る。**</summary>
     public int FormatVersion { get; init; } = SurveyExchange.CurrentFormatVersion;
 
     /// <summary>
-    /// 書き出しで落としたものの一覧。**人が読むための情報で、取り込みでは使わない。**
+    /// エクスポートで落としたものの一覧。**人が読むための情報で、インポートでは使わない。**
     /// </summary>
     public IReadOnlyList<string> Omitted { get; init; } = [];
 
@@ -27,7 +27,7 @@ public sealed record SurveyExchangeDocument
     public MappingDefinition Mapping { get; init; } = new();
 }
 
-/// <summary>取り込みで入れ物を断った理由。</summary>
+/// <summary>インポートで入れ物を断った理由。</summary>
 public enum SurveyExchangeError
 {
     /// <summary>大きすぎる。</summary>
@@ -36,7 +36,7 @@ public enum SurveyExchangeError
     /// <summary>JSON として読めない、または定義の形に合わない。</summary>
     Malformed,
 
-    /// <summary>この製品の書き出しではない。</summary>
+    /// <summary>この製品のエクスポートではない。</summary>
     WrongFormat,
 
     /// <summary>この版では読めない新しい入れ物。</summary>
@@ -59,24 +59,24 @@ public sealed record SurveyExchangeParseResult(
 }
 
 /// <summary>
-/// アンケートの定義を JSON として書き出し、取り込む（Issue #1009）。
+/// アンケートの定義を JSON としてエクスポートし、インポートする（Issue #1009）。
 /// </summary>
 /// <remarks>
 /// <para>
 /// **複製（Issue #46）・テンプレート（Issue #58）と同じ「コピーしてよいもの」の線を使う。**
-/// コピーする側の線引き（<see cref="SurveyDuplication.Copy"/>）を書き出しにも取り込みにも使い、
+/// コピーする側の線引き（<see cref="SurveyDuplication.Copy"/>）をエクスポートにもインポートにも使い、
 /// 線が 2 つに割れないようにする。違いは **コピーする先が同じ環境の DB か、環境をまたぐファイルか**
 /// だけで、ファイルは複製と違って **誰が作ったか分からない入力**になる。
 /// </para>
 /// <para>
-/// **秘密は書き出さない。** 定義にも資格情報の平文は無いが、
+/// **秘密はエクスポートしない。** 定義にも資格情報の平文は無いが、
 /// 参照（<see cref="LookupDefinition.CredentialId"/>）は他の環境では意味を持たず、
 /// 取り違えると別の環境の資格情報を指すので、複製と同じく落とす。
 /// </para>
 /// <para>
 /// **画像などの資産（ヘッダ画像・記法から参照する画像）は運ばない。**
 /// DB の別の表にあり、大きさの上限や種類の検査（<c>AdminSurveyEndpoints</c>）を
-/// 迂回して取り込まれるのを避けるため。ヘッダ画像の指定は落とす。
+/// 迂回してインポートされるのを避けるため。ヘッダ画像の指定は落とす。
 /// </para>
 /// </remarks>
 public static class SurveyExchange
@@ -87,7 +87,7 @@ public static class SurveyExchange
     /// <summary>いまの入れ物の版。</summary>
     public const int CurrentFormatVersion = 1;
 
-    /// <summary>取り込む JSON の大きさの上限（バイト）。</summary>
+    /// <summary>インポートする JSON の大きさの上限（バイト）。</summary>
     public const int MaxBytes = 2 * 1024 * 1024;
 
     /// <summary>ページ数の上限。</summary>
@@ -120,7 +120,7 @@ public static class SurveyExchange
     private static readonly JsonSerializerOptions IndentedOptions =
         new(SurveyJson.Options) { WriteIndented = true };
 
-    /// <summary>定義とマッピングを書き出す。</summary>
+    /// <summary>定義とマッピングをエクスポートする。</summary>
     /// <param name="definition">元の定義。**変えない。**</param>
     /// <param name="mapping">元のマッピング。</param>
     public static string Export(SurveyDefinition definition, MappingDefinition mapping)
@@ -141,7 +141,7 @@ public static class SurveyExchange
     /// <summary>
     /// 環境をまたいで持ち運べる形にする。**複製と同じ線引きに、画像の指定を落とす。**
     /// </summary>
-    /// <remarks>内部 ID は取り込み側が決めるので空にする。</remarks>
+    /// <remarks>内部 ID はインポート側が決めるので空にする。</remarks>
     public static SurveyDefinition Portable(SurveyDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -230,11 +230,11 @@ public static class SurveyExchange
     }
 
     /// <summary>
-    /// 取り込む定義を、新しいアンケートの下書きにする。
+    /// インポートする定義を、新しいアンケートの下書きにする。
     /// **複製と同じ線引き（版・資格情報）に、画像の指定の除去を足す。**
     /// </summary>
     /// <param name="document">読んだ入れ物。</param>
-    /// <param name="newSurveyId">取り込み先の内部 ID。</param>
+    /// <param name="newSurveyId">インポート先の内部 ID。</param>
     public static SurveyDefinition ToDraft(SurveyExchangeDocument document, string newSurveyId)
     {
         ArgumentNullException.ThrowIfNull(document);

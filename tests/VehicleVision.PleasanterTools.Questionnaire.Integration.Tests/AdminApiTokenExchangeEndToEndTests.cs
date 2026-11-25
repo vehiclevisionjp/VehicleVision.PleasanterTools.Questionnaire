@@ -11,13 +11,13 @@ using VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
 /// <summary>
-/// 書き出し（<c>GET .../export</c>）・取り込み（<c>POST .../import</c>）を、個人トークンで使う入口を、
+/// エクスポート（<c>GET .../export</c>）・インポート（<c>POST .../import</c>）を、個人トークンで使う入口を、
 /// 実アプリの host（SQLite）へ HTTP で当てて確かめる（Issue #1029。親 #1012）。
 /// </summary>
 /// <remarks>
-/// 見るのは「書き出しは <c>surveys.read</c>・取り込みは <c>surveys.publish</c> で通る（他のスコープは 403）」
+/// 見るのは「エクスポートは <c>surveys.read</c>・インポートは <c>surveys.publish</c> で通る（他のスコープは 403）」
 /// 「<b>トークンではルックアップを持ち込めない</b>（403 で断り、1 行も作らない）」
-/// 「書き出し・取り込みの監査にトークンの識別が付く」。<b>SQLite だけ</b>で動く。
+/// 「エクスポート・インポートの監査にトークンの識別が付く」。<b>SQLite だけ</b>で動く。
 /// </remarks>
 public sealed class AdminApiTokenExchangeEndToEndTests
 {
@@ -99,7 +99,7 @@ public sealed class AdminApiTokenExchangeEndToEndTests
         ],
     };
 
-    /// <summary>書き出した内容（取り込みの <c>document</c> に入れる JSON）。</summary>
+    /// <summary>エクスポートした内容（インポートの <c>document</c> に入れる JSON）。</summary>
     private static JsonNode Document(bool withLookup) =>
         JsonNode.Parse(SurveyExchange.Export(Definition(Guid.NewGuid().ToString(), withLookup), new MappingDefinition()))!;
 
@@ -123,7 +123,7 @@ public sealed class AdminApiTokenExchangeEndToEndTests
     private static Dictionary<string, string> DetailOf(AuditEntry entry) =>
         JsonSerializer.Deserialize<Dictionary<string, string>>(entry.DetailJson!)!;
 
-    // ---- 書き出し --------------------------------------------------------------------------
+    // ---- エクスポート --------------------------------------------------------------------------
 
     [Fact]
     public async Task 書き出しは_surveys_readのトークンで通り_内容は人の画面と同じ()
@@ -183,7 +183,7 @@ public sealed class AdminApiTokenExchangeEndToEndTests
         Assert.Equal(prefix, DetailOf(entry)["tokenPrefix"]);
         Assert.DoesNotContain(token[prefix.Length..], entry.DetailJson, StringComparison.Ordinal);
 
-        // 人（cookie）の書き出しは、今までどおり残さない
+        // 人（cookie）のエクスポートは、今までどおり残さない
         using var human = host.CreateClient();
         using var login = await human.PostAsJsonAsync(
             "/api/admin/login", new { loginId = owner.LoginId, password = Password });
@@ -193,7 +193,7 @@ public sealed class AdminApiTokenExchangeEndToEndTests
         Assert.Single(await AuditAsync(host, "GET /api/admin/surveys/{surveyId}/export"));
     }
 
-    // ---- 取り込み --------------------------------------------------------------------------
+    // ---- インポート --------------------------------------------------------------------------
 
     [Fact]
     public async Task 取り込みは_surveys_publishのトークンで通り_新しい下書きができ_監査にトークンの識別が付く()
@@ -214,7 +214,7 @@ public sealed class AdminApiTokenExchangeEndToEndTests
 
         var entry = Assert.Single(await AuditAsync(host), item => item.Action == "POST /api/admin/surveys/import");
         Assert.True(entry.Succeeded);
-        // 取り込みの対象の種別は、既存の書き込み（複製など）と同じ小文字
+        // インポートの対象の種別は、既存の書き込み（複製など）と同じ小文字
         Assert.Equal("survey", entry.TargetType);
         Assert.Equal(surveyId.ToString(), entry.TargetId);
         Assert.Equal(owner.Id.ToString("D"), entry.ActorKey);

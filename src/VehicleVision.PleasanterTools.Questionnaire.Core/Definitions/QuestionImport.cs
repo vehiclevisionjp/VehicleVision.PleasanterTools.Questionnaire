@@ -3,12 +3,12 @@ using System.Text.RegularExpressions;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
-/// <summary>ほかのアンケートから設問を取り込むための変換（Issue #358）。</summary>
+/// <summary>ほかのアンケートから設問をインポートするための変換（Issue #358）。</summary>
 public static partial class QuestionImport
 {
-    /// <summary>設問を取り込み先で安全に使える形へコピーする。</summary>
-    /// <param name="source">取り込む設問。**元の値は変えない。**</param>
-    /// <param name="existingQuestionIds">取り込み先ですでに使っている設問 ID。</param>
+    /// <summary>設問をインポート先で安全に使える形へコピーする。</summary>
+    /// <param name="source">インポートする設問。**元の値は変えない。**</param>
+    /// <param name="existingQuestionIds">インポート先ですでに使っている設問 ID。</param>
     /// <param name="newQuestionId">新しい設問 ID を作る関数。</param>
     public static QuestionImportResult Copy(
         IEnumerable<Question> source,
@@ -114,8 +114,8 @@ public static partial class QuestionImport
     private static partial Regex AssetMarkup();
 }
 
-/// <summary>設問を取り込み用にコピーした結果。</summary>
-/// <param name="Questions">取り込み先へ追加する設問。</param>
+/// <summary>設問をインポート用にコピーした結果。</summary>
+/// <param name="Questions">インポート先へ追加する設問。</param>
 /// <param name="RemovedChoiceTransitions">除去した選択肢の分岐数。</param>
 /// <param name="RemovedVisibilityConditions">除去した表示条件の数。</param>
 /// <param name="RemovedAssetReferences">平文へ置き換えた資産参照の数。</param>

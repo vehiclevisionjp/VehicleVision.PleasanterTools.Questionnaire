@@ -511,9 +511,9 @@ export const duplicateSurvey = (
   });
 
 /**
- * 書き出した JSON から、新しいアンケートを下書きとして取り込む（Issue #1009）。
+ * エクスポートした JSON から、新しいアンケートを下書きとしてインポートする（Issue #1009）。
  *
- * **書き込み先のサイトは書き出しに入っていない**ので、ここで指定する。
+ * **書き込み先のサイトはエクスポートに入っていない**ので、ここで指定する。
  * **公開前の検査と同じ検査をサーバが行い、通らなければ 1 件も作らない。**
  */
 export const importSurvey = (
@@ -526,7 +526,7 @@ export const importSurvey = (
     json: { document, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
   });
 
-/** 書き出しのダウンロード先。**認証は cookie なので、リンクで開いてよい。** */
+/** エクスポートのダウンロード先。**認証は cookie なので、リンクで開いてよい。** */
 export const surveyExportUrl = (surveyId: string) =>
   appUrl(`/api/admin/surveys/${surveyId}/export`);
 
@@ -585,14 +585,14 @@ export const listVersions = (surveyId: string) =>
 export const loadVersion = (surveyId: string, version: number) =>
   call<SurveyVersionContent>(`/api/admin/surveys/${surveyId}/versions/${version}`);
 
-/** 取り込み元のページと設問を読む。**マッピングは返さない。** */
+/** インポート元のページと設問を読む。**マッピングは返さない。** */
 export const loadQuestionImportSource = (surveyId: string, sourceSurveyId: string) =>
   call<QuestionImportSource>(
     `/api/admin/surveys/${surveyId}/question-import/${sourceSurveyId}`,
   );
 
 /**
- * 選んだ設問を取り込み先用にコピーする。
+ * 選んだ設問をインポート先用にコピーする。
  *
  * **ID の再採番と、分岐・表示条件・資産参照の除去はサーバが行う。**
  */

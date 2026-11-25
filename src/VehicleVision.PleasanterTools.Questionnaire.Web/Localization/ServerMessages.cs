@@ -933,13 +933,13 @@ public static class ServerMessages
 
         Add(
             ServerMessageKeys.QuestionImportSourceInvalid,
-            "取り込み元のアンケートを開けません。削除・アーカイブ・変更されていないか確認してください。",
+            "インポート元のアンケートを開けません。削除・アーカイブ・変更されていないか確認してください。",
             "The source survey cannot be opened. Check whether it was deleted, archived, or changed.",
             "Không thể mở khảo sát nguồn. Vui lòng kiểm tra xem khảo sát đã bị xóa, lưu trữ hoặc thay đổi chưa.");
 
         Add(
             ServerMessageKeys.QuestionImportSelectionRequired,
-            "取り込む設問を 1 つ以上選んでください。",
+            "インポートする設問を 1 つ以上選んでください。",
             "Select at least one question to import.",
             "Vui lòng chọn ít nhất một câu hỏi để nhập.");
 
@@ -1125,16 +1125,16 @@ public static class ServerMessages
             "This is a template. Templates cannot be published. Create a survey from it first.",
             "Đây là mẫu. Không thể công bố mẫu. Vui lòng tạo khảo sát từ mẫu.");
 
-        // ---- 書き出し・取り込み（Issue #1009） ------------------------------
+        // ---- エクスポート・インポート（Issue #1009） ------------------------------
         Add(
             ServerMessageKeys.SurveyImportInvalid,
-            "取り込めないファイルです。この製品が書き出した JSON か、大きさと版を確認してください。",
+            "インポートできないファイルです。この製品がエクスポートした JSON か、大きさと版を確認してください。",
             "This file cannot be imported. Check that it is a JSON exported by this product, and its size and version.",
             "Không thể nhập tệp này. Hãy kiểm tra tệp là JSON do sản phẩm này xuất ra, cũng như kích thước và phiên bản.");
 
         Add(
             ServerMessageKeys.SurveyImportBlocked,
-            "取り込めません。公開前の検査と同じ基準で、不備が見つかりました。",
+            "インポートできません。公開前の検査と同じ基準で、不備が見つかりました。",
             "The survey cannot be imported. Problems were found by the same checks as before publishing.",
             "Không thể nhập. Đã phát hiện vấn đề theo cùng tiêu chuẩn với kiểm tra trước khi công bố.");
 

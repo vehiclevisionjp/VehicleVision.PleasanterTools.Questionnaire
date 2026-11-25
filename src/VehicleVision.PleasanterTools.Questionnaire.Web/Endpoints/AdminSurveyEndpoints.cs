@@ -306,10 +306,10 @@ public static class AdminSurveyEndpoints
                 : Results.NotFound();
         }).RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish));
 
-        // ---- 書き出し（Issue #1009） -----------------------------------------
+        // ---- エクスポート（Issue #1009） -----------------------------------------
         // **定義とマッピングだけを JSON にして返す。** 書き込み先・公開用 ID・公開状態・
         // 資格情報・画像は入れない（`SurveyExchange`）。**秘密を持たないので、
-        // 閲覧できる人なら書き出せる**（画面で見えるものと同じ）
+        // 閲覧できる人ならエクスポートできる**（画面で見えるものと同じ）
         group.MapGet("/{surveyId:guid}/export", async (
             Guid surveyId,
             ISurveyDraftStore drafts,
@@ -328,14 +328,14 @@ public static class AdminSurveyEndpoints
                 // **題名をファイル名へ入れない。** 日本語や記号が環境ごとに化ける
                 fileDownloadName: $"survey-{surveyId:N}.json");
         })
-            // **トークンでの書き出しは監査へ残す**（定義の一括持ち出し。#1027）。人の画面の読み取りは残さない
+            // **トークンでのエクスポートは監査へ残す**（定義の一括持ち出し。#1027）。人の画面の読み取りは残さない
             .AuditAutomationReads()
             // **閲覧と同じ `surveys.read` でトークンを許す**（スコープは新設しない。#1029）
             .AllowAutomation(AdminPermissions.SurveysRead)
             // OpenAPI の説明（#1030）。トークンで呼べること・スコープは、許可宣言から生成される
-            .WithDescription("アンケートの定義とマッピングを JSON で書き出す（書き込み先・公開用 ID・公開状態・資格情報・画像は入れない）。");
+            .WithDescription("アンケートの定義とマッピングを JSON でエクスポートする（書き込み先・公開用 ID・公開状態・資格情報・画像は入れない）。");
 
-        // ---- 取り込み（公開と同じ権限） --------------------------------------
+        // ---- インポート（公開と同じ権限） --------------------------------------
         // **新しいアンケートの下書きとして作る。** 複製と同じく、書き込み先のサイトを
         // 新しく決める操作なので、公開と同じ権限を要る。
         // **公開前の検査と同じ検査を通す**（`PublishInspector`）。通らなければ 1 行も作らない
@@ -375,7 +375,7 @@ public static class AdminSurveyEndpoints
 
             // **ルックアップの設定を持ち込めるのはアンケート管理者だけ**（保存と同じ。Issue #879）。
             // **トークンでは持ち込めない**（`lookups.manage` はスコープに付けられない。#1029）。
-            // 無視して取り込まず、403 で断る（黙って落とすと、設定が入ったつもりになる）。
+            // 無視してインポートせず、403 で断る（黙って落とすと、設定が入ったつもりになる）。
             // トークンの principal は役割の claim を持たないので役割の判定でも落ちるが、
             // 役割の持たせ方が変わっても開かないよう、トークンかどうかを明示して見る
             if (!definition.GetLookups().IsEmpty
@@ -423,7 +423,7 @@ public static class AdminSurveyEndpoints
                 }),
                 assetTicketDaysInvalid = inspection.AssetTicketDaysInvalid,
                 noAnswerableQuestion = inspection.NoAnswerableQuestion,
-                // **画像は運ばない。** 記法が指す画像は取り込み先に無いので、知らせる
+                // **画像は運ばない。** 記法が指す画像はインポート先に無いので、知らせる
                 omittedAssetReferences = SurveyAssetReferences.ReferencedAssetIds(definition).Count,
             };
 
@@ -437,7 +437,7 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            // **検査だけ**（取り込む前の確認）。何も作らない
+            // **検査だけ**（インポートする前の確認）。何も作らない
             if (request.DryRun)
             {
                 return Results.Ok(new { valid = true, problems = report });
@@ -476,13 +476,13 @@ public static class AdminSurveyEndpoints
                 new { surveyId, record.PublicId, problems = report });
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysPublish))
-            // **取り込みが今要る権限（公開相当 `surveys.publish`）と同じスコープでトークンを許す**（#1029）。
+            // **インポートが今要る権限（公開相当 `surveys.publish`）と同じスコープでトークンを許す**（#1029）。
             // ⚠️ 宣言は口の権限（RequireAuthorization）と同じにする。ずらすと、別のスコープのトークンが通ってしまう
             .AllowAutomation(AdminPermissions.SurveysPublish)
             // OpenAPI の説明（#1030）。トークンで呼べること・スコープは、許可宣言から生成される
             .WithDescription(
-                "書き出した JSON から、新しいアンケートの下書きを作る。公開前の検査と同じ検査を通らなければ 1 行も作らない。"
-                + "ルックアップの設定を含む取り込みは、個人トークンでは 403（lookups.manage はスコープに付けられない。"
+                "エクスポートした JSON から、新しいアンケートの下書きを作る。公開前の検査と同じ検査を通らなければ 1 行も作らない。"
+                + "ルックアップの設定を含むインポートは、個人トークンでは 403（lookups.manage はスコープに付けられない。"
                 + "検査だけ（dryRun）の要求でも断る）。人のセッションでは、役割に lookups.manage があれば持ち込める。")
             .AddEndpointFilter(async (filterContext, next) =>
             {
@@ -537,8 +537,8 @@ public static class AdminSurveyEndpoints
         })
             .AllowAutomation(AdminPermissions.SurveysRead);
 
-        // ---- ほかのアンケートから設問を取り込む（Issue #358）----------------
-        // **読み取りにも取り込み先を含める。** URL の surveyId を変えて、
+        // ---- ほかのアンケートから設問をインポートする（Issue #358）----------------
+        // **読み取りにもインポート先を含める。** URL の surveyId を変えて、
         // アーカイブ済みやテンプレートを編集先にできないようにする。
         group.MapGet("/{surveyId:guid}/question-import/{sourceSurveyId:guid}", async (
             Guid surveyId,
@@ -622,7 +622,7 @@ public static class AdminSurveyEndpoints
             }
 
             // **画面にまだ保存していない設問 ID も避ける。**
-            // 連続して取り込んでも、次の保存まで ID が衝突しない。
+            // 連続してインポートしても、次の保存まで ID が衝突しない。
             var existingQuestionIds = targetDraft.Definition.AllQuestions
                 .Select(question => question.QuestionId)
                 .Concat(request.ExistingQuestionIds ?? []);
@@ -848,7 +848,7 @@ public static class AdminSurveyEndpoints
                 });
             }
 
-            // **保存の関所は取り込み（Issue #1009）と共通。** フォールバック言語・色の形・
+            // **保存の関所はインポート（Issue #1009）と共通。** フォールバック言語・色の形・
             // 許していない埋め込み先を、保存のときにその場で断る（`DefinitionSaveRules`）
             var embeds = EmbedOptions.FromSnapshot(
                 await appSettings.GetAsync(cancellationToken).ConfigureAwait(false));
@@ -1916,7 +1916,7 @@ public static class AdminSurveyEndpoints
     {
         // **公開のときだけ拒否する。** 壊れた定義で回答を受け付けると、
         // 受け付けた回答が Pleasanter へ届かないまま溜まる
-        // **取り込み（Issue #1009）と同じ検査を通す。** 定義だけで決まる検査は
+        // **インポート（Issue #1009）と同じ検査を通す。** 定義だけで決まる検査は
         // `PublishInspector` に 1 つだけ置き、片方に検査を足し漏らさない
         var inspection = PublishInspector.Inspect(draft.Definition, draft.Mapping);
         var problems = inspection.MappingProblems;
@@ -2643,26 +2643,26 @@ public static class AdminSurveyEndpoints
     /// <summary>選択肢 1 件。<c>値,表示文字列</c>。</summary>
     public sealed record ColumnChoice(string Value, string Text);
 
-    /// <summary>取り込み元のページ。**ページそのものは取り込まない。**</summary>
+    /// <summary>インポート元のページ。**ページそのものはインポートしない。**</summary>
     public sealed record QuestionImportPageResponse(
         string PageId,
         LocalizedText? Title,
         IReadOnlyList<QuestionImportQuestionResponse> Questions);
 
-    /// <summary>取り込み候補として見せる設問。</summary>
+    /// <summary>インポート候補として見せる設問。</summary>
     public sealed record QuestionImportQuestionResponse(
         string QuestionId,
         QuestionType Type,
         LocalizedText Title);
 
-    /// <summary>取り込み元から選べる設問。</summary>
+    /// <summary>インポート元から選べる設問。</summary>
     public sealed record QuestionImportSourceResponse(
         IReadOnlyList<QuestionImportPageResponse> Pages);
 
-    /// <summary>選んだ設問を取り込む。</summary>
-    /// <param name="QuestionIds">取り込み元で選んだ設問 ID。</param>
+    /// <summary>選んだ設問をインポートする。</summary>
+    /// <param name="QuestionIds">インポート元で選んだ設問 ID。</param>
     /// <param name="ExistingQuestionIds">
-    /// 取り込み先の画面にある設問 ID。**未保存の設問も含めて衝突を避ける。**
+    /// インポート先の画面にある設問 ID。**未保存の設問も含めて衝突を避ける。**
     /// </param>
     public sealed record QuestionImportRequest(
         IReadOnlyList<string>? QuestionIds,
@@ -2752,8 +2752,8 @@ public static class AdminSurveyEndpoints
         long AssetHistorySiteId = 0,
         MappingDefinition? AssetHistoryMapping = null);
 
-    /// <summary>取り込みの要求（Issue #1009）。</summary>
-    /// <param name="Document">書き出した JSON（<c>SurveyExchange</c> の入れ物）。</param>
+    /// <summary>インポートの要求（Issue #1009）。</summary>
+    /// <param name="Document">エクスポートした JSON（<c>SurveyExchange</c> の入れ物）。</param>
     /// <param name="PleasanterSiteId">書き込み先のサイト。**入れ物には入っていないので指定させる。**</param>
     /// <param name="ResponseJsonColumn">回答 JSON の正本を入れる列。**サイトに紐づく値なので入れ物に無い。**</param>
     /// <param name="DryRun"><c>true</c> なら検査だけで、何も作らない。</param>

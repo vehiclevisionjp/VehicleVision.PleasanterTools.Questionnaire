@@ -1527,7 +1527,7 @@ public class AdminSurveyEndToEndTests
             {
                 surveyId = sourceId,
                 version = 1,
-                title = new { ja = "取り込み元" },
+                title = new { ja = "インポート元" },
                 pages = new[]
                 {
                     new
