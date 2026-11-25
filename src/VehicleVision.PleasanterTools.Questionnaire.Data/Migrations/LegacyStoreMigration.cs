@@ -3,15 +3,15 @@ using FluentMigrator;
 namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
 /// <summary>
-/// 旧表の行を Core.Data の共有表（<c>Core_</c> 接頭辞）へ写して、旧表を落とす移行の共通部品。
+/// 旧表の行を Core.Data の共有表（<c>Core_</c> 接頭辞）へコピーして、旧表を落とす移行の共通部品。
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>稼働中のデータがあり得るので、行を写してから落とす。</b> 写す SQL は RDBMS ごとに違う
+/// <b>稼働中のデータがあり得るので、行をコピーしてから落とす。</b> コピーする SQL は RDBMS ごとに違う
 /// （Guid・真偽値・文字列の照合順序）ので、呼び出し側が RDBMS ごとに書き分けて渡す。
 /// </para>
 /// <para>
-/// <b>冪等。</b> 旧表が無ければ何もしない。Core の表に同じキーの行があれば、その行は写さない
+/// <b>冪等。</b> 旧表が無ければ何もしない。Core の表に同じキーの行があれば、その行はコピーしない
 /// （<c>WHERE NOT EXISTS</c> は呼び出し側の SQL に書く）。
 /// </para>
 /// <para>
@@ -21,11 +21,11 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// </remarks>
 internal static class LegacyStoreMigration
 {
-    /// <summary>旧表の行を写して、旧表を落とす。旧表が無ければ何もしない。</summary>
+    /// <summary>旧表の行をコピーして、旧表を落とす。旧表が無ければ何もしない。</summary>
     /// <param name="migration">呼び出す移行。</param>
     /// <param name="legacyTable">旧表の名前。</param>
     /// <param name="copySql">
-    /// 写す SQL を RDBMS ごとに返す。<b>識別子は角括弧で囲んで書く</b>
+    /// コピーする SQL を RDBMS ごとに返す。<b>識別子は角括弧で囲んで書く</b>
     /// （<see cref="SqlDialect.Format"/> が各 RDBMS の引用符へ書き換える）。<b>文字列リテラルに角括弧を含めない。</b>
     /// </param>
     public static void CopyThenDrop(
@@ -43,7 +43,7 @@ internal static class LegacyStoreMigration
 
         // **RDBMS は、実際に繋いでいる接続の型で見分ける。** FluentMigrator の `IfDatabase` は名前の一致で決まり、
         // 名前が合わないと**何も実行されないまま旧表だけが落ちて、行が消える**
-        // （PostgreSQL の処理系の名前が `Postgres` ではなく `PostgreSQL` だったために、実際に行が写らなかった）。
+        // （PostgreSQL の処理系の名前が `Postgres` ではなく `PostgreSQL` だったために、実際に行がコピーされなかった）。
         // 見分けられない接続なら例外にして、旧表を落とさない
         WithConnection(migration, (connection, transaction, provider) =>
             ExecuteNonQuery(connection, transaction, provider, copySql(provider)));
@@ -123,7 +123,7 @@ internal static class LegacyStoreMigration
     }
 
     /// <summary>
-    /// 旧表の列を、写し先の列と比べられる形で書く。
+    /// 旧表の列を、コピー先の列と比べられる形で書く。
     /// </summary>
     /// <remarks>
     /// <b>MySQL だけ、文字列の照合順序が旧表と Core の表で違う</b>（Core の表は <c>utf8mb4_0900_as_cs</c> へ直してある）。

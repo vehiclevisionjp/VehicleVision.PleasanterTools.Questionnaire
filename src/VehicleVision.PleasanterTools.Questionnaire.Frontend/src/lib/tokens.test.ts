@@ -4,7 +4,7 @@ import { READABILITY_COLORS } from './readability';
 import { CONTRAST_AA, DEFAULT_COLORS, contrastRatio } from './theme';
 
 /**
- * `styles/tokens.css`（DesignReference の明示型）を読み、TypeScript 側の写しと突き合わせる（Issue #776）。
+ * `styles/tokens.css`（DesignReference の明示型）を読み、TypeScript 側のコピーと突き合わせる（Issue #776）。
  * 値の出どころは 1 か所（tokens.css）。ここが食い違えば、DesignReference と画面の色がずれている。
  */
 const css = readFileSync(new URL('../styles/tokens.css', import.meta.url), 'utf-8');

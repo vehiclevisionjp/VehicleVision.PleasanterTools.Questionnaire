@@ -141,7 +141,7 @@ public sealed class ResponseSender(
         {
             return await DeadLetterAsync(
                 claimed,
-                $"列へ写せない: {string.Join(" / ", record.Problems.Select(p => $"{p.ColumnName}:{p.Reason}"))}",
+                $"列へコピーできない: {string.Join(" / ", record.Problems.Select(p => $"{p.ColumnName}:{p.Reason}"))}",
                 cancellationToken).ConfigureAwait(false);
         }
 

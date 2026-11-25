@@ -7,7 +7,7 @@ import { expect, type Page } from '@playwright/test';
  *
  * 実際に起きたこと。結合テストを何度も走らせた検証環境には
  * **アンケートの行が 1367 件**溜まっていた。管理画面の一覧はそれを全部描くので、
- * ページ全体の写しが巨大になり、Chromium が
+ * ページ全体のスクリーンショットが巨大になり、Chromium が
  * `Protocol error (Page.captureScreenshot): Unable to capture screenshot`
  * を返す。**落ちる場所は走らせるたびに変わる**ので、
  * 特定の画面の問題にも、倍率の問題にも見える（どちらでもない）。
@@ -66,7 +66,7 @@ export async function expectFewSurveys(page: Page): Promise<void> {
   expect(
     count,
     `アンケートが ${count} 件ある。検証環境に結合テストの残骸が溜まっている。`
-      + '一覧のページが長くなりすぎ、ページ全体の写しが '
+      + '一覧のページが長くなりすぎ、ページ全体のスクリーンショットが '
       + '「Unable to capture screenshot」で撮れなくなる（Issue #65）。'
       + 'docker compose down -v からやり直すこと',
   ).toBeLessThanOrEqual(MaxSurveys);

@@ -124,7 +124,7 @@
    *
    * ⚠️ **`undefined` も「無い」として扱う。** サーバの JSON は `null` を省くので、
    * 一度も入っていない人では項目そのものが来ない。
-   * `null` だけを見ていると `Invalid Date` と出た（写しで見つけた）。
+   * `null` だけを見ていると `Invalid Date` と出た（スクリーンショットで見つけた）。
    */
   function when(value: string | null | undefined): string {
     return value === null || value === undefined ? '—' : new Date(value).toLocaleString();
@@ -437,7 +437,7 @@
   }
 
   .url code {
-    /* **長い URL を折り返す。** 選んで写せる形のままにする */
+    /* **長い URL を折り返す。** 選んでコピーできる形のままにする */
     word-break: break-all;
     font-size: 0.85rem;
   }

@@ -7,7 +7,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 /// <summary>設定ファイルの読み込み（Issue #158）。</summary>
 /// <remarks>
 /// **README が書いている優先順位（<c>local.json</c> ＞ 環境変数 ＞ <c>json</c>）**と、
-/// **ファイルのキーを正式な名前へ写すこと**を確かめる。
+/// **ファイルのキーを正式な名前へコピーすること**を確かめる。
 /// </remarks>
 // プロセスの環境変数を書き換えるので、AddParameterFiles を呼ぶ他の試験と並行させない
 [Collection("ProcessEnvironment")]
@@ -131,7 +131,7 @@ public sealed class ParameterFilesTests : IDisposable
     public void nullのキーは環境変数を塗り潰さない()
     {
         // ⚠️ **Pleasanter.json の ApiKey は既定で null。**
-        // 写してしまうと、環境変数で与えた API キーが消える
+        // コピーしてしまうと、環境変数で与えた API キーが消える
         Write("Pleasanter.json", """
         {
             "BaseUrl": "https://pleasanter.example.jp",
@@ -155,7 +155,7 @@ public sealed class ParameterFilesTests : IDisposable
     [Fact]
     public void 名前が同じ設定はそのまま読める()
     {
-        // Security.json と Analytics.json は環境変数と同じ名前なので、写す必要が無い
+        // Security.json と Analytics.json は環境変数と同じ名前なので、コピーする必要が無い
         Write("Security.json", """{ "PasswordMinimumLength": 16 }""");
         Write("Analytics.json", """{ "AnalyticsProvider": "Ga4", "AnalyticsSiteId": "G-XXXX" }""");
 

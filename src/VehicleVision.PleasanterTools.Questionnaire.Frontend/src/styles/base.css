@@ -267,7 +267,7 @@ a {
  * チェック・ラジオ（DesignReference の .vv-check と同じ形）。枠は --border-strong（面に対し 3:1 以上）、
  * 選んだ状態は --accent の塗り。ダークや作成者のテーマの地でも見えるよう、色は意味名から引く。
  * ⚠️ **寸法と枠の太さは `!important`。** 各画面に `width: auto; border: 0` のような指定が残っていて、
- * `appearance: none` と組み合わさると大きさ 0 のボタンになり、見えず押せなくなる（CI の写しの試験で見つかった）。
+ * `appearance: none` と組み合わさると大きさ 0 のボタンになり、見えず押せなくなる（CI のスクリーンショットの試験で見つかった）。
  * 色と余白は各画面が変えられる
  */
 :where(input[type='checkbox'], input[type='radio']) {

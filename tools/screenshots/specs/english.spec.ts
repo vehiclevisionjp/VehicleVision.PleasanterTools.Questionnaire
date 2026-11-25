@@ -119,7 +119,7 @@ test.describe('英語の画面', () => {
 
     expect(japanese, `英語の画面に日本語が残っている: ${japanese.join(' / ')}`).toEqual([]);
 
-    // **英語の写しも残す。** 後で英語の取説を作るときに要る
+    // **英語のスクリーンショットも残す。** 後で英語の取説を作るときに要る
     await page.screenshot({ path: 'shots/en-admin-01-setup.png', fullPage: true });
   });
 });

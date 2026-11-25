@@ -4,7 +4,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Pleasanter;
 
-/// <summary>列の値を Pleasanter の形へ写せなかった理由。</summary>
+/// <summary>列の値を Pleasanter の形へコピーできなかった理由。</summary>
 /// <param name="ColumnName">対象の列。</param>
 /// <param name="Reason">理由。</param>
 public sealed record ColumnConversionProblem(string ColumnName, string Reason);
@@ -42,7 +42,7 @@ public sealed record PleasanterAttachmentColumn(
 
 /// <summary>Pleasanter へ送るレコードの中身。</summary>
 /// <param name="Body">リクエストボディへ載せる内容。</param>
-/// <param name="Problems">写せなかった列。</param>
+/// <param name="Problems">コピーできなかった列。</param>
 public sealed record PleasanterRecord(
     IReadOnlyDictionary<string, object?> Body,
     ImmutableArray<ColumnConversionProblem> Problems);

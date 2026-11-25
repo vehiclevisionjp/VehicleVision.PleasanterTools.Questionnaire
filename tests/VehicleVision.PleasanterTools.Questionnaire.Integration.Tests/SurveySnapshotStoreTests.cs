@@ -219,7 +219,7 @@ public class SurveySnapshotStoreTests
         // ⚠️ **デッドレターでは止めない。** テスト公開は割り当ての誤りを見つけるためのもので、
         // デッドレターが出るのは想定どおり。ここで止めると、直すためにサイトを
         // 変えたいときに永久に変えられなくなる
-        await outbox.DeadLetterAsync(token, "列へ写せない");
+        await outbox.DeadLetterAsync(token, "列へコピーできない");
         Assert.Equal(
             PleasanterSiteUpdateResult.Updated,
             await repository.UpdatePleasanterSiteIdAsync(surveyId, 25));

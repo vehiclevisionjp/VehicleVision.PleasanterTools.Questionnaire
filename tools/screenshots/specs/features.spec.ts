@@ -13,7 +13,7 @@ test.beforeAll(async ({ browser, baseURL }) => {
   await ensureAdminStorageState(browser, baseURL ?? '');
 });
 
-test.describe('v0.12.0 の取説用の写し', { tag: '@standalone' }, () => {
+test.describe('v0.12.0 の取説用のスクリーンショット', { tag: '@standalone' }, () => {
   test.use({ storageState: authFile });
 
   let surveyId = '';

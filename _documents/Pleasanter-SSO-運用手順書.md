@@ -430,7 +430,7 @@ IIS のサブアプリケーションでは PathBase を IIS が渡すので、�
 ### 8.2 Apache・Nginx（サブディレクトリへのリバースプロキシ）
 
 **設定例は [サブパス配置-運用手順書](サブパス配置-運用手順書.md) の 3.2（Apache）・3.3（Nginx）を使う。**
-ここに写しを置くと食い違うので、設定そのものは載せない。シングルサインオンのために気を付けるのは次の 3 点。
+ここにコピーを置くと食い違うので、設定そのものは載せない。シングルサインオンのために気を付けるのは次の 3 点。
 
 - **Pleasanter は `/` のまま置く**（`pathBase` を設定しない）。Pleasanter の cookie は Pleasanter の PathBase に
   閉じるので、Pleasanter をサブパスに置くと `/questionnaire/` にいる本アプリへ届かない（4.1）
@@ -512,7 +512,7 @@ Core.Web へ移した後も同じ名前で出す）と操作の記録（`POST /a
 | 利用者ごとの API 禁止（`DisableApi` 以外の禁止） | **未検証**（`UserSettings.AllowApi` の同じ判定に入る） |
 | 複数テナント | **対象外**（テナントと本アプリは 1 対 1 で置く前提。API キーの持ち主と利用者のテナントは一致する） |
 | PostgreSQL・MySQL の Pleasanter | DBMS に依らない（SQL を書かない）が実機では**未検証** |
-| ブラウザでの往復（「Pleasanter でログイン」→ 別窓で Pleasanter にログイン → 別窓が閉じて本アプリの 2 要素の登録 → 管理画面） | **自動試験**（写しの一式 `tools/screenshots/specs/pleasanter-sso.spec.ts`。未登録の利用者はその場で登録する設定） |
+| ブラウザでの往復（「Pleasanter でログイン」→ 別窓で Pleasanter にログイン → 別窓が閉じて本アプリの 2 要素の登録 → 管理画面） | **自動試験**（スクリーンショットの一式 `tools/screenshots/specs/pleasanter-sso.spec.ts`。未登録の利用者はその場で登録する設定） |
 | 設定画面（画面から有効にして保存・固定項目のロック表示） | **自動試験**（同上。ロック表示は応答の `fixedFields` を書き換えて確かめる。サーバ側の固定は `PleasanterSsoEndToEndTests`） |
 | ブラウザでの自動確認（ログイン画面を開いただけで入る）・ログアウトの印 | **未検証** |
 | サブパス配置: Nginx・Apache（8.2） | **確認済み**（2026-09-25。Docker の Nginx 1.29・Apache httpd 2.4 ＋ Pleasanter 1.5.8.1 ＋ `QUESTIONNAIRE_PATH_BASE=/questionnaire` の本アプリ。下記） |

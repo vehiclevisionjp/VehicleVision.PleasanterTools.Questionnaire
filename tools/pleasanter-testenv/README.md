@@ -116,7 +116,7 @@ docker compose down -v               # 後片付け（DB ごと破棄）
   （`Implem.Pleasanter/Models/Users/UserModel.cs:5704-5723` の `EnabledSecondaryAuthentication`）。
   `Administrator` と API キーで動く試験は素通りする（端から端まで通す試験の一式で確認）
 - **ファイルの中身は `implem/pleasanter:1.5.10.0` の `/app/App_Data/Parameters/Security.json`
-  の写しで、`Mode` の 1 か所だけを変えてある。** Pleasanter は Parameters のファイルを
+  のコピーで、`Mode` の 1 か所だけを変えてある。** Pleasanter は Parameters のファイルを
   丸ごと読むため、変えたい項目だけを置くことはできない
 - **JSON には注釈が書けないので、由来は先頭の `"//"` の項目とこの節に書いてある**
   （`Rds.json` と同じやり方。知らない項目は Pleasanter が読み飛ばす。実測）
@@ -125,7 +125,7 @@ docker compose down -v               # 後片付け（DB ごと破棄）
   （`Rds.json` と同じ扱い）
 
 ⚠️ **Pleasanter の版を上げるときは、新しいイメージから取り直すこと。**
-古い写しのままだと、新しい版で増えた項目が既定値にならない。
+古いコピーのままだと、新しい版で増えた項目が既定値にならない。
 
 ```bash
 docker run --rm --entrypoint cat implem/pleasanter:<版> /app/App_Data/Parameters/Security.json

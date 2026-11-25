@@ -21,7 +21,7 @@ public sealed class M0001_InitialSchema : Migration
         // **JSON はネイティブ JSON 型を使わない。** 3 者で機能差が大きく、検索・更新の
         // 書き方が揃わない（_documents/データモデル設計.md 4 章）。
         // AsString(int.MaxValue) は SQL Server の NVARCHAR(MAX) / PostgreSQL の TEXT /
-        // MySQL の LONGTEXT へそれぞれ写る
+        // MySQL の LONGTEXT へそれぞれ対応する
 
         // ---- アンケート ----------------------------------------------------
         Create.Table("Surveys")

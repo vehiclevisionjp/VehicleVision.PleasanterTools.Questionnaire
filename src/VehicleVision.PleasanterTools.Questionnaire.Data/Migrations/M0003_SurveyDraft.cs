@@ -71,7 +71,7 @@ public sealed class M0003_SurveyDraft : Migration
             .WithColumn("SurveyId").AsGuid().NotNullable()
             .WithColumn("QuestionId").AsString(64).NotNullable()
             .WithColumn("SortOrder").AsInt32().NotNullable()
-            // **Pleasanter の列へ写るのはこちら。** 画面に出る文字列は LabelJson
+            // **Pleasanter の列へコピーされるのはこちら。** 画面に出る文字列は LabelJson
             .WithColumn("Value").AsString(512).NotNullable()
             .WithColumn("LabelJson").AsString(int.MaxValue).NotNullable()
             .WithColumn("IsOther").AsBoolean().NotNullable().WithDefaultValue(false);

@@ -2,10 +2,10 @@ using FluentMigrator;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
-/// <summary>管理操作の記録を、Core.Data の共有表（<c>Core_AuditLogs</c>）へ写す。</summary>
+/// <summary>管理操作の記録を、Core.Data の共有表（<c>Core_AuditLogs</c>）へコピーする。</summary>
 /// <remarks>
 /// <para>
-/// 旧 <c>AuditLogs</c> の行を <c>Core_AuditLogs</c> へ写し、旧表を落とす（<see cref="LegacyStoreMigration"/>）。
+/// 旧 <c>AuditLogs</c> の行を <c>Core_AuditLogs</c> へコピーし、旧表を落とす（<see cref="LegacyStoreMigration"/>）。
 /// 列の対応は次のとおり。
 /// </para>
 /// <list type="bullet">
@@ -13,7 +13,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// <item><description><c>ActorLoginId</c> ← 旧 <c>AdminUsers.LoginId</c>（<b>LEFT JOIN</b>。居ない管理者の行は NULL。旧は読むときに結合していた）</description></item>
 /// <item><description><c>Succeeded</c> ← <c>StatusCode</c> が NULL か 400 未満なら 1、そうでなければ 0
 /// （結果を持たない行は、旧の「400 以上だけを失敗」と同じ側へ倒して成功とする）</description></item>
-/// <item><description>そのほかは同名の列をそのまま写す</description></item>
+/// <item><description>そのほかは同名の列をそのままコピーする</description></item>
 /// </list>
 /// </remarks>
 [Migration(100000, "管理操作の記録を Core.Data の共有表へ写す")]

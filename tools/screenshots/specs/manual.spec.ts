@@ -5,7 +5,7 @@ import { findTofu, japaneseSamples } from '../lib/tofu';
 import { readEnrollmentSecret, totp, totpInNewWindow } from '../lib/totp';
 
 /**
- * 取説へ載せる画面の写しを撮る。
+ * 取説へ載せる画面のスクリーンショットを撮る。
  *
  * **まっさらな検証環境が前提**（管理者がまだ 1 人も居ない）。
  * 初期設定と 2 要素の登録も取説に要る画面なので、実際の初回の流れをそのまま辿る。
@@ -51,7 +51,7 @@ async function mask(page: import('@playwright/test').Page): Promise<void> {
   });
 }
 
-/** 撮った写しに豆腐が無いことを、撮るたびに確かめる。 */
+/** 撮ったスクリーンショットに豆腐が無いことを、撮るたびに確かめる。 */
 async function shoot(
   page: import('@playwright/test').Page,
   name: string,
@@ -78,11 +78,11 @@ let surveyId = '';
 let secretBase32 = '';
 let enrolledAt = new Date(0);
 
-test.describe('取説用の写し', { tag: '@standalone' }, () => {
+test.describe('取説用のスクリーンショット', { tag: '@standalone' }, () => {
 
   test('管理画面：初期設定から 2 要素の登録まで', async ({ page }) => {
     // **撮り始める前に前提を確かめる**（Issue #65）。
-    // 汚れた環境では、写しの途中で分からない形で落ちる
+    // 汚れた環境では、スクリーンショットの途中で分からない形で落ちる
     await expectNoAdminYet(page);
 
     // **まだ誰も登録されていない状態の入口**
@@ -98,7 +98,7 @@ test.describe('取説用の写し', { tag: '@standalone' }, () => {
     await expect(page.getByRole('heading', { name: '2 要素認証を登録する' })).toBeVisible();
     await expect(page.locator('img.qr')).toBeVisible();
 
-    // **伏せる前に読む。** 写しでは見本の文字へ置き換えてしまう
+    // **伏せる前に読む。** スクリーンショットでは見本の文字へ置き換えてしまう
     const secret = await readEnrollmentSecret(page);
     secretBase32 = secret;
 
@@ -118,7 +118,7 @@ test.describe('取説用の写し', { tag: '@standalone' }, () => {
     await expect(page.getByRole('heading', { name: 'アンケート' })).toBeVisible();
 
     // **残骸が溜まっていないこと**（Issue #65）。
-    // 一覧が長いと、ページ全体の写しが撮れなくなる
+    // 一覧が長いと、ページ全体のスクリーンショットが撮れなくなる
     await expectFewSurveys(page);
 
     await shoot(page, 'admin-04-survey-list-empty');
@@ -128,7 +128,7 @@ test.describe('取説用の写し', { tag: '@standalone' }, () => {
   });
 });
 
-test.describe('取説用の写し（ログイン済み）', { tag: '@standalone' }, () => {
+test.describe('取説用のスクリーンショット（ログイン済み）', { tag: '@standalone' }, () => {
   test.use({ storageState: authFile });
 
   test('管理画面：アンケートを作って公開する', async ({ page }) => {

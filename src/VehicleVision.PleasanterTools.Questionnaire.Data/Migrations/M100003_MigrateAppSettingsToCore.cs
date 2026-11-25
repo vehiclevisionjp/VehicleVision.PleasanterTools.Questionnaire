@@ -2,15 +2,15 @@ using FluentMigrator;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 
-/// <summary>アプリケーション設定を、Core.Data の共有表（<c>Core_AppSettings</c>）へ写す。</summary>
+/// <summary>アプリケーション設定を、Core.Data の共有表（<c>Core_AppSettings</c>）へコピーする。</summary>
 /// <remarks>
 /// <para>
-/// 旧 <c>AppSettings</c> の行を <c>Core_AppSettings</c> へ写し、旧表を落とす（<see cref="LegacyStoreMigration"/>）。
+/// 旧 <c>AppSettings</c> の行を <c>Core_AppSettings</c> へコピーし、旧表を落とす（<see cref="LegacyStoreMigration"/>）。
 /// </para>
 /// <list type="bullet">
 /// <item><description><c>IsSecret</c>（真偽値）→ <c>IsSecret</c>（整数 0 / 1）。<b>PostgreSQL だけ真偽値を <c>= true</c> で比べる</b>（<c>= 1</c> は型が合わず通らない）</description></item>
 /// <item><description><c>UpdatedByAdminUserId</c> → <c>UpdatedBy</c></description></item>
-/// <item><description><b>秘密の値は暗号文のまま写す</b>（復号しない）。そのほかは同名の列をそのまま写す</description></item>
+/// <item><description><b>秘密の値は暗号文のままコピーする</b>（復号しない）。そのほかは同名の列をそのままコピーする</description></item>
 /// </list>
 /// </remarks>
 [Migration(100003, "アプリケーション設定を Core.Data の共有表へ写す")]

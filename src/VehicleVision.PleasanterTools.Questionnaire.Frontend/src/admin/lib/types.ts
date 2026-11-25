@@ -720,7 +720,7 @@ export interface QuestionImportSource {
   pages: QuestionImportPage[];
 }
 
-/** 設問を取り込み用に写した結果。 */
+/** 設問を取り込み用にコピーした結果。 */
 export interface QuestionImportResult {
   questions: Question[];
   removedChoiceTransitions: number;

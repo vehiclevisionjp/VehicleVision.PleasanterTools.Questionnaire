@@ -52,7 +52,7 @@ public enum LookupProblemCode
     /// <summary>入力先の設問の形式が対象外（複数選択・日付など）。</summary>
     TargetQuestionTypeUnsupported,
 
-    /// <summary>同じ入力先の設問へ複数の列を写している、または参照元の列が空・重複。</summary>
+    /// <summary>同じ入力先の設問へ複数の列をコピーしている、または参照元の列が空・重複。</summary>
     TargetConflict,
 
     /// <summary>入力先の設問が起点と別のページにある。</summary>

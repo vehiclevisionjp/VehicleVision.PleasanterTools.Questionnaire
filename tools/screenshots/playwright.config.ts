@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * 取説用の写しを撮るための設定。
+ * 取説用のスクリーンショットを撮るための設定。
  *
  * **画面の見た目を揃える。** 撮るたびに幅や倍率が違うと、差分が読めない。
  */
@@ -11,7 +11,7 @@ export default defineConfig({
   // 並べると互いの行を消し合う（結合テストと同じ理由）
   workers: 1,
   fullyParallel: false,
-  // **失敗を握り潰さない。** 撮れていない写しがあるなら落とす
+  // **失敗を握り潰さない。** 撮れていないスクリーンショットがあるなら落とす
   forbidOnly: true,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'report' }]],
@@ -35,8 +35,8 @@ export default defineConfig({
     screenshot: 'off',
     trace: 'off',
     // **容器の /dev/shm は既定で 64 MB しかない。**
-    // 画面全体の写しを撮るときに足りず「Unable to capture screenshot」で落ちる
-    // （実際に踏んだ）。**写しの内容とは関係のない、容器側の都合。**
+    // 画面全体のスクリーンショットを撮るときに足りず「Unable to capture screenshot」で落ちる
+    // （実際に踏んだ）。**スクリーンショットの内容とは関係のない、容器側の都合。**
     launchOptions: { args: ['--disable-dev-shm-usage'] },
 
   },
@@ -44,7 +44,7 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop',
-      // **写しはデスクトップだけで撮る。**
+      // **スクリーンショットはデスクトップだけで撮る。**
       // 初期設定は「管理者がまだ 1 人も居ない」状態でしか通らないので、
       // 複数の見え方で走らせると 2 回目が必ず落ちる。
       // 携帯の見え方は、回答画面の中で画面の大きさを変えて撮る
@@ -56,13 +56,13 @@ export default defineConfig({
         // ⚠️ **2 のままでよい。** ここを 1 に下げると
         // `Unable to capture screenshot` が出なくなるが、**原因はこちらではない**
         // （Issue #65）。真因は**検証環境に溜まったアンケートの行**で、
-        // 一覧が長くなりすぎてページ全体の写しが撮れなくなる。
+        // 一覧が長くなりすぎてページ全体のスクリーンショットが撮れなくなる。
         // **DB を空にすれば 2 のまま通る。** 前提は `lib/fresh.ts` が見ている
         deviceScaleFactor: 2,
       },
     },
     {
-      // **携帯では書体の確認だけ。** 写しはデスクトップ側で撮る
+      // **携帯では書体の確認だけ。** スクリーンショットはデスクトップ側で撮る
       name: 'mobile',
       testMatch: /font\.spec\.ts/,
       use: {

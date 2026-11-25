@@ -37,7 +37,7 @@ public static class AdminSurveyEndpoints
     /// <remarks>
     /// **画面が足すページと同じ書き方にそろえる**（<c>page-</c> で始まる）。
     /// ⚠️ **固定の値にしない。** 同じ ID が複数のアンケートに出ると、
-    /// 分岐の行き先を写したときに取り違える
+    /// 分岐の行き先をコピーしたときに取り違える
     /// </remarks>
     private static string InitialPageId => $"page-{Guid.NewGuid():N}"[..13];
 
@@ -230,7 +230,7 @@ public static class AdminSurveyEndpoints
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.SurveysWrite));
 
         // ---- 複製（Administrator だけ） --------------------------------------
-        // **設問・選択肢・ページ・分岐・マッピングを写し、下書きとして作る**（Issue #46）。
+        // **設問・選択肢・ページ・分岐・マッピングをコピーし、下書きとして作る**（Issue #46）。
         // 似たアンケートを作り直すたびに手で入れ直さずに済ませる。
         // **Editor には行わせない。** 書き込み先のサイトを新しく決める操作であり、
         // 誤ると別の業務のサイトへ回答が流れ込む
@@ -2678,10 +2678,10 @@ public static class AdminSurveyEndpoints
 
     /// <summary>アンケートを複製する（Issue #46）。</summary>
     /// <param name="PleasanterSiteId">
-    /// **複製先が書き込むサイト。** 元の値を写さないので、必ず指定させる。
+    /// **複製先が書き込むサイト。** 元の値をコピーしないので、必ず指定させる。
     /// </param>
     /// <param name="ResponseJsonColumn">
-    /// 回答 JSON の正本を入れる列。**サイトに紐づく値なので写さない。**
+    /// 回答 JSON の正本を入れる列。**サイトに紐づく値なのでコピーしない。**
     /// </param>
     public sealed record DuplicateSurveyRequest(
         long PleasanterSiteId,

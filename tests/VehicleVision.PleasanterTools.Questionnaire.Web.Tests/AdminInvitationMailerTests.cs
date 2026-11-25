@@ -102,7 +102,7 @@ public class AdminInvitationMailerTests
     [Fact]
     public async Task アンケートに紐づかないので紐づけなしで積む()
     {
-        // **Core の送信待ちは、紐づかないことを NULL で持つ**（旧は空の識別子だった。写す移行で NULL にしてある）
+        // **Core の送信待ちは、紐づかないことを NULL で持つ**（旧は空の識別子だった。コピーする移行で NULL にしてある）
         var (mailer, outbox) = Create();
 
         await mailer.TryEnqueueAsync("hito@example.jp", "tok-1", ExpiresAt, "ja");
