@@ -20,8 +20,8 @@ public static class RemovedSsoButtonLabelSettings
     /// <summary>廃止した名前。環境変数と設定ファイルのキーの両方を並べる。</summary>
     public static readonly IReadOnlyList<string> Names =
     [
-        "QUESTIONNAIRE_SAML_BUTTONLABEL",
-        "QUESTIONNAIRE_PLEASANTERSSO_BUTTONLABEL",
+        SamlOptions.ButtonLabelKey,
+        PleasanterSsoOptions.ButtonLabelKey,
         "SamlButtonLabel",
         "PleasanterSsoButtonLabel",
     ];

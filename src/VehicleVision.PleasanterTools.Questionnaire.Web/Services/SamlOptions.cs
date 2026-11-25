@@ -24,6 +24,9 @@ public sealed class SamlOptions
     public const string LoginIdClaimKey = "QUESTIONNAIRE_SAML_LOGINIDCLAIM";
     public const string SingleLogoutUrlKey = "QUESTIONNAIRE_SAML_SINGLELOGOUTURL";
 
+    /// <summary>廃止した表示名の鍵（Issue #1079）。**読まない。** Core.Web の鍵の一覧と揃えるためだけに残す。</summary>
+    public const string ButtonLabelKey = "QUESTIONNAIRE_SAML_BUTTONLABEL";
+
     private static readonly SamlSettingKeys Keys = new("QUESTIONNAIRE_");
 
     public bool Enabled { get; init; }

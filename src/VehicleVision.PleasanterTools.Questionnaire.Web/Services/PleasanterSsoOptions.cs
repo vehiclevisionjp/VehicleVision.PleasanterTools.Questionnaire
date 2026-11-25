@@ -18,6 +18,10 @@ public sealed class PleasanterSsoOptions : IPleasanterSsoVerificationOptions
     public const string RegisterRoleKey = "QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE";
     public const string RevalidateMinutesKey = "QUESTIONNAIRE_PLEASANTERSSO_REVALIDATEMINUTES";
     public const string TimeoutSecondsKey = "QUESTIONNAIRE_PLEASANTERSSO_TIMEOUTSECONDS";
+
+    /// <summary>廃止した表示名の鍵（Issue #1079）。**読まない。** Core.Web の鍵の一覧と揃えるためだけに残す。</summary>
+    public const string ButtonLabelKey = "QUESTIONNAIRE_PLEASANTERSSO_BUTTONLABEL";
+
     public const string OwnCookiePrefix = "q.";
 
     public const string DefaultCookieNames = CoreOptions.DefaultCookieNames;
