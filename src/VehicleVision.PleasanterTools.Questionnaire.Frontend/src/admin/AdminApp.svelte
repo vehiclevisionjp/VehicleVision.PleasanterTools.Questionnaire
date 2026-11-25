@@ -891,13 +891,9 @@
   }
 
   .language select {
-    font: inherit;
     font-size: 0.85rem;
-    padding: 0.2rem 0.35rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    color: var(--text);
+    min-height: var(--control-h-sm);
+    padding: var(--space-1) var(--space-2);
   }
 
   .readability {

@@ -422,11 +422,6 @@
   select {
     display: block;
     margin-top: var(--space-1);
-    padding: 0.4rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    color: initial;
   }
 
   .issued {

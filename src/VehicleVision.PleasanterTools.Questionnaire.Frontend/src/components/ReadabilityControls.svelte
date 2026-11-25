@@ -229,11 +229,7 @@
 
   select {
     max-width: 100%;
-    padding: var(--space-1) 0.4rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
+    min-height: var(--control-h-sm);
+    padding: var(--space-1) var(--space-2);
   }
 </style>

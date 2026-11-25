@@ -470,23 +470,11 @@
   .font select {
     display: block;
     margin-top: 0.2rem;
-    padding: 0.3rem 0.4rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    background: var(--surface);
-    color: var(--text);
   }
 
   .color-scheme select {
     display: block;
     margin-top: 0.2rem;
-    padding: 0.3rem 0.4rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    background: var(--surface);
-    color: var(--text);
   }
 
   .caption {
