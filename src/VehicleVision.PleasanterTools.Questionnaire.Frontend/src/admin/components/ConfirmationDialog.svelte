@@ -18,7 +18,8 @@
 
   $effect(() => {
     if (request !== null) {
-      void tick().then(() => confirmButton?.focus());
+      const target = request.focusCancel === true ? cancelButton : confirmButton;
+      void tick().then(() => target?.focus());
     }
   });
 

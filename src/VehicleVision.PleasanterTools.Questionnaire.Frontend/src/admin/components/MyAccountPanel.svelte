@@ -20,6 +20,7 @@
   } from '../lib/api';
   import AdminSessionList from './AdminSessionList.svelte';
   import ApiTokenPanel from './ApiTokenPanel.svelte';
+  import PasskeyPanel from './PasskeyPanel.svelte';
   import { twoFactorPolicyLabel } from '../lib/adminUsers';
   import { activeTokenCount, shouldOfferTokenRevoke } from '../lib/apiTokens';
   import { confirmActionWithChoice } from '../lib/confirmation.svelte';
@@ -366,6 +367,11 @@
       </form>
     {/if}
   </div>
+
+  <!-- ---- パスキー（Issue #1068）。サーバが使えると返したときだけ出す -->
+  {#if session.passkeyEnabled === true}
+    <PasskeyPanel />
+  {/if}
 
   <!-- ---- API キー（個人トークン。Issue #1025）----------------------------- -->
   <ApiTokenPanel overview={apiTokens} onchanged={loadApiTokens} />

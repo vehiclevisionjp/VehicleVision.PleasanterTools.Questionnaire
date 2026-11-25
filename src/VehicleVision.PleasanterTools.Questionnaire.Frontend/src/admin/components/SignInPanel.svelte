@@ -30,6 +30,7 @@
     tabId,
     type LoginMethod,
   } from '../lib/loginTabs';
+  import PasskeySignIn from './PasskeySignIn.svelte';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -257,6 +258,8 @@
     availableMethods({
       ssoAvailable: !isSetup && (session.samlEnabled === true || pleasanterAvailable),
       passwordAvailable: passwordSignInEnabled,
+      // **サーバが使えると返したときだけ**（Issue #1068）。最初の管理者を作る画面には出さない
+      passkeyAvailable: !isSetup && session.passkeyEnabled === true,
     }),
   );
   const tabbed = $derived(shouldShowTabs(methods));
@@ -267,7 +270,14 @@
   const tabButtons: Partial<Record<LoginMethod, HTMLButtonElement>> = {};
 
   function methodLabel(method: LoginMethod): string {
-    return method === 'sso' ? t('signIn.tabSso') : t('signIn.tabPassword');
+    switch (method) {
+      case 'sso':
+        return t('signIn.tabSso');
+      case 'passkey':
+        return t('signIn.tabPasskey');
+      default:
+        return t('signIn.tabPassword');
+    }
   }
 
   function selectMethod(method: LoginMethod, focus: boolean) {
@@ -496,12 +506,17 @@
           >
             {#if method === 'sso'}
               {@render ssoButtons(false)}
+            {:else if method === 'passkey'}
+              <PasskeySignIn {onadvance} />
             {:else}
               {@render passwordForm()}
             {/if}
           </div>
         {/each}
       </div>
+    {:else if methods[0] === 'passkey'}
+      <!-- パスキーだけが使えるとき（通常のセクション） -->
+      <PasskeySignIn {onadvance} />
     {:else}
       {#if passwordSignInEnabled}
         {@render passwordForm()}
