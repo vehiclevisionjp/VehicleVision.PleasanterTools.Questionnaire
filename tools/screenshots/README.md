@@ -1,4 +1,4 @@
-# 取説用の画面の写しを撮る
+# 取説用の画面のスクリーンショットを撮る
 
 **手で撮ると、画面が変わるたびに古くなる。** Playwright で撮り直せるようにしてある。
 
@@ -19,7 +19,7 @@ docker compose --profile screenshots build screenshots
 docker compose --profile sqlserver --profile screenshots run --rm screenshots
 ```
 
-写しは `tools/screenshots/shots/` に出る。
+スクリーンショットは `tools/screenshots/shots/` に出る。
 
 ### ⚠️ 変更したものに応じてイメージを作り直す
 
@@ -33,7 +33,7 @@ spec は screenshots イメージへ焼き込まれ、容器へマウントし�
 docker compose --profile sqlserver up -d --build --wait
 ```
 
-`up` だけでは古いアプリのイメージが残り、直した画面を写しへ反映できない。
+`up` だけでは古いアプリのイメージが残り、直した画面をスクリーンショットへ反映できない。
 
 **2 回目も必ず `down -v` から始める。** 1 回目に管理者を作るため、
 同じボリュームでもう一度走らせると初期設定の画面へ進めず、必ず落ちる。
@@ -52,7 +52,7 @@ Error: page.screenshot: Protocol error (Page.captureScreenshot):
 
 原因は**溜まった行**。結合テストを何度も走らせた検証環境には
 **アンケートが 1367 件**あり、管理画面の一覧はそれを全部描く。
-ページ全体の写しが巨大になり、Chromium が撮れなくなる。
+ページ全体のスクリーンショットが巨大になり、Chromium が撮れなくなる。
 **DB を空にすれば、同じ倍率のまま 9 件すべて通る**（実測、2026-08-20）。
 
 **効かなかったもの。** 原因を取り違えないよう記しておく。
@@ -78,10 +78,10 @@ Error: page.screenshot: Protocol error (Page.captureScreenshot):
 **単発確認用の `review.spec.ts` は既定の一式へ混ぜない。**
 
 ```bash
-# 写しを撮る（まっさらな環境で、これだけ）
+# スクリーンショットを撮る（まっさらな環境で、これだけ）
 docker compose --profile sqlserver --profile screenshots run --rm     screenshots npx playwright test specs/manual.spec.ts
 
-# 製品の検証（写しは撮らない）
+# 製品の検証（スクリーンショットは撮らない）
 docker compose --profile sqlserver --profile screenshots run --rm     screenshots npx playwright test --grep-invert @standalone
 
 # 直した画面だけを確認する
@@ -150,16 +150,16 @@ docker compose --profile sqlserver --profile screenshots run --rm     screenshot
 | `answer-09-readability-dark` | 回答画面の暗い配色（同上） |
 | `answer-10-readability-required-error` | 高コントラストでの必須の入力漏れの表示（同上） |
 | `admin-19-pleasanter-sso-settings` | Pleasanter ログイン設定（`specs/pleasanter-sso.spec.ts`） |
-| `admin-20-pleasanter-login` | ログイン（「Pleasanter でログイン」の釦） |
+| `admin-20-pleasanter-login` | ログイン（「Pleasanter でログイン」のボタン） |
 | `admin-21-question-reorder` | 設問の移動（警告が出る候補） |
 | `admin-22-page-reorder` | ページの移動（警告が出る候補） |
-| `admin-23-page-buttons` | ページ下部の釦の設定 |
+| `admin-23-page-buttons` | ページ下部のボタンの設定 |
 | `admin-24-unsaved-question` | 未保存の設問カード |
 | `answer-11-choice-remarks-disabled-next` | 選択肢の備考と無効な「次へ」 |
 | `answer-12-disabled-submit` | 無効な「送信する」と理由 |
 
 `admin-12`〜`admin-14` は `specs/manual.spec.ts` が撮る。
-`admin-19`・`admin-20` は `shots/` にコミットしていない（2026-09-25 時点。e2e.yml の写しの一式で撮られる）。
+`admin-19`・`admin-20` は `shots/` にコミットしていない（2026-09-25 時点。e2e.yml のスクリーンショットの一式で撮られる）。
 
 ## 秘密の値は伏せる
 
@@ -170,7 +170,7 @@ docker compose --profile sqlserver --profile screenshots run --rm     screenshot
 
 ## 気をつけていること
 
-- **写しはデスクトップだけで撮る。** 初期設定は「管理者がまだ 1 人も居ない」状態でしか
+- **スクリーンショットはデスクトップだけで撮る。** 初期設定は「管理者がまだ 1 人も居ない」状態でしか
   通らないので、複数の見え方で走らせると 2 回目が必ず落ちる。
   携帯の見え方は、回答画面の中で画面の幅を変えて撮っている
 - **`app` という名前でブラウザから開かない。** Chrome は `.app` を HSTS の
@@ -187,11 +187,11 @@ docker compose --profile sqlserver --profile screenshots run --rm     screenshot
 ログイン画面の「Pleasanter でログイン」→ 別窓で Pleasanter にログイン → 管理画面へ入る往復を確かめる。
 
 - **Pleasanter の利用者を先に入れておくこと**（`tools/pleasanter-testenv/seed/03_sso_users.sql`。
-  e2e.yml の写しの一式の job が流している）
+  e2e.yml のスクリーンショットの一式の job が流している）
 - **Pleasanter と本アプリをブラウザから同じホスト名で開く。** cookie はホスト名ごとにしか届かないため、
   容器の中に `localhost:8080`（→ `pleasanter:8080`）と `localhost:8081`（→ `questionnaire-app:8080`）の
   素通しを立てる（`lib/tcp-forward.ts`。TCP を流すだけ）
-- **設定は画面から有効にし、終わったら無効へ戻す。** 写しの一式の本アプリは外部設定を持たないので、
+- **設定は画面から有効にし、終わったら無効へ戻す。** スクリーンショットの一式の本アプリは外部設定を持たないので、
   ロック表示はサーバの応答の `fixedFields` だけを書き換えて確かめる。サーバが外部設定を優先することは
   結合テストの `PleasanterSsoEndToEndTests` が見ている
 - 手元（容器の外）で走らせるときは、`localhost:8080` と `localhost:8081` に Pleasanter と本アプリが

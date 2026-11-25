@@ -115,7 +115,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
 同梱する書体とアイコン（**成果物に含まれる。** 自前配信なので外部へ要求は出ない）
 
   Zen Kaku Gothic New 1.002（Regular・Bold）・Zen Maru Gothic 1.001（Bold） / SIL Open Font License 1.1 / https://github.com/googlefonts/zen-kakugothic / https://github.com/googlefonts/zen-marugothic
-    （管理画面と回答画面の既定・テーマの「ゴシック体」（Zen Kaku Gothic New）。管理画面の見出し・釦（Zen Maru Gothic）。
+    （管理画面と回答画面の既定・テーマの「ゴシック体」（Zen Kaku Gothic New）。管理画面の見出し・ボタン（Zen Maru Gothic）。
       DesignReference 第 2.4 版（0730ea9）の同梱書体を `sync-app-fonts.mjs` で複写したもの。
       JIS X 0208 + NEC・IBM 拡張に絞った woff2 を unicode-range で区画に分けている（第 1 水準は使用頻度の順に jis1a・jis1b・jis1c の 3 つ）。出どころ・SHA は
       `src/VehicleVision.PleasanterTools.Questionnaire.Frontend/src/fonts/app/SOURCE.json` と `manifest.json`。
@@ -141,7 +141,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   xunit.runner.visualstudio 4.0.1 / Apache-2.0
   Microsoft.NET.Test.Sdk 18.12.0 / MIT
   @playwright/test 1.65.1 / Apache-2.0 / https://github.com/microsoft/playwright
-  Noto Sans CJK / SIL Open Font License 1.1（写しを撮る入れ物に同梱。端末の書体の代わりに使うだけで、成果物へは入らない）
+  Noto Sans CJK / SIL Open Font License 1.1（スクリーンショットを撮る入れ物に同梱。端末の書体の代わりに使うだけで、成果物へは入らない）
   Keycloak 26.7.3 / Apache-2.0 / https://github.com/keycloak/keycloak
     （SAML の検証用 IdP。**別のコンテナとして立てるだけで、成果物には含まれない**）
   Mailpit 1.31.1 / MIT / https://github.com/axllent/mailpit

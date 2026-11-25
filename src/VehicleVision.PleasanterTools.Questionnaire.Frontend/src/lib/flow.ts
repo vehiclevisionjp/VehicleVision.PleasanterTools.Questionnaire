@@ -10,10 +10,10 @@ import type {
 /**
  * 回答に応じて、辿るページと出す設問を決める。
  *
- * **正はサーバ側**（`Core/Flow/SurveyFlow.cs`）。ここはその写しで、
+ * **正はサーバ側**（`Core/Flow/SurveyFlow.cs`）。ここはそのコピーで、
  * **画面を進めるためだけのもの**。受け付けるかどうかはサーバが決める。
  *
- * **写しである以上、規則を変えるときは両方直すこと。**
+ * **コピーである以上、規則を変えるときは両方直すこと。**
  * サーバだけ直すと、画面が出した設問がサーバに落とされて食い違う。
  * 逆に画面だけ直すと、隠したはずの設問の答えが保存される。
  *
@@ -71,7 +71,7 @@ function isVisible(
   return conditionSatisfied(question.visibleWhen, answers, visibleSoFar);
 }
 
-/** 設問とページ下部の釦で共有する条件評価。未指定または空なら成立する。 */
+/** 設問とページ下部のボタンで共有する条件評価。未指定または空なら成立する。 */
 export function conditionSatisfied(
   condition: VisibilityCondition | null | undefined,
   answers: Record<string, AnswerState>,

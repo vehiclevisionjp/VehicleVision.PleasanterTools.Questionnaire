@@ -35,7 +35,7 @@
 
 | 項目 | 内容 |
 |---|---|
-| 起点 | **SP 起動のみ**（本アプリのログイン画面の釦から始める） |
+| 起点 | **SP 起動のみ**（本アプリのログイン画面のボタンから始める） |
 | 要求の送り方 | HTTP Redirect Binding（`AuthnRequest`） |
 | 応答の受け方 | HTTP POST Binding（`/api/admin/saml/acs`。サブパス配置では `/questionnaire/api/admin/saml/acs` など。4.2 節） |
 | 利用者の突き合わせ | **ログイン ID**（既定は `NameID`。属性からも取れる） |
@@ -55,7 +55,7 @@ sequenceDiagram
     participant SP as 本アプリ
     participant IdP as IdP（Google など）
 
-    管理者->>SP: ログイン画面の釦を押す
+    管理者->>SP: ログイン画面のボタンを押す
     SP->>SP: 出す要求の id を cookie へ預ける
     SP-->>管理者: IdP へ転送（AuthnRequest）
     管理者->>IdP: ログイン（＋ IdP 側の多要素）
@@ -87,7 +87,7 @@ sequenceDiagram
   `Endpoints/AdminSamlEndpoints.cs` の `LocalReturnUrl`）
 - **失敗の理由は画面へ返さない。** 決まった文言を出し、詳しい理由はサーバのログと
   操作の記録（`Core_AuditLogs`）に残す
-- **最初の管理者を作る画面には SAML の釦を出さない。**
+- **最初の管理者を作る画面には SAML のボタンを出さない。**
   サーバも管理者 0 人の ACS を失敗転送で拒み、JIT を行わない（共通仕様 U8）。
   締め出し中の利用者も Pending / Session の発行前に拒否し、失敗回数を成功扱いで戻さない
   IdP から来た人を最初の管理者にすると、誰でも全権を取れる
@@ -343,8 +343,8 @@ ACS URL が正しく組み立たない（[`サブパス配置-運用手順書.md
 
 ### 確かめること
 
-1. 管理画面（既定は `/admin`。`QUESTIONNAIRE_ADMIN_PATH` で変えていればその入口）を開き、**「シングルサインオンでログイン」の釦が出ている**こと
-2. 釦を押して Google のログインへ飛ぶこと
+1. 管理画面（既定は `/admin`。`QUESTIONNAIRE_ADMIN_PATH` で変えていればその入口）を開き、**「シングルサインオンでログイン」のボタンが出ている**こと
+2. ボタンを押して Google のログインへ飛ぶこと
 3. 戻ってきて管理画面に入れること（`Reject` のときは、
    本アプリ側に同じログイン ID の管理者を先に作っておく）
 4. **本アプリに居ない利用者で試して、断られること**

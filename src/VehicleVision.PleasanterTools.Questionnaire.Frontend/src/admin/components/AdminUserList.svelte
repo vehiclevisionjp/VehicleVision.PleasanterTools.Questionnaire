@@ -2,7 +2,7 @@
   /**
    * 管理者の一覧と管理（Issue #156）。
    *
-   * **押せない釦は出さない。** 決まり（最後の Administrator を止めない・自分は触らない）は
+   * **押せないボタンは出さない。** 決まり（最後の Administrator を止めない・自分は触らない）は
    * `lib/adminUsers.ts` に置き、**サーバ側の判定と同じ形**にしてある。
    * ⚠️ **入口を隠すのは守りではない。** 守りはサーバ側にある。
    */
@@ -124,7 +124,7 @@
    *
    * ⚠️ **`undefined` も「無い」として扱う。** サーバの JSON は `null` を省くので、
    * 一度も入っていない人では項目そのものが来ない。
-   * `null` だけを見ていると `Invalid Date` と出た（写しで見つけた）。
+   * `null` だけを見ていると `Invalid Date` と出た（スクリーンショットで見つけた）。
    */
   function when(value: string | null | undefined): string {
     return value === null || value === undefined ? '—' : new Date(value).toLocaleString();
@@ -437,7 +437,7 @@
   }
 
   .url code {
-    /* **長い URL を折り返す。** 選んで写せる形のままにする */
+    /* **長い URL を折り返す。** 選んでコピーできる形のままにする */
     word-break: break-all;
     font-size: 0.85rem;
   }

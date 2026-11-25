@@ -90,18 +90,18 @@ public sealed record SurveySummary(
     DateTime? AcceptFrom = null,
     DateTime? AcceptTo = null);
 
-/// <summary>複製で作るアンケートの、**写さない値**（Issue #46）。</summary>
+/// <summary>複製で作るアンケートの、**コピーしない値**（Issue #46）。</summary>
 /// <param name="SurveyId">複製先の内部 ID。</param>
 /// <param name="PublicId">
 /// **新しく作った推測不能な値**（<see cref="Core.Definitions.SurveyPublicId.Generate"/>）。
 /// **元の値を使い回さない**（<c>_documents/データモデル設計.md</c> 3 章）。
 /// </param>
 /// <param name="PleasanterSiteId">
-/// 書き込み先のサイト。**元の値を写さない。** 1 アンケート = 1 サイトなので、
-/// 写すと 2 つのアンケートが同じサイトへ書き込む。
+/// 書き込み先のサイト。**元の値をコピーしない。** 1 アンケート = 1 サイトなので、
+/// コピーすると 2 つのアンケートが同じサイトへ書き込む。
 /// </param>
 /// <param name="ResponseJsonColumn">
-/// 回答 JSON の正本を入れる列。**サイトに紐づく値なので、元の値を写さない。**
+/// 回答 JSON の正本を入れる列。**サイトに紐づく値なので、元の値をコピーしない。**
 /// </param>
 public sealed record SurveyDuplicationTarget(
     Guid SurveyId,
@@ -120,7 +120,7 @@ public sealed record SurveyTemplateSummary(
     string Title,
     DateTime UpdatedAt);
 
-/// <summary>テンプレートとして作る行の、**写さない値**（Issue #58）。</summary>
+/// <summary>テンプレートとして作る行の、**コピーしない値**（Issue #58）。</summary>
 /// <param name="TemplateId">作るテンプレートの内部 ID。</param>
 /// <param name="PublicId">
 /// **新しく作った推測不能な値**（<see cref="Core.Definitions.SurveyPublicId.Generate"/>）。
@@ -203,9 +203,9 @@ public interface ISurveyDraftStore
         long assetHistorySiteId = 0,
         MappingDefinition? assetHistoryMapping = null);
 
-    /// <summary>アンケートを丸ごと写して、新しい**下書き**を作る（Issue #46）。</summary>
-    /// <param name="sourceSurveyId">写す元のアンケート。</param>
-    /// <param name="target">写さない値。**呼ぶ側が決める。**</param>
+    /// <summary>アンケートを丸ごとコピーして、新しい**下書き**を作る（Issue #46）。</summary>
+    /// <param name="sourceSurveyId">コピーする元のアンケート。</param>
+    /// <param name="target">コピーしない値。**呼ぶ側が決める。**</param>
     /// <returns>元のアンケートが無ければ <c>false</c>。</returns>
     /// <remarks>
     /// **アンケートの行と下書きを 1 つのトランザクションで入れる。**
@@ -222,18 +222,18 @@ public interface ISurveyDraftStore
     Task<IReadOnlyList<SurveyTemplateSummary>> ListTemplatesAsync(
         CancellationToken cancellationToken = default);
 
-    /// <summary>アンケートを丸ごと写して、**テンプレート**を作る（Issue #58）。</summary>
-    /// <param name="sourceSurveyId">写す元のアンケート。**テンプレートは指定できない。**</param>
+    /// <summary>アンケートを丸ごとコピーして、**テンプレート**を作る（Issue #58）。</summary>
+    /// <param name="sourceSurveyId">コピーする元のアンケート。**テンプレートは指定できない。**</param>
     /// <returns>元が無い、または元がテンプレートだったときは <c>false</c>。</returns>
     Task<bool> SaveAsTemplateAsync(
         Guid sourceSurveyId,
         SurveyTemplateTarget target,
         CancellationToken cancellationToken = default);
 
-    /// <summary>テンプレートを丸ごと写して、新しい**下書き**を作る（Issue #58）。</summary>
-    /// <param name="templateId">写す元のテンプレート。**アンケートは指定できない。**</param>
+    /// <summary>テンプレートを丸ごとコピーして、新しい**下書き**を作る（Issue #58）。</summary>
+    /// <param name="templateId">コピーする元のテンプレート。**アンケートは指定できない。**</param>
     /// <param name="target">
-    /// 写さない値。**書き込み先のサイトは呼ぶ側が決める**
+    /// コピーしない値。**書き込み先のサイトは呼ぶ側が決める**
     /// （テンプレートは持っていない）。
     /// </param>
     /// <returns>元が無い、または元がテンプレートでなかったときは <c>false</c>。</returns>
@@ -322,7 +322,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
 
     private sealed record CopySourceRow(bool IsTemplate, DateTime? ArchivedAt);
 
-    /// <summary>複製で写すヘッダ画像の 1 行。</summary>
+    /// <summary>複製でコピーするヘッダ画像の 1 行。</summary>
     private sealed record AssetRow(
         string ContentType, string FileName, long ByteSize, string ContentBase64);
 
@@ -500,7 +500,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
     /// <remarks>
     /// **複製は読みと書きを 1 つのトランザクションに入れる**ため、
     /// 接続とトランザクションを外から渡せるようにしてある。
-    /// 読んだ後に元が書き換わると、写した先が新旧の混ざったものになる。
+    /// 読んだ後に元が書き換わると、コピーした先が新旧の混ざったものになる。
     /// </remarks>
     private async Task<SurveyDraft?> LoadAsync(
         DbConnection connection,
@@ -846,7 +846,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
                 target.ResponseJsonColumn,
                 IsTemplate: false,
                 // **テンプレートから作るものに「のコピー」は付けない。**
-                // 元は並んで見えないので、付けても何の写しか分からない
+                // 元は並んで見えないので、付けても何のコピーか分からない
                 RenameAsCopy: false),
             cancellationToken);
     }
@@ -882,10 +882,10 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         return true;
     }
 
-    /// <summary>写して 1 行作るときの、**写さない値**。</summary>
+    /// <summary>コピーして 1 行作るときの、**コピーしない値**。</summary>
     /// <remarks>
-    /// **複製もテンプレートも、写すものは同じで写さないものだけが違う。**
-    /// 道を分けると、後から足した項目を片方だけ写し漏らす。
+    /// **複製もテンプレートも、コピーするものは同じでコピーしないものだけが違う。**
+    /// 道を分けると、後から足した項目を片方だけコピー漏らす。
     /// </remarks>
     /// <param name="RenameAsCopy">題名の後ろへ「のコピー」を付けるか。</param>
     private sealed record CopyTarget(
@@ -904,9 +904,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
     /// </remarks>
     private const long NoPleasanterSiteId = 0;
 
-    /// <summary>元を丸ごと写して、新しい行と下書きを作る。</summary>
+    /// <summary>元を丸ごとコピーして、新しい行と下書きを作る。</summary>
     /// <param name="sourceIsTemplate">
-    /// 元がテンプレートであることを期待するか。**食い違ったら写さない。**
+    /// 元がテンプレートであることを期待するか。**食い違ったらコピーしない。**
     /// アンケートの ID をテンプレートの口へ渡す（またはその逆）と、
     /// サイトを持たないアンケートや、公開できるテンプレートができてしまう。
     /// </param>
@@ -921,7 +921,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
         // **同じトランザクションの中で読む。** 読んでから書くまでの間に
-        // 元が保存されると、写した先が新旧の混ざったものになる。
+        // 元が保存されると、コピーした先が新旧の混ざったものになる。
         // **種類が食い違ったら何もしない**（アンケートとテンプレートの取り違え）
         var sourceRow = await connection.QueryFirstOrDefaultAsync<CopySourceRow>(Sql(
             "SELECT [IsTemplate], [ArchivedAt] FROM [Surveys] WHERE [SurveyId] = @SurveyId",
@@ -950,9 +950,9 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             source.Definition, target.SurveyId.ToString(), target.RenameAsCopy);
         var now = DbTime.UtcNowTruncated();
 
-        // **ヘッダ画像は写す**（Issue #56）。画像は元のアンケートに紐づいており、
-        // 読み出しをアンケートで絞っている以上、識別子だけ写しても複製先からは読めない。
-        // **同じトランザクションの中で写す。** 途中で失敗すると、
+        // **ヘッダ画像はコピーする**（Issue #56）。画像は元のアンケートに紐づいており、
+        // 読み出しをアンケートで絞っている以上、識別子だけコピーしても複製先からは読めない。
+        // **同じトランザクションの中でコピーする。** 途中で失敗すると、
         // 出ない画像を指したままの複製が残る
         definition = definition with
         {
@@ -964,8 +964,8 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             connection, transaction, sourceSurveyId, definition, target.SurveyId, now, cancellationToken)
             .ConfigureAwait(false);
 
-        // **下書きとして作る**（Issue #46）。公開状態も公開済みの版も写さない。
-        // **受付期間・回答上限も写さない。** 公開の設定であり、
+        // **下書きとして作る**（Issue #46）。公開状態も公開済みの版もコピーしない。
+        // **受付期間・回答上限もコピーしない。** 公開の設定であり、
         // 期限切れの期間を引き継いだ複製は、作った直後から回答できない
         await connection.ExecuteAsync(Sql(
             "INSERT INTO [Surveys] "
@@ -1010,7 +1010,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         // **保存と同じ道を通す。** 別に書くと、後から足した項目を
-        // 複製だけ写し漏らす（分岐がまさにそうなりやすい）
+        // 複製だけコピー漏らす（分岐がまさにそうなりやすい）
         await InsertDraftAsync(
             connection, transaction, target.SurveyId, definition, source.Mapping, cancellationToken)
             .ConfigureAwait(false);
@@ -1219,7 +1219,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         }
     }
 
-    /// <summary>ヘッダ画像を複製先へ写し、新しい識別子を指すテーマを返す。</summary>
+    /// <summary>ヘッダ画像を複製先へコピーし、新しい識別子を指すテーマを返す。</summary>
     /// <remarks>
     /// <para>
     /// **中身を読んで入れ直す。** <c>INSERT ... SELECT</c> で同じ表を跨ぐ書き方は
@@ -1280,7 +1280,7 @@ public sealed class SurveyDraftStore(IDbConnectionFactory connectionFactory) : I
         return theme with { HeaderImageId = copiedId.ToString() };
     }
 
-    /// <summary>記法が参照する画像を複製先へ写し、記法内の識別子を差し替える。</summary>
+    /// <summary>記法が参照する画像を複製先へコピーし、記法内の識別子を差し替える。</summary>
     private async Task<SurveyDefinition> CopyContentAssetsAsync(
         DbConnection connection,
         DbTransaction transaction,

@@ -4,7 +4,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data;
 /// <remarks>
 /// ⚠️ **メンバーの名前は変えないこと。** DB（<c>Core_AdminUsers.Role</c>）へは**名前の文字列**で入っている。
 /// 名前を変えると、既存の管理者の役割が読めなくなる。
-/// <b>数値は DB へ入らない</b>（旧 <c>AdminUsers.Role</c> の整数は、移行 M100004 が名前へ写した。
+/// <b>数値は DB へ入らない</b>（旧 <c>AdminUsers.Role</c> の整数は、移行 M100004 が名前へコピーした。
 /// 移行の対応表はこの値のまま固定してある）。
 /// <b>足すときは末尾へ足し、<c>AdminPermissions</c> の対応表と <see cref="AdminRoleMap"/> の移行用の対応にも書く。</b>
 /// </remarks>

@@ -16,7 +16,7 @@
 
   interface Props {
     tokens: ApiTokenRow[];
-    /** 失効の釦を出すか。 */
+    /** 失効のボタンを出すか。 */
     canRevoke: boolean;
     busy: boolean;
     onrevoke: (token: ApiTokenRow) => void;

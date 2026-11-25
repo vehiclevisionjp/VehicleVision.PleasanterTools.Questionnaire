@@ -10,12 +10,12 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 public sealed record SaveRuleViolation(string MessageKey, IReadOnlyList<string> Fields);
 
 /// <summary>
-/// 下書きを保存する前に断る定義の不備（保存の口と取り込みの口で共通。Issue #1009）。
+/// 下書きを保存する前に断る定義の不備（保存の口とインポートの口で共通。Issue #1009）。
 /// </summary>
 /// <remarks>
 /// **設問の不備（公開のときに弾く）と違い、画面が作り得ない値や、
-/// 運用側が許していない値**だけを見る。保存と取り込みで線が割れると、
-/// 取り込みが保存の関所を迂回する道になる。
+/// 運用側が許していない値**だけを見る。保存とインポートで線が割れると、
+/// インポートが保存の関所を迂回する道になる。
 /// </remarks>
 public static class DefinitionSaveRules
 {

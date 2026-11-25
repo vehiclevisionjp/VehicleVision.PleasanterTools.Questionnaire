@@ -2,7 +2,7 @@ import type { APIRequestContext } from '@playwright/test';
 import { currentRevision } from './survey';
 
 /**
- * 写しを撮るための下ごしらえ。
+ * スクリーンショットを撮るための下ごしらえ。
  *
  * **まっさらな検証環境が前提。** 管理者がまだ 1 人も居ない状態から始める。
  * 初期設定と 2 要素の登録は取説にも載せたい画面なので、
@@ -10,7 +10,7 @@ import { currentRevision } from './survey';
  */
 export const demoAdmin = {
   loginId: 'kanri-tantou',
-  // **検証用と分かる値にする。** 実在しそうな資格情報を写しに入れない
+  // **検証用と分かる値にする。** 実在しそうな資格情報をスクリーンショットに入れない
   password: 'demo-password-for-manual',
 };
 

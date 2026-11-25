@@ -31,11 +31,11 @@ test('直した画面を撮る', { tag: '@standalone' }, async ({ page, context 
   await page.getByRole('heading', { name: '復旧コードを控えてください' }).waitFor();
   await page.getByLabel('控えました').check();
   await page.getByRole('button', { name: '管理画面へ進む' }).click();
-  // **空の一覧には表が出ない。** 常にある釦で待つ
+  // **空の一覧には表が出ない。** 常にあるボタンで待つ
   await expect(page.getByRole('button', { name: '新規作成' })).toBeVisible({ timeout: 30000 });
 
   // ---- 見本を 2 本 ---------------------------------------------------------
-  // **釦が出そろった行と、下書きのままの行を並べたい**
+  // **ボタンが出そろった行と、下書きのままの行を並べたい**
   const { surveyId } = await prepareSurvey(context.request, 1);
   await context.request.post('/api/admin/surveys', {
     data: { title: '下書きのままのアンケート（見本）', pleasanterSiteId: 2 },

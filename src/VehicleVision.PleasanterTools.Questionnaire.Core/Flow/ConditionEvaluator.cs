@@ -4,7 +4,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Flow;
 
-/// <summary>設問と釦で共有する回答条件の評価器。</summary>
+/// <summary>設問とボタンで共有する回答条件の評価器。</summary>
 public static class ConditionEvaluator
 {
     /// <summary>条件を満たすか。未指定または空なら満たす。</summary>

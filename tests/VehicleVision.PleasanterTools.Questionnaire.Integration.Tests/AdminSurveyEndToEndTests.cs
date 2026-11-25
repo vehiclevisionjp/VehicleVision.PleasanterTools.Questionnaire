@@ -1527,7 +1527,7 @@ public class AdminSurveyEndToEndTests
             {
                 surveyId = sourceId,
                 version = 1,
-                title = new { ja = "取り込み元" },
+                title = new { ja = "インポート元" },
                 pages = new[]
                 {
                     new
@@ -1685,7 +1685,7 @@ public class AdminSurveyEndToEndTests
             var body = await ReadAsync(draft);
             Assert.NotNull(body);
             Assert.Equal("満足度調査のコピー", body["definition"]!["title"]!["ja"]!.GetValue<string>());
-            // **マッピングも写る**
+            // **マッピングもコピーされる**
             Assert.Single(body["mapping"]!["assignments"]!.AsArray());
         }
 
@@ -1694,7 +1694,7 @@ public class AdminSurveyEndToEndTests
             var copy = (await ReadAsync(list))!["items"]!.AsArray()
                 .Single(row => row!["surveyId"]!.GetValue<string>() == copyId)!;
 
-            // **公開状態も公開済みの版も写さない**
+            // **公開状態も公開済みの版もコピーしない**
             Assert.Equal(0, copy["status"]!.GetValue<int>());
             Assert.Null(copy["publishedVersion"]);
             Assert.Equal(2L, copy["pleasanterSiteId"]!.GetValue<long>());

@@ -53,7 +53,7 @@ public sealed record LookupSearchRequest(
     LookupDefinition Lookup,
     IReadOnlyDictionary<string, string?> KeyValues);
 
-/// <summary>検索の結果の区分（仕様書 4.3 節の HTTP・コードへ写す前の分類）。</summary>
+/// <summary>検索の結果の区分（仕様書 4.3 節の HTTP・コードへコピーする前の分類）。</summary>
 public enum LookupSearchStatus
 {
     /// <summary>検索できた（0・1・複数件）。</summary>

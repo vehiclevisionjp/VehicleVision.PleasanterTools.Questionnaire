@@ -265,7 +265,7 @@ public class SurveyThemeTests
     [Fact]
     public void 複製はテーマも写す()
     {
-        // **`with` で丸ごと写しているので、項目を足しても写し漏れない**
+        // **`with` で丸ごとコピーしているので、項目を足してもコピーし漏れない**
         var theme = new SurveyTheme { AccentColor = "#175cd3", Font = ThemeFont.Sans };
 
         var copied = SurveyDuplication.Copy(Definition(theme), Guid.NewGuid().ToString());

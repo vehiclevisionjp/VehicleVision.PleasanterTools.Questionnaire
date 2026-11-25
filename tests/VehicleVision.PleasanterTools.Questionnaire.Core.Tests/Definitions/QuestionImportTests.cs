@@ -3,7 +3,7 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Definitions;
 
-/// <summary>設問の取り込み（Issue #358）。**DB を使わない。**</summary>
+/// <summary>設問のインポート（Issue #358）。**DB を使わない。**</summary>
 public class QuestionImportTests
 {
     [Fact]

@@ -142,7 +142,7 @@ public class EmbedPolicyTests
     [Fact]
     public void 埋め込みは回答を持たない()
     {
-        // **Pleasanter の列へ写さない。** 説明文ブロックと同じ扱い
+        // **Pleasanter の列へコピーしない。** 説明文ブロックと同じ扱い
         var question = new Question
         {
             QuestionId = "q1",

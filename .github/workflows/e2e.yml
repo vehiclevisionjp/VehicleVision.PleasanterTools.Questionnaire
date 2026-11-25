@@ -84,7 +84,7 @@ jobs:
       QUESTIONNAIRE_ADMIN_PATH: /back-office
       # **Pleasanter のログイン（Issue #464）を外部設定で有効にする**（Issue #470）。
       # この job の docker compose はすべて compose.pleasanter-sso.yaml を重ねて動く。
-      # 本体の compose.yaml へ書かないのは、手元と写しの一式で設定画面をロックしないため
+      # 本体の compose.yaml へ書かないのは、手元とスクリーンショットの一式で設定画面をロックしないため
       COMPOSE_FILE: compose.yaml:compose.pleasanter-sso.yaml
 
     steps:
@@ -429,11 +429,11 @@ jobs:
           submodules: false
 
       - name: まっさらな検証環境にする
-        # **溜まった行があると Chromium が写しを撮れずに落ちる**（Issue #65）。
+        # **溜まった行があると Chromium がスクリーンショットを撮れずに落ちる**（Issue #65）。
         # runner の状態に頼らず、名前付き volume も含めて最初に消す
         run: docker compose --profile sqlserver down -v --remove-orphans
 
-      - name: 写し用のイメージを組み直す
+      - name: スクリーンショット用のイメージを組み直す
         # spec はイメージへ焼き込まれるため、毎回現在のソースから作る
         run: docker compose --profile screenshots build screenshots
 
@@ -484,7 +484,7 @@ jobs:
               exit 1
           fi
 
-      - name: 写しの一式を実行する
+      - name: スクリーンショットの一式を実行する
         # 初期設定を先に撮る順序と単発確認用 spec の除外は npm run shot に集約してある
         run: docker compose --profile sqlserver --profile screenshots run --rm screenshots
 
@@ -504,7 +504,7 @@ jobs:
           path: TestResults/sqlserver-startup/
           if-no-files-found: ignore
 
-      - name: 失敗したときは写しの報告書を残す
+      - name: 失敗したときはスクリーンショットの報告書を残す
         if: failure()
         uses: actions/upload-artifact@v7
         with:
@@ -654,7 +654,7 @@ jobs:
                 body: [
                   '## 直ったので閉じます',
                   '',
-                  '端から端まで通す試験と写しの一式が、どちらも成功しました。',
+                  '端から端まで通す試験とスクリーンショットの一式が、どちらも成功しました。',
                   '',
                   runUrl,
                 ].join('\n'),
