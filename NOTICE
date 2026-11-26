@@ -45,7 +45,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   Microsoft.Extensions.Hosting.Abstractions 10.0.15 / MIT
   Microsoft.Extensions.Logging.Abstractions 10.0.15 / MIT
   Microsoft.AspNetCore.OpenApi 10.0.15 / MIT / https://www.nuget.org/packages/Microsoft.AspNetCore.OpenApi
-  Scalar.AspNetCore 2.21.0 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/2.21.0
+  Scalar.AspNetCore 3.2.1 / MIT / https://www.nuget.org/packages/Scalar.AspNetCore/3.2.1
     （OpenAPI 文書を読む画面。画面本体は埋め込みアセットで同梱し、CDN の既定フォントと
       利用状況テレメトリーは無効化する）
   Jint 4.18.1 / BSD-2-Clause / https://github.com/sebastienros/jint
