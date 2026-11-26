@@ -266,7 +266,7 @@ public class PathBaseTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var cookie = Assert.Single(response.Headers.GetValues("Set-Cookie"));
-        // **ブラウザは cookie の Path を大文字小文字で区別する。** 要求の綴りを写してはいけない
+        // **ブラウザは cookie の Path を大文字小文字で区別する。** 要求の綴りをコピーしてはいけない
         Assert.Contains("path=/questionnaire;", cookie + ";", StringComparison.Ordinal);
     }
 

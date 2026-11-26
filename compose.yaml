@@ -54,7 +54,7 @@ x-app-environment: &app-environment
     # 試験が増えるほど枠を食うので、検証環境では大きめに取る。**本番では設定しないこと**
     # **検証環境では 2 要素を必須にする**（Issue #172）。
     # 製品の既定は「任意」（Issue #154）だが、ここを任意にすると
-    # **初期設定の直後に管理画面へ入ってしまい、2 要素の画面を写しに撮れない。**
+    # **初期設定の直後に管理画面へ入ってしまい、2 要素の画面をスクリーンショットに撮れない。**
     # 取説（_documents/アンケート作成-運用手順書.md）はこの状態の図で説明している。
     # 任意・無効の振る舞いを手元で見たいときは DEV_ADMIN_TWOFACTOR で切り替える
     QUESTIONNAIRE_ADMIN_TWOFACTOR: ${DEV_ADMIN_TWOFACTOR:-required}
@@ -62,7 +62,7 @@ x-app-environment: &app-environment
     QUESTIONNAIRE_ADMIN_PATH: ${DEV_ADMIN_PATH:-/admin}
     # **サブパスに置く**（Issue #465）。未指定（空）なら従来どおり `/` で動く。
     # 例: DEV_PATH_BASE=/questionnaire で http://localhost:8081/questionnaire/admin になる。
-    # ⚠️ 結合試験・E2E・写しの一式は `/` を前提にしているので、試すときだけ指定すること
+    # ⚠️ 結合試験・E2E・スクリーンショットの一式は `/` を前提にしているので、試すときだけ指定すること
     QUESTIONNAIRE_PATH_BASE: ${DEV_PATH_BASE:-}
     # ---- SAML（Issue #166）--------------------------------------------------
     # **既定は無効。** saml profile の IdP と合わせて使うときだけ有効にする
@@ -84,7 +84,15 @@ x-app-environment: &app-environment
     # **管理 API のトークン（API キー）の機能。** 既定は無効（製品の既定と同じ）。
     # SAML の強制再認証（ForceAuthn。Issue #1034）の試験で `enabled` にする
     QUESTIONNAIRE_ADMIN_API_TOKENS: ${DEV_ADMIN_API_TOKENS:-disabled}
-    QUESTIONNAIRE_SAML_BUTTONLABEL: ${DEV_SAML_BUTTONLABEL:-検証用 IdP でログイン}
+    # ---- パスキー（Issue #1082 / #1085）-------------------------------------
+    # **既定は無効**（製品の既定と同じ）。ブラウザ試験（tools/screenshots/specs/passkey.spec.ts）で有効にする
+    #
+    #   DEV_ADMIN_PASSKEY=true DEV_ADMIN_PASSKEY_RPID=questionnaire-app     #   DEV_ADMIN_PASSKEY_ORIGINS=https://questionnaire-app:8443 docker compose --profile sqlserver up -d --build --wait app
+    #
+    # ⚠️ **RP ID・Origin は、ブラウザが開く名前と https のポートに合わせる。** 食い違うとブラウザが拒む
+    QUESTIONNAIRE_ADMIN_PASSKEY: ${DEV_ADMIN_PASSKEY:-false}
+    QUESTIONNAIRE_ADMIN_PASSKEY_RPID: ${DEV_ADMIN_PASSKEY_RPID:-}
+    QUESTIONNAIRE_ADMIN_PASSKEY_ORIGINS: ${DEV_ADMIN_PASSKEY_ORIGINS:-}
     # ---- メール（Issue #189）------------------------------------------------
     # **既定は無効。** mail profile の Mailpit と合わせて使うときだけ有効にする
     #
@@ -495,7 +503,7 @@ services:
           # （実測。curl では http のまま 200 が返る）
           - questionnaire-app
 
-  # ---- 取説用の写しを撮る ----------------------------------------------------
+  # ---- 取説用のスクリーンショットを撮る ----------------------------------------------------
   # **ホストに Playwright とブラウザを入れない。**
   # **日本語フォントを入れてある**（入れないと文字が豆腐になる）
   #
@@ -518,12 +526,14 @@ services:
       # 平文の経路も残っている（控えの SHA-256）ので、**両方を試す**
       # （specs/secure-context.spec.ts）
       QUESTIONNAIRE_HTTPS_BASE_URL: https://questionnaire-app:8443
+      # パスキーのブラウザ試験の入口（specs/passkey.spec.ts）。RP ID・Origin は app 側の DEV_ADMIN_PASSKEY_* と合わせる
+      QUESTIONNAIRE_PASSKEY_BASE_URL: https://questionnaire-app:8443
       # **回答画面とは別生成元の親ページ。** 同じ screenshots コンテナの別ポートで
       # HTTPS 配信し、iframe の Cookie と frame-ancestors を実ブラウザで確かめる
       EMBED_PARENT_CERTIFICATE_PATH: /https/aspnetapp.pfx
       EMBED_PARENT_CERTIFICATE_PASSWORD: *devcert-password
     volumes:
-      # 撮った写しと報告書をホストへ出す
+      # 撮ったスクリーンショットと報告書をホストへ出す
       - ./tools/screenshots/shots:/work/shots
       - ./tools/screenshots/report:/work/report
       # 親ページも HTTPS で立てる。SameSite=None の Cookie は Secure が必須

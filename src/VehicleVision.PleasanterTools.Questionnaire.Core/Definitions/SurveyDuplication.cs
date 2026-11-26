@@ -2,17 +2,17 @@ using System.Collections.Frozen;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Definitions;
 
-/// <summary>アンケートの定義を丸ごと写す（Issue #46）。</summary>
+/// <summary>アンケートの定義を丸ごとコピーする（Issue #46）。</summary>
 /// <remarks>
 /// <para>
 /// **ここで扱うのは定義だけ。** 公開用 ID・書き込み先のサイト・公開状態・公開済みの版は
-/// 定義の外（<c>Surveys</c> の行）にあり、**写さずに複製のたびへ決め直す。**
+/// 定義の外（<c>Surveys</c> の行）にあり、**コピーせずに複製のたびへ決め直す。**
 /// </para>
 /// <para>
-/// **ページと設問の識別子は写す。** 分岐（<see cref="Page.Next"/> /
+/// **ページと設問の識別子はコピーする。** 分岐（<see cref="Page.Next"/> /
 /// <see cref="Choice.Next"/> / <see cref="Question.VisibleWhen"/>）と
 /// マッピングがこの識別子を指しており、振り直すと参照先を全部書き換えることになる。
-/// **識別子はアンケートの中でだけ一意**なので、写しても衝突しない
+/// **識別子はアンケートの中でだけ一意**なので、コピーしても衝突しない
 /// （<c>M0003_SurveyDraft</c>）。
 /// </para>
 /// </remarks>
@@ -41,9 +41,9 @@ public static class SurveyDuplication
     /// そこから作ったアンケートに「のコピー」が付くと、回答者に見える題名が汚れる。
     /// </param>
     /// <remarks>
-    /// **<c>with</c> で丸ごと写し、変えるものだけを並べる。**
-    /// 項目を 1 つずつ並べて写すと、後から足した項目（分岐がそうだった）を
-    /// 写し漏らしても気付けない。
+    /// **<c>with</c> で丸ごとコピーし、変えるものだけを並べる。**
+    /// 項目を 1 つずつ並べてコピーすると、後から足した項目（分岐がそうだった）を
+    /// コピーし漏らしても気付けない。
     /// </remarks>
     public static SurveyDefinition Copy(
         SurveyDefinition source,
@@ -56,7 +56,7 @@ public static class SurveyDuplication
         return source with
         {
             SurveyId = newSurveyId,
-            // **公開済みの版は写さないので、次に公開されるのは 1 版目**
+            // **公開済みの版はコピーしないので、次に公開されるのは 1 版目**
             Version = 1,
             Title = renameAsCopy ? CopyTitle(source.Title) : source.Title,
             // **資格情報の参照は他のアンケートへ引き継がない。** 再登録を求める（仕様書 3.2・12.5）

@@ -323,7 +323,7 @@ export interface Page {
    * **説明文ブロックは動かさない。**
    */
   shuffleQuestions?: boolean;
-  /** ページ下部の釦。未指定なら従来どおり常に表示し、有効。 */
+  /** ページ下部のボタン。未指定なら従来どおり常に表示し、有効。 */
   buttons?: PageButtons | null;
 }
 
@@ -708,19 +708,19 @@ export interface SurveyTemplateSummary {
   updatedAt: string;
 }
 
-/** 設問の取り込み元にあるページ。**ページ自体は取り込まない。** */
+/** 設問のインポート元にあるページ。**ページ自体はインポートしない。** */
 export interface QuestionImportPage {
   pageId: string;
   title?: LocalizedText | null;
   questions: Pick<Question, 'questionId' | 'type' | 'title'>[];
 }
 
-/** 取り込み元から選べる設問。 */
+/** インポート元から選べる設問。 */
 export interface QuestionImportSource {
   pages: QuestionImportPage[];
 }
 
-/** 設問を取り込み用に写した結果。 */
+/** 設問をインポート用にコピーした結果。 */
 export interface QuestionImportResult {
   questions: Question[];
   removedChoiceTransitions: number;
@@ -787,7 +787,7 @@ export function problemKey(code: string): MessageKey | null {
  *
  * **画面はこれで出し分ける。**「Administrator かどうか」で分けると、
  * 役割を増やすたびに画面を直すことになる。
- * **サーバ側でも同じ権限で判定している**ので、隠すのは押せない釦を出さないため。
+ * **サーバ側でも同じ権限で判定している**ので、隠すのは押せないボタンを出さないため。
  */
 export type AdminPermission =
   | 'surveys.read'
@@ -805,6 +805,7 @@ export type AdminPermission =
   | 'users.read'
   | 'users.write'
   | 'users.resetTwoFactor'
+  | 'users.resetPasskeys'
   | 'settings.saml'
   | 'settings.pleasanterSso'
   | 'settings.manage'
@@ -841,7 +842,6 @@ export interface SamlSettings {
   registerRole: string;
   loginIdSource: string;
   loginIdClaim: string;
-  buttonLabel: string;
   singleLogoutUrl: string;
   fixedFields: Record<SamlSettingField, boolean>;
 }
@@ -874,7 +874,6 @@ export interface PleasanterSsoSettings {
   registerRole: string;
   revalidateMinutes: string;
   timeoutSeconds: string;
-  buttonLabel: string;
   fixedFields: Record<PleasanterSsoSettingField, boolean>;
 }
 
@@ -889,8 +888,7 @@ export type PleasanterSsoSettingField =
   | 'unknownUser'
   | 'registerRole'
   | 'revalidateMinutes'
-  | 'timeoutSeconds'
-  | 'buttonLabel';
+  | 'timeoutSeconds';
 
 /** 設定画面の「接続の試験」の結果（Issue #464）。 */
 export interface PleasanterSsoTestResult {
@@ -915,7 +913,6 @@ export type SamlSettingField =
   | 'registerRole'
   | 'loginIdSource'
   | 'loginIdClaim'
-  | 'buttonLabel'
   | 'singleLogoutUrl';
 
 /**
@@ -932,8 +929,22 @@ export interface AdminUserRow {
   isDisabled: boolean;
   /** 2 要素を登録しているか。**共有鍵そのものは返らない** */
   hasTotp: boolean;
+  /**
+   * 登録しているパスキーの件数（Issue #1087）。
+   *
+   * ⚠️ **`users.resetPasskeys` を持つ相手にだけ、パスキーが有効のときだけ来る**（それ以外は項目そのものが来ない）。
+   * 復旧の確認ダイアログに「何件消すか」を出すために要る。**名前・資格情報 ID は来ない**
+   */
+  passkeyCount?: number;
   /** まだ招待を受け取っていない（＝一度も入っていない） */
   invitationPending: boolean;
+  /**
+   * 本人がパスワードを知っているか（Issue #1086）。**偽は「パスワードなし（SSO のみ）」。**
+   *
+   * ⚠️ **ログインの成否ではない。** パスキーの最後の 1 件を消してよいかの判定で、
+   * パスワードを「使えるログイン方法」に数えるかだけを決める印
+   */
+  passwordSet: boolean;
   /**
    * **止め忘れを見つける唯一の手掛かり。**
    *
@@ -986,6 +997,15 @@ export interface AdminSession {
   /** SAML でのログインが使えるか（Issue #166）。**既定は無効** */
   samlEnabled?: boolean;
 
+  /**
+   * パスキーが使えるか（Issue #1068。Core の仕様書 3.10）。**サーバが決める。** 既定は無効。
+   *
+   * **無い・偽のときは、ログインのタブも管理の画面も出さない**（API が無い環境でも画面を崩さない）。
+   * **`GET /api/admin/session` の応答に載せる**（Core の API 契約 5.3.1。アプリが実装する。Core#222 で確定）。
+   * ログイン画面のタブ（未認証の応答）と、マイアカウントの管理（認証済みの応答）の**両方の応答**に要る。
+   */
+  passkeyEnabled?: boolean;
+
   /** 合言葉ログインの入口を出すか（Issue #423）。 */
   passwordSignInEnabled?: boolean;
 
@@ -998,14 +1018,8 @@ export interface AdminSession {
    */
   apiTokensEnabled?: boolean;
 
-  /** SAML の釦に出す文字。`null` なら決まった文言を使う */
-  samlLabel?: string | null;
-
   /** Pleasanter のログインで入れるか（Issue #464）。**既定は無効** */
   pleasanterSsoEnabled?: boolean;
-
-  /** Pleasanter の釦に出す文字。`null` なら決まった文言を使う */
-  pleasanterSsoLabel?: string | null;
 
   /**
    * ブラウザで開く Pleasanter のログイン画面（Issue #464）。
@@ -1357,4 +1371,16 @@ export interface DeadLetterPage {
   entries: DeadLetterEntry[];
   /** 次のページがあるか。**総数は数えない。** */
   hasMore: boolean;
+}
+
+/** 自分のパスキー 1 件（Core の仕様書 3.10.6 の一覧。登録の完了の `passkey` も同じ形）。**公開鍵・資格情報 ID は返ってこない。** */
+export interface PasskeyRow {
+  id: string;
+  /** 本人が付けた名前 */
+  name: string;
+  createdAt: string;
+  lastUsedAt?: string | null;
+  /** 同期されているパスキーか（BS） */
+  backedUp?: boolean;
+  transports?: string[] | null;
 }

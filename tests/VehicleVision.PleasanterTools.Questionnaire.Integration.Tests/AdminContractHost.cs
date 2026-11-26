@@ -168,26 +168,31 @@ internal sealed class AdminContractHost : IAdminContractHost
             var parameters = Path.Combine(directory, "App_Data", "Parameters");
             Directory.CreateDirectory(parameters);
             // 環境変数より強い専用の設定ファイルで、開発者の DB・資格情報を使わせない。
-            File.WriteAllText(Path.Combine(parameters, "General.local.json"),
-                JsonSerializer.Serialize(new Dictionary<string, string?>(settings?.ToDictionary(
-                    pair => pair.Key, pair => (string?)pair.Value) ?? [])
-                {
-                    ["QUESTIONNAIRE_DB_PROVIDER"] = "Sqlite",
-                    ["QUESTIONNAIRE_DB_CONNECTIONSTRING"] = ConnectionString,
-                    ["QUESTIONNAIRE_DB_AUTO_MIGRATE"] = "false",
-                    ["QUESTIONNAIRE_DB_SKIP_MIGRATION_CHECK"] = "false",
-                    ["QUESTIONNAIRE_SECRET_KEY"] = SecretProtector.GenerateKey(),
-                    ["QUESTIONNAIRE_ADMIN_TWOFACTOR"] = "Optional",
-                    ["QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN"] = "true",
-                    ["QUESTIONNAIRE_LOGIN_PROOF_OF_WORK"] = "false",
-                    ["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"] = "1000",
-                    ["QUESTIONNAIRE_ADMIN_SESSION_STORE"] = "Database",
-                    ["QUESTIONNAIRE_SAML_ENABLED"] = "false",
-                    ["QUESTIONNAIRE_PLEASANTERSSO_ENABLED"] = "false",
-                    ["QUESTIONNAIRE_ASSET_PATH"] = Path.Combine(directory, "assets"),
-                    ["QUESTIONNAIRE_PLEASANTER_BASEURL"] = "https://localhost.invalid",
-                    ["QUESTIONNAIRE_PLEASANTER_APIKEY"] = "contract-test-not-a-real-key",
-                }));
+            var values = new Dictionary<string, string?>
+            {
+                ["QUESTIONNAIRE_DB_PROVIDER"] = "Sqlite",
+                ["QUESTIONNAIRE_DB_CONNECTIONSTRING"] = ConnectionString,
+                ["QUESTIONNAIRE_DB_AUTO_MIGRATE"] = "false",
+                ["QUESTIONNAIRE_DB_SKIP_MIGRATION_CHECK"] = "false",
+                ["QUESTIONNAIRE_SECRET_KEY"] = SecretProtector.GenerateKey(),
+                ["QUESTIONNAIRE_ADMIN_TWOFACTOR"] = "Optional",
+                ["QUESTIONNAIRE_ADMIN_PASSWORD_SIGNIN"] = "true",
+                ["QUESTIONNAIRE_LOGIN_PROOF_OF_WORK"] = "false",
+                ["QUESTIONNAIRE_LOGIN_ATTEMPTS_PER_5MIN"] = "1000",
+                ["QUESTIONNAIRE_ADMIN_SESSION_STORE"] = "Database",
+                ["QUESTIONNAIRE_SAML_ENABLED"] = "false",
+                ["QUESTIONNAIRE_PLEASANTERSSO_ENABLED"] = "false",
+                ["QUESTIONNAIRE_ASSET_PATH"] = Path.Combine(directory, "assets"),
+                ["QUESTIONNAIRE_PLEASANTER_BASEURL"] = "https://localhost.invalid",
+                ["QUESTIONNAIRE_PLEASANTER_APIKEY"] = "contract-test-not-a-real-key",
+            };
+            // 呼び出し側の指定が、上の既定より優先する（レート制限の上限などを試験ごとに変えるため）
+            foreach (var (key, value) in settings ?? new Dictionary<string, string>())
+            {
+                values[key] = value;
+            }
+
+            File.WriteAllText(Path.Combine(parameters, "General.local.json"), JsonSerializer.Serialize(values));
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)

@@ -3,10 +3,15 @@ import {
   canChangeRole,
   hasLoggedIn,
   canDisable,
+  canMarkPasswordless,
+  canMarkPasswordSet,
   canReissueInvitation,
+  canResetPasskeys,
   canResetTwoFactor,
   hasOtherUsableAdministrator,
   invitationUrl,
+  isPasswordless,
+  resetPasskeysFailureKey,
 } from './adminUsers';
 import type { AdminUserRow } from './types';
 
@@ -18,7 +23,10 @@ function row(overrides: Partial<AdminUserRow> = {}): AdminUserRow {
     role: overrides.role ?? 'Administrator',
     isDisabled: overrides.isDisabled ?? false,
     hasTotp: overrides.hasTotp ?? false,
+    // 件数は、権限がないとき・パスキーが無効のときは項目そのものが来ない
+    ...('passkeyCount' in overrides ? { passkeyCount: overrides.passkeyCount } : {}),
     invitationPending: overrides.invitationPending ?? false,
+    passwordSet: overrides.passwordSet ?? true,
     // ⚠️ **`??` を使わない。** `null` を渡したときに既定値へ落ちてしまう
     lastLoginAt: 'lastLoginAt' in overrides ? overrides.lastLoginAt! : '2026-09-01T00:00:00Z',
     createdAt: overrides.createdAt ?? '2026-08-01T00:00:00Z',
@@ -140,6 +148,39 @@ describe('2 要素の解除', () => {
   });
 });
 
+describe('パスキーの復旧（Issue #1087）', () => {
+  it('登録している他人には出す', () => {
+    expect(canResetPasskeys(row({ adminUserId: 'other', passkeyCount: 2 }), 'me')).toBe(true);
+  });
+
+  it('消すものが無い相手には出さない', () => {
+    expect(canResetPasskeys(row({ adminUserId: 'other', passkeyCount: 0 }), 'me')).toBe(false);
+  });
+
+  it('件数が来ない（権限がない・パスキーが無効）ときは出さない', () => {
+    expect(canResetPasskeys(row({ adminUserId: 'other' }), 'me')).toBe(false);
+  });
+
+  it('自分の分はここから消さない（Core が自分を拒む。自分の設定で 1 件ずつ消せる）', () => {
+    expect(canResetPasskeys(row({ adminUserId: 'me', passkeyCount: 3 }), 'me')).toBe(false);
+  });
+
+  it('失敗は code から文言の鍵にする', () => {
+    expect(resetPasskeysFailureKey(400, { code: 'users.selfNotAllowed' })).toBe(
+      'users.passkeys.error.self',
+    );
+    expect(resetPasskeysFailureKey(404, { code: 'users.notFound' })).toBe(
+      'users.passkeys.error.notFound',
+    );
+    expect(resetPasskeysFailureKey(403, { code: 'auth.forbidden' })).toBe(
+      'users.passkeys.error.forbidden',
+    );
+    // パスキーが無効の間は、経路そのものが本文なしの 404
+    expect(resetPasskeysFailureKey(404, undefined)).toBe('users.passkeys.error.disabled');
+    expect(resetPasskeysFailureKey(500, undefined)).toBe('users.failed');
+  });
+});
+
 describe('招待', () => {
   it('受け取っていない人だけ出し直せる', () => {
     expect(canReissueInvitation(row({ invitationPending: true }))).toBe(true);
@@ -157,5 +198,28 @@ describe('招待', () => {
     expect(invitationUrl('token', 'https://example.jp', '/back-office')).toBe(
       'https://example.jp/back-office/invitations/accept?token=token',
     );
+  });
+});
+
+describe('「パスワードなし（SSO のみ）」の印（Issue #1086）', () => {
+  const jit = row({ adminUserId: 'jit', passwordSet: false });
+
+  it('印が偽でも招待中の人は「パスワードなし」と見せない', () => {
+    expect(isPasswordless(jit)).toBe(true);
+    expect(isPasswordless(row({ passwordSet: false, invitationPending: true }))).toBe(false);
+    expect(isPasswordless(row())).toBe(false);
+  });
+
+  it('付けられるのは、パスワードありの人（自分にも出す。招待中には出さない）', () => {
+    expect(canMarkPasswordless(row())).toBe(true);
+    expect(canMarkPasswordless(me)).toBe(true);
+    expect(canMarkPasswordless(jit)).toBe(false);
+    expect(canMarkPasswordless(row({ invitationPending: true }))).toBe(false);
+  });
+
+  it('戻せるのは、パスワードなしの他人だけ（自分には出さない）', () => {
+    expect(canMarkPasswordSet(jit, 'me')).toBe(true);
+    expect(canMarkPasswordSet(row({ adminUserId: 'me', passwordSet: false }), 'me')).toBe(false);
+    expect(canMarkPasswordSet(row(), 'me')).toBe(false);
   });
 });

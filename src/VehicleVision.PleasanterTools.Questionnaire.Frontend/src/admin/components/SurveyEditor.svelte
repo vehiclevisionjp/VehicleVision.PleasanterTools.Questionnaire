@@ -181,7 +181,7 @@
   let hasUnpublishedChanges = $state(false);
   /**
    * 公開設定（Issue #580）。**定義ではなく運用の設定**なので、下書きの保存・未保存の判定
-   * （`hasUnsavedChanges`）とは切り離し、「公開」タブの保存釦で別に保存する。
+   * （`hasUnsavedChanges`）とは切り離し、「公開」タブの保存ボタンで別に保存する。
    * 既定値はサーバと同じ（上限なし・proof-of-work 有効・下書き無効・埋め込み無効）。
    */
   let publicId = $state('');
@@ -1472,7 +1472,7 @@
 
   {#if tab === 'extras'}
   <!-- **見た目は設問と同じく定義の一部**（Issue #56）。
-       保存も公開も、設問とまとめてこの画面の釦で行う -->
+       保存も公開も、設問とまとめてこの画面のボタンで行う -->
   <ThemeEditor
     {surveyId}
     theme={definition.theme}
@@ -1969,12 +1969,8 @@
     }
 
     select {
-      font: inherit;
-      padding: var(--space-1) 0.4rem;
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-sm);
-      background: var(--surface);
-      color: var(--text);
+      min-height: var(--control-h-sm);
+      padding: var(--space-1) var(--space-2);
     }
 
     .hint {
@@ -2051,13 +2047,6 @@
     display: block;
     width: 100%;
     margin-top: 0.2rem;
-    padding: 0.45rem var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    background: var(--surface);
-    color: var(--text);
-    box-sizing: border-box;
   }
 
   /*
@@ -2204,12 +2193,8 @@
     color: var(--muted);
 
     select {
-      font: inherit;
-      padding: 0.3rem 0.4rem;
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-sm);
-      background: var(--surface);
-      color: var(--text);
+      min-height: var(--control-h-sm);
+      padding: var(--space-1) var(--space-2);
     }
 
     .hint {

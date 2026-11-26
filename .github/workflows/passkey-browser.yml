@@ -1,0 +1,111 @@
+# パスキーのブラウザ試験（Issue #1085。親 Core#213）。
+#
+# **Playwright（Chromium）の CDP の仮想認証器で、管理画面のパスキーを画面から通す**
+# （tools/screenshots/specs/passkey.spec.ts）。登録・一覧・名前の変更・削除と、
+# パスキーでのログイン（ディスコバラブル資格情報。`loginMethod = Passkey`）。
+#
+# **e2e.yml へ足さず、別のワークフローにしてある。**
+# - e2e.yml は Pleasanter・SAML・メールまで起こす（丸ごとで 7〜8 分）。この試験は SQL Server と本アプリだけで足り、
+#   **Pleasanter を起こさない**ので軽い
+# - **e2e は必須チェックで、失敗すると develop への push で Issue を立てる**（notify-failure）。
+#   新しい試験の不安定さが既存の e2e・スクリーンショットの一式へ波及しないよう、**切り離す**
+# - **必須チェックにしない**（安定してから別に決める。Issue #1085）
+#
+# **対象は、パスキーを有効にした本アプリ**（compose.yaml の `DEV_ADMIN_PASSKEY*`）。
+# RP ID は `questionnaire-app`、Origin は `https://questionnaire-app:8443`（自己署名の https）。
+# 選んだ理由は tools/screenshots/README.md の「パスキーのブラウザ試験」。
+name: Passkey Browser Tests
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+      - master
+    # **振る舞いが変わり得るものだけ。** ドキュメントだけでは回さない
+    paths:
+      - "src/**"
+      - "tools/screenshots/**"
+      - "scripts/wait_sqlserver.py"
+      - "compose.yaml"
+      - "Dockerfile"
+      - "Directory.Build.props"
+      - "global.json"
+      - ".github/workflows/passkey-browser.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  passkey:
+    name: passkey-browser
+    runs-on: ubuntu-latest
+    # イメージ作成（本アプリと Playwright）が大半。e2e と同じ上限にはしない
+    timeout-minutes: 30
+    env:
+      # **パスキーを有効にする。** 既定は無効（compose.yaml）
+      DEV_ADMIN_PASSKEY: "true"
+      DEV_ADMIN_PASSKEY_RPID: questionnaire-app
+      DEV_ADMIN_PASSKEY_ORIGINS: https://questionnaire-app:8443
+      # **検証環境用の固定値。** 本番の資格情報ではない（e2e.yml と同じ。wait_sqlserver.py が読む）
+      TESTENV_SA_PASSWORD: Questionnaire#Test1
+
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: まっさらな検証環境にする
+        # 試験は最初の管理者を自分で作る。管理者が残っていると初期設定の画面が出ない
+        run: docker compose --profile sqlserver down -v --remove-orphans
+
+      - name: ブラウザ試験用のイメージを組み直す
+        # spec はイメージへ焼き込まれるため、毎回現在のソースから作る
+        run: docker compose --profile screenshots build screenshots
+
+      - name: SQL Server を先に起動して確かめる
+        run: |
+          set -euo pipefail
+          docker compose --profile sqlserver up -d db
+          python3 scripts/wait_sqlserver.py "$(docker compose ps -aq db)"
+
+      - name: 本アプリを起動する
+        # **Pleasanter は起こさない**（サービス名を指定すると、依存の db・migrate・devcert だけが起きる）
+        run: docker compose --profile sqlserver up -d --build --wait app
+
+      - name: パスキーのブラウザ試験を実行する
+        run: docker compose --profile sqlserver --profile screenshots run --rm screenshots npm run passkey
+
+      - name: SQL Server の診断を残す
+        if: failure()
+        run: |
+          id="$(docker compose ps -aq db)"
+          if [ -n "$id" ]; then
+              python3 scripts/wait_sqlserver.py "$id" --diagnose-only
+          fi
+
+      - name: 失敗したときは本アプリのログを残す
+        if: failure()
+        run: docker compose logs --no-color app | tail -n 100
+
+      - name: 失敗したときはスクリーンショットとトレースを残す
+        # **原因が追えること**が受け入れ条件。トレースは `npx playwright show-trace` か
+        # https://trace.playwright.dev で開ける。HTML の報告書も同じ場所に入る
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: パスキーのブラウザ試験の失敗の記録
+          path: tools/screenshots/report
+          if-no-files-found: warn
+
+      - name: 後片付け
+        if: always()
+        run: docker compose --profile '*' down -v --remove-orphans

@@ -86,7 +86,7 @@
    * 送信待ちへ戻す。
    *
    * **押した人の判断で 1 件ずつ戻す**（`_documents/画面設計.md` 2 章）。
-   * まとめて戻す釦は置かない。原因が直っていなければ、同じだけ失敗するだけになる。
+   * まとめて戻すボタンは置かない。原因が直っていなければ、同じだけ失敗するだけになる。
    */
   async function requeue(entry: DeadLetterEntry) {
     requeuing = entry.responseToken;

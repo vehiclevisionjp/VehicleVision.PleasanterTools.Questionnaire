@@ -4,7 +4,7 @@ import { READABILITY_COLORS } from './readability';
 import { CONTRAST_AA, DEFAULT_COLORS, contrastRatio } from './theme';
 
 /**
- * `styles/tokens.css`（DesignReference の明示型）を読み、TypeScript 側の写しと突き合わせる（Issue #776）。
+ * `styles/tokens.css`（DesignReference の明示型）を読み、TypeScript 側のコピーと突き合わせる（Issue #776）。
  * 値の出どころは 1 か所（tokens.css）。ここが食い違えば、DesignReference と画面の色がずれている。
  */
 const css = readFileSync(new URL('../styles/tokens.css', import.meta.url), 'utf-8');
@@ -65,8 +65,8 @@ const pairs: [string, string, string, number][] = [
   ['補助の文字/面', 'color-text-muted', 'color-surface', CONTRAST_AA],
   ['リンク/面', 'color-primary-text', 'color-surface', CONTRAST_AA],
   ['リンク/地', 'color-primary-text', 'color-bg', CONTRAST_AA],
-  ['主要釦の文字', 'color-on-fill', 'color-primary', CONTRAST_AA],
-  ['危険釦・バッジの文字', 'color-on-fill', 'color-danger', CONTRAST_AA],
+  ['主要ボタンの文字', 'color-on-fill', 'color-primary', CONTRAST_AA],
+  ['危険ボタン・バッジの文字', 'color-on-fill', 'color-danger', CONTRAST_AA],
   ['エラー文/面', 'color-danger-text', 'color-surface', CONTRAST_AA],
   ['エラー文/淡い面', 'color-danger-text', 'color-danger-subtle', CONTRAST_AA],
   ['成功/淡い面', 'color-success-text', 'color-success-subtle', CONTRAST_AA],
@@ -74,6 +74,10 @@ const pairs: [string, string, string, number][] = [
   ['本文/情報の淡い面', 'color-text', 'color-primary-subtle', CONTRAST_AA],
   ['入力欄の枠/面', 'color-border-strong', 'color-surface', 3],
   ['入力欄の枠/地', 'color-border-strong', 'color-bg', 3],
+  ['入力欄の枠（hover）/面', 'color-text-muted', 'color-surface', 3],
+  ['入力欄の枠（aria-invalid）/面', 'color-danger-text', 'color-surface', 3],
+  ['入力欄の枠（aria-invalid）/地', 'color-danger-text', 'color-bg', 3],
+  ['無効の入力欄の文字/無効の地', 'color-text-muted', 'color-bg', CONTRAST_AA],
   ['フォーカスリング/面', 'color-primary-text', 'color-surface', 3],
   ['フォーカスリング/地', 'color-primary-text', 'color-bg', 3],
   ['フォーカスリング/選択行', 'color-primary-text', 'color-primary-subtle', 3],
@@ -83,10 +87,10 @@ describe.each([
   ['ライト', light],
   ['ダーク', dark],
 ])('色の組み合わせ（%s）', (_name, scheme) => {
-  // ダークの主要釦は面と文字を入れ替える（base.css）。ダークでは 淡い鉄紺の面 + 鉄紺の文字
+  // ダークの主要ボタンは面と文字を入れ替える（base.css）。ダークでは 淡い鉄紺の面 + 鉄紺の文字
   const resolved = (key: string) => scheme[key]!;
   it.each(pairs)('%s', (_label, fg, bg, min) => {
-    // ダークの釦文字は color-on-fill ではなく color-primary（base.css の --accent-text）。別途検査する
+    // ダークのボタン文字は color-on-fill ではなく color-primary（base.css の --accent-text）。別途検査する
     const isFillPair = fg === 'color-on-fill' && bg === 'color-primary';
     const f = isFillPair && scheme === dark ? resolved('color-primary') : resolved(fg);
     const b = isFillPair && scheme === dark ? resolved('color-primary-text') : resolved(bg);

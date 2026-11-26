@@ -11,12 +11,12 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 
 /// <summary>
 /// 旧表（<c>AuditLogs</c> / <c>MailOutbox</c> / <c>AdminInvitations</c> / <c>AppSettings</c>）の行が、
-/// Core.Data の共有表（<c>Core_</c> 接頭辞）へ写り、旧表が消えることを 4 RDBMS で確かめる。
+/// Core.Data の共有表（<c>Core_</c> 接頭辞）へコピーされ、旧表が消えることを 4 RDBMS で確かめる。
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>旧スキーマの段階（M0037 まで）で行を入れてから、Core の共有表（M10001〜M10007）を作り、
-/// 最後に写す移行（M100000〜）まで上げる。</b> 稼働中のデータがある導入先が、更新で通る道そのもの。
+/// <b>旧スキーマの段階（M0037 まで）で行を入れてから、Core の共有表（M10001〜M10009）を作り、
+/// 最後にコピーする移行（M100000〜）まで上げる。</b> 稼働中のデータがある導入先が、更新で通る道そのもの。
 /// 各 RDBMS に<b>使い捨ての DB</b>を作って確かめる（ほかの試験が残した表・行の影響を受けない）。
 /// </para>
 /// <para>
@@ -31,7 +31,7 @@ public class CoreStoreMigrationTests
 {
     private const long LastLegacyVersion = 37;
 
-    private const long LastCoreVersion = 10007;
+    private const long LastCoreVersion = 10009;
 
     private static bool Enabled =>
         Environment.GetEnvironmentVariable("QUESTIONNAIRE_INTEGRATION") == "1";
@@ -42,7 +42,7 @@ public class CoreStoreMigrationTests
     [Fact]
     public void 写す移行はCoreの共有表の後に動く()
     {
-        // **Core の共有表が先にできていないと、写し先が無い。**
+        // **Core の共有表が先にできていないと、コピー先が無い。**
         var versions = typeof(QuestionnaireDatabase).Assembly.GetTypes()
             .Select(type => type.GetCustomAttributes(typeof(FluentMigrator.MigrationAttribute), false)
                 .Cast<FluentMigrator.MigrationAttribute>().SingleOrDefault())
@@ -75,7 +75,7 @@ public class CoreStoreMigrationTests
         MigrateTo(provider, database.ConnectionString, LastLegacyVersion);
         var legacy = await InsertLegacyRowsAsync(factory);
 
-        // Core の共有表を作る（旧表は残ったまま）。**写す前に、Core の表へ同じキーの行を入れておく**（冪等の確認）
+        // Core の共有表を作る（旧表は残ったまま）。**コピーする前に、Core の表へ同じキーの行を入れておく**（冪等の確認）
         MigrateTo(provider, database.ConnectionString, LastCoreVersion);
         await InsertAlreadyMigratedRowsAsync(factory, legacy);
 
@@ -93,12 +93,49 @@ public class CoreStoreMigrationTests
         await AssertAdminInvitationsAsync(factory, legacy);
         await AssertAppSettingsAsync(factory, legacy);
 
-        // **管理者の表も写して落とす**（M100004。詳しい確認は別の試験）
+        // **管理者の表もコピーして落とす**（M100004。詳しい確認は別の試験）
         Assert.False(await TableExistsAsync(factory, "AdminUsers"));
 
         // もう一度当てても何も起きない
         QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
         Assert.Equal(5, (await new AuditLogStore(factory).ListAsync(new AuditLogQuery())).Count);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task Coreのパスキーの共有移行が通り表と列ができる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+
+        // 0.2.0 までの Core の共有表（M10007）まで当ててから、アプリが起動時に通る道で全適用する（0.3.0 へ上げた更新の再現）
+        MigrateTo(provider, database.ConnectionString, 10007);
+        Assert.False(await TableExistsAsync(factory, "Core_AdminPasskeys"));
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+
+        Assert.False(QuestionnaireDatabase.Instance.Migrator.HasPendingMigrations(provider, database.ConnectionString));
+        Assert.True(await TableExistsAsync(factory, "Core_AdminPasskeys"));
+        Assert.True(await TableExistsAsync(factory, "Core_AdminPasskeyChallenges"));
+
+        await using var connection = factory.Create();
+        await connection.OpenAsync();
+
+        // M10009: Core_AdminSessions に NULL 可の Via 列。既存の行は NULL のまま
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
+            SqlDialect.Format(provider, "SELECT COUNT([Via]) FROM [Core_AdminSessions]")));
+
+        // 番号が Questionnaire の移行（M00xx・M100000〜）と衝突せず、10008・10009 が 1 本ずつ記録される
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>(
+            SqlDialect.Format(provider, "SELECT COUNT(*) FROM [VersionInfo] WHERE [Version] = 10008")));
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>(
+            SqlDialect.Format(provider, "SELECT COUNT(*) FROM [VersionInfo] WHERE [Version] = 10009")));
     }
 
     [Theory]
@@ -113,7 +150,7 @@ public class CoreStoreMigrationTests
         await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
         var factory = new DbConnectionFactory(provider, database.ConnectionString);
 
-        // 旧表を落としてから、写す移行を当てる（旧表が最初から無い導入先・移行をやり直した導入先）
+        // 旧表を落としてから、コピーする移行を当てる（旧表が最初から無い導入先・移行をやり直した導入先）
         MigrateTo(provider, database.ConnectionString, LastCoreVersion);
         await using (var connection = factory.Create())
         {
@@ -274,7 +311,7 @@ public class CoreStoreMigrationTests
         return legacy;
     }
 
-    /// <summary>写す前に、Core の表へ同じキーの行を入れておく。<b>写した後も、この行が残る</b>（上書きも重複もしない）。</summary>
+    /// <summary>コピーする前に、Core の表へ同じキーの行を入れておく。<b>コピーした後も、この行が残る</b>（上書きも重複もしない）。</summary>
     private static async Task InsertAlreadyMigratedRowsAsync(DbConnectionFactory factory, Legacy legacy)
     {
         var provider = factory.Provider;
@@ -307,7 +344,7 @@ public class CoreStoreMigrationTests
             new { Key = "TEST_CONFLICT", Value = "Core の値", legacy.Now });
     }
 
-    // ---- 写った後の確認（Core のストアで読む。Core の読み方と整合していること） ----------
+    // ---- コピーされた後の確認（Core のストアで読む。Core の読み方と整合していること） ----------
 
     private static async Task AssertAuditLogsAsync(DbConnectionFactory factory, Legacy legacy)
     {
@@ -354,7 +391,7 @@ public class CoreStoreMigrationTests
         var failed = await new AuditLogStore(factory).ListAsync(new AuditLogQuery { FailedOnly = true });
         Assert.Equal(["POST /b", "POST /c"], failed.Select(entry => entry.Action).Order().ToArray());
 
-        // 管理者での絞り込み（ActorKey）が、写した行に効く（POST /a は Core に先にあった行で、管理者を持たない）
+        // 管理者での絞り込み（ActorKey）が、コピーした行に効く（POST /a は Core に先にあった行で、管理者を持たない）
         var byAdmin = await new AuditLogStore(factory).ListAsync(
             new AuditLogQuery { ActorKey = legacy.AdminUserId.ToString("D") });
         Assert.Equal(["POST /b", "POST /d"], byAdmin.Select(entry => entry.Action).Order().ToArray());
@@ -414,7 +451,7 @@ public class CoreStoreMigrationTests
         Assert.Equal(9, alreadyInCore.Kind);
         Assert.Null(alreadyInCore.SubjectId);
 
-        // Core のストアが、写した行を数えられる（死んだ手紙 1 通、待ち 2 通）
+        // Core のストアが、コピーした行を数えられる（死んだ手紙 1 通、待ち 2 通）
         var status = await new MailOutbox(factory, TimeProvider.System).GetStatusAsync();
         Assert.Equal(2, status.PendingCount);
         Assert.Equal(1, status.DeadLetterCount);
@@ -433,7 +470,7 @@ public class CoreStoreMigrationTests
         Assert.Equal(legacy.Now.AddHours(-2), unused.CreatedAt!.Value.UtcDateTime);
         Assert.Equal(legacy.AdminUserId, unused.CreatedBy);
 
-        // 使用済みの行も写る（使われた事実として残す）。大文字小文字を含むハッシュもそのまま引ける
+        // 使用済みの行もコピーされる（使われた事実として残す）。大文字小文字を含むハッシュもそのまま引ける
         var used = await store.FindByTokenHashAsync(TokenHashB);
         Assert.NotNull(used);
         Assert.Equal(legacy.Now.AddMinutes(-3), used.UsedAt!.Value.UtcDateTime);
@@ -444,10 +481,10 @@ public class CoreStoreMigrationTests
         Assert.NotNull(existing);
         Assert.Equal(legacy.InvitationIds[2], existing.InvitationId);
 
-        // 招待中（未使用で期限内）の管理者。写した未使用の行と、Core に先にあった行（期限が今）
+        // 招待中（未使用で期限内）の管理者。コピーした未使用の行と、Core に先にあった行（期限が今）
         Assert.Equal([legacy.AdminUserId], await store.ListPendingAdminUserIdsAsync());
 
-        // 写した招待は使い切れる（同時に 2 回は通らない）
+        // コピーした招待は使い切れる（同時に 2 回は通らない）
         Assert.True(await store.TryConsumeAsync(unused.InvitationId));
         Assert.False(await store.TryConsumeAsync(unused.InvitationId));
     }
@@ -580,7 +617,7 @@ public class CoreStoreMigrationTests
                 new { Id = Guid.NewGuid(), User = AdminA, Hash = RecoveryHash(code), UsedAt = usedAt, Now = now });
         }
 
-        // 旧セッション（写さずに落とす）
+        // 旧セッション（コピーせずに落とす）
         foreach (var user in new[] { AdminA, AdminC })
         {
             await Run(
@@ -647,10 +684,10 @@ public class CoreStoreMigrationTests
         // パスワードのハッシュは、そのまま照合できる
         Assert.True(Hasher.Verify("pw-A", found.Value.PasswordHash).Verified);
 
-        // **旧の暗号文（文脈なし）が、新しい文脈の窓口でそのまま読める。** 共有鍵は復号しないで写している
+        // **旧の暗号文（文脈なし）が、新しい文脈の窓口でそのまま読める。** 共有鍵は復号しないでコピーしている
         Assert.Equal(TotpSecret, await store.GetTotpSecretAsync(AdminA));
 
-        // 時間枠も写っている（同じ枠は通らない）
+        // 時間枠もコピーされている（同じ枠は通らない）
         Assert.False(await store.TryUseTotpStepAsync(AdminA, 12345));
         Assert.True(await store.TryUseTotpStepAsync(AdminA, 12346));
 
@@ -670,10 +707,18 @@ public class CoreStoreMigrationTests
         Assert.True(await settings.GetResponseNotificationEnabledAsync(AdminA));
         Assert.False(await settings.GetResponseNotificationEnabledAsync(AdminB));
 
+        // **パスワード設定済みの印は、既存の管理者が全員「設定済み」**（M0044。誰も締め出さない）
+        foreach (var id in new[] { AdminA, AdminB, AdminC, AdminD })
+        {
+            Assert.True(await settings.GetPasswordSetAsync(id));
+        }
+
+        Assert.Empty(await settings.ListSsoOnlyAdminUserIdsAsync());
+
         // **初期設定の印が立つ。** 最初の管理者は、もう作れない
         Assert.Null(await store.CreateFirstAsync("attacker", "hash", string.Empty));
 
-        // **旧セッションは写さない。** 全員が再ログインになる
+        // **旧セッションはコピーしない。** 全員が再ログインになる
         var sessions = new AdminSessionStore(factory, time);
         Assert.Empty(await sessions.ListForUserAsync(AdminA));
         Assert.Empty(await sessions.ListForUserAsync(AdminC));
@@ -681,6 +726,48 @@ public class CoreStoreMigrationTests
         // もう一度当てても何も起きない
         QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
         Assert.Equal(4, (await store.ListAsync()).Count);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 設定の行がある導入先へ印の列を足すと全員が設定済みになる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+
+        // M0043 まで（印の列の前）。回答通知を受け取る管理者の行が、すでにある導入先
+        MigrateTo(provider, database.ConnectionString, 43);
+        var enabled = Guid.NewGuid();
+        await using (var connection = factory.Create())
+        {
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                SqlDialect.Format(
+                    provider,
+                    "INSERT INTO [AdminUserSettings] ([AdminUserId], [ResponseNotificationEnabled]) VALUES (@Id, @On)"),
+                new { Id = enabled, On = true });
+        }
+
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+        Assert.False(QuestionnaireDatabase.Instance.Migrator.HasPendingMigrations(provider, database.ConnectionString));
+
+        await using var check = factory.Create();
+        await check.OpenAsync();
+
+        // 既存の行は「設定済み」、回答通知の値はそのまま
+        Assert.Equal(1, await check.ExecuteScalarAsync<int>(SqlDialect.Format(
+            provider,
+            "SELECT COUNT(*) FROM [AdminUserSettings] WHERE [PasswordSet] = @Set AND [ResponseNotificationEnabled] = @On"),
+            new { Set = true, On = true }));
+        Assert.Equal(0, await check.ExecuteScalarAsync<int>(SqlDialect.Format(
+            provider, "SELECT COUNT(*) FROM [AdminUserSettings] WHERE [PasswordSet] = @Set"), new { Set = false }));
     }
 
     [Theory]
@@ -805,7 +892,7 @@ public class CoreStoreMigrationTests
         Assert.Contains("ADMIN@example.test", message, StringComparison.Ordinal);
         Assert.Contains(AdminE.ToString(), message, StringComparison.OrdinalIgnoreCase);
 
-        // **旧表は落ちず、Core にも何も写っていない**
+        // **旧表は落ちず、Core にも何もコピーされていない**
         Assert.True(await TableExistsAsync(factory, "AdminUsers"));
         Assert.True(await TableExistsAsync(factory, "AdminSessions"));
         await using var check = factory.Create();

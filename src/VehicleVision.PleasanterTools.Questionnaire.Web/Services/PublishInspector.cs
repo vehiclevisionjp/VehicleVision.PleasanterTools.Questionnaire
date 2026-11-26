@@ -24,7 +24,7 @@ public sealed record PublishInspection(
     ImmutableArray<LookupProblem> LookupStructure,
     bool NoAnswerableQuestion)
 {
-    /// <summary>公開・取り込みを止める不備が 1 つでもあるか。</summary>
+    /// <summary>公開・インポートを止める不備が 1 つでもあるか。</summary>
     public bool HasBlocking =>
         MappingProblems.Any(problem => problem.IsBlocking)
         || !Flow.IsEmpty
@@ -40,12 +40,12 @@ public sealed record PublishInspection(
 /// </summary>
 /// <remarks>
 /// <para>
-/// **テスト公開と取り込みが同じ検査を通る。** 取り込みの側に写しを持つと、
-/// 検査を足したときに片方だけ漏れ、**取り込めたのに公開できない**定義が出る。
+/// **テスト公開とインポートが同じ検査を通る。** インポートの側にコピーを持つと、
+/// 検査を足したときに片方だけ漏れ、**インポートできたのに公開できない**定義が出る。
 /// </para>
 /// <para>
 /// 外部（Pleasanter・資格情報の保管）を呼ぶ検査は含めない
-/// （<see cref="LookupPublishValidator"/>）。取り込みでは資格情報を運ばないので、
+/// （<see cref="LookupPublishValidator"/>）。インポートでは資格情報を運ばないので、
 /// その検査は公開のときに行う。
 /// </para>
 /// </remarks>

@@ -20,6 +20,7 @@
   } from '../lib/api';
   import AdminSessionList from './AdminSessionList.svelte';
   import ApiTokenPanel from './ApiTokenPanel.svelte';
+  import PasskeyPanel from './PasskeyPanel.svelte';
   import { twoFactorPolicyLabel } from '../lib/adminUsers';
   import { activeTokenCount, shouldOfferTokenRevoke } from '../lib/apiTokens';
   import { confirmActionWithChoice } from '../lib/confirmation.svelte';
@@ -367,6 +368,11 @@
     {/if}
   </div>
 
+  <!-- ---- パスキー（Issue #1068）。サーバが使えると返したときだけ出す -->
+  {#if session.passkeyEnabled === true}
+    <PasskeyPanel />
+  {/if}
+
   <!-- ---- API キー（個人トークン。Issue #1025）----------------------------- -->
   <ApiTokenPanel overview={apiTokens} onchanged={loadApiTokens} />
 
@@ -429,11 +435,6 @@
     display: block;
     width: 100%;
     margin-top: var(--space-1);
-    padding: var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    box-sizing: border-box;
   }
 
   .check {
@@ -479,7 +480,7 @@
     padding: 0.4rem 0.6rem;
     background: var(--disabled-surface);
     border-radius: var(--radius-sm);
-    /* **写し間違いを減らす。** 桁が揃う書体で出す */
+    /* **コピー間違いを減らす。** 桁が揃う書体で出す */
     font-family: var(--font-mono, monospace);
     letter-spacing: 0.08em;
     word-break: break-all;

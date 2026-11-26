@@ -39,7 +39,7 @@ public enum FlowProblemCode
     /// <summary>任意リンクの識別子が同じページで重複している。</summary>
     DuplicateButtonId,
 
-    /// <summary>同じ条件で全釦が隠れ、操作できなくなる回答がある。</summary>
+    /// <summary>同じ条件で全ボタンが隠れ、操作できなくなる回答がある。</summary>
     AllButtonsMayBeHidden,
 }
 

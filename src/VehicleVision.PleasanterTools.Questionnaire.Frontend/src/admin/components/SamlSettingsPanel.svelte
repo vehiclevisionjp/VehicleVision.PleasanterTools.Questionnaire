@@ -246,12 +246,6 @@
       </div>
 
       <label>
-        {t('saml.buttonLabel')}
-        {#if fixed('buttonLabel')}<span class="fixed">{t('saml.fixed')}</span>{/if}
-        <input type="text" bind:value={settings.buttonLabel} disabled={fixed('buttonLabel')} />
-      </label>
-
-      <label>
         {t('saml.singleLogoutUrl')}
         {#if fixed('singleLogoutUrl')}<span class="fixed">{t('saml.fixed')}</span>{/if}
         <input
@@ -375,21 +369,10 @@
   input:not([type='checkbox']),
   select,
   textarea {
-    box-sizing: border-box;
     width: 100%;
-    padding: 0.55rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-    font: inherit;
   }
   textarea {
     font-family: var(--font-mono);
-  }
-  input:disabled,
-  select:disabled,
-  textarea:disabled {
-    background: var(--disabled-surface);
-    color: var(--disabled-text);
   }
   .row {
     display: grid;

@@ -59,7 +59,6 @@ public sealed class PleasanterSsoOptionsProvider(
         (PleasanterSsoOptions.RegisterRoleKey, values => values.RegisterRole),
         (PleasanterSsoOptions.RevalidateMinutesKey, values => values.RevalidateMinutes),
         (PleasanterSsoOptions.TimeoutSecondsKey, values => values.TimeoutSeconds),
-        (PleasanterSsoOptions.ButtonLabelKey, values => values.ButtonLabel),
     ];
 
     private CacheEntry? cache;
@@ -147,8 +146,6 @@ public sealed class PleasanterSsoOptionsProvider(
                 PleasanterSsoOptions.RevalidateMinutesKey, requested.RevalidateMinutes, current.RevalidateMinutes),
             TimeoutSeconds = Mutable(
                 PleasanterSsoOptions.TimeoutSecondsKey, requested.TimeoutSeconds, current.TimeoutSeconds),
-            ButtonLabel = Mutable(
-                PleasanterSsoOptions.ButtonLabelKey, requested.ButtonLabel, current.ButtonLabel),
         };
 
     private PleasanterSsoOptionsSnapshot Resolve(
@@ -185,14 +182,18 @@ public sealed class PleasanterSsoOptionsProvider(
             TimeoutSeconds = OrDefault(
                 ValueOf(PleasanterSsoOptions.TimeoutSecondsKey),
                 PleasanterSsoOptions.DefaultTimeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            ButtonLabel = ValueOf(PleasanterSsoOptions.ButtonLabelKey) ?? string.Empty,
         };
 
         return new PleasanterSsoOptionsSnapshot(
-            PleasanterSsoOptions.FromValues(key => Fields.First(field => field.Key == key).Read(effective)),
+            PleasanterSsoOptions.FromValues(ReadEffective(effective)),
             effective,
             fixedKeys);
     }
+
+    /// <summary>Core.Web へ値を渡す。**Fields に無い名前（廃止した名前）は未指定として返す。**</summary>
+    /// <remarks>Core.Web はログインボタンの表示名も読みに来るが、固定の文言にしたため（Issue #1079）渡さない。</remarks>
+    private static Func<string, string?> ReadEffective(PleasanterSsoSettingValues effective) =>
+        key => Fields.FirstOrDefault(field => field.Key == key).Read?.Invoke(effective);
 
     private string? Mutable(string key, string? requested, string? current) =>
         configuration[key] is null ? requested?.Trim() : current;

@@ -1051,19 +1051,6 @@
     flex: 1 1 14rem;
     min-width: 0;
     max-width: 100%;
-    background: var(--surface);
-    color: var(--text);
-  }
-
-  input[type='text'],
-  input[type='number'],
-  textarea,
-  select {
-    padding: 0.4rem var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    box-sizing: border-box;
   }
 
   .description {

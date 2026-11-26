@@ -43,7 +43,7 @@ export const POLL_TIMEOUT_MS = 5 * 60 * 1000;
  *
  * **ログアウトした直後に、ログイン画面が自動で入り直さないためのもの。**
  * Pleasanter のログインは残っているので、印が無いと本アプリのログアウトが効かないように見える。
- * **釦を押したら外す。** タブをまたいで効くよう localStorage に置く。
+ * **ボタンを押したら外す。** タブをまたいで効くよう localStorage に置く。
  */
 export const SUPPRESS_AUTO_KEY = 'questionnaire.admin.pleasanterSso.suppressAuto';
 

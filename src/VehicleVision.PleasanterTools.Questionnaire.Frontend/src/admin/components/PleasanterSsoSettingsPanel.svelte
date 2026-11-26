@@ -221,12 +221,6 @@
         </label>
       </div>
 
-      <label>
-        {t('pleasanterSso.buttonLabel')}
-        {#if fixed('buttonLabel')}<span class="fixed">{t('pleasanterSso.fixed')}</span>{/if}
-        <input type="text" bind:value={settings.buttonLabel} disabled={fixed('buttonLabel')} />
-      </label>
-
       {#if error}<p class="error" role="alert">{error}</p>{/if}
       {#if done}<p class="done" role="status">{done}</p>{/if}
       <button type="submit" disabled={busy}>
@@ -297,17 +291,7 @@
   }
   input:not([type='checkbox']),
   select {
-    box-sizing: border-box;
     width: 100%;
-    padding: 0.55rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-    font: inherit;
-  }
-  input:disabled,
-  select:disabled {
-    background: var(--disabled-surface);
-    color: var(--disabled-text);
   }
   .row {
     display: grid;

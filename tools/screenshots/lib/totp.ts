@@ -35,7 +35,7 @@ function decodeBase32(input: string): Buffer {
 /**
  * 認証アプリが出す 6 桁のコードを作る（RFC 6238 / SHA-1 / 30 秒）。
  *
- * **本体では Otp.NET に任せている。** ここは写しを撮るためだけの実装で、
+ * **本体では Otp.NET に任せている。** ここはスクリーンショットを撮るためだけの実装で、
  * 製品のコードではない。
  */
 export function totp(secretBase32: string, at: Date = new Date()): string {

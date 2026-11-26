@@ -12,6 +12,8 @@ export interface ConfirmationOptions {
   message: string;
   confirmLabel: string;
   danger?: boolean;
+  /** 初期の focus をキャンセルへ置く（取り返しのつかない削除。DesignReference の確認 dialog の契約）。 */
+  focusCancel?: boolean;
   checkbox?: ConfirmationCheckbox;
 }
 

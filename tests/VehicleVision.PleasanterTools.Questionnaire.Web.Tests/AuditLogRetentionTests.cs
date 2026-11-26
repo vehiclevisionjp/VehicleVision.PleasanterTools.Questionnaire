@@ -240,6 +240,44 @@ public class AuditLogRetentionTests
         Assert.NotEmpty(store.Thresholds);
     }
 
+    private sealed class FakePasskeyChallengeStore : IAdminPasskeyChallengeStore
+    {
+        public int Sweeps;
+
+        public Task StoreAsync(
+            byte[] challenge, string purpose, Guid? userId, TimeSpan lifetime, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<bool> ConsumeAsync(
+            byte[] challenge, string purpose, Guid? userId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<int> DeleteExpiredAsync(CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref Sweeps);
+            return Task.FromResult(1);
+        }
+    }
+
+    [Fact]
+    public async Task 期限切れのパスキーのチャレンジを同じ周期で消す()
+    {
+        // 監査ログを消さない設定でも、チャレンジの掃除のために常駐する（Issue #1082）
+        var options = new AuditLogRetentionOptions { RetentionDays = 0, SweepInterval = TimeSpan.FromHours(6) };
+        var challenges = new FakePasskeyChallengeStore();
+        var time = new FakeTimeProvider(DateTimeOffset.Parse(
+            "2026-11-25T09:00:00+09:00", System.Globalization.CultureInfo.InvariantCulture));
+        var service = new AuditLogRetentionService(
+            new FakeStore(), options, NullLogger<AuditLogRetentionService>.Instance, time, passkeyChallenges: challenges);
+
+        await service.StartAsync(CancellationToken.None);
+        Assert.Equal(0, Volatile.Read(ref challenges.Sweeps));
+        await AdvanceUntilAsync(time, options.SweepInterval, () => Volatile.Read(ref challenges.Sweeps) > 0);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.True(Volatile.Read(ref challenges.Sweeps) > 0);
+    }
+
     /// <summary>条件が満たされるまで、時計を進めながら待つ。</summary>
     /// <remarks>
     /// <para>

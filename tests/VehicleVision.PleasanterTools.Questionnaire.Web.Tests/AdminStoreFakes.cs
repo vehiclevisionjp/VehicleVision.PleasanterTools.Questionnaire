@@ -49,6 +49,9 @@ internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUser
 
         public bool ResponseNotificationEnabled { get; set; }
 
+        /// <summary>パスワード設定済みの印。既定は「設定済み」（M0044 の列の既定と同じ）。</summary>
+        public bool PasswordSet { get; set; } = true;
+
         public List<(string Hash, bool Used)> Codes { get; } = [];
 
         public AdminUser ToUser() => new(
@@ -254,6 +257,18 @@ internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUser
                 .Select(user => new ResponseNotificationRecipient(
                     user.Id, user.LoginId, string.IsNullOrEmpty(user.Language) ? null : user.Language))
                 .ToList());
+
+    public Task<bool> GetPasswordSetAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(!users.TryGetValue(adminUserId, out var entry) || entry.PasswordSet);
+
+    public Task SetPasswordSetAsync(Guid adminUserId, bool passwordSet, CancellationToken cancellationToken = default)
+    {
+        users[adminUserId].PasswordSet = passwordSet;
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlySet<Guid>> ListSsoOnlyAdminUserIdsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlySet<Guid>>(users.Values.Where(user => !user.PasswordSet).Select(user => user.Id).ToHashSet());
 
     public Task SetLanguageAsync(Guid adminUserId, string? language, CancellationToken cancellationToken = default)
     {

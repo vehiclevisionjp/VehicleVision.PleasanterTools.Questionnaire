@@ -64,6 +64,7 @@ public class AdminUserManagementTests
 
         var service = new AdminUserService(
             users,
+            new AdminUserSettingsStore(factory, users),
             sessions,
             invitations,
             new AdminApiTokenStore(factory),

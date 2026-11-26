@@ -20,8 +20,6 @@
   "SamlLoginIdSource": null,
   "//SamlLoginIdClaim": "QUESTIONNAIRE_SAML_LOGINIDCLAIM と同じ。",
   "SamlLoginIdClaim": null,
-  "//SamlButtonLabel": "QUESTIONNAIRE_SAML_BUTTONLABEL と同じ。",
-  "SamlButtonLabel": null,
   "//PleasanterSsoEnabled": "QUESTIONNAIRE_PLEASANTERSSO_ENABLED と同じ。",
   "PleasanterSsoEnabled": null,
   "//PleasanterSsoInternalBaseUrl": "QUESTIONNAIRE_PLEASANTERSSO_INTERNALBASEURL と同じ。",
@@ -43,7 +41,5 @@
   "//PleasanterSsoRevalidateMinutes": "QUESTIONNAIRE_PLEASANTERSSO_REVALIDATEMINUTES と同じ。",
   "PleasanterSsoRevalidateMinutes": null,
   "//PleasanterSsoTimeoutSeconds": "QUESTIONNAIRE_PLEASANTERSSO_TIMEOUTSECONDS と同じ。",
-  "PleasanterSsoTimeoutSeconds": null,
-  "//PleasanterSsoButtonLabel": "QUESTIONNAIRE_PLEASANTERSSO_BUTTONLABEL と同じ。",
-  "PleasanterSsoButtonLabel": null
+  "PleasanterSsoTimeoutSeconds": null
 }

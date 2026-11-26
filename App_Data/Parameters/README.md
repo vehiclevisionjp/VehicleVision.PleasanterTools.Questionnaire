@@ -52,7 +52,7 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 
 **`Pleasanter.json` と `Service.json` は、キーの名前が環境変数と違う**
 （Pleasanter 本体に合わせた短い名前を使っているため）。
-**読み込み時に下表のとおり写している**ので、どちらで書いても効く。
+**読み込み時に下表のとおりコピーしている**ので、どちらで書いても効く。
 
 | ファイルのキー | 環境変数 |
 | --- | --- |
@@ -69,7 +69,7 @@ DB・Pleasanter・管理者の認証・アクセス解析のすべてがこれ�
 追加した短いキーの対応は[設定ファイル対応一覧](../../_documents/設定ファイル対応一覧.md)を参照してください。
 
 > ⚠️ **値が `null` や空のキーは無視する。** `Pleasanter.json` の `ApiKey` は既定で `null`
-> （ここへ書かせないため）なので、写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
+> （ここへ書かせないため）なので、コピーすると**環境変数で与えた API キーを空で塗り潰してしまう。**
 
 ## 環境変数
 
@@ -138,6 +138,9 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 | `QUESTIONNAIRE_OPENAPI_ENABLED` | `true` で `/openapi/v1.json` を公開する。**既定は `false`** |
 | `QUESTIONNAIRE_OPENAPI_NETWORKS` | OpenAPI 文書を許す送信元 CIDR。複数はカンマ区切り。`inherit` なら `QUESTIONNAIRE_HEALTH_NETWORKS` を引き継ぐ。**未設定なら制限しない** |
 | `QUESTIONNAIRE_ADMIN_TWOFACTOR` | 管理者の 2 要素認証。`required` / `optional`（既定） / `disabled`。**知らない値は起動時に落ちる。** ⚠️ `disabled` にしても、登録済みの管理者からは 2 要素を外さない |
+| `QUESTIONNAIRE_ADMIN_PASSKEY` | 管理画面のパスキー（WebAuthn）を使うか。`true` / `false`（既定）。**真偽値の書き間違いは起動時に落ちる。** パラメータファイルの別名は無く、環境変数で指定する |
+| `QUESTIONNAIRE_ADMIN_PASSKEY_RPID` | パスキーの RP ID（ホスト名だけ）。**`QUESTIONNAIRE_ADMIN_PASSKEY=true` のとき必須。** 未設定・空なら起動を止める。⚠️ 変えると登録済みのパスキーはすべて使えなくなる |
+| `QUESTIONNAIRE_ADMIN_PASSKEY_ORIGINS` | パスキーを許す Origin（`https://ホスト名[:ポート]`。複数はカンマ区切り）。**`true` のとき必須。** 手順は `_documents/パスキー-運用手順書.md` |
 | `PasswordMinimumLength` | パスワードの最低の長さ（既定 12）。`Security.json` にも書ける（Issue #157） |
 | `PasswordAllowSameAsLoginId` | ログイン ID と同じパスワードを許すか（既定 `false`）。同上 |
 | `AnalyticsProvider` | アクセス解析のサービス。`None`（既定）/ `Ga4` / `Gtm` / `Matomo` / `Plausible`。`Analytics.json` にも書ける |
@@ -157,7 +160,6 @@ v0.7.0 で足したサブパス配置（`QUESTIONNAIRE_PATH_BASE`）と Pleasant
 | `QUESTIONNAIRE_PLEASANTERSSO_REGISTERROLE` | Pleasanter SSO の JIT 役割。許可値・既定値は SAML と同じ |
 | `QUESTIONNAIRE_SAML_LOGINIDSOURCE` | ログイン ID の取り出し先。`NameId`（既定）/ `Claim` |
 | `QUESTIONNAIRE_SAML_LOGINIDCLAIM` | `LOGINIDSOURCE=Claim` のときに読む属性名 |
-| `QUESTIONNAIRE_SAML_BUTTONLABEL` | ログイン画面の釦に出す文字（省略時は「シングルサインオンでログイン」） |
 | `QUESTIONNAIRE_BOT_MITIGATION` | `off` で bot 対策を切る。**検証環境のためだけ。本番で切らないこと** |
 | `QUESTIONNAIRE_SUBMIT_MIN_SECONDS` | 送信チケットの発行から送信までの最短時間（秒・既定 3） |
 | `QUESTIONNAIRE_SUBMIT_TICKET_HOURS` | 送信チケットの有効期間（時間・既定 24） |

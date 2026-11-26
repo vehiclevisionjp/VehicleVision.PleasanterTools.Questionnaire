@@ -49,7 +49,7 @@ public sealed class M0009_SurveyTheme : Migration
             // 管理画面に出す用。**配信の判断には使わない**
             .WithColumn("FileName").AsString(256).NotNullable()
             .WithColumn("ByteSize").AsInt64().NotNullable()
-            // **Base64。** 3 者で実測済みの長い文字列の型へ写る
+            // **Base64。** 3 者で実測済みの長い文字列の型へ対応する
             .WithColumn("ContentBase64").AsString(int.MaxValue).NotNullable()
             .WithColumn("CreatedAt").AsDateTime2().NotNullable();
 

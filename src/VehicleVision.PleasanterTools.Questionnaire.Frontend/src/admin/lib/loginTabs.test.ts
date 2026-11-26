@@ -19,6 +19,18 @@ describe('availableMethods', () => {
     expect(availableMethods({ ssoAvailable: true, passwordAvailable: true })).toEqual(['sso', 'local']);
   });
 
+  it('パスキーはサーバが使えると返したときだけ、最後に並べる', () => {
+    expect(
+      availableMethods({ ssoAvailable: true, passwordAvailable: true, passkeyAvailable: true }),
+    ).toEqual(['sso', 'local', 'passkey']);
+    expect(
+      availableMethods({ ssoAvailable: false, passwordAvailable: true, passkeyAvailable: true }),
+    ).toEqual(['local', 'passkey']);
+    expect(
+      availableMethods({ ssoAvailable: false, passwordAvailable: true, passkeyAvailable: false }),
+    ).toEqual(['local']);
+  });
+
   it('使えない方式は並べない', () => {
     expect(availableMethods({ ssoAvailable: true, passwordAvailable: false })).toEqual(['sso']);
     expect(availableMethods({ ssoAvailable: false, passwordAvailable: true })).toEqual(['local']);

@@ -4,7 +4,7 @@ import { readEnrollmentSecret, totp } from '../lib/totp';
 
 /**
  * 所属制限を実際の Pleasanter とアプリで確かめる（Issue #505）。
- * 専用の空 DB と 03_sso_users.sql の投入が必要。通常の写しの一式とは別に実行する。
+ * 専用の空 DB と 03_sso_users.sql の投入が必要。通常のスクリーンショットの一式とは別に実行する。
  * SSO_MEMBERSHIP_E2E=1、QUESTIONNAIRE_BASE_URL、SSO_MEMBERSHIP_PLEASANTER_URL、
  * SSO_MEMBERSHIP_API_KEY（検証環境のキー）を指定する。
  */

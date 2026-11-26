@@ -810,11 +810,6 @@
     display: block;
     width: 100%;
     margin-block-start: var(--space-1);
-    padding: 0.4rem var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    box-sizing: border-box;
   }
 
   .grid {

@@ -656,16 +656,6 @@
   textarea,
   select {
     width: 100%;
-    padding: var(--space-2);
-    /* **部品の枠は --border-strong**（面に対し 3:1 以上。DesignReference） */
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-    font: inherit;
-    box-sizing: border-box;
-    /* **入力欄の地と文字もテーマに追随させる**（Issue #109）。
-       ブラウザ既定の白のままだと、地の色を濃くしたときに入力欄だけが浮く */
-    background: var(--surface);
-    color: var(--text);
   }
 
   .other {
@@ -777,7 +767,7 @@
 
   .rank-item {
     display: flex;
-    /* **狭い幅では ↑↓ の釦を次の行へ回す**（Issue #901）。選択肢名の列が 1 文字幅まで潰れるのを防ぐ */
+    /* **狭い幅では ↑↓ のボタンを次の行へ回す**（Issue #901）。選択肢名の列が 1 文字幅まで潰れるのを防ぐ */
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);

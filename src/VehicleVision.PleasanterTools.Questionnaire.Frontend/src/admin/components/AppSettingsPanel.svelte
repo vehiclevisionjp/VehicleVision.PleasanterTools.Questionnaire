@@ -335,17 +335,7 @@
   input[type='password'],
   select,
   textarea {
-    box-sizing: border-box;
     width: 100%;
-    padding: 0.55rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-    font: inherit;
-  }
-  input:disabled,
-  textarea:disabled {
-    background: var(--disabled-surface);
-    color: var(--disabled-text);
   }
   .fixed {
     margin-left: var(--space-2);

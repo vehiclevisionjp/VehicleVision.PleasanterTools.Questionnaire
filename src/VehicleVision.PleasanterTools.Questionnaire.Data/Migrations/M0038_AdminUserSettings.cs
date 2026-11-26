@@ -14,7 +14,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Data.Migrations;
 /// 管理者を消す操作は無い（止めるだけ）ので、孤児は出ない。
 /// </para>
 /// <para>
-/// 旧の値を写すのは M100004（旧 <c>AdminUsers</c> を落とす移行）。
+/// 旧の値をコピーするのは M100004（旧 <c>AdminUsers</c> を落とす移行）。
 /// </para>
 /// </remarks>
 [Migration(38, "管理者ごとのアンケート固有の設定の表を追加する")]

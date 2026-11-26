@@ -5,9 +5,9 @@ import type { AnswerState, Choice, Page, Question, SurveyDefinition } from './ty
 /**
  * 分岐の経路探索の試験（Issue #110）。
  *
- * **ここはサーバ側（`Core/Flow/SurveyFlow.cs`）の写し。**
+ * **ここはサーバ側（`Core/Flow/SurveyFlow.cs`）のコピー。**
  * 食い違うと、画面が出した設問がサーバに落とされる（または隠したはずの答えが保存される）。
- * **写しであることを守るための試験**でもある。
+ * **コピーであることを守るための試験**でもある。
  */
 
 function question(id: string, extra: Partial<Question> = {}): Question {
@@ -260,7 +260,7 @@ describe('toSteps', () => {
     expect(steps.map((step) => step.page.pageId)).toEqual(['p1']);
   });
 
-  describe('ページ下部の釦条件', () => {
+  describe('ページ下部のボタン条件', () => {
     it('設問の表示と同じ規則で条件を評価する', () => {
       const condition = {
         match: 'All' as const,

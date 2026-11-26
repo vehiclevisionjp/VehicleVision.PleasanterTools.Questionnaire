@@ -30,6 +30,7 @@
     tabId,
     type LoginMethod,
   } from '../lib/loginTabs';
+  import PasskeySignIn from './PasskeySignIn.svelte';
   import type { AdminSession } from '../lib/types';
   import { t } from '../lib/i18n/state.svelte';
 
@@ -225,7 +226,7 @@
   }
 
   // **ログイン画面を開いたとき、黙って一度だけ確かめる。**
-  // Pleasanter に既にログインしていれば、釦を押さずに入れる。
+  // Pleasanter に既にログインしていれば、ボタンを押さずに入れる。
   // ⚠️ **自分でログアウトした直後は確かめない**（入り直してしまい、ログアウトできないように見える）
   $effect(() => {
     const auto = untrack(() =>
@@ -257,6 +258,8 @@
     availableMethods({
       ssoAvailable: !isSetup && (session.samlEnabled === true || pleasanterAvailable),
       passwordAvailable: passwordSignInEnabled,
+      // **サーバが使えると返したときだけ**（Issue #1068）。最初の管理者を作る画面には出さない
+      passkeyAvailable: !isSetup && session.passkeyEnabled === true,
     }),
   );
   const tabbed = $derived(shouldShowTabs(methods));
@@ -267,7 +270,14 @@
   const tabButtons: Partial<Record<LoginMethod, HTMLButtonElement>> = {};
 
   function methodLabel(method: LoginMethod): string {
-    return method === 'sso' ? t('signIn.tabSso') : t('signIn.tabPassword');
+    switch (method) {
+      case 'sso':
+        return t('signIn.tabSso');
+      case 'passkey':
+        return t('signIn.tabPasskey');
+      default:
+        return t('signIn.tabPassword');
+    }
   }
 
   function selectMethod(method: LoginMethod, focus: boolean) {
@@ -416,7 +426,7 @@
   </form>
     {/snippet}
 
-    <!-- **SSO の釦。** タブのときは SSO の区画の中に置くので、上に区切りは要らない -->
+    <!-- **SSO のボタン。** タブのときは SSO の区画の中に置くので、上に区切りは要らない -->
     {#snippet ssoButtons(dividerAbove: boolean)}
   {#if session.samlEnabled && !isSetup}
     <!-- **最初の管理者を作る画面には出さない。** IdP から来た人を
@@ -428,7 +438,7 @@
     {#if samlError}<p class="error" role="alert">{samlError}</p>{/if}
 
     <button type="button" class="saml" onclick={startSaml}>
-      {session.samlLabel ?? t('signIn.samlButton')}
+      {t('signIn.samlButton')}
     </button>
   {/if}
 
@@ -453,7 +463,7 @@
       </button>
     {:else}
       <button type="button" class="saml" disabled={busy} onclick={startPleasanter}>
-        {session.pleasanterSsoLabel ?? t('signIn.pleasanterButton')}
+        {t('signIn.pleasanterButton')}
       </button>
     {/if}
   {/if}
@@ -496,12 +506,17 @@
           >
             {#if method === 'sso'}
               {@render ssoButtons(false)}
+            {:else if method === 'passkey'}
+              <PasskeySignIn {onadvance} />
             {:else}
               {@render passwordForm()}
             {/if}
           </div>
         {/each}
       </div>
+    {:else if methods[0] === 'passkey'}
+      <!-- パスキーだけが使えるとき（通常のセクション） -->
+      <PasskeySignIn {onadvance} />
     {:else}
       {#if passwordSignInEnabled}
         {@render passwordForm()}
@@ -588,11 +603,6 @@
     display: block;
     width: 100%;
     margin-top: var(--space-1);
-    padding: var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    box-sizing: border-box;
   }
 
   /* **区切りは線と文字で出す**（Issue #166） */

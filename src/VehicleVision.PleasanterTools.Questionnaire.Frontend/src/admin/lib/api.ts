@@ -25,6 +25,7 @@ import type {
   LookupPublishProblem,
   MappingDefinition,
   OutboxStatus,
+  PasskeyRow,
   MappingProblem,
   SurveyDefinition,
   SurveyDraft,
@@ -41,6 +42,7 @@ import type {
   PleasanterSsoTestResult,
 } from './types';
 import type { PleasanterSsoCheckResponse } from './pleasanterSso';
+import type { AssertionJson, AttestationJson, PasskeyApi, Reauthentication } from './webauthn';
 
 /**
  * 呼び出しの結果。
@@ -228,6 +230,19 @@ export const setAdminUserDisabled = (adminUserId: string, isDisabled: boolean) =
   );
 
 /**
+ * 「パスワードなし（SSO のみ）」の印を付ける・外す（Issue #1086）。`users.write`。
+ *
+ * **ログインの成否は変えない**（パスワードのハッシュにもセッションにも触れない）。
+ * 変わるのは、パスキーの最後の 1 件を消してよいかの判定だけ。操作の記録に残る。
+ * **自分を「パスワードあり」へ戻す操作は 409**（知らない印で自分を締め出さないため）。
+ */
+export const setAdminUserSsoOnly = (adminUserId: string, ssoOnly: boolean) =>
+  call<{ ssoOnly: boolean }>(`/api/admin/users/${adminUserId}/sso-only`, {
+    method: 'POST',
+    json: { ssoOnly },
+  });
+
+/**
  * 他人の 2 要素を解除する（端末を失ったときの救済）。
  *
  * ⚠️ **保護を外す操作。** 操作の記録に残る。
@@ -241,6 +256,19 @@ export const resetAdminUserTwoFactor = (adminUserId: string, revokeApiTokens = t
       // **「その人の API キーも失効させる」のチェック**（Issue #1025。初期値はオン）
       json: { revokeApiTokens },
     },
+  );
+
+/**
+ * 他人のパスキーをすべて削除する（復旧。Issue #1087。Core の仕様書 3.10.9）。
+ *
+ * ⚠️ **取り返しのつかない操作。** 対象者の**全セッションが失効**し、監査ログに残る。
+ * **自分は対象にできない**（400 `users.selfNotAllowed`。自分の分は「自分の設定」から削除する）。
+ * 失敗は `{ code }` だけが返る（文言は `lib/adminUsers.ts` の `resetPasskeysFailureKey` が作る）。
+ */
+export const resetAdminUserPasskeys = (adminUserId: string) =>
+  call<{ reset: boolean; removed: number }>(
+    `/api/admin/users/${adminUserId}/passkeys/reset`,
+    { method: 'POST', json: {} },
   );
 
 // ---- 自分のアカウント（Issue #156）--------------------------------------------
@@ -280,6 +308,54 @@ export const disableOwnTotp = (password: string, revokeApiTokens = true) =>
     method: 'POST',
     json: { password, revokeApiTokens },
   });
+
+// ---- パスキー（Issue #1068。Core の仕様書 3.10.6・API 契約 5.3.1。Core#222 で確定）---
+//
+// **経路・形はこの節だけに閉じ込める。** 画面は `passkeyApi` の戻り値しか見ない。試験ではこのオブジェクトを差し替える。
+// エラーは `{ code }`（Core は文言を持たない）。理由の鍵は `Result.body.code` から `lib/passkeys.ts` が文言にする。
+// 削除は DELETE ではなく POST `…/remove`（API 契約 5.6.1）。
+
+/** パスキーの API。 */
+export const passkeyApi = {
+  /** 自分のパスキーの一覧。公開鍵・資格情報 ID は返らない。再認証は要らない。 */
+  list: () => call<{ passkeys: PasskeyRow[] }>('/api/admin/me/passkeys'),
+
+  /** 登録の開始。**再認証の証拠（`{password}` か `{assertion}`）を要求ごとに添える**（時間窓は 0）。 */
+  beginRegistration: (proof: Reauthentication) =>
+    call<unknown>('/api/admin/me/passkeys/begin', { method: 'POST', json: proof }),
+
+  /** 登録の完了。`name` は本人が付ける名前（空ならサーバが `Passkey` にする）。 */
+  completeRegistration: (name: string, credential: AttestationJson) =>
+    call<{ passkey: PasskeyRow }>('/api/admin/me/passkeys/complete', {
+      method: 'POST',
+      json: { credential, name },
+    }),
+
+  /** 名前の変更（再認証は要らない）。 */
+  rename: (id: string, name: string) =>
+    call<{ name: string }>(`/api/admin/me/passkeys/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      json: { name },
+    }),
+
+  /** 削除。**再認証の証拠を添える。** 最後のログイン方法になるときは 409 `passkeys.lastSignInMethod`。 */
+  remove: (id: string, proof: Reauthentication) =>
+    call<{ removed: boolean }>(`/api/admin/me/passkeys/${encodeURIComponent(id)}/remove`, {
+      method: 'POST',
+      json: proof,
+    }),
+
+  /** ログインの開始（認証の外。ユーザー名は送らない）。パスキーでの再認証のオプションにも使う。 */
+  beginSignIn: () =>
+    call<unknown>('/api/admin/login/passkey/begin', { method: 'POST', json: {} }),
+
+  /** ログインの完了。成功するとサーバが Session（via=passkey）を発行する。 */
+  completeSignIn: (credential: AssertionJson) =>
+    call<{ next?: string }>('/api/admin/login/passkey/complete', {
+      method: 'POST',
+      json: { credential },
+    }),
+} satisfies PasskeyApi & Record<string, unknown>;
 
 // ---- API キー（個人トークン。Issue #1025）------------------------------------
 
@@ -497,7 +573,7 @@ export const createSurvey = (
  * アンケートを複製する（Issue #46）。
  *
  * **公開用 ID はサーバが作り直す。** 使い回すと 2 つのアンケートが同じ URL を指す。
- * **書き込み先のサイトは写さない**ので、ここで新しく指定する。
+ * **書き込み先のサイトはコピーしない**ので、ここで新しく指定する。
  * **Administrator だけが通る**（サーバ側で判定する）。
  */
 export const duplicateSurvey = (
@@ -511,9 +587,9 @@ export const duplicateSurvey = (
   });
 
 /**
- * 書き出した JSON から、新しいアンケートを下書きとして取り込む（Issue #1009）。
+ * エクスポートした JSON から、新しいアンケートを下書きとしてインポートする（Issue #1009）。
  *
- * **書き込み先のサイトは書き出しに入っていない**ので、ここで指定する。
+ * **書き込み先のサイトはエクスポートに入っていない**ので、ここで指定する。
  * **公開前の検査と同じ検査をサーバが行い、通らなければ 1 件も作らない。**
  */
 export const importSurvey = (
@@ -526,7 +602,7 @@ export const importSurvey = (
     json: { document, pleasanterSiteId, responseJsonColumn: responseJsonColumn || null },
   });
 
-/** 書き出しのダウンロード先。**認証は cookie なので、リンクで開いてよい。** */
+/** エクスポートのダウンロード先。**認証は cookie なので、リンクで開いてよい。** */
 export const surveyExportUrl = (surveyId: string) =>
   appUrl(`/api/admin/surveys/${surveyId}/export`);
 
@@ -542,7 +618,7 @@ export const listTemplates = () => call<SurveyTemplateSummary[]>('/api/admin/tem
 /**
  * アンケートをテンプレートにする。
  *
- * **題名は指定しない。** 元のアンケートの題名をそのまま写す。
+ * **題名は指定しない。** 元のアンケートの題名をそのままコピーする。
  * 題名は多言語の器なので、1 つの文字列を送ると
  * 日本語の題名が英語として保存されてしまう。
  */
@@ -585,14 +661,14 @@ export const listVersions = (surveyId: string) =>
 export const loadVersion = (surveyId: string, version: number) =>
   call<SurveyVersionContent>(`/api/admin/surveys/${surveyId}/versions/${version}`);
 
-/** 取り込み元のページと設問を読む。**マッピングは返さない。** */
+/** インポート元のページと設問を読む。**マッピングは返さない。** */
 export const loadQuestionImportSource = (surveyId: string, sourceSurveyId: string) =>
   call<QuestionImportSource>(
     `/api/admin/surveys/${surveyId}/question-import/${sourceSurveyId}`,
   );
 
 /**
- * 選んだ設問を取り込み先用に写す。
+ * 選んだ設問をインポート先用にコピーする。
  *
  * **ID の再採番と、分岐・表示条件・資産参照の除去はサーバが行う。**
  */

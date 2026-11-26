@@ -20,7 +20,7 @@ config:
   # 書いた項目だけを環境変数として渡す。渡した項目は管理画面から変えられなくなる（外部設定が勝つ）。
   # 既定は何も渡さない（無効のまま。管理画面から設定できる）。秘密を含む項目は無い。
   # 書ける項目: enabled / internalBaseUrl / loginUrl / logoutUrl / cookieNames /
-  #   unknownUser / registerRole / revalidateMinutes / timeoutSeconds / buttonLabel
+  #   unknownUser / registerRole / revalidateMinutes / timeoutSeconds
   pleasanterSso: {}
 
 serviceAccount:

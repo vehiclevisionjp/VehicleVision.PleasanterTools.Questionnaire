@@ -5,9 +5,9 @@ using VehicleVision.PleasanterTools.Questionnaire.Core.Mapping;
 
 namespace VehicleVision.PleasanterTools.Questionnaire.Core.Tests.Mapping;
 
-/// <summary>グリッドとランキングを Pleasanter の列へ写せること。</summary>
+/// <summary>グリッドとランキングを Pleasanter の列へコピーできること。</summary>
 /// <remarks>
-/// **どう写すかを決めるのは使う人**（Issue #54）。
+/// **どうコピーするかを決めるのは使う人**（Issue #54）。
 /// 行ごとに列へ繋ぐことも、まとめて 1 列へ入れることも、同じ仕組みでできる。
 /// </remarks>
 public class GridMappingTests

@@ -37,14 +37,40 @@ public sealed class RedisAdminSessionStore(
 
     public string HandleOf(string sessionId) => IdHash(sessionId);
 
-    public async Task<string> CreateAsync(
+    public Task<string> CreateAsync(
         Guid userId,
         string kind,
         TimeSpan lifetime,
         CancellationToken cancellationToken = default,
         string? ipAddress = null,
         string? userAgent = null,
+        SessionSso? sso = null) =>
+        CreateCoreAsync(userId, kind, lifetime, null, cancellationToken, ipAddress, userAgent, sso);
+
+    /// <summary>入った方式（<see cref="SessionVia"/>）を保存してセッションを作る（パスキーなど、鍵を持たない方式のため）。</summary>
+    public Task<string> CreateWithViaAsync(
+        Guid userId,
+        string kind,
+        TimeSpan lifetime,
+        string via,
+        CancellationToken cancellationToken = default,
+        string? ipAddress = null,
+        string? userAgent = null,
         SessionSso? sso = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(via);
+        return CreateCoreAsync(userId, kind, lifetime, via, cancellationToken, ipAddress, userAgent, sso);
+    }
+
+    private async Task<string> CreateCoreAsync(
+        Guid userId,
+        string kind,
+        TimeSpan lifetime,
+        string? via,
+        CancellationToken cancellationToken,
+        string? ipAddress,
+        string? userAgent,
+        SessionSso? sso)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
@@ -73,7 +99,11 @@ public sealed class RedisAdminSessionStore(
             PleasanterTenantId = pleasanter?.TenantId,
             PleasanterUserId = pleasanter?.UserId,
             PleasanterVerifiedAt = pleasanter?.VerifiedAt,
+            Via = AuditText.Safe(via, 32),
         };
+
+        // **入った方式は、作るときに確定して保存する。** 明示が無ければ、SAML → Pleasanter → パスワードで導いた値を残す
+        stored.Via ??= stored.DerivedVia;
 
         // **本体だけ作って索引に載らない状態を作らない。**
         // 索引に無ければ、パスワード変更時の一括失効から漏れるため。
@@ -219,7 +249,7 @@ public sealed class RedisAdminSessionStore(
                     row.Stored.ExpiresAt,
                     row.Stored.IpAddress,
                     row.Stored.UserAgent,
-                    row.Stored.Via)),
+                    row.Stored.EffectiveVia)),
         ];
     }
 
@@ -332,9 +362,20 @@ public sealed class RedisAdminSessionStore(
 
         public DateTimeOffset? PleasanterVerifiedAt { get; set; }
 
-        /// <summary>入った方式（表示用）。Core.Data の RDBMS 版と同じ判断（SAML → Pleasanter → パスワード）。</summary>
+        /// <summary>入った方式（表示用。<see cref="SessionVia"/>）。パスキーのように鍵から導けない方式のため、作るときに保存する。</summary>
+        /// <remarks>
+        /// <b>この項目が無い（導入前に保存された）セッションは、読み出すとき <see cref="EffectiveVia"/> が
+        /// 従来の導き方（SAML → Pleasanter → パスワード）で補う</b>。切り替えでログアウトさせない。
+        /// </remarks>
+        public string? Via { get; set; }
+
+        /// <summary>表示に使う方式。保存された値があればそれ、無ければ従来の導き方。</summary>
         [System.Text.Json.Serialization.JsonIgnore]
-        public string Via =>
+        public string EffectiveVia => string.IsNullOrEmpty(Via) ? DerivedVia : Via;
+
+        /// <summary>従来の導き方。Core.Data の RDBMS 版と同じ判断（SAML → Pleasanter → パスワード）。</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string DerivedVia =>
             !string.IsNullOrEmpty(SamlNameId) ? SessionVia.Saml
             : PleasanterUserId is not null ? SessionVia.Pleasanter
             : SessionVia.Password;

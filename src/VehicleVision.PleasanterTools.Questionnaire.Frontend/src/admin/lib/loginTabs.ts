@@ -8,11 +8,11 @@
  * （docs/webui.md、components/app-login-tabs.js、scripts/check-login-tabs.mjs）に合わせる。
  * 部品そのものは取り込まない（CSS 変数が違い、SPA では DOM を後から差し替えるより
  * 描画の側でタブを組む方が素直なため）。**属性名（`data-vv-login-*`）・ARIA・キー操作の契約を揃える。**
- * Passkey は Core#213（別の Issue）。ここでは作らない。
+ * Passkey のタブは Issue #1068（親 Core#213）。サーバが使えると返したときだけ並べる。
  */
 
 /** 方式の並び順。**初期選択は先頭（SSO）。** */
-export const LOGIN_METHODS = ['sso', 'local'] as const;
+export const LOGIN_METHODS = ['sso', 'local', 'passkey'] as const;
 
 export type LoginMethod = (typeof LOGIN_METHODS)[number];
 
@@ -20,6 +20,8 @@ export type LoginMethod = (typeof LOGIN_METHODS)[number];
 export function availableMethods(input: {
   ssoAvailable: boolean;
   passwordAvailable: boolean;
+  /** サーバがパスキーを使えると返したか（省略は使えない）。 */
+  passkeyAvailable?: boolean;
 }): LoginMethod[] {
   const methods: LoginMethod[] = [];
   if (input.ssoAvailable) {
@@ -27,6 +29,9 @@ export function availableMethods(input: {
   }
   if (input.passwordAvailable) {
     methods.push('local');
+  }
+  if (input.passkeyAvailable === true) {
+    methods.push('passkey');
   }
   return methods;
 }

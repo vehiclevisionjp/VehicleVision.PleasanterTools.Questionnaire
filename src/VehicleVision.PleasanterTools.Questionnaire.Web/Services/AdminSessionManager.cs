@@ -43,6 +43,10 @@ public sealed class AdminSessionManager(
     /// SAML・Pleasanter のログインで入ったときの鍵（単一ログアウト・再検証に要る）。
     /// <b>2 要素の途中からログイン後へは、そのまま引き継ぐ。</b>
     /// </param>
+    /// <param name="via">
+    /// 入った方式（<see cref="SessionVia"/>）。<b>パスキーのように、鍵（<paramref name="sso"/>）から導けない方式を保存するために使う。</b>
+    /// <c>null</c> なら、保管先が従来の導き方（SAML → Pleasanter → パスワード）で決める。
+    /// </param>
     /// <returns>cookie に載せたセッション ID。</returns>
     public async Task<string> SignInAsync(
         HttpContext context,
@@ -50,18 +54,29 @@ public sealed class AdminSessionManager(
         string kind,
         Guid userId,
         TimeSpan lifetime,
-        SessionSso? sso = null)
+        SessionSso? sso = null,
+        string? via = null)
     {
         await RevokeCurrentAsync(context, scheme).ConfigureAwait(false);
 
-        var sessionId = await store.CreateAsync(
-            userId,
-            kind,
-            lifetime,
-            context.RequestAborted,
-            IpAddressOf(context),
-            Trim(context.Request.Headers.UserAgent.ToString(), 512),
-            sso).ConfigureAwait(false);
+        var sessionId = via is null
+            ? await store.CreateAsync(
+                userId,
+                kind,
+                lifetime,
+                context.RequestAborted,
+                IpAddressOf(context),
+                Trim(context.Request.Headers.UserAgent.ToString(), 512),
+                sso).ConfigureAwait(false)
+            : await store.CreateWithViaAsync(
+                userId,
+                kind,
+                lifetime,
+                via,
+                context.RequestAborted,
+                IpAddressOf(context),
+                Trim(context.Request.Headers.UserAgent.ToString(), 512),
+                sso).ConfigureAwait(false);
 
         var cookieIdentity = new ClaimsIdentity(
             [new Claim(SessionIdClaim, sessionId)],

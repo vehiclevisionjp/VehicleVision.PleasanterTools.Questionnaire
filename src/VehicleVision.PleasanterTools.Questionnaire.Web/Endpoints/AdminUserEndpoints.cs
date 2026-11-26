@@ -51,9 +51,30 @@ public static class AdminUserEndpoints
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersRead));
 
         // ---- 一覧 ------------------------------------------------------------
-        users.MapGet("", async (AdminUserService service, CancellationToken cancellationToken) =>
+        users.MapGet("", async (
+            AdminUserService service,
+            IAdminPasskeyStore passkeys,
+            AdminPasskeyOptions passkeyOptions,
+            ClaimsPrincipal principal,
+            CancellationToken cancellationToken) =>
         {
             var list = await service.ListAsync(cancellationToken).ConfigureAwait(false);
+
+            // **パスキーの件数は、復旧の権限（`users.resetPasskeys`）を持つ相手にだけ返す**（Issue #1087）。
+            // 復旧の確認ダイアログに「何件消すか」を出すために要る。Core の仕様書 3.10.6 は
+            // 「本人以外には存在も知らせない」としているので、**名前・資格情報 ID は返さず、件数だけ**にする。
+            // パスキーが無効のときは返さない（無効の間の口は 404 で、復旧もできない）
+            var counts = new Dictionary<Guid, int>();
+            if (passkeyOptions.Enabled
+                && AdminPermissions.Has(principal.FindFirstValue(ClaimTypes.Role), AdminPermissions.UsersResetPasskeys))
+            {
+                foreach (var user in list)
+                {
+                    counts[user.AdminUserId] = await passkeys
+                        .CountForUserAsync(user.AdminUserId, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
             return Results.Ok(new
             {
                 users = list.Select(user => new
@@ -63,8 +84,12 @@ public static class AdminUserEndpoints
                     role = user.Role,
                     isDisabled = user.IsDisabled,
                     hasTotp = user.HasTotp,
+                    // 件数を返さないときは null（JSON から省かれる）
+                    passkeyCount = counts.TryGetValue(user.AdminUserId, out var count) ? count : (int?)null,
                     // まだ招待を受け取っていない（＝一度も入っていない）
                     invitationPending = user.InvitationPending,
+                    // 偽は「パスワードなし（SSO のみ）」（Issue #1086）。ログインの成否ではなく、最後のパスキーを消せるかの判定に使う印
+                    passwordSet = user.PasswordSet,
                     // **止め忘れを見つける唯一の手掛かり**
                     lastLoginAt = AsUtc(user.LastLoginAt),
                     createdAt = AsUtc(user.CreatedAt),
@@ -263,6 +288,34 @@ public static class AdminUserEndpoints
             return outcome is AdminUserOutcome.Succeeded
                 ? Results.Ok(new { role = role.ToString() })
                 : Failure(outcome, language);
+        })
+            .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
+
+        // ---- 「パスワードなし（SSO のみ）」の印の切り替え（Issue #1086）---------
+        //
+        // すでにいる JIT 管理者（SAML・Pleasanter のログインで作られた人）を、管理者が明示して直す口。
+        // **ログインの成否は変えない**（ハッシュにもセッションにも触れない）。変わるのは、パスキーの最後の 1 件を消してよいかの判定だけ。
+        // 権限は役割の変更・停止と同じ `users.write`。新しい権限は作らない
+        // （人の状態を変える操作の 1 つで、保護を外す操作ではない。印を付ける向きは判定を厳しくする側）。
+        // 切り替えは、管理操作の監査ログに「誰が・誰に・どちらへ」残る（入口の集まりに掛けた監査フィルタ）。
+        users.MapPost("/{adminUserId:guid}/sso-only", async (
+            Guid adminUserId,
+            AdminSsoOnlyRequest request,
+            HttpContext context,
+            ClaimsPrincipal principal,
+            AdminUserService service,
+            CancellationToken cancellationToken) =>
+        {
+            // **どちらへ切り替えようとしたかまで残す。** 断られた試みも記録に残る
+            AuditNotes.Add(context, "ssoOnly", request.SsoOnly ? "true" : "false");
+
+            var outcome = await service
+                .SetSsoOnlyAsync(ActorId(principal), adminUserId, request.SsoOnly, cancellationToken)
+                .ConfigureAwait(false);
+
+            return outcome is AdminUserOutcome.Succeeded
+                ? Results.Ok(new { ssoOnly = request.SsoOnly })
+                : Failure(outcome, RequestLanguage.Of(context));
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
     }
@@ -605,7 +658,7 @@ public static class AdminUserEndpoints
             : Failure(outcome, RequestLanguage.Of(context));
     }
 
-    /// <summary>結果を応答へ写す。</summary>
+    /// <summary>結果を応答へコピーする。</summary>
     /// <remarks>
     /// **招待だけは理由を分けない。** 無い・期限切れ・使用済みを区別して返すと、
     /// トークンの当たり外れを外から確かめられる。
@@ -702,6 +755,9 @@ public static class AdminUserEndpoints
 
     /// <summary>変更後の役割。</summary>
     public sealed record AdminRoleRequest(string? Role);
+
+    /// <summary>「パスワードなし（SSO のみ）」の印の切り替え。真で付け、偽で外す。</summary>
+    public sealed record AdminSsoOnlyRequest(bool SsoOnly);
 
     /// <summary>今のパスワードと、新しいパスワード。</summary>
     /// <param name="CurrentPassword">今のパスワード。</param>

@@ -115,3 +115,29 @@ describe('文言の集合', () => {
     }
   });
 });
+
+describe('SSO のログインボタンの文言（Issue #1079）', () => {
+  it('日本語は SAML が「SSO でログイン」、Pleasanter が「Pleasanter でログイン」で固定', () => {
+    expect(ja['signIn.samlButton']).toBe('SSO でログイン');
+    expect(ja['signIn.pleasanterButton']).toBe('Pleasanter でログイン');
+  });
+
+  it('2 つのボタンは、どの言語でも区別できる', () => {
+    for (const [language, catalog] of Object.entries(catalogs)) {
+      const saml = (catalog as Record<string, string>)['signIn.samlButton'];
+      const pleasanter = (catalog as Record<string, string>)['signIn.pleasanterButton'];
+      expect(saml, language).toBeTruthy();
+      expect(pleasanter, language).toBeTruthy();
+      expect(saml, language).not.toBe(pleasanter);
+      expect(saml, language).toContain('SSO');
+      expect(pleasanter, language).toContain('Pleasanter');
+    }
+  });
+
+  it('表示名を設定する入力欄の文言は残していない', () => {
+    for (const [language, catalog] of Object.entries(catalogs)) {
+      expect(catalog, language).not.toHaveProperty('saml.buttonLabel');
+      expect(catalog, language).not.toHaveProperty('pleasanterSso.buttonLabel');
+    }
+  });
+});

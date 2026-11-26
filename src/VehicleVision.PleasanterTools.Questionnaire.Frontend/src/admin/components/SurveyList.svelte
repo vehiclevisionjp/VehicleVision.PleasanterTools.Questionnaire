@@ -39,7 +39,7 @@
      * 複製を出してよい相手か。**Administrator だけ。**
      *
      * **隠すだけでは守りにならない**ので、サーバ側でも同じ判定をしている
-     * （`AdminSurveyEndpoints`）。ここで隠すのは、押せない釦を出さないため。
+     * （`AdminSurveyEndpoints`）。ここで隠すのは、押せないボタンを出さないため。
      */
     canDuplicate?: boolean;
     /**
@@ -104,7 +104,7 @@
   /** 二重送信で 2 つ複製されないようにする */
   let duplicateBusy = $state(false);
 
-  /** フォーム定義の取り込み（Issue #1009）。 */
+  /** フォーム定義のインポート（Issue #1009）。 */
   let importing = $state(false);
   let importDocument = $state<unknown>(null);
   let importSiteId = $state('');
@@ -285,7 +285,7 @@
     }
 
     importing = false;
-    // **取り込んだものをそのまま開く。** 直すために取り込んでいる
+    // **インポートしたものをそのまま開く。** 直すためにインポートしている
     onopen(result.value.surveyId);
   }
 
@@ -1092,9 +1092,6 @@
   .filter select {
     display: block;
     margin-top: var(--space-1);
-    padding: var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
   }
 
   .pager {
@@ -1112,7 +1109,7 @@
   h1 {
     font-size: 1.35rem;
     margin: 0;
-    /* **釦は右端へ寄せる。** 見出しと釦の間を空ける */
+    /* **ボタンは右端へ寄せる。** 見出しとボタンの間を空ける */
     margin-right: auto;
   }
 
@@ -1169,7 +1166,7 @@
     中に入れ物を 1 枚はさんでそこを格子にする。
     **横だけに余白を付けると、折り返した先の行が詰まる**（Issue #150）
 
-    ⚠️ **flex の折り返しにしないこと。** 釦の出る条件が行ごとに違うので、
+    ⚠️ **flex の折り返しにしないこと。** ボタンの出る条件が行ごとに違うので、
     文字数なりに並べると**折り返す位置が行ごとに変わって縦に揃わない。**
     **格子なら幅が揃い、何個出ても桁の位置が動かない。**
   */
@@ -1204,7 +1201,7 @@
     text-align: center;
   }
 
-  /* **釦の桁は広めに取る。** 等幅にすると 1 個あたりの幅が要る */
+  /* **ボタンの桁は広めに取る。** 等幅にすると 1 個あたりの幅が要る */
   .row-actions {
     width: 18rem;
   }
@@ -1218,11 +1215,6 @@
     display: block;
     width: 100%;
     margin-top: var(--space-1);
-    padding: var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    box-sizing: border-box;
   }
 
   /*

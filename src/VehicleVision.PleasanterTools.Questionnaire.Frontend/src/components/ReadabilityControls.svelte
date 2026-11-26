@@ -23,7 +23,7 @@
     /**
      * アイコンのボタンで出す（Issue #592）。回答画面用。
      *
-     * 選択肢をアイコンの釦で横に並べる。**選んでいるものは `aria-pressed` と枠で示し、
+     * 選択肢をアイコンのボタンで横に並べる。**選んでいるものは `aria-pressed` と枠で示し、
      * 名前は `aria-label` / `title` に持つ**（色や形だけに頼らない）。既定は従来のドロップダウン。
      */
     compact?: boolean;
@@ -229,11 +229,7 @@
 
   select {
     max-width: 100%;
-    padding: var(--space-1) 0.4rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
+    min-height: var(--control-h-sm);
+    padding: var(--space-1) var(--space-2);
   }
 </style>

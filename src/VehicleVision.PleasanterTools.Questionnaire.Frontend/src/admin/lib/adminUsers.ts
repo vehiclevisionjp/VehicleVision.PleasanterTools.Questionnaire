@@ -1,7 +1,7 @@
 /**
  * 管理者の一覧で「押せる操作」を決める（Issue #156）。
  *
- * ⚠️ **ここで隠すのは、押せない釦を出さないため。**
+ * ⚠️ **ここで隠すのは、押せないボタンを出さないため。**
  * 守りはサーバ側（`AdminUserService`）にある。
  * **画面から入口を隠すだけでは守りにならない**ので、同じ判定を両方に置いている。
  */
@@ -141,6 +141,80 @@ export function canChangeRole(
  */
 export function canResetTwoFactor(target: AdminUserRow, ownAdminUserId: string): boolean {
   return target.hasTotp && target.adminUserId !== ownAdminUserId;
+}
+
+/**
+ * 他人のパスキーをすべて削除できるか（認証器を失った人の復旧。Issue #1087）。
+ *
+ * - **消すものが無ければ出さない。** 件数が来ない（権限がない・パスキーが無効）ときも出さない
+ * - **自分の分はここから消さない。** Core が自分を拒む（`users.selfNotAllowed`）。
+ *   自分のパスキーは、本人の再確認つきの「自分の設定」で 1 件ずつ削除できる
+ */
+export function canResetPasskeys(target: AdminUserRow, ownAdminUserId: string): boolean {
+  return (target.passkeyCount ?? 0) > 0 && target.adminUserId !== ownAdminUserId;
+}
+
+/**
+ * 復旧の失敗を、出す文言の鍵にする。
+ *
+ * **Core の失敗は `{ code }` だけ**（文言を持たない）。権限の無い 403 は `auth.forbidden`。
+ * パスキーが無効の間は経路そのものが 404（本文なし）。
+ */
+export function resetPasskeysFailureKey(
+  status: number,
+  body: unknown,
+):
+  | 'users.passkeys.error.self'
+  | 'users.passkeys.error.notFound'
+  | 'users.passkeys.error.forbidden'
+  | 'users.passkeys.error.disabled'
+  | 'users.failed' {
+  const code =
+    typeof body === 'object' && body !== null && 'code' in body
+      ? String((body as { code: unknown }).code)
+      : '';
+
+  if (code === 'users.selfNotAllowed') {
+    return 'users.passkeys.error.self';
+  }
+  if (code === 'users.notFound') {
+    return 'users.passkeys.error.notFound';
+  }
+  if (status === 403) {
+    return 'users.passkeys.error.forbidden';
+  }
+  if (status === 404) {
+    return 'users.passkeys.error.disabled';
+  }
+  return 'users.failed';
+}
+
+/**
+ * 「パスワードなし（SSO のみ）」として扱うか。
+ *
+ * **招待中の人は含めない。** 招待を受け取るまでパスワードが無いのは当然で、受け取れば印は「あり」になる。
+ */
+export function isPasswordless(target: AdminUserRow): boolean {
+  return !target.passwordSet && !target.invitationPending;
+}
+
+/**
+ * 「パスワードなし」にできるか（すでにいる JIT 管理者を直す。Issue #1086）。
+ *
+ * **印を付ける向きは判定を厳しくする側**なので、自分にも出す。招待中の人には出さない。
+ */
+export function canMarkPasswordless(target: AdminUserRow): boolean {
+  return target.passwordSet && !target.invitationPending;
+}
+
+/**
+ * 「パスワードあり」へ戻せるか。
+ *
+ * **自分には出さない。** 本人がパスワードを知らないまま印だけを戻すと、最後のパスキーを消して締め出される
+ * （サーバも 409 で拒む）。誤って付けた他人の印を直す道としてだけ残す。
+ */
+export function canMarkPasswordSet(target: AdminUserRow, ownAdminUserId: string): boolean {
+  return isPasswordless(target) && target.adminUserId !== ownAdminUserId;
 }
 
 /** 招待を出し直せるか。**まだ受け取っていない人だけ。** */

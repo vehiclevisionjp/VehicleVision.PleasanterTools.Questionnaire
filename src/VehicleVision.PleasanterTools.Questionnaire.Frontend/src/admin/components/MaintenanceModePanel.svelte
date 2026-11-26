@@ -156,11 +156,6 @@
   }
 
   textarea {
-    min-height: 4rem;
-    padding: var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
     font-weight: 400;
   }
 

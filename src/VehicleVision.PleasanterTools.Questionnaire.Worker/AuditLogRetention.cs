@@ -166,7 +166,8 @@ public sealed class AuditLogRetentionService(
     IResponseEditTokenStore? editTokens = null,
     IAdminSessionStore? adminSessions = null,
     IAssetTicketStore? assetTickets = null,
-    DatabaseStartupState? startupState = null)
+    DatabaseStartupState? startupState = null,
+    IAdminPasskeyChallengeStore? passkeyChallenges = null)
     : BackgroundService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -204,7 +205,8 @@ public sealed class AuditLogRetentionService(
             && !(outbox is not null && options.DeadLetterEnabled)
             && editTokens is null
             && adminSessions is null
-            && assetTickets is null)
+            && assetTickets is null
+            && passkeyChallenges is null)
         {
             return;
         }
@@ -246,6 +248,21 @@ public sealed class AuditLogRetentionService(
                         logger.LogInformation(
                             "期限を過ぎた管理者セッションを {Count} 件消した",
                             expiredSessions);
+                    }
+                }
+
+                // **期限切れのパスキーのチャレンジを消す**（Issue #1082。Core の仕様書 3.10.8）。
+                // 期限切れのセッションの掃除と同じ周期で行う。使えないチャレンジが溜まり続けないように
+                if (passkeyChallenges is not null)
+                {
+                    var expiredChallenges = await passkeyChallenges
+                        .DeleteExpiredAsync(stoppingToken)
+                        .ConfigureAwait(false);
+                    if (expiredChallenges > 0)
+                    {
+                        logger.LogInformation(
+                            "期限を過ぎたパスキーのチャレンジを {Count} 件消した",
+                            expiredChallenges);
                     }
                 }
 

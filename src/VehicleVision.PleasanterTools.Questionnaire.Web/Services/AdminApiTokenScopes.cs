@@ -9,7 +9,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Services;
 /// <remarks>
 /// <para>
 /// <b>新しい権限は増やさない。</b>既存の権限（<see cref="AdminPermissions"/>）のサブセットをスコープにする。
-/// 書き出し（<c>surveys.read</c>）・取り込み（<c>surveys.publish</c>。#1009・#1029）は、既存の権限を流用する
+/// エクスポート（<c>surveys.read</c>）・インポート（<c>surveys.publish</c>。#1009・#1029）は、既存の権限を流用する
 /// （2026-11-18 の決定）。スコープ名は、将来の OAuth の <c>scope</c> 値と同じ文字列。
 /// </para>
 /// <para>

@@ -85,7 +85,7 @@ public sealed partial class AuditLogFilter(
         var http = context.HttpContext;
 
         // **読み取りは残さない**
-        // **例外は、入口が明示した読み取りと、トークンでの書き出し**（`AuditAutomationReadMetadata`。
+        // **例外は、入口が明示した読み取りと、トークンでのエクスポート**（`AuditAutomationReadMetadata`。
         // 定義の一括持ち出しなので、漏えい時の追跡に要る。通常の読み取りは残さない）
         if ((HttpMethods.IsGet(http.Request.Method) || HttpMethods.IsHead(http.Request.Method))
             && !AuditNotes.ShouldRecordRead(http)

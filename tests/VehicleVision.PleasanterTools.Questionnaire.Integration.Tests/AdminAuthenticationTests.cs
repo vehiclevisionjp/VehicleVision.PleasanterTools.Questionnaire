@@ -124,6 +124,49 @@ public class AdminAuthenticationTests
 
     [Theory]
     [MemberData(nameof(Providers))]
+    public async Task パスワード設定済みの印は既定で設定済みで未設定へ直して戻せる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        var harness = Create(provider, connectionString);
+        var user = await harness.Authenticator
+            .TryCreateFirstAdministratorAsync("admin@example.test", "long-enough-password");
+        Assert.NotNull(user);
+        var other = await harness.Store.CreateAsync(
+            "jit@example.test", harness.Hasher.Hash("unknown"), AdminRoleNames.Administrator, string.Empty);
+        Assert.NotNull(other);
+
+        // 行が無い管理者は「設定済み」（既存の管理者はすべてこの状態）
+        Assert.True(await harness.Settings.GetPasswordSetAsync(user.Id));
+        Assert.Empty(await harness.Settings.ListSsoOnlyAdminUserIdsAsync());
+
+        // 未設定へ（行が無ければ作る）。ほかの管理者へは及ばない
+        await harness.Settings.SetPasswordSetAsync(other.Id, false);
+        Assert.False(await harness.Settings.GetPasswordSetAsync(other.Id));
+        Assert.True(await harness.Settings.GetPasswordSetAsync(user.Id));
+        Assert.Equal([other.Id], (await harness.Settings.ListSsoOnlyAdminUserIdsAsync()).ToArray());
+
+        // 回答通知の設定とは独立している（行を共有しても、互いを上書きしない）
+        await harness.Settings.SetResponseNotificationEnabledAsync(other.Id, true);
+        Assert.False(await harness.Settings.GetPasswordSetAsync(other.Id));
+        await harness.Settings.SetPasswordSetAsync(other.Id, true);
+        Assert.True(await harness.Settings.GetResponseNotificationEnabledAsync(other.Id));
+        Assert.True(await harness.Settings.GetPasswordSetAsync(other.Id));
+        Assert.Empty(await harness.Settings.ListSsoOnlyAdminUserIdsAsync());
+
+        // 設定の行が先にある管理者（回答通知だけ）も、もう一度未設定へ直せる
+        await harness.Settings.SetPasswordSetAsync(other.Id, false);
+        Assert.False(await harness.Settings.GetPasswordSetAsync(other.Id));
+        Assert.True(await harness.Settings.GetResponseNotificationEnabledAsync(other.Id));
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
     public async Task 最初の管理者は一度だけ作れる(DatabaseProvider provider, string connectionString)
     {
         if (!Enabled)

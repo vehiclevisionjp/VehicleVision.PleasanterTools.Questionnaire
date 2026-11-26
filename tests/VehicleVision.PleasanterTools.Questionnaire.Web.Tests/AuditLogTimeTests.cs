@@ -5,7 +5,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Web.Tests;
 
 /// <summary>
 /// 管理操作の記録の時刻の目盛りが、旧と同じであること
-/// （旧表から写した行と新しい行で、画面の時刻が食い違わないように）。
+/// （旧表からコピーした行と新しい行で、画面の時刻が食い違わないように）。
 /// </summary>
 public class AuditLogTimeTests
 {

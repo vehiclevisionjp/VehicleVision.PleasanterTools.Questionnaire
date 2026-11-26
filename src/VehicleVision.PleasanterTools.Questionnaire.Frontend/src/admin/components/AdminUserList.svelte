@@ -2,7 +2,7 @@
   /**
    * 管理者の一覧と管理（Issue #156）。
    *
-   * **押せない釦は出さない。** 決まり（最後の Administrator を止めない・自分は触らない）は
+   * **押せないボタンは出さない。** 決まり（最後の Administrator を止めない・自分は触らない）は
    * `lib/adminUsers.ts` に置き、**サーバ側の判定と同じ形**にしてある。
    * ⚠️ **入口を隠すのは守りではない。** 守りはサーバ側にある。
    */
@@ -10,17 +10,24 @@
     inviteAdminUser,
     listAdminUsers,
     reissueInvitation,
+    resetAdminUserPasskeys,
     resetAdminUserTwoFactor,
     setAdminUserDisabled,
+    setAdminUserSsoOnly,
     setAdminUserRole,
   } from '../lib/api';
   import {
     ADMIN_ROLES,
     canChangeRole,
     canDisable,
+    canMarkPasswordless,
+    canMarkPasswordSet,
     canReissueInvitation,
+    canResetPasskeys,
     canResetTwoFactor,
     invitationUrl,
+    isPasswordless,
+    resetPasskeysFailureKey,
     roleLabel,
   } from '../lib/adminUsers';
   import AdminSessionList from './AdminSessionList.svelte';
@@ -37,16 +44,34 @@
     canWrite: boolean;
     /** 他人の 2 要素を解除できるか（`users.resetTwoFactor`）。 */
     canReset: boolean;
+    /** 他人のパスキーをすべて削除できるか（`users.resetPasskeys`。Issue #1087）。 */
+    canResetPasskeys?: boolean;
+    /** パスキーが有効か（`GET /api/admin/session` の `passkeyEnabled`）。無効の間は復旧の口が 404 なので出さない。 */
+    passkeyEnabled?: boolean;
     /** API キー（個人トークン）の機能が有効か（Issue #1025）。 */
     apiTokensEnabled?: boolean;
     onback: () => void;
   }
 
-  let { ownAdminUserId, canWrite, canReset, apiTokensEnabled = false }: Props = $props();
+  let {
+    ownAdminUserId,
+    canWrite,
+    canReset,
+    canResetPasskeys: canResetPasskeysPermission = false,
+    passkeyEnabled = false,
+    apiTokensEnabled = false,
+  }: Props = $props();
+
+  /** パスキーの列と復旧の操作を出すか。**権限があり、パスキーが有効のときだけ**（件数もこの条件でしか来ない）。 */
+  const showPasskeys = $derived(canResetPasskeysPermission && passkeyEnabled);
+  /** 表の列数（展開行の `colspan`）。 */
+  const columnCount = $derived(showPasskeys ? 7 : 6);
 
   let users = $state<AdminUserRow[]>([]);
   let loading = $state(true);
   let error = $state('');
+  /** 復旧の結果（削除した件数）。**次の操作を始めるまで出しておく。** */
+  let notice = $state('');
   let busy = $state('');
   let sessionsFor = $state('');
   let apiTokensFor = $state('');
@@ -84,6 +109,7 @@
   async function run(key: string, action: () => Promise<{ ok: boolean; message?: string }>) {
     busy = key;
     error = '';
+    notice = '';
     const result = await action();
     busy = '';
 
@@ -115,6 +141,82 @@
     await refresh();
   }
 
+  /**
+   * 他人のパスキーをすべて削除する（復旧。Issue #1087）。
+   *
+   * **確認で「誰の・何件か」「元に戻せない」「全端末がログアウトされる」を伝える。**
+   * 結果は、**サーバが数えた削除件数**を出す（確認してから実行までの間に件数が変わることがある）。
+   * ⚠️ **一覧の再読み込みは `error` を消すので、失敗の文言は読み込みの後に出す。**
+   */
+  async function resetPasskeys(user: AdminUserRow) {
+    const confirmed = await confirmAction({
+      title: t('users.resetPasskeys'),
+      message: t('users.confirmResetPasskeys', {
+        loginId: user.loginId,
+        count: user.passkeyCount ?? 0,
+      }),
+      confirmLabel: t('users.resetPasskeysConfirmLabel'),
+      danger: true,
+      // **取り返しのつかない削除。** 初期の focus はキャンセルへ置く
+      focusCancel: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    busy = `passkeys:${user.adminUserId}`;
+    error = '';
+    notice = '';
+    const result = await resetAdminUserPasskeys(user.adminUserId);
+    busy = '';
+
+    // 失敗でも、相手の状態が変わっていることがあるので読み直す
+    await refresh();
+    if (!result.ok) {
+      error = t(resetPasskeysFailureKey(result.status, result.body));
+      return;
+    }
+
+    notice = t('users.passkeysReset', { loginId: user.loginId, count: result.value.removed });
+  }
+
+  /**
+   * 「パスワードなし（SSO のみ）」の印を切り替える（Issue #1086）。
+   *
+   * **確認で「ログインは変わらない・最後のパスキーの判定だけが変わる」を伝える。**
+   * ⚠️ **戻す向きでは、本人がパスワードを知らないと締め出されるおそれ**を伝える。
+   */
+  async function togglePasswordless(user: AdminUserRow, ssoOnly: boolean) {
+    const label = t(ssoOnly ? 'users.passwordless.set' : 'users.passwordless.unset');
+    const confirmed = await confirmAction({
+      title: label,
+      message: t(ssoOnly ? 'users.passwordless.confirmSet' : 'users.passwordless.confirmUnset', {
+        loginId: user.loginId,
+      }),
+      confirmLabel: label,
+      danger: !ssoOnly,
+      focusCancel: !ssoOnly,
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    busy = `passwordless:${user.adminUserId}`;
+    error = '';
+    notice = '';
+    const result = await setAdminUserSsoOnly(user.adminUserId, ssoOnly);
+    busy = '';
+
+    // 失敗でも状態が変わっていることがあるので読み直す（読み込みは error を消すので、文言は後に出す）
+    await refresh();
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    notice = t('users.passwordless.changed', { loginId: user.loginId });
+  }
+
   function loginIdOf(adminUserId: string): string {
     return users.find((user) => user.adminUserId === adminUserId)?.loginId ?? '';
   }
@@ -124,7 +226,7 @@
    *
    * ⚠️ **`undefined` も「無い」として扱う。** サーバの JSON は `null` を省くので、
    * 一度も入っていない人では項目そのものが来ない。
-   * `null` だけを見ていると `Invalid Date` と出た（写しで見つけた）。
+   * `null` だけを見ていると `Invalid Date` と出た（スクリーンショットで見つけた）。
    */
   function when(value: string | null | undefined): string {
     return value === null || value === undefined ? '—' : new Date(value).toLocaleString();
@@ -178,6 +280,7 @@
   {/if}
 
   {#if error}<p class="error" role="alert">{error}</p>{/if}
+  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
 
   {#if loading}
     <p class="status">{t('users.loading')}</p>
@@ -192,6 +295,7 @@
             <th>{t('users.column.role')}</th>
             <th>{t('users.column.state')}</th>
             <th>{t('users.column.twoFactor')}</th>
+            {#if showPasskeys}<th>{t('users.column.passkeys')}</th>{/if}
             <th>{t('users.column.lastLogin')}</th>
             <th>{t('users.column.actions')}</th>
           </tr>
@@ -242,9 +346,19 @@
                 {:else}
                   <span class="badge active">{t('users.state.active')}</span>
                 {/if}
+                {#if isPasswordless(user)}
+                  <span class="badge pending">{t('users.passwordless.badge')}</span>
+                {/if}
               </td>
 
               <td>{user.hasTotp ? t('users.twoFactor.on') : t('users.twoFactor.off')}</td>
+              {#if showPasskeys}
+                <td>
+                  {(user.passkeyCount ?? 0) > 0
+                    ? t('users.passkeys.count', { count: user.passkeyCount ?? 0 })
+                    : t('users.passkeys.none')}
+                </td>
+              {/if}
               <td class="when">{when(user.lastLoginAt)}</td>
 
               <td class="actions">
@@ -339,6 +453,40 @@
                   </button>
                 {/if}
 
+                {#if canWrite && canMarkPasswordless(user)}
+                  <button
+                    type="button"
+                    class="link"
+                    disabled={busy !== ''}
+                    onclick={() => void togglePasswordless(user, true)}
+                  >
+                    {t('users.passwordless.set')}
+                  </button>
+                {/if}
+
+                {#if canWrite && canMarkPasswordSet(user, ownAdminUserId)}
+                  <button
+                    type="button"
+                    class="link danger"
+                    disabled={busy !== ''}
+                    onclick={() => void togglePasswordless(user, false)}
+                  >
+                    {t('users.passwordless.unset')}
+                  </button>
+                {/if}
+
+                {#if showPasskeys && canResetPasskeys(user, ownAdminUserId)}
+                  <!-- ⚠️ **取り返しのつかない操作。** 押す前に確かめ、記録に残ることも伝える。自分の分は出さない -->
+                  <button
+                    type="button"
+                    class="link danger"
+                    disabled={busy !== ''}
+                    onclick={() => void resetPasskeys(user)}
+                  >
+                    {t('users.resetPasskeys')}
+                  </button>
+                {/if}
+
                 {#if user.adminUserId !== ownAdminUserId && !user.invitationPending}
                   <button
                     type="button"
@@ -362,14 +510,14 @@
             </tr>
             {#if sessionsFor === user.adminUserId}
               <tr>
-                <td colspan="6">
+                <td colspan={columnCount}>
                   <AdminSessionList adminUserId={user.adminUserId} canRevoke={canWrite} />
                 </td>
               </tr>
             {/if}
             {#if apiTokensFor === user.adminUserId}
               <tr>
-                <td colspan="6">
+                <td colspan={columnCount}>
                   <AdminUserApiTokens adminUserId={user.adminUserId} canRevoke={canWrite} />
                 </td>
               </tr>
@@ -422,11 +570,6 @@
   select {
     display: block;
     margin-top: var(--space-1);
-    padding: 0.4rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font: inherit;
-    color: initial;
   }
 
   .issued {
@@ -442,7 +585,7 @@
   }
 
   .url code {
-    /* **長い URL を折り返す。** 選んで写せる形のままにする */
+    /* **長い URL を折り返す。** 選んでコピーできる形のままにする */
     word-break: break-all;
     font-size: 0.85rem;
   }
@@ -561,6 +704,11 @@
 
   .error {
     color: var(--error);
+    font-size: 0.9rem;
+  }
+
+  .notice {
+    color: var(--success);
     font-size: 0.9rem;
   }
 
