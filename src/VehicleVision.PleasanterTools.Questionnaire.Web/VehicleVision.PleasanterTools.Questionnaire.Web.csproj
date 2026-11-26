@@ -15,7 +15,7 @@
     <PackageReference Include="nClam" Version="9.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
     <PackageReference Include="Otp.NET" Version="1.4.1" />
-    <PackageReference Include="Scalar.AspNetCore" Version="2.21.0" />
+    <PackageReference Include="Scalar.AspNetCore" Version="3.2.1" />
     <!-- Pleasanter のログインの本人確認（PleasanterSessionVerifier）は Core.Web（NuGet）へ集約した（Issue #706） -->
     <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.3.0" />
   </ItemGroup>
