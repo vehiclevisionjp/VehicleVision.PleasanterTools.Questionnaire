@@ -203,6 +203,7 @@ export const vi: Partial<Record<MessageKey, string>> = {
   "sessions.method.Password": "Mật khẩu",
   "sessions.method.Saml": "SAML",
   "sessions.method.PleasanterSso": "Đăng nhập Pleasanter",
+  "sessions.method.Passkey": "Passkey",
   "sessions.revoke": "Kết thúc",
   "sessions.revokeOthers": "Kết thúc tất cả các thiết bị khác",
   "sessions.confirmRevoke": "Kết thúc phiên sử dụng thiết bị này?",

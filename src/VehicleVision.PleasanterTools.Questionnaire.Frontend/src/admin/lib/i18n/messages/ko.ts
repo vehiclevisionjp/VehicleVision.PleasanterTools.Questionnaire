@@ -257,6 +257,7 @@ export const ko: Partial<Record<MessageKey, string>> = {
   'sessions.method.Password': '비밀번호',
   'sessions.method.Saml': 'SAML',
   'sessions.method.PleasanterSso': 'Pleasanter 로그인',
+  'sessions.method.Passkey': '패스키',
   'sessions.revoke': '끝내다',
   'sessions.revokeOthers': '다른 기기를 모두 종료',
   'sessions.confirmRevoke': '이 기기의 세션을 종료합니다. 괜찮습니까?',

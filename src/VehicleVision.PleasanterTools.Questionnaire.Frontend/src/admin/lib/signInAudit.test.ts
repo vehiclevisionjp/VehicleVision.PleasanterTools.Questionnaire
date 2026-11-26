@@ -53,6 +53,7 @@ describe('loginMethodKey', () => {
     expect(loginMethodKey('Password')).toBe('sessions.method.Password');
     expect(loginMethodKey('Saml')).toBe('sessions.method.Saml');
     expect(loginMethodKey('PleasanterSso')).toBe('sessions.method.PleasanterSso');
+    expect(loginMethodKey('Passkey')).toBe('sessions.method.Passkey');
     expect(loginMethodKey(null)).toBeNull();
     expect(loginMethodKey('x')).toBeNull();
   });

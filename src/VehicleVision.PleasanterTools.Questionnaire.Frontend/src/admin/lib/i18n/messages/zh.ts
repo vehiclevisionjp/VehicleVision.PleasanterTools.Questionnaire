@@ -291,6 +291,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   'sessions.method.Password': '密码',
   'sessions.method.Saml': 'SAML',
   'sessions.method.PleasanterSso': 'Pleasanter 登录',
+  'sessions.method.Passkey': '通行密钥',
   'sessions.revoke': '结束',
   'sessions.revokeOthers': '结束其他所有设备的会话',
   'sessions.confirmRevoke': '确定要结束此设备的会话吗？',
