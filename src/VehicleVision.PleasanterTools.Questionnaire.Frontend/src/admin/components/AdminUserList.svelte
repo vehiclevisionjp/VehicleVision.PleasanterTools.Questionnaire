@@ -13,16 +13,20 @@
     resetAdminUserPasskeys,
     resetAdminUserTwoFactor,
     setAdminUserDisabled,
+    setAdminUserSsoOnly,
     setAdminUserRole,
   } from '../lib/api';
   import {
     ADMIN_ROLES,
     canChangeRole,
     canDisable,
+    canMarkPasswordless,
+    canMarkPasswordSet,
     canReissueInvitation,
     canResetPasskeys,
     canResetTwoFactor,
     invitationUrl,
+    isPasswordless,
     resetPasskeysFailureKey,
     roleLabel,
   } from '../lib/adminUsers';
@@ -176,6 +180,43 @@
     notice = t('users.passkeysReset', { loginId: user.loginId, count: result.value.removed });
   }
 
+  /**
+   * 「パスワードなし（SSO のみ）」の印を切り替える（Issue #1086）。
+   *
+   * **確認で「ログインは変わらない・最後のパスキーの判定だけが変わる」を伝える。**
+   * ⚠️ **戻す向きでは、本人がパスワードを知らないと締め出されるおそれ**を伝える。
+   */
+  async function togglePasswordless(user: AdminUserRow, ssoOnly: boolean) {
+    const label = t(ssoOnly ? 'users.passwordless.set' : 'users.passwordless.unset');
+    const confirmed = await confirmAction({
+      title: label,
+      message: t(ssoOnly ? 'users.passwordless.confirmSet' : 'users.passwordless.confirmUnset', {
+        loginId: user.loginId,
+      }),
+      confirmLabel: label,
+      danger: !ssoOnly,
+      focusCancel: !ssoOnly,
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    busy = `passwordless:${user.adminUserId}`;
+    error = '';
+    notice = '';
+    const result = await setAdminUserSsoOnly(user.adminUserId, ssoOnly);
+    busy = '';
+
+    // 失敗でも状態が変わっていることがあるので読み直す（読み込みは error を消すので、文言は後に出す）
+    await refresh();
+    if (!result.ok) {
+      error = result.message;
+      return;
+    }
+
+    notice = t('users.passwordless.changed', { loginId: user.loginId });
+  }
+
   function loginIdOf(adminUserId: string): string {
     return users.find((user) => user.adminUserId === adminUserId)?.loginId ?? '';
   }
@@ -305,6 +346,9 @@
                 {:else}
                   <span class="badge active">{t('users.state.active')}</span>
                 {/if}
+                {#if isPasswordless(user)}
+                  <span class="badge pending">{t('users.passwordless.badge')}</span>
+                {/if}
               </td>
 
               <td>{user.hasTotp ? t('users.twoFactor.on') : t('users.twoFactor.off')}</td>
@@ -406,6 +450,28 @@
                     }}
                   >
                     {t('users.resetTwoFactor')}
+                  </button>
+                {/if}
+
+                {#if canWrite && canMarkPasswordless(user)}
+                  <button
+                    type="button"
+                    class="link"
+                    disabled={busy !== ''}
+                    onclick={() => void togglePasswordless(user, true)}
+                  >
+                    {t('users.passwordless.set')}
+                  </button>
+                {/if}
+
+                {#if canWrite && canMarkPasswordSet(user, ownAdminUserId)}
+                  <button
+                    type="button"
+                    class="link danger"
+                    disabled={busy !== ''}
+                    onclick={() => void togglePasswordless(user, false)}
+                  >
+                    {t('users.passwordless.unset')}
                   </button>
                 {/if}
 

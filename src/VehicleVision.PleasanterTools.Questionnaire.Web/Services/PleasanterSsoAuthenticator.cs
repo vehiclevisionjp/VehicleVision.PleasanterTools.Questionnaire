@@ -51,6 +51,7 @@ public sealed record PleasanterSsoSignInResult(
 /// </remarks>
 public sealed class PleasanterSsoAuthenticator(
     IAdminUserStore store,
+    IAdminUserSettingsStore settings,
     PasswordHasher hasher,
     AdminAuthOptions authOptions,
     TimeProvider timeProvider,
@@ -141,9 +142,17 @@ public sealed class PleasanterSsoAuthenticator(
             .CreateAsync(loginId, passwordHash, AdminRoleMap.ToName(registerRole), language: string.Empty, cancellationToken)
             .ConfigureAwait(false);
 
-        // **同時に同じログイン ID の管理者が作られていたら、その管理者を使う**（役割は上書きしない）
-        return created
-            ?? (await store.FindForLoginAsync(loginId, cancellationToken).ConfigureAwait(false))?.User
+        if (created is not null)
+        {
+            // **「パスワード未設定」の印を付ける**（Issue #1086）。上の値は誰も知らないので、
+            // パスワードを「使えるログイン方法」へ数えさせない（最後のパスキーを消した JIT 管理者が、締め出されないように）。
+            // 作った直後だけ付ける。**すでに居た管理者の印には触れない**（パスワードで入っている人を未設定にしない）
+            await settings.SetPasswordSetAsync(created.Id, false, cancellationToken).ConfigureAwait(false);
+            return created;
+        }
+
+        // **同時に同じログイン ID の管理者が作られていたら、その管理者を使う**（役割は上書きしない。印も触れない）
+        return (await store.FindForLoginAsync(loginId, cancellationToken).ConfigureAwait(false))?.User
             ?? throw new InvalidOperationException("管理者を作れず、既存の管理者も見つからなかった。");
     }
 }

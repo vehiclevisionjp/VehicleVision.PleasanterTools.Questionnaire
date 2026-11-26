@@ -230,6 +230,19 @@ export const setAdminUserDisabled = (adminUserId: string, isDisabled: boolean) =
   );
 
 /**
+ * 「パスワードなし（SSO のみ）」の印を付ける・外す（Issue #1086）。`users.write`。
+ *
+ * **ログインの成否は変えない**（パスワードのハッシュにもセッションにも触れない）。
+ * 変わるのは、パスキーの最後の 1 件を消してよいかの判定だけ。操作の記録に残る。
+ * **自分を「パスワードあり」へ戻す操作は 409**（知らない印で自分を締め出さないため）。
+ */
+export const setAdminUserSsoOnly = (adminUserId: string, ssoOnly: boolean) =>
+  call<{ ssoOnly: boolean }>(`/api/admin/users/${adminUserId}/sso-only`, {
+    method: 'POST',
+    json: { ssoOnly },
+  });
+
+/**
  * 他人の 2 要素を解除する（端末を失ったときの救済）。
  *
  * ⚠️ **保護を外す操作。** 操作の記録に残る。

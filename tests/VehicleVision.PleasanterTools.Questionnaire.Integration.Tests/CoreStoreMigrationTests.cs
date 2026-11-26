@@ -707,6 +707,14 @@ public class CoreStoreMigrationTests
         Assert.True(await settings.GetResponseNotificationEnabledAsync(AdminA));
         Assert.False(await settings.GetResponseNotificationEnabledAsync(AdminB));
 
+        // **パスワード設定済みの印は、既存の管理者が全員「設定済み」**（M0044。誰も締め出さない）
+        foreach (var id in new[] { AdminA, AdminB, AdminC, AdminD })
+        {
+            Assert.True(await settings.GetPasswordSetAsync(id));
+        }
+
+        Assert.Empty(await settings.ListSsoOnlyAdminUserIdsAsync());
+
         // **初期設定の印が立つ。** 最初の管理者は、もう作れない
         Assert.Null(await store.CreateFirstAsync("attacker", "hash", string.Empty));
 
@@ -718,6 +726,48 @@ public class CoreStoreMigrationTests
         // もう一度当てても何も起きない
         QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
         Assert.Equal(4, (await store.ListAsync()).Count);
+    }
+
+    [Theory]
+    [MemberData(nameof(Providers))]
+    public async Task 設定の行がある導入先へ印の列を足すと全員が設定済みになる(
+        DatabaseProvider provider,
+        string connectionString)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        await using var database = await ScratchDatabase.CreateAsync(provider, connectionString);
+        var factory = new DbConnectionFactory(provider, database.ConnectionString);
+
+        // M0043 まで（印の列の前）。回答通知を受け取る管理者の行が、すでにある導入先
+        MigrateTo(provider, database.ConnectionString, 43);
+        var enabled = Guid.NewGuid();
+        await using (var connection = factory.Create())
+        {
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                SqlDialect.Format(
+                    provider,
+                    "INSERT INTO [AdminUserSettings] ([AdminUserId], [ResponseNotificationEnabled]) VALUES (@Id, @On)"),
+                new { Id = enabled, On = true });
+        }
+
+        QuestionnaireDatabase.Instance.Migrator.MigrateUp(provider, database.ConnectionString);
+        Assert.False(QuestionnaireDatabase.Instance.Migrator.HasPendingMigrations(provider, database.ConnectionString));
+
+        await using var check = factory.Create();
+        await check.OpenAsync();
+
+        // 既存の行は「設定済み」、回答通知の値はそのまま
+        Assert.Equal(1, await check.ExecuteScalarAsync<int>(SqlDialect.Format(
+            provider,
+            "SELECT COUNT(*) FROM [AdminUserSettings] WHERE [PasswordSet] = @Set AND [ResponseNotificationEnabled] = @On"),
+            new { Set = true, On = true }));
+        Assert.Equal(0, await check.ExecuteScalarAsync<int>(SqlDialect.Format(
+            provider, "SELECT COUNT(*) FROM [AdminUserSettings] WHERE [PasswordSet] = @Set"), new { Set = false }));
     }
 
     [Theory]
