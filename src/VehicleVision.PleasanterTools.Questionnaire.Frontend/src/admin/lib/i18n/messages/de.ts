@@ -203,6 +203,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "sessions.method.Password": "Passwort",
   "sessions.method.Saml": "SAML",
   "sessions.method.PleasanterSso": "Pleasanter-Anmeldung",
+  "sessions.method.Passkey": "Passkey",
   "sessions.revoke": "Ende",
   "sessions.revokeOthers": "Beenden Sie alle anderen Geräte",
   "sessions.confirmRevoke": "Beenden Sie diese Gerätesitzung?",

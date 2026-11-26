@@ -289,6 +289,7 @@ export const ja = {
   'sessions.method.Password': 'パスワード',
   'sessions.method.Saml': 'SAML',
   'sessions.method.PleasanterSso': 'Pleasanter のログイン',
+  'sessions.method.Passkey': 'パスキー',
   'sessions.revoke': '終了する',
   'sessions.revokeOthers': 'ほかの端末をすべて終了する',
   'sessions.confirmRevoke': 'この端末のセッションを終了します。よろしいですか？',

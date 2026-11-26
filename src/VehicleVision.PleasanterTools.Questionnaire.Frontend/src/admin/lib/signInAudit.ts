@@ -112,6 +112,8 @@ export function loginMethodKey(method: string | null | undefined): MessageKey | 
       return 'sessions.method.Saml';
     case 'PleasanterSso':
       return 'sessions.method.PleasanterSso';
+    case 'Passkey':
+      return 'sessions.method.Passkey';
     default:
       return null;
   }

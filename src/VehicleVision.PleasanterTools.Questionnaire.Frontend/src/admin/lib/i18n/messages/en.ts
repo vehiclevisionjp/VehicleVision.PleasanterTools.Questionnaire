@@ -289,6 +289,7 @@ export const en: Record<MessageKey, string> = {
   'sessions.method.Password': 'Password',
   'sessions.method.Saml': 'SAML',
   'sessions.method.PleasanterSso': 'Pleasanter sign-in',
+  'sessions.method.Passkey': 'Passkey',
   'sessions.revoke': 'End',
   'sessions.revokeOthers': 'End all other devices',
   'sessions.confirmRevoke': 'End this device session?',
