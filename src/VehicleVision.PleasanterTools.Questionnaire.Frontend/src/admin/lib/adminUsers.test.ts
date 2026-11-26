@@ -3,11 +3,14 @@ import {
   canChangeRole,
   hasLoggedIn,
   canDisable,
+  canMarkPasswordless,
+  canMarkPasswordSet,
   canReissueInvitation,
   canResetPasskeys,
   canResetTwoFactor,
   hasOtherUsableAdministrator,
   invitationUrl,
+  isPasswordless,
   resetPasskeysFailureKey,
 } from './adminUsers';
 import type { AdminUserRow } from './types';
@@ -23,6 +26,7 @@ function row(overrides: Partial<AdminUserRow> = {}): AdminUserRow {
     // 件数は、権限がないとき・パスキーが無効のときは項目そのものが来ない
     ...('passkeyCount' in overrides ? { passkeyCount: overrides.passkeyCount } : {}),
     invitationPending: overrides.invitationPending ?? false,
+    passwordSet: overrides.passwordSet ?? true,
     // ⚠️ **`??` を使わない。** `null` を渡したときに既定値へ落ちてしまう
     lastLoginAt: 'lastLoginAt' in overrides ? overrides.lastLoginAt! : '2026-09-01T00:00:00Z',
     createdAt: overrides.createdAt ?? '2026-08-01T00:00:00Z',
@@ -194,5 +198,28 @@ describe('招待', () => {
     expect(invitationUrl('token', 'https://example.jp', '/back-office')).toBe(
       'https://example.jp/back-office/invitations/accept?token=token',
     );
+  });
+});
+
+describe('「パスワードなし（SSO のみ）」の印（Issue #1086）', () => {
+  const jit = row({ adminUserId: 'jit', passwordSet: false });
+
+  it('印が偽でも招待中の人は「パスワードなし」と見せない', () => {
+    expect(isPasswordless(jit)).toBe(true);
+    expect(isPasswordless(row({ passwordSet: false, invitationPending: true }))).toBe(false);
+    expect(isPasswordless(row())).toBe(false);
+  });
+
+  it('付けられるのは、パスワードありの人（自分にも出す。招待中には出さない）', () => {
+    expect(canMarkPasswordless(row())).toBe(true);
+    expect(canMarkPasswordless(me)).toBe(true);
+    expect(canMarkPasswordless(jit)).toBe(false);
+    expect(canMarkPasswordless(row({ invitationPending: true }))).toBe(false);
+  });
+
+  it('戻せるのは、パスワードなしの他人だけ（自分には出さない）', () => {
+    expect(canMarkPasswordSet(jit, 'me')).toBe(true);
+    expect(canMarkPasswordSet(row({ adminUserId: 'me', passwordSet: false }), 'me')).toBe(false);
+    expect(canMarkPasswordSet(row(), 'me')).toBe(false);
   });
 });

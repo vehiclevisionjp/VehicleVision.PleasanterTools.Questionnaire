@@ -189,6 +189,34 @@ export function resetPasskeysFailureKey(
   return 'users.failed';
 }
 
+/**
+ * 「パスワードなし（SSO のみ）」として扱うか。
+ *
+ * **招待中の人は含めない。** 招待を受け取るまでパスワードが無いのは当然で、受け取れば印は「あり」になる。
+ */
+export function isPasswordless(target: AdminUserRow): boolean {
+  return !target.passwordSet && !target.invitationPending;
+}
+
+/**
+ * 「パスワードなし」にできるか（すでにいる JIT 管理者を直す。Issue #1086）。
+ *
+ * **印を付ける向きは判定を厳しくする側**なので、自分にも出す。招待中の人には出さない。
+ */
+export function canMarkPasswordless(target: AdminUserRow): boolean {
+  return target.passwordSet && !target.invitationPending;
+}
+
+/**
+ * 「パスワードあり」へ戻せるか。
+ *
+ * **自分には出さない。** 本人がパスワードを知らないまま印だけを戻すと、最後のパスキーを消して締め出される
+ * （サーバも 409 で拒む）。誤って付けた他人の印を直す道としてだけ残す。
+ */
+export function canMarkPasswordSet(target: AdminUserRow, ownAdminUserId: string): boolean {
+  return isPasswordless(target) && target.adminUserId !== ownAdminUserId;
+}
+
 /** 招待を出し直せるか。**まだ受け取っていない人だけ。** */
 export function canReissueInvitation(target: AdminUserRow): boolean {
   return target.invitationPending;
