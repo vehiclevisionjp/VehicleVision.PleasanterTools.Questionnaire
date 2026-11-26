@@ -298,23 +298,23 @@ public static class AdminUserEndpoints
         // 権限は役割の変更・停止と同じ `users.write`。新しい権限は作らない
         // （人の状態を変える操作の 1 つで、保護を外す操作ではない。印を付ける向きは判定を厳しくする側）。
         // 切り替えは、管理操作の監査ログに「誰が・誰に・どちらへ」残る（入口の集まりに掛けた監査フィルタ）。
-        users.MapPost("/{adminUserId:guid}/passwordless", async (
+        users.MapPost("/{adminUserId:guid}/sso-only", async (
             Guid adminUserId,
-            AdminPasswordlessRequest request,
+            AdminSsoOnlyRequest request,
             HttpContext context,
             ClaimsPrincipal principal,
             AdminUserService service,
             CancellationToken cancellationToken) =>
         {
             // **どちらへ切り替えようとしたかまで残す。** 断られた試みも記録に残る
-            AuditNotes.Add(context, "passwordless", request.Passwordless ? "true" : "false");
+            AuditNotes.Add(context, "ssoOnly", request.SsoOnly ? "true" : "false");
 
             var outcome = await service
-                .SetPasswordlessAsync(ActorId(principal), adminUserId, request.Passwordless, cancellationToken)
+                .SetSsoOnlyAsync(ActorId(principal), adminUserId, request.SsoOnly, cancellationToken)
                 .ConfigureAwait(false);
 
             return outcome is AdminUserOutcome.Succeeded
-                ? Results.Ok(new { passwordless = request.Passwordless })
+                ? Results.Ok(new { ssoOnly = request.SsoOnly })
                 : Failure(outcome, RequestLanguage.Of(context));
         })
             .RequireAuthorization(AdminPermissions.PolicyOf(AdminPermissions.UsersWrite));
@@ -757,7 +757,7 @@ public static class AdminUserEndpoints
     public sealed record AdminRoleRequest(string? Role);
 
     /// <summary>「パスワードなし（SSO のみ）」の印の切り替え。真で付け、偽で外す。</summary>
-    public sealed record AdminPasswordlessRequest(bool Passwordless);
+    public sealed record AdminSsoOnlyRequest(bool SsoOnly);
 
     /// <summary>今のパスワードと、新しいパスワード。</summary>
     /// <param name="CurrentPassword">今のパスワード。</param>

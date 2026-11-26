@@ -267,7 +267,7 @@ internal sealed class FakeAdminUserStore(TimeProvider timeProvider) : IAdminUser
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlySet<Guid>> ListPasswordlessAdminUserIdsAsync(CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlySet<Guid>> ListSsoOnlyAdminUserIdsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlySet<Guid>>(users.Values.Where(user => !user.PasswordSet).Select(user => user.Id).ToHashSet());
 
     public Task SetLanguageAsync(Guid adminUserId, string? language, CancellationToken cancellationToken = default)

@@ -16,7 +16,7 @@ namespace VehicleVision.PleasanterTools.Questionnaire.Integration.Tests;
 /// Core の契約試験は招待中の 1 通りだけを見るので、印の分をここで足す。
 /// </para>
 /// <para>
-/// 2 つ目は、印を切り替える口（<c>POST /api/admin/users/{id}/passwordless</c>）の権限・自分への扱い・監査・一覧。
+/// 2 つ目は、印を切り替える口（<c>POST /api/admin/users/{id}/sso-only</c>）の権限・自分への扱い・監査・一覧。
 /// </para>
 /// </remarks>
 public class AdminPasswordlessEndToEndTests
@@ -80,7 +80,7 @@ public class AdminPasswordlessEndToEndTests
         var (operatorClient, _) = await LoggedInOperatorAsync(host);
         var adminId = await host.UserIdAsync(admin);
         using (var restored = await operatorClient.PostAsJsonAsync(
-            $"/api/admin/users/{adminId}/passwordless", new { passwordless = false }))
+            $"/api/admin/users/{adminId}/sso-only", new { ssoOnly = false }))
         {
             Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
         }
@@ -102,11 +102,11 @@ public class AdminPasswordlessEndToEndTests
         Assert.True((await UsersAsync(operatorClient))[targetId].GetProperty("passwordSet").GetBoolean());
 
         using (var set = await operatorClient.PostAsJsonAsync(
-            $"/api/admin/users/{targetId}/passwordless", new { passwordless = true }))
+            $"/api/admin/users/{targetId}/sso-only", new { ssoOnly = true }))
         {
             Assert.Equal(HttpStatusCode.OK, set.StatusCode);
             using var body = JsonDocument.Parse(await set.Content.ReadAsStringAsync());
-            Assert.True(body.RootElement.GetProperty("passwordless").GetBoolean());
+            Assert.True(body.RootElement.GetProperty("ssoOnly").GetBoolean());
         }
 
         Assert.False((await UsersAsync(operatorClient))[targetId].GetProperty("passwordSet").GetBoolean());
@@ -118,12 +118,12 @@ public class AdminPasswordlessEndToEndTests
             Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         }
 
-        var audit = Assert.Single(await host.AdminAuditAsync("POST /api/admin/users/{adminUserId}/passwordless"));
+        var audit = Assert.Single(await host.AdminAuditAsync("POST /api/admin/users/{adminUserId}/sso-only"));
         Assert.True(audit.Succeeded);
         Assert.Equal("AdminUser", audit.TargetType);
         Assert.Equal(targetId.ToString(), audit.TargetId, ignoreCase: true);
         Assert.Equal(operatorAdmin.LoginId, audit.ActorLoginId);
-        Assert.Contains("\"passwordless\":\"true\"", audit.DetailJson, StringComparison.Ordinal);
+        Assert.Contains("\"ssoOnly\":\"true\"", audit.DetailJson, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public class AdminPasswordlessEndToEndTests
         }
 
         using var denied = await editorClient.PostAsJsonAsync(
-            $"/api/admin/users/{targetId}/passwordless", new { passwordless = true });
+            $"/api/admin/users/{targetId}/sso-only", new { ssoOnly = true });
 
         Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
     }
@@ -153,13 +153,13 @@ public class AdminPasswordlessEndToEndTests
         var ownId = await host.UserIdAsync(operatorAdmin);
 
         using (var toSet = await operatorClient.PostAsJsonAsync(
-            $"/api/admin/users/{ownId}/passwordless", new { passwordless = false }))
+            $"/api/admin/users/{ownId}/sso-only", new { ssoOnly = false }))
         {
             Assert.Equal(HttpStatusCode.Conflict, toSet.StatusCode);
         }
 
         using (var toPasswordless = await operatorClient.PostAsJsonAsync(
-            $"/api/admin/users/{ownId}/passwordless", new { passwordless = true }))
+            $"/api/admin/users/{ownId}/sso-only", new { ssoOnly = true }))
         {
             Assert.Equal(HttpStatusCode.OK, toPasswordless.StatusCode);
         }
@@ -167,7 +167,7 @@ public class AdminPasswordlessEndToEndTests
         Assert.False((await UsersAsync(operatorClient))[ownId].GetProperty("passwordSet").GetBoolean());
 
         using var missing = await operatorClient.PostAsJsonAsync(
-            $"/api/admin/users/{Guid.NewGuid()}/passwordless", new { passwordless = true });
+            $"/api/admin/users/{Guid.NewGuid()}/sso-only", new { ssoOnly = true });
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 

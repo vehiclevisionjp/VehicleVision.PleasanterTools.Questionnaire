@@ -143,13 +143,13 @@ public class AdminAuthenticationTests
 
         // 行が無い管理者は「設定済み」（既存の管理者はすべてこの状態）
         Assert.True(await harness.Settings.GetPasswordSetAsync(user.Id));
-        Assert.Empty(await harness.Settings.ListPasswordlessAdminUserIdsAsync());
+        Assert.Empty(await harness.Settings.ListSsoOnlyAdminUserIdsAsync());
 
         // 未設定へ（行が無ければ作る）。ほかの管理者へは及ばない
         await harness.Settings.SetPasswordSetAsync(other.Id, false);
         Assert.False(await harness.Settings.GetPasswordSetAsync(other.Id));
         Assert.True(await harness.Settings.GetPasswordSetAsync(user.Id));
-        Assert.Equal([other.Id], (await harness.Settings.ListPasswordlessAdminUserIdsAsync()).ToArray());
+        Assert.Equal([other.Id], (await harness.Settings.ListSsoOnlyAdminUserIdsAsync()).ToArray());
 
         // 回答通知の設定とは独立している（行を共有しても、互いを上書きしない）
         await harness.Settings.SetResponseNotificationEnabledAsync(other.Id, true);
@@ -157,7 +157,7 @@ public class AdminAuthenticationTests
         await harness.Settings.SetPasswordSetAsync(other.Id, true);
         Assert.True(await harness.Settings.GetResponseNotificationEnabledAsync(other.Id));
         Assert.True(await harness.Settings.GetPasswordSetAsync(other.Id));
-        Assert.Empty(await harness.Settings.ListPasswordlessAdminUserIdsAsync());
+        Assert.Empty(await harness.Settings.ListSsoOnlyAdminUserIdsAsync());
 
         // 設定の行が先にある管理者（回答通知だけ）も、もう一度未設定へ直せる
         await harness.Settings.SetPasswordSetAsync(other.Id, false);

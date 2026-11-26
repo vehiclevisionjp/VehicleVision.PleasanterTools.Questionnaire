@@ -713,7 +713,7 @@ public class CoreStoreMigrationTests
             Assert.True(await settings.GetPasswordSetAsync(id));
         }
 
-        Assert.Empty(await settings.ListPasswordlessAdminUserIdsAsync());
+        Assert.Empty(await settings.ListSsoOnlyAdminUserIdsAsync());
 
         // **初期設定の印が立つ。** 最初の管理者は、もう作れない
         Assert.Null(await store.CreateFirstAsync("attacker", "hash", string.Empty));

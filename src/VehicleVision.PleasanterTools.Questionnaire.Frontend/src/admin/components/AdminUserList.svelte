@@ -13,7 +13,7 @@
     resetAdminUserPasskeys,
     resetAdminUserTwoFactor,
     setAdminUserDisabled,
-    setAdminUserPasswordless,
+    setAdminUserSsoOnly,
     setAdminUserRole,
   } from '../lib/api';
   import {
@@ -186,16 +186,16 @@
    * **確認で「ログインは変わらない・最後のパスキーの判定だけが変わる」を伝える。**
    * ⚠️ **戻す向きでは、本人がパスワードを知らないと締め出されるおそれ**を伝える。
    */
-  async function togglePasswordless(user: AdminUserRow, passwordless: boolean) {
-    const label = t(passwordless ? 'users.passwordless.set' : 'users.passwordless.unset');
+  async function togglePasswordless(user: AdminUserRow, ssoOnly: boolean) {
+    const label = t(ssoOnly ? 'users.passwordless.set' : 'users.passwordless.unset');
     const confirmed = await confirmAction({
       title: label,
-      message: t(passwordless ? 'users.passwordless.confirmSet' : 'users.passwordless.confirmUnset', {
+      message: t(ssoOnly ? 'users.passwordless.confirmSet' : 'users.passwordless.confirmUnset', {
         loginId: user.loginId,
       }),
       confirmLabel: label,
-      danger: !passwordless,
-      focusCancel: !passwordless,
+      danger: !ssoOnly,
+      focusCancel: !ssoOnly,
     });
     if (!confirmed) {
       return;
@@ -204,7 +204,7 @@
     busy = `passwordless:${user.adminUserId}`;
     error = '';
     notice = '';
-    const result = await setAdminUserPasswordless(user.adminUserId, passwordless);
+    const result = await setAdminUserSsoOnly(user.adminUserId, ssoOnly);
     busy = '';
 
     // 失敗でも状態が変わっていることがあるので読み直す（読み込みは error を消すので、文言は後に出す）

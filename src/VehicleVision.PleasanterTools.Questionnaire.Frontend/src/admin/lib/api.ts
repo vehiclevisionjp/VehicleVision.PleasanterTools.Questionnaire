@@ -236,10 +236,10 @@ export const setAdminUserDisabled = (adminUserId: string, isDisabled: boolean) =
  * 変わるのは、パスキーの最後の 1 件を消してよいかの判定だけ。操作の記録に残る。
  * **自分を「パスワードあり」へ戻す操作は 409**（知らない印で自分を締め出さないため）。
  */
-export const setAdminUserPasswordless = (adminUserId: string, passwordless: boolean) =>
-  call<{ passwordless: boolean }>(`/api/admin/users/${adminUserId}/passwordless`, {
+export const setAdminUserSsoOnly = (adminUserId: string, ssoOnly: boolean) =>
+  call<{ ssoOnly: boolean }>(`/api/admin/users/${adminUserId}/sso-only`, {
     method: 'POST',
-    json: { passwordless },
+    json: { ssoOnly },
   });
 
 /**

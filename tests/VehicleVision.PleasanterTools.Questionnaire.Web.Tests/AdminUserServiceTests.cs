@@ -518,16 +518,16 @@ public class AdminUserServiceTests
         var admin = await FirstAdministratorAsync(harness);
         var target = await InviteAndAcceptAsync(harness, admin.Id, "sso-user", AdminRole.Editor);
 
-        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetPasswordlessAsync(admin.Id, target, true));
+        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetSsoOnlyAsync(admin.Id, target, true));
         Assert.False(await harness.Users.GetPasswordSetAsync(target));
         var listed = await harness.Service.ListAsync();
         Assert.False(listed.Single(user => user.AdminUserId == target).PasswordSet);
         Assert.True(listed.Single(user => user.AdminUserId == admin.Id).PasswordSet);
 
         // 同じ向きをもう一度行っても何も起きない
-        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetPasswordlessAsync(admin.Id, target, true));
+        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetSsoOnlyAsync(admin.Id, target, true));
 
-        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetPasswordlessAsync(admin.Id, target, false));
+        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetSsoOnlyAsync(admin.Id, target, false));
         Assert.True(await harness.Users.GetPasswordSetAsync(target));
     }
 
@@ -540,7 +540,7 @@ public class AdminUserServiceTests
         var session = await harness.Sessions.CreateAsync(target, AdminSessionKinds.Session, TimeSpan.FromHours(1));
 
         // **パスワードで入っている管理者へ付けても、締め出さない**
-        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetPasswordlessAsync(admin.Id, target, true));
+        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetSsoOnlyAsync(admin.Id, target, true));
 
         Assert.Equal(PasswordOutcome.SignedIn, (await harness.Authenticator.CheckPasswordAsync("pw-user", Password)).Outcome);
         Assert.NotNull(await harness.Sessions.FindAsync(session));
@@ -554,11 +554,11 @@ public class AdminUserServiceTests
         var admin = await FirstAdministratorAsync(harness);
 
         // 安全側（最後のパスキーを消せなくなる向き）は通す
-        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetPasswordlessAsync(admin.Id, admin.Id, true));
+        Assert.Equal(AdminUserOutcome.Succeeded, await harness.Service.SetSsoOnlyAsync(admin.Id, admin.Id, true));
         Assert.False(await harness.Users.GetPasswordSetAsync(admin.Id));
 
         // 知らない印を自分で立てて締め出される道は作らない
-        Assert.Equal(AdminUserOutcome.SelfNotAllowed, await harness.Service.SetPasswordlessAsync(admin.Id, admin.Id, false));
+        Assert.Equal(AdminUserOutcome.SelfNotAllowed, await harness.Service.SetSsoOnlyAsync(admin.Id, admin.Id, false));
         Assert.False(await harness.Users.GetPasswordSetAsync(admin.Id));
     }
 
@@ -568,7 +568,7 @@ public class AdminUserServiceTests
         var harness = Create();
         var admin = await FirstAdministratorAsync(harness);
 
-        Assert.Equal(AdminUserOutcome.NotFound, await harness.Service.SetPasswordlessAsync(admin.Id, Guid.NewGuid(), true));
+        Assert.Equal(AdminUserOutcome.NotFound, await harness.Service.SetSsoOnlyAsync(admin.Id, Guid.NewGuid(), true));
     }
 
     // ---- 自分のパスワード ------------------------------------------------------

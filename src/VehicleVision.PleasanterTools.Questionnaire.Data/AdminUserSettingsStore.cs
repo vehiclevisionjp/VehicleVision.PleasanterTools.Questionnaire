@@ -64,7 +64,7 @@ public interface IAdminUserSettingsStore
     Task SetPasswordSetAsync(Guid adminUserId, bool passwordSet, CancellationToken cancellationToken = default);
 
     /// <summary>パスワード未設定の印が付いた管理者の ID。一覧の表示に使う。</summary>
-    Task<IReadOnlySet<Guid>> ListPasswordlessAdminUserIdsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlySet<Guid>> ListSsoOnlyAdminUserIdsAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Dapper を使った実装。表は <c>AdminUserSettings</c>（M0038）。</summary>
@@ -186,7 +186,7 @@ public sealed class AdminUserSettingsStore(IDbConnectionFactory connectionFactor
         }
     }
 
-    public async Task<IReadOnlySet<Guid>> ListPasswordlessAdminUserIdsAsync(
+    public async Task<IReadOnlySet<Guid>> ListSsoOnlyAdminUserIdsAsync(
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);

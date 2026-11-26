@@ -109,7 +109,7 @@ public sealed class AdminUserService(
         var users = await store.ListAsync(cancellationToken).ConfigureAwait(false);
         var pending = (await invitations
             .ListPendingAdminUserIdsAsync(cancellationToken).ConfigureAwait(false)).ToHashSet();
-        var passwordless = await settings.ListPasswordlessAdminUserIdsAsync(cancellationToken).ConfigureAwait(false);
+        var ssoOnlyIds = await settings.ListSsoOnlyAdminUserIdsAsync(cancellationToken).ConfigureAwait(false);
 
         return users.Select(user => new AdminUserSummary
         {
@@ -119,7 +119,7 @@ public sealed class AdminUserService(
             IsDisabled = user.IsDisabled,
             HasTotp = user.TotpEnabled,
             InvitationPending = pending.Contains(user.Id),
-            PasswordSet = !passwordless.Contains(user.Id),
+            PasswordSet = !ssoOnlyIds.Contains(user.Id),
             LastLoginAt = user.LastLoginAt?.UtcDateTime,
             CreatedAt = user.CreatedAt.UtcDateTime,
         }).ToList();
@@ -387,10 +387,10 @@ public sealed class AdminUserService(
     /// </para>
     /// <para>切り替えは自動では行わない（ログイン時の自動修正は、パスワードを持つ管理者を誤って直すおそれがあるため採らない）。</para>
     /// </remarks>
-    public async Task<AdminUserOutcome> SetPasswordlessAsync(
+    public async Task<AdminUserOutcome> SetSsoOnlyAsync(
         Guid actorId,
         Guid targetId,
-        bool passwordless,
+        bool ssoOnly,
         CancellationToken cancellationToken = default)
     {
         var target = await store.FindByIdAsync(targetId, cancellationToken).ConfigureAwait(false);
@@ -400,22 +400,22 @@ public sealed class AdminUserService(
         }
 
         // **自分を「パスワードあり」へ戻す操作は通さない。** 知らない印を自分で立てて締め出される道を作らない
-        if (!passwordless && targetId == actorId)
+        if (!ssoOnly && targetId == actorId)
         {
             return AdminUserOutcome.SelfNotAllowed;
         }
 
-        if (await settings.GetPasswordSetAsync(targetId, cancellationToken).ConfigureAwait(false) == !passwordless)
+        if (await settings.GetPasswordSetAsync(targetId, cancellationToken).ConfigureAwait(false) == !ssoOnly)
         {
             return AdminUserOutcome.Succeeded;
         }
 
-        await settings.SetPasswordSetAsync(targetId, !passwordless, cancellationToken).ConfigureAwait(false);
+        await settings.SetPasswordSetAsync(targetId, !ssoOnly, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation(
-            "パスワードなし（SSO のみ）の印を切り替えた（AdminUserId={AdminUserId}、パスワードなし={Passwordless}、操作したのは {ActorId}）",
+            "パスワードなし（SSO のみ）の印を切り替えた（AdminUserId={AdminUserId}、SSO のみ={SsoOnly}、操作したのは {ActorId}）",
             targetId,
-            passwordless,
+            ssoOnly,
             actorId);
         return AdminUserOutcome.Succeeded;
     }
