@@ -49,6 +49,22 @@ public interface IAdminUserSettingsStore
     Task<IReadOnlyList<string>> ListUnusedRecoveryCodeHashesAsync(
         Guid adminUserId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 本人がパスワードを知っている（設定した）か。<b>行が無ければ「設定済み」</b>（既存の管理者は全員そう。M0044）。
+    /// </summary>
+    /// <remarks>
+    /// <b>ログインの成否には使わない。</b>パスワードで入れるかは、ハッシュの照合だけが決める。
+    /// この印は、パスキーの最後の 1 件を消してよいか（<c>IPasskeyAccounts</c>）を決めるときに、
+    /// パスワードを「使えるログイン方法」へ数えるかだけを決める（Issue #1086）。
+    /// </remarks>
+    Task<bool> GetPasswordSetAsync(Guid adminUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>パスワード設定済みの印を書く（行が無ければ作る）。</summary>
+    Task SetPasswordSetAsync(Guid adminUserId, bool passwordSet, CancellationToken cancellationToken = default);
+
+    /// <summary>パスワード未設定の印が付いた管理者の ID。一覧の表示に使う。</summary>
+    Task<IReadOnlySet<Guid>> ListPasswordlessAdminUserIdsAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Dapper を使った実装。表は <c>AdminUserSettings</c>（M0038）。</summary>
@@ -130,6 +146,65 @@ public sealed class AdminUserSettingsStore(IDbConnectionFactory connectionFactor
         Guid adminUserId,
         CancellationToken cancellationToken = default) =>
         users.ListUnusedRecoveryCodeHashesAsync(adminUserId, cancellationToken);
+
+    public async Task<bool> GetPasswordSetAsync(Guid adminUserId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await connection.ExecuteScalarAsync<bool?>(Sql(
+            "SELECT [PasswordSet] FROM [AdminUserSettings] WHERE [AdminUserId] = @AdminUserId",
+            new { AdminUserId = adminUserId },
+            cancellationToken: cancellationToken)).ConfigureAwait(false) ?? true;
+    }
+
+    public async Task SetPasswordSetAsync(
+        Guid adminUserId,
+        bool passwordSet,
+        CancellationToken cancellationToken = default)
+    {
+        var parameters = new { AdminUserId = adminUserId, PasswordSet = passwordSet };
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        if (await UpdatePasswordSetAsync(connection, parameters, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        try
+        {
+            await connection.ExecuteAsync(Sql(
+                "INSERT INTO [AdminUserSettings] ([AdminUserId], [PasswordSet]) VALUES (@AdminUserId, @PasswordSet)",
+                parameters,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+        catch (DbException)
+        {
+            // 同時に別の要求が行を作った（主キーの重複）。**更新し直せば足りる**。更新も通らなければ握りつぶさない
+            if (!await UpdatePasswordSetAsync(connection, parameters, cancellationToken).ConfigureAwait(false))
+            {
+                throw;
+            }
+        }
+    }
+
+    public async Task<IReadOnlySet<Guid>> ListPasswordlessAdminUserIdsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var ids = await connection.QueryAsync<Guid>(Sql(
+            "SELECT [AdminUserId] FROM [AdminUserSettings] WHERE [PasswordSet] = @PasswordSet",
+            new { PasswordSet = false },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return ids.ToHashSet();
+    }
+
+    private async Task<bool> UpdatePasswordSetAsync(
+        DbConnection connection,
+        object parameters,
+        CancellationToken cancellationToken) =>
+        await connection.ExecuteAsync(Sql(
+            "UPDATE [AdminUserSettings] SET [PasswordSet] = @PasswordSet WHERE [AdminUserId] = @AdminUserId",
+            parameters,
+            cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
 
     private async Task<bool> UpdateAsync(
         DbConnection connection,
