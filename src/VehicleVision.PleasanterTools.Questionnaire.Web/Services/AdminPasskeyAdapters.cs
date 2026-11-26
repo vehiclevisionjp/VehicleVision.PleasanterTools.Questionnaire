@@ -98,6 +98,7 @@ public sealed class PasskeyChallengeStoreAdapter(IAdminPasskeyChallengeStore sto
 /// <summary>管理者まわりの受け口。管理者・セッションは Core.Data の共有ストア、パスワードの照合は本アプリの認証を使う。</summary>
 public sealed class PasskeyAccountsAdapter(
     IAdminUserStore users,
+    IAdminUserSettingsStore userSettings,
     IAdminSessionStore sessions,
     AdminAuthenticator authenticator,
     IAdminInvitationStore invitations,
@@ -153,7 +154,7 @@ public sealed class PasskeyAccountsAdapter(
 
     /// <summary>
     /// 使えるログイン方法（Core の P5。<b>ほかのパスキーは数えない</b>）。
-    /// パスワード（合言葉のログインが塞がれておらず、招待を受け取り済み）・SAML・Pleasanter のログインの、いずれか。
+    /// パスワード（合言葉のログインが塞がれておらず、招待を受け取り済みで、<b>パスワードを持つ印がある</b>）・SAML・Pleasanter のログインの、いずれか。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -161,8 +162,14 @@ public sealed class PasskeyAccountsAdapter(
     /// （<see cref="AdminPasswordSignInPolicy"/>）ので、その間は使えるとする。救済トークンでの一時的な入口は数えない。
     /// </para>
     /// <para>
-    /// ⚠️ <b>「本人がパスワードを知るか」は見分けられない。</b>SAML・Pleasanter のログインで作られた管理者は誰も知らない値を持つが、
-    /// その印は表に無い。招待中でなければ、パスワードで入れると数える（SAML・Pleasanter が有効なら、どのみちそちらでも入れる）。
+    /// <b>「パスワード設定済み」の印を見る</b>（Issue #1086。<see cref="IAdminUserSettingsStore.GetPasswordSetAsync"/>）。
+    /// SAML・Pleasanter のログインで作られた管理者（JIT）は本人の知らない値のハッシュを持つので、
+    /// パスワードを「使えるログイン方法」へ数えると、最後のパスキーを消した人が誰にも入れなくなる。
+    /// 印が「未設定」の管理者は、パスワードを数えない。<b>SAML・Pleasanter が有効なら、それは今までどおり数える。</b>
+    /// </para>
+    /// <para>
+    /// <b>この判定はログインの成否を変えない。</b>パスワードで入れるかは、ハッシュの照合だけが決める
+    /// （印が未設定でも、パスワードのログインが通る・通らないは今までと同じ）。
     /// </para>
     /// </remarks>
     public async Task<PasskeySignInMethods> GetSignInMethodsAsync(
@@ -174,7 +181,8 @@ public sealed class PasskeyAccountsAdapter(
         var passwordSignInOpen = settings.PasswordSignInEnabled || !(saml || pleasanterSso);
 
         var password = false;
-        if (passwordSignInOpen)
+        if (passwordSignInOpen
+            && await userSettings.GetPasswordSetAsync(userId, cancellationToken).ConfigureAwait(false))
         {
             var pending = await invitations.ListPendingAdminUserIdsAsync(cancellationToken).ConfigureAwait(false);
             password = !pending.Contains(userId);

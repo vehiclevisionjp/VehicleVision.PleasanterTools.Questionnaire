@@ -47,6 +47,7 @@ public class AdminPasskeyAdaptersTests
 
         var accounts = new PasskeyAccountsAdapter(
             users,
+            users,
             sessions,
             authenticator,
             invitations,
@@ -68,6 +69,52 @@ public class AdminPasskeyAdaptersTests
 
         Assert.Equal(new PasskeySignInMethods(Password: true, Saml: false, PleasanterSso: false), methods);
         Assert.True(methods.Any);
+    }
+
+    [Fact]
+    public async Task パスワード未設定の管理者はパスワードを使えるログイン方法に数えない()
+    {
+        var harness = await CreateAsync();
+        await harness.Users.SetPasswordSetAsync(harness.User.Id, false);
+
+        var methods = await harness.Accounts.GetSignInMethodsAsync(harness.User.Id);
+
+        Assert.Equal(new PasskeySignInMethods(Password: false, Saml: false, PleasanterSso: false), methods);
+        Assert.False(methods.Any);
+    }
+
+    [Fact]
+    public async Task パスワード未設定の管理者でも_SAMLが有効ならSAMLを数える()
+    {
+        var harness = await CreateAsync(passwordSignInEnabled: false, saml: true);
+        await harness.Users.SetPasswordSetAsync(harness.User.Id, false);
+
+        var methods = await harness.Accounts.GetSignInMethodsAsync(harness.User.Id);
+
+        Assert.Equal(new PasskeySignInMethods(Password: false, Saml: true, PleasanterSso: false), methods);
+        Assert.True(methods.Any);
+    }
+
+    [Fact]
+    public async Task パスワード未設定の管理者でも_Pleasanterのログインが有効ならそれを数える()
+    {
+        var harness = await CreateAsync(pleasanterSso: true);
+        await harness.Users.SetPasswordSetAsync(harness.User.Id, false);
+
+        var methods = await harness.Accounts.GetSignInMethodsAsync(harness.User.Id);
+
+        // 合言葉は塞がれていない（既定）が、印が未設定なので数えない。Pleasanter は数える
+        Assert.Equal(new PasskeySignInMethods(Password: false, Saml: false, PleasanterSso: true), methods);
+    }
+
+    [Fact]
+    public async Task パスワード未設定の印はログインの成否を変えない()
+    {
+        // 印は「使えるログイン方法」の数え方だけを決める。パスワードの照合は、ハッシュだけが決める
+        var harness = await CreateAsync();
+        await harness.Users.SetPasswordSetAsync(harness.User.Id, false);
+
+        Assert.Equal(PasswordConfirmation.Confirmed, await harness.Accounts.ConfirmPasswordAsync(harness.User.Id, Password));
     }
 
     [Fact]

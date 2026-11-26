@@ -184,6 +184,15 @@ internal sealed class AdminPasskeyContractHost : IAdminPasskeyContractHost
         }
     }
 
+    /// <summary>「パスワード設定済み」の印を書く（Issue #1086）。偽は、JIT で作られたパスワードを持たない管理者の状態。</summary>
+    public Task SetPasswordSetAsync(SeededAdmin admin, bool passwordSet) =>
+        Service<VehicleVision.PleasanterTools.Questionnaire.Data.IAdminUserSettingsStore>().SetPasswordSetAsync(ids[admin.LoginId], passwordSet);
+
+    /// <summary>管理操作の監査ログ（<c>Core_AuditLogs</c>）のうち、操作の名前が <paramref name="actionPrefix"/> で始まるもの。</summary>
+    public async Task<IReadOnlyList<AuditEntry>> AdminAuditAsync(string actionPrefix) =>
+        [.. (await Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Limit = AuditLogQuery.MaxLimit }))
+            .Where(entry => entry.Action.StartsWith(actionPrefix, StringComparison.Ordinal))];
+
     public async Task<IReadOnlyList<PasskeyAuditRecord>> AuditAsync() =>
         [.. (await Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Limit = AuditLogQuery.MaxLimit }))
             .Where(entry => entry.Action.StartsWith("Passkey.", StringComparison.Ordinal))

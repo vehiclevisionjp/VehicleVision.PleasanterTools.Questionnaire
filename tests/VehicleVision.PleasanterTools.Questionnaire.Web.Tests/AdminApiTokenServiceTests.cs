@@ -64,6 +64,7 @@ public class AdminApiTokenServiceTests
             NullLogger<AdminAuthenticator>.Instance);
         var userService = new AdminUserService(
             users,
+            users,
             sessions,
             invitations,
             tokens,

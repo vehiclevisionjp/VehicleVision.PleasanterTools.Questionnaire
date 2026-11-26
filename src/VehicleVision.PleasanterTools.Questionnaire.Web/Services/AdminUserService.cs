@@ -55,6 +55,12 @@ public sealed record AdminUserSummary
     /// <summary>招待をまだ受け取っていないか。</summary>
     public required bool InvitationPending { get; init; }
 
+    /// <summary>
+    /// 本人がパスワードを知っている（設定した）か。<b>偽は「パスワードなし（SSO のみ）」</b>（Issue #1086）。
+    /// ログインの成否ではなく、パスキーの最後の 1 件を消してよいかの判定に使う印。
+    /// </summary>
+    public bool PasswordSet { get; init; } = true;
+
     /// <summary>**止め忘れを見つける唯一の手掛かり**（<c>_documents/データモデル設計.md</c> 2.6）。</summary>
     public DateTime? LastLoginAt { get; init; }
 
@@ -85,6 +91,7 @@ public sealed record IssuedInvitation(Guid AdminUserId, string Token, DateTime E
 /// </remarks>
 public sealed class AdminUserService(
     IAdminUserStore store,
+    IAdminUserSettingsStore settings,
     IAdminSessionStore sessions,
     IAdminInvitationStore invitations,
     IAdminApiTokenStore apiTokens,
@@ -102,6 +109,7 @@ public sealed class AdminUserService(
         var users = await store.ListAsync(cancellationToken).ConfigureAwait(false);
         var pending = (await invitations
             .ListPendingAdminUserIdsAsync(cancellationToken).ConfigureAwait(false)).ToHashSet();
+        var passwordless = await settings.ListPasswordlessAdminUserIdsAsync(cancellationToken).ConfigureAwait(false);
 
         return users.Select(user => new AdminUserSummary
         {
@@ -111,6 +119,7 @@ public sealed class AdminUserService(
             IsDisabled = user.IsDisabled,
             HasTotp = user.TotpEnabled,
             InvitationPending = pending.Contains(user.Id),
+            PasswordSet = !passwordless.Contains(user.Id),
             LastLoginAt = user.LastLoginAt?.UtcDateTime,
             CreatedAt = user.CreatedAt.UtcDateTime,
         }).ToList();
@@ -238,6 +247,10 @@ public sealed class AdminUserService(
         await store.SetPasswordHashAsync(user.Id, hasher.Hash(password!), cancellationToken)
             .ConfigureAwait(false);
 
+        // **本人がパスワードを決めたので「設定済み」にする**（Issue #1086）。
+        // SAML・Pleasanter の JIT 管理者へ招待を出し直して、パスワードを持たせた場合もここで直る
+        await settings.SetPasswordSetAsync(user.Id, true, cancellationToken).ConfigureAwait(false);
+
         logger.LogInformation("招待からパスワードを決めた（AdminUserId={AdminUserId}）", user.Id);
         return (AdminUserOutcome.Succeeded, user, null);
     }
@@ -275,6 +288,7 @@ public sealed class AdminUserService(
 
         await store.SetPasswordHashAsync(actorId, hasher.Hash(newPassword!), cancellationToken)
             .ConfigureAwait(false);
+        await settings.SetPasswordSetAsync(actorId, true, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation("パスワードを変えた（AdminUserId={AdminUserId}）", actorId);
         return AdminUserOutcome.Succeeded;
@@ -351,6 +365,58 @@ public sealed class AdminUserService(
 
         logger.LogInformation(
             "管理者を止めた（AdminUserId={AdminUserId}、操作したのは {ActorId}）", targetId, actorId);
+        return AdminUserOutcome.Succeeded;
+    }
+
+    /// <summary>
+    /// 「パスワードなし（SSO のみ）」の印を付ける・外す（Issue #1086）。
+    /// すでにいる JIT 管理者（SAML・Pleasanter のログインで作られた人）を、管理者が明示して直すための操作。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>印はログインの成否を変えない。</b>パスワードのハッシュには触れず、セッションも失効させない。
+    /// 変わるのは、パスキーの最後の 1 件を消してよいかの判定でパスワードを数えるかだけ。
+    /// だから、パスワードで入っている管理者へ誤って付けても、<b>締め出さない</b>
+    /// （最後のパスキーを消せなくなる、安全側へ倒れるだけ）。
+    /// </para>
+    /// <para>
+    /// <b>自分自身へ「パスワードあり」に戻す操作は通さない。</b>本人がパスワードを知らないまま印だけを戻すと、
+    /// 最後のパスキーを消して締め出される。他の管理者の役割・停止を自分へ行えないのと同じ考え方
+    /// （<see cref="AdminUserOutcome.SelfNotAllowed"/>）。自分を「パスワードなし」にする向きは安全側なので通す。
+    /// 他人を「パスワードあり」へ戻すのは、誤って付けた印を直す道として残す（ユーザー管理の権限を持つ管理者の明示の操作）。
+    /// </para>
+    /// <para>切り替えは自動では行わない（ログイン時の自動修正は、パスワードを持つ管理者を誤って直すおそれがあるため採らない）。</para>
+    /// </remarks>
+    public async Task<AdminUserOutcome> SetPasswordlessAsync(
+        Guid actorId,
+        Guid targetId,
+        bool passwordless,
+        CancellationToken cancellationToken = default)
+    {
+        var target = await store.FindByIdAsync(targetId, cancellationToken).ConfigureAwait(false);
+        if (target is null)
+        {
+            return AdminUserOutcome.NotFound;
+        }
+
+        // **自分を「パスワードあり」へ戻す操作は通さない。** 知らない印を自分で立てて締め出される道を作らない
+        if (!passwordless && targetId == actorId)
+        {
+            return AdminUserOutcome.SelfNotAllowed;
+        }
+
+        if (await settings.GetPasswordSetAsync(targetId, cancellationToken).ConfigureAwait(false) == !passwordless)
+        {
+            return AdminUserOutcome.Succeeded;
+        }
+
+        await settings.SetPasswordSetAsync(targetId, !passwordless, cancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation(
+            "パスワードなし（SSO のみ）の印を切り替えた（AdminUserId={AdminUserId}、パスワードなし={Passwordless}、操作したのは {ActorId}）",
+            targetId,
+            passwordless,
+            actorId);
         return AdminUserOutcome.Succeeded;
     }
 

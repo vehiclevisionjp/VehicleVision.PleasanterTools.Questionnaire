@@ -47,6 +47,7 @@ public class SamlAuthenticatorTests
             time,
             new SamlAuthenticator(
                 store,
+                store,
                 hasher,
                 new StaticSamlOptionsProvider(options),
                 new AdminAuthOptions { TwoFactor = twoFactor },
@@ -198,6 +199,27 @@ public class SamlAuthenticatorTests
         Assert.NotEmpty(passwordHash);
         Assert.False(harness.Hasher.Verify(string.Empty, passwordHash).Verified);
         Assert.False(harness.Hasher.Verify(LoginId, passwordHash).Verified);
+    }
+
+    [Fact]
+    public async Task 登録した管理者はパスワード未設定の印を付け_すでに居た管理者の印には触れない()
+    {
+        var harness = Create(Options(SamlUnknownUserPolicy.Register));
+
+        var registered = await harness.Authenticator.SignInAsync(LoginId);
+        Assert.True(registered.Registered);
+        Assert.False(await harness.Store.GetPasswordSetAsync(registered.User!.Id));
+
+        // パスワードで入っている管理者（印は設定済み）が SAML で来ても、未設定にしない
+        var existing = await harness.Store.CreateAsync("pw@example.jp", harness.Hasher.Hash("pw"), "Editor", "");
+        var result = await harness.Authenticator.SignInAsync("pw@example.jp");
+        Assert.False(result.Registered);
+        Assert.True(await harness.Store.GetPasswordSetAsync(existing!.Id));
+
+        // 二度目のログインで、印を書き換えない（管理者が設定済みへ直したものを戻さない）
+        await harness.Store.SetPasswordSetAsync(registered.User!.Id, true);
+        await harness.Authenticator.SignInAsync(LoginId);
+        Assert.True(await harness.Store.GetPasswordSetAsync(registered.User!.Id));
     }
 
     [Fact]

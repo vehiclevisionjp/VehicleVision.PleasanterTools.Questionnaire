@@ -28,6 +28,7 @@ public class PleasanterSsoAuthenticatorTests
             time,
             new PleasanterSsoAuthenticator(
                 store,
+                store,
                 hasher,
                 new AdminAuthOptions { TwoFactor = twoFactor },
                 time,
@@ -139,6 +140,9 @@ public class PleasanterSsoAuthenticatorTests
         var (_, passwordHash) = (await harness.Store.FindForLoginAsync(LoginId))!.Value;
         Assert.False(harness.Hasher.Verify(string.Empty, passwordHash).Verified);
         Assert.False(harness.Hasher.Verify(LoginId, passwordHash).Verified);
+
+        // **パスワード未設定の印が付く**（Issue #1086）。最後のパスキーを消した JIT 管理者を締め出さないため
+        Assert.False(await harness.Store.GetPasswordSetAsync(stored.Id));
     }
 
     [Theory]
