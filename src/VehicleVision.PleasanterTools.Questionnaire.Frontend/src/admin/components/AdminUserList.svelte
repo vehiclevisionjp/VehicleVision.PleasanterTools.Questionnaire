@@ -10,6 +10,7 @@
     inviteAdminUser,
     listAdminUsers,
     reissueInvitation,
+    resetAdminUserPasskeys,
     resetAdminUserTwoFactor,
     setAdminUserDisabled,
     setAdminUserRole,
@@ -19,8 +20,10 @@
     canChangeRole,
     canDisable,
     canReissueInvitation,
+    canResetPasskeys,
     canResetTwoFactor,
     invitationUrl,
+    resetPasskeysFailureKey,
     roleLabel,
   } from '../lib/adminUsers';
   import AdminSessionList from './AdminSessionList.svelte';
@@ -37,16 +40,34 @@
     canWrite: boolean;
     /** 他人の 2 要素を解除できるか（`users.resetTwoFactor`）。 */
     canReset: boolean;
+    /** 他人のパスキーをすべて削除できるか（`users.resetPasskeys`。Issue #1087）。 */
+    canResetPasskeys?: boolean;
+    /** パスキーが有効か（`GET /api/admin/session` の `passkeyEnabled`）。無効の間は復旧の口が 404 なので出さない。 */
+    passkeyEnabled?: boolean;
     /** API キー（個人トークン）の機能が有効か（Issue #1025）。 */
     apiTokensEnabled?: boolean;
     onback: () => void;
   }
 
-  let { ownAdminUserId, canWrite, canReset, apiTokensEnabled = false }: Props = $props();
+  let {
+    ownAdminUserId,
+    canWrite,
+    canReset,
+    canResetPasskeys: canResetPasskeysPermission = false,
+    passkeyEnabled = false,
+    apiTokensEnabled = false,
+  }: Props = $props();
+
+  /** パスキーの列と復旧の操作を出すか。**権限があり、パスキーが有効のときだけ**（件数もこの条件でしか来ない）。 */
+  const showPasskeys = $derived(canResetPasskeysPermission && passkeyEnabled);
+  /** 表の列数（展開行の `colspan`）。 */
+  const columnCount = $derived(showPasskeys ? 7 : 6);
 
   let users = $state<AdminUserRow[]>([]);
   let loading = $state(true);
   let error = $state('');
+  /** 復旧の結果（削除した件数）。**次の操作を始めるまで出しておく。** */
+  let notice = $state('');
   let busy = $state('');
   let sessionsFor = $state('');
   let apiTokensFor = $state('');
@@ -84,6 +105,7 @@
   async function run(key: string, action: () => Promise<{ ok: boolean; message?: string }>) {
     busy = key;
     error = '';
+    notice = '';
     const result = await action();
     busy = '';
 
@@ -113,6 +135,45 @@
     issued = result.value;
     newLoginId = '';
     await refresh();
+  }
+
+  /**
+   * 他人のパスキーをすべて削除する（復旧。Issue #1087）。
+   *
+   * **確認で「誰の・何件か」「元に戻せない」「全端末がログアウトされる」を伝える。**
+   * 結果は、**サーバが数えた削除件数**を出す（確認してから実行までの間に件数が変わることがある）。
+   * ⚠️ **一覧の再読み込みは `error` を消すので、失敗の文言は読み込みの後に出す。**
+   */
+  async function resetPasskeys(user: AdminUserRow) {
+    const confirmed = await confirmAction({
+      title: t('users.resetPasskeys'),
+      message: t('users.confirmResetPasskeys', {
+        loginId: user.loginId,
+        count: user.passkeyCount ?? 0,
+      }),
+      confirmLabel: t('users.resetPasskeysConfirmLabel'),
+      danger: true,
+      // **取り返しのつかない削除。** 初期の focus はキャンセルへ置く
+      focusCancel: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    busy = `passkeys:${user.adminUserId}`;
+    error = '';
+    notice = '';
+    const result = await resetAdminUserPasskeys(user.adminUserId);
+    busy = '';
+
+    // 失敗でも、相手の状態が変わっていることがあるので読み直す
+    await refresh();
+    if (!result.ok) {
+      error = t(resetPasskeysFailureKey(result.status, result.body));
+      return;
+    }
+
+    notice = t('users.passkeysReset', { loginId: user.loginId, count: result.value.removed });
   }
 
   function loginIdOf(adminUserId: string): string {
@@ -178,6 +239,7 @@
   {/if}
 
   {#if error}<p class="error" role="alert">{error}</p>{/if}
+  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
 
   {#if loading}
     <p class="status">{t('users.loading')}</p>
@@ -192,6 +254,7 @@
             <th>{t('users.column.role')}</th>
             <th>{t('users.column.state')}</th>
             <th>{t('users.column.twoFactor')}</th>
+            {#if showPasskeys}<th>{t('users.column.passkeys')}</th>{/if}
             <th>{t('users.column.lastLogin')}</th>
             <th>{t('users.column.actions')}</th>
           </tr>
@@ -245,6 +308,13 @@
               </td>
 
               <td>{user.hasTotp ? t('users.twoFactor.on') : t('users.twoFactor.off')}</td>
+              {#if showPasskeys}
+                <td>
+                  {(user.passkeyCount ?? 0) > 0
+                    ? t('users.passkeys.count', { count: user.passkeyCount ?? 0 })
+                    : t('users.passkeys.none')}
+                </td>
+              {/if}
               <td class="when">{when(user.lastLoginAt)}</td>
 
               <td class="actions">
@@ -339,6 +409,18 @@
                   </button>
                 {/if}
 
+                {#if showPasskeys && canResetPasskeys(user, ownAdminUserId)}
+                  <!-- ⚠️ **取り返しのつかない操作。** 押す前に確かめ、記録に残ることも伝える。自分の分は出さない -->
+                  <button
+                    type="button"
+                    class="link danger"
+                    disabled={busy !== ''}
+                    onclick={() => void resetPasskeys(user)}
+                  >
+                    {t('users.resetPasskeys')}
+                  </button>
+                {/if}
+
                 {#if user.adminUserId !== ownAdminUserId && !user.invitationPending}
                   <button
                     type="button"
@@ -362,14 +444,14 @@
             </tr>
             {#if sessionsFor === user.adminUserId}
               <tr>
-                <td colspan="6">
+                <td colspan={columnCount}>
                   <AdminSessionList adminUserId={user.adminUserId} canRevoke={canWrite} />
                 </td>
               </tr>
             {/if}
             {#if apiTokensFor === user.adminUserId}
               <tr>
-                <td colspan="6">
+                <td colspan={columnCount}>
                   <AdminUserApiTokens adminUserId={user.adminUserId} canRevoke={canWrite} />
                 </td>
               </tr>
@@ -556,6 +638,11 @@
 
   .error {
     color: var(--error);
+    font-size: 0.9rem;
+  }
+
+  .notice {
+    color: var(--success);
     font-size: 0.9rem;
   }
 

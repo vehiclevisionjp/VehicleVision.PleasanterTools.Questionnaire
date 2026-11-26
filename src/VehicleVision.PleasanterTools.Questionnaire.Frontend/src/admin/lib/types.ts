@@ -805,6 +805,7 @@ export type AdminPermission =
   | 'users.read'
   | 'users.write'
   | 'users.resetTwoFactor'
+  | 'users.resetPasskeys'
   | 'settings.saml'
   | 'settings.pleasanterSso'
   | 'settings.manage'
@@ -928,6 +929,13 @@ export interface AdminUserRow {
   isDisabled: boolean;
   /** 2 要素を登録しているか。**共有鍵そのものは返らない** */
   hasTotp: boolean;
+  /**
+   * 登録しているパスキーの件数（Issue #1087）。
+   *
+   * ⚠️ **`users.resetPasskeys` を持つ相手にだけ、パスキーが有効のときだけ来る**（それ以外は項目そのものが来ない）。
+   * 復旧の確認ダイアログに「何件消すか」を出すために要る。**名前・資格情報 ID は来ない**
+   */
+  passkeyCount?: number;
   /** まだ招待を受け取っていない（＝一度も入っていない） */
   invitationPending: boolean;
   /**

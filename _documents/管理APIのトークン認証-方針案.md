@@ -87,7 +87,7 @@ cookie `q.admin` を得る。[`非機能設計.md`](非機能設計.md) 1 章「
 | `surveys.delete` | **不可** | 完全削除は `Administrator` の画面操作に限る |
 | `surveys.deleteTestResponses` | **不可** | Pleasanter のレコードを消す取り消せない操作。画面操作に限る |
 | `lookups.manage` | **不可** | ルックアップ専用の API キーを扱う |
-| `users.*`・`users.resetTwoFactor` | **不可** | 乗っ取りの足場になる。トークンで人・2 要素を触らせない |
+| `users.*`・`users.resetTwoFactor`・`users.resetPasskeys` | **不可** | 乗っ取りの足場になる。トークンで人・2 要素・パスキーを触らせない |
 | `settings.*`・`maintenance.manage` | **不可** | SAML・SSO・アプリ設定・メンテナンス |
 | `audit.read`・`outbox.*`・`notifications.read`・`templates.*` | **不可（初版）** | 範囲外。必要になったら別 Issue |
 | **トークンの発行・失効そのもの** | **不可** | **トークンでトークンを作らせない**（足場の増殖を防ぐ） |
